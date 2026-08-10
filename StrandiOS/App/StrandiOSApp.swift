@@ -257,6 +257,11 @@ struct StrandiOSApp: App {
                 // into Apple Health. Gated inside writeIfEnabled on the opt-in default (OFF) — a
                 // no-op until the user turns on Shortcuts Export.
                 Task { await ShortcutHealthExport.writeIfEnabled(repo: model.repo) }
+                // …and the two SESSION sibling files (noop_sleep.txt / noop_workouts.txt) next to it,
+                // so a sideloaded install without the HealthKit entitlement can get sleep stages and
+                // workouts into Health too, not just the sampled HR/HRV/steps windows. Shares the same
+                // opt-in toggle and the same one-way, advance-only-on-success watermark discipline.
+                Task { await ShortcutSessionExport.writeIfEnabled(repo: model.repo) }
             }
         }
     }
