@@ -671,7 +671,19 @@ public enum SleepStager {
         let local = center + tzOffsetSeconds
         let secOfDay = ((local % secondsPerDay) + secondsPerDay) % secondsPerDay
         let hour = secOfDay / 3_600
-        return hour >= daytimeBandStartHour && hour < daytimeBandEndHour
+        return hourInBand(hour, start: daytimeBandStartHour, end: daytimeBandEndHour)
+    }
+
+    /// True when `hour` falls in the local band `[start, end)`, handling a band that WRAPS midnight.
+    ///
+    /// The default band (11:00–20:00) does not wrap, and for it this is exactly the previous
+    /// `hour >= start && hour < end` — behaviour at the shipped constants is unchanged. The wrapping
+    /// branch exists because the band is really "the hours you are normally AWAKE", and for a night-shift
+    /// wearer those hours straddle midnight (e.g. 19:00 → 12:00). Without it, retuning the constants for
+    /// such a schedule silently makes the predicate ALWAYS FALSE — which does not shift the guard, it
+    /// disables it, letting every sedentary stretch through as sleep.
+    static func hourInBand(_ hour: Int, start: Int, end: Int) -> Bool {
+        start <= end ? (hour >= start && hour < end) : (hour >= start || hour < end)
     }
 
     /// True when a run's ONSET (start), in LOCAL time, falls OUTSIDE the daytime band — i.e.
@@ -681,7 +693,7 @@ public enum SleepStager {
         let local = start + tzOffsetSeconds
         let secOfDay = ((local % secondsPerDay) + secondsPerDay) % secondsPerDay
         let hour = secOfDay / 3_600
-        return !(hour >= daytimeBandStartHour && hour < daytimeBandEndHour)
+        return !hourInBand(hour, start: daytimeBandStartHour, end: daytimeBandEndHour)
     }
 
     /// Stricter bar for a daytime-centered window (#90). A real daytime nap clears it; a
