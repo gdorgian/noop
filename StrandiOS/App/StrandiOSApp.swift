@@ -77,7 +77,18 @@ struct StrandiOSApp: App {
         // scenePhase pass below starts the offload and wrote to Health in parallel with it, so a night
         // synced on open only reached Health at the next launch. Weak so the scene owns the bridge's
         // lifetime; the bridge no-ops unless Health was authorized.
-        model.healthWriteBack = { [weak bridge] in await bridge?.writeBackAfterNewData() }
+        // #1021: publish to Apple Health when an offload lands. The Shortcuts drop files ride the SAME
+        // hook rather than only the scenePhase .background transition — this app runs with
+        // bluetooth-central, so the process stays alive collecting while backgrounded, and without this
+        // the files went stale for as long as the wearer went without opening the app. Both writers are
+        // gated on the Shortcuts Export opt-in, so this is a no-op until it is turned on.
+        model.healthWriteBack = { [weak bridge, weak model] in
+            await bridge?.writeBackAfterNewData()
+            if let repo = model?.repo {
+                await ShortcutHealthExport.writeIfEnabled(repo: repo)
+                await ShortcutSessionExport.writeIfEnabled(repo: repo)
+            }
+        }
     }
 
     var body: some Scene {
