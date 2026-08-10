@@ -240,7 +240,11 @@ public enum SleepStageTotals {
         let local = ts + offsetSec
         let secOfDay = ((local % secondsPerDay) + secondsPerDay) % secondsPerDay
         let hour = secOfDay / 3_600
-        return hour >= overnightStartHour || hour < overnightEndHour
+        // Shares `SleepStager.hourInBand` so the selector and the detector stay reconciled (#547) even
+        // when the constants are retuned. At the shipped 20:00 → 11:00 band this is exactly the previous
+        // `hour >= start || hour < end`; the helper additionally handles a NON-wrapping sleep window
+        // (e.g. a day-sleeper's 10:00 → 21:00), where the old form was true almost everywhere.
+        return SleepStager.hourInBand(hour, start: overnightStartHour, end: overnightEndHour)
     }
 
     /// Local time-of-day, in seconds [0, 86400), of a unix timestamp shifted east by `offsetSec`.
