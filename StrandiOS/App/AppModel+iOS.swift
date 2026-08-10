@@ -12,6 +12,14 @@ extension AppModel {
             // The one-shot routine sends the confirmed pattern + RUN_ALARM sequence, acked, so a
             // busy just-foregrounded BLE link can't silently drop it.
             case .buzz:       buzzStrapOnce()
+            // Both drop-file writers are gated on the same Shortcuts Export opt-in, so this is a no-op
+            // until the wearer turns it on. Fire-and-forget: the Shortcut that raised this intent reads
+            // the files on its next step, and a slow store read must not block the drain.
+            case .exportHealth:
+                Task { [repo] in
+                    await ShortcutHealthExport.writeIfEnabled(repo: repo)
+                    await ShortcutSessionExport.writeIfEnabled(repo: repo)
+                }
             }
         }
     }

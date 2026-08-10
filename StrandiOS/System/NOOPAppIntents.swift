@@ -6,7 +6,7 @@ import AppIntents
 /// into the running `AppModel` directly (BLE only lives in the foreground app), so they enqueue here
 /// and the app drains the queue when it next becomes active.
 enum PendingIntents {
-    enum Action: String { case markMoment, buzz }
+    enum Action: String { case markMoment, buzz, exportHealth }
 
     private static let key = "noop.pendingIntents"
     private static var defaults: UserDefaults? { UserDefaults(suiteName: WidgetSnapshot.suiteName) }
@@ -62,6 +62,29 @@ struct BuzzStrapIntent: AppIntent {
     }
 }
 
+/// Rewrite the Shortcuts drop files (`noop_sync.txt`, `noop_sleep.txt`, `noop_workouts.txt`) on demand,
+/// so a Shortcut can refresh them and read them back in a single automation.
+///
+/// Without this the files only refresh when the app moves to the BACKGROUND, which couples export to app
+/// usage: go a day without opening NOOP and a time-based automation reads a stale (or, once the watermark
+/// has truncated it, empty) file. The offload-landed hook in `StrandiOSApp` covers the common case; this
+/// covers "give me everything up to now, right now".
+///
+/// `openAppWhenRun` because the export reads the on-device store through the app's `Repository`, which
+/// only exists in the app process — the same reason `BuzzStrapIntent` opens the app for BLE. It respects
+/// the Shortcuts Export opt-in: with the toggle off this writes nothing.
+struct RefreshHealthExportIntent: AppIntent {
+    static var title: LocalizedStringResource = "Refresh Health Export"
+    static var description = IntentDescription(
+        "Update NOOP's Shortcuts export files with any new heart rate, HRV, steps, sleep and workouts.")
+    static var openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult {
+        PendingIntents.append(.exportHealth)
+        return .result()
+    }
+}
+
 /// Surfaces NOOP's intents to Siri, Spotlight, and the Shortcuts gallery without any user setup.
 struct NOOPShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
@@ -73,6 +96,10 @@ struct NOOPShortcuts: AppShortcutsProvider {
                     phrases: ["Buzz my \(.applicationName) strap"],
                     shortTitle: "Buzz Strap",
                     systemImageName: "waveform.path")
+        AppShortcut(intent: RefreshHealthExportIntent(),
+                    phrases: ["Refresh my \(.applicationName) health export"],
+                    shortTitle: "Refresh Health Export",
+                    systemImageName: "square.and.arrow.up.on.square")
     }
 }
 #endif
