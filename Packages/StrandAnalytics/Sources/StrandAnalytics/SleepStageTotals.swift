@@ -138,11 +138,17 @@ public enum SleepStageTotals {
     /// detector's `SleepStager.isOvernightOnset` window [20:00, 11:00) so the selector and detector agree
     /// (this removes the old [10:00, 11:00) off-by-one where the detector kept a ~10:30 onset as "night"
     /// but the selector demoted it to a nap). (#547)
-    public static let overnightStartHour = 20
-    /// Local hour (exclusive) that closes the cold-start overnight band. Now 11 (was 10) to match the
-    /// detector's [20:00, 11:00) onset window. A block onset in [`overnightEndHour`, `overnightStartHour`)
-    /// is daytime; everything else is overnight.
-    public static let overnightEndHour = 11
+    ///
+    /// Now DERIVED from `SleepSchedule.current` as the complement of the awake band, rather than being a
+    /// second pair of constants kept in step with the detector's by hand — the reconciliation #547 had to
+    /// perform (and which had already drifted once, the [10:00, 11:00) off-by-one) is now structural and
+    /// cannot desynchronise. `.dayWorker` yields 20, the previous constant.
+    public static var overnightStartHour: Int { SleepSchedule.current.sleepWindow.startHour }
+    /// Local hour (exclusive) that closes the cold-start overnight band. A block onset in
+    /// [`overnightEndHour`, `overnightStartHour`) is daytime; everything else is overnight.
+    ///
+    /// Derived from `SleepSchedule.current`; `.dayWorker` yields 11, the previous constant.
+    public static var overnightEndHour: Int { SleepSchedule.current.sleepWindow.endHour }
 
     /// Seconds in a day, for circular time-of-day math.
     public static let secondsPerDay = 86_400

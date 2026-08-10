@@ -87,10 +87,16 @@ public enum SleepStager {
     // stretch keeps a near-baseline HR). Overnight windows are UNCHANGED.
 
     /// Local hour (inclusive) at which the stricter daytime bar begins.
-    public static let daytimeBandStartHour: Int = 11
+    ///
+    /// Derived from `SleepSchedule.current`, which defaults to `.dayWorker` (11) — so this is the same
+    /// value it was as a constant unless the host sets a schedule. See `SleepSchedule` for why the band
+    /// is a setting: it is "when the wearer is awake", which a night-shift wearer inverts.
+    public static var daytimeBandStartHour: Int { SleepSchedule.current.awakeStartHour }
     /// Local hour (exclusive) at which the stricter daytime bar ends. A window whose center
     /// is in [start, end) local hours is "daytime"; everything else is "overnight".
-    public static let daytimeBandEndHour: Int = 20
+    ///
+    /// Derived from `SleepSchedule.current`; `.dayWorker` gives 20, the previous constant.
+    public static var daytimeBandEndHour: Int { SleepSchedule.current.awakeEndHour }
     /// A still sleep run that resumes within this gap of an overnight sleep chain is the
     /// night's TAIL — a late wake past the daytime-band start, or a brief morning stir then
     /// back to sleep — not an isolated daytime nap, so it skips the daytime guard. Without
