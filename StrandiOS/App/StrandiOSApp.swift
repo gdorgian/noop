@@ -38,6 +38,10 @@ struct StrandiOSApp: App {
     @AppStorage(UnitPrefs.effortScaleKey) private var effortScaleRaw = EffortScale.hundred.rawValue
 
     init() {
+        // Install the wearer's awake window before ANYTHING stages a night: the daytime false-sleep
+        // guard (#90) and the cold-start midsleep anchor (#547) both derive from it, and a pass that
+        // ran under the default schedule would have to be re-analysed to correct itself.
+        SleepSchedulePrefs.apply()
         // #1008: pin the pre-change Overnight-only default for existing installs before
         // anything reads it. Idempotent; a no-op on fresh installs and after the first launch.
         PuffinExperiment.migrateContinuousHrvOvernightDefault()
