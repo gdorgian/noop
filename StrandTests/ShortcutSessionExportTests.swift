@@ -153,8 +153,8 @@ final class ShortcutSessionExportTests: XCTestCase {
         """
         let lines = ShortcutSessionExport.renderSleep([sleep(100, 700, stages: stages)], timeZone: utc)
         XCTAssertEqual(lines, [
-            "light,1970-01-01 00:01:40,1970-01-01 00:06:40",
-            "deep,1970-01-01 00:06:40,1970-01-01 00:11:40",
+            "light,1970-01-01 00:01:40,1970-01-01 00:06:40,Asleep",
+            "deep,1970-01-01 00:06:40,1970-01-01 00:11:40,Asleep",
         ])
     }
 
@@ -169,11 +169,11 @@ final class ShortcutSessionExportTests: XCTestCase {
     // than fabricated stage positions — the same honest fallback the HealthKit bridge makes.
     func testSleepWithoutStageTimingFallsBackToOneUnspecifiedBlock() {
         XCTAssertEqual(ShortcutSessionExport.renderSleep([sleep(0, 600)], timeZone: utc),
-                       ["unspecified,1970-01-01 00:00:00,1970-01-01 00:10:00"])
+                       ["unspecified,1970-01-01 00:00:00,1970-01-01 00:10:00,Asleep"])
         // The aggregate minute-dict shape carries no positions either.
         XCTAssertEqual(ShortcutSessionExport.renderSleep(
             [sleep(0, 600, stages: #"{"deep":30,"light":90}"#)], timeZone: utc),
-                       ["unspecified,1970-01-01 00:00:00,1970-01-01 00:10:00"])
+                       ["unspecified,1970-01-01 00:00:00,1970-01-01 00:10:00,Asleep"])
     }
 
     // #318: a hand-corrected onset drives the exported span; startTs stays the immutable key.
@@ -182,7 +182,7 @@ final class ShortcutSessionExportTests: XCTestCase {
                                    avgHrv: nil, stagesJSON: nil, userEdited: true,
                                    startTsAdjusted: 300)
         XCTAssertEqual(ShortcutSessionExport.renderSleep([s], timeZone: utc),
-                       ["unspecified,1970-01-01 00:05:00,1970-01-01 00:10:00"])
+                       ["unspecified,1970-01-01 00:05:00,1970-01-01 00:10:00,Asleep"])
     }
 
     func testSleepDropsZeroLengthSessions() {
@@ -257,7 +257,7 @@ final class ShortcutSessionExportTests: XCTestCase {
         // literal stamp rendering is pinned by testTimestampUsesGivenZone.
         XCTAssertEqual(try text(ShortcutSessionExport.sleepFileName),
                        "unspecified,\(ShortcutSessionExport.stamp(nightStart, utc))," +
-                       "\(ShortcutSessionExport.stamp(nightEnd, utc))")
+                       "\(ShortcutSessionExport.stamp(nightEnd, utc)),Asleep")
     }
 
     // MARK: - File semantics
