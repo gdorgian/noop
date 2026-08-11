@@ -15,8 +15,21 @@ extension AppModel {
             // Both drop-file writers are gated on the same Shortcuts Export opt-in, so this is a no-op
             // until the wearer turns it on. Fire-and-forget: the Shortcut that raised this intent reads
             // the files on its next step, and a slow store read must not block the drain.
+            // A refresh CONFIRMS the previous batch before writing the next one.
+            //
+            // "Refresh" is raised by a Shortcut that is about to read the files, so whatever it was
+            // handed last time it has already logged. Acknowledging here means the Shortcut does not
+            // have to delete the files to acknowledge them — and file deletion is the one step iOS
+            // prompts for on EVERY run, which is what stops an automation being unattended.
+            //
+            // The trade-off is bounded and deliberate: if a run refreshes and then dies before logging,
+            // that one batch is acknowledged without reaching Health. Settings → Shortcuts Export →
+            // "Re-export the last 7 days" recovers it. Losing at most one batch to a crash beats
+            // requiring a human tap on every single run.
             case .exportHealth:
                 Task { [repo] in
+                    ShortcutHealthExport.confirm()
+                    ShortcutSessionExport.confirm()
                     await ShortcutHealthExport.writeIfEnabled(repo: repo)
                     await ShortcutSessionExport.writeIfEnabled(repo: repo)
                 }
