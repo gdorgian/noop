@@ -305,11 +305,28 @@ enum ShortcutSessionExport {
                                                            sessionStart: start,
                                                            sessionEnd: s.endTs)
             guard !intervals.isEmpty else {
-                return ["unspecified,\(stamp(start, timeZone)),\(stamp(s.endTs, timeZone))"]
+                return ["unspecified,\(stamp(start, timeZone)),\(stamp(s.endTs, timeZone))," +
+                        "\(healthState(for: .unspecified))"]
             }
             return intervals.map {
-                "\($0.kind.rawValue),\(stamp($0.start, timeZone)),\(stamp($0.end, timeZone))"
+                "\($0.kind.rawValue),\(stamp($0.start, timeZone)),\(stamp($0.end, timeZone))," +
+                "\(healthState(for: $0.kind))"
             }
+        }
+    }
+
+    /// Column 4: the stage collapsed to the vocabulary the Shortcuts "Log Health Sample → Sleep"
+    /// picker actually offers — **Awake / In Bed / Asleep**, and nothing else.
+    ///
+    /// Shortcuts cannot write the staged categories (`asleepCore` / `asleepDeep` / `asleepREM`) that the
+    /// entitled HealthKit path can, so a sideloaded install has to collapse them. Doing it HERE rather
+    /// than in the Shortcut keeps the true stage in column 1 — nothing is lost from the file, a future
+    /// consumer that can write stages just reads the other column — and leaves the Shortcut with a value
+    /// it passes straight through, with no mapping logic to get wrong.
+    static func healthState(for kind: HealthWriteback.StageKind) -> String {
+        switch kind {
+        case .awake: return "Awake"
+        case .light, .deep, .rem, .unspecified: return "Asleep"
         }
     }
 
