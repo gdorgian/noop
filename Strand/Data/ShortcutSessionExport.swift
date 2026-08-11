@@ -44,6 +44,23 @@ enum ShortcutSessionExport {
 
     static let sleepFileName = "noop_sleep.txt"
     static let workoutFileName = "noop_workouts.txt"
+    /// Per-night vitals that are single values rather than spans or samples — `metric,value,start,end`.
+    ///
+    /// One generic file rather than one file per metric: the Shortcut loops it once and branches on the
+    /// metric name, and a new vital costs a row type instead of a new file and a new loop. Values are
+    /// anchored to the SLEEP SESSION they describe, because that is the window they were measured over —
+    /// Apple Health wants an interval, and a bare day would place a night's respiration at midnight.
+    static let vitalsFileName = "noop_vitals.txt"
+
+    /// Metric labels used in `noop_vitals.txt`. Stable strings — a Shortcut matches on them.
+    enum Vital: String {
+        /// Breaths per minute during sleep, estimated on-device from the R-R stream (RSA). The 5.0 sends
+        /// no raw respiration channel, so this is the only respiration NOOP has — and it is real, not a
+        /// placeholder. Maps to Apple Health's Respiratory Rate.
+        case respiratoryRate = "respiratory_rate"
+        /// Resting heart rate for the night, already carried on the sleep session.
+        case restingHR = "resting_hr"
+    }
 
     /// Catch-up bound, mirroring the window exporter: never reach further back than 7 days.
     static let lookbackSeconds = ShortcutHealthExport.lookbackSeconds
@@ -93,6 +110,10 @@ enum ShortcutSessionExport {
     @discardableResult
     static func export(source: ShortcutSessionReads, deviceId: String, now: Date,
                        defaults: UserDefaults, directory: URL, timeZone: TimeZone) async -> Outcome {
+        // Deletion IS acknowledgement — see the twin in `ShortcutHealthExport`. Checked per stream so a
+        // Shortcut that consumes sleep but not workouts acks only what it took.
+        acknowledgeDeletedFiles(defaults: defaults, directory: directory)
+
         let nowTs = Int(now.timeIntervalSince1970)
         let horizon = nowTs - settleSeconds
         let floor = nowTs - lookbackSeconds
@@ -123,8 +144,20 @@ enum ShortcutSessionExport {
             let freshSleep = selectSleep(sleeps, watermark: sleepMark, horizon: horizon)
             let freshWorkouts = selectWorkouts(workouts, watermark: workoutMark, horizon: horizon)
 
+            // Per-night vitals ride the SLEEP selection: same sessions, same watermark, so a night's
+            // respiration cannot be exported before (or after) the night it describes.
+            var dailies: [DailyMetric] = []
+            if let first = freshSleep.first, let last = freshSleep.last {
+                let fromDay = dayString(first.effectiveStartTs, timeZone: timeZone)
+                let toDay = dayString(last.endTs, timeZone: timeZone)
+                for id in ids {
+                    dailies += try await source.dailyMetrics(deviceId: id, from: fromDay, to: toDay)
+                }
+            }
+
             let sleepLines = renderSleep(freshSleep, timeZone: timeZone)
             let workoutLines = renderWorkouts(freshWorkouts, timeZone: timeZone)
+            let vitalsLines = renderVitals(freshSleep, dailies: dailies, timeZone: timeZone)
 
             // Full-file replace even when empty. The Shortcut has no dedup and its automation fires on
             // every app close, so stale rows left behind would be re-logged into Health on the next
@@ -133,6 +166,8 @@ enum ShortcutSessionExport {
                 .write(to: directory.appendingPathComponent(sleepFileName), options: .atomic)
             try Data(workoutLines.joined(separator: "\n").utf8)
                 .write(to: directory.appendingPathComponent(workoutFileName), options: .atomic)
+            try Data(vitalsLines.joined(separator: "\n").utf8)
+                .write(to: directory.appendingPathComponent(vitalsFileName), options: .atomic)
 
             // PENDING, not confirmed — only after both writes landed, and only to what we emitted.
             // `confirm(...)` promotes these once the Shortcut has logged the rows.
@@ -180,6 +215,65 @@ enum ShortcutSessionExport {
     /// The strap id and its NOOP-computed sibling, in a stable order. `apple-health` /
     /// `health-connect` are deliberately absent — see the type doc.
     static func sourceIds(deviceId: String) -> [String] { [deviceId, deviceId + "-noop"] }
+
+    /// Promote pending → confirmed for any stream whose drop file the consumer has DELETED.
+    ///
+    /// A file that is gone was taken; a file still sitting there was not. Per stream, so a Shortcut that
+    /// handles sleep but ignores workouts does not silently acknowledge the workouts it never read.
+    static func acknowledgeDeletedFiles(defaults: UserDefaults, directory: URL) {
+        let fm = FileManager.default
+        for (file, pendingKey, watermarkKey) in [
+            (sleepFileName, sleepPendingKey, sleepWatermarkKey),
+            (workoutFileName, workoutPendingKey, workoutWatermarkKey),
+        ] {
+            let pending = defaults.integer(forKey: pendingKey)
+            guard pending > 0,
+                  !fm.fileExists(atPath: directory.appendingPathComponent(file).path) else { continue }
+            if pending > defaults.integer(forKey: watermarkKey) {
+                defaults.set(pending, forKey: watermarkKey)
+            }
+            defaults.removeObject(forKey: pendingKey)
+        }
+    }
+
+    /// `metric,value,start,end` — one row per per-night vital, anchored to the sleep session it describes.
+    ///
+    /// Respiration comes from the day row (`respRateBpm`, the on-device RSA estimate); resting HR is
+    /// already on the session. A vital with no value is simply not emitted — an absent row is honest,
+    /// where a zero would be logged into Health as a real reading.
+    static func renderVitals(_ sessions: [CachedSleepSession], dailies: [DailyMetric],
+                             timeZone: TimeZone) -> [String] {
+        let byDay = Dictionary(dailies.map { ($0.day, $0) }, uniquingKeysWith: { a, b in
+            // Prefer whichever row actually carries a respiration value; ties keep the first source.
+            a.respRateBpm != nil ? a : b
+        })
+        return sessions.flatMap { s -> [String] in
+            let start = s.effectiveStartTs
+            guard s.endTs > start else { return [] }
+            let stamps = "\(stamp(start, timeZone)),\(stamp(s.endTs, timeZone))"
+            var out: [String] = []
+            if let resp = byDay[dayString(start, timeZone: timeZone)]?.respRateBpm {
+                out.append("\(Vital.respiratoryRate.rawValue),\(String(format: "%.1f", resp)),\(stamps)")
+            }
+            if let rhr = s.restingHr {
+                out.append("\(Vital.restingHR.rawValue),\(rhr),\(stamps)")
+            }
+            return out
+        }
+    }
+
+    /// `yyyy-MM-dd` in the given zone — the key `dailyMetrics` rows are stored under.
+    static func dayString(_ ts: Int, timeZone: TimeZone) -> String {
+        dayFormatter.timeZone = timeZone
+        return dayFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(ts)))
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
 
     /// Sessions strictly newer than the watermark that have also finished settling, oldest first.
     static func selectSleep(_ all: [CachedSleepSession], watermark: Int,
@@ -261,6 +355,9 @@ enum ShortcutSessionExport {
 protocol ShortcutSessionReads {
     func sleepSessions(deviceId: String, from: Int, to: Int, limit: Int) async throws -> [CachedSleepSession]
     func workouts(deviceId: String, from: Int, to: Int, limit: Int) async throws -> [WorkoutRow]
+    /// Day rows, for the per-night vitals that are not carried on the session itself. `from`/`to` are
+    /// `yyyy-MM-dd`.
+    func dailyMetrics(deviceId: String, from: String, to: String) async throws -> [DailyMetric]
 }
 
 extension WhoopStore: ShortcutSessionReads {}
