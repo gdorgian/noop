@@ -22,9 +22,19 @@ enum ShortcutHealthExport {
 
     /// Opt-in gate (default OFF — every automation in NOOP is optional).
     static let enabledKey = "noop.shortcutSync.enabled"
-    /// Exclusive end of the last successfully written coverage, unix seconds. Advances ONLY after
-    /// a successful file write, so a failed export retries the same span next time.
+    /// Exclusive end of the coverage the Shortcut has CONFIRMED it logged into Apple Health. Advances
+    /// only on `confirm(...)` — never on a write — so nothing leaves the file until something has
+    /// actually consumed it.
     static let watermarkKey = "noop.shortcutSync.lastExportTs"
+    /// Exclusive end of what the last successful write PUT IN THE FILE, awaiting confirmation.
+    ///
+    /// The original design advanced the watermark on write, which is correct only if a Shortcut is
+    /// definitely reading between one write and the next. With no Shortcut installed yet — the state
+    /// every user is in while they are still building one — each background transition wrote rows and
+    /// the following one truncated them, silently destroying the span for good. Splitting "written" from
+    /// "confirmed" makes the file accumulate instead: worst case it re-offers the same rows, best case
+    /// the Shortcut acks and they are dropped exactly once.
+    static let pendingKey = "noop.shortcutSync.pendingThroughTs"
     static let fileName = "noop_sync.txt"
     /// Aggregation window: 15 minutes, epoch-aligned — the same boundaries hrBuckets(900) groups by.
     static let windowSeconds = 900
@@ -103,7 +113,9 @@ enum ShortcutHealthExport {
             // behind would be double-logged on its next run.
             try Data(render(windows, timeZone: timeZone).utf8)
                 .write(to: directory.appendingPathComponent(fileName), options: .atomic)
-            defaults.set(span.end, forKey: watermarkKey)   // only after the write landed
+            // PENDING, not confirmed: the rows are in the file but nothing has logged them yet. The
+            // watermark moves in `confirm(...)`, which the Shortcut calls once it has.
+            defaults.set(span.end, forKey: pendingKey)     // only after the write landed
             return .written(lines: windows.count)
         } catch {
             return .failure("Shortcut export failed: \(error.localizedDescription)")
@@ -114,6 +126,22 @@ enum ShortcutHealthExport {
     /// rebuilds their Shortcut or clears its Health entries).
     static func resetWatermark(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: watermarkKey)
+        defaults.removeObject(forKey: pendingKey)
+    }
+
+    /// The Shortcut has logged everything currently in the file: promote pending → confirmed, so the
+    /// next write starts after it. A no-op when nothing is pending, so a double-run cannot skip a span.
+    ///
+    /// Deliberately does NOT re-write the file. The caller (the confirm intent) triggers a fresh export
+    /// afterwards, which produces an empty file when nothing new has accumulated since.
+    static func confirm(defaults: UserDefaults = .standard) {
+        let pending = defaults.integer(forKey: pendingKey)
+        guard pending > 0 else { return }
+        // Monotonic guard: never move the confirmed mark backwards if two confirms race.
+        if pending > defaults.integer(forKey: watermarkKey) {
+            defaults.set(pending, forKey: watermarkKey)
+        }
+        defaults.removeObject(forKey: pendingKey)
     }
 
     // MARK: - Pure logic

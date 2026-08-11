@@ -20,6 +20,15 @@ extension AppModel {
                     await ShortcutHealthExport.writeIfEnabled(repo: repo)
                     await ShortcutSessionExport.writeIfEnabled(repo: repo)
                 }
+            // Promote pending → confirmed, THEN re-export: the rewrite is what actually empties the
+            // files, and it must run after the watermarks have moved or it would re-emit the same span.
+            case .confirmHealthExport:
+                Task { [repo] in
+                    ShortcutHealthExport.confirm()
+                    ShortcutSessionExport.confirm()
+                    await ShortcutHealthExport.writeIfEnabled(repo: repo)
+                    await ShortcutSessionExport.writeIfEnabled(repo: repo)
+                }
             }
         }
     }

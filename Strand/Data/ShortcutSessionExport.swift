@@ -34,9 +34,13 @@ enum ShortcutSessionExport {
 
     /// Shares the window exporter's single opt-in toggle: one switch, all three files.
     static let enabledKey = ShortcutHealthExport.enabledKey
-    /// Highest `startTs` already exported, per stream. Advances ONLY after a successful write.
+    /// Highest `startTs` the Shortcut has CONFIRMED it logged, per stream. Advances only on
+    /// `confirm(...)` — see `ShortcutHealthExport.pendingKey` for why a write must not advance it.
     static let sleepWatermarkKey = "noop.shortcutSync.lastSleepStartTs"
     static let workoutWatermarkKey = "noop.shortcutSync.lastWorkoutStartTs"
+    /// Highest `startTs` the last successful write PUT IN THE FILE, awaiting confirmation.
+    static let sleepPendingKey = "noop.shortcutSync.pendingSleepStartTs"
+    static let workoutPendingKey = "noop.shortcutSync.pendingWorkoutStartTs"
 
     static let sleepFileName = "noop_sleep.txt"
     static let workoutFileName = "noop_workouts.txt"
@@ -130,12 +134,13 @@ enum ShortcutSessionExport {
             try Data(workoutLines.joined(separator: "\n").utf8)
                 .write(to: directory.appendingPathComponent(workoutFileName), options: .atomic)
 
-            // Advance only after both writes landed, and only to what we actually emitted.
+            // PENDING, not confirmed — only after both writes landed, and only to what we emitted.
+            // `confirm(...)` promotes these once the Shortcut has logged the rows.
             if let newest = freshSleep.map(\.startTs).max() {
-                defaults.set(newest, forKey: sleepWatermarkKey)
+                defaults.set(newest, forKey: sleepPendingKey)
             }
             if let newest = freshWorkouts.map(\.startTs).max() {
-                defaults.set(newest, forKey: workoutWatermarkKey)
+                defaults.set(newest, forKey: workoutPendingKey)
             }
 
             if sleepLines.isEmpty && workoutLines.isEmpty { return .nothingNew }
@@ -151,6 +156,23 @@ enum ShortcutSessionExport {
     static func resetWatermarks(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: sleepWatermarkKey)
         defaults.removeObject(forKey: workoutWatermarkKey)
+        defaults.removeObject(forKey: sleepPendingKey)
+        defaults.removeObject(forKey: workoutPendingKey)
+    }
+
+    /// The Shortcut has logged both files: promote pending → confirmed for each stream independently,
+    /// so a night that logged does not wait on a workout that did not. Monotonic and no-op when nothing
+    /// is pending, so a repeated confirm cannot skip a session.
+    static func confirm(defaults: UserDefaults = .standard) {
+        for (pendingKey, watermarkKey) in [(sleepPendingKey, sleepWatermarkKey),
+                                           (workoutPendingKey, workoutWatermarkKey)] {
+            let pending = defaults.integer(forKey: pendingKey)
+            guard pending > 0 else { continue }
+            if pending > defaults.integer(forKey: watermarkKey) {
+                defaults.set(pending, forKey: watermarkKey)
+            }
+            defaults.removeObject(forKey: pendingKey)
+        }
     }
 
     // MARK: - Pure logic
