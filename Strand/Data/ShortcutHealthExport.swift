@@ -89,6 +89,15 @@ enum ShortcutHealthExport {
     @discardableResult
     static func export(source: ShortcutExportReads, deviceId: String, now: Date,
                        defaults: UserDefaults, directory: URL, timeZone: TimeZone) async -> Outcome {
+        // Deletion IS acknowledgement. Every community Shortcut built for this file ends by deleting it,
+        // which is the honest signal that its rows were logged — so treat a missing file with a pending
+        // span as a confirm. Without this those Shortcuts silently double-log: the rows are re-offered on
+        // the next export and logged again on the next run. A file that still exists is NOT acknowledged,
+        // so a Shortcut that only reads keeps being re-offered the same span.
+        if defaults.integer(forKey: pendingKey) > 0,
+           !FileManager.default.fileExists(atPath: directory.appendingPathComponent(fileName).path) {
+            confirm(defaults: defaults)
+        }
         let nowTs = Int(now.timeIntervalSince1970)
         let span = coverageSpan(nowTs: nowTs, watermark: defaults.integer(forKey: watermarkKey))
         guard span.from < span.end else {

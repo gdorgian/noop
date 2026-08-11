@@ -39,8 +39,14 @@ final class ShortcutSessionExportTests: XCTestCase {
     private struct FakeReads: ShortcutSessionReads {
         var sleepByDevice: [String: [CachedSleepSession]] = [:]
         var workoutsByDevice: [String: [WorkoutRow]] = [:]
+        var dailiesByDevice: [String: [DailyMetric]] = [:]
         var error: Error? = nil
         struct Boom: Error {}
+
+        func dailyMetrics(deviceId: String, from: String, to: String) async throws -> [DailyMetric] {
+            if let error { throw error }
+            return dailiesByDevice[deviceId] ?? []
+        }
 
         func sleepSessions(deviceId: String, from: Int, to: Int,
                            limit: Int) async throws -> [CachedSleepSession] {
@@ -68,6 +74,73 @@ final class ShortcutSessionExportTests: XCTestCase {
 
     private func text(_ name: String) throws -> String {
         try String(contentsOf: dir.appendingPathComponent(name), encoding: .utf8)
+    }
+
+    private func daily(_ day: String, resp: Double? = nil) -> DailyMetric {
+        DailyMetric(day: day, totalSleepMin: nil, efficiency: nil, deepMin: nil, remMin: nil,
+                    lightMin: nil, disturbances: nil, restingHr: nil, avgHrv: nil, recovery: nil,
+                    strain: nil, exerciseCount: nil, respRateBpm: resp)
+    }
+
+    // MARK: - Per-night vitals
+
+    // Respiration comes from the DAY row; resting HR is already on the session. Both are anchored to the
+    // session span, because that is the window they describe — a bare day would place a night's
+    // respiration at midnight.
+    func testVitalsRenderRespirationAndRestingHR() {
+        let s = CachedSleepSession(startTs: nightStart, endTs: nightEnd, efficiency: nil,
+                                   restingHr: 52, avgHrv: nil, stagesJSON: nil)
+        let day = ShortcutSessionExport.dayString(nightStart, timeZone: utc)
+        let lines = ShortcutSessionExport.renderVitals([s], dailies: [daily(day, resp: 14.16)],
+                                                       timeZone: utc)
+        let span = "\(ShortcutSessionExport.stamp(nightStart, utc))," +
+                   "\(ShortcutSessionExport.stamp(nightEnd, utc))"
+        XCTAssertEqual(lines, ["respiratory_rate,14.2,\(span)", "resting_hr,52,\(span)"])
+    }
+
+    // An absent vital is OMITTED, never zero — a 0 would be logged into Health as a real reading.
+    func testVitalsOmitMissingValuesRatherThanWritingZero() {
+        let s = CachedSleepSession(startTs: nightStart, endTs: nightEnd, efficiency: nil,
+                                   restingHr: nil, avgHrv: nil, stagesJSON: nil)
+        let day = ShortcutSessionExport.dayString(nightStart, timeZone: utc)
+        XCTAssertTrue(ShortcutSessionExport.renderVitals([s], dailies: [daily(day)], timeZone: utc).isEmpty)
+    }
+
+    func testVitalsIgnoreADayRowThatIsNotTheSessionsDay() {
+        let s = CachedSleepSession(startTs: nightStart, endTs: nightEnd, efficiency: nil,
+                                   restingHr: nil, avgHrv: nil, stagesJSON: nil)
+        let lines = ShortcutSessionExport.renderVitals([s], dailies: [daily("1999-01-01", resp: 14.1)],
+                                                       timeZone: utc)
+        XCTAssertTrue(lines.isEmpty)
+    }
+
+    // MARK: - Deletion is acknowledgement
+
+    // Every community Shortcut for these files ends by deleting them; that is the honest "I took these"
+    // signal. Without treating it as a confirm, those Shortcuts double-log on every run.
+    func testDeletingTheSleepFileAcknowledgesIt() async throws {
+        let source = FakeReads(sleepByDevice: ["dev-noop": [sleep(nightStart, nightEnd)]])
+        _ = await ShortcutSessionExport.export(source: source, deviceId: "dev", now: now,
+                                               defaults: defaults, directory: dir, timeZone: utc)
+        XCTAssertGreaterThan(defaults.integer(forKey: ShortcutSessionExport.sleepPendingKey), 0)
+
+        try FileManager.default.removeItem(at: dir.appendingPathComponent(
+            ShortcutSessionExport.sleepFileName))
+        let second = await ShortcutSessionExport.export(source: source, deviceId: "dev", now: now,
+                                                        defaults: defaults, directory: dir, timeZone: utc)
+        XCTAssertEqual(second, .nothingNew, "a deleted file must not be re-offered")
+        XCTAssertEqual(defaults.integer(forKey: ShortcutSessionExport.sleepWatermarkKey), nightStart)
+    }
+
+    // A file that is still sitting there was NOT consumed — those rows must keep being offered.
+    func testAnUnreadFileIsNotAcknowledged() async throws {
+        let source = FakeReads(sleepByDevice: ["dev-noop": [sleep(nightStart, nightEnd)]])
+        _ = await ShortcutSessionExport.export(source: source, deviceId: "dev", now: now,
+                                               defaults: defaults, directory: dir, timeZone: utc)
+        let second = await ShortcutSessionExport.export(source: source, deviceId: "dev", now: now,
+                                                        defaults: defaults, directory: dir, timeZone: utc)
+        XCTAssertEqual(second, .written(sleepLines: 1, workoutLines: 0))
+        XCTAssertEqual(defaults.integer(forKey: ShortcutSessionExport.sleepWatermarkKey), 0)
     }
 
     // MARK: - Sleep line formatting
