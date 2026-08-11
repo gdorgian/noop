@@ -213,9 +213,17 @@ final class ShortcutSessionExportTests: XCTestCase {
                                                        defaults: defaults, directory: dir, timeZone: utc)
         XCTAssertEqual(first, .written(sleepLines: 1, workoutLines: 1))
 
+        // Nothing has confirmed these rows yet, so a second export must RE-OFFER them, not destroy them.
         let second = await ShortcutSessionExport.export(source: source, deviceId: "dev", now: now,
                                                         defaults: defaults, directory: dir, timeZone: utc)
-        XCTAssertEqual(second, .nothingNew)
+        XCTAssertEqual(second, .written(sleepLines: 1, workoutLines: 1))
+        XCTAssertFalse(try text(ShortcutSessionExport.sleepFileName).isEmpty)
+
+        // Only once the Shortcut confirms do they stop being offered.
+        ShortcutSessionExport.confirm(defaults: defaults)
+        let third = await ShortcutSessionExport.export(source: source, deviceId: "dev", now: now,
+                                                       defaults: defaults, directory: dir, timeZone: utc)
+        XCTAssertEqual(third, .nothingNew)
         XCTAssertEqual(try text(ShortcutSessionExport.sleepFileName), "")
         XCTAssertEqual(try text(ShortcutSessionExport.workoutFileName), "")
     }
@@ -247,6 +255,7 @@ final class ShortcutSessionExportTests: XCTestCase {
         var source = FakeReads(sleepByDevice: ["dev-noop": [sleep(nightStart, nightEnd)]])
         _ = await ShortcutSessionExport.export(source: source, deviceId: "dev", now: now,
                                                defaults: defaults, directory: dir, timeZone: utc)
+        ShortcutSessionExport.confirm(defaults: defaults)   // the night is logged and acknowledged
         source.workoutsByDevice = ["dev-noop": [workout(nightEnd + 3_600, nightEnd + 5_400)]]
         let second = await ShortcutSessionExport.export(source: source, deviceId: "dev", now: now,
                                                         defaults: defaults, directory: dir, timeZone: utc)

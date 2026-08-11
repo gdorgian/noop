@@ -6,7 +6,7 @@ import AppIntents
 /// into the running `AppModel` directly (BLE only lives in the foreground app), so they enqueue here
 /// and the app drains the queue when it next becomes active.
 enum PendingIntents {
-    enum Action: String { case markMoment, buzz, exportHealth }
+    enum Action: String { case markMoment, buzz, exportHealth, confirmHealthExport }
 
     private static let key = "noop.pendingIntents"
     private static var defaults: UserDefaults? { UserDefaults(suiteName: WidgetSnapshot.suiteName) }
@@ -85,6 +85,25 @@ struct RefreshHealthExportIntent: AppIntent {
     }
 }
 
+/// Tell NOOP the Shortcut has finished logging the current drop files into Apple Health, so their rows
+/// can be dropped exactly once.
+///
+/// This is the other half of the accumulate-until-consumed contract: writes only ever mark rows PENDING,
+/// and nothing is discarded until this runs. A Shortcut that reads the files but never confirms simply
+/// sees the same rows again next time — annoying, but never lossy. Put it as the LAST step of the
+/// Shortcut, after the logging loops.
+struct ConfirmHealthExportIntent: AppIntent {
+    static var title: LocalizedStringResource = "Confirm Health Export"
+    static var description = IntentDescription(
+        "Tell NOOP the exported rows have been logged, so it can move on to newer data.")
+    static var openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult {
+        PendingIntents.append(.confirmHealthExport)
+        return .result()
+    }
+}
+
 /// Surfaces NOOP's intents to Siri, Spotlight, and the Shortcuts gallery without any user setup.
 struct NOOPShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
@@ -100,6 +119,10 @@ struct NOOPShortcuts: AppShortcutsProvider {
                     phrases: ["Refresh my \(.applicationName) health export"],
                     shortTitle: "Refresh Health Export",
                     systemImageName: "square.and.arrow.up.on.square")
+        AppShortcut(intent: ConfirmHealthExportIntent(),
+                    phrases: ["Confirm my \(.applicationName) health export"],
+                    shortTitle: "Confirm Health Export",
+                    systemImageName: "checkmark.circle")
     }
 }
 #endif
