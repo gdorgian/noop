@@ -76,14 +76,15 @@ final class SleepSchedulePrefsTests: XCTestCase {
         XCTAssertEqual(SleepStager.daytimeBandStartHour, 18)   // no relaunch needed
     }
 
-    // This build ships a night-shift wearer's window: awake 19:00 → 10:00, so their sleep window is
-    // 10:00 → 19:00 and comfortably contains their sleep CENTRES (~14:00–17:00), which is what the
-    // daytime guard actually tests. The band predicate itself is pinned in the package's own suite.
+    // This build ships a night-shift wearer's window: awake 22:00 → 10:00, so their sleep window is
+    // 10:00 → 22:00. It must clear the LATEST plausible wake (21:00), not just the sleep centres — a
+    // first pass closed it at 19:00 and a real 19:15 wake landed in the awake band, which truncated the
+    // detected wake back to ~18:00. The band predicate itself is pinned in the package's own suite.
     func testForkFallbackPutsTheWearersSleepOutsideTheStrictBand() {
         SleepSchedule.current = SleepSchedulePrefs.fallback
-        XCTAssertEqual(SleepStager.daytimeBandStartHour, 19)
+        XCTAssertEqual(SleepStager.daytimeBandStartHour, 22)
         XCTAssertEqual(SleepStager.daytimeBandEndHour, 10)
         XCTAssertEqual(SleepStageTotals.overnightStartHour, 10)   // sleep window opens
-        XCTAssertEqual(SleepStageTotals.overnightEndHour, 19)     // …and closes
+        XCTAssertEqual(SleepStageTotals.overnightEndHour, 22)     // …and closes
     }
 }

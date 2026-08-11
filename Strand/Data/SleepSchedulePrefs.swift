@@ -18,13 +18,18 @@ enum SleepSchedulePrefs {
     static let awakeStartKey = "noop.sleepSchedule.awakeStartHour"
     static let awakeEndKey = "noop.sleepSchedule.awakeEndHour"
 
-    /// FORK-LOCAL: this wearer works nights and sleeps roughly 10:00–19:00 local, so they are awake
-    /// 19:00 → 10:00. Upstream would seed `.dayWorker` here and let a Settings screen write the two keys.
+    /// FORK-LOCAL: this wearer works nights, falling asleep 10:00–13:00 and waking 18:00–21:00.
+    ///
+    /// The awake band must sit clear of the LATEST plausible wake, not the earliest. A first pass used
+    /// 19:00 → 10:00, which put a real 19:15 wake inside the awake band: the tail of the night then met
+    /// the daytime false-sleep guard's stricter bar and the detected wake was truncated to ~18:00, an
+    /// hour and a quarter early. 22:00 → 10:00 leaves the whole 18:00–21:00 wake range inside the
+    /// sleep-permissive window with an hour of margin, and still guards the hours actually spent awake.
     ///
     /// Seeding it in the HOST rather than changing the package default is what keeps the analytics
     /// package byte-identical to upstream — all 1310 of its tests pass untouched — while this build
     /// still stages the wearer's real sleep correctly.
-    static let fallback = SleepSchedule(awakeStartHour: 19, awakeEndHour: 10)
+    static let fallback = SleepSchedule(awakeStartHour: 22, awakeEndHour: 10)
 
     /// Read the stored schedule (or the fallback) and install it. Idempotent; call once per launch
     /// before any analysis runs.
