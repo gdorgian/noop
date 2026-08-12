@@ -1124,11 +1124,33 @@ public enum SleepStager {
             lastSleepEnd = max(lastSleepEnd, p.end)
             let spanMin = (p.end - p.start) / 60
             if (p.end - p.start) <= minSleepS {
-                minSleepDrops += 1
+                // A sub-threshold run that directly CONTINUES an already-accepted run is that night's
+                // TAIL, not an isolated fragment — so dropping it silently truncates the reported wake.
+                //
+                // The failure this fixes: a fragmented sleeper's last stretch comes in just under the
+                // 60-minute floor (55 min was the observed case), gets discarded whole, and the session
+                // ends at the previous run's boundary — an hour or more before the wearer actually got
+                // up. Every downstream number inherits it: wake time, in-bed total, efficiency, and
+                // anything exported to Apple Health.
+                //
+                // Letting it through does NOT weaken the floor for isolated fragments — an unattached
+                // short run is still dropped. It only re-attaches a piece to a night already accepted
+                // within `nightContinuationGapMin`, which is exactly the adjacency the aggregate's
+                // fragment bridge (#777/#705) already folds into one night with the gap counted as
+                // awake. The remaining gates (span cap, HR confirm, daytime guard) still apply.
+                let continuesAccepted = chainPrevEnd.map { p.start - $0 <= continuationGapS } ?? false
+                if !continuesAccepted {
+                    minSleepDrops += 1
+                    traceSink?(GateTrace.runLine(index: runIndex, startTs: p.start, endTs: p.end,
+                        verdict: .dropped, gate: "minSleepMin",
+                        detail: "spanMin=\(spanMin) minSleepMin=\(minSleepMin)"))
+                    continue
+                }
                 traceSink?(GateTrace.runLine(index: runIndex, startTs: p.start, endTs: p.end,
-                    verdict: .dropped, gate: "minSleepMin",
-                    detail: "spanMin=\(spanMin) minSleepMin=\(minSleepMin)"))
-                continue
+                    verdict: .kept, gate: "minSleepMinTail",
+                    detail: "spanMin=\(spanMin) minSleepMin=\(minSleepMin) "
+                        + "gapMin=\((p.start - (chainPrevEnd ?? p.start)) / 60) "
+                        + "continuationGapMin=\(nightContinuationGapMin)"))
             }
             // H4 physiological in-bed span cap (#547/#531/#509 tail): a single assembled main-sleep run
             // longer than ~16 h is a bad-clock artefact (a frozen still stretch banked under a stale/wrong
