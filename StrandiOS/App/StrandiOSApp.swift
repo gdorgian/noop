@@ -73,10 +73,6 @@ struct StrandiOSApp: App {
             noopDeviceId: model.deviceId
         )
         _health = StateObject(wrappedValue: bridge)
-        // #1021: publish to Apple Health when an offload lands, not only on foreground entry - the
-        // scenePhase pass below starts the offload and wrote to Health in parallel with it, so a night
-        // synced on open only reached Health at the next launch. Weak so the scene owns the bridge's
-        // lifetime; the bridge no-ops unless Health was authorized.
         // #1021: publish to Apple Health when an offload lands. The Shortcuts drop files ride the SAME
         // hook rather than only the scenePhase .background transition — this app runs with
         // bluetooth-central, so the process stays alive collecting while backgrounded, and without this
