@@ -223,8 +223,12 @@ struct LiquidVessel: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var motion = NoopMotionState.shared
+    /// Re-arms the clock after a stand-down when the phone is tilted (see `LiquidWake`).
+    @ObservedObject private var wake = LiquidWake.shared
     @State private var sim: LiquidSim
     @State private var splashes = 0
+    /// True once the liquid has stopped moving and the clock has stood down. See `gauge`.
+    @State private var atRest = false
 
     init(value: Double?, tint: Color, animated: Bool = true) {
         self.value = value
@@ -241,19 +245,45 @@ struct LiquidVessel: View {
         // 60fps: on the 120Hz ProMotion panel a 30fps cap updated the fluid only every 4th refresh,
         // which read as juddery slosh. Only the 3 hero gauges + HR thread run live now (the small ones
         // are static), so the higher rate is affordable and the liquid actually flows.
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { tl in
+        //
+        // …but only while the liquid is actually MOVING. `LiquidSim.settled` has always known when it
+        // has stopped, and nothing consulted it: the clock ran at 60fps forever, so Today idled with
+        // three Canvas fluid sims (28 flecks + drops + wave sampling each) on the main thread, which is
+        // what made scrolling and taps feel heavy. Standing the clock down on settle costs nothing
+        // visually — a settled vessel is a still picture, and CoreAnimation holds the last frame — and
+        // every way the picture can start moving again re-arms it below:
+        //   • the value changed          → `onChange(of: value)`
+        //   • the user tapped it         → the tap gesture (splash)
+        //   • the phone was tilted       → `LiquidWake.tiltEpoch`
+        // Nothing else can move it, so "no wake fired" and "the picture is unchanged" are the same
+        // state — there is no way for it to sit paused while it should be animating.
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: atRest)) { tl in
             let now = liquidSeconds(tl.date)
             Canvas { context, size in
                 sim.step(now: now, tilt: LiquidMotion.shared.tilt, target: value ?? 0)
                 LiquidRender.vessel(context, size, sim, now: now, tint: tint)
+                standDownIfSettled()
             }
         }
         .aspectRatio(1, contentMode: .fit)
         .contentShape(Circle())
-        .onTapGesture { sim.splash(12); splashes &+= 1 }
+        .onTapGesture { sim.splash(12); splashes &+= 1; atRest = false }
         .liquidTapHaptic(trigger: splashes)   // light tap feedback (guarded so the primitives compile on macOS 13)
+        .onChangeCompat(of: value) { _ in atRest = false }
+        .onChangeCompat(of: wake.tiltEpoch) { _ in atRest = false }
         .onAppear { LiquidMotion.shared.acquire() }
         .onDisappear { LiquidMotion.shared.release() }
+    }
+
+    /// Stand the clock down once the liquid has stopped moving.
+    ///
+    /// Deferred to the next runloop turn: this is called from inside the `Canvas` draw closure, and
+    /// writing `@State` synchronously during a view update is the "Modifying state during view update"
+    /// violation. The `atRest` half of the guard keeps it to one comparison per frame rather than one
+    /// `Task` per frame — the hop only happens on the single frame where the liquid comes to rest.
+    private func standDownIfSettled() {
+        guard sim.settled, !atRest else { return }
+        Task { @MainActor in atRest = true }
     }
 
     /// One-shot, cached render — posed at the fill line, no clock, no motion acquire.
@@ -280,23 +310,33 @@ struct LiquidTube: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var motion = NoopMotionState.shared
+    /// Re-arms the clock after a stand-down when the phone is tilted (see `LiquidWake`).
+    @ObservedObject private var wake = LiquidWake.shared
     @State private var sim = LiquidSim(target: 0)
+    /// True once the liquid has stopped moving and the clock has stood down. See `LiquidVessel.gauge`.
+    @State private var atRest = false
 
     var body: some View {
         if animated && !motion.poseStill(reduceMotion) { liveTube } else { staticTube }
     }
 
     private var liveTube: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        // Stands its clock down on settle, exactly as `LiquidVessel` does — a live tube is a second
+        // fluid sim, and Today can hold several at once. A tube has no tap affordance, so the only
+        // things that can restart it are a new `frac` and a tilt.
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: atRest)) { tl in
             let now = liquidSeconds(tl.date)
             Canvas { context, size in
                 sim.step(now: now, tilt: LiquidMotion.shared.tilt, target: frac)
                 LiquidRender.tube(context, size, sim, now: now, frac: max(0, min(1, frac)),
                                   tint: tint, showsHighlight: showsHighlight,
                                   usesCleanFill: usesCleanFill)
+                if sim.settled, !atRest { Task { @MainActor in atRest = true } }
             }
         }
         .frame(height: height)
+        .onChangeCompat(of: frac) { _ in atRest = false }
+        .onChangeCompat(of: wake.tiltEpoch) { _ in atRest = false }
         .onAppear { LiquidMotion.shared.acquire() }
         .onDisappear { LiquidMotion.shared.release() }
     }
