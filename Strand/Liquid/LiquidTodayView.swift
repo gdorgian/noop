@@ -615,14 +615,14 @@ struct LiquidTodayView: View {
             // Activity (`Repository.widgetAnchor`) and Android. Effort deliberately does NOT carry — it is
             // today's own accumulation, so yesterday's number would be a false statement, not a stale one.
             HeroScoreCell(label: String(localized: "Recovery"), score: chargeDisplay.pct, tint: chargeTint,
-                          onGuide: { guideSection = .charge })
+                          animated: dataLoaded, onGuide: { guideSection = .charge })
             // #45: the hero Effort must honour the user's Effort scale like every other Effort read-out.
             // Show the value on the chosen scale (0–100 or WHOOP 0–21) with the matching vessel max, and
             // one decimal on the compressed 0–21 axis to match the app-wide `effortDisplay` convention
             // (12.6, not a rounded "13"); the 0–100 hero stays a whole number as before.
             HeroScoreCell(label: String(localized: "Strain"),
                           score: displayDay?.strain.map { UnitFormatter.effortValue($0, scale: effortScale) },
-                          tint: StrandPalette.effortColor,
+                          tint: StrandPalette.effortColor, animated: dataLoaded,
                           onGuide: { guideSection = .effort },
                           maxValue: effortScale == .whoop ? 21 : 100,
                           decimals: effortScale == .whoop ? 1 : 0)
@@ -632,7 +632,7 @@ struct LiquidTodayView: View {
             // still one tap away in DATA SOURCES → View sources, which is where a question about it
             // actually gets asked. `heroSourceLabel` stays; that screen and the tests use it.
             HeroScoreCell(label: String(localized: "Sleep"), score: restScore, tint: restTint,
-                          onGuide: { guideSection = .rest })
+                          animated: dataLoaded, onGuide: { guideSection = .rest })
         }
         .padding(.vertical, NoopMetrics.space4)
         .padding(.horizontal, NoopMetrics.space3)
@@ -1762,8 +1762,7 @@ private struct HeroScoreCell: View {
     let label: String
     let score: Double?            // on whatever scale the caller passes (nil = no data yet)
     let tint: Color
-    // `animated` is gone with the fluid vessel: GlowRing owns its own spring draw-in and re-animates when
-    // the value changes, so there is nothing left for the caller to gate.
+    let animated: Bool
     let onGuide: () -> Void
     // The scale `score` is already expressed on — 100 for Charge/Rest, or the user's chosen Effort scale
     // max (100 or 21, #45) — so the vessel fill matches the displayed number.
@@ -1773,8 +1772,15 @@ private struct HeroScoreCell: View {
     var decimals: Int = 0
 
     var body: some View {
-        VStack(spacing: 9) {
-            gauge
+        VStack(spacing: 7) {
+            LiquidScoreGauge(
+                score: score,
+                tint: tint,
+                diameter: Self.vesselDiameter,
+                animated: animated,
+                maxValue: maxValue,
+                decimals: decimals
+            )
             Button(action: onGuide) {
                 HStack(spacing: 3) {
                     // Sentence case, not an ALL-CAPS tracked overline. An overline is chrome — it labels a
@@ -1795,44 +1801,6 @@ private struct HeroScoreCell: View {
             .accessibilityLabel(Text("\(label), \(score.map { decimals > 0 ? String(format: "%.\(decimals)f", $0) : String(Int($0.rounded())) } ?? String(localized: "no data yet")). See how it is scored."))
         }
         .frame(maxWidth: .infinity)
-    }
-
-    /// The hero ring.
-    ///
-    /// This was `LiquidScoreGauge` — the Canvas fluid vessel — which is where the skeuomorphic look came
-    /// from: a recessed inner bevel and a chrome highlight around a sloshing fill. Next to Bevel's flat
-    /// ring it read as dated, and it was also the single most expensive thing on the screen (a fluid sim
-    /// with 28 suspended flecks, per gauge, per frame).
-    ///
-    /// `GlowRing` is the design system's WHOOP-style ring and the CLASSIC Today has always used it: a
-    /// clearly-visible full-circle track so the arc reads as a fraction of a circle, one crisp solid arc
-    /// with rounded caps, and a centre number that counts up. It already handles theming, Reduce Motion
-    /// and the spring draw-in, so this is a swap to something proven rather than a new component.
-    ///
-    /// What is genuinely lost: the liquid slosh and the tap-to-splash easter egg on these three gauges.
-    /// The liquid layer is untouched everywhere else.
-    @ViewBuilder private var gauge: some View {
-        if let score {
-            GlowRing(fraction: score / maxValue,
-                     value: score,
-                     format: { decimals > 0 ? String(format: "%.\(decimals)f", $0) : "\(Int($0.rounded()))" },
-                     color: tint,
-                     diameter: Self.vesselDiameter,
-                     lineWidth: Self.vesselDiameter * 0.10)
-        } else {
-            // No score yet. Draw the SAME track at the SAME metrics rather than an empty space, so the trio
-            // keeps its shape while one score is still calibrating — and use GlowRing's own centre font so
-            // the dash sits exactly where a number would.
-            ZStack {
-                Circle()
-                    .stroke(StrandPalette.textPrimary.opacity(0.10),
-                            style: StrokeStyle(lineWidth: Self.vesselDiameter * 0.10, lineCap: .round))
-                Text("–")
-                    .font(GlowRing.centerFont(diameter: Self.vesselDiameter))
-                    .foregroundStyle(StrandPalette.textSecondary)
-            }
-            .frame(width: Self.vesselDiameter, height: Self.vesselDiameter)
-        }
     }
 }
 
