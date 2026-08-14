@@ -45,10 +45,27 @@ enum KeyMetric: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The original, hard-coded grid order — the default when the user hasn't customised the layout.
-    static let defaultOrder: [KeyMetric] = [
+    /// The canonical grid order. Every tile the editor can offer, in the order it lists them.
+    static let canonicalOrder: [KeyMetric] = [
         .charge, .effort, .rest, .hrv, .restingHr,
         .bloodOxygen, .respiratory, .steps, .weight, .calories,
+    ]
+
+    /// The tiles a fresh install SHOWS — deliberately not all of them.
+    ///
+    /// FORK: the default used to be every tile, which meant Today stated the same number up to three times
+    /// in three different visual grammars. Charge / Effort / Rest are the hero gauges directly above this
+    /// grid — and the grid labelled them "Recovery" / "Strain" / "Rest", so the duplicates did not even
+    /// read as duplicates: a wearer could reasonably conclude Charge and Recovery were separate metrics.
+    /// HRV, resting HR and respiratory rate are each already a row in RECOVERY VITALS, and HRV and resting
+    /// HR are ALSO rows in YOUR CARDS. Six of the ten tiles were restating something already on screen.
+    ///
+    /// What remains is exactly the set this grid is the only home for. Nothing is removed from the app:
+    /// every tile stays in `canonicalOrder`, so the EDIT sheet still offers all ten and a wearer who wants
+    /// Charge on the grid can add it back. A wearer who has already customised the grid is untouched —
+    /// `decodeEnabled` only falls back to this when nothing is stored.
+    static let defaultOrder: [KeyMetric] = [
+        .bloodOxygen, .steps, .weight, .calories,
     ]
 }
 
