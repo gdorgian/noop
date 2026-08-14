@@ -509,14 +509,11 @@ struct LiquidTodayView: View {
                     .accessibilityLabel("Customize Today")
                 }
             }
-            // Subtle NOOP wordmark in the sky between header and hero. Perfectly centred (a letter row has
-            // no trailing tracking gap the way `Text(...).tracking()` does), with a tap easter egg.
-            // #today-layout: the hero + Start-session row moved OUT of the scene into the reorderable
-            // section block below. The wordmark's bottom pad (10) + the section VStack's 12 spacing keeps
-            // the default hero-under-wordmark gap at the original 22.
-            LiquidWordmark()
-                .padding(.top, 30)
-                .padding(.bottom, 10)
+            // FORK: the NOOP wordmark used to sit here, between the header and the first section, costing
+            // ~85pt at the single most valuable position on the screen — directly above the one sentence
+            // that says how you are. The app icon already answers "which app is this", and neither Bevel
+            // nor WHOOP puts a wordmark on its home screen. `LiquidWordmark` is kept (it still carries the
+            // tap easter egg) for any surface that wants to brand itself; Today simply doesn't.
         }
     }
 
@@ -555,37 +552,52 @@ struct LiquidTodayView: View {
         .accessibilityLabel("Start a live session. Beta. Silent strap coaching against today's Charge.")
     }
 
+    /// The Charge gauge's tint, SAMPLED FROM THE SCORE.
+    ///
+    /// It used to be `StrandPalette.chargeColor` — one fixed colour for every value — so a Charge of 32
+    /// and a Charge of 92 were drawn identically and the number was the only thing distinguishing a rest
+    /// day from a green light. Under the classic ramp this now runs red → amber → green, so a low Charge
+    /// reads as low before the number is parsed, and the gauge stops disagreeing with the synthesis
+    /// sentence sitting directly above it.
+    ///
+    /// Falls back to the flat brand colour when there is no score — an unscored day must not imply a
+    /// bad one by rendering red.
+    private var chargeTint: Color {
+        chargeDisplay.pct.map { StrandPalette.recoveryColor($0) } ?? StrandPalette.chargeColor
+    }
+
+    /// Rest is the same shape of number as Charge — 0–100, higher is better — so it takes the same
+    /// value-derived ramp. Effort deliberately does NOT: a high Effort is not a bad Effort, so tinting it
+    /// on a good/bad scale would assert something false. It keeps its flat identity colour.
+    private var restTint: Color {
+        restScore.map { StrandPalette.recoveryColor($0) } ?? StrandPalette.restColor
+    }
+
     private var heroCard: some View {
         HStack(alignment: .top, spacing: 4) {
             // #543 carry: an unscored today shows the last scored night's REAL Charge (labelled as prior by
             // the state pill) rather than an empty vessel, matching the classic Today, the widget/watch/Live
             // Activity (`Repository.widgetAnchor`) and Android. Effort deliberately does NOT carry — it is
             // today's own accumulation, so yesterday's number would be a false statement, not a stale one.
-            HeroScoreCell(label: String(localized: "Charge"), score: chargeDisplay.pct, tint: StrandPalette.chargeColor,
+            HeroScoreCell(label: String(localized: "Recovery"), score: chargeDisplay.pct, tint: chargeTint,
                           animated: dataLoaded, onGuide: { guideSection = .charge })
             // #45: the hero Effort must honour the user's Effort scale like every other Effort read-out.
             // Show the value on the chosen scale (0–100 or WHOOP 0–21) with the matching vessel max, and
             // one decimal on the compressed 0–21 axis to match the app-wide `effortDisplay` convention
             // (12.6, not a rounded "13"); the 0–100 hero stays a whole number as before.
-            HeroScoreCell(label: String(localized: "Effort"),
+            HeroScoreCell(label: String(localized: "Strain"),
                           score: displayDay?.strain.map { UnitFormatter.effortValue($0, scale: effortScale) },
                           tint: StrandPalette.effortColor, animated: dataLoaded,
                           onGuide: { guideSection = .effort },
                           maxValue: effortScale == .whoop ? 21 : 100,
                           decimals: effortScale == .whoop ? 1 : 0)
-            HeroScoreCell(label: String(localized: "Rest"), score: restScore, tint: StrandPalette.restColor,
+            // FORK: the "WHOOP" provenance badge that used to pin to the top-right of this card is gone.
+            // It named the strap that supplied the scores on every single render of the home screen — a
+            // fact the wearer establishes once when they pair and never needs restated. Provenance is
+            // still one tap away in DATA SOURCES → View sources, which is where a question about it
+            // actually gets asked. `heroSourceLabel` stays; that screen and the tests use it.
+            HeroScoreCell(label: String(localized: "Sleep"), score: restScore, tint: restTint,
                           animated: dataLoaded, onGuide: { guideSection = .rest })
-                .overlay(alignment: .top) {
-                    if let sourceLabel = heroSourceLabel {
-                        SourceBadge("\(sourceLabel)", tint: StrandPalette.textSecondary)
-                            // Match the badge's trailing edge to the Rest vessel and centre it on the card border.
-                            .fixedSize()
-                            .frame(width: HeroScoreCell.vesselDiameter, alignment: .trailing)
-                            .offset(y: -(NoopMetrics.space4 + NoopMetrics.sourceBadgeHeight / 2))
-                            .allowsHitTesting(false)
-                            .accessibilityLabel(Text("Source: \(sourceLabel)"))
-                    }
-                }
         }
         .padding(.vertical, NoopMetrics.space4)
         .padding(.horizontal, NoopMetrics.space3)
@@ -901,24 +913,28 @@ struct LiquidTodayView: View {
                     .lineLimit(1).minimumScaleFactor(0.6)   // yield to the pills rather than push them to wrap
                 Spacer(minLength: 8)
                 HStack(spacing: 8) {
+                    // Both pills take the SCORE-derived tint (see `chargeTint`), not the flat brand green.
+                    // A state pill reading "Solid" in confident green while the sentence underneath said
+                    // "prioritise rest today" was the sharpest version of the contradiction — the colour
+                    // and the words were making opposite claims about the same day.
                     if let word = readinessWord {
                         Text(word)
                             .font(StrandFont.caption.weight(.bold))
-                            .foregroundStyle(StrandPalette.chargeColor)
+                            .foregroundStyle(chargeTint)
                             .padding(.horizontal, 13)
                             .padding(.vertical, 6)
-                            .background(Capsule().fill(StrandPalette.chargeColor.opacity(0.14))
-                                .overlay(Capsule().strokeBorder(StrandPalette.chargeColor.opacity(0.3), lineWidth: 1)))
+                            .background(Capsule().fill(chargeTint.opacity(0.14))
+                                .overlay(Capsule().strokeBorder(chargeTint.opacity(0.3), lineWidth: 1)))
                     }
                     HStack(spacing: 5) {
-                        Circle().fill(StrandPalette.chargeColor).frame(width: 6, height: 6)
+                        Circle().fill(chargeTint).frame(width: 6, height: 6)
                         Text(chargeDisplay.stateLabel)
                             .font(StrandFont.caption.weight(.bold))
-                            .foregroundStyle(StrandPalette.chargeColor)
+                            .foregroundStyle(chargeTint)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Capsule().strokeBorder(StrandPalette.chargeColor.opacity(0.3), lineWidth: 1))
+                    .background(Capsule().strokeBorder(chargeTint.opacity(0.3), lineWidth: 1))
                 }
                 .fixedSize(horizontal: true, vertical: false)   // pills keep their natural width — no "Calibrating" wrap
             }
@@ -1088,7 +1104,7 @@ struct LiquidTodayView: View {
         case .effort:
             ktile(String(localized: "Strain"), icon: keyMetricIcon(metric), intText(displayDay?.strain), "%", StrandPalette.effortColor, frac(displayDay?.strain), key: "strain")
         case .rest:
-            ktile(String(localized: "Rest"), icon: keyMetricIcon(metric), intText(restScore), "%", StrandPalette.restColor, frac(restScore), key: "sleep_performance")
+            ktile(String(localized: "Sleep"), icon: keyMetricIcon(metric), intText(restScore), "%", StrandPalette.restColor, frac(restScore), key: "sleep_performance")
         case .hrv:
             ktile("HRV", icon: keyMetricIcon(metric), intText(hrv), "ms", StrandPalette.metricCyan, fracOver(hrv, 120), key: "hrv")
         case .restingHr:

@@ -401,7 +401,7 @@ struct CoupledView: View {
         } label: {
             card {
                 VStack(alignment: .leading, spacing: 14) {
-                    SectionHeader("Sleep performance", overline: "Last night", trailing: String(localized: "Rest"))
+                    SectionHeader("Sleep performance", overline: "Last night", trailing: String(localized: "Sleep"))
                     HStack(alignment: .center, spacing: 16) {
                         // Left: the SLEEP PERFORMANCE % as the liquid vessel (Rest world), with the score
                         // counting up over the fluid. Empty vessel when there's no scored performance.
@@ -635,7 +635,7 @@ struct CoupledView: View {
     private func calibrationCard(banked: Int) -> some View {
         let remaining = max(1, Baselines.minNightsSeed - banked)
         let countdown = ChargeBreakdownFormat.calibrationCountdown(nightsRemaining: remaining)
-        let unlock = ChargeBreakdownFormat.calibrationUnlockCopy(scoreName: String(localized: "Charge"))
+        let unlock = ChargeBreakdownFormat.calibrationUnlockCopy(scoreName: String(localized: "Recovery"))
         let progress = ChargeBreakdownFormat.calibrationProgress(banked: banked, seed: Baselines.minNightsSeed)
         return NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
             HStack(alignment: .top, spacing: 12) {

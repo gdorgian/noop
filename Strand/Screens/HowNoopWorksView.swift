@@ -46,7 +46,7 @@ struct HowNoopWorksView: View {
             case .sleepSorting:
                 return String(localized: "NOOP picks your main sleep as your longest real block, and (once it has learned your usual hours) the one nearest your normal sleep time. Everything else that day is a nap. You can always edit bed and wake times.")
             case .scores:
-                return String(localized: "Charge, Effort and Rest are scored on your own device from your strap data. Charge needs about four nights of sleep to learn your baseline (that's \"Calibrating\", counted as nights of 4 on the ring), and keeps sharpening over your first couple of weeks. On a WHOOP 5 or MG the strap banks little history, so that count can sit at 0 of 4 until you have worn it across a few nights. That's the strap's sync limit, not a fault. Before there's a number, NOOP shows what it can without faking one.")
+                return String(localized: "Recovery, Strain and Sleep are scored on your own device from your strap data. Recovery needs about four nights of sleep to learn your baseline (that's \"Calibrating\", counted as nights of 4 on the ring), and keeps sharpening over your first couple of weeks. On a WHOOP 5 or MG the strap banks little history, so that count can sit at 0 of 4 until you have worn it across a few nights. That's the strap's sync limit, not a fault. Before there's a number, NOOP shows what it can without faking one.")
             case .recording:
                 return String(localized: "When your strap is connected NOOP is saving data live. \"Last synced\" tells you how fresh it is. If it says \"Not recording\", reconnect.")
             case .provenance:
@@ -214,16 +214,16 @@ struct HowNoopWorksView: View {
 
     /// The four scores, each named with the PUBLISHED method family it follows. Honest about the
     /// approach without faking precision: it cites the method, not a proprietary-identical claim. Order
-    /// mirrors the app's score order (Charge, Effort, Rest, Fitness Age); the tint matches each domain.
+    /// mirrors the app's score order (Recovery, Strain, Sleep, Fitness Age); the tint matches each domain.
     private enum ScoreMethod: CaseIterable, Identifiable {
         case charge, effort, rest, fitnessAge
         var id: Self { self }
 
         var name: String {
             switch self {
-            case .charge:     return String(localized: "Charge")
-            case .effort:     return String(localized: "Effort")
-            case .rest:       return String(localized: "Rest")
+            case .charge:     return String(localized: "Recovery")
+            case .effort:     return String(localized: "Strain")
+            case .rest:       return String(localized: "Sleep")
             case .fitnessAge: return String(localized: "Fitness Age")
             }
         }

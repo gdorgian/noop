@@ -496,9 +496,9 @@ final class InsightsHubViewModel: ObservableObject {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .recovery: return String(localized: "Charge")
+            case .recovery: return String(localized: "Recovery")
             case .hrv:      return "HRV"
-            case .sleep:    return String(localized: "Rest")
+            case .sleep:    return String(localized: "Sleep")
             case .rhr:      return "RHR"
             }
         }
@@ -514,9 +514,9 @@ final class InsightsHubViewModel: ObservableObject {
         /// The engine's outcome label (carried onto each RankedEffect).
         var outcomeName: String {
             switch self {
-            case .recovery: return String(localized: "Charge")
+            case .recovery: return String(localized: "Recovery")
             case .hrv:      return "HRV"
-            case .sleep:    return String(localized: "Rest")
+            case .sleep:    return String(localized: "Sleep")
             case .rhr:      return String(localized: "Resting HR")
             }
         }

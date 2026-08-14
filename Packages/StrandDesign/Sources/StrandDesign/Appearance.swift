@@ -22,7 +22,20 @@ public enum ChartStyle: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    public static func resolve(_ raw: String) -> ChartStyle { ChartStyle(rawValue: raw) ?? .titanium }
+    /// FORK: the default is CLASSIC, not titanium.
+    ///
+    /// The brand ramp runs bronze → champagne, so a score reads as "darker" or "lighter" rather than
+    /// good or bad. On the home screen that is actively misleading: a Charge of 32 — a rest day — was
+    /// rendering in a confident colour directly above a sentence saying "prioritise rest today", so the
+    /// screen contradicted itself. Red → amber → green is the scale every health app has trained people
+    /// on, WHOOP included, and it makes a bad number legible before you have read a single word.
+    ///
+    /// Both styles remain; Settings → "Chart colours" still switches between them. This only moves
+    /// which one you get before choosing, and it is the single place that decision lives — the app
+    /// roots and the Settings picker all read their `@AppStorage` default from here.
+    public static let fallback: ChartStyle = .classic
+
+    public static func resolve(_ raw: String) -> ChartStyle { ChartStyle(rawValue: raw) ?? fallback }
 }
 
 /// The Sleep tab's stage-CHART shape (distinct from `ChartStyle`, which is colours): the long-standing

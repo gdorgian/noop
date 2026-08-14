@@ -84,7 +84,7 @@ struct AppleWatchAboutView: View {
         WatchMetric(icon: "lungs.fill", metric: String(localized: "Fitness Age"),
                     confidence: .great,
                     detail: String(localized: "Built from Apple's cardio-fitness VO₂ max estimate, the same number the Fitness app shows.")),
-        WatchMetric(icon: "flame.fill", metric: String(localized: "Effort"),
+        WatchMetric(icon: "flame.fill", metric: String(localized: "Strain"),
                     confidence: .good,
                     detail: String(localized: "Heart rate plus active energy give a solid daily cardiovascular load. An on-watch workout sharpens it further.")),
         WatchMetric(icon: "heart.fill", metric: String(localized: "Recovery / Charge"),
