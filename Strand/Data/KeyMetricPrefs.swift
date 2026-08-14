@@ -32,9 +32,9 @@ enum KeyMetric: String, CaseIterable, Identifiable {
     /// The tile's display label — matches the `StatTile(label:)` text rendered on the grid.
     var title: String {
         switch self {
-        case .charge:      return String(localized: "Charge")
-        case .effort:      return String(localized: "Effort")
-        case .rest:        return String(localized: "Rest")
+        case .charge:      return String(localized: "Recovery")
+        case .effort:      return String(localized: "Strain")
+        case .rest:        return String(localized: "Sleep")
         case .hrv:         return "HRV"
         case .restingHr:   return String(localized: "Resting HR")
         case .bloodOxygen: return String(localized: "Blood Oxygen")
@@ -54,15 +54,16 @@ enum KeyMetric: String, CaseIterable, Identifiable {
     /// The tiles a fresh install SHOWS — deliberately not all of them.
     ///
     /// FORK: the default used to be every tile, which meant Today stated the same number up to three times
-    /// in three different visual grammars. Charge / Effort / Rest are the hero gauges directly above this
-    /// grid — and the grid labelled them "Recovery" / "Strain" / "Rest", so the duplicates did not even
-    /// read as duplicates: a wearer could reasonably conclude Charge and Recovery were separate metrics.
-    /// HRV, resting HR and respiratory rate are each already a row in RECOVERY VITALS, and HRV and resting
-    /// HR are ALSO rows in YOUR CARDS. Six of the ten tiles were restating something already on screen.
+    /// in three different visual grammars. Recovery / Strain / Sleep are the hero gauges directly above
+    /// this grid, and back when the hero called them "Charge" / "Effort" / "Rest" the duplicates did not
+    /// even read as duplicates — a wearer could reasonably conclude Charge and Recovery were two different
+    /// metrics. (The names are now one vocabulary; the duplication is still worth removing.) HRV, resting
+    /// HR and respiratory rate are each already a row in RECOVERY VITALS, and HRV and resting HR are ALSO
+    /// rows in YOUR CARDS. Six of the ten tiles were restating something already on screen.
     ///
     /// What remains is exactly the set this grid is the only home for. Nothing is removed from the app:
     /// every tile stays in `canonicalOrder`, so the EDIT sheet still offers all ten and a wearer who wants
-    /// Charge on the grid can add it back. A wearer who has already customised the grid is untouched —
+    /// Recovery on the grid can add it back. A wearer who has already customised the grid is untouched —
     /// `decodeEnabled` only falls back to this when nothing is stored.
     static let defaultOrder: [KeyMetric] = [
         .bloodOxygen, .steps, .weight, .calories,

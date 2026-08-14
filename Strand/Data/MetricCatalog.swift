@@ -129,7 +129,7 @@ enum MetricCatalog {
         d("body_age", String(localized: "Body Age"), "Heart", "yrs", "my-whoop", "figure.stand", 0, false),
 
         // ── Charge (was Recovery)
-        d("recovery", String(localized: "Charge"), "Charge", "%", "my-whoop", "heart.circle", 0, true,
+        d("recovery", String(localized: "Recovery"), "Charge", "%", "my-whoop", "heart.circle", 0, true,
           String(localized: "How recovered you are, led by HRV versus your personal baseline.")),
         d("hrv", String(localized: "Heart Rate Variability"), "Charge", "ms", "my-whoop", "waveform.path.ecg", 0, true),
         d("rhr", String(localized: "Resting Heart Rate"), "Charge", "bpm", "my-whoop", "heart", 0, false),
@@ -138,7 +138,7 @@ enum MetricCatalog {
         d("skin_temp", String(localized: "Skin Temperature"), "Charge", "°C", "my-whoop", "thermometer", 1, nil),
 
         // ── Rest (was Sleep)
-        d("sleep_performance", String(localized: "Rest"), "Rest", "%", "my-whoop", "moon.stars", 0, true,
+        d("sleep_performance", String(localized: "Sleep"), "Rest", "%", "my-whoop", "moon.stars", 0, true,
           String(localized: "How restorative your sleep was: duration, efficiency, deep+REM, timing.")),
         d("in_bed_min", String(localized: "Time in Bed"), "Rest", "min", "my-whoop", "bed.double", 0, nil),
         d("sleep_total_min", String(localized: "Asleep Time"), "Rest", "min", "my-whoop", "moon.zzz", 0, true),
@@ -154,7 +154,7 @@ enum MetricCatalog {
         d("sleep_debt_min", String(localized: "Sleep Debt"), "Rest", "min", "my-whoop", "exclamationmark.circle", 0, false),
 
         // ── Effort (was Strain)
-        d("strain", String(localized: "Effort"), "Effort", "/100", "my-whoop", "flame", 1, nil,
+        d("strain", String(localized: "Strain"), "Effort", "/100", "my-whoop", "flame", 1, nil,
           String(localized: "Cardiovascular load for the day, on a 0-100 scale (was 0-21).")),
         d("steps", String(localized: "Steps"), "Effort", "", "apple-health", "figure.walk", 0, true),
         // WHOOP 5.0 / MG exposes a measured daily step count. Declared AFTER apple-health on purpose:
@@ -245,9 +245,9 @@ enum MetricCatalog {
     static func categoryDisplayName(_ category: String) -> String {
         switch category {
         case "Heart":     return String(localized: "Heart")
-        case "Charge":    return String(localized: "Charge")
-        case "Rest":      return String(localized: "Rest")
-        case "Effort":    return String(localized: "Effort")
+        case "Charge":    return String(localized: "Recovery")
+        case "Rest":      return String(localized: "Sleep")
+        case "Effort":    return String(localized: "Strain")
         case "Health":    return String(localized: "Health")
         case "Nutrition": return String(localized: "Nutrition")
         case "Mind":      return String(localized: "Mind")

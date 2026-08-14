@@ -1086,7 +1086,7 @@ private struct ActiveWorkoutLive: View {
                      tint: model.bpm == nil ? StrandPalette.textPrimary : StrandPalette.metricRose)
                 stat(String(localized: "Avg"), workout.avgHr > 0 ? "\(workout.avgHr)" : "—")
                 stat(String(localized: "Peak"), workout.peakHr > 0 ? "\(workout.peakHr)" : "—")
-                stat(String(localized: "Effort"), UnitFormatter.effortDisplay(workout.liveStrain, scale: effortScale),
+                stat(String(localized: "Strain"), UnitFormatter.effortDisplay(workout.liveStrain, scale: effortScale),
                      tint: StrandPalette.strainColor(workout.liveStrain))
             }
             // A liquid effort tube — the live effort as a fraction of the 0–100 strain axis.

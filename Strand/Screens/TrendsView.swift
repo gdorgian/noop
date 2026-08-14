@@ -683,7 +683,7 @@ struct TrendsView: View {
                     // Plotted points + range stay on the stored 0–100 scale (line shape unchanged); only the
                     // displayed numbers + unit follow the Effort-scale toggle, converted inside `fmt`. (#268)
                     title: "Effort", unit: "/ \(UnitFormatter.effortScaleMax(effortScale))",
-                    accessibilityTitle: String(localized: "Effort"),
+                    accessibilityTitle: String(localized: "Strain"),
                     metricKey: "strain",
                     points: strainPts,
                     // WHOOP: Effort/Strain is always BLUE — a deep→bright blue line, not the amber ramp.
