@@ -532,6 +532,9 @@ final class Repository: ObservableObject {
     static let appleHealthSource = "apple-health"
     static let healthConnectSource = "health-connect"
     static let activityFileSource = "activity-file"
+    /// Xiaomi Smart Band (Mi Fitness export). Written by the import, read by `XiaomiBandView` — and, since
+    /// the merge below, by the dashboard too. See `mergeXiaomi`.
+    static let xiaomiBandSource = "xiaomi-band"
 
     /// Imported wearable-export sources whose DAILY aggregates (HRV / resting HR / sleep) can be scored
     /// for a NOOP Charge/Rest on an import-only day, exactly like a live day (#823). These carry no raw HR
@@ -772,6 +775,8 @@ final class Repository: ObservableObject {
         let computed = await unionComputedDailyMetrics(store: store, from: fromDay, to: toDay)
         let apple = (try? await store.dailyMetrics(deviceId: Self.appleHealthSource, from: fromDay, to: toDay)) ?? []
         let activityFile = (try? await store.dailyMetrics(deviceId: Self.activityFileSource, from: fromDay, to: toDay)) ?? []
+        // Mi Band (Mi Fitness export) — merged as the lowest-priority filler, see `mergeXiaomi`.
+        let xiaomi = (try? await store.dailyMetrics(deviceId: Self.xiaomiBandSource, from: fromDay, to: toDay)) ?? []
         let impSleep = await unionSleepSessions(store: store, from: lo, to: hi)
         let compSleep = await unionComputedSleepSessions(store: store, from: lo, to: hi)
 
@@ -798,9 +803,14 @@ final class Repository: ObservableObject {
             let editedDays = Self.userEditedDays(compSleep)
             return MergedCaches(
                 importedSleep: fig,
-                days: Self.mergeActivityFileSteps(
-                    into: Self.mergeDaily(imported: imported, computed: computed, userEditedDays: editedDays),
-                    activityFile
+                // Mi Band goes on LAST so it fills only what the strap, its computed sibling and the
+                // activity files all left empty.
+                days: Self.mergeXiaomi(
+                    into: Self.mergeActivityFileSteps(
+                        into: Self.mergeDaily(imported: imported, computed: computed, userEditedDays: editedDays),
+                        activityFile
+                    ),
+                    xiaomi
                 ),
                 sleeps: Self.mergeSleep(imported: impSleep, computed: compSleep),
                 vitalRows: Self.sourceRows(imported: imported, computed: computed, apple: apple),
@@ -873,6 +883,40 @@ final class Repository: ObservableObject {
                     : merged
             } else {
                 byDay[d.day] = d
+            }
+        }
+        return byDay.values.sorted { $0.day < $1.day }
+    }
+
+    /// Fold Mi Band days into the dashboard as the LOWEST-priority source.
+    ///
+    /// The Mi Fitness import has always landed in the same tables under `xiaomi-band`, but `refresh()`
+    /// only ever asked for the strap, its computed sibling, Apple Health and activity files — so a year of
+    /// imported history was visible on the Mi Band screen and nowhere else. It was never a separate store;
+    /// the dashboard was simply one query short.
+    ///
+    /// Precedence is strap-wins, field by field:
+    ///   • a day the strap covers keeps every value it has, and Mi Band fills only the fields it left nil;
+    ///   • a day the strap never saw (anything before the WHOOP) is taken from Mi Band whole.
+    ///
+    /// This is the same shape as `mergeActivityFileSteps`, expressed through `fillingNilFields` rather
+    /// than a hand-written field list, so a field added to `DailyMetric` later cannot be silently dropped.
+    ///
+    /// What this DOESN'T do, and can't: give those days a Recovery or an Effort. Recovery is scored from
+    /// HRV over R-R intervals against a personal baseline, and Effort from a per-second heart-rate series
+    /// through the HRR zones — the Mi Fitness export contains neither (it carries daily avg/min/max HR and
+    /// no beat-to-beat data at all). So Mi Band days fill in sleep, steps, resting HR and SpO2 and stay
+    /// honestly blank on the two scores, rather than being handed a number derived from nothing.
+    nonisolated static func mergeXiaomi(into base: [DailyMetric], _ xiaomi: [DailyMetric]) -> [DailyMetric] {
+        guard !xiaomi.isEmpty else { return base }
+        // Last-wins on a duplicate day rather than `uniqueKeysWithValues`, which TRAPS if `base` ever
+        // carries two rows for one day — same safe convention as the other builders here.
+        var byDay = Dictionary(base.map { ($0.day, $0) }, uniquingKeysWith: { _, last in last })
+        for row in xiaomi {
+            if let existing = byDay[row.day] {
+                byDay[row.day] = existing.fillingNilFields(from: row)   // strap wins; Mi Band fills gaps
+            } else {
+                byDay[row.day] = row                                   // a day the strap never saw
             }
         }
         return byDay.values.sorted { $0.day < $1.day }
@@ -1145,7 +1189,20 @@ final class Repository: ObservableObject {
         var importedDays = Set<Date>()
         for s in imported { importedDays.insert(endDay(s)) }
         let computedKept = computed.filter { !importedDays.contains(endDay($0)) }
-        return (imported + computedKept).sorted { $0.effectiveStartTs < $1.effectiveStartTs }
+
+        // Mi Band nights, on the same lowest-priority terms the dashboard merge uses (`mergeXiaomi`): a
+        // night is kept ONLY where neither the strap nor its computed sibling already covers that end-day,
+        // so an imported Mi Band year fills the history BEFORE the WHOOP without ever competing with a
+        // real strap night. The Sleep tab reads this accessor rather than `refresh()`'s caches, so the
+        // merge has to be made here too — doing it in one place only would have left the Sleep tab still
+        // showing nothing for those days.
+        let xiaomi = Self.dedupBlocks(
+            await unionRawSleepBlocks(store: store, ids: [Self.xiaomiBandSource], from: lo, to: hi))
+        var coveredDays = importedDays
+        for s in computedKept { coveredDays.insert(endDay(s)) }
+        let xiaomiKept = xiaomi.filter { !coveredDays.contains(endDay($0)) }
+
+        return (imported + computedKept + xiaomiKept).sorted { $0.effectiveStartTs < $1.effectiveStartTs }
     }
 
     /// The persisted per-epoch MOTION series for each of `starts` (detected session start keys), keyed by
