@@ -227,6 +227,16 @@ targets:
         AppGroupIdentifier: "$(APP_GROUP_ID)"
         LSApplicationCategoryType: public.app-category.healthcare-fitness
         UILaunchScreen: {}
+        # ProMotion opt-in. WITHOUT this key iOS clamps every app-driven animation to 60Hz on a 120Hz
+        # panel — CADisplayLink, Core Animation, and SwiftUI's TimelineView(.animation) alike. The app
+        # never declared it, so the whole liquid layer has been running at half the panel's rate on
+        # every Pro iPhone since it was written, which is exactly the "why isn't this 120Hz / feels like
+        # an old phone" the display is capable of and the app was not asking for.
+        #
+        # Worth knowing what this does NOT fix: system-driven scrolling was already running at 120Hz,
+        # so this makes the app's own motion match the panel rather than making scrolling faster. Frame
+        # COST is the separate problem, handled by the liquid idle stand-down.
+        CADisableMinimumFrameDuration: true
         # Alternate app icons (v3 "Titanium & Gold"). The primary icon stays the asset-catalog
         # AppIcon (machined titanium); the alternate "AppIcon-Navy" (blued titanium) is declared
         # here so UIApplication.setAlternateIconName("AppIcon-Navy") can switch to it at runtime.
