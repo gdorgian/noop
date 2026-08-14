@@ -57,10 +57,24 @@ enum TodaySection: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The original, hard-coded section order — the default when the layout isn't customised. The journal
-    /// widget (#656) is last by default, where it was first added, above the data-sources card.
+    /// The default section order — used until the wearer customises the layout. The journal widget (#656)
+    /// stays last, where it was first added, above the data-sources card.
+    ///
+    /// FORK: Today now LEADS WITH THE ANSWER. `synthesis` — the greeting, the readiness pills and the
+    /// one-line "what to do about it" — used to sit third, below the hero and the Start-session row, which
+    /// put the only plain-language sentence on the screen roughly half a scroll down. The three hero scores
+    /// are what the app IS, but they are raw numbers; the sentence is what a wearer actually reads first.
+    /// Bevel and WHOOP both open with the verdict and keep the detail below it, and this is that shape.
+    ///
+    /// The rest is ordered most-glanceable first: live heart rate, then the three recovery vitals that
+    /// explain the Charge score, then the remaining metric tiles. `liveSession` is an ACTION rather than a
+    /// reading, so it drops below the data it would be based on instead of interrupting at position two.
+    ///
+    /// Only the ORDER changes. Every `rawValue` is untouched, so the "today.sectionOrder" string stays the
+    /// byte-identical cross-platform contract it is, and a wearer who has already arranged their own layout
+    /// keeps it — `decodeOrder` returns the saved order and only consults this for sections missing from it.
     static let defaultOrder: [TodaySection] = [
-        .hero, .liveSession, .synthesis, .keyMetrics, .workouts, .heartRate, .recoveryVitals, .yourCards,
+        .synthesis, .hero, .heartRate, .recoveryVitals, .keyMetrics, .liveSession, .workouts, .yourCards,
         .menstrualCycle, .journal, .addedCards,
     ]
 }

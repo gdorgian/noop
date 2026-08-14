@@ -89,7 +89,10 @@ struct TodayCustomizationSheet: View {
         )
         let metrics = EditableLayoutDraft(
             visible: KeyMetricPrefs.decodeEnabled(keyMetricsRaw.wrappedValue),
-            allItems: KeyMetric.defaultOrder
+            // `canonicalOrder`, not `defaultOrder`: this is the full registry the editor lists, and the
+            // default is now a SUBSET of it (the tiles that don't restate the hero or Recovery Vitals).
+            // Passing the default here would drop every un-defaulted tile out of the editor entirely.
+            allItems: KeyMetric.canonicalOrder
         )
         let cards = EditableLayoutDraft(
             visible: DashboardCardPrefs.decodeEnabled(dashboardCardsRaw.wrappedValue),
@@ -202,8 +205,8 @@ struct TodayCustomizationSheet: View {
             )
         case .keyMetrics:
             keyMetricDraft = EditableLayoutDraft(
-                visible: KeyMetric.defaultOrder,
-                allItems: KeyMetric.defaultOrder
+                visible: KeyMetric.defaultOrder,       // reset shows the default tiles…
+                allItems: KeyMetric.canonicalOrder     // …and the rest stay available to re-add
             )
             detailed = false
             windowDays = 14
