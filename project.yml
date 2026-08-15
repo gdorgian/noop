@@ -33,6 +33,10 @@ settings:
     # at runtime via the AppGroupIdentifier Info.plist key (WidgetSnapshot.suiteName) so the value is
     # never hard-coded in Swift. Built from $(BUNDLE_ID_PREFIX) (see Config/BundleId.xcconfig) — set
     # BUNDLE_ID_PREFIX in a gitignored Config/BundleIdSecrets.xcconfig to build under your own Apple ID.
+    # The iPhone app's bundle id. A variable so a build can be retargeted at a signing
+    # service's EXPLICIT App ID without editing sources (HealthKit cannot live on a wildcard,
+    # so the bundle id must match the profile exactly). Default is unchanged.
+    IOS_BUNDLE_ID: $(BUNDLE_ID_PREFIX).noop
     APP_GROUP_ID: group.$(BUNDLE_ID_PREFIX).noop.staging
     # Build for both Apple Silicon and Intel so the release runs on every Mac.
     ARCHS: "$(ARCHS_STANDARD)"
@@ -277,6 +281,13 @@ targets:
         NSLocationWhenInUseUsageDescription: "NOOP records your route during an outdoor workout to show distance, pace, and a map, and keeps recording while the screen is off. The route stays on your device. Nothing leaves it."
         NSHealthShareUsageDescription: "NOOP reads your own Apple Health data on-device to compute recovery, strain, and sleep. Nothing leaves your device."
         NSHealthUpdateUsageDescription: "NOOP writes the metrics it computes from your strap back into Apple Health, on-device and only when you allow it."
+        # NOOP does not read clinical health records. This string is declared anyway because the
+        # entitlement that would require it is not always ours to choose: a signing identity whose
+        # provisioning profile carries `com.apple.developer.healthkit.access = [health-records]` has that
+        # entitlement applied to the app at SIGNING time, and iOS terminates an app holding it without a
+        # matching usage string. Declaring it costs nothing (no prompt is shown unless the app actually
+        # requests records) and turns an unexplained launch failure into a non-event.
+        NSHealthClinicalHealthRecordsShareUsageDescription: "NOOP does not read clinical health records. This appears only because the certificate NOOP was signed with grants that capability."
         NSMotionUsageDescription: "NOOP reads your iPhone's step count for a walking or running workout to show steps in the activity summary. It stays on your device. Nothing leaves it."
         # #187: the opt-in AI Coach's "Custom (OpenAI-compatible)" provider can point at a LOCAL LLM on
         # the LAN (Ollama / LM Studio at http://192.168.x.x:11434). ATS blocks cleartext by default;
@@ -307,7 +318,7 @@ targets:
           - $(APP_GROUP_ID)
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).noop
+        PRODUCT_BUNDLE_IDENTIFIER: $(IOS_BUNDLE_ID)
         PRODUCT_NAME: "NOOP Staging"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Ship every *.appiconset (not just the primary AppIcon) so the alternate "AppIcon-Navy"
@@ -366,7 +377,7 @@ targets:
           - $(APP_GROUP_ID)
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).noop.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: $(IOS_BUNDLE_ID).widgets
         PRODUCT_NAME: NOOPWidgets
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1,2"
@@ -408,7 +419,7 @@ targets:
         # Pairs this watch app to the iPhone companion (must match NOOPiOS PRODUCT_BUNDLE_IDENTIFIER).
         # Built from the same $(BUNDLE_ID_PREFIX) rather than $(PRODUCT_BUNDLE_IDENTIFIER) because that
         # build setting would resolve to THIS target's own id, not NOOPiOS's.
-        WKCompanionAppBundleIdentifier: $(BUNDLE_ID_PREFIX).noop
+        WKCompanionAppBundleIdentifier: $(IOS_BUNDLE_ID)
         NSHealthShareUsageDescription: "NOOP reads your heart rate from the Watch sensor to show a live readout on your wrist. It stays on your device."
         NSHealthUpdateUsageDescription: "NOOP records a basic workout session on your Watch for a higher-fidelity heart rate. The session stays on your device."
     entitlements:
@@ -420,7 +431,7 @@ targets:
           - $(APP_GROUP_ID)
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).noop.watch
+        PRODUCT_BUNDLE_IDENTIFIER: $(IOS_BUNDLE_ID).watch
         # The bundle FILE is NOOPWatch.app so it doesn't collide with the iPhone app's NOOP.app when it is
         # embedded at NOOP.app/Watch/NOOPWatch.app. The user still sees "NOOP" on the wrist via the
         # CFBundleName / CFBundleDisplayName above.
@@ -470,7 +481,7 @@ targets:
           - $(APP_GROUP_ID)
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).noop.watch.complications
+        PRODUCT_BUNDLE_IDENTIFIER: $(IOS_BUNDLE_ID).watch.complications
         PRODUCT_NAME: NOOPWatchComplications
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "4"
