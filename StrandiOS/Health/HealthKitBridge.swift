@@ -647,6 +647,30 @@ final class HealthKitBridge: ObservableObject {
         if let firstError { throw firstError }
     }
 
+    /// Merge the computed and imported daily rows for the vitals write, FIELD BY FIELD.
+    ///
+    /// This used to be `byDay[r.day] = r` for each imported row — a wholesale replacement — described as
+    /// "matching the dashboard's source precedence". It did not match it. `Repository.mergeDaily` is
+    /// explicit that "imported daily values win FIELD-BY-FIELD; computed rows fill only nil imported
+    /// fields", and the difference is not cosmetic here: HRV, resting HR, SpO₂ and respiratory rate are
+    /// COMPUTED-only (see `computedDeviceId` — a Bluetooth-only wearer has no imported row carrying
+    /// them). So on every day that also had a raw strap row, replacing the whole row discarded all four,
+    /// and Apple Health received minute-by-minute heart rate and almost nothing else.
+    ///
+    /// It fails silently and selectively, which is why it survived: a day with no imported row writes
+    /// perfectly, so the pipeline looks like it works while quietly dropping most days.
+    ///
+    /// `fillingNilFields` gives the documented precedence — the import wins wherever it actually holds a
+    /// value, and the computed row supplies what the import left empty.
+    static func mergeVitalRows(computed: [DailyMetric], imported: [DailyMetric]) -> [DailyMetric] {
+        var byDay: [String: DailyMetric] = [:]
+        for r in computed { byDay[r.day] = r }
+        for r in imported {
+            byDay[r.day] = byDay[r.day].map { r.fillingNilFields(from: $0) } ?? r
+        }
+        return byDay.keys.sorted().map { byDay[$0]! }
+    }
+
     /// The nightly vitals write (the original write-back), now stamped at the day's wake time when
     /// that day has a sleep session — a real timestamp inside the night the value describes, instead
     /// of a fabricated noon. Keys are unchanged, so re-stamped samples replace their noon ancestors.
@@ -669,10 +693,7 @@ final class HealthKitBridge: ObservableObject {
         // computed per day, matching the dashboard's source precedence.
         let computed = (try? await whoopStore.dailyMetrics(deviceId: computedDeviceId, from: from, to: to)) ?? []
         let imported = (try? await whoopStore.dailyMetrics(deviceId: noopDeviceId, from: from, to: to)) ?? []
-        var byDay: [String: DailyMetric] = [:]
-        for r in computed { byDay[r.day] = r }   // computed first
-        for r in imported { byDay[r.day] = r }   // imported overrides
-        let rows = byDay.keys.sorted().map { byDay[$0]! }
+        let rows = HealthKitBridge.mergeVitalRows(computed: computed, imported: imported)
 
         struct Candidate { let type: HKQuantityType; let key: String; let sample: HKQuantitySample }
         var candidates: [Candidate] = []
