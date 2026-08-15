@@ -27,6 +27,11 @@ mkdir -p "$STAGE/Payload"
 cp -R "$APP" "$STAGE/Payload/"
 
 BUNDLE="$STAGE/Payload/$(basename "$APP")"
+if [ "${STRIP_EXTENSIONS:-0}" = "1" ] && [ -d "$BUNDLE/PlugIns" ]; then
+    echo "stripping app extensions (explicit App ID covers the app bundle id only)"
+    rm -rf "$BUNDLE/PlugIns"
+fi
+
 if [ -d "$BUNDLE/Watch" ]; then
     echo "stripping embedded Watch app (see header for why)"
     rm -rf "$BUNDLE/Watch"
