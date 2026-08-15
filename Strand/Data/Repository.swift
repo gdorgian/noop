@@ -2906,10 +2906,15 @@ final class Repository: ObservableObject {
     }
 }
 
-private extension DailyMetric {
+extension DailyMetric {
     /// A copy of self where every nil field is backfilled from `fallback`. Used by the field-by-field
     /// daily merge so an imported export keeps its own values while a computed row fills the gaps it
     /// doesn't carry (e.g. on-device Charge / skin-temp deviation / activity totals).
+    ///
+    /// Module-scoped rather than file-private: `HealthKitBridge.mergeVitalRows` needs the SAME rule when
+    /// it picks the rows to publish to Apple Health. It previously open-coded a wholesale row
+    /// replacement instead, which silently discarded every computed-only metric — HRV, resting HR, SpO₂,
+    /// respiratory rate — on any day that also had an imported row. One definition, one behaviour.
     func fillingNilFields(from fallback: DailyMetric) -> DailyMetric {
         DailyMetric(
             day: day,
