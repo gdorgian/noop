@@ -14,6 +14,8 @@ import WhoopStore
 struct AuraTodayView: View {
 
     @EnvironmentObject var repo: Repository
+    @EnvironmentObject var profile: ProfileStore
+    @EnvironmentObject var live: LiveState
 
     /// Today's row, or the newest scored one. The design shows a filled screen; a wearer opening the app
     /// mid-morning before a sync has today's row empty, so falling back to the newest scored day keeps
@@ -25,6 +27,7 @@ struct AuraTodayView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Aura.cardGap) {
+                header
                 hero
                 stateBlock
                 pillars
@@ -52,6 +55,110 @@ struct AuraTodayView: View {
             .ignoresSafeArea()
         }
         .accessibilityHidden(false)
+    }
+
+    // MARK: Header
+
+    /// `padding: 58px 20px 18px` in the design — greeting + headline on the left, the band chip and the
+    /// avatar on the right. The horizontal padding is applied by the scroll container, so only the
+    /// vertical offsets are set here.
+    private var header: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(greeting).font(Aura.text(13.5)).foregroundStyle(Aura.inkCoach)
+                Text(headline)
+                    .font(Aura.display(23, .regular)).kerning(-0.46)
+                    .foregroundStyle(Aura.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                bandChip
+                avatar
+            }
+            .padding(.top, 2)
+        }
+        .padding(.bottom, 6)
+    }
+
+    /// The strap chip: a 13×7 battery glyph over the percentage. Both are gated on a live link — the
+    /// stored percentage is never cleared when a strap disconnects, so drawing it ungated shows a
+    /// day-old reading as if it were current.
+    private var bandChip: some View {
+        VStack(spacing: 1) {
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .strokeBorder(Aura.restored, lineWidth: 1.2)
+                    .frame(width: 13, height: 7)
+                if let pct = liveBatteryPct {
+                    RoundedRectangle(cornerRadius: 1, style: .continuous)
+                        .fill(Aura.restored)
+                        .frame(width: max(1, 11 * CGFloat(pct) / 100), height: 5)
+                        .padding(.leading, 1)
+                }
+            }
+            .frame(width: 13, height: 7)
+            Text(liveBatteryPct.map(String.init) ?? "—")
+                .font(Aura.text(8.5, .semibold)).monospacedDigit()
+                .foregroundStyle(Aura.inkCoach)
+        }
+        .frame(width: 38, height: 38)
+        .background(
+            Circle().fill(Color.white.opacity(0.06))
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
+        )
+        .accessibilityLabel(Text(liveBatteryPct.map { String(localized: "Strap battery \($0) percent") }
+                                 ?? String(localized: "Strap battery unknown")))
+    }
+
+    /// The profile avatar. Renders the wearer's initial when a name is set, and a person glyph when it
+    /// is not — NOOP has never asked for a name, so an unset one is the common case, and a hardcoded
+    /// placeholder letter would be someone else's initial on every screen.
+    private var avatar: some View {
+        Group {
+            if let initial = profile.initial {
+                Text(initial).font(Aura.text(13, .semibold))
+            } else {
+                Image(systemName: "person.fill").font(.system(size: 14, weight: .medium))
+            }
+        }
+        .foregroundStyle(Color(hex: "#C6CEC9"))
+        .frame(width: 38, height: 38)
+        .background(
+            Circle().fill(LinearGradient(colors: [Color(hex: "#3A4340"), Color(hex: "#242B29")],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
+        )
+    }
+
+    /// `LiveState.batteryPct` is deliberately never cleared on disconnect, so it must be read behind a
+    /// `connected` gate — ungated, a strap that died yesterday keeps showing its last percentage as
+    /// though it were current.
+    private var liveBatteryPct: Int? {
+        guard live.connected, let pct = live.batteryPct else { return nil }
+        return Int(pct.rounded())
+    }
+
+    /// The design's `Hi, Gabriel`, degrading to a plain time-of-day greeting when no name is set.
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let name = profile.displayName.trimmingCharacters(in: .whitespaces)
+        if !name.isEmpty { return String(localized: "Hi, \(name)") }
+        switch hour {
+        case ..<12:  return String(localized: "Good morning")
+        case ..<18:  return String(localized: "Good afternoon")
+        default:     return String(localized: "Good evening")
+        }
+    }
+
+    /// The design's `Here's your morning read`, tracking the actual time of day.
+    private var headline: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case ..<12:  return String(localized: "Here's your morning read")
+        case ..<18:  return String(localized: "Here's where you stand")
+        default:     return String(localized: "Here's how today went")
+        }
     }
 
     // MARK: Hero

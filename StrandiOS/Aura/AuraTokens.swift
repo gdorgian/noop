@@ -74,13 +74,20 @@ enum Aura {
     }
 
     // MARK: Type
-    // The design sets numerals in Outfit, which NOOP does not bundle and which cannot ship with an
-    // anonymous sideload without adding a font licence to the repo. `.rounded` is the closest system
-    // face: same geometric, low-contrast character, and it carries the tabular figures the design's
-    // numerals rely on. Weights and tracking are the design's.
+    // Outfit, bundled (SIL Open Font License 1.1 — licence shipped at StrandiOS/Aura/Fonts/OFL.txt and
+    // registered via UIAppFonts). The design sets every numeral in it, and substituting the nearest
+    // system face is the difference between a copy and an approximation.
+    //
+    // Outfit ships as a VARIABLE font, so a plain `Font.custom` request resolves to Regular regardless
+    // of the weight asked for. `variableWeight` drives the wght axis directly, which is the only way the
+    // design's 300 and 500 weights actually render.
+    static let familyName = "Outfit"
+
     static func display(_ size: CGFloat, _ weight: Font.Weight = .light) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
+        .custom(familyName, fixedSize: size).weight(weight)
     }
+    /// Body copy stays on the system face — the design pairs Outfit numerals with Instrument Sans text,
+    /// and the system UI face is the closer match to Instrument Sans than Outfit is.
     static func text(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         .system(size: size, weight: weight)
     }

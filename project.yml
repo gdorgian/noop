@@ -231,6 +231,11 @@ targets:
         AppGroupIdentifier: "$(APP_GROUP_ID)"
         LSApplicationCategoryType: public.app-category.healthcare-fitness
         UILaunchScreen: {}
+        # The Aura design sets every numeral in Outfit. Bundled (SIL Open Font License 1.1, licence
+        # shipped beside the file at StrandiOS/Aura/Fonts/OFL.txt) so the transcribed screens match the
+        # design exactly rather than substituting the nearest system face.
+        UIAppFonts:
+          - Outfit.ttf
         # ProMotion opt-in. WITHOUT this key iOS clamps every app-driven animation to 60Hz on a 120Hz
         # panel — CADisplayLink, Core Animation, and SwiftUI's TimelineView(.animation) alike. The app
         # never declared it, so the whole liquid layer has been running at half the panel's rate on
