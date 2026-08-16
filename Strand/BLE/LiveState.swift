@@ -596,7 +596,12 @@ public final class LiveState: ObservableObject {
         // (redactPii below); tagging happens BEFORE redaction so the scrub covers the whole line.
         let tagged = domain.map { "[\($0.id)] " + line } ?? line
         let redacted = Self.redactPii(tagged)
-        if Self.mirrorLogToStdout { print("[noop] \(redacted)") }
+        // stderr, NOT `print`. Swift's stdout is BLOCK-buffered whenever it isn't a TTY, and over a
+        // devicectl console pipe it never is — so a mirrored line sat in a 4 KB buffer and appeared only
+        // when the process exited, which is precisely useless for watching a live session. stderr is
+        // unbuffered, so each line reaches the console as it happens. (Measured: a stdout mirror produced
+        // a 0-byte capture across a whole session, then flushed everything at termination.)
+        if Self.mirrorLogToStdout { fputs("[noop] \(redacted)\n", stderr) }
         log.append(redacted)
         // Batched trim: overrun by `trimSlack`, then trim back to the cap in one shot (amortized O(1)/line).
         if log.count > Self.maxLogLines + Self.trimSlack { log.removeFirst(log.count - Self.maxLogLines) }
