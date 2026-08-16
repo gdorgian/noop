@@ -870,6 +870,15 @@ public final class BLEManager: NSObject, ObservableObject {
     private var clockRequested = false
     /// #700: retry count for GET_CLOCK when no correlation establishes before backfill. Capped at 3.
     private var clockRetries = 0
+    /// When the last GET_CLOCK was put on the wire, so the 3-retry budget is spent over TIME rather than
+    /// over calls. Backfill triggers (connect / foreground / periodic / strap) arrive back-to-back —
+    /// measured on a 5.0/MG, retries 1 and 2 burned within a single second — so a per-call counter
+    /// exhausts the budget long before any reply could arrive, whether or not the offload defers.
+    private var lastClockRequestAt: TimeInterval = 0
+    /// How long a re-sent GET_CLOCK is given to answer before another retry is spent. The reply crosses
+    /// a BLE notify, so this only has to clear round-trip plus the strap's own turnaround; 2 s is
+    /// generous for that and still lets all three retries resolve inside ~6 s of a connect.
+    private static let clockReplyGraceSec: TimeInterval = 2.0
     private var intentionalDisconnect = false
     /// Consecutive `didFailToConnect` count, for the auto-reconnect backoff (#414). Reset to 0 on a
     /// successful connect; grows the reschedule delay so a strap that's genuinely out of range doesn't
@@ -1783,6 +1792,16 @@ public final class BLEManager: NSObject, ObservableObject {
         // WHOOP 4.0 — GET_CLOCK sent, no reply, entire session decodes under IDENTITY fallback, all
         // rows land on the current day). Capped at 3 retries to avoid flooding.
         if clockRef == nil && clockRetries < 3 {
+            // Only SPEND a retry once the previous request has had `clockReplyGraceSec` to answer.
+            // Otherwise defer without consuming one: the budget exists to give the strap time to reply,
+            // and back-to-back triggers would otherwise burn all three in the same second and drop
+            // straight through to the rough fallback — measured doing exactly that on a 5.0/MG.
+            let now = Date().timeIntervalSince1970
+            guard now - lastClockRequestAt >= Self.clockReplyGraceSec else {
+                log("Backfill: deferred — GET_CLOCK sent \(Int(now - lastClockRequestAt))s ago, awaiting reply")
+                return false
+            }
+            lastClockRequestAt = now
             clockRetries += 1
             log("Clock: no correlation yet — re-sending GET_CLOCK (retry \(clockRetries)/3)")
             send(.getClock, payload: [])
