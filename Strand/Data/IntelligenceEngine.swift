@@ -1271,6 +1271,25 @@ final class IntelligenceEngine: ObservableObject {
             if let cand = spo2CandidateByDay[daily.day] {
                 restPoints.append(MetricPoint(day: daily.day, key: "spo2_candidate", value: Double(cand)))
             }
+            // The ABSOLUTE nightly worn skin temperature (°C), beside the baseline-relative deviation
+            // already carried on `daily.skinTempDevC`. The deviation is NOOP-relative and meaningless to
+            // anyone else; the absolute is what Apple Health's sleeping-wrist-temperature type wants, and
+            // it is otherwise computed and discarded — `wornNightlySkinTempC` runs every pass, seeds the
+            // baseline, and never reaches a store. Written under the "-noop" computed device ID so the
+            // HealthKit write-back can read a real measurement rather than re-deriving one from a
+            // deviation plus a baseline (which would bake NOOP's own baseline into a value other apps
+            // read as absolute).
+            //
+            // 5.0/MG ONLY. There `raw / 100` is a proven centidegree register (Whoop5HistoricalTests reads
+            // worn 3057 = 30.6 °C, off-wrist 2247 = 22.5 °C). A 4.0 goes through `Whoop4SkinTemp`'s
+            // provisional single-anchor affine map, whose own docs call it "NOT a claimed-accurate absolute
+            // thermometer" (TODO #938) — fine as a self-relative deviation, wrong to publish into Health as
+            // an absolute other apps will read as measured. The deviation path is unchanged for both.
+            if let c = night.nightlySkin,
+               let owner = resolvedScoreOwnerByDay[daily.day],
+               Self.skinTempFamily(forOwner: owner, devices: regDevices) == .whoop5 {
+                restPoints.append(MetricPoint(day: daily.day, key: "skin_temp_c", value: c))
+            }
             // #1169 shadow metric: the primary-session mean RHR, stored beside the shipped floor
             // (daily.restingHr) under the "-noop" computed ID. Instrumentation only — never shown, never
             // scored — so the mean-vs-floor comparison the issue needs can be evaluated from exports later.
