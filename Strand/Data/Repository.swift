@@ -1716,7 +1716,14 @@ final class Repository: ObservableObject {
     /// raw→°C conversion. Reads the registry ONCE; the model-label → family mapping (and the `.whoop5`
     /// fallback for unknowns) lives in `DeviceFamily.forRegistryDevice` (#171, #1086). Best-effort: an unreadable
     /// registry yields an empty map, so every caller falls back to `.whoop5`.
-    private static func skinTempFamilies(store: WhoopStore, ids: [String]) -> [String: DeviceFamily] {
+    /// Module-scoped (not `private`) so the strap-log diagnostic resolves the family the SAME way the
+    /// scoring path does. It used to read a legacy `selectedWhoopModel` UserDefaults key and fall to
+    /// `.whoop4` whenever that key wasn't literally "whoop5" — which a wizard-paired 5.0/MG never sets —
+    /// so the log reported a 5/MG's centidegree raws through the 4.0 anchor map, mapped ~34 °C to
+    /// ~162 °C, and printed `kept 0/…, outOfRange=<all>` on a night the pipeline scored perfectly well.
+    /// A diagnostic that misreports is worse than none: it sends whoever reads it after a fault that
+    /// isn't there.
+    static func skinTempFamilies(store: WhoopStore, ids: [String]) -> [String: DeviceFamily] {
         let devices = (try? DeviceRegistryStore(dbQueue: store.registryWriter).all()) ?? []
         var out: [String: DeviceFamily] = [:]
         for id in ids {
