@@ -615,7 +615,8 @@ struct LiquidTodayView: View {
             // Activity (`Repository.widgetAnchor`) and Android. Effort deliberately does NOT carry — it is
             // today's own accumulation, so yesterday's number would be a false statement, not a stale one.
             HeroScoreCell(label: String(localized: "Recovery"), score: chargeDisplay.pct, tint: chargeTint,
-                          animated: dataLoaded, onGuide: { guideSection = .charge })
+                          animated: dataLoaded, onGuide: { guideSection = .charge },
+                          verdict: readinessWord)
             // #45: the hero Effort must honour the user's Effort scale like every other Effort read-out.
             // Show the value on the chosen scale (0–100 or WHOOP 0–21) with the matching vessel max, and
             // one decimal on the compressed 0–21 axis to match the app-wide `effortDisplay` convention
@@ -664,7 +665,8 @@ struct LiquidTodayView: View {
     private var yourCardsSection: some View {
         VStack(spacing: 8) {
             HStack {
-                Text("YOUR CARDS").font(StrandFont.overline).tracking(1.6)
+                Text("YOUR CARDS").font(StrandFont.overline)
+                    .tracking(StrandFont.overlineTracking)   // token, not 1.6 — see `sectionHead`
                     .foregroundStyle(StrandPalette.textTertiary)
                 Spacer()
                 Button { customizationDestination = .yourCards } label: {
@@ -952,15 +954,12 @@ struct LiquidTodayView: View {
                     // A state pill reading "Solid" in confident green while the sentence underneath said
                     // "prioritise rest today" was the sharpest version of the contradiction — the colour
                     // and the words were making opposite claims about the same day.
-                    if let word = readinessWord {
-                        Text(word)
-                            .font(StrandFont.caption.weight(.bold))
-                            .foregroundStyle(chargeTint)
-                            .padding(.horizontal, 13)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(chargeTint.opacity(0.14))
-                                .overlay(Capsule().strokeBorder(chargeTint.opacity(0.3), lineWidth: 1)))
-                    }
+                    // The readiness word (Push / Maintain / Rest) USED to sit here, as a pill beside the
+                    // greeting — a verdict about the Recovery score, rendered a hundred points away from
+                    // the Recovery score. It now sits directly under that number, which is where a reader
+                    // looking at "32" asks "so what do I do?". Same word, same tint, read in one glance
+                    // instead of two. Only the provenance pill stays here, because that IS about the
+                    // greeting row: which night the screen is showing.
                     HStack(spacing: 5) {
                         Circle().fill(chargeTint).frame(width: 6, height: 6)
                         Text(chargeDisplay.stateLabel)
@@ -1352,7 +1351,14 @@ struct LiquidTodayView: View {
 
     private func sectionHead(_ title: String, trailing: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(LocalizedStringKey(title)).font(StrandFont.overline).tracking(1.6).foregroundStyle(StrandPalette.textTertiary)
+            // `StrandFont.overlineTracking`, not a hardcoded 1.6. The design system defines the overline
+            // letter-spacing once (0.45) and `StrandFont.overlineStyle` applies it everywhere else; Today
+            // was spacing its section heads 3.5x wider than the token, which is why SYNTHESIS / HEART RATE
+            // / RECOVERY VITALS read as shouted chrome competing with the numbers under them rather than
+            // as quiet labels. Tokens-only is the house rule, and here the rule and the look agree.
+            Text(LocalizedStringKey(title)).font(StrandFont.overline)
+                .tracking(StrandFont.overlineTracking)
+                .foregroundStyle(StrandPalette.textTertiary)
             Spacer()
             Text(LocalizedStringKey(trailing)).font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
         }
@@ -1820,6 +1826,11 @@ private struct HeroScoreCell: View {
     // Decimal places for the displayed number. 0 keeps the whole-number scores; the WHOOP 0–21 Effort
     // scale passes 1 to match the app-wide one-decimal `effortDisplay` convention (#45).
     var decimals: Int = 0
+    /// The one-word instruction this score implies — Push / Maintain / Rest — set on Recovery only.
+    /// A score is a measurement; this is what to DO about it, and it belongs under the number rather
+    /// than in a pill at the top of the screen, where the reader has to carry "Rest" down to "32" and
+    /// join them up themselves. Nil on Effort and Sleep, which imply no single instruction.
+    var verdict: String? = nil
 
     var body: some View {
         VStack(spacing: 7) {
@@ -1848,7 +1859,17 @@ private struct HeroScoreCell: View {
                 .foregroundStyle(StrandPalette.textSecondary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text("\(label), \(score.map { decimals > 0 ? String(format: "%.\(decimals)f", $0) : String(Int($0.rounded())) } ?? String(localized: "no data yet")). See how it is scored."))
+            .accessibilityLabel(Text("\(label), \(score.map { decimals > 0 ? String(format: "%.\(decimals)f", $0) : String(Int($0.rounded())) } ?? String(localized: "no data yet"))\(verdict.map { ". \($0)" } ?? ""). See how it is scored."))
+            // The instruction, in the score's own tint, directly beneath it. Hidden from VoiceOver as a
+            // separate element because it is already folded into the label above — a reader should hear
+            // "Recovery, 32, Rest", not meet the word a second time as an orphan.
+            if let verdict {
+                Text(verdict)
+                    .font(StrandFont.caption.weight(.bold))
+                    .foregroundStyle(tint)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                    .accessibilityHidden(true)
+            }
         }
         .frame(maxWidth: .infinity)
     }
