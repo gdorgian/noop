@@ -46,13 +46,31 @@ struct RootTabView: View {
     @AppStorage(MoreSectionPrefs.storageKey) private var expandedMoreSectionsCSV = MoreSectionPrefs.defaultCSV
     private var expandedMoreSections: Set<String> { MoreSectionPrefs.decode(expandedMoreSectionsCSV) }
 
-    /// V8 liquid redesign is the default Today; the Settings toggle lets a user fall back to the classic
-    /// Today if they prefer it (keyed identically to the SettingsView toggle). Default ON.
-    @AppStorage("noop.liquidTodayEnabled") private var liquidTodayEnabled = true
-
-    /// The Today tab root, honouring the liquid/classic preference.
+    /// The Today tab root. iPhone's Today is the Aura redesign — it replaced the liquid/classic pair
+    /// outright here, so there is no `noop.liquidTodayEnabled` branch on this platform any more (macOS
+    /// still honours that toggle in `RootView`; the Settings card is macOS-only for that reason).
+    ///
+    /// Aura's own Rest / Charge / Effort screens are not built yet, so its pillars and signal rows route
+    /// to the incumbent screens: Rest to the Sleep tab, Charge and Effort to Trends. Those arms retire as
+    /// each Aura screen lands.
     @ViewBuilder private var todayTabRoot: some View {
-        if liquidTodayEnabled { LiquidTodayView() } else { TodayView() }
+        AuraTodayView { destination in
+            switch destination {
+            case .rest:
+                switchTab(to: 2)
+            case .charge, .effort:
+                switchTab(to: 1)
+            case .band:
+                showDevices = true
+            case .profile:
+                switchTab(to: 3)
+            }
+        }
+    }
+
+    /// Moves to another tab with the shell's standard crossfade.
+    private func switchTab(to tag: Int) {
+        withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.24)) { selectedTab = tag }
     }
 
     /// Native tab selection binding. SwiftUI sends taps on the already-selected item through the
@@ -86,13 +104,13 @@ struct RootTabView: View {
     /// rebuild the tab roots underneath it. The same class of rebuild is what #197 caused with an
     /// `.id()` reset and #198 had to undo — it lost scroll position and re-ran `.task`.
     ///
-    /// Only a decisive horizontal flick switches tabs, and Today is carved out because it uses
-    /// horizontal swipe to change DAYS. Both thresholds are unchanged from the original gesture.
+    /// Only a decisive horizontal flick switches tabs. Both thresholds are unchanged from the original
+    /// gesture. Today used to be carved out of this because the liquid Today owned horizontal swipe for
+    /// changing DAYS; Aura Today has no day navigation, so the carve-out was removed with it rather than
+    /// left to silently eat the gesture on the first tab.
     private var tabSwipeGesture: some Gesture {
         DragGesture(minimumDistance: 24)
             .onEnded { v in
-                // Today (tab 0) uses horizontal swipe to change DAYS, so tab-swipe is off there.
-                guard selectedTab != 0 else { return }
                 let dx = v.translation.width, dy = v.translation.height
                 guard abs(dx) > 60, abs(dx) > abs(dy) * 1.6 else { return }
                 let next = min(3, max(0, selectedTab + (dx < 0 ? 1 : -1)))
