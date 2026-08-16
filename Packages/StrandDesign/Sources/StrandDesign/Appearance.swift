@@ -11,6 +11,12 @@ import SwiftUI
 public enum ChartStyle: String, CaseIterable, Identifiable, Sendable {
     case titanium   // brand: gold recovery, amber strain, blue rest
     case classic    // throwback: red→green recovery, cool→hot zones, green→red stress
+    // Aura: the body-state ramp from the Noop design project — coral → orange → amber → BLUE at the top.
+    // Not a traffic light. Green/red says pass/fail, which is a verdict on the wearer; the Aura ramp
+    // says depleted → restored, which is a description of a body. Blue reads as cool and settled where
+    // green reads as "correct", and the warm end climbs through the same amber the Effort world uses,
+    // so a hard day and a low recovery share a temperature rather than clashing.
+    case aura
 
     public var id: String { rawValue }
     public static let storageKey = "chart.style"
@@ -19,6 +25,7 @@ public enum ChartStyle: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .titanium: return String(localized: "Default", bundle: .module)
         case .classic:  return String(localized: "Classic", bundle: .module)
+        case .aura:     return String(localized: "Aura", bundle: .module)
         }
     }
 
@@ -33,7 +40,7 @@ public enum ChartStyle: String, CaseIterable, Identifiable, Sendable {
     /// Both styles remain; Settings → "Chart colours" still switches between them. This only moves
     /// which one you get before choosing, and it is the single place that decision lives — the app
     /// roots and the Settings picker all read their `@AppStorage` default from here.
-    public static let fallback: ChartStyle = .classic
+    public static let fallback: ChartStyle = .aura
 
     public static func resolve(_ raw: String) -> ChartStyle { ChartStyle(rawValue: raw) ?? fallback }
 }
