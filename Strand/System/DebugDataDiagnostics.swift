@@ -155,7 +155,14 @@ enum DebugDataDiagnostics {
         }
         let det = SleepSession(start: cs.startTs, end: cs.endTs, efficiency: cs.efficiency ?? 0,
                                stages: [], restingHR: cs.restingHr, avgHRV: cs.avgHrv)
-        let family: DeviceFamily = (UserDefaults.standard.string(forKey: "selectedWhoopModel") == "whoop5") ? .whoop5 : .whoop4
+        // Resolve the family from the DEVICE REGISTRY, the same source the scoring path reads via
+        // `IntelligenceEngine.skinTempFamily(forOwner:devices:)`. This previously keyed off a legacy
+        // `selectedWhoopModel` UserDefaults value and defaulted to `.whoop4` whenever it wasn't exactly
+        // "whoop5" — which a 5.0/MG paired through the modern wizard never writes, since the wizard fills
+        // the registry instead. The diagnostic therefore ran a 5/MG's centidegree raws through the 4.0
+        // anchor map on a strap the registry correctly labelled "WHOOP 5.0 / MG", reporting every sample
+        // out of range while `analyzeDay` was converting the same rows correctly.
+        let family = Repository.skinTempFamilies(store: store, ids: [did])[did] ?? .whoop5
         // Mirror the real per-device anchor (#404): learn it from the WHOLE recent window's raws — not just
         // this night — so a single sparse night (<100 in-band) can't misreport under the global fallback when
         // the window as a whole has enough in-band samples for analyzeDay to learn a device anchor.
