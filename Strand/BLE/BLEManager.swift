@@ -5610,6 +5610,43 @@ extension BLEManager: @preconcurrency CBPeripheralDelegate {
                         continue
                     }
                     router.handle(frame: frame)
+                    // GET_CLOCK response — the clock correlation the 4.0 branch establishes and this one
+                    // never did. Its absence is why a 5/MG logs "Clock: no correlation yet" forever and
+                    // decodes EVERY historical offload under the IDENTITY ref: GET_CLOCK was being sent
+                    // (repeatedly, with retries) and nothing on this path was listening for the answer.
+                    //
+                    // Puffin envelope, mapped from the reference decode in b-nnett/goose
+                    // (GooseBLEClient+HistoricalHandlers) whose payload indices sit 8 bytes earlier than
+                    // this frame's: cmd @10, sequence @11, result @12, body from @13. Body is the same
+                    // shape NOOP already SENDS in SET_CLOCK — u32 LE seconds, then u32 LE subseconds at
+                    // 32768/s — which is why the strap accepts our SET_CLOCK and we simply never read the
+                    // GET back.
+                    //
+                    // Result byte must be 1; anything else is a failure reply carrying no timestamp.
+                    if clockRef == nil, frame.count > 20, frame[8] == 0x24,
+                       frame[10] == WhoopCommand.getClock.rawValue, frame[12] == 1 {
+                        let seconds = UInt32(frame[13]) | UInt32(frame[14]) << 8
+                            | UInt32(frame[15]) << 16 | UInt32(frame[16]) << 24
+                        let subseconds = UInt32(frame[17]) | UInt32(frame[18]) << 8
+                            | UInt32(frame[19]) << 16 | UInt32(frame[20]) << 24
+                        let deviceTime = TimeInterval(seconds) + TimeInterval(subseconds) / 32768.0
+                        // Correlate against the MIDPOINT of the round trip, not the arrival instant: the
+                        // strap sampled its clock somewhere between our request and this reply, so
+                        // arrival-time correlation biases the offset by the full RTT. Same compensation
+                        // goose applies. Falls back to now when no request timestamp is recorded (a reply
+                        // to the connect-time GET_CLOCK, which predates the retry bookkeeping).
+                        let arrival = Date().timeIntervalSince1970
+                        let sampledAt = lastClockRequestAt > 0
+                            ? lastClockRequestAt + (arrival - lastClockRequestAt) / 2
+                            : arrival
+                        let ref = ClockRef(device: Int(deviceTime.rounded()), wall: Int(sampledAt.rounded()))
+                        clockRef = ref
+                        collector?.clockRef = ref
+                        backfiller?.clockRef = ref
+                        log("Clock correlated (5/MG): device=\(ref.device) wall=\(ref.wall) "
+                            + "offset \(ref.wall - ref.device)s"
+                            + (clockRetries > 0 ? " (after retry \(clockRetries))" : ""))
+                    }
                     // #592: a 5/MG extended-battery probe COMMAND_RESPONSE (puffin envelope: type @8, cmd
                     // @10). Format + publish it for the Devices dialog, exactly like the 4.0 path above.
                     if frame.count > 10, frame[8] == 0x24, frame[10] == WhoopCommand.getExtendedBatteryInfo.rawValue {
