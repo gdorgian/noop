@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import StrandDesign
+import WhoopStore
 
 /// iOS navigation shell. macOS uses a `NavigationSplitView` sidebar (`RootView`); on iPhone the
 /// natural analogue is a `TabView` with the most-used screens as tabs and everything else under a
@@ -11,6 +12,15 @@ struct RootTabView: View {
     let homeScreenQuickActionsEnabled: Bool
 
     @EnvironmentObject private var repo: Repository
+    /// Aura Today reads the wearer's own values through these — the strap link for the band chip and
+    /// the profile for the greeting and avatar initial.
+    @EnvironmentObject private var live: LiveState
+    @EnvironmentObject private var profile: ProfileStore
+
+    /// The newest SCORED day, falling back to the newest row. A wearer opening the app before the first
+    /// analytics pass of the morning has today's row present but unscored, and blanking the screen for
+    /// that window reads as data loss rather than as "not computed yet".
+    private var auraDay: DailyMetric? { repo.days.last(where: { $0.recovery != nil }) ?? repo.days.last }
     /// Cross-screen navigation requests (e.g. Live → "Manage devices"). Devices isn't a tab — it lives
     /// behind the More list — so a request presents it as a sheet, matching the quick-action screens.
     @EnvironmentObject private var router: NavRouter
@@ -54,7 +64,13 @@ struct RootTabView: View {
     /// to the incumbent screens: Rest to the Sleep tab, Charge and Effort to Trends. Those arms retire as
     /// each Aura screen lands.
     @ViewBuilder private var todayTabRoot: some View {
-        AuraTodayView { destination in
+        AuraTodayView(state: AuraBodyState.forCharge(auraDay?.recovery),
+                      reading: AuraTodayReading.live(
+                          day: auraDay,
+                          history: Array(repo.days.suffix(14)),
+                          // Gated on a live link: LiveState.batteryPct is never cleared on disconnect.
+                          batteryPercent: live.connected ? live.batteryPct.map { Int($0.rounded()) } : nil,
+                          displayName: profile.displayName)) { destination in
             switch destination {
             case .rest:
                 switchTab(to: 2)
