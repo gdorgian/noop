@@ -999,23 +999,73 @@ struct LiquidTodayView: View {
             card {
             VStack(alignment: .leading, spacing: 12) {
                 vitalRow(String(localized: "Heart-rate variability"), unitText(hrv, "ms"),
-                         StrandPalette.metricCyan, fracOver(hrv, 120))
+                         StrandPalette.metricCyan, windowedSpark("hrv"), hrv)
                 vitalRow(String(localized: "Resting heart rate"), unitText(rhr, "bpm"),
-                         StrandPalette.metricRose, fracOver(rhr, 100))
+                         StrandPalette.metricRose, windowedSpark("rhr"), rhr)
                 vitalRow(String(localized: "Breaths per minute"), unitText(resp, "rpm", decimals: 1),
-                         StrandPalette.accent, fracOver(resp, 24))
+                         StrandPalette.accent, windowedSpark("resp_rate"), resp)
             }
             }
         }
     }
 
-    private func vitalRow(_ label: String, _ value: String, _ tint: Color, _ frac: Double?) -> some View {
-        HStack(spacing: 12) {
-            LiquidVessel(value: frac, tint: tint, animated: false).frame(width: 26, height: 26)
-            Text(label).font(StrandFont.subhead).foregroundStyle(StrandPalette.textSecondary)
-            Spacer()
-            Text(value).font(StrandFont.number(15)).foregroundStyle(StrandPalette.textPrimary)
+    /// One vital: the number, and — the point of the change — the wearer's OWN recent trend beneath it.
+    ///
+    /// This row used to draw a `LiquidVessel` filled to `fracOver(value, <arbitrary ceiling>)`: HRV
+    /// against 120 ms, resting HR against 100 bpm, breaths against 24 rpm. Those ceilings are not the
+    /// wearer's range and not anyone's clinical range, so the arc moved without meaning — a 67 ms HRV
+    /// read as "just over half full" whether that was a great night or a poor one FOR THIS PERSON. A
+    /// vital is only legible against a baseline, which is the whole reason the number gets a chart in
+    /// Bevel and in OpenStrap, and the reason "67 ms" alone tells a wearer nothing.
+    ///
+    /// The series comes from `kSparks`, already loaded for the Key Metrics tiles, so this costs no
+    /// extra query. It also removes three per-row `LiquidVessel` Canvas instances from Today, each of
+    /// which ran its own animation clock.
+    private func vitalRow(_ label: String, _ value: String, _ tint: Color,
+                          _ series: [Double], _ current: Double?) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 10) {
+                Circle().fill(tint).frame(width: 7, height: 7)
+                Text(label).font(StrandFont.subhead).foregroundStyle(StrandPalette.textSecondary)
+                Spacer()
+                Text(value).font(StrandFont.number(19)).foregroundStyle(StrandPalette.textPrimary)
+            }
+            if series.count >= 3 {
+                HStack(spacing: 10) {
+                    Sparkline(values: series,
+                              gradient: Gradient(colors: [tint.opacity(0.45), tint]),
+                              lineWidth: 1.5, showsArea: true, showsHead: true, showsHover: false)
+                        .frame(height: 24)
+                    if let band = Self.baselineReading(series: series, current: current) {
+                        Text(band.label).font(StrandFont.caption).foregroundStyle(band.tint)
+                            .fixedSize()
+                    }
+                }
+            }
         }
+    }
+
+    /// Where today's value sits against the wearer's own recent spread — mean ± 1 SD over the same
+    /// window the sparkline draws. Deliberately the wearer's OWN history rather than a population
+    /// range: NOOP has no population norms, and inventing one would be the same dishonesty as
+    /// publishing a raw ADC as a calibrated SpO₂.
+    ///
+    /// Returns nil when the window is too short to have a spread worth calling typical, or when the
+    /// spread is degenerate (every night identical) — better no verdict than a confident one drawn
+    /// from four points. `current` is excluded from the baseline it is being judged against, so a
+    /// single outlying night cannot widen the band enough to call itself normal.
+    private static func baselineReading(series: [Double], current: Double?)
+        -> (label: String, tint: Color)? {
+        guard let current, series.count >= 7 else { return nil }
+        let history = series.dropLast()          // exclude today from its own baseline
+        guard history.count >= 6 else { return nil }
+        let mean = history.reduce(0, +) / Double(history.count)
+        let variance = history.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(history.count)
+        let sd = variance.squareRoot()
+        guard sd > 0.0001 else { return nil }
+        if current > mean + sd { return (String(localized: "above usual"), StrandPalette.statusWarning) }
+        if current < mean - sd { return (String(localized: "below usual"), StrandPalette.statusWarning) }
+        return (String(localized: "usual range"), StrandPalette.statusPositive)
     }
 
     // MARK: - Key metrics grid
