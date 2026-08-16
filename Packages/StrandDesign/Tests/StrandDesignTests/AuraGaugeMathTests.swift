@@ -138,6 +138,24 @@ final class AuraGaugeMathTests: XCTestCase {
         XCTAssertEqual(fractions, fractions.sorted(by: >))
     }
 
+    func testChromeAccentIsFixedAcrossEveryBodyState() {
+        // The decision this pins: the ORB carries body temperature, chrome does not. Letting `accent`
+        // vary again would swing tabs, banners and buttons through amber and clay on a bad day, which is
+        // the behaviour that was explicitly rejected.
+        for state in AuraBodyState.allCases {
+            XCTAssertEqual(state.accent, AuraPalette.accent, "\(state.rawValue) moved the chrome accent")
+        }
+    }
+
+    func testOrbTintDiffersPerBodyStateSoTheOrbStillReadsAsTemperature() {
+        let tints = AuraBodyState.allCases.map(\.orbTint)
+        XCTAssertEqual(Set(tints.map { "\($0)" }).count, AuraBodyState.allCases.count,
+                       "two states share an orb tint — the temperature read collapses")
+        // Restored is the one state whose orb agrees with the chrome accent's family, but they are
+        // still distinct values: the orb takes the mid stop of its own ramp.
+        XCTAssertNotEqual(AuraBodyState.depleted.orbTint, AuraPalette.accent)
+    }
+
     func testBodyStateRawValuesAreStable() {
         // Persisted / passed across the app, so these strings are a contract.
         XCTAssertEqual(AuraBodyState.allCases.map(\.rawValue),
