@@ -50,9 +50,17 @@ struct RootTabView: View {
     /// Today if they prefer it (keyed identically to the SettingsView toggle). Default ON.
     @AppStorage("noop.liquidTodayEnabled") private var liquidTodayEnabled = true
 
-    /// The Today tab root, honouring the liquid/classic preference.
+    /// The Aura Today (the transcribed design) runs ALONGSIDE the existing one while it is finished and
+    /// wired, so the working screen stays reachable the whole time and neither has to be judged from
+    /// memory. Default OFF — this flips on once Aura carries everything the old Today does, and the old
+    /// one is removed at that point rather than left as a permanent fork.
+    @AppStorage("noop.auraTodayEnabled") private var auraTodayEnabled = false
+
+    /// The Today tab root, honouring the aura/liquid/classic preference.
     @ViewBuilder private var todayTabRoot: some View {
-        if liquidTodayEnabled { LiquidTodayView() } else { TodayView() }
+        if auraTodayEnabled { AuraTodayView() }
+        else if liquidTodayEnabled { LiquidTodayView() }
+        else { TodayView() }
     }
 
     /// Native tab selection binding. SwiftUI sends taps on the already-selected item through the
