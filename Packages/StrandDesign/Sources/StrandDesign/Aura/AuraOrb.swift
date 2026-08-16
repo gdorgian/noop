@@ -109,10 +109,12 @@ public struct AuraOrb: View {
     private var glow: some View {
         Circle()
             .fill(
+                // The halo is the orb's own light, so it wears the body temperature — NOT the fixed
+                // chrome accent, which would leave a blue glow around a clay sphere.
                 RadialGradient(
                     stops: [
-                        .init(color: state.accent.opacity(state.glowOpacity), location: 0),
-                        .init(color: state.accent.opacity(0), location: 0.68),
+                        .init(color: state.orbTint.opacity(state.glowOpacity), location: 0),
+                        .init(color: state.orbTint.opacity(0), location: 0.68),
                     ],
                     center: .center,
                     startRadius: 0,

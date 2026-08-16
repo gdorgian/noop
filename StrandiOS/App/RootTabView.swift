@@ -3,9 +3,10 @@ import SwiftUI
 import StrandDesign
 import WhoopStore
 
-/// iOS navigation shell. macOS uses a `NavigationSplitView` sidebar (`RootView`); on iPhone the
-/// natural analogue is a `TabView` with the most-used screens as tabs and everything else under a
-/// "More" list. Every screen is the same `StrandDesign`-built view the macOS app uses.
+/// iOS navigation shell. macOS uses a `NavigationSplitView` sidebar (`RootView`); iPhone hosts the Aura
+/// design's own shell (`AuraShell`) — seven screens behind a floating five-slot pill bar — and owns the
+/// sheets around it: quick actions, Devices, the v5 pillar deep links, Settings, Live Sessions, and the
+/// More index, which Aura's bar has no slot for and the You screen opens instead.
 struct RootTabView: View {
     /// External entry points must wait until the mandatory first-run gates have completed. The root owns
     /// that state; keeping it explicit here prevents this shell's window-level sheet from covering a gate.
@@ -21,6 +22,19 @@ struct RootTabView: View {
     /// analytics pass of the morning has today's row present but unscored, and blanking the screen for
     /// that window reads as data loss rather than as "not computed yet".
     private var auraDay: DailyMetric? { repo.days.last(where: { $0.recovery != nil }) ?? repo.days.last }
+
+    /// Aura's visual shell receives one immutable snapshot assembled from the same repository and live
+    /// state as the incumbent screens. Keeping this adaptation here prevents any UI-only redesign from
+    /// reaching into BLE, storage, analytics or HealthKit ownership.
+    private var auraTodayReading: AuraTodayReading {
+        AuraTodayReading.live(
+            day: auraDay,
+            history: Array(repo.days.suffix(14)),
+            // `batteryPct` is retained after disconnect, so expose it only while the strap is live.
+            batteryPercent: live.connected ? live.batteryPct.map { Int($0.rounded()) } : nil,
+            displayName: profile.displayName
+        )
+    }
     /// Cross-screen navigation requests (e.g. Live → "Manage devices"). Devices isn't a tab — it lives
     /// behind the More list — so a request presents it as a sheet, matching the quick-action screens.
     @EnvironmentObject private var router: NavRouter
@@ -34,20 +48,10 @@ struct RootTabView: View {
     /// A routed v5 pillar screen (Insights hub / Lab Book / fused record / Rhythm) presented as a sheet
     /// when a hub row deep-links to it via NavRouter. nil = closed.
     @State private var routedPillar: NavRouter.Destination?
-    /// Selected tab — bound so tab switches can crossfade (README §Motion: ~240ms opacity swap
-    /// between tab roots, calm easing). Defaults to Today.
-    @State private var selectedTab: Int = 0
-    /// One `NavigationPath` per tab, indexed by tab tag. Re-tapping the already-active tab pops
-    /// that tab's stack to its root (#135) by clearing its path — an animated pop that leaves the
-    /// root view alive, so an at-root re-tap keeps scroll position and never re-runs `.task`
-    /// (#198; the #197 resetID/`.id()` rebuild reset both). Requires the tab roots' first-hop
-    /// links to push `TabRoute`/`MoreDestination` VALUES — closure-destination links bypass the path.
-    @State private var tabPaths: [NavigationPath] = Array(repeating: NavigationPath(), count: 4)
-    /// One scroll-to-top token per tab. Bumped when the user re-taps the active tab while it's ALREADY
-    /// at its root — the other half of the iOS convention #197/#198 left unserved (an at-root re-tap was
-    /// a no-op). Threaded into each tab's root via `\.scrollToTopSignal`; ScreenScaffold / LiquidTodayView
-    /// scroll to their top anchor when their tab's token changes.
-    @State private var scrollTop: [Int] = Array(repeating: 0, count: 4)
+    /// The More index's navigation path. It was one entry in a per-tab array while More was a tab; now
+    /// that it is a sheet, it is the only stack the shell owns. Its rows still push `MoreDestination`
+    /// VALUES onto it (#135/#198), so the registration in `moreTab` is unchanged.
+    @State private var morePath = NavigationPath()
     /// Which More-tab groups are expanded (S2). Insights + Body stay open at rest; Data + App collapse to
     /// just their header until tapped. Persisted (#860 item 2): the user's open/closed choice must SURVIVE
     /// leaving and re-entering the More tab (and relaunch), not reset to the seed every visit. Backed by an
@@ -56,121 +60,35 @@ struct RootTabView: View {
     @AppStorage(MoreSectionPrefs.storageKey) private var expandedMoreSectionsCSV = MoreSectionPrefs.defaultCSV
     private var expandedMoreSections: Set<String> { MoreSectionPrefs.decode(expandedMoreSectionsCSV) }
 
-    /// The Today tab root. iPhone's Today is the Aura redesign — it replaced the liquid/classic pair
-    /// outright here, so there is no `noop.liquidTodayEnabled` branch on this platform any more (macOS
-    /// still honours that toggle in `RootView`; the Settings card is macOS-only for that reason).
-    ///
-    /// Aura's own Rest / Charge / Effort screens are not built yet, so its pillars and signal rows route
-    /// to the incumbent screens: Rest to the Sleep tab, Charge and Effort to Trends. Those arms retire as
-    /// each Aura screen lands.
-    @ViewBuilder private var todayTabRoot: some View {
-        AuraTodayView(state: AuraBodyState.forCharge(auraDay?.recovery),
-                      reading: AuraTodayReading.live(
-                          day: auraDay,
-                          history: Array(repo.days.suffix(14)),
-                          // Gated on a live link: LiveState.batteryPct is never cleared on disconnect.
-                          batteryPercent: live.connected ? live.batteryPct.map { Int($0.rounded()) } : nil,
-                          displayName: profile.displayName)) { destination in
-            switch destination {
-            case .rest:
-                switchTab(to: 2)
-            case .charge, .effort:
-                switchTab(to: 1)
-            case .band:
-                showDevices = true
-            case .profile:
-                switchTab(to: 3)
-            }
-        }
-    }
-
-    /// Moves to another tab with the shell's standard crossfade.
-    private func switchTab(to tag: Int) {
-        withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.24)) { selectedTab = tag }
-    }
-
-    /// Native tab selection binding. SwiftUI sends taps on the already-selected item through the
-    /// setter, which lets the system tab bar retain the app's refresh / pop-to-root / scroll-to-top
-    /// convention without placing a custom hit-testing layer over the platform bar.
-    private var nativeTabSelection: Binding<Int> {
-        Binding(
-            get: { selectedTab },
-            set: { tag in
-                if tag == selectedTab {
-                    reselectTab(tag)
-                } else {
-                    selectedTab = tag
-                }
-            }
-        )
-    }
-
-    private func reselectTab(_ tag: Int) {
-        Task { await repo.refresh() }
-        if !tabPaths[tag].isEmpty {
-            tabPaths[tag] = NavigationPath()
-        } else {
-            scrollTop[tag] += 1
-        }
-    }
-
-    /// The anywhere-swipe tab-switch drag (2026-07-02). Held as a property so the attachment site can
-    /// enable or disable it through a `GestureMask` instead of attaching it conditionally: a conditional
-    /// attachment changes view identity, and this condition toggles on every push and pop, which would
-    /// rebuild the tab roots underneath it. The same class of rebuild is what #197 caused with an
-    /// `.id()` reset and #198 had to undo — it lost scroll position and re-ran `.task`.
-    ///
-    /// Only a decisive horizontal flick switches tabs. Both thresholds are unchanged from the original
-    /// gesture. Today used to be carved out of this because the liquid Today owned horizontal swipe for
-    /// changing DAYS; Aura Today has no day navigation, so the carve-out was removed with it rather than
-    /// left to silently eat the gesture on the first tab.
-    private var tabSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 24)
-            .onEnded { v in
-                let dx = v.translation.width, dy = v.translation.height
-                guard abs(dx) > 60, abs(dx) > abs(dy) * 1.6 else { return }
-                let next = min(3, max(0, selectedTab + (dx < 0 ? 1 : -1)))
-                if next != selectedTab {
-                    withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.24)) { selectedTab = next }
-                }
-            }
-    }
+    /// Which Aura screen the shell is showing. Held here, not inside `AuraShell`, so `NavRouter` deep
+    /// links can move it.
+    @State private var auraScreen: AuraScreen = .today
+    /// The More index, presented as a sheet from the Aura You screen — it is no longer a tab.
+    @State private var showMore = false
+    /// Full Settings, presented from the You screen's rows and tiles.
+    @State private var showSettings = false
+    /// The Live Session (silent guardian) cover, moved here from the liquid Today it used to live on.
+    @State private var showLiveSession = false
 
     var body: some View {
-        // The platform tab bar is intentionally left fully native. iOS 26 supplies Liquid Glass and
-        // its dynamic interaction with scrolling content automatically; older supported releases use
-        // the corresponding system material and safe-area behaviour from the same TabView.
-        TabView(selection: nativeTabSelection) {
-            tab(todayTabRoot, "Today", "square.grid.2x2", path: $tabPaths[0], scrollSignal: scrollTop[0]).tag(0)
-            tab(TrendsView(), "Trends", "chart.line.uptrend.xyaxis", path: $tabPaths[1], scrollSignal: scrollTop[1]).tag(1)
-            tab(SleepView(), "Sleep", "bed.double", path: $tabPaths[2], scrollSignal: scrollTop[2]).tag(2)
-            moreTab(path: $tabPaths[3], scrollSignal: scrollTop[3]).tag(3)
-        }
+        // The iPhone shell is the Aura design: seven screens behind a floating pill bar that AuraShell
+        // owns, replacing the platform TabView the liquid design used. The pill bar overlaps content and
+        // labels only its active tab, neither of which a native tab bar can express.
+        //
+        // Everything the Aura screens do NOT cover — Coach, Live, Workouts, Health, Lab Book, Backup,
+        // Settings, Devices — is still reached from the You screen, which opens the More index as a
+        // sheet. Nothing that was reachable before became unreachable here.
+        AuraShell(
+            screen: $auraScreen,
+            bodyState: AuraBodyState.forCharge(auraDay?.recovery),
+            todayReading: auraTodayReading,
+            bandConnected: live.connected,
+            onOpenMore: { showMore = true },
+            onOpenSettings: { showSettings = true },
+            onOpenDevices: { showDevices = true },
+            onSync: { Task { await repo.refresh() } }
+        )
         .tint(StrandPalette.accent)
-            // Tab crossfade — README §Motion: ~240ms opacity swap between tab roots, global calm
-            // easing cubic-bezier(0.22,1,0.36,1).
-            .animation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.24), value: selectedTab)
-            // Swipe left/right anywhere to move between tabs (2026-07-02), but ONLY while the current
-            // tab is at its root. Attaching this ancestor drag gesture unconditionally defeated the
-            // edge-restriction of a pushed NavigationStack screen's native interactive-pop gesture —
-            // any More-tab subscreen (Settings, Devices, …) became draggable/rubber-banding from
-            // anywhere, not just the left edge (#519). Disabling the recognizer once a push is active,
-            // rather than just gating the onEnded action, is what stops the interference: the action
-            // never runs early enough, because the recognizer competes during recognition.
-            //
-            // The mask does that WITHOUT changing view identity. #519 attached the gesture through a
-            // conditional ViewModifier, which put the two states in separate _ConditionalContent
-            // branches — and since this condition toggles on every push and pop, each navigation
-            // rebuilt the whole TabView subtree and could reset @State inside the tab roots (scroll
-            // offsets, chart ranges, expanded sections). `including:` keeps one view type in both
-            // states, so nothing is torn down.
-            //
-            // The mask MUST be `.subviews`, not `.none`. `.subviews` means "enable the subview
-            // hierarchy's gestures, disable the added one" — exactly this requirement. `.none` disables
-            // the subview hierarchy TOO, which on a pushed screen would take out scrolling, taps and the
-            // interactive-pop itself: far worse than the bug being fixed.
-            .simultaneousGesture(tabSwipeGesture,
-                                 including: tabPaths[selectedTab].isEmpty ? .all : .subviews)
         .task {
             await repo.refresh()
             // Backup & Sync: on-launch catch-up (see RootView). Detached + utility priority so a
@@ -196,6 +114,30 @@ struct RootTabView: View {
         .sheet(item: $routedPillar) { dest in
             pillarScreen(dest)
         }
+        // The More index. It was a tab under the liquid shell; Aura's bar has five slots and none to
+        // spare, so the You screen opens it here instead. Same rows, same pushed destinations.
+        .sheet(isPresented: $showMore) {
+            moreSheet
+        }
+        // Full Settings, opened from the You screen's rows and tiles.
+        .sheet(isPresented: $showSettings) {
+            NavigationStack {
+                SettingsView()
+                    .background(StrandPalette.surfaceBase.ignoresSafeArea())
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { showSettings = false }
+                                .foregroundStyle(StrandPalette.accent)
+                        }
+                    }
+            }
+        }
+        // Live Sessions (silent guardian, beta). The liquid Today owned this cover; with Aura Today in
+        // its place the shell presents it, so a `NavRouter` deep link still reaches the session screen.
+        .fullScreenCover(isPresented: $showLiveSession) {
+            LiveSessionView(onClose: { showLiveSession = false })
+        }
         // Honour a router request: Devices keeps its dedicated sheet; the v5 pillars route through the
         // shared pillar sheet. Cleared so the same tap can fire again later.
         .onChange(of: router.requestedDestination) { _, dest in
@@ -207,8 +149,8 @@ struct RootTabView: View {
                 routedPillar = dest
                 router.requestedDestination = nil
             case .trends:
-                // Trends is a primary tab on iPhone (not a pillar sheet) — switch to it.
-                withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.24)) { selectedTab = 1 }
+                // Trends is one of Aura's five tabs (not a pillar sheet) — switch the shell to it.
+                withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.24)) { auraScreen = .trends }
                 router.requestedDestination = nil
             case .activeWorkout:
                 // The Today active-workout indicator opens Live through the quick-action Live sheet; once
@@ -217,9 +159,10 @@ struct RootTabView: View {
                 withAnimation(Self.sheetEase) { quickAction = .live }
                 router.requestedDestination = nil
             case .liveSession:
-                // Live Sessions is presented from Today's own Start entry (a cover, not a routed sheet),
-                // so a deep-link lands on the Today tab where that entry lives.
-                withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.24)) { selectedTab = 0 }
+                // The liquid Today carried the Start-session entry; Aura Today has no such control, so a
+                // deep link opens the session screen itself rather than landing on a screen that cannot
+                // start one. (Restoring a first-class Aura entry point for Live Sessions is outstanding.)
+                showLiveSession = true
                 router.requestedDestination = nil
             case .journal:
                 // The #627 Today journal widget opens the journal through the quick-action Journal sheet
@@ -267,6 +210,10 @@ struct RootTabView: View {
         withAnimation(Self.sheetEase) {
             showDevices = false
             routedPillar = nil
+            // More and Settings are ordinary shell sheets too, so an explicit Home Screen choice
+            // supersedes them the same way it supersedes Devices and the pillar host.
+            showMore = false
+            showSettings = false
             quickAction = destination
         }
     }
@@ -282,16 +229,16 @@ struct RootTabView: View {
                 case .fusedRecord: FusedRecordHost()
                 case .rhythm: RhythmHost(onClose: { routedPillar = nil })
                 case .devices: DevicesView()
-                // .trends is never presented as a pillar sheet on iPhone (it's a primary tab — the
-                // requestedDestination handler switches `selectedTab` instead), but the switch must stay
+                // .trends is never presented as a pillar sheet on iPhone (it's one of Aura's tabs — the
+                // requestedDestination handler moves `auraScreen` instead), but the switch must stay
                 // exhaustive. Fall back to Trends inside the sheet host if it ever arrives here.
                 case .trends: TrendsView()
                 // .activeWorkout routes through the quick-action Live sheet (handled above); this keeps the
                 // switch exhaustive and falls back to Live if it ever reaches the pillar host.
                 case .activeWorkout: LiveView()
-                // .liveSession routes to the Today tab (handled above — its Start entry owns the cover);
-                // this keeps the switch exhaustive and falls back to Today if it ever reaches the host.
-                case .liveSession: LiquidTodayView()
+                // .liveSession opens the shell's own cover (handled above); this keeps the switch
+                // exhaustive and falls back to the session screen if it ever reaches the host.
+                case .liveSession: LiveSessionView(onClose: { routedPillar = nil })
                 // .journal opens through the quick-action Journal sheet (handled above); this keeps the
                 // switch exhaustive and falls back to the journal's Insights host if it ever reaches here.
                 case .journal: InsightsView()
@@ -386,26 +333,11 @@ struct RootTabView: View {
         }
     }
 
-    private func tab<V: View>(_ view: V, _ title: LocalizedStringKey, _ icon: String,
-                              path: Binding<NavigationPath>, scrollSignal: Int) -> some View {
-        // Each primary tab gets its OWN NavigationStack so the in-content NavigationLinks (e.g. the Today
-        // dashboard card rows) both navigate AND render opaque. An ORPHANED NavigationLink (no
-        // NavigationStack ancestor) renders its whole label in a disabled/translucent state — that was
-        // washing the Today cards over the hero scene and dimming their text to grey (2026-06-23).
-        // The root view hides the system nav bar (each screen draws its own in-content header); pushed
-        // detail screens get their own nav bar + back button. The stack is bound to the tab's path so a
-        // re-tap of the active tab can pop it to the root (#135/#198); the roots' first-hop links push
-        // TabRoute values, registered here ONCE per stack (a double registration double-pushes, #38).
-        NavigationStack(path: path) {
-            view
-                .background(StrandPalette.surfaceBase.ignoresSafeArea())
-                .toolbar(.hidden, for: .navigationBar)
-                .tabRouteDestinations()
-        }
-        // Drive this tab's root scroll-to-top on an at-root re-tap (#198 follow-up); read by ScreenScaffold
-        // / LiquidTodayView inside. Only THIS tab's token changes on its reselect, so the others don't scroll.
-        .environment(\.scrollToTopSignal, scrollSignal)
-        .tabItem { Label(title, systemImage: icon) }
+    /// The More index as a sheet, with its own Done chrome. `moreTab` still builds the stack and its rows
+    /// exactly as it did when More was a tab — only the presentation changed.
+    private var moreSheet: some View {
+        moreTab(path: $morePath)
+            .presentationDragIndicator(.visible)
     }
 
     // The "More" tab is the app's catch-all index. It was a plain SwiftUI `List` with system large-title
@@ -413,7 +345,7 @@ struct RootTabView: View {
     // + SectionHeader's UPPERCASE overline + the 28pt section rhythm). Rebuilt on the shared page chrome:
     // ScreenScaffold for the title1 "More" + subtitle, a `SectionHeader` overline per group, and the group's
     // rows in a single grouped NoopCard with hairline dividers — the same row idiom Settings/Health use.
-    private func moreTab(path: Binding<NavigationPath>, scrollSignal: Int) -> some View {
+    private func moreTab(path: Binding<NavigationPath>) -> some View {
         NavigationStack(path: path) {
             ScreenScaffold(title: "More", subtitle: "Everything else, one tap away",
                            onRefresh: { await repo.refresh() },
@@ -483,9 +415,6 @@ struct RootTabView: View {
                     .toolbarBackground(.hidden, for: .navigationBar)
             }
         }
-        // Scroll the More index to the top on an at-root re-tap (#198 follow-up); read by its ScreenScaffold.
-        .environment(\.scrollToTopSignal, scrollSignal)
-        .tabItem { Label("More", systemImage: "ellipsis") }
     }
 
     /// One titled, COLLAPSIBLE group in the More index (S2): the app's overline (UPPERCASE) becomes a
