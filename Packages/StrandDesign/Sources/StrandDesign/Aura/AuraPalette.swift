@@ -49,6 +49,9 @@ public enum AuraPalette {
     /// Ink for type sitting ON an accent fill (the info banner, the Accept button, the active tab).
     public static let onAccent = Color(hex: "#08120F")
 
+    /// The chrome accent. Fixed — see `AuraBodyState.accent` for why it does not follow body state.
+    public static let accent = Color(hex: "#17A2E6")
+
     // MARK: Pillar identity
     //
     // Rest and Effort keep their own hue across every Aura screen so a colour means the same thing
@@ -91,14 +94,25 @@ public enum AuraBodyState: String, CaseIterable, Identifiable, Sendable {
 
     public var id: String { rawValue }
 
-    /// The state's accent. Chrome across the whole screen follows this — tabs, banners, the Accept
-    /// button, the trend line — so the app is visibly a different temperature on a bad day.
-    public var accent: Color {
+    /// The chrome accent — tabs, banners, the Accept button, the trend line, the gauge's lit arc.
+    ///
+    /// FIXED across all four states, by decision. The prototype swung the whole screen's chrome through
+    /// the temperature ramp with the orb, which turned the entire app amber on an average day and clay on
+    /// a bad one. Holding chrome at the brand blue leaves the ORB as the only thing that changes colour,
+    /// which is what the direction actually asks for: the body gets ONE colour. A screen that recolours
+    /// everything spends that signal on furniture.
+    ///
+    /// Use `orbTint` for anything that should read as body temperature.
+    public var accent: Color { AuraPalette.accent }
+
+    /// The body's temperature. Only the orb and its halo wear this — everything else stays `accent`.
+    /// Taken from the middle of the orb's own ramp so the halo and the sphere agree.
+    public var orbTint: Color {
         switch self {
-        case .restored: return Color(hex: "#17A2E6")
-        case .ready:    return Color(hex: "#F2B45C")
-        case .strained: return Color(hex: "#F0742C")
-        case .depleted: return Color(hex: "#E0705C")
+        case .restored: return Color(hex: "#2FB2F0")
+        case .ready:    return Color(hex: "#E9B96A")
+        case .strained: return Color(hex: "#EE9457")
+        case .depleted: return Color(hex: "#DD7A63")
         }
     }
 
