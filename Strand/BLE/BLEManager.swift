@@ -1792,6 +1792,25 @@ public final class BLEManager: NSObject, ObservableObject {
             log("Clock: no correlation yet — re-sending GET_CLOCK (retry \(clockRetries)/3)")
             send(.getClock, payload: [])
             send(.getClock, payload: [0x00])
+            // DEFER the offload instead of falling through to it. GET_CLOCK's reply arrives
+            // asynchronously on the notify characteristic, so it CANNOT have landed by the time this
+            // call returns — proceeding decoded the entire session under the identity ref, which is the
+            // very outcome the retry exists to avoid. Re-sending and then immediately offloading anyway
+            // made the retry decorative: every session logged "no correlation yet" and then decoded with
+            // no correlation, and the rough-correlation fallback below (the designed escape hatch) was
+            // unreachable because `clockRetries` only advances through this branch.
+            //
+            // Measured on a 5.0/MG: retry 1/3, retry 2/3, HISTORY_COMPLETE, and never the derived-
+            // correlation line — every night's R-R stamped on an identity time axis, which is what
+            // drives coverage 1.34–1.84, crossSecondOverCount, and beatAccurate ~0.46.
+            //
+            // Safe to defer: nothing has been started yet at this point, and returning false leaves
+            // `backfillLastAtKey` un-stamped, so the next connect/periodic/strap trigger re-attempts
+            // rather than being rate-limited out. After 3 deferrals the `else if` below derives a rough
+            // correlation from the Data Range, so an unresponsive GET_CLOCK still converges — on a real
+            // offset instead of on identity.
+            log("Backfill: deferred — waiting for clock correlation")
+            return false
         } else if clockRef == nil, let newest = strapNewestTs {
             // #700 fallback: GET_CLOCK never responded even after retries. Derive a rough correlation
             // from the Data Range's newest-banked timestamp (already parsed, always answered). The
