@@ -1732,15 +1732,21 @@ struct SettingsView: View {
     /// #22); the raw-sensor CSV diagnostic is split into its own card so it stays available on every
     /// model — a 4.0 owner still needs the export to share decoded streams.
     @ViewBuilder private var experimentalCard: some View {
+        // macOS-only: iPhone's Today is now Aura, which replaced the liquid/classic pair outright, so
+        // on iOS this toggle would switch nothing. macOS still branches on the key in `RootView`.
+        #if os(macOS)
         liquidTodayCard
+        #endif
         liveSessionsCard
         if showFiveMGControls { fiveMGCard }
         sleepStagingCard
         rawSensorDiagnosticsCard
     }
 
+    #if os(macOS)
     /// Opt-in liquid Today redesign (default ON in this build). Off falls back to the
-    /// classic dashboard immediately, no rebuild. Same data either way.
+    /// classic dashboard immediately, no rebuild. Same data either way. macOS-only since iPhone moved
+    /// to Aura — see `experimentalCard`.
     @AppStorage("noop.liquidTodayEnabled") private var liquidTodayEnabled = true
     private var liquidTodayCard: some View {
         SettingsSection(
@@ -1763,6 +1769,7 @@ struct SettingsView: View {
             }
         }
     }
+    #endif
 
     /// Live Sessions (beta) — the silent-guardian in-workout coach. Default ON (the entry itself is
     /// BETA-labelled on the Liquid Today); off removes the Start-session control entirely. Same key the
