@@ -2018,8 +2018,15 @@ private struct LiquidLiveHR: View {
                     Spacer()
                     stat(String(localized: "Max"), series.max())
                 }
-            } else {
-                Text(live.connected ? "Waiting for a live heartbeat…" : "Connect your strap to see live heart rate")
+            } else if live.connected {
+                // Only when the strap IS connected does a second line add anything: it says the link is
+                // up and a beat has not arrived yet. Disconnected, the status line above already reads
+                // "Strap not connected", and "Connect your strap to see live heart rate" repeated it —
+                // two sentences and 48pt of padding to say one thing, in the most valuable space on the
+                // screen. A strap-less user (or anyone who left it charging) met a near-empty card
+                // occupying a third of the first screen, above their vitals. It now collapses to the
+                // header plus the status line, and the content below moves up.
+                Text("Waiting for a live heartbeat…")
                     .font(StrandFont.caption)
                     .foregroundStyle(StrandPalette.textTertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
