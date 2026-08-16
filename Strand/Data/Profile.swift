@@ -19,6 +19,10 @@ final class ProfileStore: ObservableObject {
             d.set(age, forKey: K.legacyAge)
         }
     }
+    /// Display name, for the Aura greeting and header avatar. Empty = not set, which is the default and
+    /// stays the default: NOOP has never asked for a name and needs none to compute anything, so this is
+    /// presentation only and every consumer must handle it being blank.
+    @Published var displayName: String { didSet { d.set(displayName, forKey: K.displayName) } }
     @Published var sex: String { didSet { d.set(sex, forKey: K.sex) } }          // "male" | "female" | "nonbinary"
     @Published var weightKg: Double { didSet { d.set(weightKg, forKey: K.weight) } }
     @Published var heightCm: Double { didSet { d.set(heightCm, forKey: K.height) } }
@@ -75,6 +79,7 @@ final class ProfileStore: ObservableObject {
         /// Pre-#146 age key. No longer the source of truth; kept mirrored from `dateOfBirth` so the
         /// cross-platform `.noopbak` whitelist keeps round-tripping an Int age unchanged.
         static let legacyAge = "profile.age"
+        static let displayName = "profile.displayName"
         static let sex = "profile.sex", weight = "profile.weightKg"
         static let height = "profile.heightCm", hrMax = "profile.hrMaxOverride"
         static let hrZoneThresholds = "profile.hrZoneThresholds"
@@ -110,6 +115,7 @@ final class ProfileStore: ObservableObject {
         // forbids reading before every stored property is initialized).
         d.set(resolvedDOB, forKey: K.dateOfBirth)
         d.set(Self.years(from: resolvedDOB, to: Date()), forKey: K.legacyAge)
+        displayName = d.string(forKey: K.displayName) ?? ""
         sex = d.string(forKey: K.sex) ?? "male"
         weightKg = d.object(forKey: K.weight) as? Double ?? 75
         heightCm = d.object(forKey: K.height) as? Double ?? 178
