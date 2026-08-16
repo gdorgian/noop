@@ -56,11 +56,10 @@ struct RootTabView: View {
     /// one is removed at that point rather than left as a permanent fork.
     @AppStorage("noop.auraTodayEnabled") private var auraTodayEnabled = false
 
-    /// The Today tab root, honouring the aura/liquid/classic preference.
+    /// The Today tab root, honouring the liquid/classic preference. Aura does NOT appear here: it
+    /// replaces the whole shell (its own five tabs and its own bar), not one tab inside this one.
     @ViewBuilder private var todayTabRoot: some View {
-        if auraTodayEnabled { AuraTodayView() }
-        else if liquidTodayEnabled { LiquidTodayView() }
-        else { TodayView() }
+        if liquidTodayEnabled { LiquidTodayView() } else { TodayView() }
     }
 
     /// Native tab selection binding. SwiftUI sends taps on the already-selected item through the

@@ -314,11 +314,21 @@ private struct iOSRootView: View {
         return AnyView(shell)
     }
 
+    /// The Aura redesign replaces the ENTIRE shell — its own five tabs, its own bar, its own palette —
+    /// rather than swapping one tab inside the existing one. Grafting an Aura screen into the old shell
+    /// is what made the first pass read as "not the design": the chrome around it was still the old app.
+    /// Default OFF; the old shell stays reachable until Aura carries everything, and is removed then.
+    @AppStorage("noop.auraShellEnabled") private var auraShellEnabled = false
+
     private var shell: some View {
         ZStack {
-            RootTabView(homeScreenQuickActionsEnabled:
-                demoBypass || (onboarded && acceptedTerms == Terms.currentVersion
-                    && automaticLaunchSheetResolved))
+            if auraShellEnabled {
+                AuraShell()
+            } else {
+                RootTabView(homeScreenQuickActionsEnabled:
+                    demoBypass || (onboarded && acceptedTerms == Terms.currentVersion
+                        && automaticLaunchSheetResolved))
+            }
             if !onboarded && !demoBypass {
                 OnboardingWizard(onFinished: {
                     onboarded = true
