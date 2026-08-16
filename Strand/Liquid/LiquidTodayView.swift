@@ -293,7 +293,7 @@ struct LiquidTodayView: View {
                     // nothing and keeps its slot in the saved order.
                     ForEach(sectionOrder) { section in
                         switch section {
-                        case .hero: auraHeroCard
+                        case .hero: heroCard
                         case .liveSession: if liveSessionsBeta { liveSessionStartRow }
                         case .synthesis: synthesisSection
                         case .keyMetrics: keyMetricsSection
@@ -364,25 +364,6 @@ struct LiquidTodayView: View {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
                 }
-
-                // Aura ambient: a wide, soft haze bleeding down from the top of the screen, tinted by the
-                // day's own Charge. LAST in the stack so it sits over the sky as well as the base — it is
-                // atmosphere, not another layer of scenery, and the design places it above everything.
-                //
-                // This is what makes the screen state-aware before a single value is read: a restored day
-                // washes the top of the page blue, a depleted one coral, and the wearer registers it in
-                // peripheral vision on the way to the orb. Non-interactive and hidden from VoiceOver — it
-                // carries no information the numbers below don't already state.
-                Ellipse()
-                    .fill(
-                        RadialGradient(colors: [chargeTint.opacity(0.30), chargeTint.opacity(0)],
-                                       center: .center, startRadius: 0, endRadius: 230)
-                    )
-                    .frame(width: 460, height: 400)
-                    .blur(radius: 18)
-                    .offset(y: -190)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
             }
             .ignoresSafeArea()
         }
@@ -625,99 +606,6 @@ struct LiquidTodayView: View {
     /// on a good/bad scale would assert something false. It keeps its flat identity colour.
     private var restTint: Color {
         restScore.map { StrandPalette.recoveryColor($0) } ?? StrandPalette.restColor
-    }
-
-    /// The Aura hero: a tick gauge around a breathing orb, the readiness WORD at display size, and the
-    /// other two scores demoted to pillars beneath. Ported from the Aura · dark direction.
-    ///
-    /// The move it makes is demoting the number. Three equal rings asked the wearer to read three scales
-    /// at once and decide which mattered; the orb answers "how is my body" first, in colour and one word,
-    /// and keeps the digits available underneath for whoever wants them. Recovery earns the orb because
-    /// it is the only one of the three that implies an instruction.
-    ///
-    /// The coach sentence deliberately does NOT repeat here — Today already carries it in the SYNTHESIS
-    /// card directly above, and stating it twice is the duplication this screen was reordered to remove.
-    private var auraHeroCard: some View {
-        VStack(spacing: 14) {
-            AuraGauge(fraction: chargeDisplay.pct.map { $0 / 100 }, tint: chargeTint, animated: dataLoaded)
-                .overlay {
-                    // The number lives INSIDE the orb, small and quiet — present for anyone who wants it,
-                    // no longer the thing the screen shouts.
-                    VStack(spacing: 1) {
-                        Text(chargeDisplay.pct.map { String(Int($0.rounded())) } ?? "—")
-                            .font(StrandFont.number(30))
-                            .foregroundStyle(StrandPalette.textPrimary)
-                        Text("Recovery")
-                            .font(StrandFont.caption)
-                            .foregroundStyle(StrandPalette.textSecondary)
-                    }
-                }
-                .onTapGesture { guideSection = .charge }
-
-            if let word = readinessWord {
-                Text(word)
-                    .font(.system(size: 34, weight: .light, design: .rounded))
-                    .kerning(-1)
-                    .foregroundStyle(chargeTint)
-                    .lineLimit(1).minimumScaleFactor(0.6)
-                    // Pull the word UP into the ring's own dead space. The gauge frame is square (270pt),
-                    // but the sweep stops well short of the bottom — the design leaves that arc open on
-                    // purpose and tucks the label into it. Laid out below the full square instead, the
-                    // word floats in a gap the eye reads as a mistake.
-                    .padding(.top, -34)
-            }
-
-            HStack(spacing: 10) {
-                auraPillar(String(localized: "Sleep"), restScore.map { String(Int($0.rounded())) },
-                           restScore.map { $0 / 100 }, restTint) { guideSection = .rest }
-                auraPillar(String(localized: "Strain"),
-                           displayDay?.strain.map {
-                               let v = UnitFormatter.effortValue($0, scale: effortScale)
-                               return effortScale == .whoop ? String(format: "%.1f", v) : String(Int(v.rounded()))
-                           },
-                           displayDay?.strain.map {
-                               UnitFormatter.effortValue($0, scale: effortScale) / (effortScale == .whoop ? 21 : 100)
-                           },
-                           StrandPalette.effortColor) { guideSection = .effort }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        // NO panel behind the orb — deliberately. The design floats it on the page, and that is what makes
-        // it read as a light source rather than as a widget: a rounded card draws a box around the empty
-        // space the glow needs, and the eye reads the box as sparse rather than the orb as luminous. The
-        // pillars keep their own small surfaces, so the card grammar survives where it earns its keep.
-        .padding(.top, 4)
-        .padding(.bottom, NoopMetrics.space3)
-    }
-
-    /// One pillar under the orb: label, value, and a thin bar carrying the same fraction. The bar is what
-    /// makes the row scannable without reading — the design's pillar strip, which is why the two demoted
-    /// scores stay legible at a glance instead of becoming a footnote.
-    private func auraPillar(_ label: String, _ value: String?, _ frac: Double?,
-                            _ tint: Color, _ tap: @escaping () -> Void) -> some View {
-        Button(action: tap) {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(label).font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
-                    Spacer(minLength: 4)
-                    Text(value ?? "—").font(StrandFont.number(17))
-                        .foregroundStyle(StrandPalette.textPrimary)
-                }
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.10))
-                        Capsule().fill(tint)
-                            .frame(width: geo.size.width * min(max(frac ?? 0, 0), 1))
-                    }
-                }
-                .frame(height: 5)
-            }
-            .padding(.horizontal, 13).padding(.vertical, 11)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.05)))
-        }
-        .buttonStyle(LiquidPressStyle())
-        .accessibilityLabel(Text("\(label), \(value ?? String(localized: "no data yet"))"))
     }
 
     private var heroCard: some View {

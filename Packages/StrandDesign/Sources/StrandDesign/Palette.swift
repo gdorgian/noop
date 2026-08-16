@@ -129,13 +129,7 @@ public enum StrandPalette {
     // classic red→green readiness scale, in BOTH light and dark, with NO call-site changes. Chrome
     // (surfaces, text, accent) is never touched.
     public static var chartStyle: ChartStyle = .titanium
-    // `!= .titanium`, not `== .classic`. Aura overrides ONE ramp — recovery — and inherits Classic for
-    // the other 34 branch sites (zones, stress, sleep stages, strain). Written this way, adding Aura is a
-    // single new branch below instead of 35 three-way switches, and a future style that only re-colours
-    // one scale costs the same. The alternative — letting Aura fall through to Titanium — would have
-    // silently reverted every other scale to the gold world it does not belong to.
-    @inline(__always) static var isClassic: Bool { chartStyle != .titanium }
-    @inline(__always) static var isAura: Bool { chartStyle == .aura }
+    @inline(__always) static var isClassic: Bool { chartStyle == .classic }
 
     // MARK: Classic (throwback) data ramps — the recognizable health-app scale. Light/dark tuned.
     // Recovery: red → orange → amber → lime → green.
@@ -186,25 +180,9 @@ public enum StrandPalette {
     public static let recovery078 = Color(light: "#6FB23A", dark: "#8FD86A") // primed — yellow-green
     public static let recovery100 = Color(light: "#0F9D62", dark: "#03E095") // peak — WHOOP green
 
-    // MARK: Aura body-state ramp — depleted → restored, from the Noop design project's DKSTATE.
-    // coral (.16) → orange (.38) → amber (.60) → blue (.84). Four measured states rather than a
-    // continuous good/bad axis, placed at the fractions the design assigns them, so the ramp's shape
-    // matches the states it was drawn for instead of spreading them evenly and landing between them.
-    // Blue at the top is the whole point: it reads as settled rather than as "correct".
-    public static let aura016 = Color(light: "#C95644", dark: "#E0705C") // depleted
-    public static let aura038 = Color(light: "#D8601F", dark: "#F0742C") // strained
-    public static let aura060 = Color(light: "#D69A3C", dark: "#F2B45C") // ready
-    public static let aura084 = Color(light: "#0B8FCE", dark: "#17A2E6") // restored
-    static let auraRecoveryStops: [Gradient.Stop] = [
-        .init(color: aura016, location: 0.00), .init(color: aura016, location: 0.16),
-        .init(color: aura038, location: 0.38), .init(color: aura060, location: 0.60),
-        .init(color: aura084, location: 0.84), .init(color: aura084, location: 1.00),
-    ]
-
-    /// Ordered gradient stops for the recovery scale (Aura body-state, Classic red→green, or Titanium gold).
+    /// Ordered gradient stops for the recovery scale (Titanium gold ramp, or the Classic red→green).
     public static var recoveryStops: [Gradient.Stop] {
-        if isAura { return auraRecoveryStops }
-        return isClassic ? cRecoveryStops : [
+        isClassic ? cRecoveryStops : [
             .init(color: recovery000, location: 0.00),
             .init(color: recovery030, location: 0.30),
             .init(color: recovery055, location: 0.55),
