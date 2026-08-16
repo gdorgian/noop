@@ -567,6 +567,25 @@ public final class LiveState: ObservableObject {
     /// Still hard-bounded (never exceeds `maxLogLines + trimSlack`).
     private static let trimSlack = 256
 
+    /// Mirror every strap-log line to stdout when `NOOP_LOG_STDOUT=1` is in the environment, so a
+    /// cabled device can be diagnosed LIVE rather than by asking the wearer to export a file after the
+    /// fact:
+    ///
+    ///     xcrun devicectl device process launch --device <id> --console \
+    ///       --environment-variables '{"NOOP_LOG_STDOUT":"1"}' <bundle-id>
+    ///
+    /// `--console` already surfaces stdout/stderr (it is how an uncaught HealthKit share exception was
+    /// caught on launch), but NOOP's log is an in-memory ring that never reached stdout — so the very
+    /// lines a diagnosis needs (`hrv diag`, the skin-temp funnel, backfill state) were invisible until
+    /// someone tapped Save… and sent the file over.
+    ///
+    /// Read ONCE into a `let`: this is consulted per log line, and an environment lookup per line during
+    /// a historical offload is a needless syscall on a hot path. Off by default and off for every
+    /// home-screen launch, so a normal session pays one Bool test per line and nothing else. The mirrored
+    /// text is the REDACTED line — the same scrub the export applies — so enabling it cannot leak
+    /// anything the exported log wouldn't already carry.
+    private static let mirrorLogToStdout = ProcessInfo.processInfo.environment["NOOP_LOG_STDOUT"] == "1"
+
     public func append(log line: String, domain: TestDomain? = nil) {
         // FIRST append of this process: rescue the previous process's durable tail into the generation ring
         // before this process's own `persistTail` overwrites it (see `rollLogGenerationsIfNeeded`). Latched,
@@ -576,7 +595,9 @@ public final class LiveState: ObservableObject {
         // parseable marker the export filters on. Redaction is STILL the only scrub point
         // (redactPii below); tagging happens BEFORE redaction so the scrub covers the whole line.
         let tagged = domain.map { "[\($0.id)] " + line } ?? line
-        log.append(Self.redactPii(tagged))
+        let redacted = Self.redactPii(tagged)
+        if Self.mirrorLogToStdout { print("[noop] \(redacted)") }
+        log.append(redacted)
         // Batched trim: overrun by `trimSlack`, then trim back to the cap in one shot (amortized O(1)/line).
         if log.count > Self.maxLogLines + Self.trimSlack { log.removeFirst(log.count - Self.maxLogLines) }
         // Batched durable-tail mirror: persist every `persistEveryNLines` lines, not on every line;
