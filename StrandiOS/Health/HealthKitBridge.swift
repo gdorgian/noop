@@ -119,18 +119,19 @@ final class HealthKitBridge: ObservableObject {
     // attached to written workouts. Kept out of `quantityWriteIds` so `legacyCoreWriteTypes` (the
     // auth-resume set) stays exactly what pre-update users granted.
     private static let highResQuantityWriteIds: [HKQuantityTypeIdentifier] = [
-        .heartRate, .activeEnergyBurned, .distanceWalkingRunning, .distanceCycling,
-        // The nightly worn skin temperature NOOP already decodes off a 5.0/MG and already scores the
-        // wearer on (`skinTempDevC` is a Charge term) — computed, then discarded at the Health boundary,
-        // so no downstream reader ever saw it. `.appleSleepingWristTemperature` is the type Apple defines
-        // for exactly this signal.
-        //
-        // Here rather than in `quantityWriteIds` for the reason stated above: this is a NEW share a
-        // returning user has never granted, and `legacyCoreWriteTypes` must keep describing only what
-        // they did grant, or `refreshAuthIfPreviouslyGranted` reads the whole set as `.unknown` and the
-        // resume breaks for everyone who already had NOOP writing to Health.
-        .appleSleepingWristTemperature
+        .heartRate, .activeEnergyBurned, .distanceWalkingRunning, .distanceCycling
     ]
+    // NOT here: `.appleSleepingWristTemperature`. HealthKit refuses it as a SHARE type — Apple Watch is
+    // the only writer, and `requestAuthorization(toShare:)` does not fail softly, it raises
+    // `NSInvalidArgumentException` ("Authorization to share the following types is disallowed"), which is
+    // an uncaught ObjC exception and kills the app on launch with signal 6. Verified on device.
+    //
+    // There is no correct substitute. `.bodyTemperature` and `.basalBodyTemperature` ARE writable, but
+    // both are core-temperature types whose readers expect ~36-37 °C; publishing a ~30.6 °C skin reading
+    // into either misrepresents it, and a consumer that flags fever/hypothermia would read it as an
+    // emergency. NOOP's nightly worn skin temperature therefore stays on-device — persisted to
+    // metricSeries as "skin_temp_c" by IntelligenceEngine, available to the UI and to exports, and
+    // deliberately not written to Health.
 
     // MARK: - Authorization
 
@@ -691,16 +692,6 @@ final class HealthKitBridge: ObservableObject {
         let imported = (try? await whoopStore.dailyMetrics(deviceId: noopDeviceId, from: from, to: to)) ?? []
         let rows = HealthKitBridge.mergeVitalRows(computed: computed, imported: imported)
 
-        // Absolute nightly worn skin temperature, keyed by day. It does NOT live on DailyMetric — that
-        // carries only `skinTempDevC`, the deviation against the wearer's own baseline, which is
-        // NOOP-relative and would be a lie to publish as an absolute. IntelligenceEngine persists the
-        // measured °C to metricSeries as "skin_temp_c" (5.0/MG only, where the centidegree register is
-        // proven), so this reads a real measurement rather than reconstructing one from a deviation plus
-        // a baseline. Empty on a 4.0, or before the first scored pass — both write nothing, correctly.
-        let skinPoints = (try? await whoopStore.metricSeries(deviceId: computedDeviceId,
-                                                            key: "skin_temp_c", from: from, to: to)) ?? []
-        let skinTempByDay = Dictionary(skinPoints.map { ($0.day, $0.value) },
-                                       uniquingKeysWith: { _, last in last })
 
         struct Candidate { let type: HKQuantityType; let key: String; let sample: HKQuantitySample }
         var candidates: [Candidate] = []
@@ -732,9 +723,6 @@ final class HealthKitBridge: ObservableObject {
             }
             if let rr = row.respRateBpm {
                 add(.respiratoryRate, HKUnit.count().unitDivided(by: .minute()), rr, row.day, at)
-            }
-            if let skinC = skinTempByDay[row.day] {
-                add(.appleSleepingWristTemperature, .degreeCelsius(), skinC, row.day, at)
             }
         }
         guard !candidates.isEmpty else { return }
