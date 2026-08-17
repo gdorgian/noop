@@ -32,6 +32,8 @@ struct AuraShell: View {
     private let todayReading: AuraTodayReading
     /// Rest's presentation snapshot, derived from the same canonical SleepModel as the incumbent screen.
     private let restReading: AuraRestReading
+    /// Charge's snapshot, derived from the canonical recovery row, baselines and driver contract.
+    private let chargeReading: AuraChargeReading
 
     /// Written out rather than synthesized: a struct with any `private` stored property gets a PRIVATE
     /// memberwise initializer, which the app shell in another file could not call.
@@ -40,6 +42,7 @@ struct AuraShell: View {
         bodyState: AuraBodyState = .restored,
         todayReading: AuraTodayReading = .prototype,
         restReading: AuraRestReading = .prototype,
+        chargeReading: AuraChargeReading = .prototype,
         onOpenMore: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
         onOpenDevices: @escaping () -> Void,
@@ -49,6 +52,7 @@ struct AuraShell: View {
         self.bodyState = bodyState
         self.todayReading = todayReading
         self.restReading = restReading
+        self.chargeReading = chargeReading
         self.onOpenMore = onOpenMore
         self.onOpenSettings = onOpenSettings
         self.onOpenDevices = onOpenDevices
@@ -129,7 +133,7 @@ struct AuraShell: View {
         case .rest:
             AuraRestView(reading: restReading)
         case .charge:
-            AuraChargeView()
+            AuraChargeView(reading: chargeReading)
         case .effort:
             AuraEffortView()
         case .trends:
@@ -158,6 +162,8 @@ struct AuraShell: View {
             return todayReading.headline
         case .rest:
             return restReading.headline
+        case .charge:
+            return chargeReading.headline
         case .band:
             // Rendered by a LiveState-isolated leaf in AuraHeader.
             return String(localized: "Band status")

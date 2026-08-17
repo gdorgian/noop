@@ -38,12 +38,23 @@ struct RootTabView: View {
     /// history and split sleeps resolve exactly as they do in the incumbent Sleep screen.
     @State private var auraSleepSessions: [CachedSleepSession] = []
     @State private var auraHabitualMidsleepSec: Int?
+    @State private var auraStressSeries: [(day: String, value: Double)] = []
+    @State private var auraRestSeries: [(day: String, value: Double)] = []
 
     private var auraRestReading: AuraRestReading {
         AuraRestReading.live(
             days: repo.days,
             sessions: auraSleepSessions.isEmpty ? repo.sleeps : auraSleepSessions,
             habitualMidsleepSec: auraHabitualMidsleepSec
+        )
+    }
+
+    private var auraChargeReading: AuraChargeReading {
+        AuraChargeReading.live(
+            day: auraDay,
+            history: repo.days,
+            stressSeries: auraStressSeries,
+            restSeries: auraRestSeries
         )
     }
     /// Cross-screen navigation requests (e.g. Live → "Manage devices"). Devices isn't a tab — it lives
@@ -100,6 +111,7 @@ struct RootTabView: View {
             bodyState: AuraBodyState.forCharge(auraDay?.recovery),
             todayReading: auraTodayReading,
             restReading: auraRestReading,
+            chargeReading: auraChargeReading,
             onOpenMore: { showMore = true },
             onOpenSettings: { showSettings = true },
             onOpenDevices: { showDevices = true },
@@ -118,10 +130,18 @@ struct RootTabView: View {
         .task(id: repo.refreshSeq) {
             async let sessions = repo.allSleepSessions(days: 60)
             async let habitual = repo.habitualMidsleepSec()
-            let loaded = await (sessions, habitual)
+            async let stress = repo.series(key: "stress", source: Repository.whoopSource, days: 60)
+            async let rest = repo.exploreSeries(
+                key: "sleep_performance",
+                source: Repository.whoopSource,
+                days: 60
+            )
+            let loaded = await (sessions, habitual, stress, rest)
             guard !Task.isCancelled else { return }
             auraSleepSessions = loaded.0
             auraHabitualMidsleepSec = loaded.1
+            auraStressSeries = loaded.2
+            auraRestSeries = loaded.3
         }
         // Quick-action sheet presents with the calm easing (~0.42s) per the README sheet spec —
         // the easing is applied where `quickAction` is set (see `presentQuickAction`), keeping the
