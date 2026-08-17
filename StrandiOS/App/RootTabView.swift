@@ -370,8 +370,15 @@ struct RootTabView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     withAnimation(Self.sheetEase) { quickAction = picked }
                 }
+            } onStartLiveSession: {
+                // LiveSessionView is a full-screen experience. Dismiss the quick-action sheet first,
+                // then present through the shell's existing cover rather than nesting it in a sheet.
+                quickAction = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    showLiveSession = true
+                }
             }
-            .presentationDetents([.height(344)])
+            .presentationDetents([.height(410)])
             .presentationDragIndicator(.hidden)
         case .live:
             quickScreen(LiveView())
@@ -454,6 +461,7 @@ struct RootTabView: View {
                     MoreRow("Live", "waveform.path.ecg", .live)
                     MoreRow("Workouts", "figure.run", .workouts)
                     MoreRow("Health", "heart.text.square.fill", .health)
+                    MoreRow("Hydration", "drop.fill", .hydration)
                     MoreRow("Lab Book", "books.vertical.fill", .labBook)
                     MoreRow("Stress", "bolt.heart.fill", .stress)
                     MoreRow("Breathe", "wind", .breathe)
@@ -570,7 +578,7 @@ struct RootTabView: View {
 /// registration in `moreTab`.
 private enum MoreDestination: Hashable {
     case insightsHub, intelligence, coach, insights, explore, compare
-    case live, workouts, health, labBook, stress, breathe, intervals, rhythm
+    case live, workouts, health, hydration, labBook, stress, breathe, intervals, rhythm
     case fusedRecord, appleHealth, miBand, dataSources, backupSync, shortcutsExport, noopLimitations
     case alarms, automations, testCentre, siriShortcuts, settings
 
@@ -585,6 +593,7 @@ private enum MoreDestination: Hashable {
         case .live:            LiveView()
         case .workouts:        WorkoutsView()
         case .health:          HealthView()
+        case .hydration:       HydrationView()
         case .labBook:         LabBookView()
         case .stress:          StressView()
         case .breathe:         BreathingView()
@@ -669,6 +678,10 @@ private enum QuickAction: Int, Identifiable {
 private struct QuickActionSheet: View {
     /// Called with the picked destination (the host swaps the menu for that screen).
     let onPick: (QuickAction) -> Void
+    /// Live Sessions owns the shell's full-screen cover, so it has a dedicated action rather than a
+    /// `QuickAction` sheet destination.
+    let onStartLiveSession: () -> Void
+    @AppStorage(LiveSessionPrefs.betaKey) private var liveSessionsBeta = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -690,6 +703,10 @@ private struct QuickActionSheet: View {
             VStack(spacing: 8) {
                 row("Live HR", icon: "waveform.path.ecg", tint: StrandPalette.metricRose) { onPick(.live) }
                 row("Start workout", icon: "figure.run", tint: StrandPalette.effortColor) { onPick(.workout) }
+                if liveSessionsBeta {
+                    row("Start live session", icon: "shield.lefthalf.filled", tint: StrandPalette.metricCyan,
+                        action: onStartLiveSession)
+                }
                 row("Log journal", icon: "square.and.pencil", tint: StrandPalette.accent) { onPick(.journal) }
                 row("Breathe", icon: "wind", tint: StrandPalette.restColor) { onPick(.breathe) }
             }
