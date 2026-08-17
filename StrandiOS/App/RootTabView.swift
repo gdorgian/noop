@@ -13,9 +13,9 @@ struct RootTabView: View {
     let homeScreenQuickActionsEnabled: Bool
 
     @EnvironmentObject private var repo: Repository
-    /// Aura Today reads the wearer's own values through these — the strap link for the band chip and
-    /// the profile for the greeting and avatar initial.
-    @EnvironmentObject private var live: LiveState
+    /// Aura Today reads the profile for its greeting and avatar initial. Live strap state is deliberately
+    /// observed only by tiny header leaves inside `AuraHeader`; observing the 1 Hz `LiveState` here would
+    /// invalidate the entire shell, charts and scroll view for every heart-rate packet.
     @EnvironmentObject private var profile: ProfileStore
 
     /// The newest SCORED day, falling back to the newest row. A wearer opening the app before the first
@@ -30,8 +30,6 @@ struct RootTabView: View {
         AuraTodayReading.live(
             day: auraDay,
             history: Array(repo.days.suffix(14)),
-            // `batteryPct` is retained after disconnect, so expose it only while the strap is live.
-            batteryPercent: live.connected ? live.batteryPct.map { Int($0.rounded()) } : nil,
             displayName: profile.displayName
         )
     }
@@ -62,7 +60,13 @@ struct RootTabView: View {
 
     /// Which Aura screen the shell is showing. Held here, not inside `AuraShell`, so `NavRouter` deep
     /// links can move it.
-    @State private var auraScreen: AuraScreen = .today
+    @State private var auraScreen: AuraScreen = {
+        #if DEBUG
+        AuraScreen.debugLaunchScreen
+        #else
+        .today
+        #endif
+    }()
     /// The More index, presented as a sheet from the Aura You screen — it is no longer a tab.
     @State private var showMore = false
     /// Full Settings, presented from the You screen's rows and tiles.
@@ -82,7 +86,6 @@ struct RootTabView: View {
             screen: $auraScreen,
             bodyState: AuraBodyState.forCharge(auraDay?.recovery),
             todayReading: auraTodayReading,
-            bandConnected: live.connected,
             onOpenMore: { showMore = true },
             onOpenSettings: { showSettings = true },
             onOpenDevices: { showDevices = true },

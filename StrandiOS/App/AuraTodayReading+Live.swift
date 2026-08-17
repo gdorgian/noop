@@ -29,19 +29,15 @@ extension AuraBodyState {
 
 extension AuraTodayReading {
 
-    /// Build the screen's values from the day's metrics, the strap link and the profile.
+    /// Build the screen's values from the day's metrics and profile.
     ///
     /// - Parameters:
     ///   - day: the newest scored day, or nil before the first analytics pass.
     ///   - history: trailing days, oldest → newest, for the signal sparklines.
-    ///   - batteryPercent: the strap's battery, ALREADY gated on a live link by the caller —
-    ///     `LiveState.batteryPct` is never cleared on disconnect, so an ungated read shows a strap that
-    ///     died yesterday as though it were current.
     ///   - displayName: the wearer's name, or empty.
     static func live(
         day: DailyMetric?,
         history: [DailyMetric],
-        batteryPercent: Int?,
         displayName: String,
         now: Date = Date()
     ) -> AuraTodayReading {
@@ -110,10 +106,8 @@ extension AuraTodayReading {
         let banner: String
         if let sleepMin {
             banner = String(localized: "Read from your last night — \(Int(sleepMin)) minutes asleep.")
-        } else if batteryPercent != nil {
-            banner = String(localized: "Strap connected. Wear it overnight for a reading in the morning.")
         } else {
-            banner = String(localized: "Connect your strap to start reading your nights.")
+            banner = String(localized: "Wear your strap overnight for a reading in the morning.")
         }
 
         return AuraTodayReading(
@@ -121,7 +115,6 @@ extension AuraTodayReading {
             headline: headline,
             profileName: name,
             initial: name.first.map { String($0).uppercased() } ?? "N",
-            bandBatteryPercent: batteryPercent,
             restValue: restValue,
             restFraction: restFraction,
             chargeValue: chargeValue,
