@@ -73,6 +73,14 @@ struct RootTabView: View {
             scale: UnitPrefs.resolveEffortScale(auraEffortScaleRaw)
         )
     }
+
+    private var auraTrendsReading: AuraTrendsReading {
+        AuraTrendsReading.live(
+            days: repo.days,
+            sessions: auraSleepSessions.isEmpty ? repo.sleeps : auraSleepSessions,
+            habitualMidsleepSec: auraHabitualMidsleepSec
+        )
+    }
     /// Cross-screen navigation requests (e.g. Live → "Manage devices"). Devices isn't a tab — it lives
     /// behind the More list — so a request presents it as a sheet, matching the quick-action screens.
     @EnvironmentObject private var router: NavRouter
@@ -129,6 +137,7 @@ struct RootTabView: View {
             restReading: auraRestReading,
             chargeReading: auraChargeReading,
             effortReading: auraEffortReading,
+            trendsReading: auraTrendsReading,
             onOpenMore: { showMore = true },
             onOpenSettings: { showSettings = true },
             onOpenDevices: { showDevices = true },

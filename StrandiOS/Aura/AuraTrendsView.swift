@@ -53,11 +53,21 @@ struct AuraTrendsView: View {
     private var chargeCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             AuraCardHeader(title: String(localized: "Charge"),
-                           note: String(localized: "Band is your own normal"))
+                           note: series.chargeNote)
                 .padding(.bottom, 20)
 
-            AuraTrendChart(values: series.values, labels: series.labels, selected: selectedIndex) { hit in
-                point = hit
+            Group {
+                if series.values.isEmpty {
+                    Text(String(localized: "No Charge readings in this range."))
+                        .font(.system(size: 13.5))
+                        .foregroundStyle(AuraPalette.textQuiet)
+                        .frame(maxWidth: .infinity, minHeight: 140, alignment: .center)
+                } else {
+                    AuraTrendChart(values: series.values, labels: series.labels, selected: selectedIndex,
+                                   window: 0...100, normalRange: series.normalRange) { hit in
+                        point = hit
+                    }
+                }
             }
             .padding(.bottom, 10)
 
@@ -83,7 +93,14 @@ struct AuraTrendsView: View {
             AuraCardHeader(title: String(localized: "Rest debt"),
                            note: reading.debtVerdict,
                            noteTint: AuraPalette.rest)
-            AuraDebtBars(values: reading.debt)
+            if reading.debt.isEmpty {
+                Text(String(localized: "No nights with sleep data yet."))
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(AuraPalette.textQuiet)
+                    .frame(maxWidth: .infinity, minHeight: 82, alignment: .center)
+            } else {
+                AuraDebtBars(values: reading.debt)
+            }
         }
         .padding(.horizontal, 18)
         .padding(.top, 19)
@@ -118,6 +135,9 @@ struct AuraTrendsReading {
         /// Four evenly-spaced axis ticks.
         let axis: [String]
         let read: String
+        /// The wearer's trailing-30-day middle 50% Charge range.
+        let normalRange: ClosedRange<Double>?
+        let chargeNote: String
     }
 
     let fortnight: Series
@@ -125,6 +145,7 @@ struct AuraTrendsReading {
     let quarter: Series
     let debt: [Double]
     let debtVerdict: String
+    let headline: String
 
     func series(for range: Range) -> Series {
         switch range {
@@ -141,7 +162,9 @@ struct AuraTrendsReading {
                      "10 Aug", "11 Aug", "12 Aug", "13 Aug", "14 Aug", "15 Aug",
                      String(localized: "Today")],
             axis: ["3 Aug", "7 Aug", "11 Aug", String(localized: "Today")],
-            read: String(localized: "Two weeks of steady climbing, and the last three days are your best of the month. You’ve earned a hard session — take it today, not Monday.")
+            read: String(localized: "Two weeks of steady climbing, and the last three days are your best of the month. You’ve earned a hard session — take it today, not Monday."),
+            normalRange: 58...76,
+            chargeNote: String(localized: "Your normal 58–76")
         ),
         month: Series(
             values: [48, 55, 61, 52, 44, 58, 66, 71, 63, 57, 49, 62, 70, 78, 74, 66, 59, 68, 75, 82, 88],
@@ -149,7 +172,9 @@ struct AuraTrendsReading {
                      "Wk 3", "Wk 3", "Wk 3", "Wk 3", "Wk 3", "Wk 4", "Wk 4", "Wk 4",
                      "Wk 4", "Wk 5", "Wk 5", "Wk 5", String(localized: "Today")],
             axis: ["18 Jul", "26 Jul", "4 Aug", String(localized: "Today")],
-            read: String(localized: "The dip mid-month was three short nights, not training. Once sleep came back, so did everything else.")
+            read: String(localized: "The dip mid-month was three short nights, not training. Once sleep came back, so did everything else."),
+            normalRange: 56...75,
+            chargeNote: String(localized: "Your normal 56–75")
         ),
         quarter: Series(
             values: [40, 46, 52, 49, 58, 63, 57, 51, 62, 70, 66, 59, 68, 74, 71, 65, 72, 79, 84, 88],
@@ -157,10 +182,13 @@ struct AuraTrendsReading {
                      "Jul", "Jul", "Jul", "Jul", "Jul", "Aug", "Aug", "Aug",
                      "Aug", "Aug", "Aug", String(localized: "Today")],
             axis: ["19 May", "18 Jun", "18 Jul", String(localized: "Today")],
-            read: String(localized: "Up 18 points since May with fewer swings. Whatever you changed in June, keep doing it.")
+            read: String(localized: "Up 18 points since May with fewer swings. Whatever you changed in June, keep doing it."),
+            normalRange: 55...74,
+            chargeNote: String(localized: "Your normal 55–74")
         ),
         debt: [0.4, 1.1, 0.2, 1.8, 2.4, 1.2, 0.6, 0, 0.9, 1.6, 0.8, 0.3, 0, 0],
-        debtVerdict: String(localized: "Clear for 2 days")
+        debtVerdict: String(localized: "Clear for 2 days"),
+        headline: String(localized: "Where you’re trending")
     )
 }
 #endif
