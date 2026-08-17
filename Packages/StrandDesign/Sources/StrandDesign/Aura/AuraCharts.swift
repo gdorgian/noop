@@ -604,9 +604,11 @@ public struct AuraBatteryRing: View {
                     Text(percentText)
                         .font(.system(size: 48, weight: .ultraLight, design: .rounded).monospacedDigit())
                         .foregroundStyle(AuraPalette.textPrimary)
-                    Text(verbatim: "%")
-                        .font(.system(size: 17))
-                        .foregroundStyle(AuraPalette.textQuiet)
+                    if percentText != "—" {
+                        Text(verbatim: "%")
+                            .font(.system(size: 17))
+                            .foregroundStyle(AuraPalette.textQuiet)
+                    }
                 }
                 Text(caption)
                     .font(.system(size: 11.5))
@@ -615,7 +617,9 @@ public struct AuraBatteryRing: View {
         }
         .frame(width: 172, height: 172)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Band battery \(percentText) percent, \(caption)"))
+        .accessibilityLabel(percentText == "—"
+            ? Text("Band battery unavailable, \(caption)")
+            : Text("Band battery \(percentText) percent, \(caption)"))
     }
 }
 #endif

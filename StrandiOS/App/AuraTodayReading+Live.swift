@@ -70,10 +70,12 @@ extension AuraTodayReading {
         let restValue = sleepMin.map { "\(Int($0) / 60)h \(Int($0) % 60)m" } ?? "—"
         let restFraction = sleepMin.map { min($0 / 480, 1) } ?? 0
 
-        // Charge: the design's pillar carries HRV in ms, not the 0–100 score — the score is the orb.
+        // Charge: show the actual 0–100 Charge score. An earlier Aura pass put HRV in this tile while
+        // still labelling it "Charge"; HRV remains visible in Signals and on the Charge detail screen.
         let hrv = day?.avgHrv
-        let chargeValue = hrv.map { String(Int($0.rounded())) } ?? "—"
-        let chargeFraction = hrv.map { min($0 / 120, 1) } ?? 0
+        let recovery = day?.recovery
+        let chargeValue = recovery.map { String(Int($0.rounded())) } ?? "—"
+        let chargeFraction = recovery.map { min(max($0 / 100, 0), 1) } ?? 0
 
         // Effort stays on today's own logical-day row, even when Charge/Rest carry the latest scored
         // night. Its number follows NOOP's existing display preference; the stored 0–100 value is intact.
@@ -112,6 +114,7 @@ extension AuraTodayReading {
         } else {
             banner = String(localized: "Wear your strap overnight for a reading in the morning.")
         }
+        let bodyCopy = truthfulBodyCopy(recovery: recovery, effortScale: effortScale)
 
         return AuraTodayReading(
             greeting: greeting,
@@ -121,13 +124,71 @@ extension AuraTodayReading {
             restValue: restValue,
             restFraction: restFraction,
             chargeValue: chargeValue,
+            chargeUnit: "%",
             chargeFraction: chargeFraction,
             effortValue: effortValue,
             effortUnit: "/\(UnitFormatter.effortScaleMax(effortScale))",
             effortFraction: effortFraction,
             signals: signals,
-            banner: banner
+            banner: banner,
+            verdict: bodyCopy.verdict,
+            coaching: bodyCopy.coaching,
+            session: bodyCopy.session,
+            sessionRationale: bodyCopy.rationale
         )
+    }
+
+    /// Copy backed only by the recorded Charge and NOOP's established recovery-to-Effort mapping. It
+    /// never claims an HRV direction, sleep streak, prior training streak, or workout modality that was
+    /// not supplied to this adapter.
+    private static func truthfulBodyCopy(
+        recovery: Double?,
+        effortScale: EffortScale
+    ) -> (verdict: String, coaching: String, session: String, rationale: String) {
+        guard let recovery else {
+            return (
+                String(localized: "Waiting for data"),
+                String(localized: "Your next body read will appear after NOOP has a valid scored night."),
+                String(localized: "No Effort target yet"),
+                String(localized: "A recovery-matched target needs a valid Charge first.")
+            )
+        }
+
+        let score = Int(recovery.rounded())
+        let verdict: String
+        let coaching: String
+        switch recovery {
+        case 72...:
+            verdict = String(localized: "Well restored")
+            coaching = String(localized: "Your Charge is \(score) today. You have room for a demanding day if you want it.")
+        case 49..<72:
+            verdict = String(localized: "Steady")
+            coaching = String(localized: "Your Charge is \(score) today. Train as planned and let how you feel set the ceiling.")
+        case 27..<49:
+            verdict = String(localized: "Running warm")
+            coaching = String(localized: "Your Charge is \(score) today. A lighter day better matches your current recovery.")
+        default:
+            verdict = String(localized: "Needs a day")
+            coaching = String(localized: "Your Charge is \(score) today. Recovery is the useful priority.")
+        }
+
+        guard let target = CoupledView.optimalStrainRange(recovery: recovery) else {
+            return (verdict, coaching, String(localized: "No Effort target yet"),
+                    String(localized: "A recovery-matched target needs a valid Charge first."))
+        }
+        let lower = displayTarget(target.lowerBound, scale: effortScale)
+        let upper = displayTarget(target.upperBound, scale: effortScale)
+        return (
+            verdict,
+            coaching,
+            String(localized: "Aim for Effort \(lower)–\(upper)"),
+            String(localized: "Matched to today’s Charge of \(score). The activity is your choice.")
+        )
+    }
+
+    private static func displayTarget(_ target21: Int, scale: EffortScale) -> String {
+        guard scale == .hundred else { return String(target21) }
+        return String(Int((Double(target21) / 21 * 100).rounded()))
     }
 }
 #endif
