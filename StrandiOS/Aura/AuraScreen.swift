@@ -22,6 +22,18 @@ enum AuraScreen: String, CaseIterable, Identifiable {
     /// The five that appear in the tab bar, in order.
     static let tabs: [AuraScreen] = [.today, .rest, .charge, .effort, .trends]
 
+    #if DEBUG
+    /// Simulator-only visual regression seam. Launch with `--aura-screen rest` (or another raw value)
+    /// to inspect a screen without adding production navigation or mock-data controls.
+    static var debugLaunchScreen: AuraScreen {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "--aura-screen"),
+              arguments.indices.contains(flag + 1),
+              let screen = AuraScreen(rawValue: arguments[flag + 1]) else { return .today }
+        return screen
+    }
+    #endif
+
     /// The quiet line above the headline.
     var greeting: String {
         switch self {
@@ -144,9 +156,9 @@ struct AuraTabBar: View {
 /// The greeting, the headline, and the two controls that reach the screens the tab bar does not carry.
 /// Shared by all seven screens, which is why it lives in the shell rather than in any one of them.
 struct AuraHeader: View {
+    let screen: AuraScreen
     let greeting: String
     let headline: String
-    let batteryPercent: Int?
     let initial: String
     let onOpenBand: () -> Void
     let onOpenProfile: () -> Void
@@ -157,30 +169,20 @@ struct AuraHeader: View {
                 Text(greeting)
                     .font(StrandFont.subhead)
                     .foregroundStyle(AuraPalette.textSecondary)
-                Text(headline)
-                    .font(.system(size: 23, weight: .regular, design: .rounded))
-                    .foregroundStyle(AuraPalette.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 8)
-            HStack(spacing: 8) {
-                Button(action: onOpenBand) {
-                    VStack(spacing: 1) {
-                        AuraBatteryGlyph(fraction: Double(batteryPercent ?? 0) / 100)
-                        // `verbatim` — a bare number needs no String Catalog entry.
-                        Text(verbatim: batteryPercent.map(String.init) ?? "—")
-                            .font(.system(size: 8.5, weight: .semibold, design: .rounded).monospacedDigit())
-                            .foregroundStyle(AuraPalette.textSecondary)
-                    }
-                    .frame(width: 38, height: 38)
-                    .background(Circle().fill(AuraPalette.controlFill))
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
+                if screen == .band {
+                    AuraBandConnectionHeadline()
+                } else {
+                    Text(headline)
+                        .font(.system(size: 23, weight: .regular, design: .rounded))
+                        .foregroundStyle(AuraPalette.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    batteryPercent.map { Text("Band battery \($0) percent") }
-                        ?? Text("Band disconnected")
-                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
+
+            HStack(spacing: 8) {
+                AuraLiveBatteryButton(action: onOpenBand)
 
                 Button(action: onOpenProfile) {
                     Text(initial)
@@ -197,9 +199,48 @@ struct AuraHeader: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text("Account"))
             }
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.top, 2)
         }
         .padding(.top, 12)
+    }
+}
+
+/// LiveState publishes heart rate and R-R packets around once per second. Keeping that observation in
+/// these two tiny leaves prevents the whole Aura shell from being invalidated by data only the header uses.
+private struct AuraLiveBatteryButton: View {
+    @EnvironmentObject private var live: LiveState
+    let action: () -> Void
+
+    private var percent: Int? {
+        live.connected ? live.batteryPct.map { Int($0.rounded()) } : nil
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 1) {
+                AuraBatteryGlyph(fraction: Double(percent ?? 0) / 100)
+                Text(verbatim: percent.map(String.init) ?? "—")
+                    .font(.system(size: 8.5, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(AuraPalette.textSecondary)
+            }
+            .frame(width: 38, height: 38)
+            .background(Circle().fill(AuraPalette.controlFill))
+            .overlay(Circle().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(percent.map { Text("Band battery \($0) percent") } ?? Text("Band disconnected"))
+    }
+}
+
+private struct AuraBandConnectionHeadline: View {
+    @EnvironmentObject private var live: LiveState
+
+    var body: some View {
+        Text(live.connected ? String(localized: "Connected and reading") : String(localized: "Not connected"))
+            .font(.system(size: 23, weight: .regular, design: .rounded))
+            .foregroundStyle(AuraPalette.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

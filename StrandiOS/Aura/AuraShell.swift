@@ -30,7 +30,6 @@ struct AuraShell: View {
     /// Today's live repository snapshot. Aura owns its presentation only; assembling the snapshot stays
     /// in `RootTabView`, outside the design layer and away from BLE/HealthKit ownership.
     private let todayReading: AuraTodayReading
-    private let bandConnected: Bool
 
     /// Written out rather than synthesized: a struct with any `private` stored property gets a PRIVATE
     /// memberwise initializer, which the app shell in another file could not call.
@@ -38,7 +37,6 @@ struct AuraShell: View {
         screen: Binding<AuraScreen>,
         bodyState: AuraBodyState = .restored,
         todayReading: AuraTodayReading = .prototype,
-        bandConnected: Bool = true,
         onOpenMore: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
         onOpenDevices: @escaping () -> Void,
@@ -47,7 +45,6 @@ struct AuraShell: View {
         self._screen = screen
         self.bodyState = bodyState
         self.todayReading = todayReading
-        self.bandConnected = bandConnected
         self.onOpenMore = onOpenMore
         self.onOpenSettings = onOpenSettings
         self.onOpenDevices = onOpenDevices
@@ -71,9 +68,9 @@ struct AuraShell: View {
                         Color.clear.frame(height: 0).id(Self.topAnchorID)
 
                         AuraHeader(
+                            screen: screen,
                             greeting: headerGreeting,
                             headline: headerHeadline,
-                            batteryPercent: todayReading.bandBatteryPercent,
                             initial: todayReading.initial,
                             onOpenBand: { go(.band) },
                             onOpenProfile: { go(.profile) }
@@ -156,9 +153,8 @@ struct AuraShell: View {
         case .today:
             return todayReading.headline
         case .band:
-            return bandConnected
-                ? String(localized: "Connected and reading")
-                : String(localized: "Not connected")
+            // Rendered by a LiveState-isolated leaf in AuraHeader.
+            return String(localized: "Band status")
         case .profile:
             return todayReading.profileName.isEmpty
                 ? String(localized: "Your profile")

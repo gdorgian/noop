@@ -252,7 +252,6 @@ struct AuraTodayReading {
     let headline: String
     let profileName: String
     let initial: String
-    let bandBatteryPercent: Int?
 
     let restValue: String
     let restFraction: Double
@@ -279,7 +278,6 @@ struct AuraTodayReading {
         headline: String(localized: "Here’s your morning read"),
         profileName: "Gabriel D.",
         initial: "G",
-        bandBatteryPercent: 62,
         restValue: "7h 12m",
         restFraction: 0.96,
         chargeValue: "56",
