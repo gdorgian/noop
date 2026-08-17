@@ -57,7 +57,7 @@ struct AuraChargeView: View {
             }
             .padding(.bottom, 14)
 
-            Text(String(localized: "Variability through the day"))
+            Text(reading.variabilityCaption)
                 .font(.system(size: 11.5))
                 .foregroundStyle(AuraPalette.textQuiet)
                 .padding(.bottom, 16)
@@ -68,11 +68,11 @@ struct AuraChargeView: View {
                 .padding(.bottom, 11)
 
             HStack {
-                ForEach(reading.axis, id: \.self) { label in
+                ForEach(Array(reading.axis.enumerated()), id: \.offset) { index, label in
                     Text(label)
                         .font(.system(size: 10.5))
                         .foregroundStyle(AuraPalette.textDim)
-                    if label != reading.axis.last { Spacer(minLength: 4) }
+                    if index < reading.axis.count - 1 { Spacer(minLength: 4) }
                 }
             }
         }
@@ -146,6 +146,7 @@ struct AuraChargeReading {
     }
 
     let variability: String
+    let variabilityCaption: String
     let dayHigh: String
     let dayLow: String
     let stress: String
@@ -158,8 +159,11 @@ struct AuraChargeReading {
     let drivers: [Driver]
     let banner: String
 
+    let headline: String
+
     static let prototype = AuraChargeReading(
         variability: "56",
+        variabilityCaption: String(localized: "Nightly variability"),
         dayHigh: "62",
         dayLow: "41",
         stress: String(localized: "Low"),
@@ -181,7 +185,8 @@ struct AuraChargeReading {
                    position: 58, baseline: 54,
                    plain: String(localized: "Slightly cool, which is normal after a proper night’s sleep.")),
         ],
-        banner: String(localized: "Your variability is 17% above your own 30-day normal — the strongest it’s been this month.")
+        banner: String(localized: "Your variability is 17% above your own 30-day normal — the strongest it’s been this month."),
+        headline: String(localized: "Your body is settled")
     )
 }
 #endif

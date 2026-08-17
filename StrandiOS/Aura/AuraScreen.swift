@@ -164,7 +164,7 @@ struct AuraHeader: View {
     let onOpenProfile: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(greeting)
                     .font(StrandFont.subhead)
@@ -179,6 +179,7 @@ struct AuraHeader: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.trailing, 98)
 
             HStack(spacing: 8) {
                 AuraLiveBatteryButton(action: onOpenBand)
@@ -199,7 +200,6 @@ struct AuraHeader: View {
                 .accessibilityLabel(Text("Account"))
             }
             .fixedSize(horizontal: true, vertical: false)
-            .layoutPriority(1)
             .padding(.top, 2)
         }
         .padding(.top, 12)
