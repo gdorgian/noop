@@ -75,25 +75,33 @@ struct AuraEffortView: View {
     private var loggedCard: some View {
         VStack(alignment: .leading, spacing: 15) {
             Text(String(localized: "Logged today")).auraOverline()
-            ForEach(reading.activities) { activity in
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(activity.tint)
-                        .frame(width: 10, height: 10)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(activity.name)
-                            .font(.system(size: 14, weight: .medium))
+            if reading.activities.isEmpty {
+                Text(String(localized: "No workouts logged today."))
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(AuraPalette.textQuiet)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(reading.activities) { activity in
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(activity.tint)
+                            .frame(width: 10, height: 10)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(activity.name)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(AuraPalette.textPrimary)
+                            Text(activity.detail)
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(AuraPalette.textQuiet)
+                        }
+                        Spacer(minLength: 8)
+                        Text(activity.load)
+                            .font(.system(size: 19, design: .rounded).monospacedDigit())
                             .foregroundStyle(AuraPalette.textPrimary)
-                        Text(activity.detail)
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(AuraPalette.textQuiet)
                     }
-                    Spacer(minLength: 8)
-                    Text(activity.load)
-                        .font(.system(size: 19, design: .rounded).monospacedDigit())
-                        .foregroundStyle(AuraPalette.textPrimary)
+                    .accessibilityElement(children: .combine)
                 }
-                .accessibilityElement(children: .combine)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -109,7 +117,8 @@ struct AuraEffortView: View {
                            note: reading.weekVerdict,
                            noteTint: AuraPalette.accent)
             AuraWeekBars(values: reading.weekLoad, days: reading.weekDays,
-                         highlighted: reading.weekLoad.count - 1)
+                         highlighted: reading.weekLoad.count - 1,
+                         ceiling: reading.weekCeiling)
         }
         .padding(18)
         .auraCard()
@@ -127,6 +136,7 @@ struct AuraEffortReading {
         let tint: Color
     }
 
+    let greeting: String
     let effort: String
     let targetCaption: String
     /// Position on the Minimal → All out track, 0…1.
@@ -137,8 +147,11 @@ struct AuraEffortReading {
     let weekLoad: [Double]
     let weekDays: [String]
     let weekVerdict: String
+    let weekCeiling: Double
+    let headline: String
 
     static let prototype = AuraEffortReading(
+        greeting: String(localized: "Saturday"),
         effort: "6.2",
         targetCaption: String(localized: "of a 12 target"),
         fraction: 0.52,
@@ -164,7 +177,9 @@ struct AuraEffortReading {
             String(localized: "T"), String(localized: "F"), String(localized: "S"),
             String(localized: "S"),
         ],
-        weekVerdict: String(localized: "Balanced")
+        weekVerdict: String(localized: "Balanced"),
+        weekCeiling: 21,
+        headline: String(localized: "Effort so far today")
     )
 }
 #endif

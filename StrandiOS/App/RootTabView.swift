@@ -29,8 +29,10 @@ struct RootTabView: View {
     private var auraTodayReading: AuraTodayReading {
         AuraTodayReading.live(
             day: auraDay,
+            effortDay: repo.today,
             history: Array(repo.days.suffix(14)),
-            displayName: profile.displayName
+            displayName: profile.displayName,
+            effortScale: UnitPrefs.resolveEffortScale(auraEffortScaleRaw)
         )
     }
 
@@ -40,6 +42,8 @@ struct RootTabView: View {
     @State private var auraHabitualMidsleepSec: Int?
     @State private var auraStressSeries: [(day: String, value: Double)] = []
     @State private var auraRestSeries: [(day: String, value: Double)] = []
+    @State private var auraWorkouts: [WorkoutRow] = []
+    @AppStorage(UnitPrefs.effortScaleKey) private var auraEffortScaleRaw = EffortScale.hundred.rawValue
 
     private var auraRestReading: AuraRestReading {
         AuraRestReading.live(
@@ -55,6 +59,18 @@ struct RootTabView: View {
             history: repo.days,
             stressSeries: auraStressSeries,
             restSeries: auraRestSeries
+        )
+    }
+
+    /// Effort stays on today's logical-day row. Only the target may carry the latest scored recovery,
+    /// matching NOOP's existing coupled read without ever passing yesterday's strain off as today's.
+    private var auraEffortReading: AuraEffortReading {
+        AuraEffortReading.live(
+            day: repo.today,
+            targetRecovery: Repository.widgetAnchor(days: repo.days)?.recovery,
+            history: repo.days,
+            workouts: auraWorkouts,
+            scale: UnitPrefs.resolveEffortScale(auraEffortScaleRaw)
         )
     }
     /// Cross-screen navigation requests (e.g. Live → "Manage devices"). Devices isn't a tab — it lives
@@ -112,6 +128,7 @@ struct RootTabView: View {
             todayReading: auraTodayReading,
             restReading: auraRestReading,
             chargeReading: auraChargeReading,
+            effortReading: auraEffortReading,
             onOpenMore: { showMore = true },
             onOpenSettings: { showSettings = true },
             onOpenDevices: { showDevices = true },
@@ -136,12 +153,14 @@ struct RootTabView: View {
                 source: Repository.whoopSource,
                 days: 60
             )
-            let loaded = await (sessions, habitual, stress, rest)
+            async let workouts = repo.workoutRows(days: 8)
+            let loaded = await (sessions, habitual, stress, rest, workouts)
             guard !Task.isCancelled else { return }
             auraSleepSessions = loaded.0
             auraHabitualMidsleepSec = loaded.1
             auraStressSeries = loaded.2
             auraRestSeries = loaded.3
+            auraWorkouts = loaded.4
         }
         // Quick-action sheet presents with the calm easing (~0.42s) per the README sheet spec —
         // the easing is applied where `quickAction` is set (see `presentQuickAction`), keeping the

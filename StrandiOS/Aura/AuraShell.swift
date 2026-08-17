@@ -34,6 +34,8 @@ struct AuraShell: View {
     private let restReading: AuraRestReading
     /// Charge's snapshot, derived from the canonical recovery row, baselines and driver contract.
     private let chargeReading: AuraChargeReading
+    /// Effort's snapshot, derived from today's stored strain, recovery target and reconciled workouts.
+    private let effortReading: AuraEffortReading
 
     /// Written out rather than synthesized: a struct with any `private` stored property gets a PRIVATE
     /// memberwise initializer, which the app shell in another file could not call.
@@ -43,6 +45,7 @@ struct AuraShell: View {
         todayReading: AuraTodayReading = .prototype,
         restReading: AuraRestReading = .prototype,
         chargeReading: AuraChargeReading = .prototype,
+        effortReading: AuraEffortReading = .prototype,
         onOpenMore: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
         onOpenDevices: @escaping () -> Void,
@@ -53,6 +56,7 @@ struct AuraShell: View {
         self.todayReading = todayReading
         self.restReading = restReading
         self.chargeReading = chargeReading
+        self.effortReading = effortReading
         self.onOpenMore = onOpenMore
         self.onOpenSettings = onOpenSettings
         self.onOpenDevices = onOpenDevices
@@ -135,7 +139,7 @@ struct AuraShell: View {
         case .charge:
             AuraChargeView(reading: chargeReading)
         case .effort:
-            AuraEffortView()
+            AuraEffortView(reading: effortReading)
         case .trends:
             AuraTrendsView()
         case .band:
@@ -150,6 +154,7 @@ struct AuraShell: View {
     private var headerGreeting: String {
         switch screen {
         case .today: return todayReading.greeting
+        case .effort: return effortReading.greeting
         case .band: return String(localized: "Your band")
         case .profile: return String(localized: "Account")
         default: return screen.greeting
@@ -164,6 +169,8 @@ struct AuraShell: View {
             return restReading.headline
         case .charge:
             return chargeReading.headline
+        case .effort:
+            return effortReading.headline
         case .band:
             // Rendered by a LiveState-isolated leaf in AuraHeader.
             return String(localized: "Band status")
