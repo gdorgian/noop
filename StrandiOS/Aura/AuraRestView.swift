@@ -38,6 +38,7 @@ struct AuraRestView: View {
             weekCard
             nightCard
             AuraNoteBanner(text: restNote, tint: AuraPalette.rest)
+            AuraSleepMarkCard()
         }
         .onChangeCompat(of: reading.nights.map(\.id)) { _ in
             guard reading.nights.contains(where: { $0.id == selectedNightID }) else {
@@ -115,6 +116,92 @@ struct AuraRestView: View {
     private var restNote: String {
         guard let night else { return reading.averageNote }
         return "\(night.note) \(reading.averageNote)"
+    }
+}
+
+// MARK: - Sleep marks
+
+/// Aura's presentation of NOOP's existing manual sleep-mark action. This is intentionally a tiny
+/// live-observing leaf: the 1 Hz strap stream can refresh this card without invalidating the charts above.
+/// The action remains logging-only and uses the same `SleepMark` store/log contract as `SleepMarkCard`.
+private struct AuraSleepMarkCard: View {
+    @EnvironmentObject private var repo: Repository
+    @EnvironmentObject private var live: LiveState
+    @State private var lastMark: SleepMark?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            AuraCardHeader(
+                title: String(localized: "Sleep marks"),
+                note: String(localized: "Optional"),
+                symbol: "bed.double"
+            )
+
+            Text(String(localized: "Mark when you put the phone down and when you wake. These timestamps are kept for your record and never replace the sleep detected by your band."))
+                .font(.system(size: 12.5))
+                .foregroundStyle(AuraPalette.textQuiet)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                markButton(
+                    String(localized: "Going to sleep"),
+                    symbol: "moon.zzz.fill",
+                    type: .bedtime
+                )
+                markButton(
+                    String(localized: "I'm awake"),
+                    symbol: "sun.max.fill",
+                    type: .wake
+                )
+            }
+
+            if let lastMark {
+                Text(lastMark.confirmation)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(AuraPalette.rest)
+                    .transition(.opacity)
+                    .accessibilityLabel(lastMark.confirmation)
+            }
+        }
+        .padding(18)
+        .auraCard()
+        .strandHaptic(.success, trigger: lastMark?.tsMs ?? 0)
+    }
+
+    private func markButton(_ title: String, symbol: String, type: SleepMarkType) -> some View {
+        Button { logMark(type) } label: {
+            HStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .font(.system(size: 13.5, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(AuraPalette.textPrimary)
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .background(
+                RoundedRectangle(cornerRadius: AuraPalette.tileRadius, style: .continuous)
+                    .fill(AuraPalette.controlFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AuraPalette.tileRadius, style: .continuous)
+                            .strokeBorder(AuraPalette.cardBorder, lineWidth: 0.5)
+                    )
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+
+    private func logMark(_ type: SleepMarkType) {
+        let mark = SleepMark(type: type)
+        withAnimation(NoopMotion.value) { lastMark = mark }
+        live.append(log: mark.logLine)
+        Task {
+            guard let store = await repo.storeHandle() else { return }
+            try? await store.upsertMetricSeries([mark.metricPoint], deviceId: repo.deviceId)
+        }
     }
 }
 
