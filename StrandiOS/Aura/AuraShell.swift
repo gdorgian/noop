@@ -38,17 +38,20 @@ struct AuraShell: View {
     private let effortReading: AuraEffortReading
     /// Trends' snapshot, derived from real Charge history and the canonical sleep-debt ledger.
     private let trendsReading: AuraTrendsReading
+    /// You's snapshot, derived from the persisted local profile and repository history.
+    private let profileReading: AuraProfileReading
 
     /// Written out rather than synthesized: a struct with any `private` stored property gets a PRIVATE
     /// memberwise initializer, which the app shell in another file could not call.
     init(
         screen: Binding<AuraScreen>,
         bodyState: AuraBodyState = .restored,
-        todayReading: AuraTodayReading = .prototype,
-        restReading: AuraRestReading = .prototype,
-        chargeReading: AuraChargeReading = .prototype,
-        effortReading: AuraEffortReading = .prototype,
-        trendsReading: AuraTrendsReading = .prototype,
+        todayReading: AuraTodayReading,
+        restReading: AuraRestReading,
+        chargeReading: AuraChargeReading,
+        effortReading: AuraEffortReading,
+        trendsReading: AuraTrendsReading,
+        profileReading: AuraProfileReading,
         onOpenMore: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
         onOpenDevices: @escaping () -> Void,
@@ -61,6 +64,7 @@ struct AuraShell: View {
         self.chargeReading = chargeReading
         self.effortReading = effortReading
         self.trendsReading = trendsReading
+        self.profileReading = profileReading
         self.onOpenMore = onOpenMore
         self.onOpenSettings = onOpenSettings
         self.onOpenDevices = onOpenDevices
@@ -149,12 +153,12 @@ struct AuraShell: View {
         case .band:
             AuraBandView(onManageDevices: onOpenDevices, onSync: onSync)
         case .profile:
-            AuraProfileView(onOpenMore: onOpenMore, onOpenSettings: onOpenSettings)
+            AuraProfileView(reading: profileReading, onOpenMore: onOpenMore, onOpenSettings: onOpenSettings)
         }
     }
 
-    /// Today and Rest have live repository snapshots; Band and You have live shell identity/status.
-    /// The remaining screen-specific headlines stay with their prototype readings until each is wired.
+    /// Every production headline comes from its live reading. Prototype readings remain available only
+    /// to isolated design previews; AuraShell requires callers to provide all six snapshots.
     private var headerGreeting: String {
         switch screen {
         case .today: return todayReading.greeting

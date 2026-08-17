@@ -13,6 +13,7 @@ struct RootTabView: View {
     let homeScreenQuickActionsEnabled: Bool
 
     @EnvironmentObject private var repo: Repository
+    @EnvironmentObject private var ble: BLEManager
     /// Aura Today reads the profile for its greeting and avatar initial. Live strap state is deliberately
     /// observed only by tiny header leaves inside `AuraHeader`; observing the 1 Hz `LiveState` here would
     /// invalidate the entire shell, charts and scroll view for every heart-rate packet.
@@ -44,6 +45,8 @@ struct RootTabView: View {
     @State private var auraRestSeries: [(day: String, value: Double)] = []
     @State private var auraWorkouts: [WorkoutRow] = []
     @AppStorage(UnitPrefs.effortScaleKey) private var auraEffortScaleRaw = EffortScale.hundred.rawValue
+    @AppStorage(UnitPrefs.systemKey) private var auraUnitSystemRaw = UnitSystem.metric.rawValue
+    @AppStorage(UnitPrefs.temperatureKey) private var auraTemperatureRaw = ""
 
     private var auraRestReading: AuraRestReading {
         AuraRestReading.live(
@@ -79,6 +82,18 @@ struct RootTabView: View {
             days: repo.days,
             sessions: auraSleepSessions.isEmpty ? repo.sleeps : auraSleepSessions,
             habitualMidsleepSec: auraHabitualMidsleepSec
+        )
+    }
+
+    private var auraProfileReading: AuraProfileReading {
+        let unitSystem = UnitSystem(rawValue: auraUnitSystemRaw) ?? .metric
+        return AuraProfileReading.live(
+            displayName: profile.displayName,
+            age: profile.age,
+            sex: profile.sex,
+            earliestDay: repo.freshness.earliestDay,
+            unitSystem: unitSystem,
+            temperature: UnitPrefs.resolveTemperature(system: unitSystem, override: auraTemperatureRaw)
         )
     }
     /// Cross-screen navigation requests (e.g. Live → "Manage devices"). Devices isn't a tab — it lives
@@ -138,10 +153,14 @@ struct RootTabView: View {
             chargeReading: auraChargeReading,
             effortReading: auraEffortReading,
             trendsReading: auraTrendsReading,
+            profileReading: auraProfileReading,
             onOpenMore: { showMore = true },
             onOpenSettings: { showSettings = true },
             onOpenDevices: { showDevices = true },
-            onSync: { Task { await repo.refresh() } }
+            onSync: {
+                ble.syncNow()
+                Task { await repo.refresh() }
+            }
         )
         .tint(StrandPalette.accent)
         .task {

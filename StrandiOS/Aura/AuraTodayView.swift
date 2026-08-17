@@ -52,10 +52,10 @@ struct AuraTodayView: View {
         VStack(spacing: 8) {
             AuraOrb(state: state, poseStill: poseStill)
                 .frame(height: 272)
-            Text(state.label)
+            Text(reading.verdict)
                 .font(.system(size: 34, weight: .light, design: .rounded))
                 .foregroundStyle(AuraPalette.textPrimary)
-            Text(state.coaching)
+            Text(reading.coaching)
                 .font(.system(size: 14.5))
                 .lineSpacing(2)
                 .multilineTextAlignment(.center)
@@ -79,7 +79,8 @@ struct AuraTodayView: View {
                            fraction: reading.restFraction, tint: AuraPalette.rest) {
                 onNavigate(.rest)
             }
-            AuraPillarCard(title: String(localized: "Charge"), value: reading.chargeValue, unit: "ms",
+            AuraPillarCard(title: String(localized: "Charge"), value: reading.chargeValue,
+                           unit: reading.chargeUnit,
                            fraction: reading.chargeFraction, tint: AuraPalette.accent) {
                 onNavigate(.charge)
             }
@@ -108,14 +109,14 @@ struct AuraTodayView: View {
             }
             .padding(.bottom, 12)
 
-            Text(state.session)
+            Text(reading.session)
                 .font(.system(size: 19, weight: .medium))
                 .lineSpacing(2)
                 .foregroundStyle(AuraPalette.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 6)
 
-            Text(state.sessionRationale)
+            Text(reading.sessionRationale)
                 .font(.system(size: 13.5))
                 .lineSpacing(2)
                 .foregroundStyle(AuraPalette.textTertiary)
@@ -257,12 +258,17 @@ struct AuraTodayReading {
     let restValue: String
     let restFraction: Double
     let chargeValue: String
+    let chargeUnit: String
     let chargeFraction: Double
     let effortValue: String
     let effortUnit: String
     let effortFraction: Double
     let signals: [Signal]
     let banner: String
+    let verdict: String
+    let coaching: String
+    let session: String
+    let sessionRationale: String
 
     struct Signal: Identifiable {
         let id: String
@@ -283,6 +289,7 @@ struct AuraTodayReading {
         restValue: "7h 12m",
         restFraction: 0.96,
         chargeValue: "56",
+        chargeUnit: "%",
         chargeFraction: 0.78,
         effortValue: "6.2",
         effortUnit: "/12",
@@ -301,7 +308,11 @@ struct AuraTodayReading {
                    systemImage: "thermometer.medium", tint: AuraPalette.effort,
                    series: [0.3, 0.1, -0.1, 0, -0.3, -0.2, -0.1, -0.2]),
         ],
-        banner: String(localized: "Your variability is 17% above your own 30-day normal — the strongest it’s been this month.")
+        banner: String(localized: "Your variability is 17% above your own 30-day normal — the strongest it’s been this month."),
+        verdict: String(localized: "Well restored"),
+        coaching: String(localized: "Your body has room today. Good day to ask something of it."),
+        session: String(localized: "Aim for your recovery-matched Effort range"),
+        sessionRationale: String(localized: "The target follows today’s Charge. The activity is your choice.")
     )
 }
 #endif

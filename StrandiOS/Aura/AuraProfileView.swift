@@ -73,25 +73,25 @@ struct AuraProfileView: View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
                 AuraIconTile(symbol: "target", tint: AuraPalette.accent,
-                             tag: String(localized: "Auto"),
+                             tag: reading.baselineTag,
                              title: String(localized: "Your baselines"),
-                             detail: String(localized: "Recalculated monthly"))
+                             detail: reading.baselineDetail)
                 AuraIconTile(symbol: "bell", tint: AuraPalette.effort,
-                             tag: String(localized: "1/day"),
+                             tag: reading.notificationsTag,
                              title: String(localized: "Notifications"),
-                             detail: String(localized: "Morning only"),
+                             detail: reading.notificationsDetail,
                              action: onOpenSettings)
             }
             HStack(spacing: 8) {
                 AuraIconTile(symbol: "ruler", tint: AuraPalette.rest,
-                             tag: String(localized: "EU"),
+                             tag: reading.unitsTag,
                              title: String(localized: "Units"),
-                             detail: String(localized: "Metric · 24-hour"),
+                             detail: reading.unitsDetail,
                              action: onOpenSettings)
                 AuraIconTile(symbol: "square.and.arrow.down", tint: AuraPalette.textSecondary,
-                             tag: String(localized: "Any time"),
+                             tag: reading.exportTag,
                              title: String(localized: "Export data"),
-                             detail: String(localized: "CSV or Apple Health"),
+                             detail: reading.exportDetail,
                              action: onOpenMore)
             }
         }
@@ -123,11 +123,11 @@ struct AuraProfileView: View {
                         showsDivider: true,
                         action: onOpenMore)
             AuraListRow(key: String(localized: "What Noop tracks"),
-                        subtitle: String(localized: "Rest, charge, effort, stress"),
+                        subtitle: String(localized: "Health, units and score preferences"),
                         showsDivider: true,
                         action: onOpenSettings)
             AuraListRow(key: String(localized: "Privacy"),
-                        subtitle: String(localized: "Nothing leaves the band unencrypted"),
+                        subtitle: String(localized: "On-device by default · review permissions"),
                         showsDivider: false,
                         action: onOpenSettings)
         }
@@ -175,11 +175,72 @@ struct AuraProfileReading {
     let name: String
     let initial: String
     let memberSince: String
+    let baselineTag: String
+    let baselineDetail: String
+    let notificationsTag: String
+    let notificationsDetail: String
+    let unitsTag: String
+    let unitsDetail: String
+    let exportTag: String
+    let exportDetail: String
+
+    static func live(
+        displayName: String,
+        age: Int,
+        sex: String,
+        earliestDay: String?,
+        unitSystem: UnitSystem,
+        temperature: TemperatureUnit
+    ) -> AuraProfileReading {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = trimmed.isEmpty ? String(localized: "You") : trimmed
+        let initial = name.first.map { String($0).uppercased() } ?? "Y"
+        let sexLabel = sex.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let details = [String(localized: "\(age) years"), sexLabel].filter { !$0.isEmpty }
+        let tracking = earliestDay.flatMap(monthYear).map { String(localized: "Tracking since \($0)") }
+        let memberSince = ([tracking] + details.map(Optional.some)).compactMap { $0 }.joined(separator: " · ")
+
+        let systemLabel = unitSystem == .metric ? String(localized: "Metric") : String(localized: "Imperial")
+        let distance = unitSystem == .metric ? "km" : "mi"
+        let mass = unitSystem == .metric ? "kg" : "lb"
+        let temp = temperature == .celsius ? "°C" : "°F"
+
+        return AuraProfileReading(
+            name: name,
+            initial: initial,
+            memberSince: memberSince,
+            baselineTag: String(localized: "On-device"),
+            baselineDetail: String(localized: "Updates with new nights"),
+            notificationsTag: String(localized: "Settings"),
+            notificationsDetail: String(localized: "Reminders and alerts"),
+            unitsTag: systemLabel,
+            unitsDetail: "\(mass) · \(distance) · \(temp)",
+            exportTag: String(localized: "Local"),
+            exportDetail: String(localized: "Backup or Apple Health")
+        )
+    }
+
+    private static func monthYear(_ day: String) -> String? {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.calendar = Calendar(identifier: .gregorian)
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: day) else { return nil }
+        return date.formatted(.dateTime.month(.abbreviated).year())
+    }
 
     static let prototype = AuraProfileReading(
         name: "Gabriel D.",
         initial: "G",
-        memberSince: String(localized: "Member since Mar 2025 · 34, male")
+        memberSince: String(localized: "Member since Mar 2025 · 34, male"),
+        baselineTag: String(localized: "On-device"),
+        baselineDetail: String(localized: "Updates with new nights"),
+        notificationsTag: String(localized: "Settings"),
+        notificationsDetail: String(localized: "Reminders and alerts"),
+        unitsTag: String(localized: "Metric"),
+        unitsDetail: "kg · km · °C",
+        exportTag: String(localized: "Local"),
+        exportDetail: String(localized: "Backup or Apple Health")
     )
 }
 #endif
