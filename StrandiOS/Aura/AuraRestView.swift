@@ -38,7 +38,7 @@ struct AuraRestView: View {
             weekCard
             nightCard
             AuraNoteBanner(text: restNote, tint: AuraPalette.rest)
-            AuraSleepMarkCard()
+            debtCard
         }
         .onChangeCompat(of: reading.nights.map(\.id)) { _ in
             guard reading.nights.contains(where: { $0.id == selectedNightID }) else {
@@ -78,7 +78,7 @@ struct AuraRestView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(night?.id == reading.nights.last?.id
                      ? String(localized: "Last night")
-                     : String(localized: "That night"))
+                     : (night?.dateLabel ?? "—"))
                     .font(.system(size: 14.5, weight: .semibold))
                     .foregroundStyle(AuraPalette.textPrimary)
                 Spacer(minLength: 8)
@@ -117,91 +117,55 @@ struct AuraRestView: View {
         guard let night else { return reading.averageNote }
         return "\(night.note) \(reading.averageNote)"
     }
-}
 
-// MARK: - Sleep marks
-
-/// Aura's presentation of NOOP's existing manual sleep-mark action. This is intentionally a tiny
-/// live-observing leaf: the 1 Hz strap stream can refresh this card without invalidating the charts above.
-/// The action remains logging-only and uses the same `SleepMark` store/log contract as `SleepMarkCard`.
-private struct AuraSleepMarkCard: View {
-    @EnvironmentObject private var repo: Repository
-    @EnvironmentObject private var live: LiveState
-    @State private var lastMark: SleepMark?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+    private var debtCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
             AuraCardHeader(
-                title: String(localized: "Sleep marks"),
-                note: String(localized: "Optional"),
-                symbol: "bed.double"
+                title: String(localized: "Sleep debt"),
+                note: reading.debtHeadline,
+                noteTint: reading.debtIsDebt ? AuraPalette.effort : AuraPalette.rest,
+                symbol: "moon.stars",
+                symbolTint: AuraPalette.rest
             )
 
-            Text(String(localized: "Mark when you put the phone down and when you wake. These timestamps are kept for your record and never replace the sleep detected by your band."))
+            Text(reading.debtExplanation)
                 .font(.system(size: 12.5))
+                .lineSpacing(2)
                 .foregroundStyle(AuraPalette.textQuiet)
                 .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 8) {
-                markButton(
-                    String(localized: "Going to sleep"),
-                    symbol: "moon.zzz.fill",
-                    type: .bedtime
-                )
-                markButton(
-                    String(localized: "I'm awake"),
-                    symbol: "sun.max.fill",
-                    type: .wake
-                )
-            }
-
-            if let lastMark {
-                Text(lastMark.confirmation)
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(AuraPalette.rest)
-                    .transition(.opacity)
-                    .accessibilityLabel(lastMark.confirmation)
+            if reading.debtNights.isEmpty {
+                Text(String(localized: "No nights with enough sleep data yet."))
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(AuraPalette.textQuiet)
+                    .frame(maxWidth: .infinity, minHeight: 54, alignment: .center)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(reading.debtNights.enumerated()), id: \.element.id) { index, item in
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.date)
+                                    .font(.system(size: 13.5, weight: .medium))
+                                    .foregroundStyle(AuraPalette.textPrimary)
+                                Text(item.slept)
+                                    .font(.system(size: 11.5))
+                                    .foregroundStyle(AuraPalette.textQuiet)
+                            }
+                            Spacer(minLength: 8)
+                            Text(item.change)
+                                .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(item.addedDebt ? AuraPalette.effort : AuraPalette.rest)
+                        }
+                        .frame(minHeight: 51)
+                        if index < reading.debtNights.count - 1 {
+                            Rectangle().fill(AuraPalette.cardBorder).frame(height: 0.5)
+                        }
+                    }
+                }
             }
         }
         .padding(18)
         .auraCard()
-        .strandHaptic(.success, trigger: lastMark?.tsMs ?? 0)
-    }
-
-    private func markButton(_ title: String, symbol: String, type: SleepMarkType) -> some View {
-        Button { logMark(type) } label: {
-            HStack(spacing: 8) {
-                Image(systemName: symbol)
-                    .font(.system(size: 13.5, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(AuraPalette.textPrimary)
-            .frame(maxWidth: .infinity, minHeight: 46)
-            .background(
-                RoundedRectangle(cornerRadius: AuraPalette.tileRadius, style: .continuous)
-                    .fill(AuraPalette.controlFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: AuraPalette.tileRadius, style: .continuous)
-                            .strokeBorder(AuraPalette.cardBorder, lineWidth: 0.5)
-                    )
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-    }
-
-    private func logMark(_ type: SleepMarkType) {
-        let mark = SleepMark(type: type)
-        withAnimation(NoopMotion.value) { lastMark = mark }
-        live.append(log: mark.logLine)
-        Task {
-            guard let store = await repo.storeHandle() else { return }
-            try? await store.upsertMetricSeries([mark.metricPoint], deviceId: repo.deviceId)
-        }
     }
 }
 
@@ -220,6 +184,7 @@ struct AuraRestReading {
     struct NightReading: Identifiable {
         let id: Int
         let day: String
+        let dateLabel: String
         let hours: Double
         let note: String
         let window: String
@@ -228,11 +193,23 @@ struct AuraRestReading {
         let stages: [Stage]
     }
 
+    struct DebtNight: Identifiable {
+        let id: String
+        let date: String
+        let slept: String
+        let change: String
+        let addedDebt: Bool
+    }
+
     let nights: [NightReading]
     let personalAverage: Double
     let averageNote: String
     let averageSleepValue: String
     let averageDeepValue: String
+    let debtHeadline: String
+    let debtExplanation: String
+    let debtIsDebt: Bool
+    let debtNights: [DebtNight]
 
     var headline: String {
         guard let latest = nights.last else { return String(localized: "No sleep recorded yet") }
@@ -246,25 +223,33 @@ struct AuraRestReading {
 
     static let prototype = AuraRestReading(
         nights: [
-            NightReading(id: 0, day: String(localized: "S"), hours: 5.5, note: String(localized: "Late night, short."),
+            NightReading(id: 0, day: String(localized: "S"), dateLabel: "10/8", hours: 5.5, note: String(localized: "Late night, short."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 1, day: String(localized: "M"), hours: 7.3, note: String(localized: "Best night of the week."),
+            NightReading(id: 1, day: String(localized: "M"), dateLabel: "11/8", hours: 7.3, note: String(localized: "Best night of the week."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 2, day: String(localized: "T"), hours: 5.5, note: String(localized: "Woke twice after midnight."),
+            NightReading(id: 2, day: String(localized: "T"), dateLabel: "12/8", hours: 5.5, note: String(localized: "Woke twice after midnight."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 3, day: String(localized: "W"), hours: 6.1, note: String(localized: "Fine, a little short."),
+            NightReading(id: 3, day: String(localized: "W"), dateLabel: "13/8", hours: 6.1, note: String(localized: "Fine, a little short."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 4, day: String(localized: "T"), hours: 7.0, note: String(localized: "Solid and unbroken."),
+            NightReading(id: 4, day: String(localized: "T"), dateLabel: "14/8", hours: 7.0, note: String(localized: "Solid and unbroken."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 5, day: String(localized: "F"), hours: 6.6, note: String(localized: "Late to bed, slept through."),
+            NightReading(id: 5, day: String(localized: "F"), dateLabel: "15/8", hours: 6.6, note: String(localized: "Late to bed, slept through."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 6, day: String(localized: "S"), hours: 7.2, note: String(localized: "Full night, deep came early."),
+            NightReading(id: 6, day: String(localized: "S"), dateLabel: "16/8", hours: 7.2, note: String(localized: "Full night, deep came early."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
         ],
         personalAverage: 6.46,
         averageNote: String(localized: "The dashed line is your own normal, 6h 28m — you’re above it four nights out of seven."),
         averageSleepValue: "6.8",
-        averageDeepValue: "1.6"
+        averageDeepValue: "1.6",
+        debtHeadline: String(localized: "4h 12m debt"),
+        debtExplanation: String(localized: "Your running balance across the last 14 recorded nights. Short nights add debt; longer nights pay it back."),
+        debtIsDebt: true,
+        debtNights: [
+            DebtNight(id: "2026-08-14", date: "14/8", slept: "7h 0m slept", change: "+1h debt", addedDebt: true),
+            DebtNight(id: "2026-08-15", date: "15/8", slept: "8h 20m slept", change: "−20m debt", addedDebt: false),
+            DebtNight(id: "2026-08-16", date: "16/8", slept: "7h 12m slept", change: "+48m debt", addedDebt: true),
+        ]
     )
 
     private static let prototypeHypnogram = [

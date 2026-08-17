@@ -23,6 +23,7 @@ struct AuraShell: View {
     let onOpenSettings: () -> Void
     let onOpenDevices: () -> Void
     let onSync: () -> Void
+    let onSyncHealth: () -> Void
 
     /// Today's body state. Fixed until the screens are wired to `Repository`; it drives the orb's colour
     /// and the gauge marker's position.
@@ -55,7 +56,8 @@ struct AuraShell: View {
         onOpenMore: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
         onOpenDevices: @escaping () -> Void,
-        onSync: @escaping () -> Void
+        onSync: @escaping () -> Void,
+        onSyncHealth: @escaping () -> Void
     ) {
         self._screen = screen
         self.bodyState = bodyState
@@ -69,6 +71,10 @@ struct AuraShell: View {
         self.onOpenSettings = onOpenSettings
         self.onOpenDevices = onOpenDevices
         self.onSync = onSync
+        self.onSyncHealth = onSyncHealth
+        #if DEBUG
+        self._routeStack = State(initialValue: AuraRoute.debugLaunchRoute.map { [$0] } ?? [])
+        #endif
     }
 
     private static let topAnchorID = "auraShell.top"
@@ -77,8 +83,22 @@ struct AuraShell: View {
     /// established for the platform tab bar; Aura's own bar has to serve it itself, since the shell is no
     /// longer a `TabView` and the `scrollToTopSignal` environment key no longer reaches it.
     @State private var scrollToTopToken = 0
+    @State private var routeStack: [AuraRoute] = []
 
     var body: some View {
+        Group {
+            if let route = routeStack.last {
+                detail(route)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            } else {
+                rootShell
+                    .transition(.opacity)
+            }
+        }
+        .animation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.28), value: routeStack)
+    }
+
+    private var rootShell: some View {
         ZStack(alignment: .bottom) {
             background
 
@@ -141,7 +161,12 @@ struct AuraShell: View {
     private var content: some View {
         switch screen {
         case .today:
-            AuraTodayView(state: bodyState, reading: todayReading) { go($0) }
+            AuraTodayView(
+                state: bodyState,
+                reading: todayReading,
+                onNavigate: { go($0) },
+                onOpenSignal: { push(.metric($0.id)) }
+            )
         case .rest:
             AuraRestView(reading: restReading)
         case .charge:
@@ -151,9 +176,23 @@ struct AuraShell: View {
         case .trends:
             AuraTrendsView(reading: trendsReading)
         case .band:
-            AuraBandView(onManageDevices: onOpenDevices, onSync: onSync)
+            AuraBandView(
+                onManageDevices: { push(.manageStraps) },
+                onSync: onSync,
+                onSyncHealth: onSyncHealth
+            )
         case .profile:
-            AuraProfileView(reading: profileReading, onOpenMore: onOpenMore, onOpenSettings: onOpenSettings)
+            AuraProfileView(
+                reading: profileReading,
+                onEditProfile: { push(.editProfile) },
+                onOpenNotifications: { push(.notifications) },
+                onOpenUnits: { push(.units) },
+                onOpenExport: { push(.export) },
+                onOpenMore: { push(.more) },
+                onOpenTracking: { push(.tracking) },
+                onOpenPrivacy: { push(.privacy) },
+                onOpenSettings: { push(.settings) }
+            )
         }
     }
 
@@ -188,6 +227,99 @@ struct AuraShell: View {
             return todayReading.profileName.isEmpty
                 ? String(localized: "Your profile")
                 : todayReading.profileName
+        }
+    }
+
+    // MARK: Aura detail routes
+
+    @ViewBuilder
+    private func detail(_ route: AuraRoute) -> some View {
+        switch route {
+        case .metric(let id):
+            if let signal = todayReading.signals.first(where: { $0.id == id }) {
+                AuraDetailScaffold(title: signal.name, subtitle: metricSubtitle(id), onBack: pop) {
+                    AuraMetricDetailView(signal: signal)
+                }
+            } else {
+                AuraDetailScaffold(title: String(localized: "Signal"), onBack: pop) {
+                    AuraNoteBanner(text: String(localized: "This signal is not available yet."), tint: AuraPalette.accent)
+                }
+            }
+        case .editProfile:
+            AuraDetailScaffold(title: String(localized: "Your profile"),
+                               subtitle: String(localized: "Name and photo stay on this iPhone."), onBack: pop) {
+                AuraProfileEditorView()
+            }
+        case .notifications:
+            AuraDetailScaffold(title: String(localized: "Notifications"),
+                               subtitle: String(localized: "Live heart rate, reminders and strap alerts."), onBack: pop) {
+                AuraNotificationsView()
+            }
+        case .units:
+            AuraDetailScaffold(title: String(localized: "Units"),
+                               subtitle: String(localized: "Change presentation without changing stored data."), onBack: pop) {
+                AuraUnitsView()
+            }
+        case .export:
+            AuraDetailScaffold(title: String(localized: "Export data"),
+                               subtitle: String(localized: "Apple Health, portable backups and imports."), onBack: pop) {
+                AuraExportView()
+            }
+        case .more:
+            AuraDetailScaffold(title: String(localized: "Everything else"),
+                               subtitle: String(localized: "The deeper NOOP toolkit, kept within reach."), onBack: pop) {
+                AuraMoreView(onOpenAllTools: onOpenMore)
+            }
+        case .tracking:
+            AuraDetailScaffold(title: String(localized: "What NOOP tracks"),
+                               subtitle: String(localized: "Direct WHOOP signals, on-device estimates and Health output."), onBack: pop) {
+                AuraTrackingView()
+            }
+        case .privacy:
+            AuraDetailScaffold(title: String(localized: "Privacy"),
+                               subtitle: String(localized: "Where your data lives and when it leaves."), onBack: pop) {
+                AuraPrivacyView()
+            }
+        case .settings:
+            AuraDetailScaffold(title: String(localized: "Settings"),
+                               subtitle: String(localized: "Every everyday preference, separated by purpose."), onBack: pop) {
+                AuraSettingsIndexView(
+                    onOpenNotifications: { push(.notifications) },
+                    onOpenUnits: { push(.units) },
+                    onOpenExport: { push(.export) },
+                    onOpenTracking: { push(.tracking) },
+                    onOpenPrivacy: { push(.privacy) },
+                    onOpenAdvanced: onOpenSettings
+                )
+            }
+        case .manageStraps:
+            AuraDetailScaffold(title: String(localized: "Manage strap"),
+                               subtitle: String(localized: "WHOOP 5.0 connection, controls and diagnostics."), onBack: pop) {
+                AuraManageStrapsView(onOpenDeviceManager: onOpenDevices)
+            }
+        }
+    }
+
+    private func metricSubtitle(_ id: String) -> String {
+        switch id {
+        case "hr": return String(localized: "Live now, with resting history below")
+        case "hrv": return String(localized: "Nightly variability against your own history")
+        case "resp": return String(localized: "Nightly breathing estimate from clean R–R intervals")
+        case "sleep": return String(localized: "Asleep duration, not time in bed")
+        default: return String(localized: "Your recent readings")
+        }
+    }
+
+    private func push(_ route: AuraRoute) {
+        withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.28)) {
+            routeStack.append(route)
+        }
+    }
+
+    private func pop() {
+        guard !routeStack.isEmpty else { return }
+        withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.28)) {
+            _ = routeStack.removeLast()
         }
     }
 

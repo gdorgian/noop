@@ -36,6 +36,12 @@ extension AuraRestReading {
             )
         }
 
+        let naps = SleepModel.napSleepMinutesByDay(
+            navDays: navDays,
+            habitualMidsleepSec: habitualMidsleepSec
+        )
+        let ledger = SleepModel.debtLedger(days: days, napSleepMinByDay: naps)
+
         return AuraRestReading(
             nights: nights,
             personalAverage: personalAverageHours,
@@ -45,7 +51,11 @@ extension AuraRestReading {
                 nights: nights
             ),
             averageSleepValue: decimalHours(personalAverageMinutes),
-            averageDeepValue: decimalHours(mean(deepMinutes))
+            averageDeepValue: decimalHours(mean(deepMinutes)),
+            debtHeadline: debtHeadline(ledger),
+            debtExplanation: debtExplanation(ledger),
+            debtIsDebt: ledger.isDebt,
+            debtNights: ledger.nights.map(debtNight)
         )
     }
 
@@ -57,6 +67,7 @@ extension AuraRestReading {
         return AuraRestReading.NightReading(
             id: night.session.effectiveStartTs,
             day: dayFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(night.session.endTs))),
+            dateLabel: shortDateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(night.session.endTs))),
             hours: minutes / 60,
             note: note(for: night, minutes: minutes, personalAverageMinutes: personalAverageMinutes),
             window: "\(night.onsetText) – \(night.wakeText)",
@@ -160,10 +171,60 @@ extension AuraRestReading {
         return String(localized: "\(rounded / 60)h \(rounded % 60)m")
     }
 
+    private static func debtHeadline(_ ledger: SleepDebtLedger) -> String {
+        guard ledger.nightCount > 0 else { return String(localized: "No history") }
+        if ledger.magnitudeMin < SleepDebt.onTargetBandMin { return String(localized: "On target") }
+        let amount = durationText(ledger.magnitudeMin)
+        return ledger.isDebt ? String(localized: "\(amount) debt") : String(localized: "\(amount) ahead")
+    }
+
+    private static func debtExplanation(_ ledger: SleepDebtLedger) -> String {
+        guard ledger.nightCount > 0 else {
+            return String(localized: "Sleep debt appears after NOOP has enough recorded nights to compare with your sleep need.")
+        }
+        let need = durationText(ledger.needMin)
+        return String(localized: "Running balance across \(ledger.nightCount) recorded nights against a \(need) nightly need. Short nights add debt; longer nights pay it back.")
+    }
+
+    private static func debtNight(_ night: SleepDebtNight) -> AuraRestReading.DebtNight {
+        let added = night.deltaMin < 0
+        let magnitude = durationText(abs(night.deltaMin))
+        let change = added
+            ? String(localized: "+\(magnitude) debt")
+            : String(localized: "−\(magnitude) debt")
+        return AuraRestReading.DebtNight(
+            id: night.day,
+            date: shortDayKey(night.day),
+            slept: String(localized: "\(durationText(night.sleptMin)) slept"),
+            change: change,
+            addedDebt: added
+        )
+    }
+
+    private static func shortDayKey(_ day: String) -> String {
+        guard let date = dayParser.date(from: day) else { return day }
+        return shortDateFormatter.string(from: date)
+    }
+
     private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = AppLanguage.activeLocale
         formatter.setLocalizedDateFormatFromTemplate("EEEEE")
+        return formatter
+    }()
+
+    private static let dayParser: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.activeLocale
+        formatter.setLocalizedDateFormatFromTemplate("dM")
         return formatter
     }()
 

@@ -32,10 +32,11 @@ public struct AuraOrb: View {
 
     private static let orbSize: CGFloat = 134
     private static let glowSize: CGFloat = 214
-    /// How far the orb swells at the top of a breath. Small — this should be felt, not watched.
-    private static let breathScale: CGFloat = 1.055
+    /// How far the orb swells at the top of a breath. The original 5.5% change was effectively
+    /// invisible on a phone at arm's length; 10% keeps the motion calm while making the inhale legible.
+    private static let breathScale: CGFloat = 1.10
     /// The halo swells further and fades as it goes, so the bloom reads as expanding rather than pumping.
-    private static let glowScale: CGFloat = 1.11
+    private static let glowScale: CGFloat = 1.17
 
     public var body: some View {
         ZStack {

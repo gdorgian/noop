@@ -18,8 +18,6 @@ extension AuraChargeReading {
             guard let value = row.avgHrv, value > 0 else { return nil }
             return (row.day, value)
         }
-        let texture = hrvTexture(Array(hrvPoints.suffix(22)).map(\.value))
-
         let hrvBaseline = Baselines.foldHistory(history.map(\.avgHrv), cfg: Baselines.hrvCfg)
         let rhrBaseline = Baselines.foldHistory(
             history.map { $0.restingHr.map(Double.init) },
@@ -60,18 +58,24 @@ extension AuraChargeReading {
 
         let stress = StressModel(days: history, stored: stressSeries)
         let axisPoints = Array(hrvPoints.suffix(22))
+        let hrvValues = axisPoints.map(\.value)
+        let normalRange: ClosedRange<Double>? = hrvBaseline.usable
+            ? (hrvBaseline.baseline - 1.253 * hrvBaseline.spread)...(hrvBaseline.baseline + 1.253 * hrvBaseline.spread)
+            : nil
 
         return AuraChargeReading(
             variability: day?.avgHrv.map { String(format: "%.0f", $0) } ?? "—",
             variabilityCaption: axisPoints.isEmpty
-                ? String(localized: "Nightly variability")
-                : String(localized: "Nightly variability · \(axisPoints.count) readings"),
+                ? String(localized: "Nightly variability will appear after a valid sleep.")
+                : String(localized: "Each point is one night. The shaded band is your personal normal across \(axisPoints.count) readings."),
             dayHigh: recentHRV.max().map { String(format: "%.0f", $0) } ?? "—",
             dayLow: recentHRV.min().map { String(format: "%.0f", $0) } ?? "—",
             stress: stress.map { stressLabel($0.band) } ?? "—",
             baseline: hrvBaseline.usable ? String(format: "%.0f", hrvBaseline.baseline) : "—",
-            columnCounts: texture.counts,
-            columnOffsets: texture.offsets,
+            variabilitySeries: hrvValues,
+            variabilityLabels: axisPoints.map { pointLabel($0.day) },
+            variabilityWindow: chartWindow(values: hrvValues, normalRange: normalRange),
+            variabilityNormalRange: normalRange,
             axis: axisLabels(axisPoints.map(\.day)),
             drivers: drivers,
             banner: chargeBanner(day: day, drivers: canonicalDrivers),
@@ -146,15 +150,19 @@ extension AuraChargeReading {
         return (position(value), position(baseline))
     }
 
-    private static func hrvTexture(_ values: [Double]) -> (counts: [Int], offsets: [Int]) {
-        guard let lo = values.min(), let hi = values.max(), hi - lo > 0.0001 else {
-            return (values.map { _ in 3 }, values.map { _ in 2 })
-        }
-        let normalized = values.map { min(max(($0 - lo) / (hi - lo), 0), 1) }
-        return (
-            normalized.map { 2 + Int(($0 * 4).rounded()) },
-            normalized.map { Int(((1 - $0) * 3).rounded()) }
-        )
+    private static func chartWindow(
+        values: [Double],
+        normalRange: ClosedRange<Double>?
+    ) -> ClosedRange<Double> {
+        let candidates = values + [normalRange?.lowerBound, normalRange?.upperBound].compactMap { $0 }
+        guard let lo = candidates.min(), let hi = candidates.max() else { return 0...100 }
+        let padding = max((hi - lo) * 0.18, 3)
+        return max(0, lo - padding)...(hi + padding)
+    }
+
+    private static func pointLabel(_ day: String) -> String {
+        guard let date = dayParser.date(from: day) else { return day }
+        return axisFormatter.string(from: date)
     }
 
     private static func axisLabels(_ dayKeys: [String]) -> [String] {

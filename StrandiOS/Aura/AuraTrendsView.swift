@@ -43,9 +43,68 @@ struct AuraTrendsView: View {
             }
 
             chargeCard
+            overviewCard
+            signalsCard
             debtCard
             AuraReadCard(overline: String(localized: "The read"), text: series.read)
         }
+    }
+
+    private var overviewCard: some View {
+        HStack(spacing: 8) {
+            AuraStatTile(label: String(localized: "Avg Charge"),
+                         value: reading.averageCharge, unit: "%", valueTint: AuraPalette.accent)
+            AuraStatTile(label: String(localized: "Avg sleep"),
+                         value: reading.averageSleep, unit: "h", valueTint: AuraPalette.rest)
+        }
+    }
+
+    private var signalsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            AuraCardHeader(title: String(localized: "Last 30 days"),
+                           note: String(localized: "Latest · personal data"))
+                .padding(.horizontal, 2)
+                .padding(.bottom, 10)
+            ForEach(Array(reading.metrics.enumerated()), id: \.element.id) { index, metric in
+                HStack(spacing: 12) {
+                    Image(systemName: metric.symbol)
+                        .font(.system(size: 16))
+                        .foregroundStyle(metric.tint)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(metric.name)
+                            .font(.system(size: 12))
+                            .foregroundStyle(AuraPalette.textQuiet)
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            Text(metric.value)
+                                .font(.system(size: 18, design: .rounded).monospacedDigit())
+                                .foregroundStyle(AuraPalette.textPrimary)
+                            Text(metric.unit)
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(AuraPalette.textFaint)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    Sparkline(
+                        values: metric.series,
+                        gradient: Gradient(colors: [metric.tint, metric.tint]),
+                        lineWidth: 1.7,
+                        showsArea: false,
+                        showsHead: true,
+                        showsHover: false
+                    )
+                    .frame(width: 88, height: 30)
+                    .accessibilityHidden(true)
+                }
+                .frame(minHeight: 61)
+                .accessibilityElement(children: .combine)
+                if index < reading.metrics.count - 1 {
+                    Rectangle().fill(AuraPalette.cardBorder).frame(height: 0.5)
+                }
+            }
+        }
+        .padding(18)
+        .auraCard()
     }
 
     // MARK: Charge
@@ -112,6 +171,16 @@ struct AuraTrendsView: View {
 // MARK: - Reading
 
 struct AuraTrendsReading {
+    struct Metric: Identifiable {
+        let id: String
+        let name: String
+        let value: String
+        let unit: String
+        let symbol: String
+        let tint: Color
+        let series: [Double]
+    }
+
     enum Range: String, CaseIterable, Identifiable, Hashable {
         case fortnight
         case month
@@ -146,6 +215,9 @@ struct AuraTrendsReading {
     let debt: [Double]
     let debtVerdict: String
     let headline: String
+    let averageCharge: String
+    let averageSleep: String
+    let metrics: [Metric]
 
     func series(for range: Range) -> Series {
         switch range {
@@ -188,7 +260,23 @@ struct AuraTrendsReading {
         ),
         debt: [0.4, 1.1, 0.2, 1.8, 2.4, 1.2, 0.6, 0, 0.9, 1.6, 0.8, 0.3, 0, 0],
         debtVerdict: String(localized: "Clear for 2 days"),
-        headline: String(localized: "Where you’re trending")
+        headline: String(localized: "Where you’re trending"),
+        averageCharge: "68",
+        averageSleep: "6.8",
+        metrics: [
+            Metric(id: "hrv", name: String(localized: "Variability"), value: "56", unit: "ms",
+                   symbol: "waveform.path.ecg", tint: AuraPalette.accent,
+                   series: [44, 48, 46, 51, 49, 54, 53, 56]),
+            Metric(id: "rhr", name: String(localized: "Resting heart rate"), value: "58", unit: "bpm",
+                   symbol: "heart", tint: AuraPalette.effort,
+                   series: [61, 60, 62, 59, 58, 59, 58]),
+            Metric(id: "resp", name: String(localized: "Breathing"), value: "14.2", unit: "rpm",
+                   symbol: "lungs", tint: AuraPalette.rest,
+                   series: [14.5, 14.2, 14.3, 14.1, 14.2]),
+            Metric(id: "sleep", name: String(localized: "Sleep"), value: "7.2", unit: "h",
+                   symbol: "moon", tint: AuraPalette.rest,
+                   series: [5.5, 7.3, 5.5, 6.1, 7.0, 6.6, 7.2]),
+        ]
     )
 }
 #endif

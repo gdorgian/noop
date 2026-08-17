@@ -14,22 +14,27 @@ struct AuraBandView: View {
     /// Opens the app's real device manager (pair / switch straps), which Aura does not reimplement.
     let onManageDevices: () -> Void
     let onSync: () -> Void
+    let onSyncHealth: () -> Void
 
     init(
         reading: AuraBandReading? = nil,
         onManageDevices: @escaping () -> Void,
-        onSync: @escaping () -> Void
+        onSync: @escaping () -> Void,
+        onSyncHealth: @escaping () -> Void
     ) {
         self.reading = reading
         self.onManageDevices = onManageDevices
         self.onSync = onSync
+        self.onSyncHealth = onSyncHealth
     }
 
     var body: some View {
         if let reading {
-            AuraBandContent(reading: reading, onManageDevices: onManageDevices, onSync: onSync)
+            AuraBandContent(reading: reading, onManageDevices: onManageDevices,
+                            onSync: onSync, onSyncHealth: onSyncHealth)
         } else {
-            AuraLiveBandContent(onManageDevices: onManageDevices, onSync: onSync)
+            AuraLiveBandContent(onManageDevices: onManageDevices, onSync: onSync,
+                                onSyncHealth: onSyncHealth)
         }
     }
 }
@@ -41,12 +46,14 @@ private struct AuraLiveBandContent: View {
     @EnvironmentObject private var live: LiveState
     let onManageDevices: () -> Void
     let onSync: () -> Void
+    let onSyncHealth: () -> Void
 
     var body: some View {
         AuraBandContent(
             reading: .live(live),
             onManageDevices: onManageDevices,
-            onSync: onSync
+            onSync: onSync,
+            onSyncHealth: onSyncHealth
         )
     }
 }
@@ -55,6 +62,7 @@ private struct AuraBandContent: View {
     let reading: AuraBandReading
     let onManageDevices: () -> Void
     let onSync: () -> Void
+    let onSyncHealth: () -> Void
 
     var body: some View {
         VStack(spacing: AuraPalette.cardGap) {
@@ -99,6 +107,8 @@ private struct AuraBandContent: View {
             }
             .buttonStyle(.plain)
             .disabled(!reading.canSync)
+
+            AuraHealthSyncButton(action: onSyncHealth)
         }
     }
 
@@ -119,6 +129,40 @@ private struct AuraBandContent: View {
         .padding(.top, 26)
         .padding(.bottom, 22)
         .auraCard(cornerRadius: 26)
+    }
+}
+
+/// HealthKit publishes only when authorization or a sync changes, so keeping it in this small leaf
+/// avoids making the live Band screen own a second observable object.
+private struct AuraHealthSyncButton: View {
+    @EnvironmentObject private var health: HealthKitBridge
+    let action: () -> Void
+
+    private var unavailable: Bool {
+        health.auth == .unavailable || health.auth == .entitlementMissing
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                Text(health.syncing ? String(localized: "Syncing Apple Health…")
+                                    : String(localized: "Sync Apple Health"))
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            .foregroundStyle(unavailable ? AuraPalette.textQuiet : AuraPalette.textPrimary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .fill(AuraPalette.controlFill)
+                    .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous)
+                        .strokeBorder(AuraPalette.cardBorder, lineWidth: 0.5))
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(unavailable || health.syncing)
     }
 }
 

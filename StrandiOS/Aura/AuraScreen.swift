@@ -93,6 +93,7 @@ enum AuraScreen: String, CaseIterable, Identifiable {
 struct AuraTabBar: View {
     let selection: AuraScreen
     let onSelect: (AuraScreen) -> Void
+    @State private var dragOriginIndex: Int?
 
     /// Width of an inactive, icon-only pill. The active pill takes whatever is left, which reproduces the
     /// direction's wide-active proportion without a layout pass to measure it.
@@ -120,6 +121,23 @@ struct AuraTabBar: View {
         )
         .padding(.horizontal, 14)
         .animation(NoopMotion.value, value: selection)
+        .simultaneousGesture(tabSwipeGesture)
+    }
+
+    /// Liquid-Glass-style scrubbing: keep a finger down on the bar and slide across destinations. The
+    /// ordinary buttons remain available, so this gesture is an enhancement rather than the only path.
+    private var tabSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 5)
+            .onChanged { value in
+                let current = AuraScreen.tabs.firstIndex(of: selection) ?? 0
+                if dragOriginIndex == nil { dragOriginIndex = current }
+                guard let origin = dragOriginIndex else { return }
+                let steps = Int((value.translation.width / Self.inactiveWidth).rounded())
+                let target = min(max(origin + steps, 0), AuraScreen.tabs.count - 1)
+                guard target != current else { return }
+                onSelect(AuraScreen.tabs[target])
+            }
+            .onEnded { _ in dragOriginIndex = nil }
     }
 
     private func tab(_ screen: AuraScreen) -> some View {
@@ -167,9 +185,13 @@ struct AuraHeader: View {
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(greeting)
-                    .font(StrandFont.subhead)
-                    .foregroundStyle(AuraPalette.textSecondary)
-                if screen == .band {
+                    .font(screen == .today
+                          ? .system(size: 30, weight: .regular, design: .rounded)
+                          : StrandFont.subhead)
+                    .foregroundStyle(screen == .today ? AuraPalette.textPrimary : AuraPalette.textSecondary)
+                if screen == .today {
+                    EmptyView()
+                } else if screen == .band {
                     AuraBandConnectionHeadline()
                 } else {
                     Text(headline)
@@ -179,25 +201,12 @@ struct AuraHeader: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.trailing, 98)
+            .padding(.trailing, 122)
 
             HStack(spacing: 8) {
                 AuraLiveBatteryButton(action: onOpenBand)
 
-                Button(action: onOpenProfile) {
-                    Text(initial)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(AuraPalette.textPrimary.opacity(0.85))
-                        .frame(width: 38, height: 38)
-                        .background(
-                            Circle().fill(LinearGradient(
-                                colors: [Color(hex: "#3A4340"), Color(hex: "#242B29")],
-                                startPoint: .topLeading, endPoint: .bottomTrailing))
-                        )
-                        .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("Account"))
+                AuraProfileHeaderButton(action: onOpenProfile)
             }
             .fixedSize(horizontal: true, vertical: false)
             .padding(.top, 2)
@@ -218,18 +227,41 @@ private struct AuraLiveBatteryButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 1) {
+            HStack(spacing: 6) {
                 AuraBatteryGlyph(fraction: Double(percent ?? 0) / 100)
-                Text(verbatim: percent.map(String.init) ?? "—")
-                    .font(.system(size: 8.5, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(AuraPalette.textSecondary)
+                    .frame(width: 21, height: 12)
+                Text(verbatim: percent.map { "\($0)%" } ?? "—")
+                    .font(.system(size: 11.5, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(AuraPalette.textPrimary)
+                if live.charging == true {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(AuraPalette.effort)
+                        .accessibilityHidden(true)
+                }
             }
-            .frame(width: 38, height: 38)
-            .background(Circle().fill(AuraPalette.controlFill))
-            .overlay(Circle().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
+            .padding(.horizontal, 10)
+            .frame(minWidth: 62, minHeight: 38)
+            .background(Capsule(style: .continuous).fill(AuraPalette.controlFill))
+            .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(percent.map { Text("Band battery \($0) percent") } ?? Text("Band disconnected"))
+    }
+}
+
+private struct AuraProfileHeaderButton: View {
+    @EnvironmentObject private var profile: ProfileStore
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            AuraProfilePhoto(size: 38)
+        }
+        .buttonStyle(.plain)
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Rectangle())
+        .accessibilityLabel(Text("Account"))
     }
 }
 
@@ -252,12 +284,12 @@ struct AuraBatteryGlyph: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 2, style: .continuous)
             .strokeBorder(AuraPalette.accent, lineWidth: 1.2)
-            .frame(width: 13, height: 7)
+            .frame(width: 19, height: 10)
             .overlay(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 1, style: .continuous)
                     .fill(AuraPalette.accent)
                     .padding(1)
-                    .frame(width: 13 * AuraGaugeMath.clampFraction(fraction))
+                    .frame(width: 19 * AuraGaugeMath.clampFraction(fraction))
             }
             .accessibilityHidden(true)
     }

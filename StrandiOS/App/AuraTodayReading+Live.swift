@@ -44,18 +44,13 @@ extension AuraTodayReading {
         now: Date = Date()
     ) -> AuraTodayReading {
         let hour = Calendar.current.component(.hour, from: now)
-        let name = displayName.trimmingCharacters(in: .whitespaces)
-
         let greeting: String
-        if !name.isEmpty {
-            greeting = String(localized: "Hi, \(name)")
-        } else {
-            switch hour {
-            case ..<12:  greeting = String(localized: "Good morning")
-            case ..<18:  greeting = String(localized: "Good afternoon")
-            default:     greeting = String(localized: "Good evening")
-            }
+        switch hour {
+        case ..<12:  greeting = String(localized: "Good morning")
+        case ..<18:  greeting = String(localized: "Good afternoon")
+        default:     greeting = String(localized: "Good evening")
         }
+        let name = displayName.trimmingCharacters(in: .whitespaces)
 
         let headline: String
         switch hour {
@@ -83,34 +78,43 @@ extension AuraTodayReading {
         let effortValue = effort.map { UnitFormatter.effortDisplay($0, scale: effortScale) } ?? "—"
         let effortFraction = effort.map { min(max($0 / 100, 0), 1) } ?? 0
 
-        func series(_ pick: (DailyMetric) -> Double?) -> [Double] {
-            history.compactMap(pick)
+        func labelledSeries(_ pick: (DailyMetric) -> Double?) -> ([Double], [String]) {
+            let rows = history.compactMap { row -> (Double, String)? in
+                guard let value = pick(row) else { return nil }
+                return (value, detailDayLabel(row.day))
+            }
+            return (rows.map(\.0), rows.map(\.1))
         }
+
+        let hrSeries = labelledSeries { $0.restingHr.map(Double.init) }
+        let hrvSeries = labelledSeries { $0.avgHrv }
+        let respSeries = labelledSeries { $0.respRateBpm }
+        let sleepSeries = labelledSeries { $0.totalSleepMin.map { $0 / 60 } }
 
         let signals: [Signal] = [
             Signal(id: "hr", name: String(localized: "Heart rate"),
                    value: day?.restingHr.map(String.init) ?? "—", unit: "bpm",
                    systemImage: "heart", tint: AuraPalette.accent,
-                   series: series { $0.restingHr.map(Double.init) }),
+                   series: hrSeries.0, labels: hrSeries.1),
             Signal(id: "hrv", name: String(localized: "Variability"),
                    value: hrv.map { String(Int($0.rounded())) } ?? "—", unit: "ms",
                    systemImage: "waveform.path.ecg", tint: AuraPalette.accent,
-                   series: series { $0.avgHrv }),
+                   series: hrvSeries.0, labels: hrvSeries.1),
             Signal(id: "resp", name: String(localized: "Breathing"),
                    value: day?.respRateBpm.map { String(format: "%.1f", $0) } ?? "—", unit: "rpm",
                    systemImage: "lungs", tint: AuraPalette.rest,
-                   series: series { $0.respRateBpm }),
+                   series: respSeries.0, labels: respSeries.1),
             Signal(id: "sleep", name: String(localized: "Sleep"),
                    value: sleepMin.map { String(format: "%.1f", $0 / 60) } ?? "—", unit: "h",
                    systemImage: "moon", tint: AuraPalette.effort,
-                   series: series { $0.totalSleepMin.map { $0 / 60 } }),
+                   series: sleepSeries.0, labels: sleepSeries.1),
         ]
 
         // The banner states what the screen is actually reading, so a stale or absent night is visible
         // rather than implied by em-dashes the wearer has to notice.
         let banner: String
         if let sleepMin {
-            banner = String(localized: "Read from your last night — \(Int(sleepMin)) minutes asleep.")
+            banner = String(localized: "Read from your last night — \(durationText(sleepMin)) asleep.")
         } else {
             banner = String(localized: "Wear your strap overnight for a reading in the morning.")
         }
@@ -137,6 +141,34 @@ extension AuraTodayReading {
             sessionRationale: bodyCopy.rationale
         )
     }
+
+    private static func durationText(_ minutes: Double) -> String {
+        let rounded = max(0, Int(minutes.rounded()))
+        if rounded < 60 { return String(localized: "\(rounded)m") }
+        return rounded % 60 == 0
+            ? String(localized: "\(rounded / 60)h")
+            : String(localized: "\(rounded / 60)h \(rounded % 60)m")
+    }
+
+    private static func detailDayLabel(_ day: String) -> String {
+        guard let date = detailDayParser.date(from: day) else { return day }
+        return detailDayFormatter.string(from: date)
+    }
+
+    private static let detailDayParser: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let detailDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.activeLocale
+        formatter.setLocalizedDateFormatFromTemplate("dMMM")
+        return formatter
+    }()
 
     /// Copy backed only by the recorded Charge and NOOP's established recovery-to-Effort mapping. It
     /// never claims an HRV direction, sleep streak, prior training streak, or workout modality that was

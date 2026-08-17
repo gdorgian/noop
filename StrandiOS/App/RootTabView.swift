@@ -14,6 +14,7 @@ struct RootTabView: View {
 
     @EnvironmentObject private var repo: Repository
     @EnvironmentObject private var ble: BLEManager
+    @EnvironmentObject private var health: HealthKitBridge
     /// Aura Today reads the profile for its greeting and avatar initial. Live strap state is deliberately
     /// observed only by tiny header leaves inside `AuraHeader`; observing the 1 Hz `LiveState` here would
     /// invalidate the entire shell, charts and scroll view for every heart-rate packet.
@@ -137,6 +138,16 @@ struct RootTabView: View {
     /// The Live Session (silent guardian) cover, moved here from the liquid Today it used to live on.
     @State private var showLiveSession = false
 
+    /// Deterministic simulator data for visual regression checks. This can never be enabled in a
+    /// release build; production always receives the repository-backed snapshots below.
+    private var auraUsesPrototypeData: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--aura-prototype")
+        #else
+        false
+        #endif
+    }
+
     var body: some View {
         // The iPhone shell is the Aura design: seven screens behind a floating pill bar that AuraShell
         // owns, replacing the platform TabView the liquid design used. The pill bar overlaps content and
@@ -147,19 +158,29 @@ struct RootTabView: View {
         // sheet. Nothing that was reachable before became unreachable here.
         AuraShell(
             screen: $auraScreen,
-            bodyState: AuraBodyState.forCharge(auraDay?.recovery),
-            todayReading: auraTodayReading,
-            restReading: auraRestReading,
-            chargeReading: auraChargeReading,
-            effortReading: auraEffortReading,
-            trendsReading: auraTrendsReading,
-            profileReading: auraProfileReading,
+            bodyState: auraUsesPrototypeData ? .restored : AuraBodyState.forCharge(auraDay?.recovery),
+            todayReading: auraUsesPrototypeData ? .prototype : auraTodayReading,
+            restReading: auraUsesPrototypeData ? .prototype : auraRestReading,
+            chargeReading: auraUsesPrototypeData ? .prototype : auraChargeReading,
+            effortReading: auraUsesPrototypeData ? .prototype : auraEffortReading,
+            trendsReading: auraUsesPrototypeData ? .prototype : auraTrendsReading,
+            profileReading: auraUsesPrototypeData ? .prototype : auraProfileReading,
             onOpenMore: { showMore = true },
             onOpenSettings: { showSettings = true },
             onOpenDevices: { showDevices = true },
             onSync: {
                 ble.syncNow()
                 Task { await repo.refresh() }
+            },
+            onSyncHealth: {
+                Task {
+                    health.refreshAuthIfPreviouslyGranted()
+                    if health.auth == .unknown || health.auth == .denied {
+                        await health.requestAuthorization()
+                    }
+                    await health.sync()
+                    await repo.refresh()
+                }
             }
         )
         .tint(StrandPalette.accent)

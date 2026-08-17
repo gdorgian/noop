@@ -1,6 +1,8 @@
 #if os(iOS)
 import Foundation
+import SwiftUI
 import StrandAnalytics
+import StrandDesign
 import WhoopStore
 
 extension AuraTrendsReading {
@@ -29,6 +31,9 @@ extension AuraTrendsReading {
             habitualMidsleepSec: habitualMidsleepSec
         )
         let ledger = SleepModel.debtLedger(days: days, napSleepMinByDay: naps)
+        let trailing30 = Array(days.suffix(30))
+        let chargeValues = trailing30.compactMap(\.recovery)
+        let sleepValues = trailing30.compactMap { $0.totalSleepMin.map { $0 / 60 } }
 
         return AuraTrendsReading(
             fortnight: fortnight,
@@ -36,8 +41,54 @@ extension AuraTrendsReading {
             quarter: quarter,
             debt: ledger.nights.map { max(-$0.deltaMin / 60, 0) },
             debtVerdict: debtVerdict(ledger),
-            headline: trendHeadline(fortnight.values)
+            headline: trendHeadline(fortnight.values),
+            averageCharge: averageText(chargeValues, decimals: 0),
+            averageSleep: averageText(sleepValues, decimals: 1),
+            metrics: metricSummaries(trailing30)
         )
+    }
+
+    private static func metricSummaries(_ rows: [DailyMetric]) -> [AuraTrendsReading.Metric] {
+        func metric(
+            id: String,
+            name: String,
+            unit: String,
+            symbol: String,
+            tint: Color,
+            decimals: Int,
+            pick: (DailyMetric) -> Double?
+        ) -> AuraTrendsReading.Metric {
+            let values = rows.compactMap(pick)
+            return AuraTrendsReading.Metric(
+                id: id,
+                name: name,
+                value: values.last.map { format($0, decimals: decimals) } ?? "—",
+                unit: unit,
+                symbol: symbol,
+                tint: tint,
+                series: values
+            )
+        }
+
+        return [
+            metric(id: "hrv", name: String(localized: "Variability"), unit: "ms",
+                   symbol: "waveform.path.ecg", tint: AuraPalette.accent, decimals: 0) { $0.avgHrv },
+            metric(id: "rhr", name: String(localized: "Resting heart rate"), unit: "bpm",
+                   symbol: "heart", tint: AuraPalette.effort, decimals: 0) { $0.restingHr.map(Double.init) },
+            metric(id: "resp", name: String(localized: "Breathing"), unit: "rpm",
+                   symbol: "lungs", tint: AuraPalette.rest, decimals: 1) { $0.respRateBpm },
+            metric(id: "sleep", name: String(localized: "Sleep"), unit: "h",
+                   symbol: "moon", tint: AuraPalette.rest, decimals: 1) { $0.totalSleepMin.map { $0 / 60 } },
+        ]
+    }
+
+    private static func averageText(_ values: [Double], decimals: Int) -> String {
+        guard !values.isEmpty else { return "—" }
+        return format(values.reduce(0, +) / Double(values.count), decimals: decimals)
+    }
+
+    private static func format(_ value: Double, decimals: Int) -> String {
+        decimals == 0 ? String(format: "%.0f", value) : String(format: "%.1f", value)
     }
 
     private static func series(

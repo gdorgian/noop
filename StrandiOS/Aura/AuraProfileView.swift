@@ -4,67 +4,71 @@ import StrandDesign
 
 // MARK: - Aura You
 //
-// Account, the four settings that matter daily, and the one control that is genuinely part of the design
-// language: how much Noop says. That verbosity choice is the direction's escape hatch — it lets someone
-// who wants every number have them without making the default screen carry them.
-//
-// The "Everything else in NOOP" row is the seam back to the app's full surface (Coach, Live, Workouts,
-// Health, Lab Book, Backup, Settings …). Aura does not reimplement those, and none of them should become
-// unreachable because the home screen was redesigned.
+// Account plus the settings people reach most often. Every row owns one clear destination; none drops
+// the wearer into the old all-in-one Settings screen unless they explicitly choose Advanced settings.
 
 struct AuraProfileView: View {
     private let reading: AuraProfileReading
+    let onEditProfile: () -> Void
+    let onOpenNotifications: () -> Void
+    let onOpenUnits: () -> Void
+    let onOpenExport: () -> Void
     let onOpenMore: () -> Void
+    let onOpenTracking: () -> Void
+    let onOpenPrivacy: () -> Void
     let onOpenSettings: () -> Void
-
-    @AppStorage(AuraVerbosity.storageKey) private var verbosityRaw = AuraVerbosity.plain.rawValue
 
     init(
         reading: AuraProfileReading = .prototype,
+        onEditProfile: @escaping () -> Void,
+        onOpenNotifications: @escaping () -> Void,
+        onOpenUnits: @escaping () -> Void,
+        onOpenExport: @escaping () -> Void,
         onOpenMore: @escaping () -> Void,
+        onOpenTracking: @escaping () -> Void,
+        onOpenPrivacy: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void
     ) {
         self.reading = reading
+        self.onEditProfile = onEditProfile
+        self.onOpenNotifications = onOpenNotifications
+        self.onOpenUnits = onOpenUnits
+        self.onOpenExport = onOpenExport
         self.onOpenMore = onOpenMore
+        self.onOpenTracking = onOpenTracking
+        self.onOpenPrivacy = onOpenPrivacy
         self.onOpenSettings = onOpenSettings
     }
-
-    private var verbosity: AuraVerbosity { AuraVerbosity.resolve(verbosityRaw) }
 
     var body: some View {
         VStack(spacing: AuraPalette.cardGap) {
             identityCard
             tiles
-            verbosityCard
             settingsCard
         }
     }
 
     private var identityCard: some View {
-        HStack(spacing: 15) {
-            Text(reading.initial)
-                .font(.system(size: 21, weight: .semibold, design: .rounded))
-                .foregroundStyle(AuraPalette.textPrimary.opacity(0.85))
-                .frame(width: 60, height: 60)
-                .background(
-                    Circle().fill(LinearGradient(
-                        colors: [Color(hex: "#3A4340"), Color(hex: "#242B29")],
-                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                )
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(reading.name)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(AuraPalette.textPrimary)
-                Text(reading.memberSince)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(AuraPalette.textQuiet)
+        Button(action: onEditProfile) {
+            HStack(spacing: 15) {
+                AuraProfilePhoto(size: 60)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(reading.name)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(AuraPalette.textPrimary)
+                    Text(reading.memberSince)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(AuraPalette.textQuiet)
+                }
+                Spacer(minLength: 8)
+                AuraChevron()
             }
-            Spacer(minLength: 0)
+            .padding(18)
+            .auraCard()
+            .contentShape(Rectangle())
         }
-        .padding(18)
-        .auraCard()
-        .accessibilityElement(children: .combine)
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Edit profile, \(reading.name)"))
     }
 
     /// A 2×2 grid. Two `HStack`s rather than a `LazyVGrid` so both tiles in a row share one height
@@ -80,40 +84,21 @@ struct AuraProfileView: View {
                              tag: reading.notificationsTag,
                              title: String(localized: "Notifications"),
                              detail: reading.notificationsDetail,
-                             action: onOpenSettings)
+                             action: onOpenNotifications)
             }
             HStack(spacing: 8) {
                 AuraIconTile(symbol: "ruler", tint: AuraPalette.rest,
                              tag: reading.unitsTag,
                              title: String(localized: "Units"),
                              detail: reading.unitsDetail,
-                             action: onOpenSettings)
+                             action: onOpenUnits)
                 AuraIconTile(symbol: "square.and.arrow.down", tint: AuraPalette.textSecondary,
                              tag: reading.exportTag,
                              title: String(localized: "Export data"),
                              detail: reading.exportDetail,
-                             action: onOpenMore)
+                             action: onOpenExport)
             }
         }
-    }
-
-    private var verbosityCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Text(String(localized: "How much Noop says")).auraOverline()
-            VStack(spacing: 6) {
-                ForEach(AuraVerbosity.allCases) { option in
-                    AuraRadioRow(title: option.title, detail: option.detail,
-                                 isOn: option == verbosity) {
-                        withAnimation(NoopMotion.value) { verbosityRaw = option.rawValue }
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 18)
-        .padding(.top, 17)
-        .padding(.bottom, 14)
-        .auraCard()
     }
 
     private var settingsCard: some View {
@@ -123,49 +108,20 @@ struct AuraProfileView: View {
                         showsDivider: true,
                         action: onOpenMore)
             AuraListRow(key: String(localized: "What Noop tracks"),
-                        subtitle: String(localized: "Health, units and score preferences"),
+                        subtitle: String(localized: "Signals, estimates and Apple Health output"),
                         showsDivider: true,
-                        action: onOpenSettings)
+                        action: onOpenTracking)
             AuraListRow(key: String(localized: "Privacy"),
                         subtitle: String(localized: "On-device by default · review permissions"),
+                        showsDivider: true,
+                        action: onOpenPrivacy)
+            AuraListRow(key: String(localized: "Settings"),
+                        subtitle: String(localized: "Your Aura preferences in one place"),
                         showsDivider: false,
                         action: onOpenSettings)
         }
         .padding(.horizontal, 17)
         .auraCard()
-    }
-}
-
-// MARK: - Verbosity
-
-/// How much the app says by default. The direction's one genuine preference: the screens above stay
-/// spare, and someone who wants the receipts turns them on here rather than everyone paying for them.
-enum AuraVerbosity: String, CaseIterable, Identifiable {
-    case plain
-    case reason
-    case everything
-
-    var id: String { rawValue }
-
-    /// Shared with any future Android twin, so the key is the contract, not the symbol name.
-    static let storageKey = "aura.verbosity"
-
-    static func resolve(_ raw: String) -> AuraVerbosity { AuraVerbosity(rawValue: raw) ?? .plain }
-
-    var title: String {
-        switch self {
-        case .plain:      return String(localized: "One line a day")
-        case .reason:     return String(localized: "Add the reason")
-        case .everything: return String(localized: "Show me everything")
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .plain:      return String(localized: "A verdict and an instruction. Nothing else.")
-        case .reason:     return String(localized: "The verdict, plus what drove it.")
-        case .everything: return String(localized: "Every number, every baseline, on tap.")
-        }
     }
 }
 

@@ -10,9 +10,11 @@ import StrandDesign
 
 struct AuraChargeView: View {
     private let reading: AuraChargeReading
+    @State private var selectedVariabilityPoint: Int?
 
     init(reading: AuraChargeReading = .prototype) {
         self.reading = reading
+        _selectedVariabilityPoint = State(initialValue: nil)
     }
 
     var body: some View {
@@ -60,12 +62,24 @@ struct AuraChargeView: View {
             Text(reading.variabilityCaption)
                 .font(.system(size: 11.5))
                 .foregroundStyle(AuraPalette.textQuiet)
-                .padding(.bottom, 16)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 14)
 
-            AuraDotColumns(counts: reading.columnCounts,
-                           offsets: reading.columnOffsets,
-                           tint: AuraPalette.accent)
+            if reading.variabilitySeries.isEmpty {
+                Text(String(localized: "No nightly variability readings yet."))
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(AuraPalette.textQuiet)
+                    .frame(maxWidth: .infinity, minHeight: 140, alignment: .center)
+            } else {
+                AuraTrendChart(
+                    values: reading.variabilitySeries,
+                    labels: reading.variabilityLabels,
+                    selected: selectedVariabilityIndex,
+                    window: reading.variabilityWindow,
+                    normalRange: reading.variabilityNormalRange
+                ) { selectedVariabilityPoint = $0 }
                 .padding(.bottom, 11)
+            }
 
             HStack {
                 ForEach(Array(reading.axis.enumerated()), id: \.offset) { index, label in
@@ -80,6 +94,14 @@ struct AuraChargeView: View {
         .padding(.top, 19)
         .padding(.bottom, 16)
         .auraCard()
+    }
+
+    private var selectedVariabilityIndex: Int {
+        guard let selectedVariabilityPoint,
+              reading.variabilitySeries.indices.contains(selectedVariabilityPoint) else {
+            return max(reading.variabilitySeries.count - 1, 0)
+        }
+        return selectedVariabilityPoint
     }
 
     private func extremum(_ value: String, label: String) -> some View {
@@ -151,10 +173,10 @@ struct AuraChargeReading {
     let dayLow: String
     let stress: String
     let baseline: String
-    /// Dots per column for the day's variability texture.
-    let columnCounts: [Int]
-    /// How far each column is pushed down from the top, in dot-steps.
-    let columnOffsets: [Int]
+    let variabilitySeries: [Double]
+    let variabilityLabels: [String]
+    let variabilityWindow: ClosedRange<Double>
+    let variabilityNormalRange: ClosedRange<Double>?
     let axis: [String]
     let drivers: [Driver]
     let banner: String
@@ -163,14 +185,16 @@ struct AuraChargeReading {
 
     static let prototype = AuraChargeReading(
         variability: "56",
-        variabilityCaption: String(localized: "Nightly variability"),
+        variabilityCaption: String(localized: "Each point is one night. The shaded band is your normal range."),
         dayHigh: "62",
         dayLow: "41",
         stress: String(localized: "Low"),
         baseline: "48",
-        columnCounts: [3, 4, 4, 5, 6, 6, 5, 4, 3, 3, 4, 5, 4, 3, 2, 3, 4, 5, 5, 4, 3, 4],
-        columnOffsets: [3, 2, 2, 1, 0, 0, 1, 2, 3, 3, 2, 1, 2, 3, 4, 3, 2, 1, 1, 2, 3, 2],
-        axis: ["12am", "6am", "12pm", "6pm"],
+        variabilitySeries: [44, 48, 46, 51, 49, 54, 53, 56],
+        variabilityLabels: ["8 Aug", "9 Aug", "10 Aug", "11 Aug", "12 Aug", "13 Aug", "14 Aug", "15 Aug"],
+        variabilityWindow: 35...65,
+        variabilityNormalRange: 44...52,
+        axis: ["8 Aug", "10 Aug", "13 Aug", "15 Aug"],
         drivers: [
             Driver(id: "hrv", name: String(localized: "Heart rhythm"), value: "56", unit: "ms",
                    position: 74, baseline: 48,
