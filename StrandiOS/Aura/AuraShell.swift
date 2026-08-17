@@ -30,6 +30,8 @@ struct AuraShell: View {
     /// Today's live repository snapshot. Aura owns its presentation only; assembling the snapshot stays
     /// in `RootTabView`, outside the design layer and away from BLE/HealthKit ownership.
     private let todayReading: AuraTodayReading
+    /// Rest's presentation snapshot, derived from the same canonical SleepModel as the incumbent screen.
+    private let restReading: AuraRestReading
 
     /// Written out rather than synthesized: a struct with any `private` stored property gets a PRIVATE
     /// memberwise initializer, which the app shell in another file could not call.
@@ -37,6 +39,7 @@ struct AuraShell: View {
         screen: Binding<AuraScreen>,
         bodyState: AuraBodyState = .restored,
         todayReading: AuraTodayReading = .prototype,
+        restReading: AuraRestReading = .prototype,
         onOpenMore: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
         onOpenDevices: @escaping () -> Void,
@@ -45,6 +48,7 @@ struct AuraShell: View {
         self._screen = screen
         self.bodyState = bodyState
         self.todayReading = todayReading
+        self.restReading = restReading
         self.onOpenMore = onOpenMore
         self.onOpenSettings = onOpenSettings
         self.onOpenDevices = onOpenDevices
@@ -123,7 +127,7 @@ struct AuraShell: View {
         case .today:
             AuraTodayView(state: bodyState, reading: todayReading) { go($0) }
         case .rest:
-            AuraRestView()
+            AuraRestView(reading: restReading)
         case .charge:
             AuraChargeView()
         case .effort:
@@ -137,8 +141,8 @@ struct AuraShell: View {
         }
     }
 
-    /// Only Today, Band and You have enough live shell data at this integration step. The remaining
-    /// screen-specific headlines stay with their prototype readings until each screen is wired.
+    /// Today and Rest have live repository snapshots; Band and You have live shell identity/status.
+    /// The remaining screen-specific headlines stay with their prototype readings until each is wired.
     private var headerGreeting: String {
         switch screen {
         case .today: return todayReading.greeting
@@ -152,6 +156,8 @@ struct AuraShell: View {
         switch screen {
         case .today:
             return todayReading.headline
+        case .rest:
+            return restReading.headline
         case .band:
             // Rendered by a LiveState-isolated leaf in AuraHeader.
             return String(localized: "Band status")

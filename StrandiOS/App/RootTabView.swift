@@ -33,6 +33,19 @@ struct RootTabView: View {
             displayName: profile.displayName
         )
     }
+
+    /// The Rest screen uses NOOP's existing full-session union so computed WHOOP 5.0 nights, imported
+    /// history and split sleeps resolve exactly as they do in the incumbent Sleep screen.
+    @State private var auraSleepSessions: [CachedSleepSession] = []
+    @State private var auraHabitualMidsleepSec: Int?
+
+    private var auraRestReading: AuraRestReading {
+        AuraRestReading.live(
+            days: repo.days,
+            sessions: auraSleepSessions.isEmpty ? repo.sleeps : auraSleepSessions,
+            habitualMidsleepSec: auraHabitualMidsleepSec
+        )
+    }
     /// Cross-screen navigation requests (e.g. Live → "Manage devices"). Devices isn't a tab — it lives
     /// behind the More list — so a request presents it as a sheet, matching the quick-action screens.
     @EnvironmentObject private var router: NavRouter
@@ -86,6 +99,7 @@ struct RootTabView: View {
             screen: $auraScreen,
             bodyState: AuraBodyState.forCharge(auraDay?.recovery),
             todayReading: auraTodayReading,
+            restReading: auraRestReading,
             onOpenMore: { showMore = true },
             onOpenSettings: { showSettings = true },
             onOpenDevices: { showDevices = true },
@@ -100,6 +114,14 @@ struct RootTabView: View {
             Task.detached(priority: .utility) {
                 await FolderBackup.catchUpIfDue(checkpoint: { await backupRepo.checkpointForBackup() })
             }
+        }
+        .task(id: repo.refreshSeq) {
+            async let sessions = repo.allSleepSessions(days: 60)
+            async let habitual = repo.habitualMidsleepSec()
+            let loaded = await (sessions, habitual)
+            guard !Task.isCancelled else { return }
+            auraSleepSessions = loaded.0
+            auraHabitualMidsleepSec = loaded.1
         }
         // Quick-action sheet presents with the calm easing (~0.42s) per the README sheet spec —
         // the easing is applied where `quickAction` is set (see `presentQuickAction`), keeping the
