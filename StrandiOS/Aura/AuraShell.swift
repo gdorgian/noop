@@ -36,6 +36,8 @@ struct AuraShell: View {
     private let chargeReading: AuraChargeReading
     /// Effort's snapshot, derived from today's stored strain, recovery target and reconciled workouts.
     private let effortReading: AuraEffortReading
+    /// Trends' snapshot, derived from real Charge history and the canonical sleep-debt ledger.
+    private let trendsReading: AuraTrendsReading
 
     /// Written out rather than synthesized: a struct with any `private` stored property gets a PRIVATE
     /// memberwise initializer, which the app shell in another file could not call.
@@ -46,6 +48,7 @@ struct AuraShell: View {
         restReading: AuraRestReading = .prototype,
         chargeReading: AuraChargeReading = .prototype,
         effortReading: AuraEffortReading = .prototype,
+        trendsReading: AuraTrendsReading = .prototype,
         onOpenMore: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
         onOpenDevices: @escaping () -> Void,
@@ -57,6 +60,7 @@ struct AuraShell: View {
         self.restReading = restReading
         self.chargeReading = chargeReading
         self.effortReading = effortReading
+        self.trendsReading = trendsReading
         self.onOpenMore = onOpenMore
         self.onOpenSettings = onOpenSettings
         self.onOpenDevices = onOpenDevices
@@ -141,7 +145,7 @@ struct AuraShell: View {
         case .effort:
             AuraEffortView(reading: effortReading)
         case .trends:
-            AuraTrendsView()
+            AuraTrendsView(reading: trendsReading)
         case .band:
             AuraBandView(onManageDevices: onOpenDevices, onSync: onSync)
         case .profile:
@@ -171,6 +175,8 @@ struct AuraShell: View {
             return chargeReading.headline
         case .effort:
             return effortReading.headline
+        case .trends:
+            return trendsReading.headline
         case .band:
             // Rendered by a LiveState-isolated leaf in AuraHeader.
             return String(localized: "Band status")
@@ -178,8 +184,6 @@ struct AuraShell: View {
             return todayReading.profileName.isEmpty
                 ? String(localized: "Your profile")
                 : todayReading.profileName
-        default:
-            return screen.headline
         }
     }
 

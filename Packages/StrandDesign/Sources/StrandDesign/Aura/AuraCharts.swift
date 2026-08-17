@@ -240,6 +240,7 @@ public struct AuraTrendChart: View {
     private let labels: [String]
     private let selected: Int
     private let window: ClosedRange<Double>
+    private let normalRange: ClosedRange<Double>?
     private let bandWidth: Double
     private let onSelect: (Int) -> Void
 
@@ -248,6 +249,7 @@ public struct AuraTrendChart: View {
         labels: [String],
         selected: Int,
         window: ClosedRange<Double> = 30...92,
+        normalRange: ClosedRange<Double>? = nil,
         bandWidth: Double = 9,
         onSelect: @escaping (Int) -> Void
     ) {
@@ -255,6 +257,7 @@ public struct AuraTrendChart: View {
         self.labels = labels
         self.selected = selected
         self.window = window
+        self.normalRange = normalRange
         self.bandWidth = bandWidth
         self.onSelect = onSelect
     }
@@ -315,6 +318,14 @@ public struct AuraTrendChart: View {
 
     /// The band is the series ± a fixed width — "your own normal", not a statistical envelope.
     private func bandShape(_ size: CGSize) -> some View {
+        if let normalRange {
+            let lower = AuraChartMath.points([normalRange.lowerBound], in: size, window: window).first?.y ?? size.height
+            let upper = AuraChartMath.points([normalRange.upperBound], in: size, window: window).first?.y ?? 0
+            let top = min(lower, upper)
+            let height = max(abs(lower - upper), 1)
+            return Path(CGRect(x: 0, y: top, width: size.width, height: height))
+                .fill(AuraPalette.accent.opacity(0.1))
+        }
         let upper = AuraChartMath.points(values.map { $0 + bandWidth }, in: size, window: window)
         let lower = AuraChartMath.points(values.map { $0 - bandWidth }, in: size, window: window)
         var path = Path()
