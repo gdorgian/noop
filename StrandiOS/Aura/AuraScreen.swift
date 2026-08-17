@@ -179,7 +179,6 @@ struct AuraHeader: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .layoutPriority(1)
 
             HStack(spacing: 8) {
                 AuraLiveBatteryButton(action: onOpenBand)
@@ -200,6 +199,7 @@ struct AuraHeader: View {
                 .accessibilityLabel(Text("Account"))
             }
             .fixedSize(horizontal: true, vertical: false)
+            .layoutPriority(1)
             .padding(.top, 2)
         }
         .padding(.top, 12)
