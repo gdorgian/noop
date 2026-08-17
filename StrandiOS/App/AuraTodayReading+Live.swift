@@ -37,8 +37,10 @@ extension AuraTodayReading {
     ///   - displayName: the wearer's name, or empty.
     static func live(
         day: DailyMetric?,
+        effortDay: DailyMetric?,
         history: [DailyMetric],
         displayName: String,
+        effortScale: EffortScale,
         now: Date = Date()
     ) -> AuraTodayReading {
         let hour = Calendar.current.component(.hour, from: now)
@@ -73,10 +75,11 @@ extension AuraTodayReading {
         let chargeValue = hrv.map { String(Int($0.rounded())) } ?? "—"
         let chargeFraction = hrv.map { min($0 / 120, 1) } ?? 0
 
-        // Effort on the design's 0–12 axis.
-        let effort = day?.strain.map { $0 / 100 * 12 }
-        let effortValue = effort.map { String(format: "%.1f", $0) } ?? "—"
-        let effortFraction = effort.map { min($0 / 12, 1) } ?? 0
+        // Effort stays on today's own logical-day row, even when Charge/Rest carry the latest scored
+        // night. Its number follows NOOP's existing display preference; the stored 0–100 value is intact.
+        let effort = effortDay?.strain
+        let effortValue = effort.map { UnitFormatter.effortDisplay($0, scale: effortScale) } ?? "—"
+        let effortFraction = effort.map { min(max($0 / 100, 0), 1) } ?? 0
 
         func series(_ pick: (DailyMetric) -> Double?) -> [Double] {
             history.compactMap(pick)
@@ -120,6 +123,7 @@ extension AuraTodayReading {
             chargeValue: chargeValue,
             chargeFraction: chargeFraction,
             effortValue: effortValue,
+            effortUnit: "/\(UnitFormatter.effortScaleMax(effortScale))",
             effortFraction: effortFraction,
             signals: signals,
             banner: banner

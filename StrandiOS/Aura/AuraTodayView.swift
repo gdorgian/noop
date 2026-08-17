@@ -83,7 +83,8 @@ struct AuraTodayView: View {
                            fraction: reading.chargeFraction, tint: AuraPalette.accent) {
                 onNavigate(.charge)
             }
-            AuraPillarCard(title: String(localized: "Effort"), value: reading.effortValue, unit: "/12",
+            AuraPillarCard(title: String(localized: "Effort"), value: reading.effortValue,
+                           unit: reading.effortUnit,
                            fraction: reading.effortFraction, tint: AuraPalette.effort) {
                 onNavigate(.effort)
             }
@@ -258,6 +259,7 @@ struct AuraTodayReading {
     let chargeValue: String
     let chargeFraction: Double
     let effortValue: String
+    let effortUnit: String
     let effortFraction: Double
     let signals: [Signal]
     let banner: String
@@ -283,6 +285,7 @@ struct AuraTodayReading {
         chargeValue: "56",
         chargeFraction: 0.78,
         effortValue: "6.2",
+        effortUnit: "/12",
         effortFraction: 0.52,
         signals: [
             Signal(id: "hr", name: String(localized: "Heart rate"), value: "58", unit: "bpm",
