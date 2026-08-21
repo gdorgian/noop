@@ -12,11 +12,11 @@ public struct HRSample: Equatable, Codable {
 
 /// WHICH sensor channel produced an R-R interval (#1071).
 ///
-/// A WHOOP strap has ONE beat source, so its rows carry no channel (nil) and nothing here changes for
-/// them. An Oura ring has more than one: the green-quality tag (0x80) and the SpO2 tag (0x6E) both
-/// decode to R-R and both were stored, so the table held roughly TWO complete copies of every night —
-/// not duplicate rows to de-duplicate, but the SAME heartbeats measured twice. Labelling the channel is
-/// what lets scoring read one copy while both stay on disk as each other's cross-check.
+/// A WHOOP strap exposes the same beat train over multiple TRANSPORTS: standard BLE 0x2A37, WHOOP's
+/// custom realtime packets, and historical type-47 records. They need distinct labels for exactly the
+/// same reason an Oura ring's optical channels do: measurements remain durable, while scoring chooses
+/// one source instead of silently concatenating copies of the night. `nil` remains the honest
+/// legacy/unknown value.
 ///
 /// The raw values are the DURABLE, cross-platform storage codes for `rrInterval.srcChannel` and must
 /// stay in lockstep with Kotlin `RrSourceChannel` — they are written to SQLite and cross the `.noopbak`
@@ -39,13 +39,22 @@ public enum RRSourceChannel: Int, Equatable, Codable, Sendable, CaseIterable {
     /// is the question the channel choice for scoring rests on, and no stored night could answer it.
     /// Labelling only — both are read exactly as before.
     case ibiBare = 4
+    /// WHOOP's live, standard Bluetooth Heart Rate Measurement characteristic (0x2A37). Its receive-time
+    /// timestamp is normally 1–2 seconds after the matching historical record's embedded strap unix.
+    case whoopStandardBLE = 5
+    /// WHOOP historical R-R decoded by `extractHistoricalStreams` (type-47 on 5/MG and the equivalent
+    /// historical record path on 4.0). Its timestamp comes from the historical record itself.
+    case whoopHistorical = 6
+    /// WHOOP's proprietary live REALTIME_DATA stream. This is distinct from standard BLE 0x2A37 even
+    /// though both may carry the same live beat train; its timestamp is mapped from the strap clock.
+    case whoopRealtime = 7
 }
 
 public struct RRInterval: Equatable, Codable {
     public let ts: Int          // wall-clock unix seconds
     public let rrMs: Int
-    /// The sensor channel this beat came from, or nil when the source does not distinguish one (every
-    /// WHOOP row, and every row written before the column existed). See `RRSourceChannel`.
+    /// The sensor channel/transport this beat came from, or nil when the source is unknown (including
+    /// every row written before the column existed). See `RRSourceChannel`.
     public let srcChannel: RRSourceChannel?
     public init(ts: Int, rrMs: Int, srcChannel: RRSourceChannel? = nil) {
         self.ts = ts; self.rrMs = rrMs; self.srcChannel = srcChannel
@@ -754,7 +763,9 @@ public func extractStreams(_ parsed: [ParsedFrame],
             }
             // Unlike Python, drop RR rows when timestamp is absent (a ts-less RR row is unstorable).
             if let ts = ts, let rrs = p["rr_intervals"]?.intArrayValue {
-                for rr in rrs { out.rr.append(RRInterval(ts: ts, rrMs: rr)) }
+                for rr in rrs {
+                    out.rr.append(RRInterval(ts: ts, rrMs: rr, srcChannel: .whoopRealtime))
+                }
             }
         case "EVENT":
             // EVENT timestamps are real RTC unix seconds — already wall-clock, NOT offset.

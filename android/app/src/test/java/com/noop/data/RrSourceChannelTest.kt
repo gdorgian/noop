@@ -163,8 +163,7 @@ class RrSourceChannelTest {
      * packages only because the pure ring decoder does not depend on the storage carriers.
      */
     @Test
-    fun theTwoChannelEnumsAgreeCaseForCaseAndCodeForCode() {
-        assertEquals(OuraIbiChannel.entries.size, RrSourceChannel.entries.size)
+    fun everyOuraChannelMapsToTheSameDurableRrCode() {
         for (c in OuraIbiChannel.entries) {
             assertEquals(
                 "$c must map to the SAME durable storage code on both sides",
@@ -186,6 +185,9 @@ class RrSourceChannelTest {
         assertEquals(2, RrSourceChannel.SPO2_IBI.code)
         assertEquals(3, RrSourceChannel.IBI_AMPLITUDE.code)
         assertEquals(4, RrSourceChannel.IBI_BARE.code)
+        assertEquals(5, RrSourceChannel.WHOOP_STANDARD_BLE.code)
+        assertEquals(6, RrSourceChannel.WHOOP_HISTORICAL.code)
+        assertEquals(7, RrSourceChannel.WHOOP_REALTIME.code)
         assertEquals(1, OuraIbiChannel.GREEN_QUALITY.code)
         assertEquals(2, OuraIbiChannel.SPO2_IBI.code)
         assertEquals(3, OuraIbiChannel.IBI_AMPLITUDE.code)
@@ -216,9 +218,9 @@ class RrSourceChannelTest {
     }
 
     @Test
-    fun entityDefaultsSrcChannelToNull_soWhoopAndLegacyRowsStayHonest() {
-        // A WHOOP strap has ONE beat source: there is no channel to name, and NULL says exactly that
-        // rather than asserting a channel nobody measured.
+    fun entityDefaultsSrcChannelToNull_soLegacyAndUnknownRowsStayHonest() {
+        // Old rows did not record provenance. NULL stays unknown rather than being guessed into either
+        // WHOOP transport, so an upgrade never silently relabels irreplaceable stored history.
         assertNull(RrInterval(deviceId = "d", ts = 1L, rrMs = 800).srcChannel)
         assertNull(RrRow(1L, 800).srcChannel)
     }
@@ -269,8 +271,86 @@ class RrSourceChannelTest {
             "only the demonstrated duplicate is excluded: $q",
             q.contains("srcChannel <> ${RrSourceChannel.IBI_AMPLITUDE.code}"),
         )
+        assertTrue(
+            "local overlap must look only for tagged historical rows: $q",
+            q.contains("srcChannel = ${RrSourceChannel.WHOOP_HISTORICAL.code}"),
+        )
+        assertTrue(
+            "both tagged live transports must be candidates for local suppression: $q",
+            q.contains(
+                "r.srcChannel NOT IN (${RrSourceChannel.WHOOP_STANDARD_BLE.code}, " +
+                    "${RrSourceChannel.WHOOP_REALTIME.code})",
+            ),
+        )
+        assertTrue("no nearby history must leave live as fallback: $q", q.contains("OR NOT EXISTS"))
+        assertTrue(
+            "the local lower edge must include the observed receive skew: $q",
+            q.contains("h.ts >= r.ts - ${RrScoringTransportSelector.HISTORY_LOCAL_TOLERANCE_SEC}"),
+        )
+        assertTrue(
+            "the local upper edge must include the observed receive skew: $q",
+            q.contains("h.ts <= r.ts + ${RrScoringTransportSelector.HISTORY_LOCAL_TOLERANCE_SEC}"),
+        )
+        assertFalse(
+            "history just outside the result window must still suppress its shifted live copy: $q",
+            q.contains("h.ts >= :from") || q.contains("h.ts <= :to"),
+        )
+        assertFalse("one MIN..MAX envelope would erase valid live rows in internal gaps: $q", q.contains("MIN(ts)"))
+        assertFalse("one MIN..MAX envelope would erase valid live rows in internal gaps: $q", q.contains("MAX(ts)"))
+        assertTrue(
+            "transport suppression must run before LIMIT so duplicates cannot consume it: $q",
+            q.indexOf("r.srcChannel NOT IN") < q.indexOf("LIMIT"),
+        )
         // #823's emission order still leads the sort — the filter must not have displaced it.
-        assertTrue("emission order must still lead: $q", q.contains("ORDER BY ts ASC, ord ASC"))
+        assertTrue("emission order must still lead: $q", q.contains("ORDER BY r.ts ASC, r.ord ASC"))
+    }
+
+    @Test
+    fun scoringSelectorPrefersHistoryOnlyNearTaggedHistoricalRows() {
+        fun row(ts: Long, rr: Int, source: RrSourceChannel?) =
+            RrInterval(deviceId = "strap", ts = ts, rrMs = rr, srcChannel = source?.code)
+
+        val rows = listOf(
+            row(97, 701, RrSourceChannel.WHOOP_STANDARD_BLE), // before 100 - 2: keep
+            row(98, 702, RrSourceChannel.WHOOP_STANDARD_BLE), // lower tolerance edge: suppress
+            row(100, 703, RrSourceChannel.WHOOP_HISTORICAL),
+            row(101, 704, null),                              // legacy source: keep unchanged
+            row(102, 705, RrSourceChannel.GREEN_QUALITY),     // Oura source: selector leaves it alone
+            row(103, 706, RrSourceChannel.WHOOP_HISTORICAL),
+            row(105, 707, RrSourceChannel.WHOOP_REALTIME),    // upper tolerance edge: suppress
+            row(106, 708, RrSourceChannel.WHOOP_REALTIME),    // after 103 + 2: keep
+        )
+
+        assertEquals(
+            listOf(701, 703, 704, 705, 706, 708),
+            RrScoringTransportSelector.select(rows).map { it.rrMs },
+        )
+    }
+
+    @Test
+    fun scoringSelectorKeepsStandardAndNilWhenNoTaggedHistoryExists() {
+        val rows = listOf(
+            RrInterval("strap", 100, 800, srcChannel = RrSourceChannel.WHOOP_STANDARD_BLE.code),
+            RrInterval("strap", 101, 810, srcChannel = null),
+        )
+        assertEquals(rows, RrScoringTransportSelector.select(rows))
+    }
+
+    @Test
+    fun scoringSelectorKeepsLiveRowsInsideAGapBetweenHistoricalSegments() {
+        fun row(ts: Long, rr: Int, source: RrSourceChannel) =
+            RrInterval("strap", ts, rr, srcChannel = source.code)
+        val rows = listOf(
+            row(100, 800, RrSourceChannel.WHOOP_HISTORICAL),
+            row(101, 801, RrSourceChannel.WHOOP_STANDARD_BLE), // local overlap: suppress
+            row(150, 802, RrSourceChannel.WHOOP_STANDARD_BLE), // internal gap: keep
+            row(199, 803, RrSourceChannel.WHOOP_REALTIME),     // local overlap: suppress
+            row(200, 804, RrSourceChannel.WHOOP_HISTORICAL),
+        )
+        assertEquals(
+            listOf(800, 802, 804),
+            RrScoringTransportSelector.select(rows).map { it.rrMs },
+        )
     }
 
     /** The `@Query` body attached to `rrIntervals`, string fragments joined, comments excluded. */

@@ -362,7 +362,7 @@ public func isUnmappedWhoop5HistoricalRecord(_ frame: [UInt8]) -> Bool {
 /// device emits, and a naive +4 decodes to garbage (HR 0, gravity overflow). Every offset below is
 /// read directly off real frames at its absolute 5.0 position and cross-checked physiologically:
 ///   • unix monotonic at +1 s,  • rr_count matches the number of valid R-R intervals (100%),
-///   • 60000/mean(R-R) ≈ heart_rate (88%, the rest being HR-averaging cases),  • |gravity| ≈ 1 g
+///   • the v18 R-R u16 is in 1/1024-second ticks (converted to rounded ms below),  • |gravity| ≈ 1 g
 ///     (100% of 500 records).
 /// PPG / SpO₂ / skin-temp live further in the 124-byte record but lack on-device ground truth, so
 /// they are left as a raw region rather than guessed (project rule: real captures, never invented
@@ -407,9 +407,18 @@ private func decodeWhoop5Historical(_ frame: [UInt8], fb: FieldBuilder, payloadE
     var rrs: [Int] = []
     for i in 0..<min(rrn, 4) {
         let off = 24 + i * 2
-        if let v = readDType(frame, off, "u16"), v > 0 {
-            fb.add(off, 2, "rr[\(i)]", "rr", value: .int(v), note: "ms")
-            rrs.append(v)
+        if let ticks = readDType(frame, off, "u16"), ticks > 0 {
+            // WHOOP 5 layout-v18 stores intervals in the BLE Heart Rate Service's 1/1024-second
+            // unit, not milliseconds. Round once at the protocol boundary; every downstream R-R
+            // consumer and the durable `rrMs` column operate in integer milliseconds.
+            //
+            // This conversion is intentionally VERSION-LOCAL. 5/MG v20/v21/v26 contain no R-R
+            // intervals, while real WHOOP 4 v24 values are already milliseconds (their unconverted
+            // values satisfy 60000/mean(R-R) == HR); v25 contains no R-R.
+            let ms = (ticks * 1_000 + 512) / 1_024
+            fb.add(off, 2, "rr[\(i)]", "rr", value: .int(ms),
+                   note: "ms (rounded from 1/1024-s ticks)")
+            rrs.append(ms)
         }
     }
     fb.parsed["rr_intervals"] = .intArray(rrs)

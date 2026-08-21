@@ -205,7 +205,11 @@ final class Collector {
     /// these carry a wall-clock `ts` directly. Auto-flushes ~every 30 readings (~30s).
     func ingestStandardHR(hr: Int, rr: [Int], at ts: Int) {
         if hr >= 30, hr <= 220 { stdHR.append(HRSample(ts: ts, bpm: hr)) }
-        for r in rr where r >= 250 && r <= 3000 { stdRR.append(RRInterval(ts: ts, rrMs: r)) }
+        // WHOOP also replays this beat train in historical records. Keep both transports durable,
+        // but label the receive-time 0x2A37 copy so the scoring read can avoid mixing them.
+        let plausibleRR = rr.filter { $0 >= 250 && $0 <= 3000 }
+        stdRR.append(contentsOf: StandardHRMapping.rrSamples(
+            plausibleRR, at: ts, source: .whoopStandardBLE))
         if stdHR.count + stdRR.count >= 30 {
             Task { @MainActor in await self.flushStandardHR() }
         }

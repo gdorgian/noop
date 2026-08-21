@@ -46,6 +46,26 @@ interface WhoopDao : DeviceRegistryDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertRr(rows: List<RrInterval>): List<Long>
 
+    /**
+     * Exact-key collision repair for WHOOP transport provenance. `srcChannel` deliberately stays OUT of
+     * the primary key, so a live row can arrive first and make the matching historical insert return
+     * IGNORE. Promote only that tagged live row (5 standard BLE / 7 custom realtime) to historical (6),
+     * including history's emission order. Legacy NULL and Oura rows are never guessed or rewritten.
+     * Called inside the same transaction as [insertRr]; no row is deleted and the PK is unchanged.
+     */
+    @Query(
+        "UPDATE rrInterval SET srcChannel = 6, ord = :ord " +
+            "WHERE deviceId = :deviceId AND ts = :ts AND rrMs = :rrMs AND seq = :seq " +
+            "AND srcChannel IN (5, 7)",
+    )
+    suspend fun promoteLiveRrCollisionToHistorical(
+        deviceId: String,
+        ts: Long,
+        rrMs: Int,
+        seq: Int,
+        ord: Int?,
+    ): Int
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertEvents(rows: List<EventRow>): List<Long>
 
@@ -383,8 +403,8 @@ interface WhoopDao : DeviceRegistryDao {
         //
         // The predicate EXCLUDES the one channel proven redundant (SPO2_IBI, 0x6E) rather than
         // whitelisting the one preferred (GREEN_QUALITY, 0x80), which matters for what it does NOT drop:
-        //   - NULL is kept. Every WHOOP row is NULL by construction (one beat source), as is every row
-        //     written before v26. A whitelist would delete every WHOOP night from scoring.
+        //   - NULL is kept. It represents every row written before provenance was added, plus any source
+        //     whose transport is genuinely unknown. A whitelist would delete that history from scoring.
         //   - IBI_AMPLITUDE (0x60/0x44) is kept. It does not fire on the Gen-3 hardware this was measured
         //     on, so there is no evidence it duplicates green — and dropping a ring's ONLY beat source on
         //     an untested assumption is the more expensive mistake. If a capture ever shows 0x60 and 0x80
@@ -393,15 +413,33 @@ interface WhoopDao : DeviceRegistryDao {
         // the two: quantised to an 8 ms grid, no quality gate, and running only while an SpO2 measurement
         // is on — so scoring off it would make HRV coverage a function of the SpO2 duty cycle.
         //
-        // Rows are FILTERED, never deleted: the 0x6E stream stays on disk as the cross-check on green.
+        // WHOOP transport selection is LOCAL, not beat-value de-duplication and not one MIN..MAX envelope.
+        // Historical rows win over tagged standard-BLE/custom-realtime rows only when a historical row
+        // exists within the observed 2-second clock/receive skew. A gap inside a long history range keeps
+        // live rows as fallback. Oura channels and legacy NULL rows are unchanged.
+        //
+        // Rows are FILTERED, never deleted: excluded streams stay on disk as cross-checks.
         // Every R-R consumer reads through this one query, so the `hrv diag` trace moves with the scores
         // rather than reporting a coverage nobody can reproduce. The literal 2 is RrSourceChannel.SPO2_IBI
         // .code — a Room @Query is a compile-time constant string and cannot reference it; RrChannelTest
-        // pins the two together.
-        "SELECT * FROM rrInterval WHERE deviceId = :deviceId AND ts >= :from AND ts <= :to " +
-            "AND (srcChannel IS NULL OR srcChannel <> 2) " +
-            "AND (tsSuspect IS NULL OR tsSuspect <> 1) " +   // #1073: exclude future-stamped beats
-            "ORDER BY ts ASC, ord ASC, rrMs ASC, seq ASC LIMIT :limit"
+        // pins the two together. The literals 5/6/7 are WHOOP_STANDARD_BLE/WHOOP_HISTORICAL/
+        // WHOOP_REALTIME, and the two tolerance literals are
+        // RrScoringTransportSelector.HISTORY_LOCAL_TOLERANCE_SEC. Room @Query strings cannot reference
+        // Kotlin constants; focused tests pin them.
+        //
+        // The local EXISTS selection happens in ONE SQLite snapshot and BEFORE LIMIT. A
+        // fetch-then-filter query would let suppressed standard duplicates consume the limit and hide
+        // valid rows after the newest historical record.
+        "SELECT r.* FROM rrInterval r " +
+            "WHERE r.deviceId = :deviceId AND r.ts >= :from AND r.ts <= :to " +
+            "AND (r.srcChannel IS NULL OR r.srcChannel <> 2) " +
+            "AND (r.tsSuspect IS NULL OR r.tsSuspect <> 1) " + // #1073: future-stamped beats
+            "AND (r.srcChannel IS NULL OR r.srcChannel NOT IN (5, 7) OR NOT EXISTS (" +
+            "SELECT 1 FROM rrInterval h WHERE h.deviceId = r.deviceId " +
+            "AND h.srcChannel = 6 " +
+            "AND (h.tsSuspect IS NULL OR h.tsSuspect <> 1) " +
+            "AND h.ts >= r.ts - 2 AND h.ts <= r.ts + 2)) " +
+            "ORDER BY r.ts ASC, r.ord ASC, r.rrMs ASC, r.seq ASC LIMIT :limit"
     )
     suspend fun rrIntervals(deviceId: String, from: Long, to: Long, limit: Int): List<RrInterval>
 

@@ -209,7 +209,8 @@ object CaptureImporter {
     }
 
     private fun InsertCounts.plus(o: InsertCounts) = InsertCounts(
-        hr = hr + o.hr, rr = rr + o.rr, events = events + o.events, battery = battery + o.battery,
+        hr = hr + o.hr, rr = rr + o.rr, rrPromoted = rrPromoted + o.rrPromoted,
+        events = events + o.events, battery = battery + o.battery,
         spo2 = spo2 + o.spo2, skinTemp = skinTemp + o.skinTemp, steps = steps + o.steps,
         resp = resp + o.resp, gravity = gravity + o.gravity,
     )

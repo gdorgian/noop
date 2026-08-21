@@ -746,14 +746,13 @@ extension WhoopStore {
         // in the key would make the SAME beat insertable twice under two labels, the data-loss/duplication
         // regression the v24 note warns about from the other direction.
         //
-        // Pre-v32 rows stay NULL and are still READ (a WHOOP row is legitimately NULL forever — one beat
-        // source, no channel to name — so a filter that dropped NULL would silently delete every WHOOP
-        // night from scoring). Historical Oura rows therefore keep their old inflated coverage; they were
-        // never labelled, and a backfill would be a guess. For the record, since this is how the defect
+        // Pre-v32 rows stay NULL and are still READ. Their source/transport was never retained, and a
+        // backfill would be a guess, so filtering NULL could silently delete a real WHOOP or Oura night.
+        // Historical Oura rows therefore keep their old inflated coverage. For the record, since this is how the defect
         // was diagnosed: in an existing DB the two channels remain separable by `rrMs % 8`, an 0x6E row
         // always being a multiple of 8 and an 0x80 row landing there only 1 time in 8 by chance.
         //
-        // Values are `RRSourceChannel.rawValue` (1 green / 2 spo2 / 3 ibiAmplitude), a DURABLE wire format
+        // Values are `RRSourceChannel.rawValue` (1...4 Oura channels, 5/6/7 WHOOP transports), a DURABLE wire format
         // shared with Kotlin `RrSourceChannel`. INTEGER rather than a text label because `rrInterval` is
         // the highest-volume table in the schema (~60k rows a night) and this column rides every one.
         //

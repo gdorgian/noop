@@ -415,8 +415,14 @@ class FramingTest {
         assertEquals(1, streams.hr.size)
         assertEquals(HrSample(ts = 1700000000, bpm = 62), streams.hr[0])
         assertEquals(2, streams.rr.size)
-        assertEquals(RrInterval(ts = 1700000000, rrMs = 850), streams.rr[0])
-        assertEquals(RrInterval(ts = 1700000000, rrMs = 870), streams.rr[1])
+        assertEquals(
+            RrInterval(ts = 1700000000, rrMs = 850, srcChannel = RrSourceChannel.WHOOP_REALTIME),
+            streams.rr[0],
+        )
+        assertEquals(
+            RrInterval(ts = 1700000000, rrMs = 870, srcChannel = RrSourceChannel.WHOOP_REALTIME),
+            streams.rr[1],
+        )
     }
 
     // MARK: - WHOOP 5.0/MG REALTIME_DATA (+4) + family-aware reassembly

@@ -68,7 +68,7 @@ class Backfiller(
      * invisible until the next 15-min analysis tick. Empty chunks (metadata-only ENDs) don't fire.
      * (#78 fork)
      */
-    private val onChunkCommitted: (StreamBatch) -> Unit = {},
+    private val onChunkCommitted: (StreamBatch, InsertCounts) -> Unit = { _, _ -> },
     /**
      * Per-console-only chunk hook (#77 family): a chunk arrived with frames but decoded no rows and
      * held no genuine rejects — pure diagnostic/console output. Lets the client tally a completed-but-
@@ -368,6 +368,7 @@ class Backfiller(
         }
 
         var committed: StreamBatch? = null
+        var committedCounts: InsertCounts? = null
         if (frames.isNotEmpty()) {
             val ref = clockRef
             val decoded = extractHistoricalStreams(
@@ -524,6 +525,7 @@ class Backfiller(
             try {
                 val counts = repository.insert(decoded, deviceId)
                 committed = decoded
+                committedCounts = counts
                 // Success-side observability (#150): tally what actually persisted so the session can emit
                 // "persisted N rows (M with motion) across K night(s)" — the win-rate signal we never logged.
                 val (rows, motion, nights) = chunkTally(counts, decoded.gravity.map { it.ts } + decoded.hr.map { it.ts })
@@ -608,7 +610,11 @@ class Backfiller(
 
         ackTrim(trim, endData)
         lastAckedTrim = trim   // #364: record the advanced cursor for the auto-continue spin-detector
-        committed?.takeIf { !it.isEmpty }?.let(onChunkCommitted)
+        val committedBatch = committed
+        val counts = committedCounts
+        if (committedBatch != null && !committedBatch.isEmpty && counts != null) {
+            onChunkCommitted(committedBatch, counts)
+        }
     }
 
     /**

@@ -16,6 +16,7 @@ import com.noop.analytics.IntelligenceEngine
 import com.noop.analytics.CircadianEngine
 import com.noop.analytics.V5HealthSignals
 import com.noop.analytics.RegistryDayOwnerSource
+import com.noop.analytics.ScoringInvalidation
 import com.noop.analytics.RestScorer
 import com.noop.analytics.RouteMath
 import com.noop.analytics.SleepMark
@@ -961,7 +962,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // since the last COMPLETED run. Mirrors the Swift analyzeRecent(force:false) gate; the watermark
                 // advances only on success (below), so an interrupted run can never hide unscored data.
                 val analyzeFp = repository.hrFingerprint()
-                if (analyzeFp != NoopPrefs.analyzeWatermark(appContext)) runCatching {
+                val rrRevision = NoopPrefs.rrScoringRevision(appContext)
+                if (ScoringInvalidation.needsRun(
+                        hrFingerprint = analyzeFp,
+                        analyzedHrFingerprint = NoopPrefs.analyzeWatermark(appContext),
+                        rrRevision = rrRevision,
+                        analyzedRrRevision = NoopPrefs.rrAnalyzedRevision(appContext),
+                    )) runCatching {
                     IntelligenceEngine.analyzeRecent(
                         repo = repository,
                         profile = currentProfile(),
@@ -1067,7 +1074,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     // analyzeRecent now hops to Dispatchers.Default; a scope cancellation surfaces as a
                     // CancellationException that runCatching would otherwise swallow, breaking the loop's
                     // own cancellation — rethrow it so onCleared() actually stops the loop. (#125)
-                }.onSuccess { NoopPrefs.setAnalyzeWatermark(appContext, analyzeFp) }
+                }.onSuccess {
+                    NoopPrefs.setAnalyzeWatermark(appContext, analyzeFp)
+                    NoopPrefs.setRrAnalyzedRevision(appContext, rrRevision)
+                }
                     .onFailure { if (it is kotlin.coroutines.cancellation.CancellationException) throw it }
                 // Opt-in writeback: push the freshly computed nights into Health Connect so other
                 // apps see them. Idempotent (clientRecordId per metric+day), so re-running every

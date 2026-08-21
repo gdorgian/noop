@@ -332,7 +332,8 @@ fun isUnmappedWhoop5HistoricalRecord(frame: ByteArray): Boolean {
  * byte 8 (type@8, version@9) and fields sit at their WHOOP5-ABSOLUTE offsets — NOT the WHOOP4 V24 layout
  * shifted by +4 (that decodes to garbage on v18). Offsets verified against real worn/off-wrist frames
  * (the data is the arbiter): unix@15, hr@22, rr@24+, gravity@45/49/53, and per-second fields each gated
- * to a physical range so a wrong offset on unmapped firmware stores nothing; further fields (aux thermal
+ * to a physical range so a wrong offset on unmapped firmware stores nothing; the v18 R-R u16 values are
+ * 1/1024-second ticks and are converted to rounded milliseconds at this protocol boundary; further fields (aux thermal
  * @69/71, status words @75/77/79, the @81 band-flag nibbles, aux byte @82) are read off the same real
  * frames. Mirrors Swift `decodeWhoop5Historical`, and emits the same keys [extractHistoricalStreams] reads.
  * v26 (PPG) and other
@@ -359,8 +360,16 @@ private fun decodeWhoop5Historical(frame: ByteArray): Map<String, Any?>? {
     out["rr_count"] = rrn
     val rrVals = ArrayList<Int>()
     for (i in 0 until minOf(rrn, 4)) {
-        val v = frame.histU16(24 + i * 2)
-        if (v != null && v != 0) rrVals.add(v)
+        val ticks = frame.histU16(24 + i * 2)
+        if (ticks != null && ticks != 0) {
+            // WHOOP 5 layout-v18 uses the BLE Heart Rate Service's 1/1024-second unit, not
+            // milliseconds. Convert exactly once here; every downstream consumer and the durable
+            // `rrMs` column operate in integer milliseconds.
+            //
+            // VERSION-LOCAL by construction: this function accepts only v18. WHOOP 5 v20/v21/v26
+            // contain no R-R intervals, WHOOP 4 v24 is already milliseconds, and v25 has no R-R.
+            rrVals.add((ticks * 1_000 + 512) / 1_024)
+        }
     }
     out["rr_intervals"] = rrVals
     // Bytes adjacent to the HR/R-R fields: @36 is a FLAG byte and @37 a duplicate heart rate — not the
@@ -806,7 +815,9 @@ fun extractHistoricalStreams(
                 p.intOrNull("heart_rate")?.let { bpm -> if (bpm != 0) hr.add(HrRow(ts, bpm)) }
 
                 @Suppress("UNCHECKED_CAST")
-                (p["rr_intervals"] as? List<Int>)?.forEach { rrMs -> rr.add(RrRow(ts, rrMs)) }
+                (p["rr_intervals"] as? List<Int>)?.forEach { rrMs ->
+                    rr.add(RrRow(ts, rrMs, RrSourceChannel.WHOOP_HISTORICAL))
+                }
 
                 p.intOrNull("spo2_red")?.let { red ->
                     spo2.add(Spo2Row(ts, red = red, ir = p.intOrNull("spo2_ir") ?: 0))
@@ -943,7 +954,7 @@ fun extractHistoricalStreams(
                 parsed.parsed.intOrNull("heart_rate")?.let { bpm -> hr.add(HrRow(ts.toLong(), bpm)) }
                 @Suppress("UNCHECKED_CAST")
                 (parsed.parsed["rr_intervals"] as? List<Int>)?.forEach { rrMs ->
-                    rr.add(RrRow(ts.toLong(), rrMs))
+                    rr.add(RrRow(ts.toLong(), rrMs, RrSourceChannel.WHOOP_HISTORICAL))
                 }
             }
 

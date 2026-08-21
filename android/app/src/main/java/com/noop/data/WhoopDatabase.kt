@@ -717,11 +717,12 @@ abstract class WhoopDatabase : RoomDatabase() {
          * the key would make the SAME beat insertable twice under two labels — the double-count being
          * fixed, arrived at from the other direction.
          *
-         * Existing rows stay NULL and are still READ (a WHOOP row is legitimately NULL forever — one beat
-         * source, no channel to name), so historical Oura rows keep their old inflated coverage. Not
-         * backfillable: the channel was never recorded.
+         * Existing rows stay NULL and are still READ, so historical Oura and WHOOP rows keep their old
+         * behaviour. Not backfillable: the channel/transport was never recorded. New WHOOP rows use the
+         * appended standard-BLE and historical codes so their overlapping transports can be selected at read.
          *
-         * Values are [com.noop.protocol.RrSourceChannel.code] (1 green / 2 spo2 / 3 ibiAmplitude), a
+         * Values are [com.noop.protocol.RrSourceChannel.code] (1 green / 2 spo2 / 3 ibiAmplitude /
+         * 4 ibiBare / 5 WHOOP standard BLE / 6 WHOOP historical), a
          * DURABLE wire format shared with Swift `RRSourceChannel`. INTEGER rather than a text label
          * because `rrInterval` is the highest-volume table in the schema (~60k rows a night) and this
          * column rides every one.

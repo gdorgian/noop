@@ -84,11 +84,11 @@ class RrSeqMigrationTest {
         assertEquals("same input → same keys", r1.map { pk(it) }, assignRrSeq("d", batch).map { pk(it) })
     }
 
-    /** The real v18 golden record ([602,613]) round-trips: distinct values, both seq 0, both kept. */
+    /** The real v18 golden record's converted values ([588,599]) round-trip: both seq 0, both kept. */
     @Test
     fun assignRrSeq_realV18Record() {
-        val out = assignRrSeq("my-whoop", listOf(RrRow(1_780_916_150L, 602), RrRow(1_780_916_150L, 613)))
-        assertEquals(listOf(602, 613), out.map { it.rrMs })
+        val out = assignRrSeq("my-whoop", listOf(RrRow(1_780_916_150L, 588), RrRow(1_780_916_150L, 599)))
+        assertEquals(listOf(588, 599), out.map { it.rrMs })
         assertEquals(listOf(0, 0), out.map { it.seq })
     }
 }

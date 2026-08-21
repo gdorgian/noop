@@ -114,7 +114,8 @@ data class HrWindowStats(
  * NULL first in ASC, so a pre-v24 second (all NULL) ties on `ord` and falls through to the old
  * `rrMs, seq` order exactly. Not backfillable: the order was never recorded.
  *
- * `srcChannel` (Room v26, #1071) is WHICH sensor channel measured the beat, as [RrSourceChannel.code].
+ * `srcChannel` (Room v26, #1071) is WHICH sensor channel or transport measured the beat, as
+ * [RrSourceChannel.code].
  * An Oura ring reports the SAME heartbeats on more than one tag — 0x80 green-quality for the whole wear
  * period, 0x6E only while an SpO2 measurement runs — and every one of them decoded to an R-R row, so an
  * untagged table held roughly TWO complete copies of every night (2.06x the beats the measured HR curve
@@ -128,10 +129,11 @@ data class HrWindowStats(
  * keying on the label would make the SAME beat insertable twice under two labels, which is the
  * double-count being fixed.
  *
- * NULL means "no channel to name": every WHOOP row forever (one beat source), every row written before
- * v26, and any source that does not report one. Pre-v26 rows are still READ — a filter that dropped NULL
- * would delete every WHOOP night from scoring — so historical Oura rows keep their old inflated
- * coverage. Not backfillable: the channel was never recorded. (For the record, since it is how this was
+ * NULL means "source unknown": every row written before v26, and any source that does not report one.
+ * New WHOOP standard-BLE and historical rows are tagged separately so scoring can prefer history where
+ * both transports overlap. Pre-v26 rows are still READ — a filter that dropped NULL would delete stored
+ * history — so old over-covered rows remain unchanged. Not backfillable: the source was never recorded.
+ * (For the record, since it is how the Oura channel issue was
  * diagnosed: in an existing DB the two remain separable by `rrMs % 8`, an 0x6E row always being a
  * multiple of 8 and an 0x80 row landing there only 1 time in 8 by chance.)
  *

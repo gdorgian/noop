@@ -140,6 +140,10 @@ public struct DeviceRegistryStore: Sendable {
             // namespace. Forgetting a provider must remove those associations too.
             try db.execute(sql: "DELETE FROM scoreInputProvenance WHERE sourceId = ?",
                            arguments: [deviceId])
+            // Score-cache metadata is device-scoped too even though it lives in the generic cursor table.
+            // Clearing recordings must not leave a local identifier or stale generation behind.
+            try db.execute(sql: "DELETE FROM cursors WHERE name = ?",
+                           arguments: [WhoopStore.rrScoringGenerationCursor(deviceId: deviceId)])
         }
     }
 
@@ -185,6 +189,17 @@ public struct DeviceRegistryStore: Sendable {
                 try db.execute(sql: "UPDATE OR IGNORE \(table) SET deviceId = ? WHERE deviceId = ?", arguments: [serialId, activeId])
                 try db.execute(sql: "DELETE FROM \(table) WHERE deviceId = ?", arguments: [activeId])
             }
+            // Move the transactional R-R generation with the recordings. If both identities already have
+            // data, summing their monotonic generations preserves every invalidating write; then remove the
+            // provisional-id metadata just like its sample rows.
+            let activeGeneration = WhoopStore.rrScoringGenerationCursor(deviceId: activeId)
+            let serialGeneration = WhoopStore.rrScoringGenerationCursor(deviceId: serialId)
+            try db.execute(sql: """
+                INSERT INTO cursors (name, value)
+                SELECT ?, value FROM cursors WHERE name = ?
+                ON CONFLICT(name) DO UPDATE SET value = value + excluded.value
+                """, arguments: [serialGeneration, activeGeneration])
+            try db.execute(sql: "DELETE FROM cursors WHERE name = ?", arguments: [activeGeneration])
             // Drop ONLY the provisional CB-UUID registry rows; other oura-* pairings are left as-is.
             try db.execute(sql: "DELETE FROM pairedDevice WHERE id = ?", arguments: [activeId])
             try db.execute(sql: "DELETE FROM device WHERE id = ?", arguments: [activeId])

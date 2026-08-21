@@ -307,9 +307,10 @@ object OuraStreamMapping {
      *
      * Two enums rather than one because `com.noop.oura` is the pure ring decoder and does not depend on
      * the storage carriers — the same split the Swift twin has between `OuraProtocol` and
-     * `WhoopProtocol`. They pin the SAME [OuraIbiChannel.code] / [RrSourceChannel.code] values, and the
-     * mapping is written out case by case rather than as `fromCode(c.code)` so that adding a case on one
-     * side without the other is a COMPILE error instead of a silent null. Internal for the parity test.
+     * `WhoopProtocol`. Every Oura case pins the SAME [OuraIbiChannel.code] / [RrSourceChannel.code]
+     * value. [RrSourceChannel] also has WHOOP-only transport cases, so the mapping is intentionally
+     * one-way and is written out case by case rather than as `fromCode(c.code)`: adding an Oura case
+     * without mapping it is a COMPILE error instead of a silent null. Internal for the parity test.
      */
     internal fun rrChannel(c: OuraIbiChannel?): RrSourceChannel? = when (c) {
         OuraIbiChannel.GREEN_QUALITY -> RrSourceChannel.GREEN_QUALITY

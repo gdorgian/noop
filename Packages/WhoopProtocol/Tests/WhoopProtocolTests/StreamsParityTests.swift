@@ -41,7 +41,9 @@ final class StreamsParityTests: XCTestCase {
         let s = extractStreams(parsed, deviceClockRef: deviceClockRef, wallClockRef: wallClockRef)
 
         XCTAssertEqual(s.hr, gold.hr.map { HRSample(ts: $0.ts, bpm: $0.bpm) })
-        XCTAssertEqual(s.rr, gold.rr.map { RRInterval(ts: $0.ts, rrMs: $0.rr_ms) })
+        XCTAssertEqual(s.rr, gold.rr.map {
+            RRInterval(ts: $0.ts, rrMs: $0.rr_ms, srcChannel: .whoopRealtime)
+        })
         XCTAssertEqual(s.battery, gold.battery.map { BatterySample(ts: $0.ts, soc: $0.soc, mv: $0.mv, charging: $0.charging) })
         XCTAssertEqual(s.events.count, gold.events.count, "event count mismatch")
         for (i, g) in gold.events.enumerated() {
@@ -51,6 +53,8 @@ final class StreamsParityTests: XCTestCase {
         }
         // Sanity: the fixture must actually exercise the stream types.
         XCTAssertGreaterThan(s.hr.count, 0)
+        XCTAssertGreaterThan(s.rr.count, 0)
+        XCTAssertEqual(Set(s.rr.compactMap(\.srcChannel)), [.whoopRealtime])
         XCTAssertGreaterThan(s.events.count, 0)
         XCTAssertGreaterThan(s.battery.count, 0)
     }

@@ -14,11 +14,11 @@ data class HrSample(val ts: Int, val bpm: Int)
 /**
  * WHICH sensor channel produced an R-R interval (#1071).
  *
- * A WHOOP strap has ONE beat source, so its rows carry no channel (null) and nothing here changes for
- * them. An Oura ring has more than one: the green-quality tag (0x80) and the SpO2 tag (0x6E) both
- * decode to R-R and both were stored, so the table held roughly TWO complete copies of every night —
- * not duplicate rows to de-duplicate, but the SAME heartbeats measured twice. Labelling the channel is
- * what lets scoring read one copy while both stay on disk as each other's cross-check.
+ * A WHOOP strap exposes the same beat train over multiple TRANSPORTS: standard BLE 0x2A37, WHOOP's
+ * custom realtime packets, and historical type-47 records. They need distinct labels for exactly the
+ * same reason an Oura ring's optical channels do: measurements remain durable, while scoring chooses
+ * one source instead of silently concatenating copies of the night. null remains the honest
+ * legacy/unknown value.
  *
  * [code] is the DURABLE, cross-platform storage value for `rrInterval.srcChannel` and must stay in
  * lockstep with Swift `RRSourceChannel` — it is written to SQLite and crosses the `.noopbak` boundary,
@@ -51,6 +51,25 @@ enum class RrSourceChannel(val code: Int) {
      * Labelling only — both are read exactly as before.
      */
     IBI_BARE(4),
+
+    /**
+     * WHOOP's live, standard Bluetooth Heart Rate Measurement characteristic (0x2A37). Its
+     * receive-time timestamp is normally 1–2 seconds after the matching historical record's embedded
+     * strap unix timestamp.
+     */
+    WHOOP_STANDARD_BLE(5),
+
+    /**
+     * WHOOP historical R-R decoded by [extractHistoricalStreams] (type-47 on 5/MG and the equivalent
+     * historical record path on 4.0). Its timestamp comes from the historical record itself.
+     */
+    WHOOP_HISTORICAL(6),
+
+    /**
+     * WHOOP's proprietary live REALTIME_DATA stream. This is distinct from standard BLE 0x2A37 even
+     * though both may carry the same live beat train; its timestamp is mapped from the strap clock.
+     */
+    WHOOP_REALTIME(7),
     ;
 
     companion object {
@@ -62,9 +81,8 @@ enum class RrSourceChannel(val code: Int) {
 /**
  * A single beat-to-beat R-R interval (ms) at wall-clock unix seconds [ts].
  *
- * [srcChannel] is the sensor channel that measured this beat, or null when the source does not
- * distinguish one (every WHOOP row, and every row written before the column existed). See
- * [RrSourceChannel].
+ * [srcChannel] is the sensor channel/transport that measured this beat, or null when the source is
+ * unknown (including every row written before the column existed). See [RrSourceChannel].
  */
 data class RrInterval(val ts: Int, val rrMs: Int, val srcChannel: RrSourceChannel? = null)
 
@@ -299,7 +317,7 @@ fun extractStreams(parsed: List<ParsedFrame>, deviceClockRef: Int, wallClockRef:
                     p.intOrNull("heart_rate")?.let { bpm -> out.hr.add(HrSample(ts, bpm)) }
                     // Drop RR rows when timestamp is absent (a ts-less RR row is unstorable).
                     p.intArrayOrNull("rr_intervals")?.let { rrs ->
-                        for (rr in rrs) out.rr.add(RrInterval(ts, rr))
+                        for (rr in rrs) out.rr.add(RrInterval(ts, rr, RrSourceChannel.WHOOP_REALTIME))
                     }
                 }
             }

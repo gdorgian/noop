@@ -450,29 +450,40 @@ final class IntelligenceEngine: ObservableObject {
               let respCfg = Baselines.metricCfg["resp"],
               let skinCfg = Baselines.metricCfg["skin_temp"] else { return }
 
+        // Snapshot the SAME registry universe used by per-day owner resolution before evaluating the
+        // score-input watermark. The engine writes computed rows under canonical `deviceId`, but raw for a
+        // remove/re-added strap lands under `whoop-<uuid>` and can win `resolveDayOwner`. Include canonical,
+        // active, and every registry id (a safe superset that also covers a locked day owner); the store
+        // de-duplicates/sorts the scope. Otherwise active-id-only R-R could be skipped as "unchanged".
+        let registry = DeviceRegistryStore(dbQueue: store.registryWriter)
+        let regDevices = (try? registry.all()) ?? []
+        let regActiveId = (try? registry.activeDeviceId()) ?? deviceId
+        let scoringOwnerIds = [deviceId, regActiveId] + regDevices.map(\.id)
+
         // #836 (idle-tick gate): re-scoring a 21-day window re-reads ~21×54 h of raw HR and re-runs
         // analyzeDay over it. After a big Apple Health import (a reporter's: 2.1 M rows, ~190 k HR/day) that
         // is multi-second, memory-heavy work, and the 15-minute steady-state tick (AppModel) repeats it
-        // every tick even when NOTHING new landed — the ongoing lag/crash in #836. A cheap whole-history HR
-        // fingerprint (count+maxTs, indexed, no rows materialized) lets a NON-forced caller short-circuit
-        // when the raw stream is byte-for-byte unchanged since the last successful run. All-or-nothing: it
+        // every tick even when NOTHING new landed — the ongoing lag/crash in #836. A cheap whole-history
+        // score-input fingerprint (indexed HR count/maxTs + a transactional R-R change generation) lets a
+        // NON-forced caller short-circuit when neither raw stream changed since the last successful run. It
+        // does not scan/materialize R-R. All-or-nothing: it
         // never produces a PARTIAL pass, so the window-wide reconciliation (stale-day eviction, detected-
         // workout delete) is untouched and no computed history is dropped. Every real update path (sync
         // backfill, import, sleep/workout edit, baseline recalibrate, timestamp heal) calls with the default
         // `force: true` and always rescores, so a skipped tick can never hide new data.
-        let wmKey: String = (try? await store.hrFingerprint(deviceId: deviceId, from: 0, to: 9_999_999_999))
-            .map { "\($0.count):\($0.maxTs)" } ?? ""
+        let wmKey: String = (try? await store.scoringInputFingerprint(
+            deviceIds: scoringOwnerIds, from: 0, to: 9_999_999_999))?.watermarkKey ?? ""
         if !force, !wmKey.isEmpty,
            UserDefaults.standard.string(forKey: Self.analyzeWatermarkKey) == wmKey {
             return
         }
         // #1196/#1146: a FORCED post-offload pass can opt into the same fingerprint gate. An empty/duplicate
-        // offload (fingerprint already == the watermark the last successful run advanced) has no new HR to
-        // score, so a re-score would reproduce IDENTICAL rows; skip the whole pass rather than churn the
+        // offload (fingerprint already == the watermark the last successful run advanced) has no new HR or
+        // R-R to score, so a re-score would reproduce IDENTICAL rows; skip the whole pass rather than churn the
         // window. Over a flapping-link offload storm that churn made the reactive Trends/streak reads
         // flicker between full and empty — a scare that looked like data loss (#1196). Scoped via
         // `skipIfUnchanged` to the post-offload caller (refreshAfterCompletedBackfill) ONLY, so an
-        // import/edit/settings/recalibrate re-score — which changes scores WITHOUT changing the HR
+        // import/edit/settings/recalibrate re-score — which changes scores WITHOUT changing the raw-input
         // fingerprint — always runs. Twin of the Android WhoopBleClient post-offload `newData` gate.
         if force, skipIfUnchanged, !wmKey.isEmpty,
            UserDefaults.standard.string(forKey: Self.analyzeWatermarkKey) == wmKey {
@@ -561,14 +572,8 @@ final class IntelligenceEngine: ObservableObject {
         var nightlyRespByDay: [String: Double?] = [:]
         var nightlySkinByDay: [String: Double?] = [:]
 
-        // Device-registry snapshot for per-day owner resolution (invariant I2 , a day's scores come from
-        // exactly ONE source). Read once before the loop: the paired-device list + the active id are
-        // stable for the run. With only the seeded 'my-whoop' row paired (the default and every
-        // single-WHOOP install) the active strap is `deviceId`, so `resolveDayOwner` below returns
-        // `deviceId` for every day and the per-day reads are byte-identical to the pre-I2 behaviour.
-        let registry = DeviceRegistryStore(dbQueue: store.registryWriter)
-        let regDevices = (try? registry.all()) ?? []
-        let regActiveId = (try? registry.activeDeviceId()) ?? deviceId
+        // The registry snapshot above is reused for per-day owner resolution (invariant I2: one source per
+        // day). With only seeded `my-whoop`, active and canonical collapse to the legacy single-source path.
 
         // Floor `now` to LOCAL midnight (#277) so each `dayStart` lands on a local-day boundary and the
         // day keys are LOCAL calendar days, consistent with the dashboard's local "today" lookup. A
@@ -1872,16 +1877,16 @@ final class IntelligenceEngine: ObservableObject {
         // Sleep tab stops showing the removed duplicates right away.
         if !dailies.isEmpty || !healDropped.isEmpty { await repo.refresh() }
 
-        // #836: record the raw-HR fingerprint this run scored against, so a later NON-forced tick can
+        // #836: record the HR+R-R input fingerprint this run scored against, so a later NON-forced tick can
         // short-circuit while it's unchanged. Written ONLY here at the end of a completed run (never on an
         // early guard-return), so an interrupted/failed run can't advance the watermark past unscored data.
         if !wmKey.isEmpty { UserDefaults.standard.set(wmKey, forKey: Self.analyzeWatermarkKey) }
         diagnosticSink?("re-score: done — scored \(scoredNights.count) night(s) in \(Int(Date().timeIntervalSince(reScoreStart) * 1000)) ms (#1005)", nil)
     }
 
-    /// UserDefaults key for the #836 idle-tick gate: the `(count:maxTs)` HR fingerprint the last completed
-    /// `analyzeRecent` scored against. A non-forced tick whose current fingerprint equals this skips the
-    /// 21-day rescore; cleared implicitly by any HR insert/delete (the fingerprint moves), so it self-heals.
+    /// UserDefaults key for the #836 idle-tick gate: the indexed-HR + durable-R-R fingerprint the last
+    /// completed `analyzeRecent` scored against. A non-forced tick whose current fingerprint equals this
+    /// skips the 21-day rescore; any actual HR or R-R write moves it, so it self-heals.
     private static let analyzeWatermarkKey = "noop.analyzeWatermark"
 
     /// CAPTURE-B (#814/#799): build the universal `dayOwner …` self-diagnostic line VERBATIM (the Test

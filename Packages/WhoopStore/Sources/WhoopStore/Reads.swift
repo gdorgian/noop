@@ -26,6 +26,63 @@ public struct HRWindowStats: Sendable, Equatable {
     public init(n: Int, avg: Double?, max: Int?) { self.n = n; self.avg = avg; self.max = max }
 }
 
+/// Cheap raw-input watermark for `IntelligenceEngine.analyzeRecent`.
+///
+/// HR alone is insufficient: a completed history offload can add or relabel R-R while its already-live
+/// HR rows all conflict. `rrGeneration` advances transactionally only for an actual R-R insert or the
+/// exact-key 5/7 -> 6 provenance promotion. It makes those changes visible without scanning the large
+/// R-R table on every idle tick, and idempotent replays leave it unchanged.
+public struct ScoringInputFingerprint: Sendable, Equatable {
+    public let deviceIds: [String]
+    public let hrCount: Int
+    public let hrMaxTs: Int
+    public let rrGeneration: Int
+
+    public init(deviceIds: [String], hrCount: Int, hrMaxTs: Int, rrGeneration: Int) {
+        self.deviceIds = Array(Set(deviceIds)).sorted()
+        self.hrCount = hrCount
+        self.hrMaxTs = hrMaxTs
+        self.rrGeneration = rrGeneration
+    }
+
+    /// Stable persisted form. The labels make an old HR-only `count:maxTs` watermark differ once after
+    /// upgrade, intentionally forcing one pass that records the richer input state.
+    public var watermarkKey: String {
+        let scope = deviceIds.map { "\($0.utf8.count):\($0)" }.joined()
+        return "ids:\(scope)|h:\(hrCount):\(hrMaxTs)|rrGen:\(rrGeneration)"
+    }
+}
+
+/// Chooses WHOOP's historical beat transport over its live copies where they locally overlap.
+/// Pure so the boundary policy is pinned without involving SQLite; `rrIntervals` applies the same
+/// predicate in SQL before `LIMIT`, then runs this once more defensively on the decoded rows.
+enum RRScoringTransportSelector {
+    /// Paired captures put every 0x2A37 receive timestamp exactly 1 or 2 seconds AFTER the matching
+    /// v18 embedded unix (14,322/14,322 pairs). Expanding both ends by two seconds prevents the final
+    /// receive-time copy from leaking just beyond an observed historical second; custom REALTIME_DATA is
+    /// strap-clock mapped and falls within the same bound. Symmetry tolerates boundary rounding too. This
+    /// is transport alignment, not per-beat/value de-duplication.
+    static let historyBoundaryToleranceSec = 2
+
+    static func select(_ rows: [RRInterval]) -> [RRInterval] {
+        let historicalTimes = Set(rows.lazy
+            .filter { $0.srcChannel == .whoopHistorical }
+            .map(\.ts))
+        guard !historicalTimes.isEmpty else {
+            // No tagged history in this read: WHOOP's live transports are the fallback. Oura and legacy
+            // nil rows also pass through exactly as they did before transport provenance existed.
+            return rows
+        }
+        return rows.filter { row in
+            guard row.srcChannel == .whoopStandardBLE || row.srcChannel == .whoopRealtime else {
+                return true
+            }
+            return !(-historyBoundaryToleranceSec...historyBoundaryToleranceSec)
+                .contains { historicalTimes.contains(row.ts + $0) }
+        }
+    }
+}
+
 extension WhoopStore {
     /// Shared decoder, JSONDecoder is stateless across decodes and was previously allocated once
     /// per event row. Battery events are dense (~every 8 min), so a multi-year read decodes
@@ -77,6 +134,45 @@ extension WhoopStore {
             let c: Int = row["c"]
             let m: Int = row["m"]
             return (c, m)
+        }
+    }
+
+    /// Raw HR + R-R change detector for score-cache invalidation. The HR half retains the indexed
+    /// aggregate; the R-R half is a single cursor lookup, not a scan. StreamStore advances that durable
+    /// generation for inserts and source promotions, including a history row that changes which transport
+    /// scoring sees without changing the R-R key.
+    public func scoringInputFingerprint(deviceId: String, from: Int, to: Int) async throws
+        -> ScoringInputFingerprint {
+        try await scoringInputFingerprint(deviceIds: [deviceId], from: from, to: to)
+    }
+
+    /// Multi-owner form used by `IntelligenceEngine`: per-day scoring can resolve to the canonical id,
+    /// the registry's active re-added strap id, or another registered owner. Folding the indexed aggregate
+    /// and per-device generations across the SAME candidate set prevents an active-id-only R-R offload from
+    /// looking unchanged merely because the engine's computed-write id remains canonical.
+    public func scoringInputFingerprint(deviceIds: [String], from: Int, to: Int) async throws
+        -> ScoringInputFingerprint {
+        let ids = Array(Set(deviceIds)).sorted()
+        return try syncRead { db in
+            var hrCount = 0
+            var hrMaxTs = 0
+            var rrGeneration = 0
+            for id in ids {
+                if let row = try Row.fetchOne(db, sql: """
+                    SELECT COUNT(*) AS hc, COALESCE(MAX(ts), 0) AS hm FROM hrSample
+                    WHERE deviceId = ? AND ts >= ? AND ts <= ?
+                    """, arguments: [id, from, to]) {
+                    let count: Int = row["hc"]
+                    let maxTs: Int = row["hm"]
+                    hrCount += count
+                    hrMaxTs = max(hrMaxTs, maxTs)
+                }
+                rrGeneration += try Int.fetchOne(db,
+                    sql: "SELECT value FROM cursors WHERE name = ?",
+                    arguments: [WhoopStore.rrScoringGenerationCursor(deviceId: id)]) ?? 0
+            }
+            return ScoringInputFingerprint(deviceIds: ids, hrCount: hrCount, hrMaxTs: hrMaxTs,
+                                           rrGeneration: rrGeneration)
         }
     }
 
@@ -181,8 +277,8 @@ extension WhoopStore {
     ///
     /// The predicate EXCLUDES the one channel proven redundant (`spo2Ibi`, 0x6E) rather than whitelisting
     /// the one preferred (`greenQuality`, 0x80), which matters for what it does NOT drop:
-    ///   - NULL is kept. Every WHOOP row is NULL by construction (one beat source), as is every row
-    ///     written before v32. A whitelist would delete every WHOOP night from scoring.
+    ///   - NULL is kept. It represents every row written before provenance was added, plus any source
+    ///     whose transport is genuinely unknown. A whitelist would delete that history from scoring.
     ///   - `ibiAmplitude` (0x60/0x44) is kept. It does not fire on the Gen-3 hardware this was measured
     ///     on, so there is no evidence it duplicates green — and dropping a ring's ONLY beat source on an
     ///     untested assumption is the more expensive mistake. If a capture ever shows 0x60 and 0x80 firing
@@ -191,22 +287,44 @@ extension WhoopStore {
     /// two: it is quantised to an 8 ms grid, applies no quality gate, and runs only while an SpO2
     /// measurement is on — so scoring off it would make HRV coverage a function of the SpO2 duty cycle.
     ///
-    /// Rows are FILTERED, never deleted: the 0x6E stream stays on disk as the cross-check on green.
+    /// WHOOP TRANSPORT selection is local coverage, not beat-value de-duplication. A historical row wins
+    /// over either tagged live transport within +/- the observed 2 s receive skew. Live rows with no nearby
+    /// history survive, including internal offload gaps as well as the periods before/after banked history.
+    /// Oura channels and legacy NULL rows are unchanged.
+    ///
+    /// Rows are FILTERED, never deleted: excluded streams stay on disk as a cross-check.
     /// Every R-R consumer reads through this one function, so the `hrv diag` trace moves with the scores
     /// rather than reporting a coverage nobody can reproduce.
     public func rrIntervals(deviceId: String, from: Int, to: Int, limit: Int) async throws -> [RRInterval] {
         try syncRead { db in
-            try Row.fetchAll(db, sql: """
-                SELECT ts, rrMs, srcChannel FROM rrInterval
-                WHERE deviceId = ? AND ts >= ? AND ts <= ?
-                AND (srcChannel IS NULL OR srcChannel <> ?)
-                AND (tsSuspect IS NULL OR tsSuspect <> 1)   -- #1073: exclude future-stamped beats
-                ORDER BY ts ASC, ord ASC, rrMs ASC, seq ASC LIMIT ?
-                """, arguments: [deviceId, from, to, RRSourceChannel.spo2Ibi.rawValue, limit])
+            // Suppress a WHOOP live row only when this same snapshot contains local history evidence,
+            // BEFORE LIMIT. A broad MIN...MAX envelope would erase valid live fallback across an internal
+            // history gap; fetch-then-filter would let discarded copies consume the limit.
+            let tolerance = RRScoringTransportSelector.historyBoundaryToleranceSec
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT r.ts, r.rrMs, r.srcChannel FROM rrInterval r
+                WHERE r.deviceId = ? AND r.ts >= ? AND r.ts <= ?
+                  AND (r.srcChannel IS NULL OR r.srcChannel <> ?)
+                  AND (r.tsSuspect IS NULL OR r.tsSuspect <> 1) -- #1073: future-stamped beats
+                  AND (r.srcChannel IS NULL
+                       OR r.srcChannel NOT IN (?, ?)
+                       OR NOT EXISTS (
+                           SELECT 1 FROM rrInterval h
+                           WHERE h.deviceId = r.deviceId AND h.srcChannel = ?
+                             AND h.ts BETWEEN r.ts - ? AND r.ts + ?
+                             AND (h.tsSuspect IS NULL OR h.tsSuspect <> 1)
+                       ))
+                ORDER BY r.ts ASC, r.ord ASC, r.rrMs ASC, r.seq ASC LIMIT ?
+                """, arguments: [deviceId, from, to, RRSourceChannel.spo2Ibi.rawValue,
+                                  RRSourceChannel.whoopStandardBLE.rawValue,
+                                  RRSourceChannel.whoopRealtime.rawValue,
+                                  RRSourceChannel.whoopHistorical.rawValue,
+                                  tolerance, tolerance, limit])
                 .map { row in
                     RRInterval(ts: row["ts"], rrMs: row["rrMs"],
                                srcChannel: (row["srcChannel"] as Int?).flatMap(RRSourceChannel.init(rawValue:)))
                 }
+            return RRScoringTransportSelector.select(rows)
         }
     }
 

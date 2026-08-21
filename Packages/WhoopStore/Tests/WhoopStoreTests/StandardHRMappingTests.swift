@@ -29,4 +29,16 @@ final class StandardHRMappingTests: XCTestCase {
         XCTAssertTrue(s.events.isEmpty)
         XCTAssertTrue(s.battery.isEmpty)
     }
+
+    func testWhoopStandardTransportSourcePropagatesToEveryRR() {
+        let rr = StandardHRMapping.rrSamples(
+            [820, 815], at: 1_750_000_000, source: .whoopStandardBLE)
+        XCTAssertEqual(rr.map(\.rrMs), [820, 815])
+        XCTAssertEqual(rr.map(\.ts), [1_750_000_000, 1_750_000_000])
+        XCTAssertEqual(rr.map(\.srcChannel), [.whoopStandardBLE, .whoopStandardBLE])
+
+        // Generic standard-HR sources remain unlabelled; only WHOOP's Collector opts into this code.
+        XCTAssertEqual(StandardHRMapping.samples(fromHR: 72, rr: [820], at: 42)
+            .rr.map(\.srcChannel), [nil])
+    }
 }

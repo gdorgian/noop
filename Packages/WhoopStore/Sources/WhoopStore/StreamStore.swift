@@ -172,7 +172,11 @@ extension WhoopStore {
                 let stmt = try db.cachedStatement(sql: """
                     INSERT INTO rrInterval (deviceId, ts, rrMs, seq, ord, srcChannel)
                     VALUES (?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(deviceId, ts, rrMs, seq) DO NOTHING
+                    ON CONFLICT(deviceId, ts, rrMs, seq) DO UPDATE SET
+                        srcChannel = excluded.srcChannel,
+                        ord = excluded.ord
+                    WHERE rrInterval.srcChannel IN (?, ?)
+                      AND excluded.srcChannel = ?
                     """)
                 // v24 (#163): number EQUAL (ts, rrMs) beats 0, 1, … within this batch so both survive;
                 // distinct beats keep seq 0 and their own (ts, rrMs, 0) key, so a distinct beat is never
@@ -187,14 +191,15 @@ extension WhoopStore {
                 // DO NOTHING keeps the first row. The historical path delivers a second atomically.
                 // Twin of Kotlin assignRrSeq.
                 //
-                // v32 (#1071): `srcChannel` is the sensor channel that measured the beat, carried from the
-                // decoder that produced it. NULL for every WHOOP row (one beat source — there is no channel
-                // to name, and that is honest rather than a placeholder) and for any source that does not
-                // report one. Like `ord` it is OUTSIDE the key: two channels measuring the same beat can
-                // yield the same (ts, rrMs), and keying on the label would store both — which is precisely
-                // the double-count this fixes. `DO NOTHING` therefore keeps whichever arrived first and the
-                // second channel's copy of THAT exact beat is dropped at insert; the read filter is what
-                // separates the streams in general.
+                // v32 (#1071): `srcChannel` is the sensor channel/transport that produced the beat. NULL
+                // remains the honest value for legacy or unknown provenance; new WHOOP rows distinguish
+                // standard BLE/custom realtime from history. Like `ord` it is OUTSIDE the key: two sources
+                // measuring the same beat can yield the same (ts, rrMs), and keying on the label would store
+                // both — which is precisely the double-count this fixes. Usually their timestamps differ by
+                // 1-2 s and both stay durable. On an exact key collision, however, history must not be lost
+                // merely because live arrived first: the narrow UPSERT above promotes only WHOOP live 5/7
+                // to historical 6 and adopts historical emission order. Every other conflict (including
+                // Oura, legacy NULL, history-first, and an idempotent replay) remains DO NOTHING.
                 var seqByTsRr: [Int: [Int: Int]] = [:]
                 var ordByTs: [Int: Int] = [:]
                 for r in streams.rr {
@@ -203,8 +208,20 @@ extension WhoopStore {
                     let ord = ordByTs[r.ts] ?? 0
                     ordByTs[r.ts] = ord + 1
                     try stmt.execute(arguments: [deviceId, r.ts, r.rrMs, seq, ord,
-                                                 r.srcChannel?.rawValue])
+                                                 r.srcChannel?.rawValue,
+                                                 RRSourceChannel.whoopStandardBLE.rawValue,
+                                                 RRSourceChannel.whoopRealtime.rawValue,
+                                                 RRSourceChannel.whoopHistorical.rawValue])
                     rr += db.changesCount
+                }
+                if rr > 0 {
+                    // Durable score-cache invalidation, in the SAME transaction as the rows. Increment
+                    // once per changed batch (not per beat): the watermark only needs to distinguish this
+                    // store state from the last successfully-scored one. Idempotent conflicts leave rr=0.
+                    try db.execute(sql: """
+                        INSERT INTO cursors (name, value) VALUES (?, 1)
+                        ON CONFLICT(name) DO UPDATE SET value = value + 1
+                        """, arguments: [WhoopStore.rrScoringGenerationCursor(deviceId: deviceId)])
                 }
             }
             if !streams.events.isEmpty {

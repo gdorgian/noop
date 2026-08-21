@@ -229,6 +229,11 @@ object NoopPrefs {
     const val KEY_HR_BROADCAST = "noop.hrBroadcast"
 
     const val KEY_ANALYZE_WATERMARK = "noop.analyzeWatermark"
+    /** Durable invalidation for scoring-input changes the HR-only watermark cannot see (R-R insert or
+     *  live→historical provenance promotion). Two generations avoid clearing a newer mutation when it
+     *  lands during an in-flight analyzeRecent pass. */
+    const val KEY_RR_SCORING_REVISION = "noop.rrScoringRevision"
+    const val KEY_RR_ANALYZED_REVISION = "noop.rrAnalyzedRevision"
 
     /** "Power saving" (#477): when on, NOOP stretches its periodic strap-sync cadence (15 → 45 min) while
      *  the STRAP is discharging at/below [KEY_POWER_SAVING_BATTERY_PCT].
@@ -364,6 +369,26 @@ object NoopPrefs {
 
     fun setAnalyzeWatermark(context: Context, fingerprint: String) {
         of(context).edit().putString(KEY_ANALYZE_WATERMARK, fingerprint).apply()
+    }
+
+    fun rrScoringRevision(context: Context): Long =
+        of(context).getLong(KEY_RR_SCORING_REVISION, 0L)
+
+    fun rrAnalyzedRevision(context: Context): Long =
+        of(context).getLong(KEY_RR_ANALYZED_REVISION, 0L)
+
+    /** Mark a committed R-R scoring-input change synchronously so it survives a process death. */
+    @Synchronized
+    fun markRrScoringChanged(context: Context): Long {
+        val prefs = of(context)
+        val next = prefs.getLong(KEY_RR_SCORING_REVISION, 0L) + 1L
+        prefs.edit().putLong(KEY_RR_SCORING_REVISION, next).commit()
+        return next
+    }
+
+    /** Advance only to the revision captured BEFORE a successful pass; a concurrent newer revision stays pending. */
+    fun setRrAnalyzedRevision(context: Context, revision: Long) {
+        of(context).edit().putLong(KEY_RR_ANALYZED_REVISION, revision).apply()
     }
 
     /** Whether NOOP should hold the strap connection open via a foreground service. Default true. */

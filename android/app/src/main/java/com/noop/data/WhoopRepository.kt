@@ -193,10 +193,48 @@ data class DynAccelDiag(
 data class HrRow(val ts: Long, val bpm: Int)
 
 /**
- * One decoded R-R beat awaiting insert. [srcChannel] is the sensor channel that measured it (#1071),
- * null for a source that does not distinguish one (every WHOOP row). Swift `RRInterval`.
+ * One decoded R-R beat awaiting insert. [srcChannel] is the sensor channel/transport that measured it
+ * (#1071), null only when the source is unknown or legacy. Swift `RRInterval`.
  */
 data class RrRow(val ts: Long, val rrMs: Int, val srcChannel: RrSourceChannel? = null)
+
+/**
+ * Chooses WHOOP's historical beat transport over its tagged live copies where they overlap locally.
+ * Pure so boundary behaviour is pinned without Room; [WhoopDao.rrIntervals] applies the same predicate
+ * in SQL before LIMIT, and [WhoopRepository.rrIntervals] runs it once more defensively on decoded rows.
+ */
+internal object RrScoringTransportSelector {
+    /**
+     * Paired captures put every 0x2A37 receive timestamp exactly 1 or 2 seconds AFTER the matching v18
+     * embedded unix. A live row is suppressed only when history exists within this local radius; a gap
+     * inside a long offload range therefore keeps live data instead of treating MIN..MAX as full coverage.
+     */
+    const val HISTORY_LOCAL_TOLERANCE_SEC: Long = 2L
+
+    fun select(rows: List<RrInterval>): List<RrInterval> {
+        val historyTimes = rows.asSequence()
+            .filter { it.srcChannel == RrSourceChannel.WHOOP_HISTORICAL.code }
+            .map { it.ts }
+            .distinct()
+            .sorted()
+            .toList()
+        if (historyTimes.isEmpty()) return rows
+
+        fun overlapsHistory(ts: Long): Boolean {
+            val lo = ts - HISTORY_LOCAL_TOLERANCE_SEC
+            val hi = ts + HISTORY_LOCAL_TOLERANCE_SEC
+            val found = historyTimes.binarySearch(lo)
+            val firstAtOrAfterLo = if (found >= 0) found else -found - 1
+            return firstAtOrAfterLo < historyTimes.size && historyTimes[firstAtOrAfterLo] <= hi
+        }
+
+        return rows.filter { row ->
+            val isWhoopLive = row.srcChannel == RrSourceChannel.WHOOP_STANDARD_BLE.code ||
+                row.srcChannel == RrSourceChannel.WHOOP_REALTIME.code
+            !isWhoopLive || !overlapsHistory(row.ts)
+        }
+    }
+}
 
 /**
  * Attach a tiebreaker `seq` to each R-R interval before insert (Room v18). Multiple beats share one
@@ -221,11 +259,11 @@ data class RrRow(val ts: Long, val rrMs: Int, val srcChannel: RrSourceChannel? =
  * and ON CONFLICT DO NOTHING keeps whichever row landed first. The historical path delivers a second
  * atomically, so the authoritative copy is correctly ordered.
  *
- * And carries `srcChannel` (Room v26, #1071): the sensor channel that measured the beat, as reported by
- * the decoder that produced it. NULL for every WHOOP row (one beat source — there is no channel to name,
- * and that is honest rather than a placeholder). Like `ord` it is OUTSIDE the key: two channels measuring
- * the same beat can yield the same (ts, rrMs), and keying on the label would store both — which is
- * precisely the double-count this fixes. Twin of the Swift StreamStore insert.
+ * And carries `srcChannel` (Room v26, #1071): the sensor channel/transport that measured the beat, as
+ * reported by the decoder that produced it. NULL remains the honest legacy/unknown value. Like `ord` it
+ * is OUTSIDE the key: two sources carrying the same beat can yield the same (ts, rrMs), and keying on the
+ * label would store both under distinct keys — precisely the double-count the scoring read avoids. Twin
+ * of the Swift StreamStore insert.
  */
 internal fun assignRrSeq(deviceId: String, rows: List<RrRow>): List<RrInterval> {
     val seqByBeat = HashMap<Pair<Long, Int>, Int>()
@@ -305,6 +343,8 @@ data class PpgWaveformRow(val ts: Long, val samples: List<Int>)
 data class InsertCounts(
     val hr: Int = 0,
     val rr: Int = 0,
+    /** Existing exact-key WHOOP live rows relabelled to historical; not a newly-inserted row. */
+    val rrPromoted: Int = 0,
     val events: Int = 0,
     val battery: Int = 0,
     val spo2: Int = 0,
@@ -453,8 +493,22 @@ class WhoopRepository(
     ): InsertCounts {
         val hrIds = if (streams.hr.isEmpty()) emptyList() else
             dao.insertHr(streams.hr.map { HrSample(deviceId, it.ts, it.bpm) })
-        val rrIds = if (streams.rr.isEmpty()) emptyList() else
-            dao.insertRr(assignRrSeq(deviceId, streams.rr))
+        val rrRows = if (streams.rr.isEmpty()) emptyList() else assignRrSeq(deviceId, streams.rr)
+        val rrIds = if (rrRows.isEmpty()) emptyList() else dao.insertRr(rrRows)
+        // `srcChannel` is intentionally outside the PK. If a tagged live copy won an exact-key race,
+        // the history insert above is ignored; promote that one surviving row so local read suppression
+        // cannot drop it as live while its historical twin is absent. Same transaction, no delete/PK edit.
+        var rrPromoted = 0
+        for (row in rrRows) {
+            if (row.srcChannel != RrSourceChannel.WHOOP_HISTORICAL.code) continue
+            rrPromoted += dao.promoteLiveRrCollisionToHistorical(
+                deviceId = row.deviceId,
+                ts = row.ts,
+                rrMs = row.rrMs,
+                seq = row.seq,
+                ord = row.ord,
+            )
+        }
         val evIds = if (streams.events.isEmpty()) emptyList() else
             dao.insertEvents(streams.events.map { EventRow(deviceId, it.ts, it.kind, it.payloadJSON) })
         val batIds = if (streams.battery.isEmpty()) emptyList() else
@@ -543,6 +597,7 @@ class WhoopRepository(
         return InsertCounts(
             hr = hrIds.countInserted() + ppgHrIds.countInserted(),
             rr = rrIds.countInserted(),
+            rrPromoted = rrPromoted,
             events = evIds.countInserted(),
             battery = batIds.countInserted(),
             spo2 = spo2Ids.countInserted(),
@@ -1034,8 +1089,13 @@ class WhoopRepository(
         }
     }
 
-    suspend fun rrIntervals(deviceId: String, from: Long, to: Long, limit: Int = DEFAULT_LIMIT) =
-        dao.rrIntervals(deviceId, from, to, limit)
+    suspend fun rrIntervals(
+        deviceId: String,
+        from: Long,
+        to: Long,
+        limit: Int = DEFAULT_LIMIT,
+    ): List<RrInterval> =
+        RrScoringTransportSelector.select(dao.rrIntervals(deviceId, from, to, limit))
 
     suspend fun events(deviceId: String, from: Long, to: Long, limit: Int = DEFAULT_LIMIT) =
         dao.events(deviceId, from, to, limit)

@@ -18,7 +18,8 @@ class Whoop5HistoricalDecodeTest {
     private fun bytes(s: String): ByteArray =
         s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
-    // Real worn WHOOP 5 v18 frame: hr=102, rr=[602,613] ms, |gravity|≈1, skin temp 30.57 °C.
+    // Real worn WHOOP 5 v18 frame: hr=102, raw R-R ticks=[602,613] -> [588,599] ms,
+    // |gravity|≈1, skin temp 30.57 °C.
     private val wornV18 =
         "aa01740001003fb12f1280733d8401b69f266a66460066025a0265020000000000007b0a8d656463ff0012163cf6a439bf2924fd3ed763fe3e3200aa000000000000000000f7000901f10b0007010c020c00000000000000000000000000000000000000000000000100656f1e1e0000009d61a7c00000003e862817"
 
@@ -35,7 +36,7 @@ class Whoop5HistoricalDecodeTest {
         assertEquals(1780916150, p["unix"])
         assertEquals(102, p["heart_rate"])
         assertEquals(2, p["rr_count"])
-        assertEquals(listOf(602, 613), p["rr_intervals"])
+        assertEquals(listOf(588, 599), p["rr_intervals"])
 
         val gx = p["gravity_x"] as Double
         val gy = p["gravity_y"] as Double
@@ -50,6 +51,33 @@ class Whoop5HistoricalDecodeTest {
         // @63 also reads as the activity-class enum (#316): this worn-still frame's byte is 0 => still.
         assertEquals(0, p["activity_class"])
         assertTrue((p["dynamic_acceleration"] as Double) in 0.0..8.0)
+    }
+
+    @Test
+    fun realV18FixtureConverts1024HzTicksAndTagsHistoricalTransport() {
+        val frame = bytes(wornV18)
+        fun rawU16(off: Int) =
+            (frame[off].toInt() and 0xFF) or ((frame[off + 1].toInt() and 0xFF) shl 8)
+
+        // Pin what the capture actually contains before conversion. Treating these integers as ms was
+        // the bug; 60000 / mean(602, 613) cannot match the frame's measured 102 bpm.
+        assertEquals(listOf(602, 613), listOf(rawU16(24), rawU16(26)))
+        assertEquals(
+            listOf((602 * 1_000 + 512) / 1_024, (613 * 1_000 + 512) / 1_024),
+            decodeHistorical(frame, DeviceFamily.WHOOP5)!!["rr_intervals"],
+        )
+
+        val streams = extractHistoricalStreams(
+            listOf(frame),
+            deviceClockRef = 1780916150,
+            wallClockRef = 1780916150,
+            family = DeviceFamily.WHOOP5,
+        )
+        assertEquals(listOf(588, 599), streams.rr.map { it.rrMs })
+        assertEquals(
+            listOf(RrSourceChannel.WHOOP_HISTORICAL, RrSourceChannel.WHOOP_HISTORICAL),
+            streams.rr.map { it.srcChannel },
+        )
     }
 
     /** Mutate one absolute frame byte and re-stamp the CRC32 (over frame[8..len-4]) so it passes the gate. */

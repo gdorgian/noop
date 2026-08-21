@@ -2,6 +2,13 @@ import Foundation
 import GRDB
 
 extension WhoopStore {
+    /// Per-device generation used by the score-input watermark. StreamStore increments it in the SAME
+    /// transaction as any real R-R insert or live->historical provenance promotion. A generation avoids
+    /// the race a clearable dirty bit has when a new beat lands between analysis and flag clearing.
+    static func rrScoringGenerationCursor(deviceId: String) -> String {
+        "analysis:rrGeneration:" + deviceId
+    }
+
     public func setCursor(_ name: String, _ value: Int) async throws {
         try syncWrite { db in
             try db.execute(sql: """

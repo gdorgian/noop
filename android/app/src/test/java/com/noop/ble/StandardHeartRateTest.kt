@@ -1,5 +1,6 @@
 package com.noop.ble
 
+import com.noop.protocol.RrSourceChannel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -55,6 +56,22 @@ class StandardHeartRateTest {
         val r = StandardHeartRate.parse(bytes(0x18, 65, 0xFF, 0x00, 0x00, 0x04))!!
         assertEquals(65, r.hr)
         assertEquals(listOf(1000), r.rr)
+    }
+
+    @Test
+    fun whoopPersistenceLabelsStandardBleTransport() {
+        // Same two raw tick values held in the real historical v18 fixture. The standard parser and the
+        // v18 decoder must land on identical rounded milliseconds, but with different durable transport
+        // labels so the scoring read can prefer history over this receive-time copy.
+        val reading = StandardHeartRate.parse(bytes(0x10, 102, 0x5A, 0x02, 0x65, 0x02))!!
+        assertEquals(listOf(588, 599), reading.rr)
+
+        val rows = whoopStandardRrRows(1_780_916_152L, listOf(200) + reading.rr + 3_001)
+        assertEquals(listOf(588, 599), rows.map { it.rrMs })
+        assertEquals(
+            listOf(RrSourceChannel.WHOOP_STANDARD_BLE, RrSourceChannel.WHOOP_STANDARD_BLE),
+            rows.map { it.srcChannel },
+        )
     }
 
     @Test

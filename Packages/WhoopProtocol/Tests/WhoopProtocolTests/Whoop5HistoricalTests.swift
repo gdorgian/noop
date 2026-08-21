@@ -26,7 +26,7 @@ final class Whoop5HistoricalTests: XCTestCase {
     }
 
     /// A real type-47 HISTORICAL_DATA v18 frame (worn WHOOP 5, captured 2026-06-08):
-    /// unix=1780916150, hr=102, rr=[602,613] ms, |gravity| ≈ 1.0 g.
+    /// unix=1780916150, hr=102, raw rr=[602,613] ticks (1/1024 s), |gravity| ≈ 1.0 g.
     private let historicalHex =
         "aa01740001003fb12f1280733d8401b69f266a66460066025a0265020000000000007b0a8d656463ff0012163cf6a439bf2924fd3ed763fe3e3200aa000000000000000000f7000901f10b0007010c020c00000000000000000000000000000000000000000000000100656f1e1e0000009d61a7c00000003e862817"
 
@@ -42,7 +42,11 @@ final class Whoop5HistoricalTests: XCTestCase {
         XCTAssertEqual(f.parsed["unix"]?.intValue, 1780916150)
         XCTAssertEqual(f.parsed["heart_rate"]?.intValue, 102)
         XCTAssertEqual(f.parsed["rr_count"]?.intValue, 2)
-        XCTAssertEqual(f.parsed["rr_intervals"]?.intArrayValue, [602, 613])
+        // The fixture bytes are 602/613 ticks. Decode owns the unit conversion and exposes rounded
+        // milliseconds to every downstream/store consumer: 587.89 -> 588, 598.63 -> 599.
+        XCTAssertEqual(Int(bytes(historicalHex)[24]) | Int(bytes(historicalHex)[25]) << 8, 602)
+        XCTAssertEqual(Int(bytes(historicalHex)[26]) | Int(bytes(historicalHex)[27]) << 8, 613)
+        XCTAssertEqual(f.parsed["rr_intervals"]?.intArrayValue, [588, 599])
 
         // Gravity triplet (f32) at 45/49/53 — magnitude ≈ 1 g.
         let gx = f.parsed["gravity_x"]?.doubleValue ?? 0
@@ -51,7 +55,7 @@ final class Whoop5HistoricalTests: XCTestCase {
         XCTAssertEqual((gx * gx + gy * gy + gz * gz).squareRoot(), 1.0, accuracy: 0.05)
 
         // R-R is internally consistent with the heart rate (60000 / mean(R-R) ≈ bpm).
-        let meanRR = Double(602 + 613) / 2.0
+        let meanRR = Double(588 + 599) / 2.0
         XCTAssertEqual(60000.0 / meanRR, 102, accuracy: 8)
     }
 
@@ -377,11 +381,12 @@ final class Whoop5HistoricalTests: XCTestCase {
         let s = extractHistoricalStreams([f], deviceClockRef: 0, wallClockRef: 0)
         XCTAssertEqual(s.hr.map { $0.bpm }, [102])
         XCTAssertEqual(s.hr.first?.ts, 1780916150)          // real unix, no wall-clock offset
-        XCTAssertEqual(s.rr.map { $0.rrMs }, [602, 613])
+        XCTAssertEqual(s.rr.map { $0.rrMs }, [588, 599])
+        XCTAssertEqual(s.rr.map { $0.srcChannel }, [.whoopHistorical, .whoopHistorical])
         XCTAssertEqual(s.gravity.count, 1)
     }
 
-    /// A real single-R-R v18 frame (same strap): unix=1780916152, hr=101, rr=[595] ms.
+    /// A real single-R-R v18 frame (same strap): unix=1780916152, hr=101, raw rr=595 ticks.
     private let historicalOneRRHex =
         "aa01740001003fb12f1280753d8401b89f266a664600650153020000000000000000f8018d656365ff80702f3c7b7039bf71f5fd3e142a003f3200aa000000000000000000f7000901f30b0007010c020c0000000000000000000000000000000000000000000000010066701f1e0000005e77a8c00000001194fc6a"
 
@@ -390,7 +395,8 @@ final class Whoop5HistoricalTests: XCTestCase {
         let f = parseFrame(bytes(historicalOneRRHex), family: .whoop5)
         XCTAssertEqual(f.parsed["heart_rate"]?.intValue, 101)
         XCTAssertEqual(f.parsed["rr_count"]?.intValue, 1)
-        XCTAssertEqual(f.parsed["rr_intervals"]?.intArrayValue, [595])
+        // 595 * 1000 / 1024 = 581.05 ms -> 581. This second real record pins the one-RR path too.
+        XCTAssertEqual(f.parsed["rr_intervals"]?.intArrayValue, [581])
     }
 
     /// A real off-wrist v18 frame (HR=0): the strap still emits a record with no biometric reading.

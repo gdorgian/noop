@@ -50,6 +50,7 @@ import com.noop.protocol.FeatureFlagProbeReport
 import com.noop.protocol.Framing
 import com.noop.protocol.HapticClock
 import com.noop.protocol.Reassembler
+import com.noop.protocol.RrSourceChannel
 import com.noop.protocol.Whoop5Variant
 import com.noop.protocol.RebootProbeVariant
 import com.noop.protocol.Streams
@@ -64,6 +65,7 @@ import com.noop.analytics.NapDetector
 import com.noop.analytics.NapPrefs
 import com.noop.analytics.NapVerdict
 import com.noop.analytics.SedentaryDetector
+import com.noop.analytics.ScoringInvalidation
 import com.noop.analytics.StressOnsetDetector
 import com.noop.analytics.UserProfile
 import com.noop.analytics.WorkoutDetector
@@ -91,6 +93,14 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * Build the durable R-R rows for WHOOP's standard 0x2A37 transport. Kept pure so provenance and the
+ * physiological guard are testable without constructing an Android Bluetooth stack.
+ */
+internal fun whoopStandardRrRows(ts: Long, rr: List<Int>): List<RrRow> =
+    rr.filter { it in 250..3000 }
+        .map { RrRow(ts, it, RrSourceChannel.WHOOP_STANDARD_BLE) }
 
 /**
  * Immutable snapshot of the live connection + biometric state.
@@ -2200,7 +2210,7 @@ class WhoopBleClient(
         deviceId = deviceId,
         cursorStore = cursorStore,
         ackTrim = { trim, endData -> ackHistoricalChunk(trim, endData) },
-        onChunkCommitted = { batch -> onBackfillChunkCommitted(batch) },
+        onChunkCommitted = { batch, counts -> onBackfillChunkCommitted(batch, counts) },
         onConsoleChunk = { consoleChunksThisSession += 1 },
         // #77/#91: archive undecodable frames before the ack. append() returns ok=true (written, or
         // archive-full → still safe to ack) and THROWS only on a genuine write failure → return false
@@ -2236,8 +2246,12 @@ class WhoopBleClient(
      * foreground service alive). Mirrors the AppViewModel loop's profile + writeback behaviour. (#78 fork)
      */
     @Suppress("UNUSED_PARAMETER")
-    private fun onBackfillChunkCommitted(batch: StreamBatch) {
+    private fun onBackfillChunkCommitted(batch: StreamBatch, counts: com.noop.data.InsertCounts) {
         decodedChunksThisSession += 1   // invoked once per non-empty decoded chunk (#77 family tally)
+        // The post-offload skip watermark historically watched HR only. An R-R-only insert — or an
+        // exact-key live→historical provenance promotion — changes HRV/respiration inputs without moving
+        // that fingerprint, so persist a separate invalidation bit until a scoring pass succeeds.
+        if (counts.rr > 0 || counts.rrPromoted > 0) NoopPrefs.markRrScoringChanged(context)
         if (!analyzeAfterBackfillScheduled.compareAndSet(false, true)) return
         ioScope.launch {
             try {
@@ -2275,7 +2289,13 @@ class WhoopBleClient(
                 // data loss (#1196). Scoped to THIS post-offload trigger only: import/edit/settings/
                 // recalibrate re-scores force regardless of the HR fingerprint and are untouched. Twin of
                 // the Swift `analyzeRecent(skipIfUnchanged:)` gate at the refreshAfterCompletedBackfill site.
-                val newData = analyzeFp != NoopPrefs.analyzeWatermark(context)
+                val rrRevision = NoopPrefs.rrScoringRevision(context)
+                val newData = ScoringInvalidation.needsRun(
+                    hrFingerprint = analyzeFp,
+                    analyzedHrFingerprint = NoopPrefs.analyzeWatermark(context),
+                    rrRevision = rrRevision,
+                    analyzedRrRevision = NoopPrefs.rrAnalyzedRevision(context),
+                )
                 log("re-score: trigger=post-offload newData=" +
                     if (newData) "yes"
                     else "no (empty/duplicate offload — nothing changed since last run) — skipping (#1146)")
@@ -2356,6 +2376,7 @@ class WhoopBleClient(
                 }.onSuccess {
                     // Advance the shared watermark so the next 15-min tick sees no change and skips (#836).
                     NoopPrefs.setAnalyzeWatermark(context, analyzeFp)
+                    NoopPrefs.setRrAnalyzedRevision(context, rrRevision)
                     log("Backfill: post-sync scoring pass done")
                     // #277 diagnostic: surface the day-key the dashboard treats as "today" against the
                     // newest banked row, so a UTC-bucket vs local-day split (rows persist but Today
@@ -6935,7 +6956,9 @@ class WhoopBleClient(
     private fun ingestStandardHr(hr: Int, rr: List<Int>, ts: Long) {
         val shouldFlush = synchronized(collectorLock) {
             if (hr in 30..220) stdHr.add(HrRow(ts, hr))
-            for (r in rr) if (r in 250..3000) stdRr.add(RrRow(ts, r))
+            // WHOOP replays this beat train in its historical records. Preserve both transports, but
+            // label the receive-time 0x2A37 copy so scoring does not concatenate the two.
+            stdRr.addAll(whoopStandardRrRows(ts, rr))
             stdHr.size + stdRr.size >= 30
         }
         if (shouldFlush) ioScope.launch { flushStandardHr() }
