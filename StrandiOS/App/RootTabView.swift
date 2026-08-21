@@ -323,6 +323,7 @@ struct RootTabView: View {
                 withAnimation(Self.sheetEase) { showMore = true }
                 morePath.append(MoreDestination.coach)
             },
+            onStartLiveSession: { showLiveSession = true },
             onSyncHealth: {
                 Task {
                     health.refreshAuthIfPreviouslyGranted()

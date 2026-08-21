@@ -26,6 +26,8 @@ struct AuraShell: View {
     let onSyncHealth: () -> Void
     /// Opens the coach from Today's Svea card.
     let onOpenCoach: () -> Void
+    /// Starts a Live Session from the Effort screen.
+    let onStartLiveSession: () -> Void
 
     /// Today's body state. Fixed until the screens are wired to `Repository`; it drives the orb's colour
     /// and the gauge marker's position.
@@ -63,6 +65,7 @@ struct AuraShell: View {
         onOpenDevices: @escaping () -> Void,
         onSync: @escaping () -> Void,
         onOpenCoach: @escaping () -> Void,
+        onStartLiveSession: @escaping () -> Void,
         onSyncHealth: @escaping () -> Void
     ) {
         self._screen = screen
@@ -80,6 +83,7 @@ struct AuraShell: View {
         self.onSync = onSync
         self.onSyncHealth = onSyncHealth
         self.onOpenCoach = onOpenCoach
+        self.onStartLiveSession = onStartLiveSession
         #if DEBUG
         self._routeStack = State(initialValue: AuraRoute.debugLaunchRoute.map { [$0] } ?? [])
         #endif
@@ -181,7 +185,7 @@ struct AuraShell: View {
         case .charge:
             AuraChargeView(reading: chargeReading)
         case .effort:
-            AuraEffortView(reading: effortReading)
+            AuraEffortView(reading: effortReading, onStartLiveSession: onStartLiveSession)
         case .trends:
             AuraTrendsView(reading: trendsReading, onOpenAge: { push(.age) })
         case .band:

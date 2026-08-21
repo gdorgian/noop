@@ -10,17 +10,37 @@ import StrandDesign
 
 struct AuraEffortView: View {
     private let reading: AuraEffortReading
+    /// Starts a guided Live Session. The liquid Today carried this control; Aura Today replaced that
+    /// screen and the entry point went with it, leaving the feature reachable only by deep link. Effort
+    /// is where it belongs anyway — a session is effort you are about to spend, next to the target that
+    /// says how much is left.
+    private let onStartLiveSession: () -> Void
 
-    init(reading: AuraEffortReading = .prototype) {
+    init(reading: AuraEffortReading = .prototype, onStartLiveSession: @escaping () -> Void = {}) {
         self.reading = reading
+        self.onStartLiveSession = onStartLiveSession
     }
 
     var body: some View {
         VStack(spacing: AuraPalette.cardGap) {
             targetCard
+            liveSessionRow
             loggedCard
             weekCard
         }
+    }
+
+    /// An ACTION, so it reads as one — a row with a chevron, under the reading it acts on rather than
+    /// above it. Aura's rule is that a screen opens with what is true, not with what to press.
+    private var liveSessionRow: some View {
+        VStack(spacing: 0) {
+            AuraListRow(key: String(localized: "Start a live session"),
+                        subtitle: String(localized: "Guided effort with live heart rate"),
+                        showsDivider: false,
+                        action: onStartLiveSession)
+        }
+        .padding(.horizontal, 16)
+        .auraCard()
     }
 
     // MARK: Today against target
