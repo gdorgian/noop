@@ -39,13 +39,92 @@ struct AuraAgeView: View {
                 headline
                 driversCard
                 if !reading.history.isEmpty { trendCard }
+                if !reading.domains.isEmpty { domainsCard }
                 fitnessCard
                 AuraReadCard(overline: String(localized: "The read"), text: reading.read)
             } else {
                 notReadyCard
             }
-            AuraInfoBanner(text: reading.disclaimer, accent: AuraPalette.textQuiet)
+            disclaimer
         }
+    }
+
+    // MARK: Domains
+
+    /// The five weighted domains, from a second and independent scorer.
+    ///
+    /// Drawn deliberately UNLIKE the drivers above. A driver is a signed push on Body Age and leaves a
+    /// centre line in one of two directions; a domain is a 0–100 standing that fills from the left. They
+    /// are different axes, and drawing them the same way would invite reading a high activity score as
+    /// "activity is taking years off", which it does not say.
+    ///
+    /// The weight sits beside each name because it is half the information: a 55 in a domain worth 15%
+    /// of the score and a 55 in one worth 28% are not the same finding.
+    private var domainsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            AuraCardHeader(title: String(localized: "Health domains"), note: reading.domainsNote)
+                .padding(.horizontal, 2)
+                .padding(.bottom, 14)
+
+            ForEach(Array(reading.domains.enumerated()), id: \.element.id) { index, domain in
+                VStack(spacing: 0) {
+                    HStack(spacing: 10) {
+                        Text(domain.label)
+                            .font(.system(size: 15))
+                            .foregroundStyle(AuraPalette.textPrimary)
+                        Text(domain.weight)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .monospacedDigit()
+                            .foregroundStyle(AuraPalette.textFaint)
+                        Spacer(minLength: 8)
+                        Text(String(Int(domain.score.rounded())))
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(AuraPalette.textPrimary)
+                    }
+                    .padding(.bottom, 8)
+
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(AuraPalette.track).frame(height: 3)
+                            Capsule()
+                                .fill(AuraPalette.rest)
+                                .frame(width: max(2, geo.size.width * domain.score / 100), height: 3)
+                        }
+                    }
+                    .frame(height: 3)
+
+                    if index < reading.domains.count - 1 {
+                        Rectangle().fill(AuraPalette.cardBorder).frame(height: 1).padding(.top, 14)
+                    }
+                }
+                .padding(.vertical, 6)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text("\(domain.label), \(Int(domain.score.rounded())) out of 100, "
+                    + "\(domain.weight) of the score"))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .auraCard()
+    }
+
+    /// Fine print, drawn as fine print.
+    ///
+    /// This used `AuraInfoBanner`, which fills its background with the colour it is handed and draws
+    /// near-black text on top — it exists to make one sentence unmissable, and it is correct on Today,
+    /// where it carries the day's read in full accent cyan. Handing it a muted grey produced a pale slab
+    /// of dark-on-grey text sitting under a dark screen: the loudest element on the page was its
+    /// disclaimer, and the contrast was poor in the bargain.
+    private var disclaimer: some View {
+        Text(reading.disclaimer)
+            .font(.system(size: 12.5))
+            .lineSpacing(2)
+            .foregroundStyle(AuraPalette.textFaint)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 4)
+            .padding(.top, 4)
     }
 
     // MARK: Headline
