@@ -1084,6 +1084,9 @@ private struct VitalitySection: View {
     /// The same `vo2max_est` the stored Body Age was computed from — without it this breakdown would omit
     /// the model's largest term and contradict the headline it sits under.
     @State private var vo2max: Double?
+    /// Session timing for the Sleep Regularity Index. Loaded here rather than derived from `repo.days`,
+    /// because SRI needs to know WHEN the wearer slept and a daily row only carries how long.
+    @State private var sriSessions: [(start: Int, end: Int)] = []
     @State private var loaded = false
 
     private var contributions: [VitalityEngine.Contribution] {
@@ -1091,7 +1094,8 @@ private struct VitalitySection: View {
         // breakdown reconciles with the Vitality / Body Age number it explains instead of being recomputed
         // on different statistics. See `IntelligenceEngine.vitalityInputs` for why that matters.
         VitalityEngine.contributions(IntelligenceEngine.vitalityInputs(
-            days: Array(repo.days.suffix(7)), age: profile.age, sex: profile.sex, vo2max: vo2max))
+            days: Array(repo.days.suffix(7)), age: profile.age, sex: profile.sex, vo2max: vo2max,
+            sleepSessions: sriSessions))
     }
 
     var body: some View {
@@ -1189,6 +1193,7 @@ private struct VitalitySection: View {
         vitality = (await repo.exploreSeries(key: "vitality", source: "my-whoop")).last?.value
         bodyAge = (await repo.exploreSeries(key: "body_age", source: "my-whoop")).last?.value
         vo2max = (await repo.exploreSeries(key: "vo2max_est", source: "my-whoop")).last?.value
+        sriSessions = (await repo.allSleepSessions(days: 15)).map { (start: $0.effectiveStartTs, end: $0.endTs) }
         loaded = true
     }
 }

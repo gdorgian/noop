@@ -239,7 +239,8 @@ final class IntelligenceEngine: ObservableObject {
     /// person, so the comparison measures the wearer rather than cancelling the estimator's terms. Absent
     /// a VO₂max the whole term drops out: a fitness input with no reference is not evidence.
     nonisolated static func vitalityInputs(days: [DailyMetric], age: Int, sex: String,
-                               vo2max: Double?) -> VitalityEngine.Inputs {
+                                          vo2max: Double?,
+                                          sleepSessions: [(start: Int, end: Int)] = []) -> VitalityEngine.Inputs {
         let nights = days.compactMap { $0.totalSleepMin }.map { $0 / 60.0 }.filter { $0 > 0 }
         let hrvs = days.compactMap { $0.avgHrv }
         let rhrs = days.compactMap { $0.restingHr }.map(Double.init)
@@ -251,7 +252,14 @@ final class IntelligenceEngine: ObservableObject {
             vo2max: vo2max,
             expectedVO2max: vo2max.map { _ in VitalityEngine.vo2maxNorm(forAge: Double(age), sex: sex) },
             sleepHours: mean(nights),
-            sleepConsistency: VitalityEngine.sleepConsistency(nightlyHours: nights),
+            // Prefer the real Sleep Regularity Index over the duration proxy. The proxy measures
+            // `1 − CV` over nightly LENGTHS, so a wearer who sleeps exactly 7.5 h every night scores a
+            // perfect 1.0 whether they start at 23:00 or alternate 23:00 and 04:00 — it cannot see the
+            // thing regularity means. SRI compares each minute's asleep/awake state with the same minute
+            // 24 h later, which is what catches a shifted weekend. It needs a week of session timing, so
+            // the proxy remains the fallback rather than being deleted.
+            sleepConsistency: SleepRegularity.consistency(sessions: sleepSessions)
+                ?? VitalityEngine.sleepConsistency(nightlyHours: nights),
             rmssd: hrvs.isEmpty ? nil : medianOf(hrvs),
             rmssdNorm: VitalityEngine.rmssdNorm(forAge: Double(age)),
             steps: mean(steps))
@@ -1849,9 +1857,18 @@ final class IntelligenceEngine: ObservableObject {
         // and it is the term WHOOP Age leans on hardest too. The value is the one this same pass just wrote
         // to `vo2max_est` above (Nes waist-based, or the waist-free Uth fallback), compared against the
         // population age/sex norm rather than against either model's own reference person.
+        // Session TIMING for the Sleep Regularity Index — read over a fortnight rather than the seven
+        // days the vitals use, because SRI compares each day against the next and a 7-day window yields
+        // only six comparisons. Falls back to the duration proxy on its own if the read comes up short.
+        let sriTo = Int(Date().timeIntervalSince1970)
+        let sriFrom = sriTo - 15 * 86_400
+        let sriSessions = ((try? await store.sleepSessions(deviceId: computedId, from: sriFrom, to: sriTo,
+                                                           limit: 400)) ?? [])
+            .map { (start: $0.effectiveStartTs, end: $0.endTs) }
         let vInputs = IntelligenceEngine.vitalityInputs(
             days: Array(fa7), age: profile.age, sex: profile.sex,
-            vo2max: faPts.first { $0.key == "vo2max_est" }?.value)
+            vo2max: faPts.first { $0.key == "vo2max_est" }?.value,
+            sleepSessions: sriSessions)
         if let vRes = VitalityEngine.compute(vInputs) {
             let satKey = IntelligenceEngine.saturdayKey(onOrBefore: newestDay)
             _ = try? await store.upsertMetricSeries([

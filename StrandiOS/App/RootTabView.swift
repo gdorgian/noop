@@ -96,6 +96,7 @@ struct RootTabView: View {
             fitnessAgeSeries: auraFitnessAgeSeries,
             vo2maxSeries: auraVo2maxSeries,
             days: last7,
+            sleepSessions: auraSleepSessions.map { (start: $0.effectiveStartTs, end: $0.endTs) },
             domainResult: auraDomainResult,
             readiness: FitnessAgeEngine.assessReadiness(
                 hasAge: profile.age > 0,

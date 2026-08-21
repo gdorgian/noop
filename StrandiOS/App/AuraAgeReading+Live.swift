@@ -27,6 +27,7 @@ extension AuraAgeReading {
         fitnessAgeSeries: [(day: String, value: Double)],
         vo2maxSeries: [(day: String, value: Double)],
         days: [DailyMetric],
+        sleepSessions: [(start: Int, end: Int)],
         domainResult: BioAge.DomainResult?,
         readiness: FitnessAgeReadiness,
         chronologicalAge: Int,
@@ -65,7 +66,8 @@ extension AuraAgeReading {
         }
 
         let contributions = VitalityEngine.contributions(IntelligenceEngine.vitalityInputs(
-            days: Array(days.suffix(7)), age: chronologicalAge, sex: sex, vo2max: vo2max))
+            days: Array(days.suffix(7)), age: chronologicalAge, sex: sex, vo2max: vo2max,
+            sleepSessions: sleepSessions))
         let drivers = Self.drivers(from: contributions)
 
         // The weekly rows are already Saturday-keyed; show the trailing ten so a run of weeks reads as a
