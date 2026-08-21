@@ -28,6 +28,9 @@ import UIKit
 
 struct SleepView: View {
     @EnvironmentObject var repo: Repository
+    /// The empty state's "Open Data Sources" button routes through the shell (`NavRouter`), because
+    /// neither shell exposes a selection this screen could set directly.
+    @EnvironmentObject var router: NavRouter
     // NOTE: SleepView itself deliberately does NOT observe `LiveState`. A connected strap publishes
     // at ~1 Hz; observing here would re-evaluate this heavy body on every tick. The only two live
     // dependencies — the "going to sleep / awake" mark card (it appends to the strap log) and the
@@ -149,15 +152,17 @@ struct SleepView: View {
             Group {
                 if let resolved {
                     // Each top-level section fades + rises in sequence on first appear (Reduce-Motion safe).
+                    // Order (redesign §6): score hero, then the sleep balance directly under it (the most
+                    // important number), the stage breakdown, night-detail tiles, stage comparison and the
+                    // 30-night trend. Sleep marks / naps are an INPUT, not a read-out, so they sink to the
+                    // bottom (they were second from the top).
                     VStack(alignment: .leading, spacing: NoopMetrics.sectionSpacing) {
                         if let sleepUndo { sleepUndoBanner(sleepUndo) }
-                        // Bleed past ScreenScaffold's 16/24 gutters so the hero column is edge-to-edge
-                        // in the upper band; the night scene itself is the fixed topBackground.
-                        // Customize sits at the end of the hero (not floating in a blank band).
-                        restHero(resolved)
-                            .padding(.horizontal, -16)
-                            .padding(.top, -24)
-                            .staggeredAppear(index: 0)
+                        // The Rest hero stays pinned above the arrangeable cards. It keeps this fork's
+                        // card treatment rather than upstream's edge-to-edge bleed: `restHero` here is
+                        // styled as a card on the normal gutters, so negative padding would push it
+                        // under the scaffold's chrome.
+                        restHero(resolved).staggeredAppear(index: 0)
                         // #sleep-layout: the analytical cards render in the user's saved order minus the
                         // hidden set, below the pinned Rest hero. Reordered via the Arrange sheet.
                         ForEach(Array(sleepVisibleSections.enumerated()), id: \.element) { idx, section in
@@ -229,6 +234,10 @@ struct SleepView: View {
                     // sleep window, not just the Sleep tab's session view; then refresh the read cache.
                     await intelligence.analyzeRecent()
                     await repo.refresh()
+                    // The coach's morning brief was written against the OLD wake time. Correcting the
+                    // night used to leave that wrong plan standing for the rest of the day — the exact
+                    // complaint behind this change — because the day was already stamped.
+                    CoachBriefStamp.invalidateAfterSleepCorrection(wakeTs: newWakeTs)
                 }, onDelete: {
                     // Delete = the edit path minus the re-insert: drop this session so every metric
                     // recomputes immediately as if the night were never recorded, durably tombstoned so a
@@ -239,6 +248,7 @@ struct SleepView: View {
                                                                  endTs: edit.wakeTs)
                     await intelligence.analyzeRecent()
                     await repo.refresh()
+                    CoachBriefStamp.invalidateAfterSleepCorrection(wakeTs: edit.wakeTs)
                     // `edit.bedTs` is the effective (displayed) onset, so the banner shows the same clock
                     // time the user saw for this night.
                     if let snapshot { presentSleepUndo(snapshot, displayStart: edit.bedTs, windowEnd: edit.wakeTs) }
@@ -262,6 +272,7 @@ struct SleepView: View {
                     // Re-score so the day's aggregates pick up the new session, exactly like an edit.
                     await intelligence.analyzeRecent()
                     await repo.refresh()
+                    CoachBriefStamp.invalidateAfterSleepCorrection(wakeTs: endTs)
                 }
             }
         }
@@ -431,64 +442,65 @@ struct SleepView: View {
     private func restHero(_ model: SleepModel) -> some View {
         let night = heroNight(model)
         let score = performanceScore(for: night)
-        VStack(spacing: 0) {
-            Text("Sleep")
-                .font(StrandFont.rounded(24, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.96))
-                .shadow(color: .black.opacity(0.35), radius: 5, y: 1)
-                .padding(.top, 6)
-                .accessibilityAddTraits(.isHeader)
-
-            if let score {
-                // Same LiquidVessel gauge as Home (`LiquidTodayView` / `HeroScoreCell`).
-                VStack(spacing: 8) {
-                    LiquidScoreGauge(
-                        score: score,
-                        tint: StrandPalette.restColor,
-                        diameter: 184,
-                        animated: true,
-                        captionText: String(localized: "of 100"),
-                        numberColor: Color.white.opacity(0.98),
-                        captionColor: Color.white.opacity(0.52)
-                    )
-                    Text(sleepScoreWord(score))
-                        .font(StrandFont.subhead.weight(.semibold))
-                        .foregroundStyle(Color.white.opacity(0.90))
-                        .shadow(color: .black.opacity(0.30), radius: 2, y: 1)
+        VStack(alignment: .leading, spacing: NoopMetrics.gap) {
+            // The sleep score is named ONCE here ("Sleep performance"); the old trailing "Rest" chip and the
+            // duplicate "Rest" night-detail tile showed the same number under a second name (redesign bug §1).
+            SectionHeader("Sleep performance", overline: nightRelativeLabel)
+            // A subtle night atmosphere sits behind the sleep hero ONLY (the Rest world's whisper:
+            // faint indigo wash + crescent moon over the near-black canvas, no glow), clipped to the
+            // card. Replaces the now-flat ScenicHeroBackground here.
+            VStack(spacing: NoopMetrics.space4) {
+                if let score {
+                    // The signature liquid gauge: a filling vessel tinted Rest, with the 0–100 score
+                    // counting up over it and a short state word beneath — the same `LiquidScoreGauge`
+                    // Today's HeroScoreCell draws, so both heroes fill and roll up identically. The
+                    // gauge drives its own count-up, which is why the screen no longer keeps a separate
+                    // `heroFraction` animation state.
+                    VStack(spacing: NoopMetrics.space3) {
+                        LiquidScoreGauge(
+                            score: score,
+                            tint: StrandPalette.restColor,
+                            diameter: 184,
+                            animated: true,
+                            captionText: String(localized: "of 100"),
+                            numberColor: StrandPalette.textPrimary,
+                            captionColor: StrandPalette.textSecondary
+                        )
+                        Text(sleepScoreWord(score))
+                            .font(StrandFont.subhead.weight(.semibold))
+                            .foregroundStyle(StrandPalette.restColor)
+                    }
+                    .padding(.top, NoopMetrics.space1)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Sleep performance \(Int(score.rounded())) of 100")
+                } else {
+                    // No 0–100 score for the night — lead with hours slept as a big rounded headline
+                    // whose minutes tick up on appear (the same count-up the scored hero gets).
+                    VStack(spacing: NoopMetrics.space1) {
+                        CountUpText(
+                            value: night.stages.asleep,
+                            format: { durationText($0) },
+                            font: StrandFont.number(46),
+                            color: StrandPalette.restBright
+                        )
+                        Text("asleep last night")
+                            .font(StrandFont.subhead)
+                            .foregroundStyle(StrandPalette.textSecondary)
+                    }
+                    .padding(.vertical, NoopMetrics.space5)
+                    .accessibilityElement(children: .combine)
                 }
-                .padding(.top, 8)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(String(localized: "Sleep performance \(Int(score.rounded())) of 100, \(sleepScoreWord(score))"))
-            } else {
-                VStack(spacing: NoopMetrics.space1) {
-                    CountUpText(
-                        value: night.stages.asleep,
-                        format: { durationText($0) },
-                        font: StrandFont.number(42),
-                        color: Color.white.opacity(0.96)
-                    )
-                    Text("asleep last night")
-                        .font(StrandFont.subhead)
-                        .foregroundStyle(Color.white.opacity(0.72))
-                }
-                .padding(.top, 14)
-                .padding(.bottom, 4)
-                .accessibilityElement(children: .combine)
+                SourceBadge(score != nil ? heroSource(for: night) : (repo.activeDeviceIsOura ? "Oura" : "On-device"), tint: StrandPalette.restColor)
+                // Subtle Customize at the hero foot — opens the Arrange sheet for the reorderable
+                // cards below (#1112). Functional, not competing with the gauge.
+                sleepArrangeAffordance
+                    .padding(.top, NoopMetrics.space1)
             }
-
-            SourceBadge(
-                score != nil ? heroSource(for: night) : (repo.activeDeviceIsOura ? "Oura" : "On-device"),
-                tint: StrandPalette.restColor
-            )
-            .padding(.top, 8)
-
-            // Subtle Customize at the hero foot — functional, not competing with the gauge.
-            sleepArrangeAffordance
-                .padding(.horizontal, 16)
-                .padding(.top, 6)
-                .padding(.bottom, 6)
+            .padding(NoopMetrics.cardInnerPadding + NoopMetrics.space1)
+            .frame(maxWidth: .infinity)
+            .timeOfDayBackground(.night)
+            .clipShape(RoundedRectangle(cornerRadius: NoopMetrics.cardRadius, style: .continuous))
         }
-        .frame(maxWidth: .infinity)
     }
 
     /// Fixed night-scene band behind Sleep scroll content — same ScreenScaffold.topBackground pattern
@@ -1976,9 +1988,10 @@ struct SleepView: View {
         // SleepView (scroll-stutter isolation; identical output to the prior inline check).
         SleepSyncingNote()
         if repo.loaded {
-            ComingSoon(what: "No nights here yet. Import your WHOOP export in Data Sources to see every night, your sleep stages and trends straight away. Or open Intelligence to see last night computed from the strap after you wear it to bed.")
+            ComingSoon(what: "No nights here yet. Import your WHOOP export in Data Sources to see every night, your sleep stages and trends straight away. Or open Intelligence to see last night computed from the strap after you wear it to bed.",
+                       action: ("Open Data Sources", { router.openDataSources() }))
         } else {
-            ComingSoon(what: "Loading your sleep history…")
+            ComingSoon.loading("Loading your sleep history…", title: "Reading your sleep history")
         }
     }
 

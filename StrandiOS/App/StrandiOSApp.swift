@@ -2,6 +2,7 @@
 import SwiftUI
 import StrandDesign
 import UserNotifications
+import UIKit
 
 /// iOS entry point. Unlike the macOS app (which adds a `MenuBarExtra` scene), iOS uses a single
 /// `WindowGroup`; the glanceable menu-bar role is filled by the Home/Lock-Screen widget instead.
@@ -38,6 +39,11 @@ struct StrandiOSApp: App {
     @AppStorage(UnitPrefs.effortScaleKey) private var effortScaleRaw = EffortScale.hundred.rawValue
 
     init() {
+        // One-time migration off the retired card/button/both Coach-entry picker onto the three
+        // independent entry toggles (banner/header-icon/floating-button). No-op after the first launch
+        // that has them. Must run before any Today/RootTabView reads its @AppStorage default.
+        CoachEntryPrefs.migrateIfNeeded()
+
         // Install the wearer's awake window before ANYTHING stages a night: the daytime false-sleep
         // guard (#90) and the cold-start midsleep anchor (#547) both derive from it, and a pass that
         // ran under the default schedule would have to be re-analysed to correct itself.
@@ -66,11 +72,16 @@ struct StrandiOSApp: App {
         // target's BGTaskSchedulerPermittedIdentifiers (project.yml). Without this the overnight drop
         // never fires; the macOS timer, foreground catch-up, and "Run now" already work without it.
         ScheduledDebugExport.register()
+        SemanticMemoryBackgroundTask.register()
         // Foreground presentation: without a delegate, iOS suppresses a notification's banner while the app
         // is open, so a user testing the wind-down reminder with NOOP foregrounded sees nothing. Register
         // before the first scene so any early-fired notification is presented.
         UNUserNotificationCenter.current().delegate = NotificationPresenter.shared
+        // Register the check-in's action buttons before any notification can arrive — a category a
+        // notification names but nobody registered simply shows no buttons, silently.
+        CoachCheckIn.registerCategory()
         let model = AppModel()
+        SemanticMemoryBackgroundTask.attach(coach: model.coach)
         _model = StateObject(wrappedValue: model)
         let bridge = HealthKitBridge(
             repo: model.repo,
@@ -130,6 +141,20 @@ struct StrandiOSApp: App {
                 // changes are process-wide on Apple and are applied after the documented reopen.
                 .environment(\.locale, AppLanguage.activeLocale)
                 .chartStyle(chartStyleRaw)
+                // "Health always wins" (user decision): every successful sync overwrites the profile
+                // weight with the freshest Health reading, not just once when unset.
+                .onReceive(health.$latestImportedWeightKg) { kg in
+                    if let kg { model.profile.applyHealthWeight(kg: kg) }
+                }
+                // The reverse direction: a genuine user edit to the profile weight writes back to Health.
+                // Ping-pong guard — skip when the new value is (near-)identical to what Health itself last
+                // reported, since that means this change is the "Health always wins" overwrite above
+                // echoing back through this same publisher, not a fresh user edit (a real edit almost
+                // never lands within 0.05 kg of the last Health-imported value by coincidence).
+                .onReceive(model.profile.$weightKg.dropFirst()) { kg in
+                    guard abs(kg - (health.latestImportedWeightKg ?? -.greatestFiniteMagnitude)) > 0.05 else { return }
+                    Task { try? await health.writeWeight(kg: kg) }
+                }
                 .noopAccent(accentRaw, customHex: accentCustomHex)
                 // Dynamic Type now scales the prose/label roles (StrandFont). Cap the upper end so the
                 // fixed-geometry tiles/gauges stay legible at the largest accessibility sizes rather than
@@ -215,6 +240,19 @@ struct StrandiOSApp: App {
                     guard scenePhase == .active else { return }
                     Task { await WidgetSnapshot.publish(from: model) }
                 }
+                .onReceive(NotificationCenter.default.publisher(
+                    for: UIApplication.didReceiveMemoryWarningNotification
+                )) { _ in
+                    Task { await model.coach.unloadSemanticMemory() }
+                }
+                .onReceive(NotificationCenter.default.publisher(
+                    for: ProcessInfo.thermalStateDidChangeNotification
+                )) { _ in
+                    let state = ProcessInfo.processInfo.thermalState
+                    if state == .serious || state == .critical {
+                        Task { await model.coach.unloadSemanticMemory() }
+                    }
+                }
                 // Apple Health is explicitly opt-in. Once any write type is authorized, keep one
                 // best-effort BGAppRefresh request armed; revoking all write access cancels it.
                 .onChange(of: health.auth) { _, auth in
@@ -270,6 +308,14 @@ struct StrandiOSApp: App {
                 // timer or an incidental reconnect. Floored at 90s and never clock/empty-streak-suppressed
                 // (BackfillPolicy.shouldRun's .foreground case), so this is a safe no-op on rapid re-opens.
                 model.ble.requestSync(.foreground)
+                // Re-learn the wake-time-tracking check-in from fresh sleep on foreground. No-op unless
+                // the check-in is on and set to .afterWake; keeps the repeating trigger in step with the
+                // user's actual wake time rather than a clock time that drifts out of sync.
+                Task { await CoachCheckIn.refreshDynamicScheduleIfNeeded(repo: model.repo) }
+                if CoachSemanticMemory.shared.foregroundCatchUpIsDue() {
+                    CoachSemanticMemory.shared.markForegroundCatchUp()
+                    Task { await model.coach.performSemanticMemoryMaintenance(limit: 64) }
+                }
                 Task {
                     health.refreshAuthIfPreviouslyGranted()
                     HealthWritebackBackgroundScheduler.updateSchedule(
@@ -281,6 +327,8 @@ struct StrandiOSApp: App {
                                 authorized: health.auth == .authorized)
                         }
                     )
+                    await PlanReconciliationCoordinator.reconcile(repo: model.repo)
+                    await GoalTrackingStore.shared.refresh(repo: model.repo)
                     await WidgetSnapshot.publish(from: model)
                     // Push the wrist on the SAME refresh as the Home-screen widget so the watch, the
                     // widget and Today never disagree about which day they describe. Without this the
@@ -288,6 +336,8 @@ struct StrandiOSApp: App {
                     await watch.pushLatest(from: model)
                 }
             } else if phase == .background {
+                SemanticMemoryBackgroundTask.schedule()
+                Task { await model.coach.unloadSemanticMemory() }
                 // Re-submit on every transition because iOS may discard an old best-effort request.
                 HealthWritebackBackgroundScheduler.updateSchedule(
                     isAuthorized: health.auth == .authorized)

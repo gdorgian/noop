@@ -32,7 +32,7 @@ struct FusedRecordHost: View {
             } else {
                 ScreenScaffold(title: "Your Data, Fused",
                                subtitle: "Building your best-sourced record…") {
-                    ComingSoon(what: "Reading your sources…", symbol: "square.stack.3d.up")
+                    ComingSoon.loading("Reading your sources…", title: "Reading your sources", symbol: "square.stack.3d.up")
                 }
             }
         }
@@ -83,7 +83,7 @@ struct RhythmHost: View {
         let lo = lastSleep.effectiveStartTs
         let hi = lastSleep.endTs
         guard hi > lo else { return }
-        let rr = (try? await store.rrIntervals(deviceId: repo.deviceId, from: lo, to: hi, limit: 200_000)) ?? []
+        let rr = (try? await store.rrIntervals(deviceId: repo.deviceId, from: lo, to: hi, limit: Int.max)) ?? []
         // BLE-only users have their night under the computed source; fall back to it when the imported
         // device yields nothing. Gravity MUST be read from the SAME source id as the R-R (#1360): otherwise
         // a fall-back night reads its stillness from the wrong device and every window fails the motion
@@ -91,10 +91,10 @@ struct RhythmHost: View {
         let usedFallback = rr.isEmpty
         let sourceId = usedFallback ? repo.deviceId + "-noop" : repo.deviceId
         let rrRows = usedFallback
-            ? ((try? await store.rrIntervals(deviceId: sourceId, from: lo, to: hi, limit: 200_000)) ?? [])
+            ? ((try? await store.rrIntervals(deviceId: sourceId, from: lo, to: hi, limit: Int.max)) ?? [])
             : rr
         guard !rrRows.isEmpty else { return }
-        let grav = (try? await store.gravitySamples(deviceId: sourceId, from: lo, to: hi, limit: 200_000)) ?? []
+        let grav = (try? await store.gravitySamples(deviceId: sourceId, from: lo, to: hi, limit: Int.max)) ?? []
 
         // Window the night into 5-minute slices; a slice is "still" when its gravity variance is small.
         let windowSec = 5 * 60

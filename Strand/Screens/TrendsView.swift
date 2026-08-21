@@ -14,6 +14,9 @@ import Foundation
 
 struct TrendsView: View {
     @EnvironmentObject var repo: Repository
+    /// The empty state's "Open Data Sources" button routes through the shell (`NavRouter`), because
+    /// neither shell exposes a selection this screen could set directly.
+    @EnvironmentObject var router: NavRouter
     // NOTE: deliberately does NOT observe LiveState — Trends shows historical data only, and
     // observing it forced a full re-render of this subtree on every ~1 Hz live-HR tick.
 
@@ -277,9 +280,12 @@ struct TrendsView: View {
                        lazy: true,
                        topBackground: liquidScaffoldSky()) {
             if repo.days.isEmpty {
-                ComingSoon(what: repo.loaded
-                    ? "Trends need history to draw. Import your WHOOP export in Data Sources to see weeks, months and years instantly."
-                    : "Loading your history…")
+                if repo.loaded {
+                    ComingSoon(what: "Trends need history to draw. Import your WHOOP export in Data Sources to see weeks, months and years instantly.",
+                               action: ("Open Data Sources", { router.openDataSources() }))
+                } else {
+                    ComingSoon.loading("Loading your history…", title: "Reading your history")
+                }
             } else {
                 // Resolve each metric's window ONCE per body and pass the results
                 // down — rangeBar/heroRecovery/smallMultiples all reuse these
@@ -596,6 +602,26 @@ struct TrendsView: View {
 
     // MARK: Hero — recovery over time
 
+    /// The largest data gap in a windowed (ascending) series as an explicit caption — so a run of missing
+    /// days reads as "no data" rather than an unexplained empty stretch in the line (redesign bug §1, the
+    /// Charge gap). nil when the series is dense (no gap of 2+ consecutive missing days).
+    private func gapCaption(_ pts: [TrendPoint]) -> String? {
+        guard pts.count >= 2 else { return nil }
+        let day: TimeInterval = 86_400
+        var start: Date?, end: Date?, maxMissing = 0
+        for i in 1..<pts.count {
+            let missing = Int((pts[i].date.timeIntervalSince(pts[i - 1].date) / day).rounded()) - 1
+            if missing > maxMissing {
+                maxMissing = missing
+                start = pts[i - 1].date.addingTimeInterval(day)
+                end = pts[i].date.addingTimeInterval(-day)
+            }
+        }
+        guard maxMissing >= 2, let s = start, let e = end else { return nil }
+        let fmt = Date.FormatStyle.dateTime.day().month(.abbreviated)
+        return String(localized: "No data · \(s.formatted(fmt))–\(e.formatted(fmt))")
+    }
+
     @ViewBuilder
     private func heroRecovery(recovery: ResolvedMetric) -> some View {
         let pts = recovery.points
@@ -633,6 +659,12 @@ struct TrendsView: View {
                             ("Days", "\(pts.count)"),
                         ])
                         changeChip(pts, higherIsBetter: true, fmt: { "\(Int($0.rounded()))" })
+                    }
+                    // Redesign bug §1: the 90-day Charge gap used to draw as unexplained empty space.
+                    if let gap = gapCaption(pts) {
+                        Text(gap)
+                            .font(StrandFont.footnote)
+                            .foregroundStyle(StrandPalette.textTertiary)
                     }
                 }
             }

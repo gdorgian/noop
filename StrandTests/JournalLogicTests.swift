@@ -185,4 +185,282 @@ final class JournalLogicTests: XCTestCase {
         XCTAssertNotEqual(key, "recovery")
         XCTAssertNotEqual(key, "hrv")
     }
+
+    // MARK: - Merging duplicate WHOOP wordings
+    //
+    // A WHOOP export carries several wordings for the same habit, and the question string is the key
+    // everywhere — the journal's primary key, `byBehaviour`, the coach's analyser — so two wordings
+    // read as two habits with half the history each. Merging folds them at READ time: these pin that
+    // nothing is invented, nothing is lost, and the winner on a contested day is predictable.
+
+    private func alias(_ target: String, _ folded: [String]) -> [JournalCatalogItem] {
+        [JournalCatalogItem(canonical: target, displayName: nil, kind: .bool, group: .other,
+                            sortIndex: 0, hidden: false, custom: false, aliases: folded)]
+    }
+
+    func testAliasMapIsKeyedLikeEveryOtherIdentityCheck() {
+        let items = alias("Did you drink any alcohol?", ["  HAVE you had ALCOHOL? \n"])
+        let map = JournalCatalogStore.aliasMap(items)
+        XCTAssertEqual(map[JournalCatalogStore.norm("Have you had alcohol?")], "Did you drink any alcohol?")
+        XCTAssertTrue(JournalCatalogStore.aliasMap([]).isEmpty)
+    }
+
+    func testAnUntouchedCatalogFoldsExactlyLikeMergeJournal() {
+        // The zero-merge path must be the old behaviour, not merely similar to it.
+        let imported = [e("2026-06-09", "Did you drink any alcohol?", false)]
+        let native = [e("2026-06-09", "Did you drink any alcohol?", true)]
+        XCTAssertEqual(JournalMerge.fold(imported: imported, native: native, aliases: [:]),
+                       Repository.mergeJournal(imported: imported, native: native))
+    }
+
+    func testFoldedDayKeepsOneRealRowAndNeverOrsTheAnswers() {
+        // Both wordings answered the same day, and they disagree. The result is ONE of them verbatim —
+        // never "yes because somewhere it said yes".
+        let target = "Did you drink any alcohol?"
+        let items = alias(target, ["Alcohol?"])
+        let folded = JournalMerge.fold(
+            imported: [e("2026-06-09", target, false),
+                       e("2026-06-09", "Alcohol?", true)],
+            native: [], aliases: JournalCatalogStore.aliasMap(items),
+            aliasOrder: JournalCatalogStore.aliasOrder(items))
+        XCTAssertEqual(folded.count, 1)
+        XCTAssertEqual(folded[0].question, target)
+        XCTAssertFalse(folded[0].answeredYes, "the target's own row outranks a folded wording")
+    }
+
+    func testFoldDayTargetOutranksTheFirstAliasToo() {
+        // Alias positions are zero-based. The read rank reserves zero for the target and offsets every
+        // alias by one; otherwise the first alias ties the target and alphabetical order picks a winner.
+        let target = "Did you drink any alcohol?"
+        let items = alias(target, ["Alcohol?"])
+        let folded = JournalMerge.foldDay([target: false, "Alcohol?": true],
+                                          aliases: JournalCatalogStore.aliasMap(items),
+                                          aliasOrder: JournalCatalogStore.aliasOrder(items))
+        XCTAssertEqual(folded[target], false)
+    }
+
+    func testNativeBeatsImportedAcrossAMerge() {
+        // The user's own answer is their most recent statement, whichever wording carries it — the
+        // same precedence mergeJournal already applies within one question.
+        let map = [JournalCatalogStore.norm("Alcohol?"): "Did you drink any alcohol?"]
+        let folded = JournalMerge.fold(
+            imported: [e("2026-06-09", "Did you drink any alcohol?", false)],
+            native: [e("2026-06-09", "Alcohol?", true)],
+            aliases: map)
+        XCTAssertEqual(folded.count, 1)
+        XCTAssertTrue(folded[0].answeredYes)
+        XCTAssertEqual(folded[0].question, "Did you drink any alcohol?", "renamed onto the target")
+    }
+
+    func testEarlierMergeWinsBetweenTwoFoldedWordings() {
+        let target = "Did you drink any alcohol?"
+        let map = [JournalCatalogStore.norm("Alcohol?"): target,
+                   JournalCatalogStore.norm("Any booze?"): target]
+        let order = JournalCatalogStore.aliasOrder(alias(target, ["Alcohol?", "Any booze?"]))
+        let folded = JournalMerge.fold(imported: [e("2026-06-09", "Any booze?", false),
+                                                  e("2026-06-09", "Alcohol?", true)],
+                                       native: [], aliases: map, aliasOrder: order)
+        XCTAssertEqual(folded.count, 1)
+        XCTAssertTrue(folded[0].answeredYes, "the first-merged wording wins the tie")
+    }
+
+    func testFoldingLosesNoDayAndTouchesNoUnmergedRow() {
+        let map = [JournalCatalogStore.norm("Alcohol?"): "Did you drink any alcohol?"]
+        let input = [e("2026-06-09", "Alcohol?", true),
+                     e("2026-06-10", "Did you drink any alcohol?", false),
+                     e("2026-06-11", "Did you take magnesium?", true)]
+        let folded = JournalMerge.fold(imported: input, native: [], aliases: map)
+        XCTAssertEqual(Set(folded.map(\.day)), Set(input.map(\.day)), "no day disappears")
+        XCTAssertEqual(folded.first { $0.day == "2026-06-11" }?.question, "Did you take magnesium?",
+                       "an unmerged question is passed through untouched")
+    }
+
+    @MainActor
+    func testMergedWordingLeavesTheListAndComesBackOnSeparate() {
+        let store = JournalCatalogStore()
+        store.items = []
+        let target = "Did you drink any alcohol?"
+        store.merge("Alcohol?", into: target)
+        let merged = store.resolvedItems(imported: ["Alcohol?", target])
+        XCTAssertFalse(merged.contains { $0.canonical == "Alcohol?" })
+        XCTAssertTrue(merged.contains { $0.canonical == target })
+
+        store.unmerge("Alcohol?")
+        let separated = store.resolvedItems(imported: ["Alcohol?", target])
+        XCTAssertTrue(separated.contains { $0.canonical == "Alcohol?" }, "nothing was destroyed")
+    }
+
+    @MainActor
+    func testMergingACollectorCarriesItsOwnAliasesAlong() {
+        // A → B, then B → C. Without carrying A over it would point at a question that is no longer
+        // anywhere, and its history would drop out of the fold entirely.
+        let store = JournalCatalogStore()
+        store.items = []
+        store.merge("Alcohol?", into: "Any booze?")
+        store.merge("Any booze?", into: "Did you drink any alcohol?")
+        let map = store.aliasMap()
+        XCTAssertEqual(map[JournalCatalogStore.norm("Alcohol?")], "Did you drink any alcohol?")
+        XCTAssertEqual(map[JournalCatalogStore.norm("Any booze?")], "Did you drink any alcohol?")
+    }
+
+    // MARK: - Reading the model's duplicate reply
+    //
+    // Word-overlap scoring used to live in `JournalMerge` and is gone; the model finds the groups now
+    // (`JournalDuplicateReviewer`). What is pinned here is everything AROUND the one request — the
+    // prompt, the parse, and above all the validation, since the reply is the only part of this feature
+    // the app does not control.
+
+    /// The questions actually sent, and the array every index in the reply is resolved against.
+    private let catalogFixture = [
+        "Alkohol konsumiert?",                // 1
+        "Did you drink any alcohol?",         // 2
+        "Did you take magnesium?",            // 3
+        "Ein Magnesiumpräparat eingenommen?", // 4
+        "Ein Zinkpräparat eingenommen?",      // 5
+    ]
+
+    func testTheModelSeesEveryQuestionOnceAndNothingElse() {
+        let list = AICoachEngine.journalQuestionList(
+            ["  Did you drink any alcohol?  ", "", "Did you drink any alcohol?", "Alkohol konsumiert?"])
+        XCTAssertEqual(list, ["Alkohol konsumiert?", "Did you drink any alcohol?"],
+                       "the indexed list is trimmed, deduped and stably sorted")
+        XCTAssertEqual(list, AICoachEngine.journalQuestionList(list.reversed()),
+                       "visible catalog order cannot change what a cached model index names")
+
+        let promptList = AICoachEngine.journalQuestionList(catalogFixture)
+        let prompt = AICoachEngine.journalDuplicatePrompt(promptList)
+        for (i, q) in promptList.enumerated() {
+            XCTAssertTrue(prompt.contains("\(i + 1). \(q)"), "every question is numbered from 1")
+        }
+    }
+
+    func testAWellFormedReplyBecomesTheGroupItNames() {
+        let candidates = AICoachEngine.journalDuplicateCandidates(
+            from: "GROUP 1,2\nKEEP 2\nGROUP 3,4\nKEEP 3",
+            questions: catalogFixture,
+            counts: ["Did you drink any alcohol?": 40, "Alkohol konsumiert?": 4])
+        XCTAssertEqual(candidates.count, 2)
+        XCTAssertEqual(candidates[0].questions,
+                       ["Alkohol konsumiert?", "Did you drink any alcohol?"],
+                       "the group with the most answers behind it is offered first")
+        XCTAssertEqual(candidates[0].suggestedTarget, "Did you drink any alcohol?")
+        XCTAssertEqual(candidates[1].suggestedTarget, "Did you take magnesium?",
+                       "KEEP names the survivor, even when it is not the longest history")
+    }
+
+    func testAnIndexOutsideTheListIsDroppedWithoutTakingTheReplyWithIt() {
+        // The containment that matters: the reply is numbers, resolved against our own array, so a
+        // model that invents one loses that group and nothing more.
+        let candidates = AICoachEngine.journalDuplicateCandidates(
+            from: "GROUP 4,999\nKEEP 999\nGROUP 1,2\nKEEP 1",
+            questions: catalogFixture, counts: [:])
+        XCTAssertEqual(candidates.count, 1)
+        XCTAssertEqual(candidates[0].questions, ["Alkohol konsumiert?", "Did you drink any alcohol?"])
+        XCTAssertEqual(candidates[0].suggestedTarget, "Alkohol konsumiert?")
+    }
+
+    func testARepliedGroupThatSurvivesAloneIsNotAGroup() {
+        // One valid index left, and a question claimed twice: neither is a duplicate to offer.
+        XCTAssertTrue(AICoachEngine.journalDuplicateCandidates(
+            from: "GROUP 1,999", questions: catalogFixture, counts: [:]).isEmpty)
+        let repeated = AICoachEngine.journalDuplicateCandidates(
+            from: "GROUP 1,2\nGROUP 2,3", questions: catalogFixture, counts: [:])
+        XCTAssertEqual(repeated.count, 1, "the first group claims question 2; the second is left with one")
+    }
+
+    func testSilenceIsSuccessButProseAndBrokenGroupsAreInvalid() {
+        XCTAssertEqual(AICoachEngine.journalDuplicateReview(
+            from: "", questions: catalogFixture, counts: [:]), .noDuplicates)
+        for reply in ["I could not find any duplicates in this list.", "GROUP\nKEEP 1", "KEEP 2"] {
+            XCTAssertEqual(AICoachEngine.journalDuplicateReview(
+                from: reply, questions: catalogFixture, counts: [:]), .invalid,
+                           "an unparseable reply is not presented or cached as no duplicates: \(reply)")
+        }
+    }
+
+    func testTheParseIsLenientAboutHowTheNumbersAreWritten() {
+        let groups = AICoachEngine.parseJournalDuplicateGroups("group: 1, 2\nKeep:  2\nGROUP 3 and 4")
+        XCTAssertEqual(groups.count, 2)
+        XCTAssertEqual(groups[0].indices, [1, 2])
+        XCTAssertEqual(groups[0].keep, 2)
+        XCTAssertEqual(groups[1].indices, [3, 4])
+        XCTAssertNil(groups[1].keep)
+    }
+
+    func testADismissedPairKillsTheGroupItAppearsIn() {
+        let pair = JournalMerge.pairKey("Alkohol konsumiert?", "Did you drink any alcohol?")
+        XCTAssertEqual(pair, JournalMerge.pairKey("Did you drink any alcohol?", "Alkohol konsumiert?"),
+                       "the key is order-independent, so dismissing sticks either way round")
+        XCTAssertEqual(AICoachEngine.journalDuplicateReview(
+            from: "GROUP 1,2", questions: catalogFixture, counts: [:], dismissed: [pair]),
+                       .candidates([]),
+                       "a valid cached reply stays valid after the user dismisses its only group")
+    }
+
+    func testTheSurvivorFallsBackToTheLongestHistoryWhenKeepIsMissing() {
+        let candidates = AICoachEngine.journalDuplicateCandidates(
+            from: "GROUP 3,4", questions: catalogFixture,
+            counts: ["Ein Magnesiumpräparat eingenommen?": 12, "Did you take magnesium?": 88])
+        XCTAssertEqual(candidates.first?.suggestedTarget, "Did you take magnesium?",
+                       "a sloppy reply costs a default, not the group")
+    }
+
+    func testTheCatalogFingerprintIgnoresOrderButNotContent() {
+        let a = AICoachEngine.journalCatalogFingerprint(catalogFixture)
+        XCTAssertEqual(a, AICoachEngine.journalCatalogFingerprint(catalogFixture.reversed()),
+                       "reordering the catalog does not change what the model would be asked, so it "
+                       + "must not buy a second request")
+        XCTAssertNotEqual(a, AICoachEngine.journalCatalogFingerprint(catalogFixture + ["Sauna?"]))
+        XCTAssertNotEqual(AICoachEngine.journalCatalogFingerprint(["ab", "c"]),
+                          AICoachEngine.journalCatalogFingerprint(["a", "bc"]),
+                          "the separator is what keeps concatenations apart")
+    }
+
+    // MARK: - Grouping the catalog
+    //
+    // The card buckets the resolved catalog ONCE per render and hands each group its slice. It used to
+    // call `resolvedItems` — the full merge of imported questions, saved items and starters — inside
+    // every one of the six group blocks, on every render. These pin that the cheaper shape is the same
+    // shape: same items, same per-group order.
+
+    @MainActor
+    func testItemsByGroupKeepsEveryItemExactlyOnce() {
+        let store = JournalCatalogStore()
+        store.items = []
+        let resolved = store.resolvedItems(imported: ["Did you drink any alcohol?", "Any caffeine?"])
+        let grouped = JournalLogCard.itemsByGroup(resolved)
+        let flattened = grouped.values.flatMap { $0 }
+        XCTAssertEqual(flattened.count, resolved.count)
+        XCTAssertEqual(Set(flattened.map(\.canonical)), Set(resolved.map(\.canonical)))
+    }
+
+    @MainActor
+    func testItemsByGroupPutsEachItemUnderItsOwnGroup() {
+        let store = JournalCatalogStore()
+        store.items = []
+        store.addCustom("Sauna", kind: .bool, group: .lifestyle)
+        store.addCustom("Water (L)", kind: .numeric(unitLabel: "L"), group: .nutrition)
+        let grouped = JournalLogCard.itemsByGroup(store.resolvedItems(imported: []))
+        XCTAssertTrue(grouped[.lifestyle]?.contains { $0.canonical == "Sauna" } ?? false)
+        XCTAssertTrue(grouped[.nutrition]?.contains { $0.canonical == "Water (L)" } ?? false)
+        XCTAssertFalse(grouped[.lifestyle]?.contains { $0.canonical == "Water (L)" } ?? false)
+    }
+
+    @MainActor
+    func testItemsByGroupOrdersBySortIndexThenDisplay() {
+        // The old per-group `filter().sorted()` ordered by (sortIndex, display); the bucketed form has to
+        // reproduce it, or a rename would visibly reshuffle a group.
+        let store = JournalCatalogStore()
+        store.items = [
+            JournalCatalogItem(canonical: "b", displayName: nil, kind: .bool, group: .other,
+                               sortIndex: 2, hidden: false, custom: true),
+            JournalCatalogItem(canonical: "a", displayName: nil, kind: .bool, group: .other,
+                               sortIndex: 2, hidden: false, custom: true),
+            JournalCatalogItem(canonical: "c", displayName: nil, kind: .bool, group: .other,
+                               sortIndex: 1, hidden: false, custom: true),
+        ]
+        let grouped = JournalLogCard.itemsByGroup(store.resolvedItems(imported: []))
+        let others = (grouped[.other] ?? []).filter { ["a", "b", "c"].contains($0.canonical) }
+        XCTAssertEqual(others.map(\.canonical), ["c", "a", "b"])
+    }
 }

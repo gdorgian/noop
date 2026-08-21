@@ -31,7 +31,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-LANGS = ["de", "es", "fr", "pt-PT"]
+LANGS = ["de", "es", "fr", "pt-PT", "pl"]
 ANDROID_LOCALE_DIRS = {
     "de": "values-de",
     "es": "values-es",
@@ -486,6 +486,9 @@ def android_strings_xml_gaps() -> dict[str, set[str]]:
     existing values-<locale>/strings.xml. (Doesn't invent missing locale dirs —
     see the audit summary for languages with NO directory at all.)"""
     base_path = ROOT / "android/app/src/main/res/values/strings.xml"
+    # No Android tree in this fork (see docs/FORK_GUIDE.md) — nothing to compare, so no gaps.
+    if not base_path.is_file():
+        return {}
     # <plurals> count too: converting a hand-rolled singular/plural PAIR into one <plurals> would
     # otherwise DROP those keys out of this gate's view entirely, so a locale could silently lose them —
     # fixing the plural model must not open a coverage hole (see #540 for the same class of blind spot).
@@ -509,6 +512,9 @@ ANDROID_FORMAT_PATTERN = re.compile(r"%[1-9]\d*\$[-+0 #,(]*\d*(?:\.\d+)?([sdif])
 
 def android_format_gaps() -> dict[str, list[str]]:
     """Resource keys whose translated Formatter arguments differ from English."""
+    # No Android tree in this fork (see docs/FORK_GUIDE.md) — nothing to compare.
+    if not (ROOT / "android/app/src/main/res/values/strings.xml").is_file():
+        return {}
     paths = {
         "en": ROOT / "android/app/src/main/res/values/strings.xml",
         **{
@@ -919,27 +925,41 @@ def extra_locale_allowance() -> dict[str, int]:
     return out
 
 
+
 ECHO_BASELINE_PATH = ROOT / "Tools/i18n_echo_baseline.txt"
 
-#: Format specifiers stripped before deciding whether a string has translatable words in it. Covers
-#: both the Apple (`%@`, `%lld`) and Android (`%1$s`, `%d`) conversion shapes.
+#: Format specifiers stripped before deciding whether a string has translatable words in it.
 FORMAT_SPECIFIER_PATTERN = re.compile(r"%(?:\d+\$)?[@#0\-+ ]*[\d.]*(?:ll|l|h)?[@dfsu]|%%")
 
 
-def _has_translatable_words(text: str) -> bool:
-    """Whether a string carries enough real words that an identical translation is suspicious.
+def _has_translatable_words(key: str) -> bool:
+    """Whether a catalog key contains enough real words that an identical translation is suspicious.
 
-    Strips format specifiers first: "%@ · n = %lld" / "%1$s: %2$s" are placeholders and punctuation
-    with nothing to translate, so a locale repeating them verbatim is CORRECT, not a gap. Two words is
-    the floor — one word is very often a term that legitimately travels ("HRV", "Yoga", a brand name).
+    Strips format specifiers first: "%@ · n = %lld" and "%@: %@. %@, %@. %@." are placeholders and
+    punctuation with nothing to translate, so a locale repeating them verbatim is CORRECT, not a gap.
+    Two words is the floor — one word is very often a term that legitimately travels ("HRV", "Yoga").
     """
-    stripped = FORMAT_SPECIFIER_PATTERN.sub(" ", text)
+    stripped = FORMAT_SPECIFIER_PATTERN.sub(" ", key)
     return len(re.findall(r"[^\W\d_]{2,}", stripped, flags=re.UNICODE)) >= 2
 
 
-def _ios_echoed_counts() -> dict[str, int]:
-    """`<catalog> <lang> -> count` of xcstrings localizations marked `translated` whose value IS the
-    English key (in a String Catalog the key is the source string)."""
+def echoed_translation_counts() -> dict[str, int]:
+    """`<catalog> <lang> -> count` of localizations marked `translated` whose value IS the English key.
+
+    The hole this closes: the coverage gate above asks whether a key EXISTS in a language, never
+    whether the value differs from the source. A catalog can therefore be 100% "complete" while a
+    German reader sees English sentences — which is exactly what shipped, visible on the Today screen
+    as a German goal card whose body read "Add a daily action to turn a long-term goal into something
+    concrete today."
+
+    Counts rather than a key list, for the reason `extra_locale_allowance` gives: a list goes stale on
+    every edit and trains people to regenerate it unread.
+
+    NOT every hit is a missing translation — a brand ("Apple Health"), a design-system label
+    ("Headline / Semibold 17") or a term of art legitimately reads the same in every language. That is
+    why this ratchets against a baseline instead of demanding zero: the gate's job is to stop the
+    number GROWING, and the residue is a work list to draw down by hand, not a defect count.
+    """
     counts: dict[str, int] = {}
     for _dirs, catalog_path in CATALOGS:
         if not catalog_path.is_file():
@@ -961,59 +981,8 @@ def _ios_echoed_counts() -> dict[str, int]:
     return counts
 
 
-def _android_echoed_counts() -> dict[str, int]:
-    """Android twin of `_ios_echoed_counts`: `values-<locale>/strings.xml` entries whose value is the
-    base `values/strings.xml` value VERBATIM. Android keys are identifiers, not the source text, so the
-    echo is `locale_value == base_value` (not value == key), and the translatable-words floor is applied
-    to the BASE value (the English copy)."""
-    base_path = ROOT / "android/app/src/main/res/values/strings.xml"
-    if not base_path.is_file():
-        return {}
-    try:
-        base = {n.attrib["name"]: (n.text or "") for n in ET.parse(base_path).getroot().findall("string")}
-    except ET.ParseError:
-        return {}
-    # Only base keys with real words to translate can be a meaningful echo — precompute once.
-    translatable = {k: v for k, v in base.items() if _has_translatable_words(v)}
-    counts: dict[str, int] = {}
-    res = ROOT / "android/app/src/main/res"
-    for locale_dir in shipped_android_locale_dirs():
-        lang = locale_dir[len("values-"):]
-        path = res / locale_dir / "strings.xml"
-        try:
-            loc = {n.attrib["name"]: (n.text or "") for n in ET.parse(path).getroot().findall("string")}
-        except ET.ParseError:
-            continue
-        rel = str(path.relative_to(ROOT))
-        n = sum(1 for k, base_val in translatable.items() if loc.get(k) == base_val)
-        if n:
-            counts[f"{rel} {lang}"] = n
-    return counts
-
-
-def echoed_translation_counts() -> dict[str, int]:
-    """`<catalog-or-strings.xml> <lang> -> count` of localizations that are still the English source, on
-    BOTH platforms.
-
-    The hole this closes: the coverage gate asks whether a key EXISTS in a language, never whether the
-    value differs from the source. A catalog can therefore be 100% "complete" while a German reader sees
-    English sentences — which is exactly what shipped once (a German goal card whose body read "Add a
-    daily action …").
-
-    Counts rather than a key list, for the reason `extra_locale_allowance` gives: a list goes stale on
-    every edit and trains people to regenerate it unread. NOT every hit is a missing translation — a
-    brand ("Apple Health"), a design-system label ("Headline / Semibold 17") or a term of art
-    legitimately reads the same in every language — which is why this RATCHETS against a baseline instead
-    of demanding zero: the gate's job is to stop the number GROWING, and the residue is a work list to
-    draw down by hand. iOS/xcstrings keys are disjoint from Android strings.xml paths, so the two merge
-    without collision.
-    """
-    return {**_ios_echoed_counts(), **_android_echoed_counts()}
-
-
 def echo_allowance() -> dict[str, int]:
-    """`<catalog-or-strings.xml> <lang> -> allowed echo count`, same shape and ratchet as
-    `extra_locale_allowance`."""
+    """`<catalog> <lang> -> allowed echo count`, same shape and ratchet as `extra_locale_allowance`."""
     if not ECHO_BASELINE_PATH.exists():
         return {}
     out: dict[str, int] = {}
@@ -1073,36 +1042,43 @@ def ci_check(base_ref: str) -> int:
     failed = False
     baseline = load_baseline()
 
-    print("--- Android: no NEW hardcoded UI copy, and complete focus locales ---")
-    android_literals = scan_android()
-    android_found = {(p, lit) for p, _line, lit in android_literals}
-    android_new = [f for f in android_literals if (f[0], f[2]) not in baseline["android"]]
-    if android_new:
-        failed = True
-        print(f"FAIL {len(android_new)} NEW hardcoded literal(s) (not in {BASELINE_PATH.relative_to(ROOT)}):")
-        for path, line, literal in android_new[:30]:
-            print(f"  {path}:{line}: {literal!r}")
-    else:
-        print(f"  OK no new hardcoded literals ({len(android_found)} pre-existing, tracked in the baseline)")
-    android_fixed = baseline["android"] - android_found
-    if android_fixed:
-        print(f"  {len(android_fixed)} baseline entr(y/ies) no longer found — run --update-baseline to shrink the backlog")
-    android_gaps = android_strings_xml_gaps()
-    android_formats = android_format_gaps()
-    for lang in LANGS:
-        gaps = android_gaps.get(lang)
-        if gaps:
+    # This fork removed the Android tree (see docs/FORK_GUIDE.md). Skip the whole Android arm when
+    # it is absent — several helpers below read android/app/src/main/res unguarded, so without this
+    # the gate crashes rather than reporting. Kept rather than deleted so the tool still works if the
+    # tree is restored temporarily (e.g. while resolving an upstream sync).
+    if (ROOT / "android").is_dir():
+        print("--- Android: no NEW hardcoded UI copy, and complete focus locales ---")
+        android_literals = scan_android()
+        android_found = {(p, lit) for p, _line, lit in android_literals}
+        android_new = [f for f in android_literals if (f[0], f[2]) not in baseline["android"]]
+        if android_new:
             failed = True
-            locale_dir = ANDROID_LOCALE_DIRS[lang]
-            print(f"FAIL {locale_dir}/strings.xml missing {len(gaps)} key(s): {sorted(gaps)[:30]}")
+            print(f"FAIL {len(android_new)} NEW hardcoded literal(s) (not in {BASELINE_PATH.relative_to(ROOT)}):")
+            for path, line, literal in android_new[:30]:
+                print(f"  {path}:{line}: {literal!r}")
         else:
-            locale_dir = ANDROID_LOCALE_DIRS[lang]
-            print(f"  OK {locale_dir}/strings.xml")
-        format_gaps = android_formats.get(lang)
-        if format_gaps:
-            failed = True
-            locale_dir = ANDROID_LOCALE_DIRS[lang]
-            print(f"FAIL {locale_dir}/strings.xml has {len(format_gaps)} format mismatch(es): {format_gaps[:30]}")
+            print(f"  OK no new hardcoded literals ({len(android_found)} pre-existing, tracked in the baseline)")
+        android_fixed = baseline["android"] - android_found
+        if android_fixed:
+            print(f"  {len(android_fixed)} baseline entr(y/ies) no longer found — run --update-baseline to shrink the backlog")
+        android_gaps = android_strings_xml_gaps()
+        android_formats = android_format_gaps()
+        for lang in LANGS:
+            gaps = android_gaps.get(lang)
+            if gaps:
+                failed = True
+                locale_dir = ANDROID_LOCALE_DIRS[lang]
+                print(f"FAIL {locale_dir}/strings.xml missing {len(gaps)} key(s): {sorted(gaps)[:30]}")
+            else:
+                locale_dir = ANDROID_LOCALE_DIRS[lang]
+                print(f"  OK {locale_dir}/strings.xml")
+            format_gaps = android_formats.get(lang)
+            if format_gaps:
+                failed = True
+                locale_dir = ANDROID_LOCALE_DIRS[lang]
+                print(f"FAIL {locale_dir}/strings.xml has {len(format_gaps)} format mismatch(es): {format_gaps[:30]}")
+    else:
+        print("--- Android: tree not present in this fork — skipped ---")
 
     print("\n--- Apple: no NEW un-extracted UI copy, and complete focus locales ---")
     ios_literals, _source_gaps = scan_ios()
@@ -1172,6 +1148,30 @@ def ci_check(base_ref: str) -> int:
     # #844: every OTHER shipped locale, gated against a ratcheting allowance. LANGS above stays at zero
     # tolerance; these carry real pre-existing debt (StrandDesign ships 14 of 95 Italian), so the gate
     # blocks GROWTH rather than demanding the backlog be cleared before anyone can merge.
+    # A key that EXISTS in a language still says nothing about whether it was translated. This section
+    # is the difference between "complete" and "translated": it counts localizations marked
+    # `translated` whose value is the English source verbatim. See `echoed_translation_counts`.
+    print("\n--- Translations that are still the English source (ratcheting allowance) ---")
+    echo_failed = False
+    echoes = echoed_translation_counts()
+    echo_allowed = echo_allowance()
+    echo_improved: list[str] = []
+    for target in sorted(set(echoes) | set(echo_allowed)):
+        found = echoes.get(target, 0)
+        allowed = echo_allowed.get(target, 0)
+        if found > allowed:
+            failed = True
+            echo_failed = True
+            print(f"FAIL {target}: {found} untranslated echo(es) exceeds the allowance of {allowed}")
+        elif found < allowed:
+            echo_improved.append(f"{target}: {allowed} -> {found}")
+    for line in echo_improved:
+        print(f"  IMPROVED {line}")
+    if echo_improved:
+        print(f"  Lower these in {ECHO_BASELINE_PATH.relative_to(ROOT)} to lock the gain in.")
+    if not echo_failed and not echo_improved:
+        print(f"  OK no new English-only translations ({sum(echoes.values())} tracked, ratcheting down)")
+
     print("\n--- Locales beyond the focus set: no NEW gaps (ratcheting allowance) ---")
     # Local, NOT the global `failed`: an earlier section failing (a German string, an un-extracted
     # literal) must not silence this section's own verdict. Reporting nothing here reads as "did not
@@ -1188,8 +1188,10 @@ def ci_check(base_ref: str) -> int:
             print(f"FAIL {target}: missing={missing} exceeds the allowance of {allowed}")
         elif missing < allowed:
             improved.append(f"{target}: {allowed} -> {missing}")
-    base_path = ROOT / "android/app/src/main/res/values/strings.xml"
-    base_keys = set(re.findall(r'<(?:string|plurals) name="([^"]+)"', base_path.read_text(encoding="utf-8")))
+    # Extra (non-focus) Android locales — skipped in this fork, which has no android/ tree.
+    if (ROOT / "android/app/src/main/res/values/strings.xml").is_file():
+        base_path = ROOT / "android/app/src/main/res/values/strings.xml"
+        base_keys = set(re.findall(r'<(?:string|plurals) name="([^"]+)"', base_path.read_text(encoding="utf-8")))
     for locale_dir in shipped_android_locale_dirs():
         if locale_dir in ANDROID_LOCALE_DIRS.values():
             continue   # already hard-gated above

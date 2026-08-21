@@ -165,13 +165,16 @@ final class Repository: ObservableObject {
         computedDeviceId == canonicalComputedId ? [computedDeviceId] : [computedDeviceId, canonicalComputedId]
     }
 
-    /// Every namespace that can own a sleep row the Sleep tab currently shows: computed sources first
-    /// (they keep precedence over imported), the active id ahead of the canonical one on each side.
-    /// `CachedSleepSession` deliberately carries no device id, so a write that starts from a merged
-    /// Sleep-tab row must resolve its owner against this same union the reads use — otherwise a
-    /// historical night sitting under the CANONICAL source (after a strap re-add) looks editable but its
-    /// save silently matches nothing.
-    private var sleepOwnerIds: [String] { computedReadIds + importedReadIds }
+    /// Every namespace that can own a sleep row currently visible in the app. Computed rows keep their
+    /// established precedence over imported rows; within each side the active source comes first.
+    ///
+    /// `CachedSleepSession` intentionally has no device id, so a write that starts from a merged Sleep-tab
+    /// row must resolve its owner against this same active-plus-canonical union used for reads. Otherwise a
+    /// historical night under the canonical source after a strap re-add looks editable but its save is a
+    /// no-op.
+    private var sleepOwnerIds: [String] {
+        computedReadIds + importedReadIds
+    }
 
     /// True when the ACTIVE strap is an Oura ring, resolved from its registry id prefix against the canonical
     /// brand table (`DeviceBrandCatalog.idPrefix`) rather than an ad-hoc "oura" literal. The device registry
@@ -522,6 +525,21 @@ final class Repository: ObservableObject {
         DailyMetric.lastSkinTempDay(days: days, todayKey: todayKey)
     }
 
+    /// The weight shown across all three Today screens: a real Apple Health reading wins (today's/most-
+    /// recent daily row `> 10 kg` — guards against a stray 0/garbage sample), else the newest point in a
+    /// widened "weight"/apple-health series (weight is logged sparsely; a reading from weeks ago is still
+    /// real data, unlike a fabricated number), else the user's self-reported profile weight. Never nil —
+    /// the profile field always has SOME value — so callers never need their own "—" case for weight.
+    /// `isFromProfile` lets a caller show an honest "from profile" caption on the fallback tier, mirroring
+    /// classic Today's original `weightTile`. Pure/nonisolated: any Today screen can call it synchronously
+    /// once it has already fetched its own inputs, without re-deriving the three-tier fallback itself.
+    nonisolated static func resolveWeightKg(latestAppleWeightKg: Double?, seriesFallbackKg: Double?,
+                                            profileWeightKg: Double) -> (kg: Double, isFromProfile: Bool) {
+        if let kg = latestAppleWeightKg, kg > 10 { return (kg, false) }
+        if let kg = seriesFallbackKg, kg > 10 { return (kg, false) }
+        return (profileWeightKg, true)
+    }
+
     /// PER-FIELD respiratory carry — twin of `lastSpo2Day`, but STALENESS-BOUNDED to `Baselines.vitalCarryDays`.
     /// SpO₂/skin-temp are sparse/imported so last-known-of-any-age is expected; respiratory is nightly, so a
     /// weeks-old value shown as the current number is the "Respiratory 15.6 a fortnight later" bug that
@@ -545,7 +563,7 @@ final class Repository: ObservableObject {
 
     /// Canonical source ids the resolver knows how to cross-reference. The strap's actual id is
     /// `deviceId` (and its computed sibling `deviceId + "-noop"`); these are the FIXED ids.
-    static let whoopSource = "my-whoop"
+    nonisolated static let whoopSource = "my-whoop"
     static let appleHealthSource = "apple-health"
     static let healthConnectSource = "health-connect"
     static let activityFileSource = "activity-file"
@@ -709,6 +727,11 @@ final class Repository: ObservableObject {
     /// newer one. Each call captures the token at entry and only publishes if it is still the latest. Not
     /// @Published (pure ordering, never drives the UI); race-free since Repository is @MainActor.
     private var refreshGen = 0
+    private var refreshRunnerActive = false
+    private var activeRefreshDays = 0
+    private var activeRefreshWaiters: [CheckedContinuation<Void, Never>] = []
+    private var pendingRefreshDays = 0
+    private var pendingRefreshWaiters: [CheckedContinuation<Void, Never>] = []
 
     /// #849: the `refreshSeq` value at which Today last ran its heavy history-wide reload (the ~40 reads +
     /// per-day raw-HR pass). Lives HERE, on the long-lived Repository, not in TodayView's `@State`, so it
@@ -775,7 +798,41 @@ final class Repository: ObservableObject {
     var loadFireCounts: [String: Int] = [:]
     #endif
 
-    func refresh(days nDays: Int = 4000) async {
+    /// Refresh the UI publication window only. Historical screens use the explicit range APIs below;
+    /// a bare refresh must never materialize the user's complete archive on launch/foreground/reselect.
+    func refresh(days nDays: Int = 120) async {
+        let requestedDays = max(1, nDays)
+        await withCheckedContinuation { waiter in
+            // A running wider snapshot already covers this request: share it instead of queueing the same
+            // database reads again. A wider request queues one follow-up generation and absorbs all peers.
+            if refreshRunnerActive, requestedDays <= activeRefreshDays {
+                activeRefreshWaiters.append(waiter)
+                return
+            }
+            pendingRefreshDays = max(pendingRefreshDays, requestedDays)
+            pendingRefreshWaiters.append(waiter)
+            guard !refreshRunnerActive else { return }
+            refreshRunnerActive = true
+            Task { await self.runRefreshQueue() }
+        }
+    }
+
+    private func runRefreshQueue() async {
+        while pendingRefreshDays > 0 {
+            activeRefreshDays = pendingRefreshDays
+            activeRefreshWaiters = pendingRefreshWaiters
+            pendingRefreshDays = 0
+            pendingRefreshWaiters = []
+            await performRefresh(days: activeRefreshDays)
+            let completed = activeRefreshWaiters
+            activeRefreshWaiters = []
+            activeRefreshDays = 0
+            completed.forEach { $0.resume() }
+        }
+        refreshRunnerActive = false
+    }
+
+    private func performRefresh(days nDays: Int) async {
         guard let store = await ensureStore() else { return }
         refreshGen &+= 1
         let myGen = refreshGen
@@ -813,23 +870,25 @@ final class Repository: ObservableObject {
             for p in cons { fig[p.day, default: ImportedSleepFigures()].consistencyPct = p.value }
             for p in need { fig[p.day, default: ImportedSleepFigures()].needMin = p.value }
             for p in debt { fig[p.day, default: ImportedSleepFigures()].debtMin = p.value }
-            // H5 (#509): a night the user hand-edited (userEdited) must keep its corrected sleep figures even
-            // when a WHOOP/Apple import also covers that day. The computed ("-noop") session carries the edit,
-            // and IntelligenceEngine re-keys the computed DAILY row from it; collect those edited days so the
-            // merge lets the computed row's SLEEP fields win there (imports still win on every un-edited day).
-            let editedDays = Self.userEditedDays(compSleep)
+            // A user correction can live in either the computed or imported namespace. Merge the displayed
+            // sessions first, then use their corrected stages to overlay the affected daily sleep fields.
+            // This keeps the Sleep tab, its debt ledger, and the dashboard on the same edited night even when
+            // no raw data exists to produce a computed daily row (for example a historical WHOOP import).
+            let mergedSleeps = Self.mergeSleep(imported: impSleep, computed: compSleep)
+            let editedDays = Self.userEditedDays(mergedSleeps)
+            let mergedDays = Self.mergeDaily(imported: imported, computed: computed, userEditedDays: editedDays)
             return MergedCaches(
                 importedSleep: fig,
-                // Mi Band goes on LAST so it fills only what the strap, its computed sibling and the
-                // activity files all left empty.
+                // Mi Band goes on LAST so it fills only what the strap, its computed sibling, the edited
+                // sleep overlay and the activity files all left empty.
                 days: Self.mergeXiaomi(
                     into: Self.mergeActivityFileSteps(
-                        into: Self.mergeDaily(imported: imported, computed: computed, userEditedDays: editedDays),
+                        into: Self.applyingEditedSleepSessions(mergedSleeps, to: mergedDays),
                         activityFile
                     ),
                     xiaomi
                 ),
-                sleeps: Self.mergeSleep(imported: impSleep, computed: compSleep),
+                sleeps: mergedSleeps,
                 vitalRows: Self.sourceRows(imported: imported, computed: computed, apple: apple),
                 freshness: Self.computeFreshness(imported: imported, computed: computed, apple: apple,
                                                  importedSleeps: impSleep, computedSleeps: compSleep))
@@ -991,6 +1050,53 @@ final class Repository: ObservableObject {
         return days
     }
 
+    /// Rebuild the sleep-only fields for days with a manually corrected session. Historical imports have no
+    /// raw streams, so `IntelligenceEngine` cannot always create a computed daily row after an edit; deriving
+    /// this overlay from the stored, re-clipped stages makes the edited duration immediately authoritative.
+    nonisolated static func applyingEditedSleepSessions(_ sessions: [CachedSleepSession],
+                                                        to days: [DailyMetric]) -> [DailyMetric] {
+        guard sessions.contains(where: \.userEdited) else { return days }
+        let offsetSec = TimeZone.current.secondsFromGMT()
+        let habitualBlocks = sessions.compactMap { session -> SleepStageTotals.HistoryBlock? in
+            let start = session.effectiveStartTs, end = session.endTs
+            guard end > start else { return nil }
+            let midpoint = start + (end - start) / 2
+            return SleepStageTotals.HistoryBlock(
+                start: start,
+                end: end,
+                dayKey: AnalyticsEngine.dayString(midpoint, offsetSec: offsetSec)
+            )
+        }
+        let habitualMidsleepSec = SleepStageTotals.habitualMidsleepSec(habitualBlocks, offsetSec: offsetSec)
+        let sessionsByDay = Dictionary(grouping: sessions) { session in
+            AnalyticsEngine.dayString(session.endTs, offsetSec: offsetSec)
+        }
+
+        return days.map { daily in
+            guard let daySessions = sessionsByDay[daily.day], daySessions.contains(where: \.userEdited) else {
+                return daily
+            }
+            let editedStages = Dictionary(
+                daySessions.filter(\.userEdited).map { ($0.startTs, $0.stagesJSON) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            let onsets = Dictionary(
+                daySessions.map { ($0.startTs, $0.effectiveStartTs) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            guard let aggregate = SleepStageTotals.dailyAggregateHonoringEdits(
+                detected: daySessions.map { (startTs: $0.startTs, stagesJSON: $0.stagesJSON) },
+                edited: editedStages,
+                onsetByStart: onsets,
+                offsetSec: offsetSec,
+                habitualMidsleepSec: habitualMidsleepSec
+            ), aggregate.editApplied else {
+                return daily
+            }
+            return daily.takingEditedSleepFields(from: aggregate.sleep)
+        }
+    }
+
     /// Daily rows tagged with the source that supplied them, for the source-aware vital-sign cards.
     /// One entry per (source, day) , the consumer resolves precedence per metric (imported > computed
     /// > Apple); ordered by day, then source priority, so a stable list reaches the UI.
@@ -1067,6 +1173,16 @@ final class Repository: ObservableObject {
         return byTs.values.sorted { $0.ts < $1.ts }
     }
 
+    /// Timestamp of the newest raw HR sample stored across the imported sources, or nil when empty.
+    ///
+    /// The coverage EDGE, which is what tells a truncated sleep window apart from a real early wake: a
+    /// night whose end coincides with this has been cut off by an unfinished offload rather than by the
+    /// wearer waking up. Read by `SleepWindowSettledness` through `AICoachEngine`.
+    func latestHRSampleTs() async -> Int? {
+        guard let store = await ensureStore() else { return nil }
+        return await unionLatestHRSampleTs(store: store)
+    }
+
     /// Logical day-start of the most recent day the active device has HR data for, or nil when the store is
     /// empty. Lets the Deep Timeline open on a day that actually has data instead of a possibly-empty today
     /// right after a history sync , the #597 root cause (the timeline was today-only with no way back).
@@ -1124,7 +1240,7 @@ final class Repository: ObservableObject {
         guard let store = await ensureStore() else { return nil }
         var perId: [[StepSample]] = []
         for id in importedReadIds {   // active strap FIRST so it wins a ts tie
-            perId.append((try? await store.stepSamples(deviceId: id, from: from, to: to, limit: 200_000)) ?? [])
+            perId.append((try? await store.stepSamples(deviceId: id, from: from, to: to, limit: Int.max)) ?? [])
         }
         return Self.latestActivityClass(perId)
     }
@@ -1138,7 +1254,7 @@ final class Repository: ObservableObject {
     func strapStepTicks(from: Int, to: Int) async -> Int? {
         guard let store = await ensureStore() else { return nil }
         for id in importedReadIds {   // active strap FIRST
-            let samples = (try? await store.stepSamples(deviceId: id, from: from, to: to, limit: 200_000)) ?? []
+            let samples = (try? await store.stepSamples(deviceId: id, from: from, to: to, limit: Int.max)) ?? []
             if let ticks = StepsCounter.stepsInWindow(samples) { return ticks }
         }
         return nil
@@ -1248,22 +1364,43 @@ final class Repository: ObservableObject {
     /// clears the threshold; `habitualMidsleepSec` keeps the longest block per day, so window/order/source
     /// merge differences wash out. (#547)
     func habitualMidsleepSec(days: Int = 4000) async -> Int? {
+        let offsetSec = TimeZone.current.secondsFromGMT()
+        guard let blocks = await sleepHistoryBlocks(days: days, offsetSec: offsetSec) else { return nil }
+        return SleepStageTotals.habitualMidsleepSec(blocks, offsetSec: offsetSec)
+    }
+
+    /// The user's learned habitual WAKE (local time-of-day seconds), from the same history and the same
+    /// longest-block-per-day rule as ``habitualMidsleepSec(days:)``. nil during the cold start.
+    ///
+    /// Read by the coach to judge whether last night's recorded wake is so far off the wearer's own
+    /// pattern that the window should be doubted rather than planned on (`SleepWindowSettledness`).
+    func habitualWakeSec(days: Int = 4000) async -> Int? {
+        let offsetSec = TimeZone.current.secondsFromGMT()
+        guard let blocks = await sleepHistoryBlocks(days: days, offsetSec: offsetSec) else { return nil }
+        return SleepStageTotals.habitualWakeSec(blocks, offsetSec: offsetSec)
+    }
+
+    /// The trailing sleep history both habitual learners read, as `HistoryBlock`s keyed by the LOCAL
+    /// calendar day of each session's midpoint. Extracted so the two can never diverge on WHICH nights
+    /// they learn from — they answer different questions about the identical history.
+    ///
+    /// Built EXACTLY as `IntelligenceEngine.computeHabitualMidsleep` does: the same imported + computed
+    /// ("-noop") union with identical blocks de-duplicated, so a day present in both namespaces doesn't
+    /// double-weight the learner. Reads a wide window so the distinct-day count comfortably clears the
+    /// threshold; keeping the longest block per day washes out window/order/source merge differences. (#547)
+    private func sleepHistoryBlocks(days: Int, offsetSec: Int) async -> [SleepStageTotals.HistoryBlock]? {
         guard let store = await ensureStore() else { return nil }
         let now = Int(Date().timeIntervalSince1970)
         let lo = now - days * 86_400, hi = now + 86_400
-        // UNION active strap + canonical (imported) and their computed siblings, de-duplicating identical
-        // blocks recorded under both ids so a day present in both namespaces doesn't double-weight the learner.
         let imported = Self.dedupBlocks(await unionRawSleepBlocks(store: store, ids: importedReadIds, from: lo, to: hi))
         let computed = Self.dedupBlocks(await unionRawSleepBlocks(store: store, ids: computedReadIds, from: lo, to: hi))
-        let offsetSec = TimeZone.current.secondsFromGMT()
-        let blocks = (imported + computed).compactMap { s -> SleepStageTotals.HistoryBlock? in
+        return (imported + computed).compactMap { s -> SleepStageTotals.HistoryBlock? in
             let start = s.effectiveStartTs, end = s.endTs
             guard end > start else { return nil }
             let mid = start + (end - start) / 2
             let dayKey = AnalyticsEngine.dayString(mid, offsetSec: offsetSec)
             return SleepStageTotals.HistoryBlock(start: start, end: end, dayKey: dayKey)
         }
-        return SleepStageTotals.habitualMidsleepSec(blocks, offsetSec: offsetSec)
     }
 
     /// Hand-correct a night's bed (onset) and/or wake (end) time. `detectedStartTs` is the immutable
@@ -1295,10 +1432,8 @@ final class Repository: ObservableObject {
         let stagesJSON = await restageFromRaw(start: safeStartTs, end: safeEndTs)
             ?? SleepWindowReclip.reclip(stagesJSON: storedStagesJSON, sessionStart: detectedStartTs,
                                         oldEnd: oldEndTs, newStart: safeStartTs, newEnd: safeEndTs)
-        // Apply to the source that actually OWNS this block, resolved against every namespace the Sleep
-        // tab can display (computed precedence preserved by ordering). Stop at the first source that
-        // matched, so a coincidental same-startTs row in another namespace never takes a second edit —
-        // and, unlike the old computed-then-active pair, a night under the canonical source is reached.
+        // Resolve the actual owner from every namespace the Sleep tab can display. Stop at the first
+        // match so duplicate detected keys in another source cannot receive a second edit.
         for ownerDeviceId in sleepOwnerIds {
             let changed = (try? await store.applySleepEdit(
                 deviceId: ownerDeviceId, detectedStartTs: detectedStartTs,
@@ -1342,8 +1477,7 @@ final class Repository: ObservableObject {
             dismissedSleepSpans = DismissedSleepSpans.adding(startTs: detectedStartTs, endTs: endTs,
                                                              to: dismissedSleepSpans)
         }
-        // Delete from the same union of possible owners the Sleep tab reads from, first match wins —
-        // so a night under the canonical source (post strap re-add) is actually removed, not no-op'd.
+        // Delete from the same union of possible owners that the Sleep tab reads from.
         for ownerDeviceId in sleepOwnerIds {
             let deleted = (try? await store.deleteSleepSession(
                 deviceId: ownerDeviceId, startTs: detectedStartTs)) ?? 0
@@ -1499,23 +1633,23 @@ final class Repository: ObservableObject {
     private func restageFromRaw(start: Int, end: Int) async -> String? {
         guard let store = await ensureStore() else { return nil }
         let lo = start - 3_600, hi = end + 3_600
-        let grav = (try? await store.gravitySamples(deviceId: deviceId, from: lo, to: hi, limit: 200_000)) ?? []
+        let grav = (try? await store.gravitySamples(deviceId: deviceId, from: lo, to: hi, limit: Int.max)) ?? []
         let inWindowGravity = grav.lazy.filter { $0.ts >= start && $0.ts <= end }.count
         let windowSeconds = max(1, end - start)
         guard inWindowGravity >= max(20, windowSeconds / 120) else { return nil }
-        let hr = (try? await store.hrSamples(deviceId: deviceId, from: lo, to: hi, limit: 200_000)) ?? []
-        let rr = (try? await store.rrIntervals(deviceId: deviceId, from: lo, to: hi, limit: 200_000)) ?? []
+        let hr = (try? await store.hrSamples(deviceId: deviceId, from: lo, to: hi, limit: Int.max)) ?? []
+        let rr = (try? await store.rrIntervals(deviceId: deviceId, from: lo, to: hi, limit: Int.max)) ?? []
         // Same provenance refusal as the nightly scan (`IntelligenceEngine`): an Oura ring's respiration
         // rows are its own per-window RATE stored as instrumentation, not the ~1 Hz raw ADC waveform this
         // stager reads, so they never reach a re-stage either. See `OuraRespScale.forScoring`.
         let resp = OuraRespScale.forScoring(
-            (try? await store.respSamples(deviceId: deviceId, from: lo, to: hi, limit: 200_000)) ?? [],
+            (try? await store.respSamples(deviceId: deviceId, from: lo, to: hi, limit: Int.max)) ?? [],
             deviceId: deviceId)
         // Read only when the refinement below might actually use it (see `useMotionAwareWake`) — a plain
         // read cost, but no point paying it on the (default) off path.
         let useMotionAwareWake = PuffinExperiment.motionAwareWakeEnabled
         let steps = useMotionAwareWake
-            ? ((try? await store.stepSamples(deviceId: deviceId, from: lo, to: hi, limit: 200_000)) ?? [])
+            ? ((try? await store.stepSamples(deviceId: deviceId, from: lo, to: hi, limit: Int.max)) ?? [])
             : []
         // Which staging engine re-stages this window (Settings → Experimental · Sleep staging). The flag is
         // **default ON** (#277 promoted V2 over V1; #351 extended it to every strap family), so unless the
@@ -1698,7 +1832,7 @@ final class Repository: ObservableObject {
                 // the main actor and can't beach-ball a dense day. Mirrors `restageFromRaw`.
                 var perId: [[HRSample]] = []
                 for id in unionIds {
-                    perId.append((try? await store.hrSamples(deviceId: id, from: from, to: to, limit: 200_000)) ?? [])
+                    perId.append((try? await store.hrSamples(deviceId: id, from: from, to: to, limit: Int.max)) ?? [])
                 }
                 let points = await Task.detached(priority: .utility) {
                     Self.dedupSortRawHr(perId)
@@ -1808,7 +1942,7 @@ final class Repository: ObservableObject {
             // rather than a noisy spike. The `to - from` span chooses the window width: a 2-min rMSSD for a
             // zoomed-in look, widening with the visible span so a day-scale view stays readable. The thinning
             // stride keeps a 1 Hz R-R stream from emitting a point per beat.
-            let rr = (try? await store.rrIntervals(deviceId: source, from: from, to: to, limit: 200_000)) ?? []
+            let rr = (try? await store.rrIntervals(deviceId: source, from: from, to: to, limit: Int.max)) ?? []
             let window = Self.hrvRollingWindowSec(spanSeconds: to - from)
             // rollingRmssd + the map over its output run OFF the main actor (mirrors the HR branch's
             // Task.detached in `timelineSeries`): only the already-read Sendable `rr` rows cross in.
@@ -1818,13 +1952,13 @@ final class Repository: ObservableObject {
             }.value
         case .spo2:
             // The honest raw red/IR ratio proxy (#166: no calibrated %), shown as a unitless trend.
-            let s = (try? await store.spo2Samples(deviceId: source, from: from, to: to, limit: 200_000)) ?? []
+            let s = (try? await store.spo2Samples(deviceId: source, from: from, to: to, limit: Int.max)) ?? []
             // The up-to-200k-row conversion runs OFF the main actor; only the Sendable `s` rows cross in.
             return await Task.detached(priority: .utility) {
                 s.compactMap { $0.ir > 0 ? Self.timelinePoint($0.ts, Double($0.red) / Double($0.ir)) : nil }
             }.value
         case .skinTemp:
-            let s = (try? await store.skinTempSamples(deviceId: source, from: from, to: to, limit: 200_000)) ?? []
+            let s = (try? await store.skinTempSamples(deviceId: source, from: from, to: to, limit: Int.max)) ?? []
             return await Task.detached(priority: .utility) {
                 // #938: family-aware raw→°C — 5/MG centidegrees (raw/100, #156), 4.0 v24 raw ADC map.
                 s.map { Self.timelinePoint($0.ts, skinTempCelsius(raw: $0.raw, family: family)) }
@@ -1834,13 +1968,13 @@ final class Repository: ObservableObject {
             // as before) and an Oura ring's own per-window RATE in milli-bpm (0x6A instrumentation), which
             // is scaled back to breaths/min so the track reads as ~14–16 instead of ~14,375.
             // `OuraRespScale` is the single place that mapping lives.
-            let s = (try? await store.respSamples(deviceId: source, from: from, to: to, limit: 200_000)) ?? []
+            let s = (try? await store.respSamples(deviceId: source, from: from, to: to, limit: Int.max)) ?? []
             return await Task.detached(priority: .utility) {
                 s.map { Self.timelinePoint($0.ts, OuraRespScale.displayValue(raw: $0.raw, deviceId: source)) }
             }.value
         case .motion:
             // Gravity vector magnitude as a coarse movement signal (1 g at rest).
-            let s = (try? await store.gravitySamples(deviceId: source, from: from, to: to, limit: 200_000)) ?? []
+            let s = (try? await store.gravitySamples(deviceId: source, from: from, to: to, limit: Int.max)) ?? []
             // The sqrt-per-row magnitude over up to 200k gravity rows runs OFF the main actor.
             return await Task.detached(priority: .utility) {
                 s.map { Self.timelinePoint($0.ts, ($0.x * $0.x + $0.y * $0.y + $0.z * $0.z).squareRoot()) }
@@ -1858,7 +1992,7 @@ final class Repository: ObservableObject {
             // The ring's OWN per-window motion from OURA_MOTION events (0x47, movement-gated): plot
             // `motion_seconds` (0 when still, up to 31 s of movement in the ~30 s window). An honest
             // activity track, NEVER scored and NEVER a step count; empty for a WHOOP strap (no such events).
-            let evs = (try? await store.events(deviceId: source, from: from, to: to, limit: 200_000)) ?? []
+            let evs = (try? await store.events(deviceId: source, from: from, to: to, limit: Int.max)) ?? []
             return await Task.detached(priority: .utility) {
                 evs.compactMap { e -> TrendPoint? in
                     guard e.kind == OuraStreamMapping.motionEventKind,
@@ -2262,13 +2396,72 @@ final class Repository: ObservableObject {
         return keys.sorted()
     }
 
+    /// Every locally stored source that has points for a metric key. Unlike the small fixed source list
+    /// used by individual screens, this is intentionally open-ended so a coach can discover data from a
+    /// future importer (or an existing third-party import) without an app update.
+    func metricSources(key: String) async -> [String] {
+        guard let store = await ensureStore() else { return [] }
+        return (try? await store.metricSources(key: key)) ?? []
+    }
+
+    /// Source-neutral local metric inventory, used by the coach to decide which bounded analysis is
+    /// relevant. It contains availability metadata only, never the metric readings themselves.
+    func metricCatalog() async -> [MetricCatalogEntry] {
+        guard let store = await ensureStore() else { return [] }
+        return (try? await store.metricCatalog()) ?? []
+    }
+
     /// Native journal answers live under this dedicated source id. The journal table has no
     /// `source` column (PK is (deviceId, day, question)), so writing native answers under the
     /// imported `deviceId` would let a CSV re-import silently overwrite them , and clears could
     /// then delete imported rows. A separate device id keeps the two streams independent.
     static let journalDeviceId = "noop-journal"
 
+    /// The questions the user has merged, as `norm(folded) → target` plus the merge order, refreshed
+    /// from the persisted catalog. Cached because every journal read consults it; the catalog is
+    /// edited from the UI, which calls `journalAliasesChanged()` below.
+    private var journalAliasCache: (map: [String: String], order: [String: Int])?
+
+    private func journalAliases() -> (map: [String: String], order: [String: Int]) {
+        if let journalAliasCache { return journalAliasCache }
+        let items = JournalCatalogStore.persistedItems()
+        let fresh = (JournalCatalogStore.aliasMap(items), JournalCatalogStore.aliasOrder(items))
+        journalAliasCache = fresh
+        return fresh
+    }
+
+    /// Called by the catalog UI after a merge / un-merge so the next read folds by the new rule.
+    func journalAliasesChanged() {
+        journalAliasCache = nil
+        journalItemsCache = nil
+    }
+
+    private var journalItemsCache: [JournalCatalogItem]?
+
+    /// Every wording a question reads as, verbatim: itself, its merge target, and everything folded
+    /// onto that target. The `journal` primary key stores the exact string, so a delete has to name
+    /// each one.
+    private func journalWordings(of question: String) -> [String] {
+        let items = journalItemsCache ?? {
+            let fresh = JournalCatalogStore.persistedItems()
+            journalItemsCache = fresh
+            return fresh
+        }()
+        let target = JournalMerge.writeTarget(question, aliases: journalAliases().map)
+        let targetKey = JournalCatalogStore.norm(target)
+        var out = [question, target]
+        if let item = items.first(where: { JournalCatalogStore.norm($0.canonical) == targetKey }) {
+            out += item.aliases
+        }
+        var seen = Set<String>()
+        return out.filter { seen.insert(JournalCatalogStore.norm($0)).inserted }
+    }
+
     /// Logged behaviours (imported WHOOP journal ∪ native noop-journal) for correlation insights.
+    ///
+    /// Merged questions are folded HERE, at the one door the journal comes through, so Insights, the
+    /// coach's pattern analyser and the logging card can never disagree about what counts as one
+    /// behaviour. Nothing on disk changes — see `JournalMerge.fold` for the precedence rules.
     func journalEntries(days: Int = 4000) async -> [JournalEntry] {
         guard let store = await ensureStore() else { return [] }
         let now = Date()
@@ -2278,7 +2471,9 @@ final class Repository: ObservableObject {
         for id in importedReadIds { imported += (try? await store.journalEntries(deviceId: id, from: from, to: to)) ?? [] }
         let native = (try? await store.journalEntries(deviceId: Self.journalDeviceId,
                                                       from: from, to: to)) ?? []
-        return Self.mergeJournal(imported: imported, native: native)
+        let aliases = journalAliases()
+        return JournalMerge.fold(imported: imported, native: native,
+                                 aliases: aliases.map, aliasOrder: aliases.order)
     }
 
     /// Imported journal rows only (used by the logging card to adopt the export's exact question
@@ -2290,7 +2485,35 @@ final class Repository: ObservableObject {
         let to = Self.dayString(now.addingTimeInterval(86_400))
         var rows: [JournalEntry] = []
         for id in importedReadIds { rows += (try? await store.journalEntries(deviceId: id, from: from, to: to)) ?? [] }
-        return rows
+        // Folded here too: this list is what the catalog adopts as its question wordings, so a merged
+        // wording must not come back in through the side door and re-appear as its own row.
+        let aliases = journalAliases()
+        return JournalMerge.fold(imported: rows, native: [],
+                                 aliases: aliases.map, aliasOrder: aliases.order)
+    }
+
+    /// Answers per question wording, across the imported sources AND the native one — the weight
+    /// behind each candidate in the duplicate review. Counted in SQL (`GROUP BY question`).
+    func journalQuestionCounts() async -> [String: Int] {
+        guard let store = await ensureStore() else { return [:] }
+        return (try? await store.journalQuestionCounts(
+            deviceIds: importedReadIds + [Self.journalDeviceId])) ?? [:]
+    }
+
+    /// Native journal rows only ("noop-journal"). The other half of `journalEntries()`: a caller that
+    /// needs BOTH the merged union and the imported rows on their own (Insights does — it feeds the
+    /// catalog the export's exact question strings) can read each side once and merge with
+    /// `mergeJournal`, instead of calling `journalEntries()` and `importedJournalEntries()` and reading
+    /// every imported row twice.
+    func nativeJournalEntries(days: Int = 4000) async -> [JournalEntry] {
+        guard let store = await ensureStore() else { return [] }
+        let now = Date()
+        let from = Self.dayString(now.addingTimeInterval(-Double(days) * 86_400))
+        let to = Self.dayString(now.addingTimeInterval(86_400))
+        let rows = (try? await store.journalEntries(deviceId: Self.journalDeviceId, from: from, to: to)) ?? []
+        let aliases = journalAliases()
+        return JournalMerge.fold(imported: [], native: rows,
+                                 aliases: aliases.map, aliasOrder: aliases.order)
     }
 
     /// One day's native answers (question → answeredYes) for the logging card's chip state. A
@@ -2299,8 +2522,10 @@ final class Repository: ObservableObject {
         guard let store = await ensureStore() else { return [:] }
         let rows = (try? await store.journalEntries(deviceId: Self.journalDeviceId,
                                                     from: day, to: day)) ?? []
-        return Dictionary(rows.map { ($0.question, $0.answeredYes) },
-                          uniquingKeysWith: { _, last in last })
+        let answers = Dictionary(rows.map { ($0.question, $0.answeredYes) },
+                                 uniquingKeysWith: { _, last in last })
+        let aliases = journalAliases()
+        return JournalMerge.foldDay(answers, aliases: aliases.map, aliasOrder: aliases.order)
     }
 
     /// One day's native numeric values (question → value) for the logging card's numeric fields.
@@ -2311,7 +2536,8 @@ final class Repository: ObservableObject {
                                                     from: day, to: day)) ?? []
         var out: [String: Double] = [:]
         for r in rows { if let v = r.numericValue { out[r.question] = v } }
-        return out
+        let aliases = journalAliases()
+        return JournalMerge.foldDay(out, aliases: aliases.map, aliasOrder: aliases.order)
     }
 
     /// Distinct local-day keys (yyyy-MM-dd) in the inclusive range [from, to] that carry at least one
@@ -2334,12 +2560,48 @@ final class Repository: ObservableObject {
         return byKey.values.sorted { ($0.day, $0.question) < ($1.day, $1.question) }
     }
 
+    /// Coalesces the semantic index refresh that follows journal writes. One task, replaced on every
+    /// write, so a burst of chip taps costs ONE pass instead of one per tap.
+    private var journalIndexTask: Task<Void, Never>?
+
+    /// Re-index the journal AFTER the write, off the caller's await.
+    ///
+    /// This used to be `await CoachSemanticMemory.shared.journalEntriesChanged(await journalEntries())`
+    /// inline in each writer below — so a single tap on a Yes/No chip read the whole 4000-day journal
+    /// across every imported source id, merged it, and (with the index on) rebuilt every journal
+    /// document before the caller's `await` returned. Both types are @MainActor, so that ran on the
+    /// main thread with the UI waiting on it: the chip could not repaint until it finished, which is
+    /// exactly the "my taps do nothing" report. The index still has to follow a write — it just has no
+    /// business being in front of the user.
+    ///
+    /// The history read moved INTO the closure so it is skipped entirely when the index is off or
+    /// unconsented (`journalEntriesChanged` guards before calling it). The purge that runs in that case
+    /// is deliberately still performed — a revoked consent must clear indexed journal rows even when
+    /// this process never indexed any — it is just no longer paid per tap.
+    private func scheduleJournalIndexRefresh() {
+        journalIndexTask?.cancel()
+        journalIndexTask = Task { [weak self] in
+            // Five seconds, not one: filling in a whole journal means a run of taps with normal pauses
+            // between them — finding the next switch, scrolling — and at 800 ms every one of those
+            // pauses started another pass over the full history. The index is allowed to lag: the coach
+            // reconciles everything when it opens (`AICoach` → `prewarm` → `reconcile`), so this path is
+            // freshness for an already-open coach, not the thing that keeps the index correct.
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled, let self else { return }
+            await CoachSemanticMemory.shared.journalEntriesChanged { await self.journalEntries() }
+        }
+    }
+
     /// Write one native answer (day per the importer's wake-day convention).
     func saveJournalAnswer(day: String, question: String, answeredYes: Bool, notes: String? = nil) async {
         guard let store = await ensureStore() else { return }
+        // A merged-away wording is not somewhere new answers should land: write under the question the
+        // user actually sees. The old rows stay exactly where they are.
+        let question = JournalMerge.writeTarget(question, aliases: journalAliases().map)
         _ = try? await store.upsertJournal(
             [JournalEntry(day: day, question: question, answeredYes: answeredYes, notes: notes)],
             deviceId: Self.journalDeviceId)
+        scheduleJournalIndexRefresh()
     }
 
     /// Write one native NUMERIC answer (#322): stores the value AND answeredYes=true, so the existing
@@ -2347,10 +2609,12 @@ final class Repository: ObservableObject {
     /// while the value is carried for dose-response. Day per the importer's wake-day convention.
     func saveJournalNumeric(day: String, question: String, value: Double, notes: String? = nil) async {
         guard let store = await ensureStore() else { return }
+        let question = JournalMerge.writeTarget(question, aliases: journalAliases().map)
         _ = try? await store.upsertJournal(
             [JournalEntry(day: day, question: question, answeredYes: true, notes: notes,
                           numericValue: value)],
             deviceId: Self.journalDeviceId)
+        scheduleJournalIndexRefresh()
     }
 
     /// Per-question numeric series (question → [day: value]) over the imported ∪ native union, native
@@ -2370,7 +2634,15 @@ final class Repository: ObservableObject {
     /// Clear one native answer (never touches imported rows , scoped to the dedicated source id).
     func clearJournalAnswer(day: String, question: String) async {
         guard let store = await ensureStore() else { return }
-        _ = try? await store.deleteJournal(deviceId: Self.journalDeviceId, day: day, question: question)
+        // Clearing a merged question clears the native row under EVERY wording it reads as — otherwise
+        // a folded-away row would surface again the moment the target's row was gone, and the chip
+        // would refuse to empty. Verbatim wordings, because that is what the primary key stores.
+        // Imported rows are never touched: this is scoped to "noop-journal" as it always was.
+        for wording in journalWordings(of: question) {
+            _ = try? await store.deleteJournal(deviceId: Self.journalDeviceId, day: day,
+                                               question: wording)
+        }
+        scheduleJournalIndexRefresh()
     }
 
     /// All workouts (Whoop + Apple Health + on-device detected bouts), newest first.
@@ -2380,8 +2652,27 @@ final class Repository: ObservableObject {
     /// are filtered HERE so every consumer (Workouts screen, Today, Coach context) agrees: the engine
     /// re-derives the detected rows each run, so a plain delete would resurrect them; the dismissed
     /// span list is the durable "not a workout" record.
-    func workoutRows(days: Int = 4000) async -> [WorkoutRow] {
+    /// `reconcileHrCap` bounds the DISPLAY-ONLY Avg/Max-HR reconcile at the end of this function (see
+    /// `reconcileWorkoutHrWithTrace`). It defaults to that function's own budget, so every existing caller
+    /// is unchanged; pass `0` to skip the reconcile entirely, or a small number to spend it only on the rows
+    /// a screen actually renders.
+    ///
+    /// WHY THIS KNOB EXISTS (launch freeze): the reconcile costs one HR-window query PER eligible workout,
+    /// and three independent callers run on the launch path — `TodayView` (4000 days), `GoalTrackingEngine`
+    /// (365) and `PlanReconciliationCoordinator` (45). On a large library that measured 300 + 263 + 15 = 578
+    /// queries before the app was usable, of which SIX were ever displayed: Today renders
+    /// `workouts.prefix(6)`, goal tracking reads only `durationS`, and plan matching keys on
+    /// (startTs, endTs, sport). Because `WhoopStore` is an actor whose `syncRead` blocks its serial
+    /// executor, those queries cannot overlap — a measured ~4.5 s each, and 50 s of pure queueing before a
+    /// batch of six trivial reads could even start. The reconcile writes nothing (it rebuilds `WorkoutRow`
+    /// values in memory), so skipping it costs only the displayed-vs-stored HR distinction it exists for.
+    func workoutRows(days: Int = 4000, reconcileHrCap: Int? = nil) async -> [WorkoutRow] {
         guard let store = await ensureStore() else { return [] }
+        // TEMP DIAGNOSTIC (#freeze-investigation): split the per-source workout reads from the per-workout
+        // HR reconcile below. The latter reads up to `cap` (300) workout windows out of a 1.79 M-row HR
+        // table, and its "bounded concurrency" cannot actually overlap because `WhoopStore` is an actor
+        // whose `syncRead` blocks the serial executor. Remove with the rest of the FREEZE-DIAG block.
+        let diagT0 = Date()
         let now = Int(Date().timeIntervalSince1970)
         let lo = now - days * 86_400, hi = now + 86_400
         // UNION the active strap + canonical (and their computed siblings) so workouts banked under the
@@ -2398,7 +2689,12 @@ final class Repository: ObservableObject {
         // them too, or a successful file import never appears in the Workouts list (Data Sources counts it,
         // the load didn't). HR is reconciled from the strap trace at the end like every other row.
         rows += (try? await store.workouts(deviceId: "activity-file", from: lo, to: hi, limit: 5000)) ?? []
+        // TEMP DIAGNOSTIC (#freeze-investigation) — the six reads above are 1.3 ms of real work on this
+        // library, yet this function measured 48 s, and the main-actor probe caught 8-14 s single blocks.
+        // Everything below here is PURE CPU on the main actor, so split it out per stage.
+        let diagReadsDone = Date()
         rows = Self.dedupWorkoutsByNaturalKey(rows)
+        let diagNaturalKeyMs = Date().timeIntervalSince(diagReadsDone) * 1000
         let spans = WorkoutSource.parseDismissedSpans(dismissedDetectedSpans)
         // #687: collapse the SAME activity tracked live under the strap AND imported from Health Connect /
         // Apple Health into one richer entry , they sit under different sources so without this they show
@@ -2408,6 +2704,7 @@ final class Repository: ObservableObject {
         // plus a trace line per collapsed cross-source pair, tagged `.workouts`. Zero-cost when off (the gate
         // is one UserDefaults bool read inside emitWorkouts), and the kept list equals dedupCrossSource(...)
         // exactly, so the workout list the screen shows is unchanged.
+        let diagFilterDone = Date()
         let deduped: [WorkoutRow]
         if TestCentre.active(.workouts), workoutsLog != nil {
             let (kept, trace) = WorkoutSource.dedupCrossSourceTrace(filtered)
@@ -2416,8 +2713,21 @@ final class Repository: ObservableObject {
         } else {
             deduped = WorkoutSource.dedupCrossSource(filtered)
         }
+        let diagCrossMs = Date().timeIntervalSince(diagFilterDone) * 1000
         let visible = deduped.sorted { $0.startTs > $1.startTs }
-        return await reconcileWorkoutHrWithTrace(visible, store: store)
+        NSLog("[FREEZE-DIAG] workoutRows(days=\(days), hrCap=\(reconcileHrCap.map(String.init) ?? "default")): source reads + dedup done, visible=\(visible.count) at +\(String(format: "%.2f", Date().timeIntervalSince(diagT0)))s")
+        // TEMP DIAGNOSTIC: reads vs the pure main-actor CPU that follows them. `crossSource` is the
+        // suspect — it compares each candidate against every kept row of the SAME sport, and this
+        // library's biggest sport bucket is 1038 "Walking" rows out of a ten-year Apple Health import.
+        NSLog("[FREEZE-DIAG] workoutRows(days=\(days)) SPLIT: reads=\(String(format: "%.0f", diagReadsDone.timeIntervalSince(diagT0) * 1000))ms naturalKey=\(String(format: "%.0f", diagNaturalKeyMs))ms crossSource=\(String(format: "%.0f", diagCrossMs))ms rows=\(rows.count)")
+        let out: [WorkoutRow]
+        if let reconcileHrCap {
+            out = await reconcileWorkoutHrWithTrace(visible, store: store, cap: reconcileHrCap)
+        } else {
+            out = await reconcileWorkoutHrWithTrace(visible, store: store)
+        }
+        NSLog("[FREEZE-DIAG] workoutRows(days=\(days)): HR reconcile done at +\(String(format: "%.2f", Date().timeIntervalSince(diagT0)))s")
+        return out
     }
 
     /// DISPLAY-ONLY: reconcile each workout's shown Avg/Max HR with the strap trace that actually drives
@@ -2439,6 +2749,11 @@ final class Repository: ObservableObject {
     /// == zones == effort by construction. Kotlin twin: `WhoopRepository.fillWorkoutHrFromStrap`.
     private func reconcileWorkoutHrWithTrace(_ rows: [WorkoutRow], store: WhoopStore,
                                              minSamples: Int = 60, cap: Int = 300) async -> [WorkoutRow] {
+        // `cap == 0` means "this caller never displays Avg/Max HR" — return the stored rows untouched and
+        // issue no queries at all. Used by the launch-path callers that only need duration / sport / keys
+        // (see `workoutRows(days:reconcileHrCap:)`); it is the difference between 578 HR-window queries at
+        // launch and a handful.
+        guard cap > 0 else { return rows }
         // #833 (on-open freeze): this used to run a SEQUENTIAL per-row loop, each awaiting one
         // `store.hrSamples(.., limit: 8000)` then reducing up to 8000 ints SYNCHRONOUSLY on the @MainActor
         // (sum + max), for up to `cap` rows. On a deep history that beach-balled first paint. The eligible
@@ -2470,6 +2785,9 @@ final class Repository: ObservableObject {
             budget -= 1
             eligibleIndices.append(i)
         }
+        // TEMP DIAGNOSTIC: how many windows this pass will actually read. `cap` is 300, so this is the
+        // number of HR-window queries the serial store actor has to serve before launch can continue.
+        NSLog("[FREEZE-DIAG] hrReconcile: eligible=\(eligibleIndices.count) of \(rows.count) rows (cap=\(cap))")
 
         // Phase 2 , read each eligible window with BOUNDED concurrency (chunks of `readChunk`) and reduce it
         // OFF the main actor, then return only PLAIN Ints (index, avg, peak) from the child tasks. Keeping the
@@ -2788,7 +3106,7 @@ final class Repository: ObservableObject {
         guard PuffinExperiment.autoDetectWorkoutsEnabled else { return nil }
         let now = Int(Date().timeIntervalSince1970)
         let from = now - daysBack * 86_400
-        let samples = await hrSamples(from: from, to: now, limit: 200_000)
+        let samples = await hrSamples(from: from, to: now, limit: Int.max)
         guard samples.count >= 2 else { return nil }
         let hr = samples.map { (ts: $0.ts, bpm: $0.bpm) }
 
@@ -2872,17 +3190,22 @@ final class Repository: ObservableObject {
         return await hrBuckets(deviceIds: ids, from: from, to: to, bucketSeconds: bucket)
     }
 
-    /// Raw HR samples binned into per-zone MINUTES for a workout window, using the age-derived
-    /// (Tanaka) %HRmax zones , the same display zone model `WorkoutsView` already uses for imported
-    /// zone percentages, but computed here from the strap's own samples so a session WITHOUT imported
-    /// `zonesJSON` still gets a real time-in-zone split. Returns nil when the window carries no HR (so
-    /// the view shows nothing rather than five empty bars). `age <= 0` falls back to a 30 y default ,
-    /// the zones are approximate either way and clearly labelled as such in the UI.
+    /// Raw HR samples binned into per-zone MINUTES for a workout window, using the %HRmax display zone
+    /// model — the same one `WorkoutsView` uses for imported zone percentages, but computed here from
+    /// the strap's own samples so a session WITHOUT imported `zonesJSON` still gets a real time-in-zone
+    /// split. Returns nil when the window carries no HR (so the view shows nothing rather than five
+    /// empty bars).
+    ///
+    /// Takes the CALLER'S `zoneSet` (`ProfileStore.hrZoneSet`) rather than deriving one. It used to
+    /// build zones from `age` alone, which silently ignored BOTH the manual HR-max override and the
+    /// user's own bands — so the same heart rate could read Zone 2 on the live screen and Zone 3 in a
+    /// workout's zone bars. One resolver, one answer.
     /// #856: bins the same rows the chart plots and the Avg HR aggregates. Previously this read the
     /// day-level union, so a bout detected on a second WHOOP had its zones computed from a strap that
     /// never recorded it. `source` defaults to "" (⇒ the imported branch, the union) so a caller
     /// without a row keeps today's behaviour.
-    func workoutZoneMinutes(from: Int, to: Int, zoneSet: HRZoneSet, source: String = "") async -> [Double]? {
+    func workoutZoneMinutes(from: Int, to: Int, zoneSet: HRZoneSet,
+                            source: String = "") async -> [Double]? {
         guard to > from else { return nil }
         let ids = Self.workoutHrDeviceIds(source: source, activeStrapId: deviceId,
                                           importedIds: importedReadIds)
@@ -3063,6 +3386,32 @@ extension DailyMetric {
             spo2Red: spo2Red,   // non-sleep field: preserved as-is (#93)
             spo2Ir: spo2Ir,
             avgSdnn: avgSdnn    // non-sleep (HRV) field: preserved as-is
+        )
+    }
+
+    /// Applies the stage totals re-derived from a user-edited session while retaining fields that stages
+    /// cannot truthfully recompute, such as disturbances and overnight vitals.
+    func takingEditedSleepFields(from source: SleepStageTotals.DailySleep) -> DailyMetric {
+        DailyMetric(
+            day: day,
+            totalSleepMin: source.totalSleepMin,
+            efficiency: source.efficiency,
+            deepMin: source.deepMin,
+            remMin: source.remMin,
+            lightMin: source.lightMin,
+            disturbances: disturbances,
+            restingHr: restingHr,
+            avgHrv: avgHrv,
+            recovery: recovery,
+            strain: strain,
+            exerciseCount: exerciseCount,
+            spo2Pct: spo2Pct,
+            skinTempDevC: skinTempDevC,
+            respRateBpm: respRateBpm,
+            steps: steps,
+            activeKcalEst: activeKcalEst,
+            spo2Red: spo2Red,
+            spo2Ir: spo2Ir
         )
     }
 }

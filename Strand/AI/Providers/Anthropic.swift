@@ -13,11 +13,11 @@ struct AnthropicClient: AIProviderClient {
         for m in messages { wire.append(["role": m.role.rawValue, "content": m.content]) }
 
         // Anthropic: system prompt is a top-level field, not a message role.
+        // Same output ceiling as the OpenAI-shape path: a 900-token cap starves reasoning models,
+        // which spend it on thinking before any visible text (the 8e23c355 failure).
         let body: [String: Any] = [
             "model": model,
-            // #1074: 900 truncated detailed coaching replies mid-sentence; 4096 lets a full multi-section
-            // reply complete (a cap, not a target — the system prompt keeps it short). Matches the others.
-            "max_tokens": 4096,
+            "max_tokens": CoachOutputBudget.maxTokens,
             "system": systemPrompt,
             "messages": wire
         ]

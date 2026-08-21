@@ -119,7 +119,7 @@ struct TestCentreView: View {
                     .font(StrandFont.overline).tracking(StrandFont.overlineTracking)
                     .foregroundStyle(StrandPalette.textSecondary)
                 Text("Each test logs extra detail for one part of the app while you wear the strap, then bundles it for a bug report.")
-                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 let modes = TestCentreLayout.visibleModes(is5MG: is5MG)
                 ForEach(Array(modes.enumerated()), id: \.element.id) { idx, mode in
@@ -156,7 +156,7 @@ struct TestCentreView: View {
                     .buttonStyle(.plain).font(StrandFont.mono).foregroundStyle(StrandPalette.accent)
                 }
                 Text("Grab this when you report a bug. It tells me what the app saw.")
-                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Divider().overlay(StrandPalette.hairline)
@@ -167,7 +167,7 @@ struct TestCentreView: View {
                     showRecalibrateConfirm = true
                 }
                 Text("Re-anchors every baseline that feeds Charge to your recent nights. No stored day is deleted.")
-                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Divider().overlay(StrandPalette.hairline)
@@ -226,7 +226,7 @@ struct TestCentreView: View {
                     report.start(mode: TestCentreView.masterReportMode, live: live, repo: model.repo)
                 }
                 Text("Builds a redacted .zip, shows you exactly what it contains, then opens a prefilled GitHub issue. You attach the file on the next screen.")
-                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let status = report.lastStatus {
@@ -257,7 +257,7 @@ struct TestCentreView: View {
                     Text("Daily auto-export of the strap log")
                         .font(StrandFont.subhead).foregroundStyle(StrandPalette.textPrimary)
                 }
-                .toggleStyle(.switch).tint(StrandPalette.accent)
+                .toggleStyle(.switch).appleInspiredTint("testCentre")
                 .onChangeCompat(of: debugExportOn) { on in ScheduledDebugExport.setEnabled(on) }
 
                 if debugExportOn {
@@ -276,17 +276,17 @@ struct TestCentreView: View {
                         Picker("Keep last exports", selection: $debugExportKeep) {
                             ForEach(ScheduledDebugExport.keepOptions, id: \.self) { n in Text("\(n)").tag(n) }
                         }
-                        .labelsHidden().pickerStyle(.menu).tint(StrandPalette.accent)
+                        .labelsHidden().pickerStyle(.menu).appleInspiredTint("testCentre")
                         .onChangeCompat(of: debugExportKeep) { n in ScheduledDebugExport.keepCount = n }
                     }
                     Text("Older scheduled exports beyond this many are pruned automatically, oldest first.")
-                        .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                        .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     NoopButton("Run now", systemImage: "square.and.arrow.down.on.square", kind: .secondary) {
                         runScheduledExportNow()
                     }
                     Text("On iPhone this is best-effort (iOS decides when background tasks run). Everything stays on \(Platform.deviceNounPhrase).")
-                        .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                        .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 // Manual clear (#650): always available, even with the toggle off, since files written
@@ -311,16 +311,16 @@ struct TestCentreView: View {
                     .font(StrandFont.overline).tracking(StrandFont.overlineTracking)
                     .foregroundStyle(StrandPalette.textSecondary)
                 Text("Research-grade alternatives / precision tweaks. Opt-in, off by default, non-clinical.")
-                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Toggle(isOn: $ppgHrSubLagInterpEnabled) {
                     Text("HR-from-PPG sub-lag interpolation (v26 gap-fill)")
                         .font(StrandFont.subhead).foregroundStyle(StrandPalette.textPrimary)
                 }
-                .toggleStyle(.switch).tint(StrandPalette.accent)
+                .toggleStyle(.switch).appleInspiredTint("testCentre")
                 Text("When NOOP reconstructs heart rate from the WHOOP 5/MG v26 optical waveform (the seconds the strap stored no HR), refine the autocorrelation peak with a parabolic sub-lag fit so the estimate is not quantized to roughly 16 bpm steps near a high HR. It only fills seconds the strap never reported; it never overrides a stored HR. 5/MG only, off by default.")
-                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Divider().overlay(StrandPalette.hairline)
@@ -329,9 +329,9 @@ struct TestCentreView: View {
                     Text("HRV readiness (Plews/Altini)")
                         .font(StrandFont.subhead).foregroundStyle(StrandPalette.textPrimary)
                 }
-                .toggleStyle(.switch).tint(StrandPalette.accent)
+                .toggleStyle(.switch).appleInspiredTint("testCentre")
                 Text("A read-only Plews/Altini smallest-worthwhile-change reading of your nightly HRV: it shows whether your 7-night HRV baseline sits above, inside, or below your personal normal band. It changes nothing else - the Charge ring is identical whether this is on or off. This is rough / early testing, not yet validated against varying real data (n=1).")
-                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 // The toggle's OWN effect, shown in place: when on, the live Plews/Altini reading. Nothing
@@ -359,13 +359,13 @@ struct TestCentreView: View {
                 let hi = Int(r.normalHighMs.rounded())
                 let watch = r.overreachingWatch ? ", overreaching watch" : ""
                 Text("7-night baseline \(base) ms, normal \(lo) to \(hi) ms\(watch)")
-                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("HRV readiness (experimental)")
                     .font(StrandFont.subhead).foregroundStyle(StrandPalette.textTertiary)
                 Text("Calibrating (\(hrvValidNightCount)/\(HRVReadiness.minNights) nights)")
-                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
             }
         }
     }
@@ -483,7 +483,7 @@ private struct TestModeRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
                 Image(systemName: mode.icon)
-                    .foregroundStyle(StrandPalette.accent).frame(width: 24)
+                    .appleInspiredForeground("testCentre").frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(mode.title).font(StrandFont.body).foregroundStyle(StrandPalette.textPrimary)
                     Text(TestCentreLayout.statusText(for: mode, active: on, elapsedSeconds: elapsed,
@@ -493,7 +493,7 @@ private struct TestModeRow: View {
                 Spacer()
                 Toggle("", isOn: $on)
                     .labelsHidden()
-                    .tint(StrandPalette.accent)
+                    .appleInspiredTint("testCentre")
                     .accessibilityLabel("\(mode.title) test mode")
                     .onChangeCompat(of: on) { isOn in
                         if isOn { TestCentre.activate(mode.domain) } else { TestCentre.deactivate(mode.domain) }
@@ -506,7 +506,7 @@ private struct TestModeRow: View {
                     }
             }
             Text(mode.blurb)
-                .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                .font(StrandFont.caption).foregroundStyle(StrandPalette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             // Live readout (Group E/F): the per-mode panel binding the registry's liveReadout ids. Shown
             // only while the mode is on, so an inactive row stays compact.
@@ -546,17 +546,19 @@ private struct TestModeRow: View {
         }
         .onAppear {
             on = TestCentre.active(mode.domain)
-            // If the Display mode was already on when the screen appears, (re)start its frame monitor and
-            // wire the sink, so a monitor that was torn down (e.g. the screen left and came back) resumes.
+            // If the Display mode was already on when the screen appears (left on across a relaunch, or
+            // toggled on before this row was built), wire the sink and start the monitor. Re-entering the
+            // screen mid-capture re-points the sink at the live LiveState and is otherwise a no-op:
+            // `start()` is idempotent, so a running capture is never restarted and never re-emits its
+            // one-shot device-metrics / data-volume lines.
             if mode.domain == .display, on { startDisplayMonitor() }
         }
-        .onDisappear {
-            // Leaving the screen tears the frame monitor down so no display link survives a navigation
-            // away. The mode flag stays on (the user's test is still active); the monitor resumes on
-            // .onAppear above. This keeps the perpetual-display-link contract: a link exists only while the
-            // Test Centre is on screen with the mode on.
-            if mode.domain == .display { DisplayPerformanceMonitor.shared.stop() }
-        }
+        // NO .onDisappear teardown for the Display monitor. Leaving this screen is exactly what the tester
+        // does next: the mode is turned on HERE and the stutter is reproduced THERE (Today, a chart, a long
+        // scroll). Stopping on disappear meant every exported window described this static list instead of
+        // the screen being complained about. The monitor's life is owned by the mode toggle above (and by
+        // backgrounding, handled inside the monitor), so it keeps sampling across navigation and is torn
+        // down the moment the mode goes off.
     }
 
     /// Wire the Display monitor's sink to the redacting `.display` log and start it. The sink is set every

@@ -190,6 +190,54 @@ final class BackupSettingsTests: XCTestCase {
         XCTAssertEqual(deviceB.object(forKey: "profile.hrMaxOverride") as? Int, 0)
     }
 
+    /// The user's own HR zone bands survive a backup under their own canonical keys, with identity
+    /// storage mappings (unlike `profile.hrMax`). Half-percent bounds are the interesting case: the wire
+    /// form must stay POSIX so a set written on one device restores identically on another.
+    ///
+    /// BOTH bound sets travel even though only one mode is live — a restore should return the wearer to
+    /// exactly where they were, including the mode they had tried and switched away from.
+    func testHrZoneBandsRoundTripThroughDefaults() throws {
+        let deviceA = try freshDefaults()
+        deviceA.set("bpm", forKey: "profile.zoneMode")
+        deviceA.set("55,65,75,85,92.5", forKey: "profile.zonePercentEdges")
+        deviceA.set("110,130,150,170,184", forKey: "profile.zoneBpmEdges")
+        let payload = try XCTUnwrap(BackupSettings.encode(BackupSettings.snapshot(from: deviceA)))
+
+        let deviceB = try freshDefaults()
+        BackupSettings.apply(BackupSettings.decode(payload), to: deviceB)
+
+        XCTAssertEqual(deviceB.string(forKey: "profile.zoneMode"), "bpm")
+        XCTAssertEqual(deviceB.string(forKey: "profile.zonePercentEdges"), "55,65,75,85,92.5")
+        XCTAssertEqual(deviceB.string(forKey: "profile.zoneBpmEdges"), "110,130,150,170,184")
+    }
+
+    /// A backup written by upstream ryanbr/noop carries its custom zones under the single
+    /// `profile.hrZoneThresholds` key. That key stays whitelisted here, so the bands cross the restore
+    /// instead of being dropped on the floor — `ProfileStore` is what turns them into this fork's `.bpm`
+    /// mode, and it can only do that if the value actually arrives.
+    func testUpstreamZoneKeySurvivesTheRestore() throws {
+        let deviceA = try freshDefaults()
+        deviceA.set("95,118,142,168,184", forKey: "profile.hrZoneThresholds")
+        let payload = try XCTUnwrap(BackupSettings.encode(BackupSettings.snapshot(from: deviceA)))
+
+        let deviceB = try freshDefaults()
+        BackupSettings.apply(BackupSettings.decode(payload), to: deviceB)
+
+        XCTAssertEqual(deviceB.string(forKey: "profile.hrZoneThresholds"), "95,118,142,168,184")
+    }
+
+    /// A user who never customised their bands stores nothing, so the keys are simply absent from the
+    /// backup — "not customised" travels as absence, never as a literal copy of the default set.
+    func testUncustomisedHrZoneBandsAreOmitted() throws {
+        let defaults = try freshDefaults()
+        defaults.set(29, forKey: "profile.age")
+
+        let snap = BackupSettings.snapshot(from: defaults)
+        XCTAssertNil(snap["profile.zoneMode"])
+        XCTAssertNil(snap["profile.zonePercentEdges"])
+        XCTAssertNil(snap["profile.zoneBpmEdges"])
+    }
+
     // MARK: - Suite-scoped defaults (never the test runner's real domain)
 
     private var suites: [String] = []

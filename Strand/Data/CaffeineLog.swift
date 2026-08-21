@@ -194,6 +194,9 @@ public final class CaffeineLogStore: ObservableObject {
     /// itself. The Apple Health import writes from outside it, and two instances over one UserDefaults
     /// key would mean the card kept publishing its stale in-memory array until it was rebuilt — the
     /// imported intakes would be on disk and invisible. One instance, one source of truth.
+    ///
+    /// The fork has a third writer for the same reason: the coach's `log_caffeine` tool. A chat-logged
+    /// intake appears in the card immediately because both go through this instance.
     public static let shared = CaffeineLogStore()
 
     /// Logged intakes, newest first. Persisted as JSON under one UserDefaults key.

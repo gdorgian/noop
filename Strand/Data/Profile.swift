@@ -22,7 +22,6 @@ final class ProfileStore: ObservableObject {
     /// Display name, for the Aura greeting and header avatar. Empty = not set, which is the default and
     /// stays the default: NOOP has never asked for a name and needs none to compute anything, so this is
     /// presentation only and every consumer must handle it being blank.
-    @Published var displayName: String { didSet { d.set(displayName, forKey: K.displayName) } }
     @Published var sex: String { didSet { d.set(sex, forKey: K.sex) } }          // "male" | "female" | "nonbinary"
     @Published var weightKg: Double { didSet { d.set(weightKg, forKey: K.weight) } }
     @Published var heightCm: Double { didSet { d.set(heightCm, forKey: K.height) } }
@@ -31,13 +30,21 @@ final class ProfileStore: ObservableObject {
     @Published var waistCm: Double { didSet { d.set(waistCm, forKey: K.waist) } }
     /// 0 = auto-estimate from age.
     @Published var hrMaxOverride: Int { didSet { d.set(hrMaxOverride, forKey: K.hrMax) } }
-    /// Five personalized inclusive zone starts in BPM; empty = conventional %HRmax zones.
-    @Published var hrZoneThresholds: [Int] {
-        didSet {
-            if hrZoneThresholds.isEmpty { d.removeObject(forKey: K.hrZoneThresholds) }
-            else { d.set(hrZoneThresholds.map(String.init).joined(separator: ","), forKey: K.hrZoneThresholds) }
-        }
-    }
+    // ── HR zone bands ───────────────────────────────────────────────────────────────────────────
+    // Three stored fields rather than one, because the two custom modes hold DIFFERENT quantities
+    // (fractions vs bpm) and a wearer who tries both should not lose the first set by switching. The
+    // mode picks which is live; the other simply waits. Always written through
+    // ``setHRZoneConfig(_:)``, which validates — nothing else should touch these raw.
+    //
+    // Display-only: these bands change time-in-zone, the live readout and what the coach prescribes,
+    // never the Effort score. See the header of `HRZones.swift` for why that separation is load-bearing.
+
+    /// `HRZoneConfig.Mode.rawValue` — "auto" (default), "percent" or "bpm".
+    @Published var zoneModeRaw: String { didSet { d.set(zoneModeRaw, forKey: K.zoneMode) } }
+    /// Five lower bounds as PERCENTS, `HRZoneEdges`' comma form ("55,65,75,85,92"). "" = never set.
+    @Published var zonePercentEdgesRaw: String { didSet { d.set(zonePercentEdgesRaw, forKey: K.zonePercentEdges) } }
+    /// Five lower bounds in BPM, same comma form ("110,130,150,170,184"). "" = never set.
+    @Published var zoneBpmEdgesRaw: String { didSet { d.set(zoneBpmEdgesRaw, forKey: K.zoneBpmEdges) } }
     /// Step-calibration divisor (#139/#132): counter ticks per real step for the @57 motion
     /// counter. 1.0 = raw pass-through (default — no behavior change). Clamped 0.5–30.0
     /// (WHOOP 5/MG motion-counter overcount can reach ~24×, so the ceiling has to be high).
@@ -73,15 +80,32 @@ final class ProfileStore: ObservableObject {
         }
     }
 
+    // ── Name (optional, on-device only) ─────────────────────────────────────────────────────────
+    /// What the user wants to be called — used ONLY to personalise the Today greeting
+    /// ("Good morning, Marc"). Empty = no name set, and every surface falls back to the bare greeting.
+    /// LOCAL-ONLY and deliberately NOT part of the `.noopbak` whitelist: the backup contract is
+    /// byte-identical across Swift and Kotlin, and a cosmetic greeting isn't worth widening it (a
+    /// restore simply starts again with no name). NOOP is offline, so this never leaves the device.
+    @Published var name: String {
+        didSet {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { d.removeObject(forKey: K.name) } else { d.set(trimmed, forKey: K.name) }
+        }
+    }
+
     private let d = UserDefaults.standard
     private enum K {
+        static let name = "profile.name"
         static let dateOfBirth = "profile.dateOfBirth"
         /// Pre-#146 age key. No longer the source of truth; kept mirrored from `dateOfBirth` so the
         /// cross-platform `.noopbak` whitelist keeps round-tripping an Int age unchanged.
         static let legacyAge = "profile.age"
-        static let displayName = "profile.displayName"
         static let sex = "profile.sex", weight = "profile.weightKg"
         static let height = "profile.heightCm", hrMax = "profile.hrMaxOverride"
+        static let zoneMode = "profile.zoneMode"
+        static let zonePercentEdges = "profile.zonePercentEdges"
+        static let zoneBpmEdges = "profile.zoneBpmEdges"
+        /// Upstream ryanbr/noop's single custom-zone key. READ ONLY here — see the import in `init`.
         static let hrZoneThresholds = "profile.hrZoneThresholds"
         static let stepScale = "profile.stepTicksPerStep"
         static let waist = "profile.waistCm"
@@ -115,15 +139,29 @@ final class ProfileStore: ObservableObject {
         // forbids reading before every stored property is initialized).
         d.set(resolvedDOB, forKey: K.dateOfBirth)
         d.set(Self.years(from: resolvedDOB, to: Date()), forKey: K.legacyAge)
-        displayName = d.string(forKey: K.displayName) ?? ""
         sex = d.string(forKey: K.sex) ?? "male"
         weightKg = d.object(forKey: K.weight) as? Double ?? 75
         heightCm = d.object(forKey: K.height) as? Double ?? 178
         waistCm = d.object(forKey: K.waist) as? Double ?? 0
         hrMaxOverride = d.object(forKey: K.hrMax) as? Int ?? 0
-        let storedThresholds = d.string(forKey: K.hrZoneThresholds)?
-            .split(separator: ",").compactMap { Int($0) } ?? []
-        hrZoneThresholds = Self.validZoneThresholds(storedThresholds) ? storedThresholds : []
+        var mode = d.string(forKey: K.zoneMode) ?? HRZoneConfig.Mode.auto.rawValue
+        let percentRaw = d.string(forKey: K.zonePercentEdges) ?? ""
+        var bpmRaw = d.string(forKey: K.zoneBpmEdges) ?? ""
+        // Adopt upstream's single-key custom zones when this fork has none of its own — a restore from
+        // an upstream-written `.noopbak`, or a user migrating from that build. Their key holds five
+        // inclusive bpm starts, which is exactly this fork's `.bpm` mode. Read-only and idempotent:
+        // nothing is written back, so the wearer's own edits (which fill the keys above) always win,
+        // and re-running this on every launch cannot drift. Validity is not judged here — the resolver
+        // degrades an unusable set to the conventional bands on its own.
+        if mode == HRZoneConfig.Mode.auto.rawValue, percentRaw.isEmpty, bpmRaw.isEmpty,
+           let imported = d.string(forKey: K.hrZoneThresholds).flatMap(HRZoneEdges.decodeValues),
+           imported.count == 5 {
+            bpmRaw = HRZoneEdges.encodeValues(imported)
+            mode = HRZoneConfig.Mode.bpm.rawValue
+        }
+        zoneModeRaw = mode
+        zonePercentEdgesRaw = percentRaw
+        zoneBpmEdgesRaw = bpmRaw
         stepTicksPerStep = min(max(d.object(forKey: K.stepScale) as? Double ?? 1.0, 0.5), 30.0)
         stepsCalibrationCoefficient = d.object(forKey: K.stepsCoeff) as? Double ?? 0
         stepsCalibrationSampleDays = d.object(forKey: K.stepsSampleDays) as? Int ?? 0
@@ -131,6 +169,25 @@ final class ProfileStore: ObservableObject {
         stepsCalibrationManual = d.object(forKey: K.stepsManualFlag) as? Bool ?? false
         stepsManualCoefficient = max(0, d.object(forKey: K.stepsManualCoeff) as? Double ?? 0)
         avatarImageData = d.data(forKey: K.avatar)
+        name = d.string(forKey: K.name) ?? ""
+    }
+
+    /// The persisted body weight, read WITHOUT constructing a store (#goal-journey-freeze).
+    ///
+    /// `init()` deliberately WRITES (it mirrors the #146-derived age under the legacy key), so building a
+    /// throwaway `ProfileStore()` just to read one number mutates UserDefaults as a side effect. Done
+    /// inside a SwiftUI `body` — as `CoachGoalJourneyView.goalSubtitle` did, once per goal card per pass
+    /// — that invalidates any `@AppStorage` in the same view and forces an extra layout pass. This
+    /// accessor is a plain read: same key, same default, no writes, no `@Published`, no actor hop.
+    nonisolated static var persistedWeightKg: Double {
+        UserDefaults.standard.object(forKey: K.weight) as? Double ?? 75
+    }
+
+    /// The trimmed name, or nil when none is set — what greeting surfaces read so they never have to
+    /// repeat the trim-and-check dance (and can never render "Good morning, ").
+    var displayName: String? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     // MARK: - Profile picture
@@ -159,6 +216,16 @@ final class ProfileStore: ObservableObject {
 
     /// Remove the profile photo (reverts the header / Settings to the default icon).
     func clearAvatar() { avatarImageData = nil }
+
+    /// "Health always wins" (user decision, supersedes the old one-time seed-if-unset behavior): every
+    /// successful HealthKit sync overwrites the profile weight with the freshest Health reading, not just
+    /// once when the field was never set. Still ignores unrealistic readings (<10 kg). Known tradeoff: a
+    /// manual edit not yet written back to Health (e.g. app killed mid-write) can be reverted by the next
+    /// sync — accepted explicitly per the user's choice, not engineered around (see docs/fork/decisions.md).
+    func applyHealthWeight(kg: Double) {
+        guard kg > 10 else { return }
+        weightKg = kg
+    }
 
     /// The manual override to feed into `StepsEstimateEngine.calibrate(_:manualOverride:)`:
     /// nil when 0 (auto-fit), the positive value otherwise.
@@ -189,42 +256,60 @@ final class ProfileStore: ObservableObject {
     /// Tanaka estimate unless overridden.
     var hrMax: Int { hrMaxOverride > 0 ? hrMaxOverride : Int((208 - 0.7 * Double(age)).rounded()) }
 
-    /// Personalized zone starts after enforcing the same five-value invariant as `HRZones`.
-    var customHRZoneLowerBounds: [Double]? {
-        guard Self.validZoneThresholds(hrZoneThresholds) else { return nil }
-        return hrZoneThresholds.map(Double.init)
+    // MARK: - HR zone bands
+
+    /// The stored zone configuration, decoded. An unparseable stored value yields empty bounds, which
+    /// the resolver treats as `.auto` — a hand-edited defaults plist or a truncated restore costs the
+    /// customisation, never a broken partition.
+    var hrZoneConfig: HRZoneConfig {
+        HRZoneConfig(
+            mode: HRZoneConfig.Mode(rawValue: zoneModeRaw) ?? .auto,
+            percentLowerBounds: (HRZoneEdges.decodeValues(zonePercentEdgesRaw) ?? []).map { $0 / 100.0 },
+            bpmLowerBounds: HRZoneEdges.decodeValues(zoneBpmEdgesRaw) ?? [])
     }
 
-    /// The single display-zone model used by live HR, workout splits, and haptic coaching.
+    /// Whether the resolved zones are actually the user's own — false for `.auto` and for a custom mode
+    /// whose stored bounds no longer validate, so the UI never claims a customisation the zones don't
+    /// honour.
+    var hasCustomHRZones: Bool { hrZoneConfig.isCustom(maxHR: Double(hrMax)) }
+
+    /// **The one HR-zone resolver.** Every surface that buckets a heart rate — the live readout, the
+    /// in-workout zone card, the Health hero card, workout time-in-zone, the coach's `get_zone_minutes`
+    /// — reads THIS, so they cannot disagree about where a zone starts. Before it existed, the live
+    /// readout used the profile's HRmax while `Repository.workoutZoneMinutes` built its zones from age
+    /// alone and `HealthView` carried its own hardcoded table: three answers for one question.
     var hrZoneSet: HRZoneSet {
-        HRZones.zones(maxHR: Double(hrMax), customLowerBounds: customHRZoneLowerBounds)
+        HRZones.zones(config: hrZoneConfig, maxHR: Double(hrMax),
+                      autoSource: hrMaxOverride > 0 ? "manual" : "tanaka")
     }
 
-    var hasCustomHRZones: Bool { customHRZoneLowerBounds != nil }
-
-    /// Enable by seeding the editor with boundaries that classify integer BPM exactly like today's
-    /// conventional percentages; disabling removes the override and immediately restores defaults.
-    func setCustomHRZonesEnabled(_ enabled: Bool) {
-        hrZoneThresholds = enabled ? HRZones.defaultLowerBounds(maxHR: Double(hrMax)) : []
+    /// Store a validated configuration. Returns false (and changes nothing) when the mode's bounds
+    /// aren't a legal partition, so an invalid edit can never reach storage. Writes ONLY the mode's own
+    /// bounds, leaving the other mode's stored set intact — switching percent → bpm → percent must not
+    /// silently discard the first set of numbers the user typed.
+    @discardableResult
+    func setHRZoneConfig(_ config: HRZoneConfig) -> Bool {
+        switch config.mode {
+        case .auto:
+            zoneModeRaw = HRZoneConfig.Mode.auto.rawValue
+            return true
+        case .percent:
+            guard HRZones.validatedEdges(lowerPercents: config.percentLowerBounds) != nil else { return false }
+            zonePercentEdgesRaw = HRZoneEdges.encodeValues(config.percentLowerBounds.map { $0 * 100.0 })
+            zoneModeRaw = HRZoneConfig.Mode.percent.rawValue
+            return true
+        case .bpm:
+            guard HRZones.validatedBpmEdges(lowerBpm: config.bpmLowerBounds,
+                                            maxHR: Double(hrMax)) != nil else { return false }
+            zoneBpmEdgesRaw = HRZoneEdges.encodeValues(config.bpmLowerBounds)
+            zoneModeRaw = HRZoneConfig.Mode.bpm.rawValue
+            return true
+        }
     }
 
-    /// Move one boundary while preserving strict ordering. Neighbour-aware clamps make it impossible
-    /// for the stepper to create a gap, overlap, or invalid persisted state.
-    func stepHRZoneThreshold(at index: Int, up: Bool) {
-        guard hrZoneThresholds.indices.contains(index) else { return }
-        var next = hrZoneThresholds
-        let floor = index == 0 ? HRZones.customBPMRange.lowerBound : next[index - 1] + 1
-        let ceiling = index == next.count - 1 ? HRZones.customBPMRange.upperBound : next[index + 1] - 1
-        guard floor <= ceiling else { return }   // no room between neighbours -> no-op (parity w/ Kotlin)
-        next[index] = min(max(next[index] + (up ? 1 : -1), floor), ceiling)
-        hrZoneThresholds = next
-    }
-
-    nonisolated static func validZoneThresholds(_ values: [Int]) -> Bool {
-        guard values.count == 5,
-              values.allSatisfy(HRZones.customBPMRange.contains) else { return false }
-        return zip(values, values.dropFirst()).allSatisfy(<)
-    }
+    /// Back to the conventional 50/60/70/80/90 bands. Keeps whatever bounds were typed in either mode,
+    /// so "reset" is undoable by simply switching the mode back.
+    func resetHRZones() { zoneModeRaw = HRZoneConfig.Mode.auto.rawValue }
 
     /// Whether the cycle-awareness opt-in applies to this profile (#801). Cycle phase is read from the
     /// MENSTRUAL skin-temperature shift, so the opt-in (the Health card + the Automations toggle) is only

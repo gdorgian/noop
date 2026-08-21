@@ -1,0 +1,449 @@
+import SwiftUI
+import StrandDesign
+
+/// The master availability switch for the AI Coach.
+///
+/// This is deliberately separate from `CoachEntryPrefs`: those preferences only arrange entry points on
+/// Today, whereas this switch turns the Coach feature itself on or off. A new installation starts off —
+/// until a person has deliberately connected a provider and chosen to use the feature, the app should
+/// neither advertise a dead chat button nor generate coach work in the background. Turning it off hides
+/// all Coach entry points but keeps the locally stored chats, preferences and data intact for a later
+/// re-enable.
+enum CoachFeaturePrefs {
+    static let enabledKey = "coach.featureEnabled"
+
+    /// Absent key means a fresh install, where the Coach is intentionally inactive by default.
+    static var isEnabled: Bool { isEnabled(defaults: .standard) }
+
+    /// Dependency-injected form keeps the fresh-install default testable without touching a person's
+    /// real settings.
+    static func isEnabled(defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: enabledKey) == nil
+            ? false
+            : defaults.bool(forKey: enabledKey)
+    }
+}
+
+/// How the user reaches the Coach from the home surfaces — three INDEPENDENT entry points, each its own
+/// on/off switch. Replaces the old three-way `card`/`button`/`both` picker (`CoachEntryMode`), which could
+/// only express "row XOR button XOR both" and had no room for the Liquid header-icon entry added later —
+/// a user who wanted the banner AND the header icon AND the floating button simultaneously had no way to
+/// say so. The user picks in Coach settings (`CoachSettingsView`); `CoachTodayRow` / the Liquid coach
+/// banner, `LiquidTodayView`'s header icon, and `CoachFloatingButton` each read their own key directly.
+enum CoachEntryPrefs {
+    /// Full-width row on Today — `CoachTodayRow` on classic, the Liquid-styled coach banner on Liquid.
+    /// Both render as the reorderable `TodaySection.coach` (see `TodayLayoutPrefs`), so its POSITION is
+    /// controlled by the Arrange sheet, not by a setting here — this key only turns it on/off.
+    static let bannerKey = "coach.entry.banner"
+    /// Compact avatar/sparkle button in Liquid Today's header icon cluster. No classic-Today counterpart —
+    /// classic has no such header slot, so only `LiquidTodayView` reads this key.
+    static let headerIconKey = "coach.entry.headerIcon"
+    /// The draggable floating Coach button (`CoachFloatingButton`), mounted app-wide by `RootTabView`,
+    /// iOS only.
+    static let floatingButtonKey = "coach.entry.floatingButton"
+
+    /// Master switch for the Coach's home-surface UI (#R7 / list 14): when off, ALL THREE entries above
+    /// are hidden regardless of their own toggles, while each one's own value is remembered for when it's
+    /// turned back on. Deliberately independent of `dataConsent` / `isConfigured` and of the card- and
+    /// background-AI paths (`model(for:)`), which keep running — this hides only the coach's own entry
+    /// points, not the AI features that don't depend on the chat.
+    static let uiEnabledKey = "coach.uiEnabled"
+
+    /// Whether the Coach's home-surface UI is enabled. Absent key ⇒ true, so existing installs are
+    /// unaffected. Surfaces use `@AppStorage(uiEnabledKey)` for reactivity; this is for plain call sites.
+    static var uiEnabled: Bool {
+        UserDefaults.standard.object(forKey: uiEnabledKey) == nil
+            ? true
+            : UserDefaults.standard.bool(forKey: uiEnabledKey)
+    }
+
+    /// Show the current coach's avatar (rather than a generic sparkle) on the banner/header entries (#R11).
+    /// Default on; turning it off restores the plain-icon look. Independent of `uiEnabled`.
+    static let todayAvatarKey = "coach.todayAvatar"
+
+    /// The retired three-way picker's storage key (`card` / `button` / `both`). Read ONLY by
+    /// `migrateIfNeeded()` below, never by a live surface.
+    private static let legacyModeKey = "coach.entryMode"
+
+    /// One-time migration off the retired card/button/both picker: preserves what an existing install
+    /// already had for the header icon and the floating button, and turns the (new) banner on
+    /// unconditionally — it's a brand-new capability on Liquid Today, and was already effectively on for
+    /// classic Today (whose banner, `CoachTodayRow`, used to be gated by the SAME "card" bit the header
+    /// icon now reads independently). A user who had explicitly turned that bit off will see their classic
+    /// banner once more after updating, and can hide it again with the new, more precise `bannerKey`
+    /// toggle. No-ops once the three new keys exist (call it as often as you like, from any reader's init).
+    static func migrateIfNeeded(defaults: UserDefaults = .standard) {
+        guard let legacy = defaults.string(forKey: legacyModeKey),
+              defaults.object(forKey: bannerKey) == nil,
+              defaults.object(forKey: headerIconKey) == nil,
+              defaults.object(forKey: floatingButtonKey) == nil else { return }
+        let showedCard = legacy == "card" || legacy == "both"
+        let showedButton = legacy == "button" || legacy == "both"
+        defaults.set(true, forKey: bannerKey)
+        defaults.set(showedCard, forKey: headerIconKey)
+        defaults.set(showedButton, forKey: floatingButtonKey)
+    }
+}
+
+/// Where the floating Coach button rests. The four corners are pinned clear of the app chrome — the
+/// bottom pair sits above the floating tab bar, the top pair below the status bar + Today header — so a
+/// pinned button never covers the menu. `.custom` means the user dragged it somewhere themselves.
+enum CoachButtonCorner: String, CaseIterable, Identifiable {
+    case topLeading, topTrailing, bottomLeading, bottomTrailing, custom
+
+    var id: String { rawValue }
+
+    /// Only the four real corners are offered in the picker; `.custom` is a state you reach by dragging.
+    static var pickable: [CoachButtonCorner] { [.topLeading, .topTrailing, .bottomLeading, .bottomTrailing] }
+
+    static let storageKey = "coach.fab.corner"
+    static let lockedKey = "coach.fab.locked"
+
+    var label: String {
+        switch self {
+        case .topLeading:     return "Top left"
+        case .topTrailing:    return "Top right"
+        case .bottomLeading:  return "Bottom left"
+        case .bottomTrailing: return "Bottom right"
+        case .custom:         return "Custom"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .topLeading:     return "arrow.up.left"
+        case .topTrailing:    return "arrow.up.right"
+        case .bottomLeading:  return "arrow.down.left"
+        case .bottomTrailing: return "arrow.down.right"
+        case .custom:         return "hand.draw"
+        }
+    }
+
+    /// Side margin from the screen edge.
+    static let margin: CGFloat = 18
+    /// Extra clearance ABOVE the floating tab bar, so a bottom-pinned button never sits on the menu.
+    static let bottomChrome: CGFloat = 96
+    /// Extra clearance BELOW the status bar + Today header cluster, so a top-pinned button never covers
+    /// the header's round buttons.
+    static let topChrome: CGFloat = 64
+
+    /// Keys holding the user's freely-dragged spot (fractions of the container).
+    static let fracXKey = "coach.fab.fx"
+    static let fracYKey = "coach.fab.fy"
+
+    /// One-time migration for anyone who dragged the button BEFORE corners existed: they have a stored
+    /// fraction but no corner key, so the new `.bottomTrailing` default would yank the button out from
+    /// under them. Mark those as `.custom` to keep the spot they chose.
+    static func migrateIfNeeded(defaults: UserDefaults = .standard) {
+        guard defaults.string(forKey: storageKey) == nil,
+              defaults.object(forKey: fracXKey) != nil,
+              defaults.double(forKey: fracXKey) >= 0 else { return }
+        defaults.set(custom.rawValue, forKey: storageKey)
+    }
+
+    /// Resolve this corner to a point inside `size`, honouring the safe area and the chrome clearances.
+    /// `nil` for `.custom` — the caller then uses the user's dragged fractions instead.
+    func point(in size: CGSize, safeArea: EdgeInsets, half: CGFloat) -> CGPoint? {
+        guard self != .custom else { return nil }
+        let leadingX = half + Self.margin
+        let trailingX = size.width - half - Self.margin
+        let topY = safeArea.top + Self.topChrome + half
+        let bottomY = size.height - safeArea.bottom - Self.bottomChrome - half
+        switch self {
+        case .topLeading:     return CGPoint(x: leadingX, y: topY)
+        case .topTrailing:    return CGPoint(x: trailingX, y: topY)
+        case .bottomLeading:  return CGPoint(x: leadingX, y: bottomY)
+        case .bottomTrailing: return CGPoint(x: trailingX, y: bottomY)
+        case .custom:         return nil
+        }
+    }
+}
+
+/// Card-AI entry (#P11): a small "ask the coach about this" affordance a metric screen mounts in its
+/// header. Tapping it hands the coach the card's own context (current value + trend) and opens the chat,
+/// which then produces a short read of that one metric. Only appears once the coach is connected — a dead
+/// sparkle on a card the user never set up would be noise. Design tokens only; shared (macOS + iOS).
+struct CoachCardButton: View {
+    /// Built by the card from data it already loaded — the coach reads this, nothing new is derived.
+    let context: CoachCardContext
+
+    @EnvironmentObject private var coach: AICoachEngine
+    @AppStorage(CoachFeaturePrefs.enabledKey) private var coachEnabled = false
+    /// Dismisses a presenting sheet (some cards open as sheets) so the coach isn't buried under it; a
+    /// no-op for a pushed or root screen, which is fine.
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        if coachEnabled, coach.isConfigured {
+            Button {
+                coach.openedFromCard(context)
+                NotificationCenter.default.post(name: .noopOpenCoachCard, object: nil)
+                dismiss()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "sparkles")
+                    Text("Ask coach")
+                }
+                .font(StrandFont.caption)
+                .foregroundStyle(StrandPalette.accent)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .background(StrandPalette.accent.opacity(0.12), in: Capsule(style: .continuous))
+                .overlay(Capsule(style: .continuous).strokeBorder(StrandPalette.accent.opacity(0.25), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Ask coach about \(context.title)")
+            .accessibilityHint("Opens the AI coach with this metric's data.")
+        }
+    }
+}
+
+/// A compact, icon-only sibling of `CoachCardButton` (#R-explain) for dense list rows — Today's hero
+/// circles and "Your cards" dashboard rows — where the full sparkle + "Ask coach" capsule would crowd an
+/// already busy row. Same underlying action (hand the coach this card's context, open the chat), just a
+/// small tappable sparkle instead of a labelled pill. Meant to sit ALONGSIDE a row's own navigation link,
+/// never nested inside it — two sibling tap targets, not one control inside another.
+struct CoachCardIconButton: View {
+    let context: CoachCardContext
+    /// The tappable circle's diameter — 26 fits a dashboard list row; the Today hero circles (three
+    /// abreast, genuinely tight on width) pass a smaller value.
+    var diameter: CGFloat = 26
+
+    @EnvironmentObject private var coach: AICoachEngine
+    @AppStorage(CoachFeaturePrefs.enabledKey) private var coachEnabled = false
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        if coachEnabled, coach.isConfigured {
+            Button {
+                coach.openedFromCard(context)
+                NotificationCenter.default.post(name: .noopOpenCoachCard, object: nil)
+                dismiss()
+            } label: {
+                Image(systemName: "sparkles")
+                    .font(.system(size: diameter * 0.46, weight: .semibold))
+                    .foregroundStyle(StrandPalette.accent)
+                    .frame(width: diameter, height: diameter)
+                    .background(StrandPalette.accent.opacity(0.12), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Ask coach about \(context.title)")
+            .accessibilityHint("Opens the AI coach with this metric's data.")
+        }
+    }
+}
+
+/// Whether the Coach entry's breath should run right now.
+///
+/// ONE definition, because two entry points must agree — the header button on Liquid Today and
+/// `CoachEntryAvatar` on the classic row — and a setting that behaves differently depending on which
+/// Today variant is running would be worse than no setting at all.
+///
+/// Two independent conditions, both of which must hold: the user's own preference, and the motion
+/// state. A system-level "less movement please" outranks a per-feature default, which is why
+/// `poseStill` (Reduce Motion OR Low Power OR the app's own quiet-motion switch) can veto it. Carried
+/// over verbatim from `CoachTodayTile`, the tile this breath used to live on.
+@MainActor
+enum CoachBreath {
+    static func isActive(reduceMotion: Bool, enabled: Bool, motion: NoopMotionState) -> Bool {
+        enabled && !motion.poseStill(reduceMotion)
+    }
+}
+
+/// The coach's avatar as it appears on a Today entry: the identity's picture with a small accent sparkles
+/// badge, or a plain sparkle disc when the user turned the avatar off. The badge is the whole point — even
+/// with a photo it marks the circle unmistakably as the COACH rather than the user's own profile picture.
+/// Shared by the full-width row (classic Today) and the compact tile (liquid Today) so the two can never
+/// drift apart.
+struct CoachEntryAvatar: View {
+    var size: CGFloat = 40
+    /// False renders the generic sparkle disc — the `CoachEntryPrefs.todayAvatarKey` opt-out.
+    var showsAvatar: Bool = true
+
+    @AppStorage(CoachTilePrefs.breathingKey) private var breathingEnabled = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var motion = NoopMotionState.shared
+
+    var body: some View {
+        avatar.coachBreathHalo(active: CoachBreath.isActive(reduceMotion: reduceMotion,
+                                                            enabled: breathingEnabled,
+                                                            motion: motion))
+    }
+
+    @ViewBuilder
+    private var avatar: some View {
+        if showsAvatar {
+            CoachAvatarView(size: size)
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: size * 0.30, weight: .bold))
+                        .foregroundStyle(StrandPalette.goldDeepText)
+                        .frame(width: size * 0.5, height: size * 0.5)
+                        .background(StrandPalette.accent, in: Circle())
+                        .overlay(Circle().strokeBorder(StrandPalette.surfaceBase, lineWidth: 1.5))
+                        .accessibilityHidden(true)
+                }
+        } else {
+            Image(systemName: "sparkles")
+                .font(.system(size: size * 0.42, weight: .semibold))
+                .foregroundStyle(StrandPalette.accent)
+                .frame(width: size, height: size)
+                .background(StrandPalette.accent.opacity(0.14), in: Circle())
+        }
+    }
+}
+
+/// The Coach's Today entry as its own full-width list row, instead of an icon squeezed into the top-bar
+/// cluster next to the user's own profile picture (the two used to sit flush against each other with
+/// nothing between them). Same gate the old header entry used — `coachUIEnabled && showsCard` — and
+/// tapping it opens the chat the same way the floating button and the old header avatar did. Design
+/// tokens only; shared (macOS + iOS) so both Today variants render an identical row.
+struct CoachTodayRow: View {
+    /// Flipped true to present the Coach; the host owns the actual presentation (`.coachCover` on iOS,
+    /// a sheet on macOS), same pattern as `CoachFloatingButton`.
+    @Binding var isPresented: Bool
+
+    @EnvironmentObject private var coach: AICoachEngine
+    @ObservedObject private var identityStore = CoachIdentityStore.shared
+    /// Show the coach's avatar (rather than a generic sparkle) on the row — the same toggle the old
+    /// header entry read, so turning it off keeps behaving the same way it always did.
+    @AppStorage(CoachEntryPrefs.todayAvatarKey) private var todayAvatar = true
+
+    private let avatarSize: CGFloat = 40
+
+    var body: some View {
+        Button { isPresented = true } label: {
+            // Accent-tinted card so the coach entry reads as a distinct action, never as a second profile
+            // avatar sitting under the header's (#R-header-coach follow-up: the two used to be confused for
+            // each other). The tint does the separating; the sparkles badge below removes any last ambiguity.
+            NoopCard(padding: 14, tint: StrandPalette.accent) {
+                HStack(spacing: 12) {
+                    CoachEntryAvatar(size: avatarSize, showsAvatar: todayAvatar)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(identityStore.identity.name)
+                            .font(StrandFont.headline)
+                            .foregroundStyle(StrandPalette.textPrimary)
+                        Text("Ask your coach")
+                            .font(StrandFont.footnote)
+                            .foregroundStyle(StrandPalette.textSecondary)
+                    }
+                    Spacer(minLength: 0)
+                    // Same unseen-message signal the floating button shows (#R-header-coach) — a brief
+                    // or nudge the user hasn't opened yet.
+                    if coach.hasUnseenCoachMessage {
+                        Circle()
+                            .fill(StrandPalette.statusCritical)
+                            .frame(width: 9, height: 9)
+                            .accessibilityHidden(true)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(StrandPalette.textTertiary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("\(identityStore.identity.name), your coach"))
+        .accessibilityHint("Opens the AI coach chat.")
+    }
+}
+
+#if os(iOS)
+/// A circular button that opens the Coach, floating over the whole app. It can be pinned to one of four
+/// chrome-clear corners from Coach settings, or dragged anywhere (which switches it to `.custom` and
+/// persists the spot as screen fractions, so it survives rotation / device changes). Locking it disables
+/// dragging entirely — a tap still opens the chat. Design tokens only; iOS-only (it lives over `RootTabView`).
+struct CoachFloatingButton: View {
+    /// Flipped true to present the Coach (the host owns the actual `.coachCover`).
+    @Binding var isPresented: Bool
+    /// Drives the unseen-message dot. Same engine the other entry points already observe.
+    @EnvironmentObject private var coach: AICoachEngine
+
+    /// Which corner it's pinned to; `.custom` = wherever the user dragged it.
+    @AppStorage(CoachButtonCorner.storageKey) private var cornerRaw = CoachButtonCorner.bottomTrailing.rawValue
+    /// When on, the button can't be dragged (guards against nudging it away by accident).
+    @AppStorage(CoachButtonCorner.lockedKey) private var locked = false
+    /// Persisted dragged position as a FRACTION of the container (0…1). Only used when `.custom`.
+    @AppStorage(CoachButtonCorner.fracXKey) private var fracX: Double = -1
+    @AppStorage(CoachButtonCorner.fracYKey) private var fracY: Double = -1
+    /// Live drag translation while the finger is down (committed to fracX/fracY on release).
+    @GestureState private var dragging: CGSize = .zero
+
+    private let size: CGFloat = 56
+
+    init(isPresented: Binding<Bool>) {
+        _isPresented = isPresented
+        // Keep a pre-corners dragged spot instead of snapping it to the new default (see migrateIfNeeded).
+        CoachButtonCorner.migrateIfNeeded()
+    }
+
+    private var corner: CoachButtonCorner { CoachButtonCorner(rawValue: cornerRaw) ?? .bottomTrailing }
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width, h = geo.size.height
+            let half = size / 2
+            let margin = CoachButtonCorner.margin
+            // A pinned corner wins; `.custom` falls back to the dragged fractions (and, failing that, the
+            // bottom-trailing default so a fresh install still lands somewhere sensible).
+            let pinned = corner.point(in: geo.size, safeArea: geo.safeAreaInsets, half: half)
+            let fallback = CoachButtonCorner.bottomTrailing.point(in: geo.size, safeArea: geo.safeAreaInsets,
+                                                                  half: half) ?? .zero
+            let baseX = pinned?.x ?? (fracX < 0 ? fallback.x : fracX * w)
+            let baseY = pinned?.y ?? (fracY < 0 ? fallback.y : fracY * h)
+            let x = clamp(baseX + dragging.width, min: half + margin, max: w - half - margin)
+            let y = clamp(baseY + dragging.height, min: half + margin, max: h - half - margin)
+
+            Image(systemName: "sparkles")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: size, height: size)
+                .background(Circle().fill(StrandPalette.accent))
+                .overlay(Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1))
+                // A brief or nudge the user hasn't seen. Without it the coach reaches out into an
+                // interface that gives no sign anything arrived, so proactive messages are only ever
+                // found by chance. Not a count: one dot says "there's something", which is all the
+                // user needs to decide whether to look.
+                .overlay(alignment: .topTrailing) {
+                    if coach.hasUnseenCoachMessage {
+                        Circle()
+                            .fill(StrandPalette.statusCritical)
+                            .frame(width: 11, height: 11)
+                            .overlay(Circle().strokeBorder(StrandPalette.surfaceBase, lineWidth: 2))
+                            .offset(x: 1, y: -1)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .shadow(color: .black.opacity(0.28), radius: 10, x: 0, y: 4)
+                .contentShape(Circle())
+                .position(x: x, y: y)
+                // Locked: no drag gesture at all, so the button can't be nudged. minimumDistance lets a
+                // tap through to onTapGesture; only a real drag moves it (and unpins it to `.custom`).
+                .gesture(
+                    locked ? nil :
+                    DragGesture(minimumDistance: 8)
+                        .updating($dragging) { value, state, _ in state = value.translation }
+                        .onEnded { value in
+                            let nx = clamp(baseX + value.translation.width, min: half + margin, max: w - half - margin)
+                            let ny = clamp(baseY + value.translation.height, min: half + margin, max: h - half - margin)
+                            fracX = nx / w
+                            fracY = ny / h
+                            cornerRaw = CoachButtonCorner.custom.rawValue
+                        }
+                )
+                .onTapGesture { isPresented = true }
+                .animation(StrandMotion.interactive, value: cornerRaw)
+                .accessibilityLabel("Ask your Coach")
+                .accessibilityHint(locked
+                                   ? "Opens the AI coach chat."
+                                   : "Opens the AI coach chat. Draggable.")
+                .accessibilityAddTraits(.isButton)
+        }
+        .allowsHitTesting(true)
+    }
+
+    private func clamp(_ v: CGFloat, min lo: CGFloat, max hi: CGFloat) -> CGFloat {
+        Swift.min(Swift.max(v, lo), hi)
+    }
+}
+#endif

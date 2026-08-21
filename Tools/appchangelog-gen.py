@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the in-app "What's New" entry (AppChangelog) for BOTH platforms from a release file's
+"""Generate the in-app "What's New" entry (AppChangelog) from a release file's
 front-matter, so the Kotlin and Swift entries stay byte-identical and the version bump is automatic.
 
 A per-version notes file docs/releases/v<VER>.md may carry a YAML front-matter block:
@@ -11,7 +11,7 @@ A per-version notes file docs/releases/v<VER>.md may carry a YAML front-matter b
       items:
         - "**Bold lead.** One-line description."
         - "**Another.** ..."
-      title_locales:            # OPTIONAL, but see below — without it the card ships English titles
+      title_locales:            # DEAD in this fork — see "Localizing the card" below
         de: "Kurze Überschrift"
         es: "..."
         fr: "..."
@@ -21,86 +21,31 @@ A per-version notes file docs/releases/v<VER>.md may carry a YAML front-matter b
     # NOOP v<VER>
     <the full release notes — the GitHub release body; the front-matter is stripped there>
 
+Localizing the card. `title_locales` no longer reaches anything: it was consumed by the Android
+title strings this script used to write, and that arm went with the Android tree. The Swift side
+localizes differently — `WhatsNewView` renders the title and each item through
+`LocalizedStringKey`, so the ENGLISH text is the catalog key. To ship a translated card, add the
+title and every item to `Strand/Resources/Localizable.xcstrings` for all nine languages after
+running this script; the i18n gate will fail the build if you add them for some and not others, and
+say nothing at all if you skip them entirely (an absent key falls back to English, silently).
+Leaving `title_locales` in the front matter is harmless and documents the intent, but it is the
+catalog that decides what a Polish reader sees.
+
 Running `Tools/appchangelog-gen.py docs/releases/v8.2.2.md` prepends the generated Release entry to
-`releases` in AppChangelog.kt AND AppChangelog.swift and bumps CURRENT_VERSION/currentVersion to that
+`releases` in AppChangelog.swift and bumps `currentVersion` to that
 version. Idempotent: if the version is already the newest entry it only re-checks the constant. The
 version comes from the filename (v8.2.2.md -> 8.2.2).
 
-ANDROID TITLE LOCALIZATION (#878). Compose has no auto-extraction, so a raw Kotlin `title = "..."`
-is a hardcoded literal: the i18n gate fails on it, and because that gate audits the WHOLE tree the
-failure red-checks every open PR on a line none of them touched. Apple is unaffected (SwiftUI
-auto-extracts into the catalog), so the Swift entry keeps its literal title.
-
-This script therefore emits `title = uiString(R.string.<key>)` for Kotlin and writes the string
-itself, using the repo's key scheme: `l10n_app_changelog_<first 6 alnum words, lowercased>_<sha1 of
-the exact title>[:8]` — verified to reproduce the existing 9.2.0 and 9.2.1 keys.
-
-Translations come from `whatsnew.title_locales`. A locale with no entry falls back to the ENGLISH
-title and is named in a warning, because the alternative — leaving the key out of that locale — is
-the same red gate this exists to prevent. An English title in a German card is a visible, fixable
-wart; a red main after every release is not.
 """
-import hashlib
 import re
 import sys
 import pathlib
 
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-KT = ROOT / "android/app/src/main/java/com/noop/ui/AppChangelog.kt"
 SW = ROOT / "Strand/System/AppChangelog.swift"
-RES = ROOT / "android/app/src/main/res"
 
 #: The locale resource dirs the i18n gate treats as the focus set. `values` is the English source.
-# Polish shipped in #1250 but was never added here, so a `title_locales.pl` entry was accepted and then
-# silently dropped — v10.1.0 supplied one and Polish users still saw the English card. Keep this in step
-# with the res/values-* directories that actually exist.
-LOCALE_DIRS = {"en": "values", "de": "values-de", "es": "values-es",
-               "fr": "values-fr", "pt-PT": "values-pt-rPT", "zh": "values-zh",
-               "pl": "values-pl"}
-
-
-def title_key(title: str) -> str:
-    """`l10n_app_changelog_<first 6 alnum words>_<sha1(title)[:8]>` — the repo's existing scheme.
-
-    Hashed on the EXACT title text, so an edited headline mints a new key rather than silently
-    re-pointing the old one's translations at different words.
-    """
-    slug = "_".join(re.findall(r"[A-Za-z0-9]+", title.lower())[:6])
-    return f"l10n_app_changelog_{slug}_{hashlib.sha1(title.encode()).hexdigest()[:8]}"
-
-
-def esc_xml(s: str) -> str:
-    """Android resource escaping: XML entities, plus the apostrophe Android requires backslashed."""
-    return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-             .replace("'", "\\'"))
-
-
-def write_title_strings(key: str, title: str, locales: dict) -> None:
-    """Add `key` to values/ and each focus locale, before </resources>. Idempotent."""
-    missing = []
-    for loc, d in LOCALE_DIRS.items():
-        path = RES / d / "strings.xml"
-        if not path.is_file():
-            print(f"  WARNING: {path} not found — skipped")
-            continue
-        text = path.read_text()
-        if f'name="{key}"' in text:
-            continue
-        value = title if loc == "en" else locales.get(loc)
-        if value is None:
-            value, fell_back = title, True
-            missing.append(loc)
-        else:
-            fell_back = False
-        text = text.replace("</resources>",
-                            f'    <string name="{key}">{esc_xml(value)}</string>\n</resources>')
-        path.write_text(text)
-        print(f"  {d}/strings.xml: + {key}" + ("  (ENGLISH FALLBACK)" if fell_back else ""))
-    if missing:
-        print(f"  WARNING: no whatsnew.title_locales for {', '.join(missing)} — those cards show the "
-              f"English title. Add them to the release notes front-matter and re-run to fix.")
-
 
 def frontmatter(md: pathlib.Path) -> dict:
     # Imported HERE, not at module scope: the pure helpers below carry the #878 key scheme and are
@@ -119,27 +64,8 @@ def frontmatter(md: pathlib.Path) -> dict:
     return wn
 
 
-def esc_kt(s: str) -> str:
-    return s.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
-
-
 def esc_sw(s: str) -> str:
     return s.replace("\\", "\\\\").replace('"', '\\"')
-
-
-def kt_block(ver, wn):
-    items = "\n".join(f'                "{esc_kt(i)}",' for i in wn["items"])
-    # #878: a resource reference, never a literal — see the module docstring.
-    return (
-        "        Release(\n"
-        f'            version = "{ver}",\n'
-        f'            title = uiString(R.string.{title_key(wn["title"])}),\n'
-        f'            date = "{esc_kt(wn["date"])}",\n'
-        "            items = listOf(\n"
-        f"{items}\n"
-        "            ),\n"
-        "        ),\n"
-    )
 
 
 def sw_block(ver, wn):
@@ -200,13 +126,15 @@ def main():
     ver = md.stem.lstrip("vV")
     wn = frontmatter(md)
     print(f"appchangelog-gen: v{ver} — {wn['title']}")
-    write_title_strings(title_key(wn["title"]), wn["title"], wn.get("title_locales") or {})
-    apply(KT, "val releases: List<Release> = listOf(\n", kt_block(ver, wn), ver,
-          r'(const val CURRENT_VERSION = ")[^"]*(")', rf'\g<1>{ver}\g<2>',
-          title_line=f'title = uiString(R.string.{title_key(wn["title"])}),')
     apply(SW, "static let releases: [Release] = [\n", sw_block(ver, wn), ver,
           r'(static let currentVersion = ")[^"]*(")', rf'\g<1>{ver}\g<2>',
           title_line=f'title: "{esc_sw(wn["title"])}",')
+    # The card's text is localized through the String Catalog, keyed by the English string (see
+    # "Localizing the card" above). Nothing enforces that — an absent key falls back to English on
+    # every device, silently — so the one place that knows these strings just landed says so.
+    missing = 1 + len(wn.get("items", []))
+    print(f"appchangelog-gen: {missing} string(s) for this entry are NOT in "
+          f"Strand/Resources/Localizable.xcstrings yet — the card ships English until they are.")
     print("appchangelog-gen: done. Review the diff, then compile.")
 
 

@@ -2181,13 +2181,6 @@ public final class BLEManager: NSObject, ObservableObject {
                 log(diag)
             }
         }
-        // #520: the motion-magnitude diagnostic for this session. Emitted independently of the summary
-        // above — a caught-up session banks no rows but can still have decoded records — and silent when
-        // nothing carried the field, which a WHOOP 4.0 never does.
-        if let bf = backfiller,
-           let dynLine = bf.sessionDynAccel.logLine(threshold: dynAccelStillThresholdG) {
-            log(dynLine)
-        }
         // Connection test mode: the offload OUTCOME the readout's lastOffloadResult id binds. Gated
         // zero-cost (the .connection bool is read before any string is built). Diagnostic only - it reads
         // the same per-session tallies the existing summary above does, changing no offload behaviour. A
@@ -4726,7 +4719,9 @@ extension BLEManager: @preconcurrency CBCentralManagerDelegate {
             return
         }
         cancelScanFallback()
-        persistSelectedModel(selectedModel)
+        // Persist the family that actually advertised so the next scan starts on the right service —
+        // this is what makes a one-time rotation stick after a stale-preference reconnect. (PR#195)
+        UserDefaults.standard.set(selectedModel.rawValue, forKey: "selectedWhoopModel")
         log("Discovered \(name) (rssi \(RSSI)) — connecting")
         central.stopScan()
         preparePeripheral(peripheral)
@@ -4924,7 +4919,6 @@ extension BLEManager: @preconcurrency CBCentralManagerDelegate {
         realtimeArmed = false
         whoop5SessionStarted = false
         clockRequested = false
-        clockRetries = 0
         connectHandshakeDone = false
         cmdNotifyConfirmedActive = false   // #34: a fresh connection needs its own notify-confirm + settle
         connectSettledSignaled = false
@@ -5099,7 +5093,6 @@ extension BLEManager: @preconcurrency CBCentralManagerDelegate {
         // clockRef is nil in the fresh process after restore, so we must re-request it.
         // Reset the flag so the post-restore didWriteValueFor issues exactly one getClock.
         clockRequested = false
-        clockRetries = 0
         // Ensure the store is ready before restored BLE data arrives (idempotent; no-op if already built).
         Task { @MainActor in await bootstrapStore() }
         if p.state == .connected {
@@ -5125,23 +5118,6 @@ extension BLEManager: @preconcurrency CBCentralManagerDelegate {
 
 // MARK: - CBPeripheralDelegate
 extension BLEManager: @preconcurrency CBPeripheralDelegate {
-    /// Persist the WHOOP family we are actually talking to, so the next launch scans the right service —
-    /// what makes a one-time fallback rotation stick (PR#195) — and, on a genuine family switch, untick the
-    /// 5/MG-only probes so none carries over to a strap that cannot support it.
-    ///
-    /// Compares `deviceFamily`, not the raw value: if MG ever splits from plain 5.0 into its own case the
-    /// two would share `.whoop5`, and a raw-value compare would then reset on a same-family switch. Mirrors
-    /// the Kotlin `persistSelectedModel` service compare.
-    private func persistSelectedModel(_ model: WhoopModel) {
-        let previous = UserDefaults.standard.string(forKey: "selectedWhoopModel")
-        UserDefaults.standard.set(model.rawValue, forKey: "selectedWhoopModel")
-        guard let previous,
-              let previousModel = WhoopModel(rawValue: previous),
-              previousModel.deviceFamily != model.deviceFamily else { return }
-        PuffinExperiment.resetFiveMGGatedProbes()
-        log("Strap family switched (\(previous) → \(model.rawValue)) — reset 5/MG-only experimental toggles to off.")
-    }
-
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         if let error {
             log("Service discovery failed: \(error.localizedDescription)")
@@ -5149,17 +5125,6 @@ extension BLEManager: @preconcurrency CBPeripheralDelegate {
         }
         guard let services = peripheral.services else { return }
         log("Services discovered: \(services.map { $0.uuid.uuidString }.joined(separator: ", "))")
-        // Record the family from the services the strap ACTUALLY exposes, not just from a scan. The adopt
-        // paths in connectCore (`retrieveConnectedPeripherals` / `retrievePeripherals`) reach didConnect
-        // WITHOUT ever passing through didDiscover, so a strap attached that way never persisted its family
-        // and the next launch scanned the wrong service until the fallback rotation recovered. This is the
-        // Apple analogue of the Android fix in WhoopBleClient's connect-time family resolution. Checked
-        // once here rather than inside the loop so a strap exposing both services can't thrash the pref.
-        if services.contains(where: { $0.uuid == BLEManager.whoop5Service }) {
-            persistSelectedModel(.whoop5mg)
-        } else if services.contains(where: { $0.uuid == BLEManager.customService }) {
-            persistSelectedModel(.whoop4)
-        }
         for s in services {
             switch s.uuid {
             case BLEManager.customService:
@@ -5602,17 +5567,10 @@ extension BLEManager: @preconcurrency CBPeripheralDelegate {
         // unconditionally, even if decode returns nil) so the field offsets are inspectable from a strap log.
         let hex = frame.map { String(format: "%02x", $0) }.joined()
         log("Get Data Range raw frame (#451 — for offset analysis): \(hex)")
-        // #689: ring-buffer page backlog, DIAGNOSTIC ONLY — never gates sync/backfill.
-        // BOTH branches log, deliberately. Until #818 the offsets were two bytes early, so ring capacity
-        // always read 0, the `t > 0` guard rejected every real frame, and this logged NOTHING — a strap
-        // log was indistinguishable from one where the strap never answered, which is why a broken decode
-        // survived unnoticed. The raw-frame dump above is unconditional for the same reason. If a firmware
-        // revision ever shifts these fields again, the rejection must be visible rather than silent.
+        // #689: ring-buffer page backlog, DIAGNOSTIC ONLY (RE'd, unconfirmed — never gates sync/backfill).
+        // Logged only when it decodes plausibly; a short/garbage frame → nil.
         if let pages = DataRange.pagesBehind(from: frame, cmdOff: cmdOff) {
             log("Strap backlog pages behind: \(pages) (#689 — GET_DATA_RANGE ring backlog, diagnostic only)")
-        } else {
-            log("Strap backlog pages behind: not decodable from this frame (#689 — offsets may have moved; "
-                + "the raw frame above is the input). Diagnostic only, sync is unaffected.")
         }
         if let newest = BLEManager.dataRangeNewestUnix(from: frame) {
             // #695: the sync-affecting side-effects (strapNewestTs, backfill window, LiveState range) only
@@ -5643,7 +5601,15 @@ extension BLEManager: @preconcurrency CBPeripheralDelegate {
             }
             // UNIVERSAL clock-drift snapshot (RTC cluster #531/#767/#804/#812): bank the [oldest, newest]
             // window onto LiveState UNCONDITIONALLY (observability, not gated) for the export assembler.
-            if feedsSync { state.setStrapRange(newestUnix: newest, oldestUnix: (oldest.map { $0 < newest } ?? false) ? oldest : nil) }
+            // This used to sit behind `feedsSync`, i.e. WHOOP 4.0 only, which quietly cost every 5.0/MG
+            // export its universal clock line: a v10.0.0 capture from a 5/MG strap came back
+            // "[INCOMPLETE] universal: mode was on but produced NO trace" even though the log above it
+            // carries the decoded range twice. `feedsSync` exists to gate the SYNC-affecting side effects
+            // (strapNewestTs, the backfiller's session window) while the 5/MG decode is unconfirmed; this
+            // is not one of them. It feeds one diagnostic line (and the alarm section's clock read), and
+            // the raw GET_DATA_RANGE frames are dumped right beside it, so an imperfect 5/MG decode shows
+            // itself here rather than leaving a maintainer with nothing at all.
+            state.setStrapRange(newestUnix: newest, oldestUnix: (oldest.map { $0 < newest } ?? false) ? oldest : nil)
             // Connection test mode: promote the CLOCK-DRIFT picture to one upfront tagged line (#767/#754).
             if TestCentre.active(.connection) {
                 let line = ConnectionTrace.clockDriftLine(
@@ -5754,7 +5720,7 @@ extension BLEManager: @preconcurrency CBPeripheralDelegate {
                         clockRef = ref
                         collector?.clockRef = ref                  // unblocks buffered persistence
                         backfiller?.clockRef = ref                 // unblocks historical chunk decode
-                        log("Clock correlated: device=\(ref.device) wall=\(ref.wall)\(clockRetries > 0 ? " (after retry \(clockRetries))" : "")")
+                        log("Clock correlated: device=\(ref.device) wall=\(ref.wall)")
                         // Conditional SET_CLOCK (mirrors WHOOP): only when the strap RTC has drifted /
                         // is frozen — not blindly every connect. Offload doesn't depend on this (it uses
                         // clockRef for decoding); SET_CLOCK only keeps FUTURE logging timestamps sane.

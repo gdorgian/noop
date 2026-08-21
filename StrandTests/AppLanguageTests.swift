@@ -22,7 +22,11 @@ final class AppLanguageTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         AppLanguage.apply(AppLanguage.german.rawValue, defaults: defaults)
-        XCTAssertEqual(defaults.stringArray(forKey: "AppleLanguages"), ["de"])
+        // Read the suite's OWN persisted domain here for the same reason the removal check below does,
+        // plus one specific to this fork: the Strand test scheme pins `language: en` (project.yml), so
+        // the test host launches with `-AppleLanguages (en)` in NSArgumentDomain — which outranks any
+        // suite domain. `stringArray(forKey:)` would answer "en" no matter what `apply` wrote.
+        XCTAssertEqual(defaults.persistentDomain(forName: suiteName)?["AppleLanguages"] as? [String], ["de"])
 
         AppLanguage.apply(AppLanguage.system.rawValue, defaults: defaults)
         // Read the suite's OWN persisted domain, not object(forKey:): the latter falls through to

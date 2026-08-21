@@ -97,6 +97,9 @@ private struct HealthFirstRunContent: View {
     @EnvironmentObject var repo: Repository
     @EnvironmentObject var live: LiveState
     @EnvironmentObject var model: AppModel
+    /// The empty state's "Open Data Sources" button routes through the shell (`NavRouter`), because
+    /// neither shell exposes a selection this screen could set directly.
+    @EnvironmentObject var router: NavRouter
 
     /// HR to display: the spike-filtered median (model.bpm, #39) when available, else the reported
     /// value, else R-R-derived (the strap streams R-R even when its HR field reads 0).
@@ -114,7 +117,8 @@ private struct HealthFirstRunContent: View {
                 // Even with no history yet, a freshly-connected strap can be told to sync now (#364) —
                 // so the control is reachable before the screen has any data to show.
                 SyncStatusSection()
-                ComingSoon(what: "No biometrics yet. Import your WHOOP export (and Apple Health if you have it) in Data Sources to fill this in.")
+                ComingSoon(what: "No biometrics yet. Import your WHOOP export (and Apple Health if you have it) in Data Sources to fill this in.",
+                           action: ("Open Data Sources", { router.openDataSources() }))
             }
         } else {
             HealthSectionsStack()
@@ -250,15 +254,19 @@ private struct HeartRateSection: View {
         return min(max(Double(hr) / Double(profile.hrMax), 0), 1)
     }
 
-    /// Current zone 1…5 from %HR-max (WHOOP/Karvonen-style bands: 50/60/70/80/90).
-    private func hrZone(_ fraction: Double) -> Int {
-        switch fraction {
-        case ..<0.60: return 1
-        case ..<0.70: return 2
-        case ..<0.80: return 3
-        case ..<0.90: return 4
-        default:      return 5
-        }
+    /// Current zone from the profile's resolved bands (`ProfileStore.hrZoneSet`), 0 = below Zone 1.
+    ///
+    /// This used to be a hardcoded 50/60/70/80/90 table that didn't go through `HRZones` at all — a
+    /// fourth answer to "which zone is this?" living beside the live readout, the workout split and the
+    /// coach. It ignored the manual HR-max override and would have ignored custom bands entirely, so
+    /// this card could name a different zone than the Live screen for the very same heart rate.
+    ///
+    /// Note the honest 0: the old table called anything under 60 % "Zone 1", including a resting heart
+    /// rate. The shared resolver returns 0 there, and the label renders that as a dash rather than
+    /// claiming a zone the wearer isn't in.
+    private func hrZone(_ hr: Int?) -> Int {
+        guard let hr, hr > 0 else { return 0 }
+        return profile.hrZoneSet.zoneNumber(forBPM: Double(hr))
     }
 
     /// A short, time-stamped HR series for the hero chart (newest last).
@@ -293,7 +301,7 @@ private struct HeartRateSection: View {
         let displayHR = self.displayHR
         let hasLiveHR = displayHR != nil
         let fraction = hrFraction(displayHR)
-        let zone = hrZone(fraction)
+        let zone = hrZone(displayHR)
         let series = hrSeries(displayHR)
 
         return VStack(alignment: .leading, spacing: NoopMetrics.gap) {
@@ -312,7 +320,7 @@ private struct HeartRateSection: View {
                           fraction: fraction, zone: zone, series: series)
             } footer: {
                 ChartFooter([
-                    ("Zone", hasLiveHR ? "Z\(zone)" : "—"),
+                    ("Zone", hasLiveHR && zone >= 1 ? "Z\(zone)" : "—"),
                     ("% Max", hasLiveHR ? "\(Int((fraction * 100).rounded()))%" : "—"),
                     ("Max HR", "\(profile.hrMax)"),
                     ("State", hasLiveHR ? String(localized: "STREAMING") : String(localized: "IDLE")),
@@ -374,8 +382,11 @@ private struct HeartRateSection: View {
         }
     }
 
+    /// `zone == 0` means the reading sits below Zone 1 — a resting heart rate, not a training zone. The
+    /// percentage still tells the story there, so the pill drops the zone number rather than inventing one.
     private func zoneLabel(hasLiveHR: Bool, zone: Int, fraction: Double) -> String {
         guard hasLiveHR else { return String(localized: "Idle") }
+        guard zone >= 1 else { return String(localized: "Below Zone 1 · \(Int((fraction * 100).rounded()))%") }
         return String(localized: "Zone \(zone) · \(Int((fraction * 100).rounded()))%")
     }
 }
@@ -754,7 +765,7 @@ private struct FitnessAgeSection: View {
                 refreshing: refreshing)
         } else {
             // Brief read of the weekly value; honest placeholder rather than an empty gap.
-            ComingSoon(what: "Reading your Fitness Age…", symbol: "figure.run")
+            ComingSoon.loading("Reading your Fitness Age…", title: "Reading your Fitness Age", symbol: "figure.run")
         }
     }
 
@@ -955,7 +966,7 @@ private struct ReadinessChecklistCard: View {
                     // from stored data. Spinner while it runs.
                     if let onRefresh {
                         if refreshing {
-                            ProgressView().controlSize(.small).tint(StrandPalette.accent)
+                            ProgressView().controlSize(.small).appleInspiredTint("health")
                         } else {
                             Button(action: onRefresh) {
                                 Image(systemName: "arrow.clockwise")
@@ -1107,7 +1118,7 @@ private struct VitalitySection: View {
             } else if loaded {
                 ComingSoon(what: "A few more days and we can show your Vitality.", symbol: "sparkles")
             } else {
-                ComingSoon(what: "Reading your Vitality…", symbol: "sparkles")
+                ComingSoon.loading("Reading your Vitality…", title: "Reading your Vitality", symbol: "sparkles")
             }
         }
         .task(id: repo.refreshSeq) { await load() }

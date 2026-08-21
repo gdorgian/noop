@@ -128,6 +128,12 @@ enum ExploreRange: Int, CaseIterable, Identifiable, Hashable {
     /// Trailing days the window spans (nil = everything).
     var days: Int? { self == .all ? nil : rawValue }
 
+    /// The windows OFFERED in the segmented control. Eight pills (W/2W/3W/M/3M/6M/1Y/ALL) are too tight
+    /// on a 390 pt phone (redesign bug §1), so the control shows four — W / M / 6M / ALL. The full set of
+    /// cases stays intact for the gating/widening math (`widening`, `ExploreRangeGating`); this only
+    /// curates what's drawn. A stored selection outside this set still resolves — it just highlights no pill.
+    static let displayCases: [ExploreRange] = [.week, .month, .half, .all]
+
     /// This range plus every LARGER range, ascending — the auto-expand search order
     /// when the selected window holds zero points. ALW always terminates the chain.
     var widening: [ExploreRange] {
@@ -228,6 +234,9 @@ struct MetricExplorerView: View {
     /// hint in the header, never gating the rows: the catalog is static, so every row's label/icon/unit
     /// must paint immediately even before any series read returns (#199).
     @State private var probing = true
+    /// Shared zoom namespace (iOS 18+, no-op elsewhere) so a tapped metric row visually grows into its
+    /// detail instead of sliding up from nowhere — the Liquid Glass tile→detail language.
+    @Namespace private var zoom
 
     var body: some View {
         #if os(macOS)
@@ -297,6 +306,7 @@ struct MetricExplorerView: View {
                                     // flashed then popped straight back (#38).
                                     NavigationLink {
                                         MetricDetailView(metric: metric)
+                                            .zoomDestination(id: "metric.zoom.\(metric.id)", namespace: zoom)
                                     } label: {
                                         MetricRow(metric: metric,
                                                   isEmpty: emptyByID[metric.id] ?? false)
@@ -305,6 +315,8 @@ struct MetricExplorerView: View {
                                     // LiquidPressStyle (a transform, so it works edge-to-edge with dividers
                                     // between, no corner radius to match). Matches Today's tappable rows.
                                     .buttonStyle(LiquidPressStyle())
+                                    // The row visually grows into the detail (Liquid Glass tile→detail).
+                                    .zoomSource(id: "metric.zoom.\(metric.id)", namespace: zoom)
                                     #if os(iOS)
                                     // Light selection tick on tap; the simultaneousGesture leaves the
                                     // NavigationLink push intact.
@@ -464,12 +476,15 @@ private struct MetricRow: View {
 struct MetricDetailView: View {
     let metric: MetricDescriptor
     @EnvironmentObject var repo: Repository
+    /// The empty state's "Open Data Sources" button routes through the shell (`NavRouter`), because
+    /// neither shell exposes a selection this screen could set directly.
+    @EnvironmentObject var router: NavRouter
     /// #430 parity: the detail carries the SAME backdrop as the screen that pushed it — the day-cycle sky
     /// when the setting is on, the plain canvas when off — so a Key-Metrics tile tap doesn't jar from the
     /// liquid Today's sky to a flat page. Same keys TodayView/LiquidTodayView gate on; "Sky behind cards"
     /// extends the sky to the full viewport (softer settle) so the transparent cards reveal it throughout.
-    @AppStorage(SceneBackgroundPrefs.enabledKey) private var showDayCycleBackground = true
-    @AppStorage(SkyBehindCardsPrefs.enabledKey) private var skyBehindCards = true
+    @AppStorage(SceneBackgroundPrefs.enabledKey) private var showDayCycleBackground = false
+    @AppStorage(SkyBehindCardsPrefs.enabledKey) private var skyBehindCards = false
     /// Custom background image (#custom-background): when active it overrides the sky in the backdrop.
     @ObservedObject private var backgroundStore = BackgroundImageStore.shared
     // Profile basics for the Fitness Age not-ready countdown (age/sex gate its readiness lead). Injected
@@ -494,6 +509,12 @@ struct MetricDetailView: View {
     private var effortScale: EffortScale { UnitPrefs.resolveEffortScale(effortScaleRaw) }
     private func fmt(_ v: Double) -> String {
         metric.format(v, system: unitSystem, temperature: temperatureUnit, effortScale: effortScale)
+    }
+    /// True when the category overline would just echo the title (e.g. metric "Charge" in category
+    /// "Charge") — the header suppresses the overline in that case so the same word isn't shown twice.
+    private var categoryEchoesTitle: Bool {
+        MetricCatalog.categoryDisplayName(metric.category).compare(
+            metric.title, options: .caseInsensitive) == .orderedSame
     }
 
     @State private var range: ExploreRange = .month
@@ -662,7 +683,7 @@ struct MetricDetailView: View {
                             ComingSoon(what: "\(fitnessReadyLeadCopy(rhrDays: repo.days.suffix(7).compactMap { $0.restingHr }.count, hasAge: profile.age > 0, hasSex: !profile.sex.isEmpty))", symbol: "figure.run")
                             // Force the weekly recompute NOW from stored data (works offline), then re-read.
                             if refreshing {
-                                ProgressView().controlSize(.small).tint(StrandPalette.accent)
+                                ProgressView().controlSize(.small).appleInspiredTint("dataSources")
                             } else {
                                 Button {
                                     guard !refreshing else { return }
@@ -681,11 +702,12 @@ struct MetricDetailView: View {
                             }
                         }
                     } else {
-                        ComingSoon(what: "Import your history first. A WHOOP export in Data Sources fills every metric you can explore here in about a minute.")
+                        ComingSoon(what: "Import your history first. A WHOOP export in Data Sources fills every metric you can explore here in about a minute.",
+                                   action: ("Open Data Sources", { router.openDataSources() }))
                     }
                 } else if !loaded {
                     rangeBar(effectiveRange: effRange, windowed: win, windowFellBack: fellBack)
-                    ComingSoon(what: "Reading your \(metric.title.lowercased())…")
+                    ComingSoon.loading("Reading your \(metric.title.lowercased())…", title: "Reading your history")
                 } else {
                     // Scenic hero: the metric's current value as a layered ring gauge (0–100
                     // scores) or a big SF-Rounded headline, floated over the domain's starfield,
@@ -693,6 +715,13 @@ struct MetricDetailView: View {
                     heroHeader(effectiveRange: effRange, windowed: win, windowFellBack: fellBack)
                     heroChart(effectiveRange: effRange, windowed: win, windowFellBack: fellBack)
                     statRow(effectiveRange: effRange, windowed: win)
+                    // Card-AI (#P11, briefing §8): the coach entry belongs directly under the stats,
+                    // because those four numbers ARE the context it is handed — the question a person
+                    // has here ("why is this falling?") is the one the tiles just raised. Hides itself
+                    // when the coach is off or the series is empty; see `coachCardContext`.
+                    if let ctx = coachCardContext(effectiveRange: effRange, windowed: win) {
+                        CoachCardButton(context: ctx)
+                    }
                     readingsTable(windowed: win)
                     correlationCard
                 }
@@ -799,14 +828,18 @@ struct MetricDetailView: View {
                 // Category + title on their OWN full-width row so a long title ("Heart Rate Variability")
                 // is never crushed into a letter-per-line column by the range pill (2026-07-02).
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(MetricCatalog.categoryDisplayName(metric.category).uppercased()).strandOverline()
+                    // Suppress the category overline when it would just repeat the title (e.g. the Charge
+                    // metric in the Charge category) — that's the "CHARGE / Charge" doubling (redesign bug §1).
+                    if !categoryEchoesTitle {
+                        Text(MetricCatalog.categoryDisplayName(metric.category).uppercased()).strandOverline()
+                    }
                     Text(metric.title)
                         .font(StrandFont.title2)
                         .foregroundStyle(StrandPalette.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 // Range control on its own row beneath the title.
-                SegmentedPillControl(ExploreRange.allCases, selection: selectionBinding,
+                SegmentedPillControl(ExploreRange.displayCases, selection: selectionBinding,
                                      adaptsToAvailableWidth: true,
                                      isEnabled: isUnlocked) { $0.label }
 
@@ -914,13 +947,17 @@ struct MetricDetailView: View {
                                    windowed: windowed,
                                    windowFellBack: windowFellBack)
         return VStack(alignment: .leading, spacing: 8) {
+            // Upstream #743 moved the range control off the title row onto its own full-width row below;
+            // the fork keeps its `!categoryEchoesTitle` overline suppression and its curated `displayCases`.
             VStack(alignment: .leading, spacing: 2) {
-                Text(MetricCatalog.categoryDisplayName(metric.category).uppercased()).strandOverline()
+                if !categoryEchoesTitle {
+                    Text(MetricCatalog.categoryDisplayName(metric.category).uppercased()).strandOverline()
+                }
                 Text(metric.title)
                     .font(StrandFont.title2)
                     .foregroundStyle(StrandPalette.textPrimary)
             }
-            SegmentedPillControl(ExploreRange.allCases, selection: selectionBinding,
+            SegmentedPillControl(ExploreRange.displayCases, selection: selectionBinding,
                                  adaptsToAvailableWidth: true,
                                  isEnabled: isUnlocked) { $0.label }
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -973,7 +1010,11 @@ struct MetricDetailView: View {
                 valueRange: valueRange(windowed.map(\.value)),
                 showsArea: true,
                 height: NoopMetrics.chartHeight,
-                valueFormat: { fmt($0) }
+                valueFormat: { fmt($0) },
+                // The screen has the name right there in `metric.title`; without passing it the chart
+                // announces itself as the generic "Trend", which on a screen that is ENTIRELY about one
+                // metric is the one word that carries no information.
+                accessibilityLabel: String(localized: "\(metric.title) trend")
             )
         } footer: {
             ChartFooter([
@@ -1069,6 +1110,90 @@ struct MetricDetailView: View {
         return longDate(d)
     }
 
+    // MARK: Card-AI (#P11, briefing §8)
+
+    /// This detail's context for the coach, built ONLY from what the screen is already showing: the hero
+    /// value and its date, the window the range chips actually resolved to, and the four `statRow`
+    /// numbers. `ComparisonEngine.stat` / `.compare` are the same two calls the tiles make, on the same
+    /// `windowed` slice — so the coach can never quote a number that is not on screen, and nothing new
+    /// is derived or fetched to build it.
+    ///
+    /// English on purpose, like every other block the coach reads: `summary` is context handed to the
+    /// model, not UI. The `suggestions` ARE user-facing chips, so those stay localized.
+    ///
+    /// Nil until the series has loaded and holds something, which hides the button on its own — the same
+    /// self-hiding shape `StressView.coachCardContext` uses, so there is never a dead affordance.
+    private func coachCardContext(effectiveRange: ExploreRange,
+                                  windowed: [(day: String, value: Double)]) -> CoachCardContext? {
+        guard loaded, !series.isEmpty, let latest else { return nil }
+
+        let windowValues = windowed.map(\.value)
+        let s = ComparisonEngine.stat(windowValues)
+        let cmp = ComparisonEngine.compare(current: windowValues,
+                                           previous: previousWindow(effectiveRange: effectiveRange,
+                                                                    windowed: windowed).map(\.value))
+
+        var lines: [String] = []
+        if let day = parseDay(latest.day) {
+            lines.append("\(metric.title): \(fmt(latest.value)) as of \(longDate(day)).")
+        } else {
+            lines.append("\(metric.title): \(fmt(latest.value)).")
+        }
+        if s.n > 0 {
+            let window = effectiveRange == .all ? "all history" : "the last \(effectiveRange.name)"
+            lines.append("Over \(window) (\(s.n) \(s.n == 1 ? "reading" : "readings")): "
+                         + "average \(fmt(s.mean)), lowest \(fmt(s.min)), highest \(fmt(s.max)).")
+        }
+        // The Δ tile's own gate: both windows need readings, or there is nothing to compare against.
+        let hasDelta = cmp.current.n > 0 && cmp.previous.n > 0
+        if hasDelta {
+            var line = "Change vs the previous \(effectiveRange.name): \(signed(cmp.delta))"
+            if let pct = cmp.pctChange { line += String(format: " (%+.1f%%)", pct) }
+            lines.append(line + ".")
+        }
+        // Whether that change is good news is metric-specific, and the screen already knows: the Δ tile
+        // tints by exactly this rule. Saying it in words keeps the coach from having to infer the
+        // polarity of a metric where lower is better (resting heart rate, skin temperature).
+        if hasDelta, cmp.direction != 0, let better = metric.higherIsBetter {
+            let rising = cmp.direction > 0
+            lines.append("For this metric, \(better ? "higher" : "lower") is better, so this is "
+                         + ((rising == better) ? "a move in the good direction." : "a move in the unwanted direction."))
+        }
+
+        return CoachCardContext(
+            title: metric.title,
+            summary: lines.joined(separator: " "),
+            suggestions: coachSuggestions(hasDelta: hasDelta, direction: cmp.direction)
+        )
+    }
+
+    /// Two or three follow-ups, chosen from the same two facts the summary just stated: which way the
+    /// metric moved, and whether that direction is the wanted one. A flat window — or a metric with no
+    /// declared polarity — gets the neutral pair, so a chip never asks "why is it falling?" about a line
+    /// that did not fall.
+    /// The metric's name is deliberately NOT interpolated into these. The chip sits inside that
+    /// metric's own coach card (and the coach is handed the name in `title` + `summary`), so "this" is
+    /// unambiguous — while "Why is my %@ going up?" would force a gendered possessive around a noun
+    /// whose gender the sentence cannot know, which is unfixable in German, French, Spanish and Italian
+    /// at once.
+    private func coachSuggestions(hasDelta: Bool, direction: Int) -> [String] {
+        var out: [String] = []
+        if hasDelta, direction != 0, let better = metric.higherIsBetter {
+            let wanted = (direction > 0) == better
+            out.append(direction > 0
+                       ? String(localized: "Why is this going up?")
+                       : String(localized: "Why is this going down?"))
+            out.append(wanted
+                       ? String(localized: "How do I keep this going?")
+                       : String(localized: "What can I do to turn this around?"))
+        } else {
+            out.append(String(localized: "What is driving this?"))
+            out.append(String(localized: "Is this a normal range for me?"))
+        }
+        out.append(String(localized: "What else moves with this?"))
+        return out
+    }
+
     // MARK: Readings table (task #8)
 
     /// The per-reading breakdown below the stats, so the provenance behind the trend is visible — whether
@@ -1081,7 +1206,10 @@ struct MetricDetailView: View {
         let readings = windowed.map {
             VitalReading(day: $0.day, value: $0.value, source: sourceByDay[$0.day] ?? metric.source)
         }
-        let rows = vitalReadingRows(readings: readings, unit: metric.unit,
+        // `fmt` already yields the fully-formatted, unit-included (and unit-converted, e.g. kg→lb,
+        // 0–100→0–21 Effort) display string, so the row must NOT append `metric.unit` again — doing so
+        // produced "85 % %" for Charge and "3.5 /21 /100" for Effort (redesign bug §1). Pass an empty unit.
+        let rows = vitalReadingRows(readings: readings, unit: "",
                                     strapDeviceId: repo.deviceId, format: fmt)
         if !rows.isEmpty {
             NoopCard {

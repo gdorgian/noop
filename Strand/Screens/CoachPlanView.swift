@@ -1,0 +1,774 @@
+import SwiftUI
+import StrandDesign
+
+/// The plan book: what the coach suggested, what you agreed to, and what happened.
+///
+/// This screen is where the consent lives. The coach can only ever propose; every "yes" on this page is
+/// a deliberate tap. Nothing here nags — a proposal you ignore just sits there.
+struct CoachPlanView: View {
+    @EnvironmentObject private var coach: AICoachEngine
+    @EnvironmentObject private var repo: Repository
+    @ObservedObject private var store = CoachPlanStore.shared
+    /// The active goals this plan serves — the same store Goal & Journey reads, so the two surfaces show
+    /// the same targets rather than looking unsynchronised.
+    @ObservedObject private var goalStore = CoachGoalStore.shared
+    @Environment(\.dismiss) private var dismiss
+
+    /// Assembled once for the swap sheet's consequence maths (async — it reads the workout history).
+    @State private var inputs = PlanConsequence.Inputs()
+    @State private var swapping: PlanProposal?
+    @State private var scheduling: PlanProposal?
+    @State private var rescheduling: PlanProposal?
+    @State private var feedbackProposal: PlanProposal?
+    /// Which committed session is choosing a skip reason (#R3). A `.confirmationDialog` here, not a
+    /// native `Menu` — the `Menu` sat directly over `NoopCard`'s frosted/material background, and its
+    /// dismiss transition briefly showed unrendered black compositor layers (a known Menu-over-material
+    /// interaction) before settling. A confirmationDialog's system sheet transition doesn't touch that
+    /// material at all.
+    @State private var skippingReason: PlanProposal?
+
+    private var today: String { Repository.localDayKey(Date()) }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    if !store.reconciliationResolutions.isEmpty {
+                        section("Needs your check") {
+                            ForEach(store.reconciliationResolutions) { resolution in
+                                reconciliationCard(resolution)
+                            }
+                        }
+                    }
+                    goalContextCard
+                    if !store.pending.isEmpty {
+                        section("Waiting for your call") {
+                            ForEach(store.pending) { p in pendingCard(p) }
+                        }
+                    }
+                    let upcoming = store.commitments(fromDay: today)
+                    if !upcoming.isEmpty {
+                        section("Agreed") {
+                            ForEach(upcoming) { p in commitmentCard(p) }
+                        }
+                    }
+                    let recent = store.proposals.filter {
+                        $0.day < today && $0.status.isDecided
+                    }.prefix(10)
+                    if !recent.isEmpty {
+                        section("Recently") {
+                            ForEach(Array(recent)) { p in historyRow(p) }
+                        }
+                    }
+                    if store.proposals.isEmpty { emptyState }
+                }
+                .padding(16)
+            }
+            .background(StrandPalette.surfaceBase.ignoresSafeArea())
+            .navigationTitle("Your plan")
+            #if !os(macOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+            .task {
+                inputs = await coach.planInputs()
+                await PlanReconciliationCoordinator.reconcile(repo: repo)
+                await GoalTrackingStore.shared.refresh(repo: repo)
+            }
+            .sheet(item: $swapping) { p in
+                PlanSwapSheet(proposal: p, inputs: inputs)
+            }
+            .sheet(item: $scheduling) { p in
+                PlanTimeSheet(proposal: p)
+            }
+            .sheet(item: $rescheduling) { p in
+                PlanRescheduleSheet(proposal: p)
+            }
+            .sheet(item: $feedbackProposal) { p in
+                PlanEffectFeedbackSheet(proposal: p)
+            }
+            .confirmationDialog("Why didn't it happen?",
+                                isPresented: Binding(get: { skippingReason != nil },
+                                                     set: { if !$0 { skippingReason = nil } }),
+                                titleVisibility: .visible,
+                                presenting: skippingReason) { p in
+                ForEach(PlanProposal.SkipReason.allCases, id: \.self) { reason in
+                    Button(LocalizedStringKey(reason.label)) { store.skip(p.id, reason: reason) }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+        }
+    }
+
+    // MARK: - Cards
+
+    @ViewBuilder
+    private func reconciliationCard(_ resolution: PlanReconciliationResolution) -> some View {
+        if let proposal = store.proposals.first(where: { $0.id == resolution.proposalId }) {
+            NoopCard(padding: 14, tint: StrandPalette.statusWarning) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "questionmark.circle.fill")
+                            .foregroundStyle(StrandPalette.statusWarning)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(proposal.summary())
+                                .font(StrandFont.subhead).foregroundStyle(StrandPalette.textPrimary)
+                            Text(resolution.kind == .overdue
+                                 ? "This date has passed, but nothing has been assumed."
+                                 : "A recorded workout may belong to this plan.")
+                                .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                        }
+                    }
+                    if resolution.kind == .candidates {
+                        ForEach(resolution.candidates) { workout in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(workoutLine(workout))
+                                    .font(StrandFont.footnote).foregroundStyle(StrandPalette.textSecondary)
+                                HStack(spacing: 8) {
+                                    action("Yes, link it", icon: "link", prominent: true) {
+                                        store.confirmWorkout(workout, for: proposal.id)
+                                    }
+                                    action("Not this workout", icon: "xmark") {
+                                        store.rejectWorkout(workout.workoutKey, for: proposal.id)
+                                    }
+                                }
+                            }
+                            if workout.id != resolution.candidates.last?.id {
+                                Divider().overlay(StrandPalette.hairline)
+                            }
+                        }
+                    } else {
+                        HStack(spacing: 8) {
+                            action("Done", icon: "checkmark.circle", prominent: true) {
+                                store.complete(proposal.id)
+                            }
+                            action("Move day", icon: "calendar.badge.clock") { rescheduling = proposal }
+                            Button { skippingReason = proposal } label: {
+                                Label("Didn't happen", systemImage: "xmark.circle")
+                                    .font(StrandFont.footnote)
+                                    .foregroundStyle(StrandPalette.textSecondary)
+                                    .padding(.horizontal, 10).padding(.vertical, 7)
+                                    .background(StrandPalette.surfaceInset,
+                                                in: RoundedRectangle(cornerRadius: CoachRadius.field,
+                                                                     style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func workoutLine(_ workout: PlanWorkoutReference) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(workout.startTs))
+        let when = date.formatted(date: .abbreviated, time: .shortened)
+        let duration = workout.durationS.map { " · \(Int(($0 / 60).rounded())) min" } ?? ""
+        return "\(workout.sport) · \(when)\(duration)"
+    }
+
+    /// A suggestion, with the three honest answers. "Change" is first-class alongside yes/no — a plan
+    /// you had to alter is still a plan you agreed to, and pretending otherwise is how adherence data
+    /// turns into a guilt ledger.
+    private func pendingCard(_ p: PlanProposal) -> some View {
+        NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles").foregroundStyle(StrandPalette.accent)
+                        .accessibilityHidden(true)
+                    Text(p.summary())
+                        .font(StrandFont.subhead).foregroundStyle(StrandPalette.textPrimary)
+                    Spacer(minLength: 4)
+                    Text(dayLabel(p.day)).strandOverline()
+                }
+                if !p.rationale.isEmpty {
+                    Text(p.rationale)
+                        .font(StrandFont.footnote).foregroundStyle(StrandPalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 8) {
+                    // Opens the time sheet rather than accepting untimed. `accept(_:at:)` always took a
+                    // time; only this call site didn't pass one, so agreeing to a session and saying WHEN
+                    // were two separate steps and the second was easy to never take — leaving a plan full
+                    // of commitments with no time, which no reminder can fire for.
+                    action("Accept", icon: "checkmark", prominent: true) {
+                        scheduling = p
+                    }
+                    action("Change", icon: "arrow.triangle.2.circlepath") { swapping = p }
+                    action("Not this one", icon: "xmark") {
+                        StrandHaptic.selection.play()
+                        store.decline(p.id)
+                    }
+                }
+            }
+        }
+    }
+
+    private func commitmentCard(_ p: PlanProposal) -> some View {
+        NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "calendar").foregroundStyle(StrandPalette.accent)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(p.summary())
+                            .font(StrandFont.subhead).foregroundStyle(StrandPalette.textPrimary)
+                        if let from = p.swappedFrom {
+                            Text("swapped from \(from)")
+                                .font(StrandFont.footnote).foregroundStyle(StrandPalette.textTertiary)
+                        }
+                    }
+                    Spacer(minLength: 4)
+                    Text(dayLabel(p.day)).strandOverline()
+                }
+                if p.status == .completed {
+                    effectFeedbackControl(p)
+                } else {
+                    HStack(spacing: 8) {
+                        action(p.time == nil ? "Set a time" : "Change time", icon: "clock") { scheduling = p }
+                        action("Move day", icon: "calendar.badge.clock") { rescheduling = p }
+                        action("Swap", icon: "arrow.triangle.2.circlepath") { swapping = p }
+                    }
+                    HStack(spacing: 8) {
+                        action("Done", icon: "checkmark.circle", prominent: true) { store.complete(p.id) }
+                        // The one-tap reason. A reason you have to type is a reason that never gets
+                        // recorded — and then "didn't train" reads as laziness when it was a sore knee.
+                        Button { skippingReason = p } label: {
+                            Label("Didn't happen", systemImage: "xmark.circle")
+                                .font(StrandFont.footnote)
+                                .foregroundStyle(StrandPalette.textSecondary)
+                                .padding(.horizontal, 10).padding(.vertical, 7)
+                                .background(StrandPalette.surfaceInset,
+                                            in: RoundedRectangle(cornerRadius: CoachRadius.field, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Mark as not done, and say why")
+                    }
+                }
+            }
+        }
+    }
+
+    private func historyRow(_ p: PlanProposal) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: icon(for: p.status))
+                    .font(StrandFont.footnote)
+                    .foregroundStyle(StrandPalette.textTertiary)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(p.summary())
+                        .font(StrandFont.footnote).foregroundStyle(StrandPalette.textSecondary)
+                    Text(statusLine(p))
+                        .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                }
+                Spacer(minLength: 4)
+                Text(dayLabel(p.day))
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+            }
+            if p.status == .completed {
+                effectFeedbackControl(p)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func effectFeedbackControl(_ proposal: PlanProposal) -> some View {
+        if let feedback = proposal.effectFeedback {
+            Button { feedbackProposal = proposal } label: {
+                Label(feedback.label, systemImage: "bubble.left.and.text.bubble.right")
+                    .font(StrandFont.caption)
+                    .foregroundStyle(StrandPalette.textSecondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Recommendation effect: \(feedback.label). Change feedback")
+        } else {
+            action("How did it feel?", icon: "bubble.left.and.text.bubble.right") {
+                feedbackProposal = proposal
+            }
+        }
+    }
+
+    private var emptyState: some View {
+        NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("No plan yet")
+                    .font(StrandFont.subhead).foregroundStyle(StrandPalette.textPrimary)
+                // One single literal, not `+`-concatenation: a concatenated argument is a plain String,
+                // which hits Text's verbatim initialiser and silently skips localization.
+                Text("Ask the coach what to do this week. Anything it suggests lands here for your yes first — nothing gets scheduled behind your back.")
+                    .font(StrandFont.footnote).foregroundStyle(StrandPalette.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    // MARK: - Goal context
+
+    /// What you're working towards, at the top of the plan book.
+    ///
+    /// A plan and a goal are two different things in NOOP — `PlanProposal`s are single sessions, a
+    /// `CoachGoal` is the target they serve — and this screen showing no trace of an active goal read as
+    /// the two being out of sync. They aren't; the connection just wasn't drawn anywhere. This states it,
+    /// from the SAME `CoachGoalStore.activeGoals` the Goal & Journey surface renders, so the two can't
+    /// disagree, and says plainly when there's no goal at all.
+    @ViewBuilder
+    private var goalContextCard: some View {
+        let goals = goalStore.activeGoals
+        NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "target").foregroundStyle(goals.isEmpty
+                                                                ? StrandPalette.textTertiary
+                                                                : StrandPalette.accent)
+                        .accessibilityHidden(true)
+                    Text(goals.isEmpty ? "No goal set" : "Working towards")
+                        .font(StrandFont.subhead).foregroundStyle(StrandPalette.textPrimary)
+                }
+                if goals.isEmpty {
+                    Text("These sessions aren't tied to a target yet. Set a goal under Goal & Journey and the coach plans towards it.")
+                        .font(StrandFont.footnote).foregroundStyle(StrandPalette.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ForEach(goals) { goal in
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(goal.title.isEmpty ? goal.kind.label.localizedCatalogValue : goal.title)
+                                .font(StrandFont.footnote).foregroundStyle(StrandPalette.textSecondary)
+                            Text(goalTimeLine(goal))
+                                .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
+        }
+    }
+
+    /// The one honest time line per goal — the same wording `CoachGoalJourneyView.goalSubtitle` uses for
+    /// the countdown, so the two surfaces never state the runway differently.
+    private func goalTimeLine(_ goal: CoachGoal) -> String {
+        guard let weeks = goal.weeksRemaining() else { return String(localized: "No target date set") }
+        return weeks < 0 ? String(localized: "target date passed")
+                         : String(localized: "\(Int(weeks.rounded())) weeks to go")
+    }
+
+    // MARK: - Pieces
+
+    @ViewBuilder
+    private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).strandOverline()
+            content()
+        }
+    }
+
+    private func action(_ title: String, icon: String, prominent: Bool = false,
+                        run: @escaping () -> Void) -> some View {
+        Button(action: run) {
+            Label(title, systemImage: icon)
+                .font(StrandFont.footnote)
+                .foregroundStyle(prominent ? .white : StrandPalette.textSecondary)
+                .padding(.horizontal, 10).padding(.vertical, 7)
+                .background(prominent ? StrandPalette.accent : StrandPalette.surfaceInset,
+                            in: RoundedRectangle(cornerRadius: CoachRadius.field, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+
+    private func icon(for status: PlanProposal.Status) -> String {
+        switch status {
+        case .completed:      return "checkmark.circle.fill"
+        case .skipped:        return "xmark.circle"
+        case .declined:       return "hand.thumbsdown"
+        case .paused:         return "pause.circle"
+        case .modifiedByUser: return "arrow.triangle.2.circlepath"
+        case .rescheduled:    return "calendar.badge.clock"
+        case .accepted:       return "calendar"
+        case .proposed:       return "sparkles"
+        }
+    }
+
+    /// Deliberately neutral wording — a skip states its reason, it doesn't editorialise about it.
+    ///
+    /// Every branch resolves through `String(localized:)`, with any embedded fixed-set label
+    /// (`SkipReason.label`, `dayLabel(_:)`) pre-resolved via `.localizedCatalogValue` (#P14): this
+    /// function returns a plain `String` reused both in a `Text()` and inside a larger accessibility
+    /// label, neither of which performs a catalog lookup on their own — the resolution has to happen here.
+    private func statusLine(_ p: PlanProposal) -> String {
+        switch p.status {
+        case .completed:
+            if let feedback = p.effectFeedback {
+                return String(localized: "completed — \(feedback.label.localizedCatalogValue)")
+            }
+            return String(localized: "completed — effect not rated")
+        case .skipped:
+            if let reason = p.skipReason {
+                return String(localized: "didn't happen — \(reason.label.localizedCatalogValue)")
+            }
+            return String(localized: "didn't happen")
+        case .declined:
+            return String(localized: "you passed on this one")
+        case .rescheduled:
+            if let from = p.rescheduledFrom {
+                return String(localized: "moved from \(dayLabel(from).localizedCatalogValue)")
+            }
+            return String(localized: "moved")
+        default:
+            return p.status.rawValue
+        }
+    }
+
+    private func dayLabel(_ day: String) -> String {
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        guard let date = df.date(from: day) else { return day }
+        if Calendar.current.isDateInToday(date) { return "Today" }
+        if Calendar.current.isDateInTomorrow(date) { return "Tomorrow" }
+        if Calendar.current.isDateInYesterday(date) { return "Yesterday" }
+        let out = DateFormatter(); out.dateFormat = "EEE d MMM"
+        return out.string(from: date)
+    }
+}
+
+private struct PlanEffectFeedbackSheet: View {
+    let proposal: PlanProposal
+    @ObservedObject private var store = CoachPlanStore.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var selection: PlanProposal.EffectFeedback?
+    @State private var note = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(proposal.summary())
+                        .font(StrandFont.subhead)
+                        .foregroundStyle(StrandPalette.textPrimary)
+                    Text("Completion and effect are stored separately. Missing feedback stays missing and is never treated as “no effect”.")
+                        .font(StrandFont.footnote)
+                        .foregroundStyle(StrandPalette.textTertiary)
+                }
+                Section("What happened afterwards?") {
+                    ForEach(PlanProposal.EffectFeedback.allCases, id: \.self) { feedback in
+                        Button {
+                            selection = feedback
+                        } label: {
+                            HStack {
+                                Text(feedback.label)
+                                    .foregroundStyle(StrandPalette.textPrimary)
+                                Spacer()
+                                if selection == feedback {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(StrandPalette.accent)
+                                }
+                            }
+                        }
+                    }
+                }
+                Section("Optional note") {
+                    TextField("What did you notice?", text: $note, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(StrandPalette.surfaceBase)
+            .navigationTitle("Recommendation effect")
+            #if !os(macOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        guard let selection else { return }
+                        store.recordEffect(proposal.id, feedback: selection, note: note)
+                        dismiss()
+                    }
+                    .disabled(selection == nil)
+                }
+            }
+            .onAppear {
+                selection = proposal.effectFeedback
+                note = proposal.feedbackNote ?? ""
+            }
+        }
+    }
+}
+
+// MARK: - Swap
+
+/// Swapping a session — and seeing what your own history says it costs BEFORE you decide.
+///
+/// The whole point: this informs, it never blocks. There's no disabled Save, no "are you sure". You get
+/// the numbers, then you get to choose.
+struct PlanSwapSheet: View {
+    let proposal: PlanProposal
+    let inputs: PlanConsequence.Inputs
+
+    @ObservedObject private var store = CoachPlanStore.shared
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var sport = ""
+    @State private var intent: PlanProposal.Intent = .moderate
+
+    private var comparison: PlanConsequence.Comparison? {
+        let trimmed = sport.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return PlanConsequence.compare(from: proposal.sport, fromEffort: proposal.targetEffort,
+                                       to: trimmed, toEffort: nil, inputs: inputs)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Instead of \(proposal.sport)").strandOverline()
+                            TextField("e.g. CrossFit", text: $sport)
+                                .textFieldStyle(.plain)
+                                .font(StrandFont.body)
+                                .foregroundStyle(StrandPalette.textPrimary)
+                                .padding(.horizontal, 12).padding(.vertical, 9)
+                                .background(StrandPalette.surfaceInset,
+                                            in: RoundedRectangle(cornerRadius: CoachRadius.field, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: CoachRadius.field, style: .continuous)
+                                    .strokeBorder(StrandPalette.hairline, lineWidth: 1))
+                                .accessibilityLabel("New activity")
+                            Picker("How hard", selection: $intent) {
+                                ForEach(PlanProposal.Intent.allCases, id: \.self) { i in
+                                    Text(LocalizedStringKey(i.label)).tag(i)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .accessibilityLabel("How hard")
+                        }
+                    }
+                    if let comparison {
+                        NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: "info.circle.fill")
+                                    .foregroundStyle(StrandPalette.accent)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("What your history says").strandOverline()
+                                    Text(comparison.sentence())
+                                        .font(StrandFont.footnote)
+                                        .foregroundStyle(StrandPalette.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background(StrandPalette.surfaceBase.ignoresSafeArea())
+            .navigationTitle("Swap session")
+            #if !os(macOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Swap") {
+                        store.swap(proposal.id,
+                                   toSport: sport.trimmingCharacters(in: .whitespacesAndNewlines),
+                                   intent: intent)
+                        dismiss()
+                    }
+                    .disabled(sport.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .onAppear { intent = proposal.intent }
+        }
+    }
+}
+
+// MARK: - Time
+
+/// Pinning a session to a time — "10:00 CrossFit". A plan with a time is a plan you keep.
+struct PlanTimeSheet: View {
+    let proposal: PlanProposal
+
+    @ObservedObject private var store = CoachPlanStore.shared
+    @ObservedObject private var goalStore = CoachGoalStore.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var time = Date()
+    @State private var selectedGoalIds: Set<UUID> = []
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(proposal.sport).strandOverline()
+                        // `.wheel` is iOS-only; macOS gets the graphical picker. This file is shared, so
+                        // it has to compile for both even though the fork ships iOS.
+                        DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+                            #if os(iOS)
+                            .datePickerStyle(.wheel)
+                            #endif
+                            .labelsHidden()
+                            .accessibilityLabel("Session time")
+                    }
+                }
+                if !goalStore.activeGoals.isEmpty {
+                    NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Which goals does this support?").strandOverline()
+                            Text("One activity can support several goals. Confirm the suggestions before saving.")
+                                .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            ForEach(goalStore.activeGoals) { goal in
+                                Button {
+                                    if selectedGoalIds.contains(goal.id) { selectedGoalIds.remove(goal.id) }
+                                    else { selectedGoalIds.insert(goal.id) }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: selectedGoalIds.contains(goal.id)
+                                              ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(selectedGoalIds.contains(goal.id)
+                                                             ? StrandPalette.accent : StrandPalette.textTertiary)
+                                        Text(goal.title.isEmpty ? goal.kind.label.localizedCatalogValue : goal.title)
+                                            .foregroundStyle(StrandPalette.textPrimary)
+                                        Spacer()
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                if proposal.time != nil {
+                    Button("Remove time", role: .destructive) {
+                        store.clearTime(proposal.id)
+                        dismiss()
+                    }
+                    .font(StrandFont.footnote)
+                }
+                // The escape hatch, so routing Accept through here can't trap someone who genuinely
+                // doesn't know when yet. Accepting still commits — only the time is left open.
+                if proposal.status == .proposed {
+                    Button("Accept without a time") {
+                        // Committing to a session is a landing, so it gets `.commit` — the same weight
+                        // the timed Accept below carries. Declining stays a light `.selection`: nothing
+                        // was promised.
+                        StrandHaptic.commit.play()
+                        applyGoalLink()
+                        store.accept(proposal.id)
+                        dismiss()
+                    }
+                    .font(StrandFont.footnote)
+                    .foregroundStyle(StrandPalette.textSecondary)
+                }
+                Spacer()
+            }
+            .padding(16)
+            .background(StrandPalette.surfaceBase.ignoresSafeArea())
+            .navigationTitle("Set a time")
+            #if !os(macOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Set") {
+                        // Keep the session's own day — a time alone would silently move it to today.
+                        let cal = Calendar.current
+                        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+                        let base = df.date(from: proposal.day) ?? Date()
+                        let hm = cal.dateComponents([.hour, .minute], from: time)
+                        let combined = cal.date(bySettingHour: hm.hour ?? 0, minute: hm.minute ?? 0,
+                                                second: 0, of: base)
+                        StrandHaptic.commit.play()
+                        if proposal.status == .proposed {
+                            applyGoalLink()
+                            store.accept(proposal.id, at: combined)
+                        } else {
+                            store.swap(proposal.id, toSport: proposal.sport, at: combined)
+                        }
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                time = proposal.time ?? Date()
+                if proposal.goalIds.isEmpty {
+                    selectedGoalIds = Set(GoalAttributionSuggester.suggestedGoalIds(
+                        for: proposal.sport, goals: goalStore.activeGoals))
+                } else {
+                    selectedGoalIds = Set(proposal.goalIds)
+                }
+            }
+        }
+    }
+
+    private func applyGoalLink() {
+        let ordered = goalStore.activeGoals.map(\.id).filter { selectedGoalIds.contains($0) }
+        store.linkGoals(ordered, to: proposal.id)
+    }
+}
+
+/// Move a committed session to another DAY (#P9 9.6). Keeps its time-of-day if it had one, so moving a
+/// "10:00 ride" to tomorrow keeps 10:00. Routes through `CoachPlanStore.reschedule`, which records the
+/// move (status `.rescheduled`, `rescheduledFrom`) rather than silently overwriting the day.
+struct PlanRescheduleSheet: View {
+    let proposal: PlanProposal
+
+    @ObservedObject private var store = CoachPlanStore.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var day = Date()
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(proposal.sport).strandOverline()
+                        DatePicker("New day", selection: $day, in: Date()..., displayedComponents: .date)
+                            .datePickerStyle(.graphical)
+                            .labelsHidden()
+                            .accessibilityLabel("New day")
+                    }
+                }
+                Spacer()
+            }
+            .padding(16)
+            .background(StrandPalette.surfaceBase.ignoresSafeArea())
+            .navigationTitle("Move to another day")
+            #if !os(macOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Move") {
+                        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+                        let newDay = df.string(from: day)
+                        // Carry the existing time-of-day onto the new date, if the session had one.
+                        var newTime: Date?
+                        if let t = proposal.time {
+                            let cal = Calendar.current
+                            let hm = cal.dateComponents([.hour, .minute], from: t)
+                            newTime = cal.date(bySettingHour: hm.hour ?? 0, minute: hm.minute ?? 0,
+                                               second: 0, of: day)
+                        }
+                        store.reschedule(proposal.id, toDay: newDay, at: newTime)
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+                day = df.date(from: proposal.day) ?? Date()
+            }
+        }
+    }
+}

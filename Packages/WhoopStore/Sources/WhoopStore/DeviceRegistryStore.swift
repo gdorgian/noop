@@ -124,7 +124,15 @@ public struct DeviceRegistryStore: Sendable {
         // v31-deep-capture-channels: the banked 5/MG v18 auxiliary fields are deviceId-keyed per-second
         // rows like every stream above, so a "delete all of this device's data" must clear them too.
         "v18AuxSample",
-        // v38-apple-step-hour: the hourly Apple Health step buckets are deviceId-keyed ("apple-health"),
+        // v38-day-scan-fingerprint: the analyze scan's per-day skip records. These MUST go with the data
+        // they describe — a fingerprint that outlives its raw rows says "this day is unchanged" about a
+        // day whose inputs were just deleted, and the next pass would skip re-deriving it. Deleting them
+        // is free: absence means "scan it".
+        "dayScanFingerprint",
+        // v40-analysis-input-revision: cache-invalidation metadata is device data too. A delete must not
+        // leave revisions behind that describe raw rows which no longer exist.
+        "analysisInputRevision", "analysisDeviceRevision",
+        // v41-apple-step-hour (upstream v38): the hourly Apple Health step buckets are deviceId-keyed ("apple-health"),
         // so forgetting that source must clear them — otherwise an imported phone's hour-by-hour step
         // history survives the delete (the same privacy defect this list exists to close).
         "appleStepHour",
@@ -137,8 +145,10 @@ public struct DeviceRegistryStore: Sendable {
     /// is created unconditionally by the migrator, so the set is stable.
     public func deleteAllData(deviceId: String) throws {
         try dbQueue.write { db in
+            var changed = false
             for table in Self.deviceScopedTables {
                 try db.execute(sql: "DELETE FROM \(table) WHERE deviceId = ?", arguments: [deviceId])
+                changed = changed || db.changesCount > 0
             }
             // Provenance also references the physical/import source separately from its computed
             // namespace. Forgetting a provider must remove those associations too.
@@ -148,6 +158,11 @@ public struct DeviceRegistryStore: Sendable {
             // Clearing recordings must not leave a local identifier or stale generation behind.
             try db.execute(sql: "DELETE FROM cursors WHERE name = ?",
                            arguments: [WhoopStore.rrScoringGenerationCursor(deviceId: deviceId)])
+            changed = changed || db.changesCount > 0
+            // Sensor rows just disappeared, so the analyze gate must not report "nothing changed" —
+            // every score derived from this device's data is now stale. Same in-transaction bump as
+            // the ingest and heal paths (see `WhoopStore.bumpSensorWriteSeq`).
+            if changed { try WhoopStore.markAnalysisDeviceChanged(db, deviceId: deviceId) }
         }
     }
 
@@ -207,6 +222,9 @@ public struct DeviceRegistryStore: Sendable {
             // Drop ONLY the provisional CB-UUID registry rows; other oura-* pairings are left as-is.
             try db.execute(sql: "DELETE FROM pairedDevice WHERE id = ?", arguments: [activeId])
             try db.execute(sql: "DELETE FROM device WHERE id = ?", arguments: [activeId])
+            // The rows did not vanish, but they now live under a DIFFERENT deviceId — which is exactly
+            // what `resolveDayOwner` reads by, so the scores must be recomputed against the new owner.
+            try WhoopStore.markAnalysisDeviceChanged(db, deviceId: serialId)
             return true
         }
     }

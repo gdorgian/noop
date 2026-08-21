@@ -1,6 +1,6 @@
 # NOOP Analytics
 
-On-device analytics for **NOOP** — a standalone, fully offline companion app for WHOOP straps (4.0 and 5.0/MG). NOOP talks to *your own* strap over Bluetooth, stores everything locally in SQLite, and computes its three daily scores plus HRV and sleep staging on-device. There is no cloud and no account involved in any of the math described here.
+On-device analytics for **NOOP** — an offline-first companion app for WHOOP straps (4.0 and 5.0/MG). NOOP talks to *your own* strap over Bluetooth, stores its biometric history locally in SQLite, and computes its three daily scores plus HRV and sleep staging on-device. No cloud or account participates in any of the math described here.
 
 ## NOOP's three daily scores — Charge / Effort / Rest
 
@@ -26,13 +26,16 @@ All analytics live in the cross-platform `StrandAnalytics` Swift package. Every 
 
 - Package: `Packages/StrandAnalytics/Sources/StrandAnalytics/`
 - Top-level index: `StrandAnalytics.swift` (`StrandAnalytics.version == "0.1.0"`)
-- App reference implementation: `Strand/` (SwiftUI, macOS + iOS). The same `StrandAnalytics` code backs both Swift app targets, and Android (Room/Kotlin) runs equivalent analytics — the number-crunching is shared, so results match across platforms.
+- App integration: shared `Strand/` sources back the released macOS and iOS targets. Both execute the
+  same `StrandAnalytics` code; this fork no longer carries an Android/Kotlin twin.
 
 ---
 
 ## What is actually wired into the app
 
-The package contains more analytics than the app currently surfaces. This section is the honest map of **library-only** vs **live**, verified against the app sources. The status below is shared across the Swift targets (macOS + iOS); Android runs the equivalent code through its own Kotlin/Room layer.
+The package contains more analytics than the app currently surfaces. This section is the honest map
+of **library-only** vs **live**, verified against the app sources. The status below applies to the
+released macOS and iOS targets.
 
 | Engine | File | Status in the app |
 |---|---|---|
@@ -43,10 +46,28 @@ The package contains more analytics than the app currently surfaces. This sectio
 | `Baselines` | `Baselines.swift` | **Live.** Seeds the recovery baseline in `IntelligenceEngine.analyzeRecent` (two-pass cold-start). The illness early-warning in `AppModel` still uses its own trailing-window baseline math inline (see below). |
 | `WorkoutDetector` / `Calories` | `WorkoutDetector.swift` | **Live.** Runs inside `AnalyticsEngine.analyzeDay`; detected bouts are persisted as `workout` rows under the computed `"<deviceId>-noop"` source (sport `"detected"`), de-duplicated against imported WHOOP workouts. All intensity/calorie fields are APPROXIMATE. Not yet surfaced in the Workouts screen. |
 | `AnalyticsEngine` | `AnalyticsEngine.swift` | **Live orchestrator.** `analyzeDay(...)` is called by `Strand/Data/IntelligenceEngine.swift` — every 15 minutes while connected, and from the Intelligence screen — and its `DailyMetric`, sleep sessions and detected workouts are persisted under the `"-noop"` source. |
-| `HRZones` | `HRZones.swift` | **Library-only** (display zone model). The app's live zone coaching computes `%HRmax` inline in `AppModel.coachZone(_:)`. |
+| `HRZones` | `HRZones.swift` | **Live.** The display zone model, and the ONLY one — every surface that buckets a heart rate resolves through `ProfileStore.hrZoneSet` (live readout, in-workout card, Health hero, workout time-in-zone, haptic zone coaching, the coach's `get_zone_minutes`). Bands are user-definable; see "Two zone models" below. |
 | `CorrelationEngine` | `CorrelationEngine.swift` | **Live.** Used by `InsightsView`, `CompareView`, `MetricExplorerView`. |
 | `BehaviorInsights` | `BehaviorInsights.swift` | **Live.** Used by `InsightsView` (`rank` + `sentence`). |
 | `ComparisonEngine` | `ComparisonEngine.swift` | **Live.** Used by `MetricExplorerView`. |
+
+### Incremental analysis and launch behavior
+
+`IntelligenceEngine` serializes launch, device-adoption, backfill, HealthKit and manual requests into
+merged generations. The repository publishes a 120-day recent snapshot first; maintenance and the
+ordinary 21-day score refresh run after the first interactive screen rather than competing with it.
+
+Day reuse is revision-based. Every scoring-relevant raw mutation stamps the affected UTC-day buckets
+inside its database transaction. A local analysis day can reuse its persisted result only when the
+maximum revision across its exact window, device revision, owner, `scoringVersion`, semantic/profile
+signature, learned traits and baseline carry values all match. PPG-only, R-R-only and edited external
+sleep changes therefore invalidate the same way as measured heart rate, while duplicate offloads and
+engine-derived outputs do not.
+
+Raw range reads no longer impose a semantic 200,000-row ceiling. Sorted slices and one-pass bucket
+distribution replace the most expensive repeated full-array filters in sleep and recovery. The first
+run after a legacy fingerprint upgrade can still perform a CPU-heavy 21-day background refresh; fully
+cursor-paged raw reads and a three-UTC-day chunk cache remain future work.
 
 **In short:** the *interactive data-interrogation* engines (correlation, behavior effects, period comparison) are wired into screens, and the *recompute-from-raw-streams* engines that produce the three daily scores — Charge (recovery), Effort (strain), Rest (sleep), plus workout detection — run live too: `IntelligenceEngine` calls `analyzeDay` for every night the strap offloaded and persists the APPROXIMATE results under the `"-noop"` source, merged under any imported rows — a WHOOP export still wins wherever it covers a day. The live BLE app additionally runs four small inline analytics in `AppModel`: HR smoothing, RMSSD, HR-zone coaching, an illness/strain early-warning, and a resting-stress nudge.
 
@@ -74,16 +95,31 @@ bpm = vals.isEmpty ? nil : Int(vals[vals.count / 2].rounded())
 
 Median (not mean) is deliberate: it rejects single-beat outliers without lagging the signal.
 
-### 2. HR-zone haptic coaching (`coachZone`)
+### 2. Heart-rate ceiling haptics (`HRCeilingAlertEngine`)
 
-Watches the smoothed `bpm`, computes `%HRmax` from `profile.hrMax`, and buckets into 5 zones at `0.6 / 0.7 / 0.8 / 0.9` of max:
+Watches the same ~10-second median `bpm` as the live UI. In profile-zone mode the ceiling is always the
+lower edge of the next band from `ProfileStore.hrZoneSet`, so automatic, custom-percent and custom-bpm
+profiles all drive the buzz at exactly the boundary shown on screen. Direct-bpm mode deliberately uses
+the independent fixed value instead.
 
-```swift
-let pct = Double(hr) / maxHR
-let zone = pct >= 0.9 ? 5 : pct >= 0.8 ? 4 : pct >= 0.7 ? 3 : pct >= 0.6 ? 2 : 1
-```
+The first accepted smoothed sample at or above the ceiling warns immediately. In standard mode that is a
+three-loop warning followed by at most two reminders 60 seconds apart. The optional frequent mode instead
+emits one loop every two seconds while the current smoothed value remains at or above the ceiling. Both pause below the ceiling;
+15 seconds at least 3 bpm below it produces the one-loop recovery cue and rearms the episode.
+Missing/implausible data cannot trigger or mature a reminder. The user chooses always-while-worn or
+recorded-workouts-only; both remain gated on bonded + worn and opt-in by default.
 
-On crossing **into zone 5** it buzzes three times ("ease off"); on dropping back **to zone ≤ 1** it buzzes once ("recovered"). Gated on `behavior.zoneCoaching`, bonded, worn, and a valid `hrMax`.
+### 3. Target-zone training haptics (`HRZoneTrainingEngine`)
+
+An explicitly started workout or Live Session can select no coach or one target Zone 1...5. The engine
+classifies the same smoothed `bpm` through `ProfileStore.hrZoneSet`, so automatic, custom-percent and
+custom-bpm profile bands remain the sole boundaries. Eight continuous seconds establish below, inside,
+or above target: two light taps mean increase intensity, one tap confirms the target, and three heavy
+taps mean ease off. Outside reminders are limited to every 30 seconds; the target state stays silent.
+
+Invalid or missing samples reset pending stability and anchor reminder time. A profile-band change resets
+the episode. Haptic ownership is ceiling > target-zone coach > adaptive Live Session; selecting a target
+keeps the Live Session's visual/stored adaptive analysis but suppresses its competing wrist cues.
 
 ### 4. Illness / strain early-warning (`evaluateIllness`)
 
@@ -215,6 +251,31 @@ Effort = 100 · ln(TRIMP + 1) / ln(D),    D = strainDenominator = 7201
 
 `D = 7201` is calibrated so the Edwards daily ceiling — top zone weight 5 sustained for 24 h = `5 × 1440 = 7200` — maps to exactly the maximum (`ln(7201)/ln(7201) = 1`, so `Effort = 100`). The old 0–21 scale used the identical denominator and curve; only the `maxStrain` multiplier changed from `21.0` to `100.0`.
 
+### Two zone models — and why they disagree
+
+NOOP has **two** notions of "zone". Confusing them is the root of a real user-reported defect, so they
+are worth stating plainly:
+
+| | Display zones (`HRZones`) | Effort zones (`StrainScorer`) |
+|---|---|---|
+| Measured against | **% of HRmax** | **% of heart-rate RESERVE** (`(HR − RHR) / (HRmax − RHR)`) |
+| Boundaries | 50/60/70/80/90 by default, **user-definable** | 50/60/70/80/90 %HRR, **fixed** — they are part of the Edwards method |
+| Drives | the live readout, in-workout card, Health hero, workout time-in-zone, haptic coaching, what the coach prescribes | the Effort score, and nothing else |
+
+They are not interchangeable, and the gap is large. With HRmax 190 and a resting HR of 50, the floor of
+**display** Zone 2 (60 % HRmax = 114 bpm) is only 46 %HRR — *below* Edwards' 50 % cut-off, so it earns
+weight 0 — while its top (70 % HRmax = 133 bpm) is 59 %HRR and earns weight 1.
+
+Consequences that follow from this, both deliberate:
+
+- **User-set bands never reach Effort.** They change what is displayed and what is prescribed; no stored
+  score moves when a band is edited, so history stays comparable and the ported method stays faithful.
+- **A session prescribed in display zones needs translating** before anyone can state what it is worth.
+  `EffortFeasibility` does that translation — Edwards weight × minutes through the same
+  `trimpToStrain` — which is what stops the coach offering "20 min in Zone 2, effort 15" for a session
+  worth about 30. It reports a `typical` figure from the MEAN weight across the band rather than the
+  weight at its midpoint, because a band that straddles a threshold otherwise reads as worth nothing.
+
 ### Steps / active-energy floor
 
 A long walk with little cardio still counts: when cardio TRIMP is low but step / active-kcal load is high, Effort is raised to a movement-derived floor so non-cardio activity still registers. (5/MG continuity: Effort already reads `COALESCE(measured HR, ppg_hr)` via hrBuckets, so 5-series users get Effort from live + PPG HR.)
@@ -296,12 +357,15 @@ The rule: **elevated HR alone is insufficient to call wake.** An epoch or run at
 - **`confirmSleepWithHR` (V1 detection).** When a run is deeply motion-quiescent (≥ ~90% of its dense-gravity minutes posture-stable), the HR sleep band widens from **×1.05 → ×1.30** so a supplement-elevated but motionless run is not rejected. The band keeps a **floor** (genuine all-night in-bed wakefulness is still dropped); with no gravity evidence the strict ×1.05 band stands.
 - **`adaptiveOvernightHRBaseline`.** A personalised sleep band derived from recent overnight medians (self-calibrating across a supplement/fitness era), with a floor. Threaded through `detectSleep` as an optional argument that defaults to `nil` (byte-identical when unset); live cross-night wiring in `IntelligenceEngine` is a follow-up.
 
-Source: `SleepStager.swift` (`confirmSleepWithHR`, `adaptiveOvernightHRBaseline`) and `SleepStagerV2.swift` (motion-quiescent clamp), both in `Packages/StrandAnalytics`. Filed upstream as [ryanbr/noop#462](https://github.com/ryanbr/noop/issues/462). The Kotlin analytics twin (`com.noop.analytics`) is a deliberate follow-up (Swift-only contributor) — the parity contract requires the two stagers to stay byte-identical once transcribed.
+Source: `SleepStager.swift` (`confirmSleepWithHR`, `adaptiveOvernightHRBaseline`) and
+`SleepStagerV2.swift` (motion-quiescent clamp), both in `Packages/StrandAnalytics`. Filed upstream as
+[ryanbr/noop#462](https://github.com/ryanbr/noop/issues/462). Any upstream Kotlin port is maintained
+upstream; it is not part of this Apple-only fork.
 ### Displayed sleep onset — the headline "Asleep at" spans the whole bridged night
 
 The Sleep screen headline ("Asleep at …") reports the onset of the **whole bridged night**, not the main session's start. A night stored as a short first-sleep fragment + a brief walk + the main session bridges into one group when the gap is under `gapBridgeMaxMin` (60 min). The display onset walk (`SleepView.nightOnsetTs` → `isPreOnsetAwakeStub`) previously mis-classified such a fragment as a spurious pre-onset lead through two stacked defects: (1) the #259 relative "minor lead" test compared the fragment's asleep minutes against 15% of the main block, so on a long main sleep a genuine short first sleep was skipped and the headline jumped forward to the main session's start; (2) the stub test read asleep minutes via the dict-only `decodeStages`, which returns nil for the segment-array `stagesJSON` an on-device **computed** night stores — so every fragment counted as 0 asleep minutes and tripped the "essentially sleepless stub" branch, bypassing defect (1)'s floor entirely.
 
-Fix: an **absolute floor** `preOnsetStubMinorAsleepFloorMin = 20` (min) under the #259 relative test — a leading fragment carrying **≥ 20 asleep minutes** is never treated as a spurious lead, whatever the main block's size — plus a format-agnostic `decodedAsleepMinutes` (dict-of-minutes decode with a segment-array fallback) used at both onset call sites, so the floor's input is populated on computed nights too. The relaxation is strict (it can only un-skip a real first sleep, never newly skip one), so the displayed onset now equals the bridged night's first sleep and agrees with the Apple Health write-back span (bridged night groups, #294/#364). The #736 sleepless-stub skip and the #259 tiny-stray-lead (≤ 10 min) behavior are unchanged. The constant and decode seam live in `Strand/Screens/SleepView.swift`, with the byte-identical Kotlin twin (the floor constant, the onset-walk rule, and the both-format decode + onset clamp) in `com.noop.ui.SleepScreen`.
+Fix: an **absolute floor** `preOnsetStubMinorAsleepFloorMin = 20` (min) under the #259 relative test — a leading fragment carrying **≥ 20 asleep minutes** is never treated as a spurious lead, whatever the main block's size — plus a format-agnostic `decodedAsleepMinutes` (dict-of-minutes decode with a segment-array fallback) used at both onset call sites, so the floor's input is populated on computed nights too. The relaxation is strict (it can only un-skip a real first sleep, never newly skip one), so the displayed onset now equals the bridged night's first sleep and agrees with the Apple Health write-back span (bridged night groups, #294/#364). The #736 sleepless-stub skip and the #259 tiny-stray-lead (≤ 10 min) behavior are unchanged. The constant and decode seam live in `Strand/Screens/SleepView.swift`.
 
 ---
 

@@ -6,6 +6,7 @@ enum NavItem: String, CaseIterable, Identifiable, Hashable {
     case intelligence = "Intelligence"
     case insightsHub = "What Moves You"
     case coach = "Coach"
+    case goalJourney = "Goal & Journey"
     case live = "Live"
     case breathe = "Breathe"
     case intervals = "Intervals"
@@ -20,7 +21,7 @@ enum NavItem: String, CaseIterable, Identifiable, Hashable {
     case labBook = "Lab Book"
     case rhythm = "Rhythm"
     case appleHealth = "Apple Health"
-    case xiaomi = "Mi Band"
+    case miBand = "Mi Band"
     case dataSources = "Data Sources"
     case backupSync = "Backup & Sync"
     case fusedRecord = "Your Data, Fused"
@@ -43,6 +44,7 @@ enum NavItem: String, CaseIterable, Identifiable, Hashable {
         case .intelligence: return "Intelligence"
         case .insightsHub: return "What Moves You"
         case .coach: return "Coach"
+        case .goalJourney: return "Goal & Journey"
         case .live: return "Live"
         case .breathe: return "Breathe"
         case .intervals: return "Intervals"
@@ -57,7 +59,7 @@ enum NavItem: String, CaseIterable, Identifiable, Hashable {
         case .labBook: return "Lab Book"
         case .rhythm: return "Rhythm"
         case .appleHealth: return "Apple Health"
-        case .xiaomi: return "Mi Band"
+        case .miBand: return "Mi Band"
         case .dataSources: return "Data Sources"
         case .backupSync: return "Backup & Sync"
         case .fusedRecord: return "Your Data, Fused"
@@ -87,6 +89,7 @@ enum NavItem: String, CaseIterable, Identifiable, Hashable {
         case .intelligence: return String(localized: "Intelligence")
         case .insightsHub: return String(localized: "What Moves You")
         case .coach: return String(localized: "Coach")
+        case .goalJourney: return String(localized: "Goal & Journey")
         case .live: return String(localized: "Live")
         case .breathe: return String(localized: "Breathe")
         case .intervals: return String(localized: "Intervals")
@@ -101,7 +104,7 @@ enum NavItem: String, CaseIterable, Identifiable, Hashable {
         case .labBook: return String(localized: "Lab Book")
         case .rhythm: return String(localized: "Rhythm")
         case .appleHealth: return String(localized: "Apple Health")
-        case .xiaomi: return String(localized: "Mi Band")
+        case .miBand: return String(localized: "Mi Band")
         case .dataSources: return String(localized: "Data Sources")
         case .backupSync: return String(localized: "Backup & Sync")
         case .fusedRecord: return String(localized: "Your Data, Fused")
@@ -123,6 +126,7 @@ enum NavItem: String, CaseIterable, Identifiable, Hashable {
         case .intelligence: return "brain.head.profile"
         case .insightsHub: return "wand.and.sparkles"
         case .coach: return "sparkles"
+        case .goalJourney: return "target"
         case .live: return "waveform.path.ecg"
         case .breathe: return "lungs.fill"
         case .intervals: return "timer"
@@ -137,7 +141,7 @@ enum NavItem: String, CaseIterable, Identifiable, Hashable {
         case .labBook: return "books.vertical.fill"
         case .rhythm: return "waveform.path"
         case .appleHealth: return "heart.fill"
-        case .xiaomi: return "figure.walk.motion"
+        case .miBand: return "figure.walk.motion"
         case .dataSources: return "square.and.arrow.down.fill"
         case .backupSync: return "externaldrive.fill.badge.icloud"
         case .fusedRecord: return "square.stack.3d.up.fill"
@@ -177,11 +181,11 @@ struct NavGroup: Identifiable {
         // S6: the overlapping insight surfaces (Intelligence / What Moves You / Insights / Insights Hub)
         // all collapse under this single Insights group rather than scattering across the flat list.
         NavGroup(title: "Insights", id: "insights", items: [
-            .intelligence, .insightsHub, .coach, .explore, .compare, .insights,
+            .intelligence, .insightsHub, .coach, .goalJourney, .explore, .compare, .insights,
             .labBook, .rhythm, .trends,
         ]),
         NavGroup(title: "Data & App", id: "data_app", items: [
-            .devices, .noopLimitations, .dataSources, .appleHealth, .xiaomi, .backupSync, .fusedRecord,
+            .devices, .noopLimitations, .dataSources, .appleHealth, .miBand, .backupSync, .fusedRecord,
             .notifications, .automation, .smartAlarm, .powerSaving, .settings, .testCentre,
         ]),
     ]
@@ -299,10 +303,9 @@ struct RootView: View {
             .background(StrandPalette.surfaceBase.ignoresSafeArea())
         }
         .task {
-            await repo.refresh()
             // Backup & Sync: on-launch catch-up. Gated on the auto toggle being ON (default OFF). A
             // whole-DB ZIP can be 100MB+, so it must never block startup: fire it in a DETACHED,
-            // utility-priority task AFTER the launch-critical refresh, fully off the main actor (the
+            // utility-priority task off the main actor (the AppModel startup coordinator owns refresh),
             // `FolderBackup` enum is nonisolated; only the picker hops to the main actor, and it isn't
             // reached here). The screen also offers an explicit "Back up now". (Must-fix #4.)
             let backupRepo = repo
@@ -326,11 +329,29 @@ struct RootView: View {
             // Live Sessions is presented from Today's own Start entry (a cover, not a sidebar item), so a
             // deep-link lands the user on Today where that entry lives.
             case .liveSession: selection = .today
+            case .breathe: selection = .breathe
             // The #627 Today journal widget routes to the Insights sidebar row (which hosts the journal card).
             case .journal: selection = .insights
+            // Raised by the empty states' "Open Data Sources" button — the sidebar row already exists.
+            case .dataSources: selection = .dataSources
+            // Raised by the morning card's "Fix it" when last night's wake time looks truncated.
+            case .sleep: selection = .sleep
             case nil: break
             }
             if dest != nil { router.requestedDestination = nil }
+        }
+        // "Ask coach" tapped on a metric card (#P11): select the Coach pane. CoachView then consumes the
+        // engine's pending card context on appear (or via the same notification if it's already up) and
+        // gives a short read of that metric.
+        .onReceive(NotificationCenter.default.publisher(for: .noopOpenCoachCard)) { _ in
+            selection = .coach
+        }
+        // Daily coach check-in tapped (NOOP AI): select the Coach pane, mirroring the iOS
+        // RootTabView.swift handler — without this the notification was silent whenever the sidebar
+        // wasn't already on Coach (CoachView's own .onReceive never fires because it isn't in the
+        // hierarchy until selected).
+        .onReceive(NotificationCenter.default.publisher(for: .noopOpenCoachCheckIn)) { _ in
+            selection = .coach
         }
         // Whenever the selection moves (a cross-screen route, or restoring a deep destination), make sure
         // the group that owns it is expanded so the selected row is actually visible, not hidden inside a
@@ -423,6 +444,7 @@ struct RootView: View {
         case .intelligence: IntelligenceView()
         case .insightsHub: InsightsHubView()
         case .coach: CoachView()
+        case .goalJourney: CoachGoalJourneyScreen()
         case .live: liveDetail
         case .breathe: BreathingView()
         case .intervals: IntervalTimerView()
@@ -437,7 +459,7 @@ struct RootView: View {
         case .labBook: LabBookView()
         case .rhythm: RhythmHost()
         case .appleHealth: AppleHealthView()
-        case .xiaomi: XiaomiBandView()
+        case .miBand: XiaomiBandView()
         case .dataSources: DataSourcesView()
         case .backupSync: BackupSyncView()
         case .fusedRecord: FusedRecordHost()

@@ -360,7 +360,7 @@ struct AuraProfileEditorView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text(String(localized: "Display name")).auraOverline()
-                TextField(String(localized: "Your name"), text: $profile.displayName)
+                TextField(String(localized: "Your name"), text: $profile.name)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .font(.system(size: 17))

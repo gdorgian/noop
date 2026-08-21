@@ -28,12 +28,17 @@ struct TodayCustomizationSheet: View {
     private let initialHostedDraft: EditableLayoutDraft<HostedCard>
     private let initialDetailed: Bool
     private let initialWindowDays: Int
+    private let initialColumns: Int
 
     @Binding private var sectionOrderRaw: String
     @Binding private var hiddenSectionsRaw: String
     @Binding private var keyMetricsRaw: String
     @Binding private var keyMetricsDetailed: Bool
     @Binding private var keyMetricsWindowDays: Int
+    /// Tiles per row on the Key-Metrics grid (fork-only, `KeyMetricPrefs.columnsKey`). Threaded through the
+    /// same draft/Cancel/Save path as the two settings above rather than written straight to @AppStorage,
+    /// so Cancel discards it like everything else on the page.
+    @Binding private var keyMetricsColumns: Int
     @Binding private var dashboardCardsRaw: String
     @Binding private var hostedCardsRaw: String
 
@@ -44,6 +49,7 @@ struct TodayCustomizationSheet: View {
     @State private var hostedDraft: EditableLayoutDraft<HostedCard>
     @State private var detailed: Bool
     @State private var windowDays: Int
+    @State private var columns: Int
 
     private var currentDestination: TodayCustomizationDestination {
         switch path.last {
@@ -61,6 +67,7 @@ struct TodayCustomizationSheet: View {
             || hostedDraft != initialHostedDraft
             || detailed != initialDetailed
             || windowDays != initialWindowDays
+            || columns != initialColumns
     }
 
     init(
@@ -70,6 +77,7 @@ struct TodayCustomizationSheet: View {
         keyMetricsRaw: Binding<String>,
         keyMetricsDetailed: Binding<Bool>,
         keyMetricsWindowDays: Binding<Int>,
+        keyMetricsColumns: Binding<Int>,
         dashboardCardsRaw: Binding<String>,
         hostedCardsRaw: Binding<String>
     ) {
@@ -78,6 +86,7 @@ struct TodayCustomizationSheet: View {
         _keyMetricsRaw = keyMetricsRaw
         _keyMetricsDetailed = keyMetricsDetailed
         _keyMetricsWindowDays = keyMetricsWindowDays
+        _keyMetricsColumns = keyMetricsColumns
         _dashboardCardsRaw = dashboardCardsRaw
         _hostedCardsRaw = hostedCardsRaw
 
@@ -109,6 +118,8 @@ struct TodayCustomizationSheet: View {
         initialHostedDraft = hosted
         initialDetailed = keyMetricsDetailed.wrappedValue
         initialWindowDays = keyMetricsWindowDays.wrappedValue
+        // Clamp on the way in: an unset key reads as 0, which `columns(_:)` maps to the 3-column default.
+        initialColumns = KeyMetricPrefs.columns(keyMetricsColumns.wrappedValue)
 
         _sectionDraft = State(initialValue: sections)
         _keyMetricDraft = State(initialValue: metrics)
@@ -116,6 +127,7 @@ struct TodayCustomizationSheet: View {
         _hostedDraft = State(initialValue: hosted)
         _detailed = State(initialValue: keyMetricsDetailed.wrappedValue)
         _windowDays = State(initialValue: keyMetricsWindowDays.wrappedValue)
+        _columns = State(initialValue: KeyMetricPrefs.columns(keyMetricsColumns.wrappedValue))
 
         switch initialDestination {
         case .today:
@@ -149,6 +161,7 @@ struct TodayCustomizationSheet: View {
                         draft: $keyMetricDraft,
                         detailed: $detailed,
                         windowDays: $windowDays,
+                        columns: $columns,
                         onReset: resetCurrentLayout
                     )
                     .toolbar {
@@ -174,7 +187,7 @@ struct TodayCustomizationSheet: View {
             }
         }
         .interactiveDismissDisabled(isDirty)
-        .tint(StrandPalette.accent)
+        .appleInspiredTint("dashboardEditor")
         #if os(macOS)
         .frame(
             minWidth: NoopMetrics.editorSheetMinWidth,
@@ -210,6 +223,7 @@ struct TodayCustomizationSheet: View {
             )
             detailed = false
             windowDays = 14
+            columns = 3
         case .yourCards:
             dashboardDraft = EditableLayoutDraft(
                 visible: DashboardCard.defaultSelection,
@@ -233,6 +247,7 @@ struct TodayCustomizationSheet: View {
         keyMetricsRaw = KeyMetricPrefs.encode(keyMetricDraft.visible)
         keyMetricsDetailed = detailed
         keyMetricsWindowDays = windowDays
+        keyMetricsColumns = columns
         dashboardCardsRaw = DashboardCardPrefs.encode(dashboardDraft.visible)
         hostedCardsRaw = HostedCardPrefs.encode(hostedDraft.visible)
         dismiss()
@@ -311,6 +326,7 @@ private struct KeyMetricsCustomizationPage: View {
     @Binding var draft: EditableLayoutDraft<KeyMetric>
     @Binding var detailed: Bool
     @Binding var windowDays: Int
+    @Binding var columns: Int
     let onReset: () -> Void
 
     var body: some View {
@@ -327,6 +343,16 @@ private struct KeyMetricsCustomizationPage: View {
             onReset: onReset
         ) {
             Section("Display") {
+                // Tiles per row: the density control. Two columns give each tile ~50pt more width, which
+                // the grid spends on a bigger number and a taller trend graph.
+                Picker("Tiles per row", selection: $columns) {
+                    ForEach(KeyMetricPrefs.columnChoices, id: \.self) { count in
+                        Text("\(count)").tag(count)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Tiles per row")
+
                 Toggle(isOn: $detailed) {
                     VStack(alignment: .leading, spacing: NoopMetrics.space1) {
                         Text("Detailed tiles")
@@ -419,6 +445,7 @@ private struct HostedCardsCustomizationPage: View {
         keyMetricsRaw: .constant(""),
         keyMetricsDetailed: .constant(false),
         keyMetricsWindowDays: .constant(14),
+        keyMetricsColumns: .constant(3),
         dashboardCardsRaw: .constant(""),
         hostedCardsRaw: .constant("")
     )

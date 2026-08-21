@@ -104,6 +104,22 @@ struct ConfirmHealthExportIntent: AppIntent {
     }
 }
 
+/// "How's my recovery?" (redesign briefing §9). A READ, unlike the other two intents: it answers straight
+/// from the last-published `WidgetSnapshot` (the same App Group data the widgets read), so it works without
+/// opening the app or touching BLE — Siri can answer even with NOOP backgrounded or the strap disconnected.
+/// `openAppWhenRun` stays false; there's nothing for the foreground app to do.
+struct RecoveryStatusIntent: AppIntent {
+    static var title: LocalizedStringResource = "Recovery Status"
+    static var description = IntentDescription("Hear today's Charge (recovery) score.")
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let snap = WidgetSnapshot.load(), let recovery = snap.recovery else {
+            return .result(dialog: "No recovery score yet today.")
+        }
+        return .result(dialog: "Your Charge is \(recovery) percent.")
+    }
+}
+
 /// Surfaces NOOP's intents to Siri, Spotlight, and the Shortcuts gallery without any user setup.
 struct NOOPShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
@@ -123,6 +139,10 @@ struct NOOPShortcuts: AppShortcutsProvider {
                     phrases: ["Confirm my \(.applicationName) health export"],
                     shortTitle: "Confirm Health Export",
                     systemImageName: "checkmark.circle")
+        AppShortcut(intent: RecoveryStatusIntent(),
+                    phrases: ["How's my recovery in \(.applicationName)", "What's my Charge in \(.applicationName)"],
+                    shortTitle: "Recovery Status",
+                    systemImageName: "bolt.heart.fill")
     }
 }
 #endif

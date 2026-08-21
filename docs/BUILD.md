@@ -1,10 +1,10 @@
 # Building NOOP
 
-NOOP is a standalone, fully **offline** companion app for WHOOP straps (4.0 and 5.0). It pairs
+NOOP is an **offline-first** companion app for WHOOP straps (4.0 and 5.0/MG). It pairs
 directly with the strap over Bluetooth Low Energy, stores everything on-device in SQLite, imports
 WHOOP CSV exports and Apple Health exports, and computes recovery / strain / HRV / sleep locally.
-There is no cloud, no account — the app talks only to **your own device** and
-works only with **your own data**.
+There is no NOOP cloud or account. Optional, explicit network paths are documented in
+[`PRIVACY_SECURITY.md`](PRIVACY_SECURITY.md).
 
 > **Not affiliated with WHOOP, and not a medical device.** "WHOOP" is used only to identify the
 > hardware this software interoperates with. NOOP contains no WHOOP code, firmware, or assets. All
@@ -15,11 +15,10 @@ works only with **your own data**.
 
 ## Repository layout
 
-The codebase is split into reusable, cross-platform Swift packages plus a thin platform-specific
-app layer. The **macOS app is the reference implementation**; **Android ships as a full app** under
-`android/`, and **iOS ships as a build-from-source target (`NOOPiOS`)** folded into main in v1.94 —
-built in Xcode, not distributed (no App Store / TestFlight, to stay anonymous). All reuse the same
-packages where they can.
+The codebase is split into reusable Swift packages plus Apple app targets. The **macOS app is the
+reference implementation**; iOS/iPadOS ships as an unsigned IPA and as the `NOOPiOS` Xcode target;
+the optional Watch companion ships inside the Full IPA. This fork does not contain or release
+Android — use [RyanBR's upstream repository](https://github.com/ryanbr/noop) for that platform.
 
 ```
 Strand/
@@ -35,15 +34,17 @@ Strand/
 │   ├── System/                 # MacActions (lock screen, run Shortcut), ProjectInfo
 │   └── Resources/              # Info.plist, Strand.entitlements, Assets.xcassets (AppIcon)
 ├── StrandTests/                # macOS app unit tests
-├── StrandiOS/                  # iOS SwiftUI app shell (product name: NOOPiOS)
-├── StrandiOSShared/            # shared iOS-only app code (BLE/scene wiring)
-├── StrandiOSWidgets/           # iOS WidgetKit + Live Activity extension
+├── StrandiOS/                  # iOS shell, HealthKit, widgets, Live Activity and Watch sources
 ├── Packages/
 │   ├── WhoopProtocol/          # BLE frame parsing, CRC, command/event/packet decode
 │   ├── WhoopStore/             # GRDB/SQLite persistence (migrations, streams, caches)
 │   ├── StrandAnalytics/        # HRV / recovery / strain / sleep / correlation math
 │   ├── StrandImport/           # WHOOP CSV + Apple Health importers
-│   └── StrandDesign/           # SwiftUI design system (palette, components, charts)
+│   ├── StrandDesign/           # SwiftUI design system (palette, components, charts)
+│   ├── OuraProtocol/           # Oura BLE protocol/decode
+│   ├── PolarProtocol/          # Polar protocol/decode
+│   ├── SemanticMemory/         # local Coach memory index
+│   └── NoopLocalAccess/        # optional read-only macOS local-access CLI
 ├── Tools/
 │   └── Backfill/               # `swift run backfill` — re-runs importers into the on-device DB
 └── Fixtures/                   # Sample data for tests
@@ -51,10 +52,10 @@ Strand/
 
 ### Packages and platforms
 
-Every package declares **both** `.iOS(.v16)` and `.macOS(.v13)`, so the protocol, storage,
-analytics, import, and design layers compile and run unmodified on iOS once an app target exists.
-Any framework-specific code is guarded with `#if canImport(AppKit) / #elseif canImport(UIKit)`
-(for example the color bridging in `Packages/StrandDesign/Sources/StrandDesign/Palette.swift`).
+The shared protocol, store, analytics, import and design packages declare iOS and macOS support.
+`SemanticMemory` raises its iOS floor to 17; `NoopLocalAccess` is macOS-only; selected analytics and
+design code also supports watchOS. `Package.swift` and `project.yml` are authoritative — do not infer
+target support from this summary alone.
 
 | Package          | Platforms                | Key dependencies                          | Responsibility |
 |------------------|--------------------------|-------------------------------------------|----------------|
@@ -62,7 +63,11 @@ Any framework-specific code is guarded with `#if canImport(AppKit) / #elseif can
 | `WhoopStore`     | iOS 16+, macOS 13+       | `WhoopProtocol`, `GRDB.swift` (≥ 6.0.0)   | SQLite persistence, migrations, decoded streams, metric caches |
 | `StrandAnalytics`| macOS 13+, iOS 16+       | `WhoopProtocol`, `WhoopStore`             | HRV / recovery / strain / sleep / correlation math |
 | `StrandImport`   | macOS 13+, iOS 16+       | `WhoopProtocol`, `WhoopStore`, `ZIPFoundation` (≥ 0.9.0) | WHOOP CSV + Apple Health (`export.xml`, streaming) importers |
-| `StrandDesign`   | macOS 13+, iOS 16+       | none                                      | SwiftUI design system: palette, components, charts |
+| `StrandDesign`   | macOS 13+, iOS 16+, watchOS 10+ | none                               | SwiftUI design system: palette, components, charts |
+| `OuraProtocol`   | macOS 13+, iOS 16+       | none                                      | Oura BLE protocol and clean-room decode |
+| `PolarProtocol`  | macOS 13+, iOS 16+       | none                                      | Polar protocol primitives and PPI decode |
+| `SemanticMemory` | macOS 13+, iOS 17+       | `GRDB.swift`                              | local semantic Coach index |
+| `NoopLocalAccess`| macOS 13+                 | `GRDB.swift`                              | optional read-only local-access CLI/core |
 
 All third-party dependencies are resolved through **Swift Package Manager**; nothing is vendored
 as a binary.
@@ -132,10 +137,10 @@ The app is **sandboxed** and requests Bluetooth + user-selected-file access. Fro
 <key>com.apple.security.files.user-selected.read-write</key> <true/>
 ```
 
-`project.yml` deliberately leaves `DEVELOPMENT_TEAM` empty by default (see `Config/BundleId.xcconfig`),
-keeps `ENABLE_HARDENED_RUNTIME: NO`, and uses **ad-hoc signing** — no Apple Developer account is
-required to run a personal build. To produce the runnable bundle, build without disabling signing so
-Xcode applies the sandbox + Bluetooth entitlements with an ad-hoc identity:
+`project.yml` deliberately keeps `DEVELOPMENT_TEAM` empty, `ENABLE_HARDENED_RUNTIME: NO`, and uses
+**ad-hoc signing** — no Apple Developer account is required to run a personal build. To produce the
+runnable bundle, build without disabling signing so Xcode applies the sandbox + Bluetooth
+entitlements with an ad-hoc identity:
 
 ```bash
 xcodebuild \
@@ -216,19 +221,18 @@ swift run backfill
 
 ---
 
-## iOS (build-from-source only)
+## iOS (unsigned sideload release and source builds)
 
-iOS ships as a **build-from-source-only** target, folded into main in v1.94. There is **no App
-Store or TestFlight build** — both require a real Apple Developer identity, which is fundamentally
-at odds with NOOP staying anonymous, so the only way to run it is to build it yourself in Xcode.
-The iOS app is **newer and less battle-tested** than macOS and Android: live BLE on a real iPhone
-isn't yet fully validated. It shares the same analytics packages, so once data is in, results match
-macOS.
+iOS ships as an **unsigned sideload release** plus a build-from-source target. There is **no App Store
+or TestFlight build** — both require a real Apple Developer identity, which is fundamentally at odds
+with NOOP staying anonymous. The release IPA carries no signing identity; AltStore or SideStore signs
+it locally with the user's own Apple ID. See [IOS.md](IOS.md) for the source URL and install steps.
+The iOS app uses the same store and analytics implementations as macOS. BLE requires a real iPhone;
+the simulator is suitable only for UI and non-BLE work.
 
 The `NOOPiOS` app target (plus the `NOOPiOSWidgets` WidgetKit / Live Activity extension) already
-exists in `project.yml` — you don't need to add it. All five packages target `.iOS(.v16)`, so the
-protocol, storage, analytics, import, and design cores compile for iOS unmodified; the iOS app
-shell lives in `StrandiOS/` with shared iOS code in `StrandiOSShared/`.
+exists in `project.yml` — you don't need to add it. Shared app code remains under `Strand/`; iOS-only
+lifecycle, HealthKit, widgets, Live Activity and Watch sources live under `StrandiOS/`.
 
 ### Build & run
 
@@ -255,9 +259,7 @@ Notes:
 - The `NOOPiOS` and `NOOPiOSWidgets` targets deploy to **iOS 17.0**. (The shared packages still
   declare a floor of iOS 16 — `.iOS(.v16)` — but the app targets require iOS 17.)
 - Running on a physical iPhone needs a signing identity selected in Xcode (a free personal Apple ID
-  works for on-device builds). Set `DEVELOPMENT_TEAM` in `Config/BundleIdSecrets.xcconfig` (see
-  `Config/BundleIdSecrets.example.xcconfig`) to avoid re-selecting a team in Xcode after every
-  `xcodegen generate`. **BLE requires a real device** — the iOS simulator can't reach a
+  works for on-device builds). **BLE requires a real device** — the iOS simulator can't reach a
   physical strap.
 - The iOS app reuses `BLEManager` (CoreBluetooth is identical API on iOS) and the shared analytics,
   store, import, and design packages. `StrandDesign` already bridges `NSColor`/`UIColor` behind
@@ -265,31 +267,38 @@ Notes:
   over. macOS-only surfaces (the menu-bar HR extra, screen-lock / Shortcut strap actions) have no
   iOS equivalent and are `#if os(macOS)`-gated; iOS uses a widget / Live Activity instead.
 
+### Publish an unsigned Apple release
+
+The repository's **Publish unsigned iOS release** GitHub Action is intentionally manual. Before it is
+dispatched from `main`, commit the numeric version and monotonic build number in `project.yml`, add the
+matching release note at `docs/fork/releases/v<VERSION>.md`, and run `Tools/appchangelog-gen.py` on
+that note so the in-app “What's New” card matches the release.
+
+The workflow validates those inputs, downloads the pinned on-device coach model, builds `NOOPiOS`
+without a signing identity and packages two artifacts:
+
+- `NOOP-ios-unsigned-v<VERSION>-dx.ipa` retains the iOS widget and removes only the embedded Watch app.
+  The sideload preparation step leaves AltSign a capability template for the shared App Group and
+  HealthKit, so the widget can show the installed app's real data.
+- `NOOP-ios-full-unsigned-v<VERSION>-dx.ipa` retains the widget, Watch app and Watch complication for
+  people who can provision the complete bundle with their own developer team.
+
+The release is created as a prerelease while those assets build. A separate macOS job attaches a
+universal, ad-hoc-signed `NOOP-macos-v<VERSION>-dx.zip`; only after both Apple platforms succeed does
+the final job promote `v<VERSION>-dx` to the latest public release. The publishing job also prepends
+the actual IPA URL and size to `altstore-source.json` and commits that manifest-only change to `main`.
+
+The workflow needs repository Actions permissions set to **Read and write** and permission for the
+GitHub Actions bot to push its manifest-only commit to `main`. It never receives an Apple certificate,
+provisioning profile, or personal developer name.
+
 ---
 
-## Android (shipped)
+## Android
 
-Android ships as a **full, native client** — a separate Kotlin/Gradle module rather than a port of
-the Swift app. It lives under **`android/`** with its own `README`, and a pre-built APK
-(`NOOP-full.apk`) is published in [Releases](https://github.com/ryanbr/noop/releases). A sample-data **demo** flavour still
-exists for exploring every screen with no strap, but it's now **build-from-source only**
-(`./gradlew assembleDemoDebug`) — it is no longer published as a release asset.
-
-Toolchain:
-
-| Tool            | Version |
-|-----------------|---------|
-| JDK             | 17      |
-| Android Studio  | current stable (with Android SDK) |
-| Build system    | Gradle (Android Gradle Plugin) |
-
-The Android app re-implements the same wire protocol against Android's BLE stack (the protocol
-facts in `WhoopProtocol/Resources/whoop_protocol.json` are language-agnostic). Build and run
-instructions live in **`android/README.md`** — open the `android/` directory in Android Studio, let
-Gradle sync, and run on a device with Bluetooth (an emulator cannot reach a physical strap).
-
-> The macOS app remains the reference implementation; the shared packages define the protocol,
-> storage, analytics, and import behavior every client matches.
+This fork no longer carries or releases the Android tree. For Android development and builds, use
+[RyanBR's upstream NOOP repository](https://github.com/ryanbr/noop). The Swift packages and Apple
+release gates documented here cover iOS and macOS only.
 
 ---
 
@@ -302,10 +311,15 @@ cd Packages/WhoopStore    && swift test
 cd Packages/StrandAnalytics && swift test
 cd Packages/StrandImport  && swift test
 cd Packages/StrandDesign  && swift test
+cd Packages/OuraProtocol && swift test
+cd Packages/PolarProtocol && swift test
+cd Packages/SemanticMemory && swift test
+cd Packages/NoopLocalAccess && swift test
 
 # macOS app + integration tests via Xcode:
 xcodegen generate
 xcodebuild -project Strand.xcodeproj -scheme Strand -destination 'platform=macOS' test
+xcodebuild -project Strand.xcodeproj -scheme NOOPiOS -destination 'generic/platform=iOS' build
 ```
 
 ---

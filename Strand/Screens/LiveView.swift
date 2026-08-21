@@ -138,7 +138,9 @@ struct LiveView: View {
         // Pick a named sport before starting (#519) — the live workout view then opens
         // off the activeWorkout change above, so no extra navigation is needed here.
         .workoutSelectionCover(isPresented: $showStartSport) {
-            StartWorkoutSheet { name in model.startWorkout(sport: name) }
+            StartWorkoutSheet(offersZoneTraining: true) { name, targetZone in
+                model.startWorkout(sport: name, targetZone: targetZone)
+            }
         }
         // Manual HRV snapshot (#127) — a still, seated 60s R-R reading.
         .sheet(isPresented: $showHRVSnapshot) {
@@ -259,14 +261,14 @@ struct LiveView: View {
         card {
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .center, spacing: NoopMetrics.space6) {
-                    LiveHeartReadout(hrMax: model.profile.hrMax)
+                    LiveHeartReadout(zoneSet: model.profile.hrZoneSet)
                         .frame(minWidth: 260, maxWidth: 340)
                     Divider().overlay(StrandPalette.hairline)
                     LivePhysiology()
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 VStack(alignment: .leading, spacing: 18) {
-                    LiveHeartReadout(hrMax: model.profile.hrMax)
+                    LiveHeartReadout(zoneSet: model.profile.hrZoneSet)
                     Divider().overlay(StrandPalette.hairline)
                     LivePhysiology()
                 }
@@ -748,7 +750,9 @@ private struct LiveHeaderStats: View {
 private struct LiveHeartReadout: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var live: LiveState
-    let hrMax: Int
+    /// The user's resolved bands (`ProfileStore.hrZoneSet`) — passed in rather than rebuilt here, so the
+    /// live colour world uses the SAME zone boundaries as the workout screens and the coach.
+    let zoneSet: HRZoneSet
 
     /// Smoothed, spike-filtered live HR from AppModel (median over a short window).
     private var displayHR: Int? { model.bpm }
@@ -757,7 +761,7 @@ private struct LiveHeartReadout: View {
     /// The live HR zone for the focal readout's colour world (presentation only). 0 = below Zone 1.
     private var liveZone: Int {
         guard let bpm = displayHR else { return 0 }
-        return model.profile.hrZoneSet.zoneNumber(forBPM: Double(bpm))
+        return zoneSet.zoneNumber(forBPM: Double(bpm))
     }
 
     /// The focal vessel / numeral colour: the live HR-zone hue when streaming, the Effort world otherwise.
@@ -768,8 +772,8 @@ private struct LiveHeartReadout: View {
 
     /// The vessel fill: HR as a fraction of the profile's max HR (nil = empty, no data yet).
     private var hrFrac: Double? {
-        guard let bpm = displayHR, hrMax > 0 else { return nil }
-        return max(0.02, min(1, Double(bpm) / Double(hrMax)))
+        guard let bpm = displayHR, zoneSet.maxHR > 0 else { return nil }
+        return max(0.02, min(1, Double(bpm) / zoneSet.maxHR))
     }
 
     @State private var shown: Double = 0

@@ -1,11 +1,13 @@
 import SwiftUI
 import StrandDesign
+import StrandAnalytics
 
 /// Automations — turn the strap's physical inputs (double-tap, wrist on/off) and live biometrics
 /// into actions (Shortcuts, and Mac-only screen lock) and haptic coaching. All on-device.
 struct AutomationsView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var behavior: BehaviorStore
+    @EnvironmentObject var profile: ProfileStore
     // PERF: this screen does NOT observe `LiveState`. Its only live-dependent pixel is the "Strap
     // bonded / not connected" pill inside the double-tap card, which is now the `BondStatePill` leaf
     // that owns its own `@EnvironmentObject live`. Observing `live` at this level would re-render the
@@ -143,7 +145,7 @@ struct AutomationsView: View {
                     Button {
                         model.runMacAction(behavior.doubleTapAction, shortcut: behavior.doubleTapShortcut)
                     } label: { Label("Test action", systemImage: "play.fill") }
-                    .buttonStyle(.bordered).tint(StrandPalette.accent)
+                    .buttonStyle(.bordered).appleInspiredTint("automations")
                     .disabled(behavior.doubleTapAction == .none)
                     Spacer()
                     // Live-observing leaf: re-renders on its own when the strap's bond state flips, so a
@@ -217,9 +219,99 @@ struct AutomationsView: View {
                  blurb: String(localized: "Train by feel. The strap buzzes so you don't have to watch a screen."),
                  active: behavior.zoneCoaching || behavior.stressCheckIn) {
             VStack(spacing: 0) {
-                ToggleRow(label: String(localized: "HR-zone coaching"),
-                          help: String(localized: "Buzz when you hit your top zone (ease off) and again when you recover. Uses your max HR from Settings."),
+                ToggleRow(label: String(localized: "Heart-rate ceiling"),
+                          help: String(localized: "Buzz as soon as your smoothed heart rate reaches or exceeds the ceiling, continue at your selected frequency, and confirm when it recovers."),
                           isOn: $behavior.zoneCoaching)
+                if behavior.zoneCoaching {
+                    rowDivider
+                    HStack(alignment: .center, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Ceiling source").font(StrandFont.body).foregroundStyle(StrandPalette.textPrimary)
+                            Text("Use your profile zones or an independent fixed heart rate.")
+                                .font(StrandFont.footnote).foregroundStyle(StrandPalette.textTertiary)
+                        }
+                        Spacer()
+                        Picker("Ceiling source", selection: $behavior.hrCeilingThresholdMode) {
+                            Text("Profile zone").tag(HRCeilingThresholdMode.zone)
+                            Text("Fixed BPM").tag(HRCeilingThresholdMode.bpm)
+                        }
+                        .labelsHidden().pickerStyle(.menu).fixedSize()
+                    }
+                    .frame(minHeight: 42).padding(.vertical, 4)
+
+                    rowDivider
+                    if behavior.hrCeilingThresholdMode == .zone {
+                        HStack(alignment: .center, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Maximum allowed zone").font(StrandFont.body).foregroundStyle(StrandPalette.textPrimary)
+                                Text("Uses the zones entered in your profile. Changes there apply immediately.")
+                                    .font(StrandFont.footnote).foregroundStyle(StrandPalette.textTertiary)
+                            }
+                            Spacer()
+                            Picker("Maximum allowed zone", selection: $behavior.hrCeilingAllowedZone) {
+                                ForEach(1...4, id: \.self) { zone in
+                                    Text(verbatim: "Zone \(zone)").tag(zone)
+                                }
+                            }
+                            .labelsHidden().pickerStyle(.menu).fixedSize()
+                        }
+                        .frame(minHeight: 42).padding(.vertical, 4)
+                    } else {
+                        stepperRow(label: String(localized: "Heart-rate ceiling"),
+                                   help: String(localized: "A fixed value independent of maximum heart rate and profile zones."),
+                                   value: $behavior.hrCeilingBPM, suffix: String(localized: "BPM"),
+                                   range: 40...220, step: 1)
+                    }
+
+                    rowDivider
+                    HStack(alignment: .center, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Warning frequency").font(StrandFont.body).foregroundStyle(StrandPalette.textPrimary)
+                            Text("Choose limited reminders or one buzz every two seconds while above the ceiling.")
+                                .font(StrandFont.footnote).foregroundStyle(StrandPalette.textTertiary)
+                        }
+                        Spacer()
+                        Picker("Warning frequency", selection: $behavior.hrCeilingReminderMode) {
+                            Text("Standard").tag(HRCeilingReminderMode.standard)
+                            Text("Every 2 seconds").tag(HRCeilingReminderMode.everyTwoSeconds)
+                        }
+                        .labelsHidden().pickerStyle(.menu).fixedSize()
+                    }
+                    .frame(minHeight: 42).padding(.vertical, 4)
+
+                    rowDivider
+                    HStack(alignment: .center, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Monitor").font(StrandFont.body).foregroundStyle(StrandPalette.textPrimary)
+                            Text("Always while worn, or only during a workout recorded by NOOP.")
+                                .font(StrandFont.footnote).foregroundStyle(StrandPalette.textTertiary)
+                        }
+                        Spacer()
+                        Picker("Monitor", selection: $behavior.hrCeilingScope) {
+                            Text("Always").tag(HRCeilingScope.always)
+                            Text("During workouts").tag(HRCeilingScope.workout)
+                        }
+                        .labelsHidden().pickerStyle(.menu).fixedSize()
+                    }
+                    .frame(minHeight: 42).padding(.vertical, 4)
+
+                    rowDivider
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let threshold = resolvedHRCeilingDisplayBPM {
+                            HStack(spacing: 4) {
+                                Text("Buzz at")
+                                Text(verbatim: "\(threshold)")
+                                Text("BPM")
+                            }
+                            .font(StrandFont.bodyNumber).foregroundStyle(StrandPalette.accent)
+                        }
+                        Text("Requires a connected, worn strap and current heart-rate data. This is a training aid, not medical monitoring, and it may react late or miss a reading.")
+                            .font(StrandFont.footnote).foregroundStyle(StrandPalette.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
+                }
                 rowDivider
                 // v5 L3 closed-loop check-in (master + sub toggles). Default OFF, manual-first. The keys
                 // mirror BiofeedbackPrefs, which the central detector (AppModel.evaluateStress) reads.
@@ -241,6 +333,19 @@ struct AutomationsView: View {
                               isOn: $behavior.stressUseResonancePace)
                 }
             }
+        }
+    }
+
+    /// Whole-bpm boundary the wearer will actually cross. A fractional profile edge (for example
+    /// 142.4) first admits the integer sample 143, so the preview rounds up rather than nearest.
+    private var resolvedHRCeilingDisplayBPM: Int? {
+        switch behavior.hrCeilingThresholdMode {
+        case .zone:
+            guard let lower = HRCeilingAlertEngine.profileZoneCeiling(
+                zoneSet: profile.hrZoneSet, allowedZone: behavior.hrCeilingAllowedZone) else { return nil }
+            return Int(ceil(lower - HRZoneSet.edgeEpsilon))
+        case .bpm:
+            return behavior.hrCeilingBPM
         }
     }
 
@@ -392,7 +497,7 @@ struct AutomationsView: View {
                         Button {
                             router.openRhythm()
                         } label: { Label("Open", systemImage: "waveform.path") }
-                        .buttonStyle(.bordered).tint(StrandPalette.accent)
+                        .buttonStyle(.bordered).appleInspiredTint("automations")
                     }
                     .frame(minHeight: 42).padding(.vertical, 4)
                 }
@@ -545,7 +650,7 @@ private struct Section2<Content: View>: View {
                     }
                     HStack(spacing: 10) {
                         Image(systemName: icon)
-                            .foregroundStyle(active ? StrandPalette.accent : StrandPalette.textSecondary)
+                            .appleInspiredForeground("automations")
                             .accessibilityHidden(true)
                         Text(title).font(StrandFont.title2).foregroundStyle(StrandPalette.textPrimary)
                     }
@@ -566,11 +671,11 @@ private struct ToggleRow: View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label).font(StrandFont.body).foregroundStyle(StrandPalette.textPrimary)
-                Text(help).font(StrandFont.footnote).foregroundStyle(StrandPalette.textTertiary)
+                Text(help).font(StrandFont.footnote).foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).tint(StrandPalette.accent)
+            Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).appleInspiredTint("automations")
                 .accessibilityLabel(label)
         }
         .frame(minHeight: 42).padding(.vertical, 4)

@@ -1,19 +1,15 @@
 
 # NOOP — Feature Guide
 
-NOOP is a standalone, fully **offline** companion app for WHOOP straps (4.0 and 5.0). It pairs
+NOOP is an **offline-first** companion app for WHOOP straps (4.0 and 5.0/MG). It pairs
 directly with the strap over Bluetooth Low Energy — **no WHOOP account, no
 cloud** — stores everything on-device in SQLite, imports your WHOOP and Apple Health exports,
 and computes its own daily scores locally — **Charge** (recovery), **Effort** (strain) and **Rest**
 (sleep), an energy economy you wake with, spend, and rebuild — alongside HRV and the raw signals.
-These are honest approximations from published methods, **not WHOOP's scores**. The macOS app (in `Strand/`) is the
-reference implementation (installable via the Homebrew cask); Android (in `android/`) is a full,
-shipped app (sideload the `.apk`); and iOS ships as an **unsigned `.ipa` you sideload** with
-AltStore/SideStore — signed on your own iPhone with your own free Apple ID, so there's no App
-Store or developer account and NOOP stays anonymous (see [docs/IOS.md](IOS.md); you can still
-build it yourself in Xcode). It shares NOOP's analysis code, so its results match
-macOS; it is newer and less battle-tested, with live BLE on a physical iPhone not yet fully
-validated.
+These are honest approximations from published methods, **not WHOOP's scores**. macOS and iOS/iPadOS
+ship from this fork and share the same store and analysis implementations; iOS is distributed as an
+unsigned AltStore/SideStore IPA or built with Xcode. The optional Watch companion is part of the Full
+IPA. Android is maintained in [RyanBR's upstream project](https://github.com/ryanbr/noop), not here.
 
 > **Not affiliated with WHOOP.** NOOP is independent interoperability software for *your own*
 > device and *your own* data. "WHOOP" is used only to identify the hardware NOOP talks to.
@@ -113,6 +109,86 @@ The home dashboard (`TodayView.swift`, titled "Control Center"). A tight, gaples
 - **Last Workouts** — up to six recent sessions as tiles (duration, date, avg HR, kcal).
 - **Data Sources** — a footer showing whether WHOOP and Apple Health data are present, with day/
   session counts.
+
+---
+
+## Today (iOS)
+
+**Tab bar: Today (first tab) · works from imported data; live status/battery in the header.**
+
+iOS uses a bottom tab bar (`RootTabView.swift`: Today, Trends, Sleep, More) instead of macOS's
+sidebar. The Today tab hosts one of three interchangeable home-screen presentations, picked under
+**Settings → Appearance → Experimental**:
+
+- **Liquid Today** (default, `LiquidTodayView.swift`) — a sky-gradient hero with three fluid,
+  count-up "vessel" circles for Charge / Effort / Rest, a synthesis line ("Charge is strong and
+  sleep was consistent") with day-scoped readiness pills, a scrubbable live/banked heart-rate
+  thread, "Your Cards" (swipeable coach training suggestions), Key Metrics, Recovery Vitals, Last
+  Workouts and Data Sources — the same content as Control Center, restyled.
+- **Classic Today** (`TodayView.swift`) — the same screen macOS shows as Control Center (tight
+  tile grid, no hero animation), reused verbatim as an iOS fallback. As of 2026-07-25 it has full
+  functional parity with Liquid Today (design stays its own): reorderable/hideable sections over a
+  shared saved order, a live heart-rate badge over the HR trend chart with a one-tap **Full day**
+  link into the Deep Timeline, and Recovery Vitals as its own movable section instead of being fixed
+  inside Synthesis.
+- **Customize Today** (`TodayCustomizationSheet.swift`) — one editor behind every Today layout
+  affordance on both Today screens, replacing the separate Arrange / Key Metrics / Your Cards sheets
+  (upstream #940, adopted 2026-07-31). A **Shown / Hidden** list with drag-to-reorder, Cancel/Save
+  over a draft so nothing is half-applied, and "Edit" rows that deep-link to the Key Metrics and
+  Your Cards child pages. Every section is a row, the Coach banner included — drag it anywhere or
+  move it to Hidden. The Key Metrics page also carries **Tiles per row** (2 or 3), **Detailed
+  tiles**, and the trend window.
+- **Heute** (`StrandiOS/Redesign/HeuteRedesignView.swift` and friends) — a from-scratch redesign on
+  its own fixed green/blue/violet token set (`HeuteRedesignPalette`, independent of the selected
+  chart style). **Its Settings toggle was removed (2026-07-25)** — the prototype never got past
+  off-by-default/untested-on-a-real-strap, so `RootTabView` no longer reads its flag at all and the
+  screen is unreachable. The code is left in place, not deleted, in case it's revisited later:
+  - **Header** — a greeting + tappable date (opens day navigation; swiping the screen
+    left/right also changes the day) and three status chips: **Activity status** (Active / Sick /
+    Injured / On break, each with a duration — Today / 3 days / This week / Custom date / Until
+    changed), strap **battery**, and **coach** entry.
+  - **Rings** — Charge / Effort / Rest as three glow rings. **Charge is tappable** — even while
+    calibrating or empty — and opens a breakdown sheet naming which drivers (HRV, resting HR,
+    respiration, sleep quality, skin temperature) pulled the score up or down versus your personal
+    baseline, with the same confidence tier (Calibrating / Est. / Reliable) the ring itself shows.
+    Effort and Rest stay display-only.
+  - **Card zone** — a fixed base card (today's readiness statement, or the current activity-status
+    exception) behind a swipeable stack of the coach's real pending training-plan proposals; a
+    swipe hides a card locally without declining the proposal, tapping one opens the full
+    accept/modify/decline sheet.
+  - **Vitals grid** — HRV, resting heart rate, blood oxygen, respiratory rate, Fitness Age, steps,
+    and the day's workout as a tappable tile.
+  - **Heart rate** — a live beat-by-beat trace (when connected) over the day's banked 5-minute
+    trace, scrubbable by dragging along it.
+  - **Journal reminder + Data Sources footer** — shown only on today, not on a navigated past day.
+
+All three presentations read the SAME carry-over rules: an unscored today shows the last scored
+night's Charge (labelled whose it is), a mid-calibration baseline shows "Learning your baseline,
+N of 4 nights" instead of a stale number, and each vital falls back per-field to the freshest
+prior reading independent of whether that night scored a Charge — so switching between the three
+never changes what number you see for the same day.
+
+---
+
+## Updates inbox
+
+**The bell, top of Today (Classic and Liquid alike) · `UpdateStore.swift` / `UpdatesInboxView.swift`.**
+
+A calm, newest-first log of what's new — tap the bell (badged with the unread count) to open it. Three
+kinds of row, each behaving differently rather than all looking like the same generic notification:
+
+- **Needs a decision** — a session the coach proposed (see [docs/fork/COACH.md](fork/COACH.md) §11a), with
+  **Accept / Change / Decline** right there. Once it's decided elsewhere (e.g. from the Today card
+  first), the row shows the outcome instead of stale buttons.
+- **A hint, nothing to decide** — release notes, "new data arrived" readings, and the coach's proactive
+  nudges (a body signal worth knowing about, a small win) — tap to mark read, nothing else expected of
+  you. Proactive hints used to be chat-only; they now show up here too, without needing to open Coach.
+- **Status & reminders** — a Today info-card you swiped away, restorable with one tap ("Restore to
+  Today"); everything else in this bucket is read-only history.
+
+Old rows are deduped and capped so a background recompute loop can't spam the same "new data" row; items
+still awaiting a decision sort to the top of their unread/read section. Everything here is local —
+nothing about the bell's contents leaves the device.
 
 ---
 
@@ -378,6 +454,25 @@ source, read locally on this Mac:
 Sparse weekly series (weight, body fat) auto-widen to all history so a short window is never empty;
 a single reading is shown as a "Latest reading" value rather than an empty chart.
 
+On iPhone, the same page also controls the live two-way HealthKit bridge. NOOP writes the strap's
+24/7 heart rate as one measured minute mean per sample, associates those saved samples with matching
+NOOP-authored workouts, and writes sleep stages plus nightly vitals. Apple Health's HRV type is
+**SDNN**, so the bridge computes a separately cleaned/trust-gated SDNN from the night's R-R stream;
+NOOP's own HRV tiles and Charge continue to use RMSSD. An on-device export diagnostic reports each
+category's authorization, count and last result. Its reversible A/B check can compare 60-second HR
+intervals with point-in-time minute samples on a physical iPhone when Apple's merged graph omits a
+source even though Health's raw-data list contains it. The selected representation is applied to the
+latest 14 days immediately and older exported history is migrated in resumable 14-day chunks on later
+syncs. The diagnostic never changes source priority, which HealthKit does not expose to apps.
+
+**Water and caffeine import themselves** (upstream #949, adopted 2026-07-31). A drink logged in
+Apple Health — by a hydration app, a smart bottle, or by hand — lands in NOOP's hydration and
+caffeine logs without being typed in twice. Both are **read-only**: imported entries keep their own
+row and never overwrite what you entered yourself, and NOOP never writes either back. iPhone asks
+permission once for the two new data types, including for users who granted Health access before
+this version existed. The Coach's own `log_caffeine` tool writes through the same store, so a
+chat-logged intake and an imported one appear side by side.
+
 ---
 
 ## Data Sources
@@ -464,8 +559,18 @@ React when the strap comes off or goes on:
 > macOS reserves true auto-*unlock* for Apple Watch, so this can **lock**, not unlock.
 
 ### Haptic coaching
-- **HR-zone coaching** — buzz when you hit your top zone (ease off) and again when you recover,
-  using your max HR from Settings.
+- **Heart-rate ceiling** — choose either the highest allowed profile zone or a fixed bpm value, then
+  monitor always while worn or only during a workout NOOP records. Profile-zone mode uses the exact
+  automatic / custom-percent / custom-bpm bands entered under Settings, and shows the resolved bpm
+  boundary before it is armed. The first smoothed sample at or above the boundary buzzes immediately;
+  continuing breaches can use bounded standard reminders or one buzz every two seconds, and recovery is
+  confirmed after a stable drop below it.
+  It needs current live HR and a bonded, worn strap; it is a training aid, not medical monitoring.
+- **Target-zone coach** — optionally choose Zone 1–5 when starting a recorded workout or Live Session.
+  The picker shows the exact current profile BPM band. After eight stable seconds, one tap confirms the
+  target, two light taps ask for more intensity, and three heavy taps ask you to ease off; outside reminders
+  are capped at one every 30 seconds. The last selection is proposed next time, while new installs default
+  to no coach. A configured heart-rate ceiling always has haptic priority.
 - **Stress check-ins (haptic)** — offer a guided breathing check-in after a fresh HRV dip while
   you are still. Off by default, with optional auto-nudges, quiet hours, and your resonance pace.
 
@@ -489,10 +594,9 @@ HRV down ≥20%, skin temp up ≥0.6 °C, respiration up — a banner appears on
 
 On a banner transition from clear to raised, NOOP also posts a **system notification** (at most
 once per local day) so the warning reaches you when the window is closed. The toggle lives in
-**Automations → Illness early-warning**. The defaults differ by platform on purpose: macOS is
-**opt-in** (off by default — enabling it triggers the notification-permission prompt), while
-Android is **opt-out** (on by default — the watch has always run there). Needs at least 14 days
-of history. On-device and approximate — informational only, **not** a diagnosis.
+**Automations → Illness early-warning**. It is opt-in; enabling it can trigger the platform's
+notification-permission prompt. It needs at least 14 days of history. On-device and approximate —
+informational only, **not** a diagnosis.
 
 ---
 
@@ -504,9 +608,25 @@ of history. On-device and approximate — informational only, **not** a diagnosi
 
 - **Profile** — age, sex, weight, height, and max heart rate (auto-estimated via Tanaka, or a
   manual override). These power your zones, calorie estimates and Charge baselines.
+- **Heart-rate zones** — set where each of your five zones starts, instead of accepting the standard
+  50/60/70/80/90 % of maximum. Two ways to say it: **% of max**, which moves with your maximum when
+  it is re-estimated, or **beats**, the absolute heart rates a threshold or lactate test gives you,
+  which stay put. Both keep whatever you typed in the other, so trying one costs nothing.
+  Your bands change what you see — the live zone readout, a workout's zone split, the haptic "ease
+  off" buzz — and the zones your coach prescribes in. They do **not** change your Effort score, which
+  is measured against your heart-rate reserve on a published method with its own fixed thresholds, so
+  your history stays comparable; nor zone bars that arrived inside a WHOOP export, which carry
+  WHOOP's own bands.
 - **Step calibration** — tune the stride/step estimate to your own walking so step and distance
   figures read closer to reality.
 - **Units** — choose your preferred measurement units (metric / imperial) across the app.
+- **Appearance** — card transparency, whether the coach tile pulses on Today, and **App icon
+  colors** (on by default): recolors the leading icons across the app — the More tab, Chat and its
+  submenus (Coach Settings, Coach Info, Goal & Journey), Journey, and Settings' own section headers —
+  to an Apple Health-style palette instead of plain blue. Purely cosmetic — chevrons, checkmarks and
+  state icons (e.g. bell vs. bell with a badge) are unaffected either way. Also here: chart colours
+  (Apple Health palette by default) and the day-cycle sky backdrop / "sky behind cards" (both off by
+  default).
 - **Strap** — connection status, battery, and Re-scan / Disconnect controls.
 - **Export for Shortcuts (iOS)** — a **HealthKit-free** path that hands your NOOP metrics to Apple
   Health via the Shortcuts app, so an anonymous build (with no HealthKit entitlement) can still get

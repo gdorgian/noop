@@ -6,11 +6,15 @@ import SwiftUI
 // the uniform, instrument-grade look from the reference. Do not invent ad-hoc cards.
 
 public enum NoopMetrics {
-    public static let cardRadius: CGFloat = NoopVisualStyle.cardRadius
-    public static let cardPadding: CGFloat = NoopVisualStyle.cardPadding
-    public static let gap: CGFloat = NoopVisualStyle.itemGap
-    public static let sectionGap: CGFloat = NoopVisualStyle.sectionGap
-    public static let screenPadding: CGFloat = NoopVisualStyle.pagePadding
+    public static let cardRadius: CGFloat = 22   // Apple x WHOOP rounded cards — matches the liquid home card (LiquidTodayView.card)   // Apple x WHOOP: rounded cards
+    /// Compact continuous radius for grouped lists and settings sections.
+    public static let groupedRadius: CGFloat = 17
+    /// Generous radius reserved for a screen's primary hero surface.
+    public static let heroRadius: CGFloat = 30
+    public static let cardPadding: CGFloat = 16  // Apple x WHOOP: roomier card interior
+    public static let gap: CGFloat = 12          // gap between cards
+    public static let sectionGap: CGFloat = 22   // Apple x WHOOP: breathing room (not cramped)
+    public static let screenPadding: CGFloat = 16
     public static let tileHeight: CGFloat = 96   // Design Reset: tighter metric tile
     // Key Metrics grid: one fixed height every tile snaps to, so a sparkline-and-caption tile and a
     // plain value tile read the same. maxHeight: .infinity can't equalise them inside a LazyVGrid (the
@@ -67,7 +71,7 @@ public enum NoopMetrics {
 
     // MARK: Named layout constants — the canonical margins/heights screens compose with.
     /// Horizontal page margin (the gutter on the left/right edge of a screen). Use via `.screenPadding()`.
-    public static let screenHPadding: CGFloat = NoopVisualStyle.pagePadding
+    public static let screenHPadding: CGFloat = 16
     /// Vertical gap between top-level page sections.
     public static let sectionSpacing: CGFloat = NoopVisualStyle.sectionGap
     /// Interior padding inside a card's content (matches `cardPadding`).
@@ -132,12 +136,15 @@ public extension View {
 public struct NoopCard<Content: View>: View {
     private let padding: CGFloat
     private let tint: Color?
+    private let cornerRadius: CGFloat
     @ViewBuilder private let content: () -> Content
     #if os(macOS)
     @State private var hover = false
     #endif
-    public init(padding: CGFloat = NoopMetrics.cardPadding, tint: Color? = nil, @ViewBuilder content: @escaping () -> Content) {
-        self.padding = padding; self.tint = tint; self.content = content
+    public init(padding: CGFloat = NoopMetrics.cardPadding, tint: Color? = nil,
+                cornerRadius: CGFloat = NoopMetrics.cardRadius,
+                @ViewBuilder content: @escaping () -> Content) {
+        self.padding = padding; self.tint = tint; self.cornerRadius = cornerRadius; self.content = content
     }
     public var body: some View {
         content()
@@ -157,15 +164,15 @@ public struct NoopCard<Content: View>: View {
     // count on every card, which multiplies across long scrolling lists. macOS adds the
     // hover emphasis border on top (with the #104 animation scoping) unchanged.
     @ViewBuilder private var cardSurface: some View {
-        let shape = RoundedRectangle(cornerRadius: NoopMetrics.cardRadius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         #if os(macOS)
-        FrostedCardSurface(tint: tint, cornerRadius: NoopMetrics.cardRadius)
+        FrostedCardSurface(tint: tint, cornerRadius: cornerRadius)
             .overlay(
                 shape.strokeBorder(StrandPalette.hairlineStrong, lineWidth: 1).opacity(hover ? 1 : 0)
             )
             .animation(.easeOut(duration: 0.16), value: hover)
         #else
-        FrostedCardSurface(tint: tint, cornerRadius: NoopMetrics.cardRadius)
+        FrostedCardSurface(tint: tint, cornerRadius: cornerRadius)
         #endif
     }
 }
@@ -194,7 +201,20 @@ public struct SectionHeader: View {
 // MARK: - Metric tile (UNIFORM fixed height)
 
 public struct StatTile<Accessory: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .title2) private var valueFontSize: CGFloat = 26
     let label: LocalizedStringKey, value: String
+    /// A label that must NOT be translated — a product name rather than a description (NOOP's three
+    /// scores are Charge / Effort / Rest in every language, the way WHOOP keeps "Strain"). When set it
+    /// replaces `label` entirely. Nil for every ordinary metric, which stays localized.
+    var verbatimLabel: String? = nil
+
+    /// `verbatimLabel` when set, the localized `label` otherwise. A `Text` rather than a View so the
+    /// shared `strandOverline()` (a Text extension) still applies.
+    private var labelText: Text {
+        if let verbatimLabel { return Text(verbatim: verbatimLabel) }
+        return Text(label)
+    }
     var caption: String? = nil
     var accent: Color = StrandPalette.textPrimary
     var delta: String? = nil
@@ -206,11 +226,13 @@ public struct StatTile<Accessory: View>: View {
     /// top of the value, sparkline or trend chip on a narrow tile (#495). Defaults to nothing.
     @ViewBuilder var accessory: () -> Accessory
 
-    public init(label: LocalizedStringKey, value: String, caption: String? = nil,
+    public init(label: LocalizedStringKey, verbatimLabel: String? = nil,
+                value: String, caption: String? = nil,
                 accent: Color = StrandPalette.textPrimary, delta: String? = nil,
                 deltaColor: Color = StrandPalette.textTertiary,
                 sparkline: [Double]? = nil, sparkColor: Color = StrandPalette.accent,
                 @ViewBuilder accessory: @escaping () -> Accessory) {
+        self.verbatimLabel = verbatimLabel
         self.label = label; self.value = value; self.caption = caption; self.accent = accent
         self.delta = delta; self.deltaColor = deltaColor; self.sparkline = sparkline; self.sparkColor = sparkColor
         self.accessory = accessory
@@ -224,15 +246,23 @@ public struct StatTile<Accessory: View>: View {
                 // Header row: the metric label, and (right-aligned) the optional accessory laid out in
                 // flow so it reserves its own space rather than floating over the value below (#495).
                 HStack(alignment: .top, spacing: 4) {
-                    Text(label).strandOverline()
+                    // Shrink before wrapping. With an accessory beside it the header row is narrow,
+                    // and a six-character label like "CHARGE" broke to "CHAR-/GE" in a three-column
+                    // tile while "REST" beside it did not — a ragged row from one character of
+                    // difference. Scaling keeps every label on one line whatever sits next to it.
+                    labelText.strandOverline()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                     Spacer(minLength: 0)
                     accessory()
                 }
                 Spacer(minLength: 4)
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(value).font(StrandFont.number(26)).foregroundStyle(accent).lineLimit(1).minimumScaleFactor(0.6)
+                    Text(value).font(StrandFont.number(valueFontSize)).foregroundStyle(accent)
+                        .lineLimit(1).minimumScaleFactor(0.6)
                     Spacer(minLength: 0)
                     // Trend chip — the delta as a tinted pill with a direction arrow.
+                    //
                     if let delta { TrendChip(text: delta, color: deltaColor) }
                 }
                 // Sparkline isn't available on watchOS (it relies on chart-hover helpers); the watch
@@ -245,7 +275,15 @@ public struct StatTile<Accessory: View>: View {
                 }
                 #endif
                 if let caption {
-                    Text(caption).font(StrandFont.footnote).foregroundStyle(StrandPalette.textTertiary).lineLimit(1)
+                    Text(caption).font(StrandFont.footnote).foregroundStyle(StrandPalette.textSecondary)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+                        // Shrink before ellipsising. A caption's length is not fully under the caller's
+                        // control: a workout's "14 Aug · 18:27" is 14 characters on a 24-hour clock and
+                        // "28 Dec · 11:59 PM" is 17 on a 12-hour one, because the time formatter follows
+                        // the reader's own convention (`setLocalizedDateFormatFromTemplate("jmm")`).
+                        // Sizing the tile for one of those silently truncates for the other; a slightly
+                        // smaller line keeps every character in both.
+                        .minimumScaleFactor(0.8)
                         .padding(.top, 2)
                 }
             }
@@ -266,11 +304,13 @@ public struct StatTile<Accessory: View>: View {
 // Backward-compatible convenience: a StatTile with NO accessory (the common case) — every existing
 // call site keeps working unchanged, and the type defaults `Accessory` to `EmptyView`.
 public extension StatTile where Accessory == EmptyView {
-    init(label: LocalizedStringKey, value: String, caption: String? = nil,
+    init(label: LocalizedStringKey, verbatimLabel: String? = nil,
+         value: String, caption: String? = nil,
          accent: Color = StrandPalette.textPrimary, delta: String? = nil,
          deltaColor: Color = StrandPalette.textTertiary,
          sparkline: [Double]? = nil, sparkColor: Color = StrandPalette.accent) {
-        self.init(label: label, value: value, caption: caption, accent: accent, delta: delta,
+        self.init(label: label, verbatimLabel: verbatimLabel, value: value, caption: caption,
+                  accent: accent, delta: delta,
                   deltaColor: deltaColor, sparkline: sparkline, sparkColor: sparkColor,
                   accessory: { EmptyView() })
     }

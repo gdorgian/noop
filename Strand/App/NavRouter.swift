@@ -28,7 +28,15 @@ final class NavRouter: ObservableObject {
         case trends
         case activeWorkout
         case liveSession
+        case breathe
         case journal
+        /// The import hub. Every "no data yet" state on the app explains that a WHOOP export in Data
+        /// Sources fills the screen — this is what lets them offer a button instead of directions.
+        case dataSources
+        /// The Sleep screen. Raised when the coach withholds a brief because last night's wake time
+        /// looks truncated: the card offers "Fix it" and this is what takes the wearer to the editor
+        /// rather than leaving them to find it.
+        case sleep
 
         var id: String { rawValue }
 
@@ -55,6 +63,13 @@ final class NavRouter: ObservableObject {
     /// flight, so this is the one path that re-opens the live workout for an existing session.
     @Published var presentActiveWorkout = false
 
+    /// One-shot: `LiquidTodayView` reads this to actually present the Live Session cover, since routing
+    /// alone (`requestedDestination = .liveSession`) only switches the shell to Today — where the session
+    /// screen is local `@State`, not reachable from outside. Without this, the coach chat's "Live Session"
+    /// action chip looked wired but did nothing beyond a tab switch (#P3). Consumed and cleared by
+    /// `LiquidTodayView.consumeLiveSessionRequest()`.
+    @Published var presentLiveSession = false
+
     /// Ask the shell to open the quick-action sheet (Live HR · workout · journal · breathe).
     func requestQuickActions() { quickActionsRequested = true }
 
@@ -74,10 +89,15 @@ final class NavRouter: ObservableObject {
     /// presents the in-exercise screen even when the workout is already running, in one tap from the Today
     /// indicator card. The flag is consumed (and cleared) by `LiveView.consumeActiveWorkoutRequest()`.
     func openActiveWorkout() { presentActiveWorkout = true; requestedDestination = .activeWorkout }
-    /// Open a Live Session (silent guardian, beta). The Liquid Today entry presents the session screen
-    /// directly today; this route exists for deep-link parity so a future shell/inbox item can raise it
-    /// the same way as every other destination.
-    func openLiveSession() { requestedDestination = .liveSession }
+    /// Open a Live Session (silent guardian, beta): route to Today AND raise the one-shot flag so
+    /// `LiquidTodayView` actually presents the session cover, the same `presentActiveWorkout` pattern
+    /// `openActiveWorkout()` uses. Consumed by `LiquidTodayView.consumeLiveSessionRequest()`, which
+    /// no-ops if the beta toggle is off rather than presenting a feature the user turned off.
+    func openLiveSession() { presentLiveSession = true; requestedDestination = .liveSession }
+    /// Open Breathe. Raised by the coach chat's action row (P6) so a reply that suggests calming down
+    /// leads somewhere in one tap instead of "go find it in the menu yourself".
+    func openBreathe() { requestedDestination = .breathe }
+
     /// A journal day-offset (daysBack; -1 = Tomorrow) the Today journal widget deep-linked to, so tapping
     /// a SPECIFIC day's bar opens the journal at THAT day instead of always today (#656). InsightsView
     /// consumes it on appear and clears it back to nil. nil = open at today (the default).
@@ -90,4 +110,11 @@ final class NavRouter: ObservableObject {
         pendingJournalDayOffset = offset
         requestedDestination = .journal
     }
+
+    /// Open Data Sources (import a WHOOP / Apple Health / Mi Fitness export). Both shells already had
+    /// the destination — `MoreDestination.dataSources` on iPhone, a sidebar row on macOS — but no route
+    /// to reach it from a screen, which is why the empty states could only describe the way there.
+    func openDataSources() { requestedDestination = .dataSources }
+    /// Open the Sleep screen, where last night's wake time can be corrected.
+    func openSleep() { requestedDestination = .sleep }
 }

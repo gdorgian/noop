@@ -106,6 +106,10 @@ struct LiveWorkoutView: View {
                isPresented: $showEndConfirm) {
             Button("Cancel", role: .cancel) { }
             Button("End workout", role: .destructive) {
+                // A finished session is the biggest landing this screen has, so it gets `.commit` —
+                // and it fires on the CONFIRM, not on the control that opens this alert, so the tick
+                // means "saved" rather than "asked".
+                StrandHaptic.commit.play()
                 model.endWorkout()
                 onClose()
             }
@@ -190,18 +194,15 @@ struct LiveWorkoutView: View {
         // VoiceOver needs the selected scale maximum (0–21 / 0–100) even though the visible denominator
         // was removed from the glanceable layout. Reuse the same localized "of %@" caption as Today /
         // Week-in-review, and format the spoken value like the on-screen CountUpText.
-        let valueText = effortScale == .whoop
-            ? String(format: "%.1f", displayEffort)
-            : "\(Int(displayEffort.rounded()))"
+        let valueText = String(format: "%.1f", displayEffort)
         let scaleCaption = String(localized: "of \(UnitFormatter.effortScaleMax(effortScale))")
         let effortAccessibilityLabel = "\(String(localized: "Strain")) \(valueText) \(scaleCaption)"
         return VStack(spacing: NoopMetrics.space1) {
             CountUpText(value: displayEffort,
-                        format: { value in
-                            effortScale == .whoop
-                                ? String(format: "%.1f", value)
-                                : "\(Int(value.rounded()))"
-                        },
+                        // One decimal on BOTH scales — the app-wide `effortDisplay` convention (#45).
+                        // `displayEffort` has already been through `effortValue`, so the interpolated
+                        // count-up value is formatted directly rather than scaled a second time.
+                        format: { String(format: "%.1f", $0) },
                         font: StrandFont.rounded(56, weight: .semibold),
                         color: StrandPalette.textPrimary)
             .accessibilityLabel(effortAccessibilityLabel)
@@ -238,6 +239,7 @@ struct LiveWorkoutView: View {
             HStack(spacing: 6) {
                 ForEach(1...5, id: \.self) { z in
                     let active = z == zone
+                    let target = z == model.activeWorkout?.targetZone
                     let color = StrandPalette.hrZoneColor(z)
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(active ? color : color.opacity(0.18))
@@ -247,11 +249,27 @@ struct LiveWorkoutView: View {
                                 .strokeBorder(active ? color : StrandPalette.hairline, lineWidth: 1)
                         )
                         .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(target ? StrandPalette.accent : .clear, lineWidth: 3)
+                        )
+                        .overlay(
                             Text("Z\(z)")
                                 .font(StrandFont.captionNumber)
                                 .foregroundStyle(active ? StrandPalette.surfaceBase : StrandPalette.textTertiary)
                         )
                 }
+            }
+            if let target = model.activeWorkout?.targetZone {
+                HStack(spacing: NoopMetrics.space1) {
+                    Image(systemName: "waveform.path.ecg")
+                    Text("Target zone")
+                    Text(verbatim: "\(target)")
+                    Text(verbatim: "·")
+                    Text(zoneCoachStatus(target: target))
+                }
+                .font(StrandFont.captionNumber)
+                .foregroundStyle(StrandPalette.accent)
+                .accessibilityElement(children: .combine)
             }
             if let band = zoneSet.zones.first(where: { $0.number == zone }) {
                 Text("Zone \(zone): \(Int(band.lower))-\(Int(band.upper)) bpm (\(Int(band.lowerPct * 100))-\(Int(band.upperPct * 100))% max HR)")
@@ -260,6 +278,15 @@ struct LiveWorkoutView: View {
                 Text("Warming up. Keep moving to climb into Zone 1.")
                     .font(StrandFont.footnote).foregroundStyle(StrandPalette.textTertiary)
             }
+        }
+    }
+
+    private func zoneCoachStatus(target: Int) -> String {
+        guard let bpm = model.bpm else { return String(localized: "Waiting for heart rate") }
+        switch HRZoneTrainingEngine.state(forBPM: bpm, zoneSet: zoneSet, targetZone: target) {
+        case .belowTarget: return String(localized: "Below target · increase intensity")
+        case .inTarget: return String(localized: "In target zone")
+        case .aboveTarget: return String(localized: "Above target · ease off")
         }
     }
 

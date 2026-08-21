@@ -26,7 +26,8 @@ settings:
     # Emit localizable strings so Xcode auto-extracts every LocalizedStringKey into the
     # String Catalog on build (the English (US) base entries).
     SWIFT_EMIT_LOC_STRINGS: YES
-    SWIFT_STRICT_CONCURRENCY: minimal
+    SWIFT_STRICT_CONCURRENCY: complete
+    DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     # Single source of truth for the App Group id shared by the iOS app + its widget / Live Activity
     # extension. Referenced as $(APP_GROUP_ID) by both targets' entitlements and Info.plist, and read
@@ -44,6 +45,20 @@ settings:
     Release:
       # Distribution builds must produce a universal binary, not just the host arch.
       ONLY_ACTIVE_ARCH: NO
+    Debug:
+      # Optimise the LOCAL PACKAGES in Debug; the app targets opt back out to -Onone below.
+      #
+      # The packages hold the compute: StrandAnalytics runs the sleep stager, the HRV/RMSSD passes and
+      # the recovery scoring, over ~950 k samples per scored day. At -Onone that is Swift with no
+      # inlining, no specialisation of generics and retain/release on every array access — the analyze
+      # pass is dominated by exactly the code that suffers most from it, and this is a debug-built app
+      # in daily use, not a throwaway.
+      #
+      # Xcode compiles SPM package targets against the PROJECT configuration, so setting it here reaches
+      # WhoopProtocol / WhoopStore / StrandAnalytics / StrandImport / StrandDesign / OuraProtocol, while
+      # each app target's own `SWIFT_OPTIMIZATION_LEVEL: -Onone` (see `targets:`) keeps app code fully
+      # steppable. Debug symbols are unaffected either way — `-O` changes codegen, not `-g`.
+      SWIFT_OPTIMIZATION_LEVEL: "-O"
 packages:
   # Renders the Coach's LLM replies (GitHub-flavored Markdown — bold, lists,
   # headings, tables). Pinned exactly for reproducible community builds.
@@ -60,6 +75,8 @@ packages:
     path: Packages/StrandImport
   StrandDesign:
     path: Packages/StrandDesign
+  SemanticMemory:
+    path: Packages/SemanticMemory
   # Clean-room local Oura ring BLE protocol (framing, auth, decoders, driver). Pure value types,
   # zero CoreBluetooth, so it stays headless/JVM-testable; the app target imports it for OuraLiveSource.
   OuraProtocol:
@@ -163,12 +180,19 @@ targets:
         # distributed (ad-hoc) build. The app uses no JIT / unsigned-exec memory, so it's safe.
         ENABLE_HARDENED_RUNTIME: YES
         COMBINE_HIDPI_IMAGES: YES
+      configs:
+        # Opt the APP module back out of the project-wide Debug `-O` (see `configs:` at the top): the
+        # packages get optimised so the analyze pass is usable in a debug build, this stays -Onone so
+        # app code steps and inspects normally.
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
     dependencies:
       - package: WhoopProtocol
       - package: WhoopStore
       - package: StrandAnalytics
       - package: StrandImport
       - package: StrandDesign
+      - package: SemanticMemory
       - package: MarkdownUI
       - package: ZIPFoundation
       - package: OuraProtocol
@@ -193,6 +217,7 @@ targets:
       - package: WhoopProtocol
       - package: WhoopStore
       - package: OuraProtocol
+      - package: SemanticMemory
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
@@ -237,6 +262,10 @@ targets:
           - "Resources/Info.plist"
           - "Resources/NOOP.entitlements"
       - path: StrandiOSShared
+      # Installed by Tools/bootstrap-nomic.sh before xcodegen. The final app contains the pinned model;
+      # there is no runtime download and no model load during ordinary app launch.
+      - path: Vendor/Nomic/Resources
+        buildPhase: resources
     # Same tracked wrapper as the macOS target (Strand/Oura/ is shared, not per-platform).
     configFiles:
       Debug: Strand/Oura/OuraConfig.xcconfig
@@ -245,7 +274,8 @@ targets:
       path: StrandiOS/Resources/Info.plist
       properties:
         CFBundleName: NOOP
-        CFBundleDisplayName: NOOP
+        # NOOP AI fork: home-screen name (upstream: NOOP).
+        CFBundleDisplayName: NOOP AI
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         # Surfaces APP_GROUP_ID to runtime (WidgetSnapshot.suiteName) so the App Group id isn't
@@ -293,10 +323,14 @@ targets:
           # launch in StrandiOSApp.init) or the submit fails gracefully and only the foreground/"Run now"
           # paths run.
           - fetch
-        # Permit both BGAppRefreshTask identifiers. Each derives from Bundle.main at runtime so it
-        # tracks BUNDLE_ID_PREFIX, and each is registered from StrandiOSApp.init before launch finishes.
+        # Permit every BGAppRefreshTask/BGProcessingTask identifier. Each derives from Bundle.main at
+        # runtime so it tracks BUNDLE_ID_PREFIX, and each is registered from StrandiOSApp.init before
+        # launch finishes. MUST match the registering site EXACTLY or iOS refuses to schedule/deliver.
         BGTaskSchedulerPermittedIdentifiers:
           - $(PRODUCT_BUNDLE_IDENTIFIER).debugexport
+          # Best-effort local semantic-memory indexing. No network access; iOS decides whether and when
+          # the processing lease is granted.
+          - $(PRODUCT_BUNDLE_IDENTIFIER).semanticmemory
           # Best-effort fallback that writes already-banked WHOOP data to HealthKit when iOS grants
           # background time. Fresh offloads also write immediately from their completion hook.
           - $(PRODUCT_BUNDLE_IDENTIFIER).healthwriteback
@@ -352,22 +386,41 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_EMIT_LOC_STRINGS: YES
+      configs:
+        # Same opt-out as the macOS target: packages optimised in Debug, app code left steppable.
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
     dependencies:
       - package: WhoopProtocol
       - package: WhoopStore
       - package: StrandAnalytics
       - package: StrandImport
       - package: StrandDesign
+      - package: SemanticMemory
       - package: MarkdownUI
       - package: ZIPFoundation
       - package: PolarProtocol
       - package: SuperAgeCore
+      - framework: Vendor/Nomic/llama.xcframework
+        embed: true
       - target: NOOPiOSWidgets
-      # This fork is signed and installed as an iPhone-only Arctic/Feather build. Do not embed the
-      # watchOS companion: third-party signing rewrites/signs the parent independently and an embedded
-      # Watch app then fails installation when WKCompanionAppBundleIdentifier no longer matches. The
-      # watch targets and source stay in the project for upstream parity; they simply do not ride inside
-      # this iPhone product. WidgetKit/Live Activity remains embedded above.
+      # This fork is signed and installed as an iPhone-only Arctic/Feather build. There is no watchOS
+      # companion to embed — the watch targets were removed with Android; see the iOS-only strip commit.
+
+  NOOPiOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - StrandiOSTests
+    dependencies:
+      - target: NOOPiOS
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).noop.ios.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/NOOP Staging.app/NOOP Staging"
+        BUNDLE_LOADER: "$(TEST_HOST)"
 
   # WidgetKit + Live Activity extension — the iOS analogue of the macOS menu-bar
   # extra. Reads a tiny snapshot the app publishes into the shared App Group.
@@ -419,8 +472,12 @@ schemes:
         Strand: all
     run:
       config: Debug
+      diagnostics:
+        mainThreadChecker: true
     test:
       config: Debug
+      language: en
+      region: US
       targets:
         - StrandTests
   NOOPiOS:
@@ -429,3 +486,11 @@ schemes:
         NOOPiOS: all
     run:
       config: Debug
+      diagnostics:
+        mainThreadChecker: true
+    test:
+      config: Debug
+      language: de
+      region: DE
+      targets:
+        - NOOPiOSTests

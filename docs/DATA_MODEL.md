@@ -1,6 +1,6 @@
 # NOOP — On-Device Data Model
 
-NOOP is a standalone, fully offline companion app for WHOOP straps (4.0 and 5.0). It talks to
+NOOP is an offline-first companion app for WHOOP straps (4.0 and 5.0/MG). Its biometric pipeline talks to
 the user's own strap directly over Bluetooth Low Energy — no WHOOP cloud or account
 is involved, and stores everything it decodes locally in a single SQLite database.
 This document describes that on-device database: every table, its columns, natural keys, indexes,
@@ -16,10 +16,10 @@ and the migration history that produced the current schema.
 ## Where the database lives
 
 The persistence layer is the `WhoopStore` Swift package
-(`Packages/WhoopStore`), built on [GRDB](https://github.com/groue/GRDB.swift) over SQLite. Like
-every package in the repo, it declares both platforms — `.iOS(.v16)` and `.macOS(.v13)`
+(`Packages/WhoopStore`), built on [GRDB](https://github.com/groue/GRDB.swift) over SQLite. It
+declares both platforms — `.iOS(.v16)` and `.macOS(.v13)`
 (`Packages/WhoopStore/Package.swift`) — and is UI-framework agnostic, so the same schema and
-storage code back both the macOS app and the iOS app (the latter build-from-source only — see
+storage code back both the released macOS app and iOS app (see
 `docs/IOS.md`).
 
 The macOS app target opens the database at a fixed, per-user location
@@ -62,25 +62,23 @@ single `DatabaseQueue` and applies these PRAGMAs before any query runs:
 `WhoopStore` is an `actor`: all GRDB calls run on the actor's serial executor (off the main
 thread) through the `syncRead` / `syncWrite` helpers. `WhoopStoreInfo.schemaVersion` is a
 separate, manually-maintained constant (currently `18`) that has lagged the real migration
-history for a while and should not be read as the schema's true version. The migrator itself
-(`makeMigrator()`, below) is the source of truth for what tables/columns exist, and has run
-through **v25** (`v25-oura-raw` — the Oura raw-payload archive, the newest addition; see
-below).
+history and must not be read as the schema's true version. The migrator itself (`makeMigrator()`,
+below) is the source of truth for what tables/columns exist and currently runs through
+**`v40-analysis-input-revision`**.
 
 ---
 
 ## Schema at a glance
 
-The schema falls into five groups (this section predates, and undercounts, everything added
-after v9 — see the schema-version note above; the Oura raw archive below is the one
-post-v9 addition currently documented here):
+The schema falls into the groups below. The migration table is intentionally a selected history;
+`Database.swift` remains authoritative for every intermediate migration.
 
 | Group | Tables | Origin |
 | --- | --- | --- |
 | **Device registry** | `device` | BLE pairing |
 | **Decoded streams** (durable) | `hrSample`, `rrInterval`, `event`, `battery`, `spo2Sample`, `skinTempSample`, `respSample`, `gravitySample` | Decoded from strap frames on-device |
 | **Raw outbox** (transient) | `rawBatch` | Compressed raw BLE frames, prunable |
-| **Bookkeeping** | `cursors` | Highwater / read cursors |
+| **Bookkeeping** | `cursors`, `analysisInputRevision`, `analysisDeviceRevision`, `dayScanFingerprint` | Highwater marks and exact analysis-cache invalidation |
 | **Metric caches** | `sleepSession`, `dailyMetric`, `journal`, `workout`, `appleDaily`, `metricSeries`, `scoreInputProvenance` | Derived metrics + their input-provider provenance + CSV / Apple-Health imports |
 | **Oura raw archive** (durable, v25) | `ouraRaw` | Verbatim Oura API payloads behind the opt-in cloud import — see below |
 
@@ -109,6 +107,9 @@ Migrations are registered in `Packages/WhoopStore/Sources/WhoopStore/Database.sw
 | **v24-rr-seq** | Rebuilds the `rrInterval` primary key as `(deviceId, ts, rrMs, seq)`, so an identical interval recurring within one second is no longer dropped. |
 | **v29-score-input-provenance** | Adds metric-level `scoreInputProvenance` for NOOP-computed headline scores. It does not change `dayOwnership` or score precedence. |
 | **v30-rr-ord** | Adds the nullable `rrInterval.ord` column — emission order within a `ts` — and makes it lead the read sort (#823/#830). Additive; pre-existing rows keep `ord` NULL. |
+| **v38-day-scan-fingerprint** | Adds per-local-day analysis fingerprints so unchanged raw windows can reuse their persisted computed rows. |
+| **v39-day-scan-traits** | Adds nullable learned-trait carry values to the fingerprint. Missing values deliberately make a legacy fingerprint stale. |
+| **v40-analysis-input-revision** | Adds UTC-day input revisions, per-device revisions, and nullable scoring/semantic fingerprint fields. All additions are backward-compatible; derived output writes do not advance the input revision. |
 
 > This table is a selection, not the full list — it covers the migrations the tables above refer to.
 > The registered set is the authority. Migrations are keyed by their **identifier string**, not by
@@ -196,7 +197,7 @@ second arrives across separate insert batches or via the live/historical merge. 
 would restart per batch and collide distinct beats — a data-loss regression.
 
 **Read order:** `ts ASC, ord ASC, rrMs ASC, seq ASC`
-(`Reads.swift` `rrIntervals`, `WhoopDao.kt` `rrIntervals`).
+(`Reads.swift` `rrIntervals`).
 
 `ord` leads the sort because ordering by `rrMs` returned a second's beats sorted by **value**, which
 makes successive beats similar by construction and biases RMSSD — built entirely from successive
@@ -208,15 +209,13 @@ Two properties of `ord` a consumer has to know:
 - **Pre-v30 rows have `ord` NULL.** The order was never recorded and cannot be backfilled. SQLite
   sorts NULL first in ASC, so an all-legacy second ties on `ord` and falls through to the old
   `(rrMs, seq)` order — i.e. existing data reads back exactly as before, with the #823 bias intact.
-  No `COALESCE`, no sentinel. Room and GRDB agree here because both are SQLite.
+  No `COALESCE`, no sentinel.
 - **`ord` is batch-local.** A second split across two live flushes restarts `ord` at 0, and
   `ON CONFLICT DO NOTHING` keeps whichever row landed first, so that second also falls back to
   magnitude order. The historical offload path delivers a second atomically and is unaffected.
 
-`ord` is a sort key only. The two platforms differ in whether they carry it back: Swift selects
-`ts, rrMs`, so `ord` is excluded, while `WhoopDao.rrIntervals` is `SELECT *` and Room materialises it
-into every returned `RrInterval` (`Entities.kt`, `val ord: Int? = null`). No consumer reads its value
-on either platform.
+`ord` is a storage/read-order key only. The public Swift read returns `ts, rrMs`; no current consumer
+receives or interprets `ord` directly.
 
 ### `event` *(v1)* — strap events
 
@@ -346,6 +345,19 @@ A simple key/value table for incremental-processing highwater marks (`Cursors.sw
 Helpers namespace the `name`: `highwater:<stream>` (upload/forward-only highwater) and
 `read:<stream>` (pull cursor). The distinct prefixes keep the two cursor families from colliding
 for the same stream.
+
+### Analysis input revisions *(v40)*
+
+`analysisInputRevision(deviceId, utcDay, revision)` stores the monotonic revision assigned to each
+UTC-day bucket that actually changed. `analysisDeviceRevision(deviceId, revision)` invalidates a
+whole device after repointing or a broad delete. Both revisions are updated in the same transaction
+as the scoring-relevant insert, update or delete.
+
+The per-local-day `dayScanFingerprint` combines the maximum revision across its exact analysis
+window with the device revision, owner, scoring version, semantic/profile signature and baseline
+carry values. A missing v40 field means “legacy/stale”; it is never accepted as proof that a day is
+unchanged. Engine-produced daily metrics, metric series, detected workouts and computed sleep rows
+do not move these revisions, preventing analysis from invalidating itself.
 
 ---
 
@@ -504,8 +516,7 @@ legacy scores without a row have unknown provenance and the UI omits their provi
 
 ## Oura raw-payload archive
 
-This section documents the one table added after this document's v9 baseline (see the
-schema-version note above): the lossless backstop behind the opt-in Oura history import
+This section documents the lossless backstop behind the opt-in Oura history import
 (off by default; user-initiated OAuth backfill — `docs/PRIVACY_SECURITY.md` §1.1b). It is
 **not** a metric cache like the tables above — it stores verbatim API responses, not decoded
 values, so any field Oura returns can be re-derived later without re-fetching.

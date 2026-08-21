@@ -846,7 +846,83 @@ extension WhoopStore {
                 t.add(column: "avgSdnn", .double)
             }
         }
-        // v38-apple-step-hour: hourly Apple Health step counts. The daily `collect(.stepCount, …)` path
+        // The per-day input fingerprint the analyze scan skips on. `analyzeRecent` re-derives every day
+        // in its window from the raw streams on every run — on a real library that is ~950 k rows per day
+        // over 21 days, and the days are almost always unchanged (a 21-day window on an install with 35
+        // scored days re-computes 20 days that nobody touched). This table records WHAT each day was
+        // scored against, so an unchanged day can be skipped.
+        //
+        // Additive: a fresh table, no existing row is read or rewritten. An install upgrading to it has no
+        // rows here, so the first pass scores every day exactly as before and fills the table as it goes —
+        // the safe direction, because a MISSING fingerprint means "scan it", never "skip it".
+        migrator.registerMigration("v38-day-scan-fingerprint") { db in
+            try db.create(table: "dayScanFingerprint") { t in
+                // The COMPUTED namespace the scored row belongs to ("<id>-noop"), so a second source's
+                // scores keep their own fingerprints.
+                t.column("deviceId", .text).notNull()
+                t.column("day", .text).notNull()
+                // The owner the day was READ from (I2: exactly one device owns a day). Part of the
+                // comparison, not just provenance: if the resolved owner changes, the inputs changed even
+                // when that owner's own row counts did not.
+                t.column("ownerId", .text).notNull()
+                // The raw-input fingerprint over the day's READ WINDOW — `hrFingerprint`'s (count, maxTs).
+                // COUNT moves on any insert including a backfilled older night whose maxTs would not; maxTs
+                // separates a fresh append from a re-count. Together they are what "this day's raw HR is
+                // unchanged" means.
+                t.column("hrCount", .integer).notNull()
+                t.column("hrMaxTs", .integer).notNull()
+                // The nightly raw skin-temp mean this day contributed to the skin baseline. Persisted here
+                // because the scored `dailyMetric` row carries only the DEVIATION, so a skipped day could
+                // not otherwise re-seed the baseline identically — and a baseline that changes depending on
+                // which days were skipped would make scores depend on scan history. nil when the night had
+                // no usable skin samples.
+                t.column("nightlySkinC", .double)
+                t.primaryKey(["deviceId", "day"])
+            }
+        }
+        // The LEARNED traits a day was scored against. These are re-derived from the trailing history on
+        // every pass and fed into `analyzeDay`, so they change a day's stored Rest score WITHOUT changing
+        // one byte of its raw input — invisible to the (count, maxTs) fingerprint above. A day reused
+        // across a trait shift would stay frozen on the old values while its neighbours moved, and a
+        // forced full rescore would then no longer reproduce it. Quantised (see `traitSignature`) so
+        // ordinary daily jitter does not invalidate the whole window every night.
+        //
+        // Additive, and NULL on every row written by v38: a row with no recorded traits compares as
+        // "unknown" and therefore as CHANGED, so the first pass after this migration re-derives those days
+        // once and records them. Missing means scan — the same safe direction as v38.
+        migrator.registerMigration("v39-day-scan-traits") { db in
+            try db.alter(table: "dayScanFingerprint") { t in
+                t.add(column: "traitSleepConsistency", .integer)
+                t.add(column: "traitNeedHoursTenths", .integer)
+                t.add(column: "traitMidsleepMin", .integer)
+            }
+        }
+        // v40: exact, O(1)-per-day invalidation for the analysis cache. The v38/v39 fingerprint only
+        // described measured HR. Sleep/recovery also consumes PPG HR, R-R, respiration, motion, steps,
+        // temperature, SpO2, wrist events and band sleep-state, so a change in any of those streams could
+        // otherwise leave a persisted score permanently reusable. Each real raw mutation stamps the UTC
+        // day(s) it touched with the transaction's monotone sensor-write revision. Analysis takes MAX over
+        // the UTC buckets intersecting its local 54 h window; false positives at a UTC boundary are safe,
+        // while a false negative is not.
+        migrator.registerMigration("v40-analysis-input-revision") { db in
+            try db.create(table: "analysisInputRevision") { t in
+                t.column("deviceId", .text).notNull()
+                t.column("utcDay", .integer).notNull()
+                t.column("revision", .integer).notNull()
+                t.primaryKey(["deviceId", "utcDay"])
+            }
+            try db.create(table: "analysisDeviceRevision") { t in
+                t.column("deviceId", .text).primaryKey()
+                t.column("revision", .integer).notNull()
+            }
+            try db.alter(table: "dayScanFingerprint") { t in
+                t.add(column: "inputRevision", .integer)
+                t.add(column: "deviceRevision", .integer)
+                t.add(column: "scoringVersion", .integer)
+                t.add(column: "semanticSignature", .text)
+            }
+        }
+        // v41-apple-step-hour (upstream v38): hourly Apple Health step counts. The daily `collect(.stepCount, …)` path
         // in HealthKitBridge flattens a whole day to one `appleDaily.steps` total, so a dead/absent phone
         // for part of a day (e.g. the phone died mid-hike) is invisible — steps just read low for the
         // WHOLE day instead of showing exactly which hours had no recording. HealthKit retains hourly
@@ -857,7 +933,12 @@ extension WhoopStore {
         // hour. PK (deviceId, ts) mirrors every other per-sample table (hrSample, stepSample, …) and
         // makes the hourly upsert idempotent. Additive only — a NEW table, no existing row touched, old
         // readers unaffected.
-        migrator.registerMigration("v38-apple-step-hour") { db in
+        migrator.registerMigration("v41-apple-step-hour") { db in
+            // Renumbered from upstream's "v38-apple-step-hour": this fork's v38-v40 (the persisted
+            // analyze-scan skip) already occupy those slots, and `SchemaOracleTests` requires the vN in
+            // an identifier to match its registration order. Free to renumber HERE because this fork has
+            // never shipped the upstream id, so no install has it recorded — and upstream's own
+            // `ifNotExists` below anticipates exactly this case.
             // ifNotExists: forks/sideloads that already carry this table under a different migration
             // identifier converge cleanly instead of failing the migrator.
             try db.create(table: "appleStepHour", options: [.ifNotExists]) { t in

@@ -46,13 +46,14 @@ struct ScreenScaffold<Content: View, Trailing: View>: View {
             Color.clear.frame(height: 0).id(screenScaffoldTopAnchorID)
             column
             #if os(iOS)
-            // Unified side margins matching the floating navigation bar so every page's cards + header line up
-            // to the same edges (2026-07-02); macOS keeps the classic 28 in the #else branch.
+            // One shared page gutter keeps every screen aligned with Today and the grouped lists.
             .padding(.horizontal, NoopMetrics.screenHPadding)
             .padding(.top, 24)
-            // The tab bar floats over the scroll content, so the last card sat hidden behind it.
-            // Reserve extra bottom scroll room so every screen's final card clears the floating bar.
-            .padding(.bottom, NoopMetrics.tabBarClearance)
+            // No tab-bar reserve here any more. The iOS shell uses the PLATFORM tab bar, which is part
+            // of the safe area, so the scroll view already ends above it. The old
+            // `NoopMetrics.tabBarClearance` compensated for a custom bar drawn OVER the content; keeping
+            // it would leave a second, empty gap under every screen's last card.
+            .padding(.bottom, 24)
             // iPad: cap the readable column, then centre it in the full-width scroll viewport.
             // iPhone (.compact): the inner frame is .infinity/.leading, identical to before.
             .frame(maxWidth: hSizeClass == .regular ? 700 : .infinity,
@@ -115,15 +116,19 @@ struct ScreenScaffold<Content: View, Trailing: View>: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
+        // A scaffold that draws a topBackground puts this header over the sky, where the normal
+        // scheme-following title tokens go dark-on-dark in Light mode. Pin them to the on-dark pair
+        // there and leave every other screen on the semantic tokens.
+        let overSky = topBackground != nil
+        let titleColor = overSky ? StrandPalette.onDarkPrimary : StrandPalette.textPrimary
+        let subtitleColor = overSky ? StrandPalette.onDarkSecondary : StrandPalette.textSecondary
+        return HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 if let title {
-                    // Match the liquid home's title face (SF Rounded 28) so every page's header reads
-                    // identically (2026-07-02 cohesion pass).
-                    Text(title).font(StrandFont.rounded(28)).foregroundStyle(StrandPalette.textPrimary)
+                    Text(title).font(StrandFont.title1).foregroundStyle(titleColor)
                 }
                 if let subtitle {
-                    Text(subtitle).font(StrandFont.subhead).foregroundStyle(StrandPalette.textSecondary)
+                    Text(subtitle).font(StrandFont.subhead).foregroundStyle(subtitleColor)
                 }
             }
             Spacer(minLength: 0)
@@ -150,7 +155,14 @@ private struct RefreshableIfNeeded: ViewModifier {
     let onRefresh: (() async -> Void)?
     func body(content: Content) -> some View {
         if let onRefresh {
-            content.refreshable { await onRefresh() }
+            content.refreshable {
+                await onRefresh()
+                // A tick when the refresh FINISHES, not when the pull is released: the spinner can run
+                // for a while on a wide history read, and the useful signal is "your data is current",
+                // which is the moment the thumb has already left the screen. Tap-driven, so `.play()`
+                // rather than the value-triggered modifier.
+                StrandHaptic.selection.play()
+            }
         } else {
             content
         }
@@ -159,25 +171,109 @@ private struct RefreshableIfNeeded: ViewModifier {
 
 /// Empty / pending-data placeholder for screens still gathering history. Mirrors `DataPendingNote`'s
 /// icon-anchored card so an empty screen reads as an intentional state rather than a stray text box.
+///
+/// Three things were wrong with the one-size version, all of them visible on shipped screens:
+///
+/// - **The heading was the constant "Coming together"**, printed above every message including
+///   "Reading your journal and outcomes…". Over a LOADING state that is simply false: nothing is
+///   coming together, the screen is reading a database. `title:` fixes the wording and `.loading`
+///   fixes the state, so "still loading" and "genuinely empty" stop looking identical.
+/// - **~8 callers described the route to Data Sources in prose** and left the reader to find it.
+///   `action:` gives them a button (see `NavRouter.openDataSources`).
+/// - **`UpdatesInboxView` hand-rolled a richer empty state** (large glyph, headline, centred body)
+///   because this one could not express it. That layout was the better one, so `.spacious` adopts it
+///   here rather than leaving a second empty-state idiom next door.
 struct ComingSoon: View {
+    /// How much room the state gets. `.inline` is the original compact card every existing caller
+    /// gets by default; `.spacious` is the centred, large-glyph treatment for a whole-screen empty.
+    enum Presentation { case inline, spacious }
+
     let what: LocalizedStringKey
     var symbol: String = "sparkles"
+    /// The bold first line. Defaults to the original constant so no existing caller changes.
+    var title: LocalizedStringKey = "Coming together"
+    /// True while the screen is still READING data, as opposed to having found none. Swaps the static
+    /// glyph for the pulsing `StatePill` that `SyncingHistoryNote` already uses for in-progress work,
+    /// and suppresses any action button — there is nothing to act on until the read finishes.
+    var loading: Bool = false
+    var presentation: Presentation = .inline
+    /// An optional way out of the empty state: the label, and what the button does.
+    var action: (label: LocalizedStringKey, run: () -> Void)?
+
+    /// A loading state that names what it is reading. The heading is the caller's, because
+    /// "Coming together" over a database read was the original bug.
+    static func loading(_ what: LocalizedStringKey,
+                        title: LocalizedStringKey,
+                        symbol: String = "sparkles") -> ComingSoon {
+        ComingSoon(what: what, symbol: symbol, title: title, loading: true)
+    }
+
     var body: some View {
+        switch presentation {
+        case .inline:   inlineBody
+        case .spacious: spaciousBody
+        }
+    }
+
+    @ViewBuilder
+    private var inlineBody: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: symbol)
                 .font(StrandFont.headline)
                 .foregroundStyle(StrandPalette.accent)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 8) {
-                Text("Coming together")
-                    .font(StrandFont.headline).foregroundStyle(StrandPalette.textPrimary)
+                if loading {
+                    // The same in-progress expression the history sync uses, so "working" looks the
+                    // same everywhere in the app rather than being reinvented per screen.
+                    StatePill(title, tone: .accent, pulsing: true)
+                } else {
+                    Text(title)
+                        .font(StrandFont.headline).foregroundStyle(StrandPalette.textPrimary)
+                }
                 Text(what)
                     .font(StrandFont.body).foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                actionButton
             }
         }
         .padding(20).frame(maxWidth: .infinity, alignment: .leading)
         .frostedCardSurface()
+    }
+
+    /// The whole-screen treatment, lifted from `UpdatesInboxView`'s hand-built empty state.
+    @ViewBuilder
+    private var spaciousBody: some View {
+        VStack(spacing: 12) {
+            Spacer(minLength: 40)
+            Image(systemName: symbol)
+                .font(.system(size: 34, weight: .light))
+                .foregroundStyle(StrandPalette.textTertiary)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(StrandFont.headline)
+                .foregroundStyle(StrandPalette.textPrimary)
+            Text(what)
+                .font(StrandFont.subhead)
+                .foregroundStyle(StrandPalette.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            actionButton
+            Spacer(minLength: 40)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 32)
+    }
+
+    /// Nothing to offer while still loading — a button that acts on data the screen has not finished
+    /// reading is a race, not an affordance.
+    @ViewBuilder
+    private var actionButton: some View {
+        if let action, !loading {
+            Button(action.label, action: action.run)
+                .buttonStyle(NoopButtonStyle(.secondary))
+                .padding(.top, 2)
+        }
     }
 }
 

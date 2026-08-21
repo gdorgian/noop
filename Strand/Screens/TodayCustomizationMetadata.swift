@@ -4,9 +4,14 @@ import StrandDesign
 extension TodaySection {
     var customizationIcon: String {
         switch self {
+        // Fork-only sections. The same "sparkles" mark every Coach entry point uses (CoachEntry.swift),
+        // so the editor row is recognisable as the Coach banner it reorders.
+        case .coach: return "sparkles"
+        case .dataSources: return "externaldrive.connected.to.line.below"
         case .hero: return "gauge.with.dots.needle.67percent"
         case .liveSession: return "figure.run.circle"
         case .synthesis: return "sparkles"
+        case .goals: return "target"
         case .keyMetrics: return "square.grid.2x2"
         case .workouts: return "figure.run"
         case .heartRate: return "waveform.path.ecg"
@@ -20,9 +25,12 @@ extension TodaySection {
 
     var customizationTint: Color {
         switch self {
+        case .coach: return StrandPalette.accent
+        case .dataSources: return StrandPalette.textSecondary
         case .hero: return StrandPalette.chargeColor
         case .liveSession: return StrandPalette.metricCyan
         case .synthesis: return StrandPalette.accent
+        case .goals: return StrandPalette.chargeColor
         case .keyMetrics: return StrandPalette.metricPurple
         case .workouts: return StrandPalette.effortColor
         case .heartRate: return StrandPalette.metricRose

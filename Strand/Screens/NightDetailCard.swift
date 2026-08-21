@@ -11,8 +11,8 @@ import WhoopStore
 // `debtColor` / `spark` helpers are a verbatim lift of the former `SleepView.metricGrid` (and the helpers
 // only it used); the seven series are computed once in `SleepModel.build` and read here.
 
-/// The "Night detail" card. A grid of UNIFORM fixed-height StatTiles (Rest, Efficiency, Consistency,
-/// Hours vs Needed, Restorative, Respiratory, Sleep Debt), each with its sparkline + typical caption,
+/// The "Night detail" card. A grid of UNIFORM fixed-height StatTiles (Efficiency, Consistency,
+/// Hours vs Needed, Restorative, Respiratory, last-night deficit), each with its sparkline + typical caption,
 /// rendered from the shared [SleepModel].
 struct NightDetailCard: View {
     let model: SleepModel
@@ -23,7 +23,6 @@ struct NightDetailCard: View {
         // Per-tile latest value + history series (for the sparkline) + typical mean.
         // All seven series are computed ONCE in the model build (each is a full pass over
         // repo.days/repo.sleeps) — here we only read the memoized results.
-        let perf  = model.performance
         let eff   = model.efficiency
         let cons  = model.consistency
         let need  = model.hoursVsNeeded
@@ -48,14 +47,6 @@ struct NightDetailCard: View {
             #endif
 
             LazyVGrid(columns: tileColumns, alignment: .leading, spacing: NoopMetrics.gap) {
-
-                StatTile(
-                    label: "Rest",
-                    value: pctValue(perf.latest),
-                    caption: vsTypical(perf.latest, perf.typical, suffix: "%"),
-                    accent: perf.latest.map { StrandPalette.recoveryColor($0) } ?? StrandPalette.textPrimary,
-                    sparkline: spark(perf.series),
-                    sparkColor: StrandPalette.restColor)
 
                 StatTile(
                     label: "Efficiency",
@@ -97,18 +88,19 @@ struct NightDetailCard: View {
                     sparkline: spark(resp.series),
                     sparkColor: StrandPalette.metricPurple)
 
-                #if !os(iOS)
-                // macOS keeps the original adaptive dashboard instead of stretching one
-                // phone-width summary tile across an unbounded desktop detail pane.
                 StatTile(
-                    label: "Sleep Debt",
+                    label: "Last night's deficit",
                     value: debt.latest.map { durationText($0) } ?? "—",
                     caption: debtCaption(debt.latest),
                     accent: debtColor(debt.latest),
                     sparkline: spark(debt.series),
                     sparkColor: StrandPalette.metricRose)
-                #endif
             }
+
+            Text("Consistency compares your recent bedtimes — a wide spread scores low, even after a good night.")
+                .font(StrandFont.footnote)
+                .foregroundStyle(StrandPalette.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

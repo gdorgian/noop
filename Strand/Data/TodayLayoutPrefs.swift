@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import StrandDesign
 
 // MARK: - Reorderable Today sections (#today-layout)
 //
@@ -23,9 +24,14 @@ import SwiftUI
 /// One reorderable Today section. The rawValue is the stable persisted identifier — keep it byte-identical
 /// to the Android `TodaySection` enum so a backup/restore reads the same layout on either OS.
 enum TodaySection: String, CaseIterable, Identifiable {
+    case coach
     case hero
     case liveSession
     case synthesis
+    /// Goals: where each one stands, and what there is to tick off today — ONE card. It was briefly
+    /// split into `goals` + `goalActions`, which put two cards about the same subject on top of each
+    /// other; the actions live back inside this section.
+    case goals
     case keyMetrics
     case workouts
     case heartRate
@@ -33,9 +39,10 @@ enum TodaySection: String, CaseIterable, Identifiable {
     case yourCards
     case menstrualCycle
     case journal
+    case dataSources
     /// Cards hosted from the Trends / Sleep tabs (#today-hosted-cards). Renders the `HostedCardPrefs`
     /// selection in order; empty (and effectively invisible) until the user adds a card in Customise.
-    /// Appended LAST so `decodeOrder`'s back-fill lands it predictably for existing saved orders.
+    /// Appended last so `decodeOrder`'s back-fill lands it predictably for existing saved orders.
     case addedCards
 
     var id: String { rawValue }
@@ -43,9 +50,11 @@ enum TodaySection: String, CaseIterable, Identifiable {
     /// The section's display label in the Arrange sheet — matches the Android `TodaySection.title`.
     var title: String {
         switch self {
+        case .coach:          return String(localized: "Coach")
         case .hero:           return String(localized: "Charge / Effort / Rest")
         case .liveSession:    return String(localized: "Start session")
         case .synthesis:      return String(localized: "Synthesis")
+        case .goals:          return String(localized: "Goals")
         case .keyMetrics:     return String(localized: "Key Metrics")
         case .workouts:       return String(localized: "Workouts")
         case .heartRate:      return String(localized: "Heart Rate")
@@ -53,30 +62,37 @@ enum TodaySection: String, CaseIterable, Identifiable {
         case .yourCards:      return String(localized: "Your Cards")
         case .menstrualCycle: return String(localized: "Menstrual Cycle")
         case .journal:        return String(localized: "Journal")
+        case .dataSources:    return String(localized: "Data Sources")
         case .addedCards:     return String(localized: "Added Cards")
         }
     }
 
-    /// The default section order — used until the wearer customises the layout. The journal widget (#656)
-    /// stays last, where it was first added, above the data-sources card.
-    ///
-    /// FORK: Today now LEADS WITH THE ANSWER. `synthesis` — the greeting, the readiness pills and the
-    /// one-line "what to do about it" — used to sit third, below the hero and the Start-session row, which
-    /// put the only plain-language sentence on the screen roughly half a scroll down. The three hero scores
-    /// are what the app IS, but they are raw numbers; the sentence is what a wearer actually reads first.
-    /// Bevel and WHOOP both open with the verdict and keep the detail below it, and this is that shape.
-    ///
-    /// The rest is ordered most-glanceable first: live heart rate, then the three recovery vitals that
-    /// explain the Charge score, then the remaining metric tiles. `liveSession` is an ACTION rather than a
-    /// reading, so it drops below the data it would be based on instead of interrupting at position two.
-    ///
-    /// Only the ORDER changes. Every `rawValue` is untouched, so the "today.sectionOrder" string stays the
-    /// byte-identical cross-platform contract it is, and a wearer who has already arranged their own layout
-    /// keeps it — `decodeOrder` returns the saved order and only consults this for sections missing from it.
+    /// The original, hard-coded section order — the default when the layout isn't customised. The journal
+    /// widget (#656) sits above the data-sources card, which is last. Coach leads the list — the same spot
+    /// its full-width banner has always held on classic Today, before the hero scores.
     static let defaultOrder: [TodaySection] = [
-        .synthesis, .hero, .heartRate, .recoveryVitals, .keyMetrics, .liveSession, .workouts, .yourCards,
-        .menstrualCycle, .journal, .addedCards,
+        .coach, .hero, .liveSession, .synthesis, .goals, .keyMetrics, .workouts, .heartRate, .recoveryVitals,
+        .yourCards, .menstrualCycle, .journal, .dataSources, .addedCards,
     ]
+
+    /// Sections hidden by default on a new/never-customised install: none. The redesign originally
+    /// decluttered Heart Rate, Recovery Vitals, Your Cards and Data Sources off the home screen by default;
+    /// that default was reverted (product decision) so a fresh install shows every section, matching the
+    /// classic Today. Not a removal of the feature — the Arrange sheet still lets a user hide any section,
+    /// and the stored `today.hiddenSections` string remains authoritative once set (an empty string = nothing
+    /// hidden, same as this default), so existing users who already hid sections keep that choice untouched.
+    static let defaultHidden: Set<TodaySection> = []
+
+    /// UX hierarchy: "major" sections (the hero scores, the Synthesis verdict, the Key Metrics grid, and
+    /// the Recovery Vitals) carry more visual weight and get extra breathing room above them, while minor
+    /// sections (workouts, HR, journal, data sources) sit tighter. This drives the graduated spacing in
+    /// LiquidTodayView's section stack so the screen reads in clear groups instead of a uniform dense list.
+    var isMajorSection: Bool {
+        switch self {
+        case .hero, .synthesis, .goals, .keyMetrics, .recoveryVitals: return true
+        default: return false
+        }
+    }
 }
 
 /// Display-only persistence for the Today section order and visibility. The order registry always contains
@@ -84,7 +100,8 @@ enum TodaySection: String, CaseIterable, Identifiable {
 enum TodayLayoutPrefs {
     /// UserDefaults key — a comma-joined list of `TodaySection` rawValues in display order.
     static let orderKey = "today.sectionOrder"
-    /// UserDefaults key — a comma-joined list of explicitly hidden `TodaySection` rawValues.
+    /// UserDefaults key — a comma-joined list of explicitly hidden `TodaySection` rawValues. Unset means
+    /// nothing is hidden, same as an explicit empty string.
     static let hiddenKey = "today.hiddenSections"
 
     /// Encode an ordered section list into the stored comma-joined string.

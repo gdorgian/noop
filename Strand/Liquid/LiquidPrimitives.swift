@@ -7,96 +7,159 @@
 //  one shared tilt source. Colours come from StrandDesign tokens at the call site.
 
 import SwiftUI
-import StrandDesign   // NoopMotionState — the shared quiet-motion gate
+import StrandDesign
 
 // MARK: - Renderers (pure GraphicsContext drawing)
 
 enum LiquidRender {
 
-    /// A softly sculpted circular progress ring. Geometry is fixed (`radius`, `lineWidth`, arc span);
-    /// this pass only deepens the material — recessed track, frosted inner disc, semantic progress
-    /// gradient — without neon bloom, tip dots, or layout changes.
+    /// A circular vessel of liquid filled to `sim.level`, tinted, with parallax slosh, a light band
+    /// that follows tilt, surface glints, flake and droplets.
+    ///
+    /// RESTORED FROM `6a5856cd^`, and deliberately divergent from upstream.
+    ///
+    /// ryanbr replaced this with a flat progress ring in 6a5856cd ("Refine the iOS visual system and
+    /// key screen layouts", #1068, 2026-08-09) and this fork inherited that in the sync days later.
+    /// The liquid IS the reason the screen is called Liquid Today, so it comes back here. Only this
+    /// one function: `LiquidRender.tube` stayed on its post-#1068 solid rendering on purpose, and
+    /// `LiquidScoreGauge` (which that same commit introduced) still supplies the count-up number over
+    /// the top — the number is pinned white with a shadow, which is exactly what a moving surface
+    /// underneath needs.
+    ///
+    /// The physics did not have to be restored: `LiquidSim` in LiquidCore.swift has not changed since
+    /// before the removal, so every field this reads (`level`, `a`, `av`, `ab`, `abv`, `drops`,
+    /// `flecks`, `energy`, `p`) is still there and still stepped the same way.
+    ///
+    /// Cost to know: `LiquidPrimitives.swift` is a file upstream actively reworks, so a sync that
+    /// touches it will conflict HERE and has to be resolved by hand — this is not one of those
+    /// wholesale-drop conflicts like android/ was.
     static func vessel(_ base: GraphicsContext, _ size: CGSize, _ sim: LiquidSim, now: Double, tint: Color) {
-        let diameter = max(2, min(size.width, size.height) - 3)
-        let rect = CGRect(x: (size.width - diameter) / 2, y: (size.height - diameter) / 2,
-                          width: diameter, height: diameter)
-        let center = CGPoint(x: size.width / 2, y: size.height / 2)
-        let radius = diameter * 0.39
-        let lineWidth = max(5, diameter * 0.105)
-        let cap = StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+        // Floor at 1 so a degenerate sub-3pt Canvas can't drive R negative (negative well rect / chord math).
+        let R = max(1, min(size.width, size.height) / 2 - 1.5)
+        let ext = R * 1.8
+        let cx = size.width / 2, cy = size.height / 2
+        let well = CGRect(x: -R, y: -R, width: 2 * R, height: 2 * R)
+
         var ctx = base
+        ctx.translateBy(x: cx, y: cy)
+        ctx.fill(Path(ellipseIn: well), with: .color(Color(.sRGB, red: 10/255, green: 11/255, blue: 16/255, opacity: 0.55)))
 
-        // Restrained outer lift — light gray shadow, not deep black.
-        let shadowRect = rect.offsetBy(dx: 0, dy: max(1, diameter * 0.010))
-        ctx.fill(Path(ellipseIn: shadowRect), with: .color(Color.black.opacity(0.14)))
+        var body = ctx
+        body.clip(to: Path(ellipseIn: well))
 
-        // One continuous centre disc — soft 3D: light top face, gentle rim shade.
-        // No separate inset circle / hard ring line.
-        ctx.fill(Path(ellipseIn: rect), with: .linearGradient(
-            Gradient(colors: [
-                NoopVisualStyle.surfaceTop,
-                NoopVisualStyle.surfaceBottom
-            ]),
-            startPoint: CGPoint(x: rect.midX, y: rect.minY),
-            endPoint: CGPoint(x: rect.midX, y: rect.maxY)
-        ))
-        // Soft radial lift — brighter near the upper face, slightly deeper at the rim.
-        ctx.fill(Path(ellipseIn: rect), with: .radialGradient(
-            Gradient(stops: [
-                .init(color: Color.white.opacity(0.07), location: 0.00),
-                .init(color: Color.white.opacity(0.02), location: 0.42),
-                .init(color: Color.clear, location: 0.72),
-                .init(color: Color.black.opacity(0.10), location: 1.00)
-            ]),
-            center: CGPoint(x: rect.midX, y: rect.minY + diameter * 0.32),
-            startRadius: 0,
-            endRadius: diameter * 0.52
-        ))
-        // Very soft lower-edge shade for a lightly recessed read.
-        ctx.fill(Path(ellipseIn: rect), with: .linearGradient(
-            Gradient(stops: [
-                .init(color: Color.clear, location: 0.00),
-                .init(color: Color.clear, location: 0.55),
-                .init(color: Color.black.opacity(0.06), location: 1.00)
-            ]),
-            startPoint: CGPoint(x: rect.midX, y: rect.minY),
-            endPoint: CGPoint(x: rect.midX, y: rect.maxY)
-        ))
+        let lv = sim.level
+        if lv > 0.004 {
+            let sy = R * (1 - 2 * min(0.985, lv))
+            let amp = (0.018 + sim.energy * 0.09) * R
 
-        let track = fullArc(center: center, radius: radius)
+            // helper to build a wave polygon in a given (already-transformed) context
+            func wavePolygon(_ w: (Double) -> Double) -> Path {
+                var p = Path()
+                p.move(to: CGPoint(x: -ext, y: w(-ext)))
+                var x = -ext + 4
+                while x <= ext { p.addLine(to: CGPoint(x: x, y: w(x))); x += 4 }
+                p.addLine(to: CGPoint(x: ext, y: w(ext)))
+                p.addLine(to: CGPoint(x: ext, y: R * 2.4))
+                p.addLine(to: CGPoint(x: -ext, y: R * 2.4))
+                p.closeSubpath()
+                return p
+            }
+            func surfaceLine(_ w: (Double) -> Double) -> Path {
+                var p = Path()
+                p.move(to: CGPoint(x: -ext, y: w(-ext)))
+                var x = -ext + 4
+                while x <= ext { p.addLine(to: CGPoint(x: x, y: w(x))); x += 4 }
+                p.addLine(to: CGPoint(x: ext, y: w(ext)))
+                return p
+            }
 
-        // Recessed track — gray channel (original border tone), not black.
-        ctx.stroke(track, with: .linearGradient(
-            Gradient(colors: [
-                Color.white.opacity(0.08),
-                NoopVisualStyle.border.opacity(0.18),
-                NoopVisualStyle.border.opacity(0.50)
-            ]),
-            startPoint: CGPoint(x: rect.midX, y: rect.minY),
-            endPoint: CGPoint(x: rect.midX, y: rect.maxY)
-        ), style: StrokeStyle(lineWidth: lineWidth + 1.6, lineCap: .round))
+            // back parallax layer
+            let syB = sy - R * 0.04
+            let hwB = liquidChordHW(R, syB)
+            let wB: (Double) -> Double = {
+                liquidWave($0, amp: amp, R: R, hw: hwB, curl: liquidCurl(sim.abv),
+                           ph1: sim.p1 * 0.92 + 2.1, ph2: sim.p2 * 0.9 + 1.3, ampMul: 1.35)
+            }
+            var backCtx = body
+            backCtx.translateBy(x: 0, y: syB)
+            backCtx.rotate(by: .radians(sim.ab))
+            backCtx.fill(wavePolygon(wB), with: .color(tint.opacity(0.28)))
 
-        ctx.stroke(track, with: .color(NoopVisualStyle.border.opacity(0.72)), style: cap)
+            // main body
+            let hw = liquidChordHW(R, sy)
+            let w: (Double) -> Double = {
+                liquidWave($0, amp: amp, R: R, hw: hw, curl: liquidCurl(sim.av),
+                           ph1: sim.p1, ph2: sim.p2, ampMul: 1)
+            }
+            var mainCtx = body
+            mainCtx.translateBy(x: 0, y: sy)
+            mainCtx.rotate(by: .radians(sim.a))
+            mainCtx.fill(wavePolygon(w),
+                         with: .linearGradient(Gradient(colors: [tint.opacity(0.74),
+                                                                  tint.liquidDarker(0.28).opacity(0.80)]),
+                                               startPoint: CGPoint(x: 0, y: -amp),
+                                               endPoint: CGPoint(x: 0, y: R * 1.7)))
 
-        let level = max(0, min(1, sim.level))
-        if level > 0.004 {
-            let progress = partialArc(center: center, radius: radius, level: level)
+            // a sheet of light gliding across as you tilt
+            var bandCtx = mainCtx
+            bandCtx.clip(to: wavePolygon(w))
+            let bandX = -sim.a * R * 2.2 + sin(now * 0.3) * R * 0.15
+            bandCtx.fill(Path(CGRect(x: -R * 2.4, y: -R * 2.4, width: R * 4.8, height: R * 4.8)),
+                         with: .linearGradient(Gradient(colors: [.white.opacity(0), .white.opacity(0.06), .white.opacity(0)]),
+                                               startPoint: CGPoint(x: bandX - R * 1.2, y: 0),
+                                               endPoint: CGPoint(x: bandX + R * 1.2, y: 0)))
 
-            // Contained under-lift — wider stroke, low opacity, no blur.
-            ctx.stroke(progress, with: .color(tint.opacity(0.18)),
-                       style: StrokeStyle(lineWidth: lineWidth + 2.0, lineCap: .round))
+            // surface sheen + glints + line
+            mainCtx.fill(Path(CGRect(x: -ext, y: 0, width: ext * 2, height: R * 0.15)),
+                         with: .linearGradient(Gradient(colors: [.white.opacity(0.09), .white.opacity(0)]),
+                                               startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: R * 0.15)))
+            var gx = -hw
+            while gx <= hw {
+                let slope = (w(gx + 3) - w(gx - 3)) / 6
+                if abs(slope) < 0.05 {
+                    let o = 0.22 * (1 - abs(slope) / 0.05)
+                    mainCtx.fill(Path(CGRect(x: gx - 2, y: w(gx) - 0.8, width: 4, height: 1.4)), with: .color(.white.opacity(o)))
+                }
+                gx += 6
+            }
+            mainCtx.stroke(surfaceLine(w), with: .color(.white.opacity(0.45)), lineWidth: 1.3)
 
-            // Progress arc — harsh semantic gradient (visible dark ↔ light bands).
-            ctx.stroke(progress, with: .linearGradient(
-                progressGradient(tint),
-                startPoint: CGPoint(x: rect.minX, y: rect.maxY),
-                endPoint: CGPoint(x: rect.maxX, y: rect.minY)
-            ), style: cap)
+            // droplets
+            for b in sim.drops {
+                let rr = max(0.7, b.r * R)
+                mainCtx.fill(Path(ellipseIn: CGRect(x: b.x * R - rr, y: b.y * R - rr, width: 2 * rr, height: 2 * rr)),
+                             with: .color(.white.opacity(min(0.55, b.life * 0.5) * 0.5)))
+            }
+
+            // suspended flake (circle frame, only inside the liquid)
+            let sa = sin(sim.a), ca = cos(sim.a)
+            for f in sim.flecks {
+                let fx = f.x * R, fy = f.y * R
+                if fx * fx + fy * fy > R * R * 0.9 { continue }
+                if -fx * sa + (fy - sy) * ca < R * 0.02 { continue }
+                let sVal = sin(f.ph + fx * 0.12 + sim.a * 5 + now * f.sp)
+                let spark = pow(max(0, sVal), 10)
+                let sz = 0.7 + f.z * 1.0 + spark * 1.4
+                let shade: Color
+                switch f.kind {
+                case 2: shade = Color(.sRGB, red: 8/255, green: 10/255, blue: 13/255, opacity: 0.12 + spark * 0.22)
+                case 1: shade = tint.liquidMix(.white, 0.55).opacity(0.10 + spark * 0.8)
+                default: shade = .white.opacity(0.08 * f.z + spark * 0.85)
+                }
+                body.fill(Path(CGRect(x: fx - sz / 2, y: fy - sz / 2, width: sz, height: sz)), with: .color(shade))
+            }
         }
 
-        // Outer instrument rim (unchanged placement).
-        ctx.stroke(Path(ellipseIn: rect.insetBy(dx: 0.5, dy: 0.5)),
-                   with: .color(NoopVisualStyle.borderHighlight.opacity(0.55)), lineWidth: 1)
+        // inner top shadow
+        body.fill(Path(CGRect(x: -R, y: -R, width: 2 * R, height: R * 0.75)),
+                  with: .linearGradient(Gradient(colors: [.black.opacity(0.30), .black.opacity(0)]),
+                                        startPoint: CGPoint(x: 0, y: -R), endPoint: CGPoint(x: 0, y: -R * 0.30)))
+        // soft top-left highlight
+        body.fill(Path(ellipseIn: CGRect(x: -R * 0.72, y: -R * 0.78, width: R * 0.9, height: R * 0.5)),
+                  with: .radialGradient(Gradient(colors: [.white.opacity(0.09), .white.opacity(0)]),
+                                        center: CGPoint(x: -R * 0.27, y: -R * 0.5), startRadius: 0, endRadius: R * 0.55))
+        // rim
+        ctx.stroke(Path(ellipseIn: well), with: .color(tint.opacity(0.22)), lineWidth: 1.25)
     }
 
     /// Full-span track arc — geometry unchanged from the original vessel.
@@ -176,15 +239,20 @@ enum LiquidRender {
     }
 
     /// The live heart-rate curve as a glowing liquid thread with a travelling glint.
-    static func thread(_ base: GraphicsContext, _ size: CGSize, values: [Double], now: Double, tint: Color) {
+    ///
+    /// `scrubIndex` (nil = not scrubbing) pins a crosshair + dot on that sample, so a finger dragged
+    /// across the thread has something to point at while the caller's readout follows it.
+    static func thread(_ base: GraphicsContext, _ size: CGSize, values: [Double], now: Double,
+                       tint: Color, scrubIndex: Int? = nil) {
         guard values.count >= 2 else { return }
-        let w = size.width, h = size.height, pad: Double = 10
-        var mn = Double.greatestFiniteMagnitude, mx = -Double.greatestFiniteMagnitude
-        for v in values { mn = min(mn, v); mx = max(mx, v) }
-        let span = max(10, mx - mn)
+        let w = size.width, h = size.height, pad = LiquidThreadGeometry.pad
+        // Plot geometry lives in ONE place (LiquidThreadGeometry) so the drawn curve and a scrub
+        // readout mapped back from a touch x can't drift apart. Bounds are resolved once per frame:
+        // re-deriving min/max per point would be O(n²) at 60fps over a ~288-bucket day.
+        let bounds = LiquidThreadGeometry.bounds(values)
         let n = values.count
-        func px(_ i: Int) -> Double { pad + Double(i) * (w - 2 * pad) / Double(n - 1) }
-        func py(_ v: Double) -> Double { h - pad - (v - mn) / span * (h - 2 * pad) }
+        func px(_ i: Int) -> Double { LiquidThreadGeometry.x(index: i, count: n, width: w) }
+        func py(_ v: Double) -> Double { LiquidThreadGeometry.y(value: v, bounds: bounds, height: h) }
         func curve() -> Path {
             var p = Path()
             p.move(to: CGPoint(x: px(0), y: py(values[0])))
@@ -206,6 +274,54 @@ enum LiquidRender {
         let pr = 3 + sin(now * 6) * 1.1
         ctx.fill(Path(ellipseIn: CGRect(x: ex - pr - 4, y: ey - pr - 4, width: (pr + 4) * 2, height: (pr + 4) * 2)), with: .color(tint.opacity(0.15)))
         ctx.fill(Path(ellipseIn: CGRect(x: ex - pr, y: ey - pr, width: pr * 2, height: pr * 2)), with: .color(tint))
+
+        // scrub crosshair: a hairline down the plot plus a ringed dot on the sample under the finger.
+        if let si = scrubIndex, si >= 0, si < n {
+            let sx = px(si), sy = py(values[si])
+            var hair = Path()
+            hair.move(to: CGPoint(x: sx, y: pad * 0.2))
+            hair.addLine(to: CGPoint(x: sx, y: h - pad * 0.2))
+            ctx.stroke(hair, with: .color(.white.opacity(0.28)),
+                       style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            ctx.fill(Path(ellipseIn: CGRect(x: sx - 9, y: sy - 9, width: 18, height: 18)), with: .color(tint.opacity(0.18)))
+            ctx.fill(Path(ellipseIn: CGRect(x: sx - 4, y: sy - 4, width: 8, height: 8)), with: .color(.white))
+            ctx.stroke(Path(ellipseIn: CGRect(x: sx - 4.5, y: sy - 4.5, width: 9, height: 9)), with: .color(tint), lineWidth: 2)
+        }
+    }
+}
+
+/// The heart-rate thread's plot geometry, stated ONCE: the renderer draws through it and a scrub
+/// gesture maps a touch position back through it, so the dot under the finger is always the value the
+/// readout shows. Pure math — no SwiftUI state, testable, and shared by every `LiquidThread`.
+enum LiquidThreadGeometry {
+    /// The inset the curve is drawn with, on all four sides.
+    static let pad: Double = 10
+
+    /// Value range for the vertical scale: the series' own min, with a 10 bpm floor on the span so a
+    /// flat resting trace doesn't get amplified into noise.
+    static func bounds(_ values: [Double]) -> (min: Double, span: Double) {
+        guard !values.isEmpty else { return (0, 10) }
+        var mn = Double.greatestFiniteMagnitude, mx = -Double.greatestFiniteMagnitude
+        for v in values { mn = min(mn, v); mx = max(mx, v) }
+        return (mn, max(10, mx - mn))
+    }
+
+    static func x(index: Int, count: Int, width: Double) -> Double {
+        guard count > 1 else { return width / 2 }
+        return pad + Double(index) * (width - 2 * pad) / Double(count - 1)
+    }
+
+    static func y(value: Double, bounds: (min: Double, span: Double), height: Double) -> Double {
+        height - pad - (value - bounds.min) / bounds.span * (height - 2 * pad)
+    }
+
+    /// The sample nearest a horizontal position, clamped to the series — so dragging past either end
+    /// of the plot rests on the first/last value instead of dropping the readout.
+    static func index(atX x: Double, count: Int, width: Double) -> Int {
+        guard count > 1 else { return 0 }
+        let usable = max(1, width - 2 * pad)
+        let t = min(1, max(0, (x - pad) / usable))
+        return min(count - 1, max(0, Int((t * Double(count - 1)).rounded())))
     }
 }
 
@@ -352,11 +468,16 @@ struct LiquidTube: View {
 }
 
 /// The live heart-rate thread. `bpm` is the recent series (any length ≥ 2).
+///
+/// `scrubIndex` is purely presentational: the OWNER runs the gesture (it knows what the series means
+/// and what to put in the readout) and hands the resolved sample index down. Defaults to nil, so the
+/// call sites that don't scrub are unchanged.
 struct LiquidThread: View {
     let bpm: [Double]
     var tint: Color = Color(.sRGB, red: 1, green: 107/255, blue: 129/255, opacity: 1)
     var height: CGFloat = 96
     var animated: Bool = true
+    var scrubIndex: Int? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var motion = NoopMotionState.shared
@@ -369,7 +490,7 @@ struct LiquidThread: View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { tl in   // 60fps to flow smoothly on ProMotion
             let now = liquidSeconds(tl.date)
             Canvas { context, size in
-                LiquidRender.thread(context, size, values: bpm, now: now, tint: tint)
+                LiquidRender.thread(context, size, values: bpm, now: now, tint: tint, scrubIndex: scrubIndex)
             }
         }
         .frame(height: height)
@@ -378,13 +499,40 @@ struct LiquidThread: View {
     /// One-shot render (no travelling glint / pulse) — used until first data load settles.
     private var staticThread: some View {
         Canvas { context, size in
-            LiquidRender.thread(context, size, values: bpm, now: 0, tint: tint)
+            LiquidRender.thread(context, size, values: bpm, now: 0, tint: tint, scrubIndex: scrubIndex)
         }
         .frame(height: height)
     }
 }
 
 // MARK: - Shared liquid components (cross-platform: used by Today AND the other liquid screens on iOS + mac)
+
+private struct LiquidGlassModifier<S: Shape>: ViewModifier {
+    let shape: S
+    let interactive: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if reduceTransparency {
+            content.background(StrandPalette.surfaceRaised, in: shape)
+        } else {
+            #if os(iOS)
+            if #available(iOS 26.0, *) {
+                if interactive {
+                    content.glassEffect(.regular.interactive(), in: shape)
+                } else {
+                    content.glassEffect(.regular, in: shape)
+                }
+            } else {
+                content.background(.ultraThinMaterial, in: shape)
+            }
+            #else
+            content.background(.ultraThinMaterial, in: shape)
+            #endif
+        }
+    }
+}
 
 extension View {
     /// A light selection/impact haptic, available only where `sensoryFeedback` is (iOS 17 / macOS 14);
@@ -443,6 +591,162 @@ struct CountUpNumber: View, Animatable {
     var body: some View {
         Text(decimals > 0 ? String(format: "%.\(decimals)f", value) : "\(Int(value.rounded()))")
             .font(font).monospacedDigit()
+    }
+}
+
+// MARK: - Liquid Glass (iOS 26) with a Material fallback
+
+extension View {
+    /// Real iOS 26 Liquid Glass where available; `.ultraThinMaterial` on iOS 17–25 (and on macOS, which has
+    /// no `glassEffect`) — a clean blended degrade so a surface stays modern on new OSes without breaking
+    /// older ones. Deliberately used SPARINGLY: each glass surface is its own blur pass, and Today draws a
+    /// live animated sky underneath, so this belongs on the floating chrome and the one hero surface, not on
+    /// every card and tile (those take a lighter fill instead).
+    func liquidGlass<S: Shape>(in shape: S, interactive: Bool = false) -> some View {
+        modifier(LiquidGlassModifier(shape: shape, interactive: interactive))
+    }
+}
+
+// MARK: - Availability shims for the expressive SwiftUI effects
+//
+// The app ships iOS 17.0 / macOS 13.0, so every "modern" effect below needs a gate — and on macOS the
+// bar is one release HIGHER than the iOS equivalent (scrollTransition et al are iOS 17 / macOS 14).
+// Wrapping each one here keeps the call sites (the coach chat, mainly) readable instead of drowning them
+// in `if #available` ladders, and puts the fallback decision in ONE place per effect.
+//
+// Every one of these is a no-op when the effect isn't available: the view renders, it just doesn't move.
+
+extension View {
+    /// Keep a scroll view pinned to its bottom edge — the natural resting place for a transcript.
+    @ViewBuilder func liquidBottomAnchored() -> some View {
+        if #available(iOS 17.0, macOS 14.0, *) {
+            self.defaultScrollAnchor(.bottom)
+        } else {
+            self
+        }
+    }
+
+    /// Let a downward drag dismiss the keyboard, the way every messenger does. iOS-only: macOS has no
+    /// software keyboard to dismiss.
+    @ViewBuilder func liquidInteractiveKeyboardDismiss() -> some View {
+        #if os(iOS)
+        self.scrollDismissesKeyboard(.interactively)
+        #else
+        self
+        #endif
+    }
+
+    /// Apple Intelligence Writing Tools in a text field (iOS 18+). Free capability once declared; a no-op
+    /// everywhere else.
+    @ViewBuilder func liquidWritingTools() -> some View {
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            self.writingToolsBehavior(.complete)
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+
+    /// Crisp (non-fading) top AND bottom scroll edges (iOS 26) for the chat transcript. Used to be a
+    /// `.soft` fade at the top only, matching a floating glass bar's "content dissolves beneath it"
+    /// look — but a message long enough to span most/all of the screen spends a large fraction of its
+    /// text under that fade (top, under the header; bottom, under the docked composer's automatic
+    /// system fade) at any given scroll position, which reads as lost legibility rather than polish.
+    /// `.hard` keeps the glass bars but cuts content cleanly at their edge instead of dimming it. Below
+    /// iOS 26 or on macOS this stays a no-op, same as before.
+    @ViewBuilder func liquidCrispChatEdges() -> some View {
+        #if os(iOS)
+        if #available(iOS 26.0, *) {
+            self.scrollEdgeEffectStyle(.hard, for: .top)
+                .scrollEdgeEffectStyle(.hard, for: .bottom)
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}
+
+// MARK: - Zoom transitions (iOS 18+)
+
+extension View {
+    /// Mark this view as the visual SOURCE of a zoom presentation — the presented sheet/detail appears to
+    /// grow out of it rather than sliding up from nowhere. Paired with `zoomDestination`. A no-op below
+    /// iOS 18 and on macOS, where the standard presentation is already the platform-correct one. Generic —
+    /// used by the coach avatar/chart zoom and by tile→detail pushes (metric tiles, Trends/Sleep heroes).
+    @ViewBuilder func zoomSource(id: String, namespace: Namespace.ID) -> some View {
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            self.matchedTransitionSource(id: id, in: namespace)
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+
+    /// Present this destination (sheet or pushed detail) as a zoom out of the matching source.
+    @ViewBuilder func zoomDestination(id: String, namespace: Namespace.ID) -> some View {
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            self.navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}
+
+// MARK: - Flow layout
+
+/// Lays subviews out in rows, wrapping to the next line when the current one runs out of width — the
+/// "chip cloud" a horizontal `ScrollView` can only fake by hiding half its contents off-screen. Plain
+/// `Layout` (iOS 16 / macOS 13), so it needs no availability gate and sizes correctly under Dynamic Type,
+/// which is exactly where a fixed-column grid of variable-length chips falls apart.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var rowWidth: CGFloat = 0, rowHeight: CGFloat = 0
+        var total = CGSize(width: 0, height: 0)
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if rowWidth > 0, rowWidth + spacing + size.width > maxWidth {
+                total.width = max(total.width, rowWidth)
+                total.height += rowHeight + spacing
+                rowWidth = size.width
+                rowHeight = size.height
+            } else {
+                rowWidth += (rowWidth > 0 ? spacing : 0) + size.width
+                rowHeight = max(rowHeight, size.height)
+            }
+        }
+        total.width = max(total.width, rowWidth)
+        total.height += rowHeight
+        return total
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
 

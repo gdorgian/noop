@@ -11,7 +11,8 @@ import StrandDesign
 /// states it's an estimate from what was logged.
 struct CaffeineLogCard: View {
     /// The shared UserDefaults-backed store (#949). Shared rather than owned here so the Apple Health
-    /// import and this card write through the same instance — see `CaffeineLogStore.shared`.
+    /// import, the coach's `log_caffeine` tool and this card all write through the same instance —
+    /// see `CaffeineLogStore.shared`.
     @ObservedObject private var store = CaffeineLogStore.shared
 
     /// Drives a live recompute of the estimate while the card is on screen (the decay is time-based).
@@ -105,7 +106,7 @@ struct CaffeineLogCard: View {
                 }
                 Spacer(minLength: 8)
                 Toggle("", isOn: $cutoffEnabled)
-                    .labelsHidden().toggleStyle(.switch).tint(StrandPalette.accent)
+                    .labelsHidden().toggleStyle(.switch).appleInspiredTint("caffeine")
                     .accessibilityLabel("Warn me about caffeine close to bedtime")
             }
             if cutoffEnabled {

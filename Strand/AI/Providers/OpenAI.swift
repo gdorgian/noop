@@ -57,10 +57,10 @@ struct OpenAIClient: AIProviderClient {
         // #1074: 900 truncated detailed coaching replies mid-sentence; 4096 lets a full multi-section
         // reply complete (a cap, not a target — the system prompt keeps it short). Matches Gemini + Android.
         if modernParams {
-            body["max_completion_tokens"] = 4096
+            body["max_completion_tokens"] = CoachOutputBudget.maxTokens
         } else {
             body["temperature"] = 0.6
-            body["max_tokens"] = 4096
+            body["max_tokens"] = CoachOutputBudget.maxTokens
         }
 
         var req = URLRequest(url: AIProvider.openAI.endpoint)

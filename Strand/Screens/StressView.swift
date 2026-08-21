@@ -29,6 +29,10 @@ import WhoopStore
 
 struct StressView: View {
     @EnvironmentObject var repo: Repository
+    /// The empty state's "Open Data Sources" button routes through the shell (`NavRouter`), because
+    /// neither shell exposes a selection this screen could set directly.
+    @EnvironmentObject var router: NavRouter
+    @EnvironmentObject private var coach: AICoachEngine
 
     /// The stored 0–3 stress series ("my-whoop"), oldest→newest. Empty → derive.
     @State private var storedSeries: [(day: String, value: Double)] = []
@@ -72,11 +76,14 @@ struct StressView: View {
                        // The day-of-sky liquid backdrop, matching Today / Health / Live / Sleep / Trends: a
                        // fixed, full-bleed time-of-day sky behind the scroll content (does not scroll), so the
                        // Stress screen sits in the same liquid atmosphere as every other tab.
-                       topBackground: liquidScaffoldSky()) {
+                       topBackground: liquidScaffoldSky(),
+                       // Card-AI (#P11): "Ask coach" in the header, fed this screen's own read (today's
+                       // 0–3 stress, RHR/HRV vs baseline, the intraday peak). Only shows once connected.
+                       trailing: { if let ctx = coachCardContext { CoachCardButton(context: ctx) } }) {
             if let model {
                 content(model)
             } else if !loaded {
-                ComingSoon(what: "Reading your heart-rate variability and resting heart rate…")
+                ComingSoon.loading("Reading your heart-rate variability and resting heart rate…", title: "Reading your heart data")
             } else {
                 emptyState
             }
@@ -84,6 +91,37 @@ struct StressView: View {
         .onAppear { rebuildModelIfNeeded() }
         .onChangeCompat(of: repo.days) { _ in rebuildModelIfNeeded() }
         .task(id: repo.refreshSeq) { await load() }
+    }
+
+    /// The card's own context for the coach (#P11): today's 0–3 stress and band, RHR/HRV against the
+    /// 30-day baseline, and — when the day has enough intraday HR — the hourly peak/sustained-high read.
+    /// Built from data this screen already loaded, in plain English (the coach's context is English, like
+    /// every other block it reads). Nil until the model exists, which also hides the button until then.
+    private var coachCardContext: CoachCardContext? {
+        guard let model else { return nil }
+        var lines = [String(format: "Today's stress: %.1f of 3 (%@).", model.score, model.band.title)]
+        if let rhr = model.rhrToday {
+            var l = "Resting HR \(rhr) bpm"
+            if let d = model.rhrDelta { l += String(format: " (%+.0f vs 30-day baseline)", d) }
+            lines.append(l + ".")
+        }
+        if let hrv = model.hrvToday {
+            var l = String(format: "HRV %.0f ms", hrv)
+            if let d = model.hrvDelta { l += String(format: " (%+.0f vs baseline)", d) }
+            lines.append(l + ".")
+        }
+        if let daytime, let dayLine = AICoachEngine.daytimeStressLine(daytime) {
+            lines.append(dayLine + ".")
+        }
+        return CoachCardContext(
+            title: "Stress",
+            summary: lines.joined(separator: " "),
+            suggestions: [
+                String(localized: "Why is my stress like this today?"),
+                String(localized: "What can I do to bring it down?"),
+                String(localized: "Should I train today?"),
+            ]
+        )
     }
 
     private func load() async {
@@ -103,7 +141,7 @@ struct StressView: View {
         let to = Int(Date().timeIntervalSince1970)
         let tz = TimeZone.current.secondsFromGMT(for: Date())
 
-        let hr = await repo.hrSamples(from: from, to: to, limit: 200_000)
+        let hr = await repo.hrSamples(from: from, to: to, limit: Int.max)
         // Too few HR samples: empty the timeline AND clear the advanced readouts in lockstep. Without this
         // reset a later refresh that hits this path would leave the Advanced HRV card showing stale values
         // next to an empty timeline (the readouts are only recomputed past this guard).
@@ -114,12 +152,12 @@ struct StressView: View {
             return
         }
         let rr = (try? await repo.storeHandle()?.rrIntervals(
-            deviceId: repo.deviceId, from: from, to: to, limit: 200_000)) ?? []
+            deviceId: repo.deviceId, from: from, to: to, limit: Int.max)) ?? []
         // Wrist accelerometer for the motion gate: an ambulatory hour is EXERTION, not stress, so it
         // is masked rather than scored (DaytimeStress). Same store read as R-R; empty on hardware or
         // imports with no gravity, which is exactly the "no masking, prior behaviour" degradation.
         let gravity = (try? await repo.storeHandle()?.gravitySamples(
-            deviceId: repo.deviceId, from: from, to: to, limit: 200_000)) ?? []
+            deviceId: repo.deviceId, from: from, to: to, limit: Int.max)) ?? []
 
         // Score today's hours against the PERSONAL cross-day daytime baseline ONLY when the user has
         // opted in (Settings → Experimental) AND enough worn history exists (Oura-style
@@ -567,9 +605,10 @@ struct StressView: View {
                         ("Days", "\(points.count)"),
                     ])
                 }
-                // The one segmented control. Its eight options use the shared adaptive-width mode so
-                // the control stays inside the same page gutter as the chart on compact iPhones.
-                SegmentedPillControl(ExploreRange.allCases, selection: $range,
+                // The one segmented control. Uses the shared adaptive-width mode (upstream #743/#748) so
+                // it stays inside the same page gutter as the chart on compact iPhones, over the fork's
+                // curated `displayCases` set (not upstream's `allCases`).
+                SegmentedPillControl(ExploreRange.displayCases, selection: $range,
                                      adaptsToAvailableWidth: true) { $0.label }
                     .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
@@ -633,7 +672,8 @@ struct StressView: View {
     // MARK: Empty state
 
     private var emptyState: some View {
-        ComingSoon(what: "No stress history yet. Import your WHOOP export in Data Sources to see it.")
+        ComingSoon(what: "No stress history yet. Import your WHOOP export in Data Sources to see it.",
+                   action: ("Open Data Sources", { router.openDataSources() }))
     }
 }
 
@@ -1246,7 +1286,7 @@ private struct StressPreviewHarness: View {
                 } footer: {
                     ChartFooter([("Today", String(format: "%.1f", score)), ("Average", "1.5"), ("Days", "30")])
                 }
-                SegmentedPillControl(ExploreRange.allCases, selection: $range,
+                SegmentedPillControl(ExploreRange.displayCases, selection: $range,
                                      adaptsToAvailableWidth: true) { $0.label }
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }

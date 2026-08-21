@@ -104,6 +104,16 @@ public actor WhoopStore {
         }
         config.busyMode = .timeout(5)
         let pool = try await StoreOpenGate.shared.openAndMigrate(path: path, configuration: config)
+        // TEMP DIAGNOSTIC (#freeze-investigation) — the on-disk footprint at open. A `-wal` that has grown
+        // large and never been checkpointed makes every read traverse its index, which is one of the
+        // candidate explanations for multi-second reads that should be indexed lookups.
+        // `checkpointWAL()` below is the remedy if that turns out to be the cause. Remove with the rest of
+        // the FREEZE-DIAG block.
+        let mb = { (p: String) -> String in
+            let n = (try? FileManager.default.attributesOfItem(atPath: p)[.size] as? Int64) ?? nil
+            return n.map { String(format: "%.1f MB", Double($0) / 1_048_576) } ?? "—"
+        }
+        NSLog("[FREEZE-DIAG] store open: db=\(mb(path)) wal=\(mb(path + "-wal")) shm=\(mb(path + "-shm"))")
         self.init(preMigrated: pool)
     }
 
@@ -162,6 +172,49 @@ public actor WhoopStore {
     @inline(__always)
     func syncWrite<T>(_ block: (Database) throws -> T) throws -> T {
         try dbWriter.write(block)
+    }
+
+    /// The READ counterpart that does NOT hold the actor. Use this for every read; `syncRead` remains for
+    /// the few reads still nested inside a write.
+    ///
+    /// WHY: `syncRead` blocks the actor's serial executor for the whole query, so — despite the
+    /// `DatabasePool` — no two reads in this app ever overlap, and a read also waits behind every other
+    /// read. That is not a theoretical cost. Measured on a 1.7 GB store: the six `workouts()` reads behind
+    /// one `workoutRows()` call took **0.15 s** when they ran first and **35.6 s** when three callers
+    /// competed — identical queries, 237× apart, all of it queueing. Eight HR-window queries took 79 s.
+    ///
+    /// `nonisolated` + GRDB's async `read` fixes both halves: the call never touches the actor's executor,
+    /// and GRDB serves it from its own reader pool as a WAL snapshot, so reads genuinely run in parallel
+    /// with each other and with the writer. Nothing here mutates actor state — `dbWriter` is a `let` and
+    /// GRDB's `DatabaseWriter` is Sendable and manages its own concurrency (the same reasoning that already
+    /// justifies the `registryWriter` accessor above).
+    ///
+    /// Ordering: actor isolation used to impose an incidental order between a write and a following read.
+    /// Within one task `await` still guarantees it; across tasks there was never a guarantee. Reads see
+    /// committed data only, never a partial write.
+    @inline(__always)
+    nonisolated func asyncRead<T: Sendable>(_ block: @escaping @Sendable (Database) throws -> T) async throws -> T {
+        // TEMP DIAGNOSTIC (#freeze-investigation) — split WAITING from WORKING, at the one seam every
+        // read goes through. `t0` is when the caller asked; `tAcquired` is when GRDB actually handed us a
+        // reader connection and started running the block. The gap between them is queueing for one of the
+        // pool's `maximumReaderCount` (5) readers; the gap after it is real I/O.
+        //
+        // This exists because the two are indistinguishable from the call site, and every number so far has
+        // been the sum: a one-row `cursors` lookup measured 3.9 s on device while the same query on the same
+        // 1.83 GB file takes microseconds on a Mac, and six indexed `workout` reads (1.3 ms of real work)
+        // measured 56 s. Either the reads wait for a slot, or the device I/O really is that slow — this line
+        // is the only thing that can tell those apart. Remove with the rest of the FREEZE-DIAG block.
+        let t0 = Date()
+        return try await dbWriter.read { db in
+            let tAcquired = Date()
+            let result = try block(db)
+            let waited = tAcquired.timeIntervalSince(t0)
+            let ran = Date().timeIntervalSince(tAcquired)
+            if waited + ran > 0.25 {
+                NSLog("[FREEZE-DIAG] asyncRead wait=\(String(format: "%.3f", waited))s run=\(String(format: "%.3f", ran))s")
+            }
+            return result
+        }
     }
 
     // MARK: - Maintenance

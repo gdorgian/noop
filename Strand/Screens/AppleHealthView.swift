@@ -2,6 +2,7 @@ import SwiftUI
 import StrandDesign
 import WhoopStore
 import Foundation
+import StrandImport
 
 // MARK: - Apple Health (per-source page) — locked component system
 //
@@ -40,6 +41,9 @@ struct AppleHealthLoadKey: Equatable {
 
 struct AppleHealthView: View {
     @EnvironmentObject var repo: Repository
+    /// The empty state's "Open Data Sources" button routes through the shell (`NavRouter`), because
+    /// neither shell exposes a selection this screen could set directly.
+    @EnvironmentObject var router: NavRouter
 
     // iOS-only: the live two-way HealthKit bridge, injected at StrandiOSApp. macOS has no HealthKit
     // (HealthKitBridge is `#if os(iOS)` in its own file and isn't in the macOS environment), so this
@@ -214,10 +218,12 @@ struct AppleHealthView: View {
                     // instead of telling the user to tap a control that isn't shown.
                     ComingSoon(what: health.auth == .entitlementMissing
                                ? "Nothing here yet. This sideloaded install can't read Apple Health directly. Import a Health export .zip in Data Sources, or turn on Shortcuts Export to bring your strap data into Health."
-                               : "Nothing here yet. Tap Enable Apple Health above to read your data live, or import a Health export .zip in Data Sources.")
+                               : "Nothing here yet. Tap Enable Apple Health above to read your data live, or import a Health export .zip in Data Sources.",
+                               action: ("Open Data Sources", { router.openDataSources() }))
                 }
                 #else
-                ComingSoon(what: "Nothing imported yet. On an iPhone: Health app, tap your photo, Export All Health Data, then import the .zip here in Data Sources.")
+                ComingSoon(what: "Nothing imported yet. On an iPhone: Health app, tap your photo, Export All Health Data, then import the .zip here in Data Sources.",
+                           action: ("Open Data Sources", { router.openDataSources() }))
                 #endif
             } else if !loaded {
                 loadingState
@@ -412,7 +418,7 @@ struct AppleHealthView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                 case .unknown, .denied:
-                    Text("Read your heart rate, HRV, blood oxygen, respiratory rate, sleep, steps and energy straight from Apple Health, and write NOOP's strap data back: sleep with full stages, continuous heart rate, workouts, and nightly vitals. Everything stays on \(Platform.deviceNounPhrase).")
+                    Text("Read your heart rate, HRV, blood oxygen, respiratory rate, sleep, steps and energy straight from Apple Health, and write NOOP's strap data back: sleep with full stages, continuous heart rate, workouts, nightly vitals, and your profile weight. Everything stays on \(Platform.deviceNounPhrase).")
                         .font(StrandFont.caption)
                         .foregroundStyle(StrandPalette.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -467,6 +473,161 @@ struct AppleHealthView: View {
                     .buttonStyle(.bordered)
                     .tint(StrandPalette.metricCyan)
                     .disabled(health.syncing)
+
+                    if health.fullHistoryImporting {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ProgressView(value: health.fullHistoryProgress ?? 0)
+                                .tint(StrandPalette.metricCyan)
+                            Text("Importing Apple Health history \(Int(((health.fullHistoryProgress ?? 0) * 100).rounded()))%")
+                                .font(StrandFont.footnote)
+                                .foregroundStyle(StrandPalette.textSecondary)
+                            Button("Stop import") {
+                                health.cancelFullHistoryImport()
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(StrandPalette.metricCyan)
+                        }
+                    } else {
+                        Button {
+                            health.startFullHistoryImport()
+                            Task {
+                                while health.fullHistoryImporting {
+                                    try? await Task.sleep(for: .milliseconds(250))
+                                }
+                                await repo.refresh()
+                                await load()
+                            }
+                        } label: {
+                            Label("Import all Apple Health history", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(StrandPalette.metricCyan)
+                        .disabled(health.syncing)
+                    }
+
+                    // HRV repair (#hrv-sdnn-truncation). An explicit action, because it rewrites years of
+                    // samples in a store shared with every other health app — never a launch side effect.
+                    if health.hrvRepairRunning {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ProgressView(value: health.hrvRepairProgress ?? 0)
+                                .tint(StrandPalette.metricCyan)
+                            Text("Rebuilding HRV history \(Int(((health.hrvRepairProgress ?? 0) * 100).rounded()))%")
+                                .font(StrandFont.footnote)
+                                .foregroundStyle(StrandPalette.textSecondary)
+                            Button("Stop rebuild") {
+                                health.cancelHrvSdnnRepair()
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(StrandPalette.metricCyan)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            // Say WHY before offering the button: this install's series was cut to the
+                            // regular 14-day write-back window by the 10.0.0 migration.
+                            if health.hrvHistoryWasTruncated, !health.hrvRepairCompleted {
+                                Text("An earlier update replaced NOOP's HRV values in Apple Health and only rewrote the last 14 days. Rebuilding restores every night NOOP still holds beat data for.")
+                                    .font(StrandFont.footnote)
+                                    .foregroundStyle(StrandPalette.textTertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Button {
+                                health.startHrvSdnnRepair()
+                            } label: {
+                                Label("Rebuild HRV history in Apple Health",
+                                      systemImage: "waveform.path.ecg")
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(StrandPalette.metricCyan)
+                            .disabled(health.syncing || health.fullHistoryImporting)
+                        }
+                    }
+
+                    // Re-request permission so newly-added data types (e.g. weight and body composition,
+                    // which older grants never included) surface their Health prompt. HealthKit only shows
+                    // types you haven't decided yet, so this is a no-op once everything is granted.
+                    Button {
+                        Task {
+                            await health.requestAuthorization()
+                            await health.sync()
+                            await load()
+                        }
+                    } label: {
+                        Label("Refresh permissions", systemImage: "checkmark.shield")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(StrandPalette.metricCyan)
+                    .disabled(health.syncing)
+                    Text("Import all Apple Health history once to make older values available to the Coach. Later syncs only refresh recent changes. Missing a metric like weight? Tap Refresh permissions to grant data types added in a later update. To fully disconnect, use Settings › Health › Data Access & Devices › NOOP.")
+                        .font(StrandFont.footnote)
+                        .foregroundStyle(StrandPalette.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Divider().overlay(StrandPalette.hairline)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Diagnostics", systemImage: "waveform.path.ecg.rectangle")
+                            .font(StrandFont.headline)
+                            .foregroundStyle(StrandPalette.textPrimary)
+
+                        if let report = health.lastWritebackReport {
+                            Text(verbatim: report.completedAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(StrandFont.footnote)
+                                .foregroundStyle(StrandPalette.textTertiary)
+                            ForEach(report.entries) { entry in
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text(LocalizedStringKey(entry.id))
+                                    Spacer()
+                                    Text(verbatim: entry.summary)
+                                        .foregroundStyle(StrandPalette.textTertiary)
+                                }
+                                .font(StrandFont.footnote)
+                                .foregroundStyle(StrandPalette.textSecondary)
+                            }
+                        }
+
+                        if let experiment = health.heartRateExperiment {
+                            Text("Heart rate")
+                                .font(StrandFont.subhead)
+                                .foregroundStyle(StrandPalette.textSecondary)
+                            diagnosticWindowRow("Intervals", experiment.intervalWindow,
+                                                overlap: experiment.intervalExternalOverlap)
+                            diagnosticWindowRow("Points", experiment.pointWindow,
+                                                overlap: experiment.pointExternalOverlap)
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                                Button("Intervals") {
+                                    Task { await health.finishHeartRateGraphExperiment(result: .intervalVisible) }
+                                }
+                                Button("Points") {
+                                    Task { await health.finishHeartRateGraphExperiment(result: .pointVisible) }
+                                }
+                                Button("Both") {
+                                    Task { await health.finishHeartRateGraphExperiment(result: .bothVisible) }
+                                }
+                                Button("Nothing") {
+                                    Task { await health.finishHeartRateGraphExperiment(result: .neitherVisible) }
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(StrandPalette.metricCyan)
+                            .disabled(health.syncing)
+                        } else {
+                            HStack {
+                                Text("Heart rate")
+                                    .font(StrandFont.subhead)
+                                Spacer()
+                                Text(health.heartRateEncoding == .pointAtBucketMidpoint ? "Points" : "Intervals")
+                                    .font(StrandFont.footnote)
+                                    .foregroundStyle(StrandPalette.textTertiary)
+                            }
+                            Button {
+                                Task { await health.startHeartRateGraphExperiment() }
+                            } label: {
+                                Label("Start experiment", systemImage: "abacus")
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(StrandPalette.metricCyan)
+                            .disabled(health.syncing)
+                        }
+                    }
                 }
 
                 if let err = health.lastError {
@@ -477,6 +638,24 @@ struct AppleHealthView: View {
                 }
             }
         }
+    }
+
+    private func diagnosticWindowRow(_ label: LocalizedStringKey,
+                                     _ window: HealthWriteback.HeartRateExperimentWindow,
+                                     overlap: Int) -> some View {
+        let from = Date(timeIntervalSince1970: TimeInterval(window.startTs))
+        let to = Date(timeIntervalSince1970: TimeInterval(window.endTs))
+        let range = from.formatted(date: .abbreviated, time: .shortened)
+        let end = to.formatted(date: .omitted, time: .shortened)
+        let summary = [range + "–" + end, "↔︎ " + String(overlap)].joined(separator: " · ")
+        return HStack(alignment: .firstTextBaseline) {
+            Text(label)
+            Spacer()
+            Text(verbatim: summary)
+                .multilineTextAlignment(.trailing)
+        }
+        .font(StrandFont.footnote)
+        .foregroundStyle(StrandPalette.textTertiary)
     }
     #endif
 
@@ -630,7 +809,11 @@ struct AppleHealthView: View {
     /// One uniform ChartCard for a metric series: header + TrendChart body (same
     /// height) + avg/min/max ChartFooter. Sparse-safe via resolvedWindow.
     @ViewBuilder
-    private func chartCard(title: LocalizedStringKey, key: String, gradient: Gradient,
+    /// `title` is a `LocalizedStringResource`, not a `LocalizedStringKey`, so it can do both jobs: the
+    /// compiler still extracts each literal into the string catalog, and `String(localized:)` can
+    /// resolve it for the chart's accessibility label. A `LocalizedStringKey` is opaque, which is why
+    /// all eleven of these charts announced themselves to VoiceOver as the generic "Trend".
+    private func chartCard(title: LocalizedStringResource, key: String, gradient: Gradient,
                            fallback: ClosedRange<Double>,
                            fmt: @escaping (Double) -> String) -> some View {
         let rows = resolvedWindow(key)
@@ -646,7 +829,9 @@ struct AppleHealthView: View {
             return [("Avg", fmt(avg)), ("Min", fmt(lo)), ("Max", fmt(hi)), ("Points", "\(vals.count)")]
         }()
         ChartCard(
-            title: title,
+            // Already-resolved text wrapped in an interpolation (renders verbatim), since ChartCard
+            // takes a LocalizedStringKey and the title is now a resource.
+            title: "\(String(localized: title))",
             subtitle: rangeNote(forKey: key),
             trailing: trailing,
             chart: {
@@ -657,7 +842,8 @@ struct AppleHealthView: View {
                         valueRange: valueRange(pts, fallback: fallback),
                         showsArea: true,
                         height: NoopMetrics.chartHeight,
-                        valueFormat: fmt
+                        valueFormat: fmt,
+                        accessibilityLabel: String(localized: "\(String(localized: title)) trend")
                     )
                 } else if let only = vals.last {
                     // A single point is not a line — present the lone reading,
