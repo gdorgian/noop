@@ -2133,6 +2133,33 @@ final class IntelligenceEngine: ObservableObject {
         for d in faPriorDaily { faGateByDay[d.day] = d }
         for d in dailies { faGateByDay[d.day] = d }
         let faGate7 = Array(faGateByDay.values.sorted { $0.day < $1.day }.suffix(7))
+
+        // ── Training series from LIVE workouts (zone minutes, strength time) ────────────────────────
+        // `WhoopImporter` has always derived these from a CSV export, so a wearer who can still produce
+        // one has them for their history and nothing for this week. Four of WHOOP Age's nine inputs live
+        // in this set. Same definitions as the importer — zone minutes from each workout's own zone
+        // percentages, strength by the same substring test — so an imported day and a computed day mean
+        // the same thing inside one series.
+        //
+        // Written under the computed `-noop` id, like every other series this pass produces, so an
+        // import under `my-whoop` still wins where both exist.
+        let trainingWorkouts = (await repo.workoutRows(days: 30)).compactMap { row -> TrainingLoadSeries.Workout? in
+            let minutes = Double(row.endTs - row.startTs) / 60.0
+            guard minutes > 0 else { return nil }
+            return TrainingLoadSeries.Workout(
+                day: AnalyticsEngine.dayString(row.startTs, offsetSec: tzOffset),
+                minutes: minutes,
+                sport: row.sport,
+                zonePercents: WorkoutZones.percents(row.zonesJSON))
+        }
+        let trainingPoints = TrainingLoadSeries.dayTotals(workouts: trainingWorkouts)
+            .flatMap { totals in
+                TrainingLoadSeries.seriesPoints(for: totals)
+                    .map { MetricPoint(day: totals.day, key: $0.key, value: $0.value) }
+            }
+        if !trainingPoints.isEmpty {
+            _ = try? await store.upsertMetricSeries(trainingPoints, deviceId: computedId)
+        }
         let faPts = Self.fitnessAgeRows(
             gateDays: faGate7, age: profile.age, sex: profile.sex, waistCm: profile.waistCm,
             heightCm: profile.heightCm, weightKg: profile.weightKg, computedId: computedId,
