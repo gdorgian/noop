@@ -160,6 +160,38 @@ Swift, you MUST build the app yourself: `xcodebuild … build` locally, or run `
   must keep compiling for **both** — check the `Strand` (macOS) build too when you edit shared files.
 - iOS/macOS deployment targets: macOS 13.0, iOS 17.0 (see `project.yml`).
 
+## Fork identity — read before building or releasing anything
+
+This fork is installed under a **signing service's EXPLICIT App ID**, not the tracked `com.noopapp`
+default. HealthKit cannot live on a wildcard profile, so the bundle id must match the provisioning
+profile exactly, and the App Group is whatever that profile grants — it does not resemble the bundle
+id and is not derived from it.
+
+**Those identifiers live in `Config/BundleIdSecrets.xcconfig`, which is gitignored. This repository
+is PUBLIC — never write them into a tracked file, a commit message, a release note, or this file.**
+
+- `Config/BundleId.xcconfig` holds the upstream defaults and ends with
+  `#include? "BundleIdSecrets.xcconfig"`, so the secrets file overrides `IOS_BUNDLE_ID` and
+  `APP_GROUP_ID` outright — not merely through `BUNDLE_ID_PREFIX`.
+- **Do not move those two settings into `project.yml`.** A `settings:` entry there becomes a
+  project-level pbxproj build setting, and those beat a project-level xcconfig, which makes the
+  secrets file silently unable to override them. That is not hypothetical: it shipped an IPA under
+  `com.noopapp.noop` that the certificate could not install.
+- **If `Config/BundleIdSecrets.xcconfig` is missing, stop and ask.** A build without it falls back to
+  the tracked defaults and produces an installable-looking IPA with the wrong identity. Verify after
+  packaging rather than trusting the build:
+  `unzip -p <ipa> "Payload/NOOP Staging.app/Info.plist" > /tmp/p.plist && /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" /tmp/p.plist`
+
+### Naming
+
+- **The app is always `NOOP`** — `CFBundleName` and `CFBundleDisplayName` both. Upstream merges have
+  renamed it before (the DX23876 sync set the display name to "NOOP AI", that fork's branding); check
+  after every sync.
+- **GitHub releases are always titled `NOOP Aura`.**
+- **The release version always matches the upstream `ryanbr/noop` version it is built from.** A
+  release tracking upstream 10.5.0 is 10.5.0 here — the fork does not carry its own version line.
+  Build numbers increment independently.
+
 ## PR & commit conventions
 
 - **One concern per PR.** Keep a protocol change, a schema migration, and a UI change separate.

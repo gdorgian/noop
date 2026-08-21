@@ -11,4 +11,23 @@
 // Apple ID / device so this build's bundle id, App Group, and watch companion pairing don't
 // collide with an installed copy of the official com.noopapp build.
 BUNDLE_ID_PREFIX = com.noopapp
+
+// The iPhone app's bundle id and the App Group shared with its widget / Live Activity extension.
+//
+// Defined HERE rather than in project.yml's settings, because a project.yml `settings:` entry becomes
+// a project-level pbxproj build setting, and those beat a project-level xcconfig — which made the
+// secrets include below unable to override them.
+//
+// A signing service issues an EXPLICIT App ID (HealthKit cannot live on a wildcard, so the bundle id
+// must match the provisioning profile exactly), and it will not resemble the reverse-DNS default. So
+// both are overridable outright, not just via BUNDLE_ID_PREFIX. The App Group is likewise whatever the
+// profile grants, which is often unrelated to the bundle id.
+//
+// Referenced as $(IOS_BUNDLE_ID) / $(APP_GROUP_ID) by project.yml, both targets' entitlements, and the
+// AppGroupIdentifier Info.plist key that WidgetSnapshot.suiteName reads at runtime — so neither value
+// is ever hard-coded in Swift.
+IOS_BUNDLE_ID = $(BUNDLE_ID_PREFIX).noop
+APP_GROUP_ID = group.$(BUNDLE_ID_PREFIX).noop.staging
+
+// Last, so anything it sets wins over every default above.
 #include? "BundleIdSecrets.xcconfig"

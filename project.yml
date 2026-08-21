@@ -29,16 +29,13 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
-    # Single source of truth for the App Group id shared by the iOS app + its widget / Live Activity
-    # extension. Referenced as $(APP_GROUP_ID) by both targets' entitlements and Info.plist, and read
-    # at runtime via the AppGroupIdentifier Info.plist key (WidgetSnapshot.suiteName) so the value is
-    # never hard-coded in Swift. Built from $(BUNDLE_ID_PREFIX) (see Config/BundleId.xcconfig) — set
-    # BUNDLE_ID_PREFIX in a gitignored Config/BundleIdSecrets.xcconfig to build under your own Apple ID.
-    # The iPhone app's bundle id. A variable so a build can be retargeted at a signing
-    # service's EXPLICIT App ID without editing sources (HealthKit cannot live on a wildcard,
-    # so the bundle id must match the profile exactly). Default is unchanged.
-    IOS_BUNDLE_ID: $(BUNDLE_ID_PREFIX).noop
-    APP_GROUP_ID: group.$(BUNDLE_ID_PREFIX).noop.staging
+    # IOS_BUNDLE_ID and APP_GROUP_ID are NOT defined here. They live in Config/BundleId.xcconfig, which
+    # ends with `#include? "BundleIdSecrets.xcconfig"` — the gitignored file where a personal signing
+    # identity goes. A build setting written here lands in the generated pbxproj at project level, and
+    # a project-level pbxproj setting BEATS a project-level xcconfig, so defining them here made the
+    # secrets file silently unable to override them. That is not a theoretical ordering problem: it
+    # shipped an IPA under the wrong identifiers, which a signing service's explicit App ID cannot
+    # install against. Keep them in the xcconfig so the override actually works.
     # Build for both Apple Silicon and Intel so the release runs on every Mac.
     ARCHS: "$(ARCHS_STANDARD)"
   configs:
