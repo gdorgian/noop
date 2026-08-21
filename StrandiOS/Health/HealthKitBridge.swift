@@ -37,7 +37,9 @@ final class HealthKitBridge: ObservableObject {
     /// here so an Apple Health auth revoke, quota hit, or invalid sample is visible instead of silent.
     @Published private(set) var lastError: String?
 
-    private let store = HKHealthStore()
+    // `internal` rather than `private`: the Fitness Age reader lives in its own extension file
+    // (HealthKitBridge+BioAge) to keep the read-only domain queries out of the write-back bridge.
+    let store = HKHealthStore()
     private let repo: Repository
     /// Source id imported HealthKit data lands under (matches `AppModel.appleDeviceId`).
     private let appleDeviceId: String
@@ -104,7 +106,23 @@ final class HealthKitBridge: ObservableObject {
         // its own narrow type; Health Connect has no caffeine-only scope (caffeine is a field on
         // NutritionRecord, behind READ_NUTRITION — the whole food log), which is why Android is not
         // matched here. Never written back.
-        .dietaryCaffeine
+        .dietaryCaffeine,
+
+        // ── Fitness Age domain inputs — READ-ONLY ────────────────────────────────────────────────────
+        // The five-domain Fitness Age scorer reads instruments a wrist strap cannot produce: the iPhone's
+        // own gait and stair measurements, blood pressure and glucose from whatever device records them,
+        // daylight exposure from the Watch. Every one is a HealthKit READ type; none is ever shared back,
+        // and each is optional — an absent instrument lowers the reported confidence rather than being
+        // scored as a bad value.
+        //
+        // These are added to the read set as a group so the permission sheet asks once, rather than
+        // re-prompting each time another domain is filled in.
+        .bloodPressureSystolic, .bloodPressureDiastolic, .bloodGlucose,
+        .walkingHeartRateAverage, .height,
+        .flightsClimbed, .appleStandTime, .sixMinuteWalkTestDistance,
+        .stairAscentSpeed, .stairDescentSpeed,
+        .appleWalkingSteadiness, .walkingAsymmetryPercentage, .walkingDoubleSupportPercentage,
+        .timeInDaylight
     ]
     private static let quantityWriteIds: [HKQuantityTypeIdentifier] = [
         .restingHeartRate, .heartRateVariabilitySDNN, .oxygenSaturation, .respiratoryRate
@@ -118,7 +136,20 @@ final class HealthKitBridge: ObservableObject {
     /// `NSException`, so the ONLY defense is to keep read-only ids out of the share set. Filtering here
     /// makes that structural: a read-only id added to a write list by mistake is dropped from the ask
     /// instead of bricking launch, turning a ship-and-crash into a no-op.
-    private static let writeDenied: Set<HKQuantityTypeIdentifier> = [.appleSleepingWristTemperature]
+    private static let writeDenied: Set<HKQuantityTypeIdentifier> = [
+        .appleSleepingWristTemperature,
+        // The Fitness Age domain inputs, all READ-ONLY by intent. Several are Apple-reserved (the gait
+        // and mobility measurements are produced by the iPhone and Watch, not by third-party apps), and
+        // asking to SHARE a reserved type is the uncatchable launch crash documented above. Listing every
+        // one here makes the intent structural instead of remembered: if any of them is ever added to a
+        // write list by mistake, it is dropped from the ask rather than bricking launch.
+        .bloodPressureSystolic, .bloodPressureDiastolic, .bloodGlucose,
+        .walkingHeartRateAverage, .height,
+        .flightsClimbed, .appleStandTime, .sixMinuteWalkTestDistance,
+        .stairAscentSpeed, .stairDescentSpeed,
+        .appleWalkingSteadiness, .walkingAsymmetryPercentage, .walkingDoubleSupportPercentage,
+        .timeInDaylight,
+    ]
     // High-res write-back shares: the continuous 1-minute HR stream, and the energy/distance samples
     // attached to written workouts. Kept separate from the four nightly-vital ids so the permission
     // expansion and each independently-authorized writer remain explicit.

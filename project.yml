@@ -79,6 +79,20 @@ packages:
   ZIPFoundation:
     url: https://github.com/weichsel/ZIPFoundation.git
     exactVersion: 0.9.20
+  # Multi-domain Fitness Age scoring (Apache-2.0, Foundation-only, deterministic, golden-tested).
+  # It is a pure scorer: it never imports HealthKit, asks for a permission, stores anything, or opens a
+  # socket — the host hands it normalized numbers and it hands back a score. That is exactly the shape
+  # this app can accept, and why it earns a dependency where a cloud "biological age" service could not.
+  #
+  # It does NOT replace FitnessAgeEngine or VitalityEngine. Those produce one number each from
+  # cardio-metabolic signals; this produces a five-domain breakdown with an explicit confidence and an
+  # honest instruments-used count. That breakdown is the part neither existing engine can give.
+  #
+  # Supply-chain: pinned EXACT, like every other third-party package here. Upstream states minor
+  # releases MAY change formulas, weights and results, so the version bump has to be a decision.
+  SuperAgeCore:
+    url: https://github.com/superageapp/ios-core.git
+    exactVersion: 0.4.0
 targets:
   Strand:
     type: application
@@ -159,6 +173,7 @@ targets:
       - package: ZIPFoundation
       - package: OuraProtocol
       - package: PolarProtocol
+      - package: SuperAgeCore
   StrandTests:
     type: bundle.unit-test
     platform: macOS
@@ -346,6 +361,7 @@ targets:
       - package: MarkdownUI
       - package: ZIPFoundation
       - package: PolarProtocol
+      - package: SuperAgeCore
       - target: NOOPiOSWidgets
       # This fork is signed and installed as an iPhone-only Arctic/Feather build. Do not embed the
       # watchOS companion: third-party signing rewrites/signs the parent independently and an embedded

@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import StrandAnalytics
+import SuperAgeCore
 import StrandDesign
 import WhoopStore
 
@@ -26,6 +27,7 @@ extension AuraAgeReading {
         fitnessAgeSeries: [(day: String, value: Double)],
         vo2maxSeries: [(day: String, value: Double)],
         days: [DailyMetric],
+        domainResult: BioAge.DomainResult?,
         readiness: FitnessAgeReadiness,
         chronologicalAge: Int,
         sex: String
@@ -103,6 +105,8 @@ extension AuraAgeReading {
             vo2maxUnit: vo2max == nil ? "" : "ml/kg/min",
             fitnessNote: String(localized: "± \(Int(FitnessAgeEngine.displayBandYears)) yr"),
             fitnessCaveat: String(localized: "A cardiorespiratory comparison — how your estimated fitness compares to a typical person, expressed in years. It is not a biological age and carries no medical meaning."),
+            domains: Self.domains(from: domainResult),
+            domainsNote: Self.domainsNote(from: domainResult),
             readiness: [],
             readinessNote: "",
             readinessLead: "",
@@ -136,6 +140,47 @@ extension AuraAgeReading {
                     magnitude: min(abs(contribution.lnHazard) / largest, 1)
                 )
             }
+    }
+
+    // MARK: Domains
+
+    private static func domains(from result: BioAge.DomainResult?) -> [Domain] {
+        guard let result else { return [] }
+        // Ordered by weight, heaviest first: the domain that moves the score most should be read first.
+        return FitnessAgeDomain.allCases
+            .filter { result.domainScores[$0] != nil }
+            // Sort on the NUMERIC weight, not its formatted string — "9%" sorts above "28%" lexically.
+            .sorted { $0.defaultWeight > $1.defaultWeight }
+            .compactMap { domain -> Domain? in
+                guard let score = result.domainScores[domain] else { return nil }
+                return Domain(id: domain.rawValue,
+                              label: Self.domainLabel(domain),
+                              score: score.score,
+                              weight: "\(Int((domain.defaultWeight * 100).rounded()))%")
+            }
+    }
+
+    /// The evidence line. Both halves are stated because they answer different questions: the instrument
+    /// count says how much was observed, the confidence says how much that is worth.
+    private static func domainsNote(from result: BioAge.DomainResult?) -> String {
+        guard let result else { return "" }
+        let confidence: String
+        switch result.confidence {
+        case ..<0.4:  confidence = String(localized: "low confidence")
+        case ..<0.7:  confidence = String(localized: "moderate confidence")
+        default:      confidence = String(localized: "high confidence")
+        }
+        return String(localized: "\(result.metricsUsed) of \(result.totalPossibleMetrics) instruments · \(confidence)")
+    }
+
+    private static func domainLabel(_ domain: FitnessAgeDomain) -> String {
+        switch domain {
+        case .cardiovascular:  return String(localized: "Cardiovascular")
+        case .activity:        return String(localized: "Activity")
+        case .recovery:        return String(localized: "Recovery")
+        case .bodyComposition: return String(localized: "Body composition")
+        case .lifestyle:       return String(localized: "Lifestyle")
+        }
     }
 
     // MARK: Copy
@@ -207,6 +252,7 @@ extension AuraAgeReading {
             history: [], historyLabels: [], historyWindow: 30...60, historyNote: "",
             fitnessAge: "—", fitnessAgeUnit: "", vo2max: "—", vo2maxUnit: "",
             fitnessNote: "", fitnessCaveat: "",
+            domains: [], domainsNote: "",
             readiness: items,
             readinessNote: String(localized: "Weekly"),
             readinessLead: lead,

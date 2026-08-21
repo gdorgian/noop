@@ -51,6 +51,9 @@ struct RootTabView: View {
     @State private var auraBodyAgeSeries: [(day: String, value: Double)] = []
     @State private var auraFitnessAgeSeries: [(day: String, value: Double)] = []
     @State private var auraVo2maxSeries: [(day: String, value: Double)] = []
+    /// The five-domain Fitness Age. Recomputed on each refresh rather than persisted: it is a pure
+    /// function of data already stored, and the HealthKit half can change without NOOP being told.
+    @State private var auraDomainResult: BioAge.DomainResult?
     @AppStorage(UnitPrefs.effortScaleKey) private var auraEffortScaleRaw = EffortScale.hundred.rawValue
     @AppStorage(UnitPrefs.systemKey) private var auraUnitSystemRaw = UnitSystem.metric.rawValue
     @AppStorage(UnitPrefs.temperatureKey) private var auraTemperatureRaw = ""
@@ -93,6 +96,7 @@ struct RootTabView: View {
             fitnessAgeSeries: auraFitnessAgeSeries,
             vo2maxSeries: auraVo2maxSeries,
             days: last7,
+            domainResult: auraDomainResult,
             readiness: FitnessAgeEngine.assessReadiness(
                 hasAge: profile.age > 0,
                 hasSex: !profile.sex.isEmpty,
@@ -246,6 +250,20 @@ struct RootTabView: View {
             auraBodyAgeSeries = ages.0
             auraFitnessAgeSeries = ages.1
             auraVo2maxSeries = ages.2
+
+            // The five-domain Fitness Age. The strap half comes from rows already loaded; the phone half
+            // is read from HealthKit, and returns empty unless the wearer granted it — in which case the
+            // score simply reports fewer instruments and lower confidence rather than failing.
+            let phone = await health.bioAgePhoneMetrics()
+            guard !Task.isCancelled else { return }
+            auraDomainResult = BioAge.score(
+                chronologicalAge: profile.age,
+                sex: profile.sex,
+                days: Array(repo.days.suffix(30)),
+                restScores: auraRestSeries.suffix(30).map(\.value),
+                body: .init(heightCm: profile.heightCm > 0 ? profile.heightCm : nil,
+                            weightKg: profile.weightKg > 0 ? profile.weightKg : nil),
+                phone: phone)
         }
         // Quick-action sheet presents with the calm easing (~0.42s) per the README sheet spec —
         // the easing is applied where `quickAction` is set (see `presentQuickAction`), keeping the

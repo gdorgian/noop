@@ -239,6 +239,18 @@ struct AuraAgeReading {
         let magnitude: Double
     }
 
+    /// One of SuperAgeCore's five weighted domains. Separate from `Driver`: a driver is a signed push
+    /// on Body Age, a domain is a 0–100 standing in one area of health. They are not the same axis and
+    /// must not be drawn as if they were.
+    struct Domain: Identifiable {
+        let id: String
+        let label: String
+        /// 0…100.
+        let score: Double
+        /// The domain's share of the overall score, e.g. "28%".
+        let weight: String
+    }
+
     struct ReadinessItem: Identifiable {
         let id: String
         let label: String
@@ -269,6 +281,11 @@ struct AuraAgeReading {
     let vo2maxUnit: String
     let fitnessNote: String
     let fitnessCaveat: String
+
+    /// The five-domain breakdown, empty when there is not enough evidence to score one.
+    let domains: [Domain]
+    /// How complete the evidence was, e.g. "14 of 28 instruments · moderate confidence".
+    let domainsNote: String
 
     let readiness: [ReadinessItem]
     let readinessNote: String
@@ -310,6 +327,14 @@ struct AuraAgeReading {
         vo2maxUnit: "ml/kg/min",
         fitnessNote: String(localized: "± 5 yr"),
         fitnessCaveat: String(localized: "A cardiorespiratory comparison — how your estimated fitness compares to a typical person, expressed in years. It is not a biological age and carries no medical meaning."),
+        domains: [
+            Domain(id: "cardiovascular", label: String(localized: "Cardiovascular"), score: 74, weight: "28%"),
+            Domain(id: "activity", label: String(localized: "Activity"), score: 68, weight: "24%"),
+            Domain(id: "bodyComposition", label: String(localized: "Body composition"), score: 61, weight: "18%"),
+            Domain(id: "recovery", label: String(localized: "Recovery"), score: 79, weight: "15%"),
+            Domain(id: "lifestyle", label: String(localized: "Lifestyle"), score: 55, weight: "15%"),
+        ],
+        domainsNote: String(localized: "14 of 28 instruments · moderate confidence"),
         readiness: [],
         readinessNote: "",
         readinessLead: "",

@@ -10,6 +10,15 @@
       }
     },
     {
+      "identity" : "ios-core",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/superageapp/ios-core.git",
+      "state" : {
+        "revision" : "8c7fb740aefc5851e17b40a81b3cff5dc82c952f",
+        "version" : "0.4.0"
+      }
+    },
+    {
       "identity" : "networkimage",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gonzalezreal/NetworkImage",
