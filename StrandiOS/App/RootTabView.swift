@@ -316,6 +316,13 @@ struct RootTabView: View {
                 ble.syncNow()
                 Task { await repo.refresh() }
             },
+            // The Svea card on Today opens the coach directly. It presents through the More sheet's own
+            // stack rather than a second cover, so the coach's settings and goal screens push onto a path
+            // that already exists instead of a nested one.
+            onOpenCoach: {
+                withAnimation(Self.sheetEase) { showMore = true }
+                morePath.append(MoreDestination.coach)
+            },
             onSyncHealth: {
                 Task {
                     health.refreshAuthIfPreviouslyGranted()
@@ -368,12 +375,21 @@ struct RootTabView: View {
             // is read from HealthKit, and returns empty unless the wearer granted it — in which case the
             // score simply reports fewer instruments and lower confidence rather than failing.
             let phone = await health.bioAgePhoneMetrics()
+            // Zone minutes over the same window, folded to a per-day exercise figure. Two of WHOOP Age's
+            // nine inputs are zone 1–3 and zone 4–5 minutes; NOOP's hazard model has no terms for them
+            // and inventing coefficients would be inventing evidence, so the same measurement goes
+            // through the activity domain instead, on a curve somebody else calibrated.
+            let zoneWindow = Int(Date().timeIntervalSince1970)
+            let zoneMinutes = await repo.workoutZoneMinutes(
+                from: zoneWindow - 30 * 86_400, to: zoneWindow, zoneSet: profile.hrZoneSet)
+            let exercisePerDay = BioAge.exerciseMinutes(zoneMinutesPerDay: zoneMinutes.map { $0.map { $0 / 30 } })
             guard !Task.isCancelled else { return }
             auraDomainResult = BioAge.score(
                 chronologicalAge: profile.age,
                 sex: profile.sex,
                 days: Array(repo.days.suffix(30)),
                 restScores: auraRestSeries.suffix(30).map(\.value),
+                exerciseMinutesPerDay: exercisePerDay,
                 body: .init(heightCm: profile.heightCm > 0 ? profile.heightCm : nil,
                             weightKg: profile.weightKg > 0 ? profile.weightKg : nil),
                 phone: phone)

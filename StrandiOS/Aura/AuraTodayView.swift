@@ -17,6 +17,10 @@ struct AuraTodayView: View {
     private let reading: AuraTodayReading
     private let onNavigate: (AuraScreen) -> Void
     private let onOpenSignal: (AuraTodayReading.Signal) -> Void
+    /// Opens the coach. The card below has always carried Svea's name and today's call; until now it was
+    /// a read-only paragraph, and the only way to actually reach the coach was the More sheet — two taps
+    /// away from the sentence that names it.
+    private let onOpenCoach: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The one gate every never-settling animation in the app consults — system Reduce Motion, Low Power
@@ -28,12 +32,14 @@ struct AuraTodayView: View {
         state: AuraBodyState = .restored,
         reading: AuraTodayReading = .prototype,
         onNavigate: @escaping (AuraScreen) -> Void,
-        onOpenSignal: @escaping (AuraTodayReading.Signal) -> Void
+        onOpenSignal: @escaping (AuraTodayReading.Signal) -> Void,
+        onOpenCoach: @escaping () -> Void = {}
     ) {
         self.state = state
         self.reading = reading
         self.onNavigate = onNavigate
         self.onOpenSignal = onOpenSignal
+        self.onOpenCoach = onOpenCoach
     }
 
     var body: some View {
@@ -127,6 +133,11 @@ struct AuraTodayView: View {
         .padding(.top, 18)
         .padding(.bottom, 16)
         .auraCard(surface: AuraCardSurface.coaching(accent: AuraPalette.accent))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onOpenCoach)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint(Text("Opens the coach"))
     }
 
     // MARK: Signals

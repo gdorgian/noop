@@ -163,3 +163,35 @@ final class BioAgeInputsTests: XCTestCase {
         XCTAssertEqual(first?.confidence, second?.confidence)
     }
 }
+
+// MARK: - Zone minutes → exercise time
+
+extension BioAgeInputsTests {
+    /// Zone 1 is most of a sedentary day. Counting it would report sitting still as training, which is
+    /// the one way this input could actively mislead.
+    func testExerciseMinutesStartAtZoneTwoNotZoneOne() {
+        // 800 min in zone 1, nothing above it: a day spent not training.
+        XCTAssertNil(BioAge.exerciseMinutes(zoneMinutesPerDay: [800, 0, 0, 0, 0]))
+        // 30 min in zone 2, the rest sedentary.
+        XCTAssertEqual(BioAge.exerciseMinutes(zoneMinutesPerDay: [800, 30, 0, 0, 0]), 30)
+        // Everything at or above zone 2 counts.
+        XCTAssertEqual(BioAge.exerciseMinutes(zoneMinutesPerDay: [800, 30, 20, 10, 5]), 65)
+    }
+
+    func testMalformedOrAbsentZoneMinutesProduceNoExerciseTime() {
+        XCTAssertNil(BioAge.exerciseMinutes(zoneMinutesPerDay: nil))
+        XCTAssertNil(BioAge.exerciseMinutes(zoneMinutesPerDay: [10, 20]))
+    }
+
+    /// Exercise time has to reach the scorer, and reach the ACTIVITY domain — the whole reason for
+    /// routing zone minutes here rather than inventing hazard terms for them.
+    func testExerciseTimeRaisesTheEvidenceCountInTheActivityDomain() {
+        guard let without = BioAge.score(chronologicalAge: 34, sex: "male", days: week),
+              let with = BioAge.score(chronologicalAge: 34, sex: "male", days: week,
+                                      exerciseMinutesPerDay: 48)
+        else { return XCTFail("both configurations must score") }
+        XCTAssertEqual(BioAge.metrics(days: week, exerciseMinutesPerDay: 48).exerciseTime, 48)
+        XCTAssertGreaterThan(with.metricsUsed, without.metricsUsed)
+        XCTAssertNotNil(with.domainScores[.activity])
+    }
+}

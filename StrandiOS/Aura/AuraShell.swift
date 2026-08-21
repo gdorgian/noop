@@ -24,6 +24,8 @@ struct AuraShell: View {
     let onOpenDevices: () -> Void
     let onSync: () -> Void
     let onSyncHealth: () -> Void
+    /// Opens the coach from Today's Svea card.
+    let onOpenCoach: () -> Void
 
     /// Today's body state. Fixed until the screens are wired to `Repository`; it drives the orb's colour
     /// and the gauge marker's position.
@@ -60,6 +62,7 @@ struct AuraShell: View {
         onOpenSettings: @escaping () -> Void,
         onOpenDevices: @escaping () -> Void,
         onSync: @escaping () -> Void,
+        onOpenCoach: @escaping () -> Void,
         onSyncHealth: @escaping () -> Void
     ) {
         self._screen = screen
@@ -76,6 +79,7 @@ struct AuraShell: View {
         self.onOpenDevices = onOpenDevices
         self.onSync = onSync
         self.onSyncHealth = onSyncHealth
+        self.onOpenCoach = onOpenCoach
         #if DEBUG
         self._routeStack = State(initialValue: AuraRoute.debugLaunchRoute.map { [$0] } ?? [])
         #endif
@@ -169,7 +173,8 @@ struct AuraShell: View {
                 state: bodyState,
                 reading: todayReading,
                 onNavigate: { go($0) },
-                onOpenSignal: { push(.metric($0.id)) }
+                onOpenSignal: { push(.metric($0.id)) },
+                onOpenCoach: onOpenCoach
             )
         case .rest:
             AuraRestView(reading: restReading)

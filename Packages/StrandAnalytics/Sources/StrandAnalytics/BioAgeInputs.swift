@@ -151,9 +151,26 @@ public enum BioAge {
     ///     curves expect.
     ///   - restScores: the 0–100 Rest scores over the same window, if scored.
     ///   - phone: instruments read from HealthKit by the host, all optional.
+    /// Mean daily minutes spent at or above HR zone 2, from the strap's own heart-rate series.
+    ///
+    /// This is what fills SuperAgeCore's `exerciseTime`, and it is the honest home for zone minutes.
+    /// WHOOP Age takes zone 1–3 and zone 4–5 minutes as two of its nine inputs with their own
+    /// coefficients; NOOP's hazard model (`VitalityEngine`) has no such terms and inventing them would
+    /// mean inventing the coefficients too. Feeding the same measurement through the activity domain
+    /// instead uses a curve somebody else calibrated, and claims only what it can support.
+    ///
+    /// Zone 2 is the floor rather than zone 1 because zone 1 is most of a sedentary day — counting it as
+    /// exercise would report sitting still as training.
+    public static func exerciseMinutes(zoneMinutesPerDay: [Double]?) -> Double? {
+        guard let zoneMinutesPerDay, zoneMinutesPerDay.count >= 5 else { return nil }
+        let atOrAboveZone2 = zoneMinutesPerDay.dropFirst().reduce(0, +)
+        return atOrAboveZone2 > 0 ? atOrAboveZone2 : nil
+    }
+
     public static func metrics(
         days: [DailyMetric],
         restScores: [Double] = [],
+        exerciseMinutesPerDay: Double? = nil,
         body: Body = Body(),
         phone: PhoneMetrics = PhoneMetrics()
     ) -> FitnessAgeMetrics {
@@ -175,6 +192,7 @@ public enum BioAge {
             walkingHeartRateAverage: phone.walkingHeartRateAverage,
             stepCount: mean(days.compactMap { $0.steps }.map(Double.init)),
             activeEnergy: mean(days.compactMap { $0.activeKcalEst }),
+            exerciseTime: exerciseMinutesPerDay,
             flightsClimbed: phone.flightsClimbed,
             sixMinuteWalkTestDistance: phone.sixMinuteWalkTestDistance,
             standHours: phone.standHours,
@@ -216,6 +234,7 @@ public enum BioAge {
         sex: String,
         days: [DailyMetric],
         restScores: [Double] = [],
+        exerciseMinutesPerDay: Double? = nil,
         body: Body = Body(),
         phone: PhoneMetrics = PhoneMetrics()
     ) -> DomainResult? {
@@ -226,7 +245,8 @@ public enum BioAge {
         guard profile.isValidForCalculation else { return nil }
         let result = FitnessAgeCalculator().calculate(FitnessAgeInput(
             profile: profile,
-            metrics: metrics(days: days, restScores: restScores, body: body, phone: phone)
+            metrics: metrics(days: days, restScores: restScores,
+                             exerciseMinutesPerDay: exerciseMinutesPerDay, body: body, phone: phone)
         ))
         // No instruments means no evidence. The scorer will still return a number — the neutral 50 that
         // maps to exactly the chronological age — and showing that as a result would be presenting an
