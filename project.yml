@@ -274,8 +274,11 @@ targets:
       path: StrandiOS/Resources/Info.plist
       properties:
         CFBundleName: NOOP
-        # NOOP AI fork: home-screen name (upstream: NOOP).
-        CFBundleDisplayName: NOOP AI
+        # The home-screen name. The DX23876 merge renamed this to "NOOP AI" — their fork's branding,
+        # not this one's — which silently changed what the icon says on a wearer's phone. The bundle
+        # identifier was never affected (it stayed `com.noopapp.noop` through the merge, so existing
+        # installs and their data are untouched), but the label is what a person actually sees.
+        CFBundleDisplayName: NOOP
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         # Surfaces APP_GROUP_ID to runtime (WidgetSnapshot.suiteName) so the App Group id isn't
