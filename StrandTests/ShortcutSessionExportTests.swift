@@ -69,7 +69,7 @@ final class ShortcutSessionExportTests: XCTestCase {
                          dist: Double? = nil) -> WorkoutRow {
         WorkoutRow(startTs: start, endTs: end, sport: sport, source: "strap", durationS: nil,
                    energyKcal: kcal, avgHr: avg, maxHr: max, strain: nil, distanceM: dist,
-                   zonesJSON: nil, notes: nil)
+                   zonesJSON: nil, notes: nil, steps: nil)
     }
 
     private func text(_ name: String) throws -> String {
