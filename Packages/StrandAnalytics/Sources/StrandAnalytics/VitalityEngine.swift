@@ -96,6 +96,36 @@ public enum VitalityEngine {
         return anchors[anchors.count - 1].1
     }
 
+    /// Age/sex 50th-percentile VO₂max (ml/kg/min), piecewise-linear between decade midpoints. The
+    /// reference for the fitness factor: a person at their age norm contributes 0.
+    ///
+    /// Anchors are the FRIEND registry's treadmill percentiles (Kaminsky et al.), which is the same
+    /// population the hazard coefficient above is quoted against. They are POPULATION norms, deliberately
+    /// model-independent: `vo2max_est` may arrive from the Nes waist equation or the waist-free Uth
+    /// HR-ratio fallback, and a reference derived from either one would cancel that model's own terms
+    /// out of the comparison instead of measuring the person against anyone.
+    ///
+    /// A non-binary or unstated sex takes the midpoint of the two curves rather than defaulting to one:
+    /// the honest answer is "between these", not "assume male".
+    public static func vo2maxNorm(forAge age: Double, sex: String) -> Double {
+        let male: [(Double, Double)] = [(25, 48.0), (35, 42.4), (45, 38.4), (55, 33.8), (65, 29.1), (75, 24.3)]
+        let female: [(Double, Double)] = [(25, 37.6), (35, 33.6), (45, 30.2), (55, 26.7), (65, 23.4), (75, 20.0)]
+        func interpolate(_ anchors: [(Double, Double)]) -> Double {
+            if age <= anchors[0].0 { return anchors[0].1 }
+            if age >= anchors[anchors.count - 1].0 { return anchors[anchors.count - 1].1 }
+            for i in 1..<anchors.count where age <= anchors[i].0 {
+                let (a0, v0) = anchors[i - 1]; let (a1, v1) = anchors[i]
+                return v0 + (v1 - v0) * (age - a0) / (a1 - a0)
+            }
+            return anchors[anchors.count - 1].1
+        }
+        switch sex.lowercased() {
+        case "male":   return interpolate(male)
+        case "female": return interpolate(female)
+        default:       return (interpolate(male) + interpolate(female)) / 2
+        }
+    }
+
     /// Sleep regularity (0–1) from a window of nightly sleep durations (hours): 1 − coefficient of
     /// variation, clamped. A rough but honest on-device proxy for the Sleep Regularity Index when we only
     /// have durations, not full timing. Fewer than 3 nights → nil (not enough to judge).

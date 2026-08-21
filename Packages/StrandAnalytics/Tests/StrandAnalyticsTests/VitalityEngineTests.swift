@@ -80,3 +80,58 @@ final class VitalityEngineTests: XCTestCase {
         XCTAssertGreaterThan(highRHR.lnHazard, 0)
     }
 }
+
+// MARK: - The VO₂max term (added when Body Age was finally given its strongest input)
+
+extension VitalityEngineTests {
+    func testVo2maxNormFallsWithAgeAndSeparatesSexes() {
+        XCTAssertGreaterThan(VitalityEngine.vo2maxNorm(forAge: 25, sex: "male"),
+                             VitalityEngine.vo2maxNorm(forAge: 65, sex: "male"))
+        XCTAssertGreaterThan(VitalityEngine.vo2maxNorm(forAge: 40, sex: "male"),
+                             VitalityEngine.vo2maxNorm(forAge: 40, sex: "female"))
+    }
+
+    func testVo2maxNormInterpolatesAndHoldsOutsideTheAnchors() {
+        let thirty = VitalityEngine.vo2maxNorm(forAge: 30, sex: "male")
+        XCTAssertLessThan(thirty, VitalityEngine.vo2maxNorm(forAge: 25, sex: "male"))
+        XCTAssertGreaterThan(thirty, VitalityEngine.vo2maxNorm(forAge: 35, sex: "male"))
+        // Outside the anchor range the curve holds rather than extrapolating into nonsense.
+        XCTAssertEqual(VitalityEngine.vo2maxNorm(forAge: 18, sex: "male"),
+                       VitalityEngine.vo2maxNorm(forAge: 25, sex: "male"))
+        XCTAssertEqual(VitalityEngine.vo2maxNorm(forAge: 95, sex: "female"),
+                       VitalityEngine.vo2maxNorm(forAge: 75, sex: "female"))
+    }
+
+    func testUnstatedSexTakesTheMidpointRatherThanAssumingMale() {
+        let age = 45.0
+        let male = VitalityEngine.vo2maxNorm(forAge: age, sex: "male")
+        let female = VitalityEngine.vo2maxNorm(forAge: age, sex: "female")
+        XCTAssertEqual(VitalityEngine.vo2maxNorm(forAge: age, sex: "nonbinary"),
+                       (male + female) / 2, accuracy: 1e-9)
+    }
+
+    func testFitterThanTheAgeNormIsProtectiveAndReadsAsAYoungerBody() {
+        let age = 40.0
+        let norm = VitalityEngine.vo2maxNorm(forAge: age, sex: "male")
+        func inputs(_ vo2: Double) -> VitalityEngine.Inputs {
+            VitalityEngine.Inputs(chronoAge: age, restingHR: 65, vo2max: vo2, expectedVO2max: norm,
+                                  sleepHours: 7.5, rmssd: VitalityEngine.rmssdNorm(forAge: age),
+                                  rmssdNorm: VitalityEngine.rmssdNorm(forAge: age))
+        }
+        guard let fit = VitalityEngine.compute(inputs(norm + 7)),
+              let unfit = VitalityEngine.compute(inputs(norm - 7)) else {
+            return XCTFail("both inputs carry ≥3 factors and must produce a result")
+        }
+        XCTAssertLessThan(fit.bodyAge, unfit.bodyAge)
+        let driver = VitalityEngine.contributions(inputs(norm + 7)).first { $0.key == "vo2max" }
+        XCTAssertNotNil(driver, "the fitness term must appear in the driver breakdown")
+        XCTAssertLessThan(driver?.lnHazard ?? 0, 0, "fitter than the norm is protective")
+    }
+
+    /// A VO₂max with no reference is not evidence — the term must drop out rather than score against 0.
+    func testVo2maxWithoutAReferenceContributesNothing() {
+        let inputs = VitalityEngine.Inputs(chronoAge: 40, restingHR: 65, vo2max: 45,
+                                           sleepHours: 7.5, rmssd: 33, rmssdNorm: 33)
+        XCTAssertNil(VitalityEngine.contributions(inputs).first { $0.key == "vo2max" })
+    }
+}

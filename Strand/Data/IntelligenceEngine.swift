@@ -1808,14 +1808,24 @@ final class IntelligenceEngine: ObservableObject {
         // ── Vitality / Body Age (Phase 7) , weekly, keyed to the week's Saturday ────────────────────
         // Roll the last 7 days' wearable signals into the mortality-hazard model and upsert a weekly
         // Vitality (0–100) + Body Age. VitalityEngine gates on ≥3 inputs, so a sparse week writes nothing.
-        // (VO₂max is omitted here , fitness is already its own Fitness Age headline; Vitality leans on
-        // resting HR, sleep duration + regularity, HRV-vs-age-norm, and steps.)
+        // VO₂max IS included. It was omitted on the reasoning that "fitness already has its own Fitness Age
+        // headline", but the two answer different questions: Fitness Age is a cardiorespiratory comparison,
+        // Body Age is a hazard sum — and cardiorespiratory fitness carries the LARGEST published coefficient
+        // in that sum (~14% per MET). Leaving it out was dropping the strongest term the app can measure,
+        // and it is the term WHOOP Age leans on hardest too. The value is the one this same pass just wrote
+        // to `vo2max_est` above (Nes waist-based, or the waist-free Uth fallback), compared against the
+        // population age/sex norm rather than against either model's own reference person.
         let vNights = fa7.compactMap { $0.totalSleepMin }.map { Double($0) / 60.0 }.filter { $0 > 0 }
         let vHRVs = fa7.compactMap { $0.avgHrv }
         let vSteps = fa7.compactMap { $0.steps }.map(Double.init)
+        let vVO2 = faPts.first { $0.key == "vo2max_est" }?.value
         let vInputs = VitalityEngine.Inputs(
             chronoAge: Double(profile.age),
             restingHR: faRHRs.isEmpty ? nil : IntelligenceEngine.medianOf(faRHRs),
+            vo2max: vVO2,
+            expectedVO2max: vVO2.map { _ in
+                VitalityEngine.vo2maxNorm(forAge: Double(profile.age), sex: profile.sex)
+            },
             sleepHours: vNights.isEmpty ? nil : vNights.reduce(0, +) / Double(vNights.count),
             sleepConsistency: VitalityEngine.sleepConsistency(nightlyHours: vNights),
             rmssd: vHRVs.isEmpty ? nil : IntelligenceEngine.medianOf(vHRVs),
