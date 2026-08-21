@@ -984,6 +984,15 @@ final class HealthKitBridge: ObservableObject {
         let computed = (try? await whoopStore.dailyMetrics(deviceId: computedDeviceId, from: from, to: to)) ?? []
         let imported = (try? await whoopStore.dailyMetrics(deviceId: noopDeviceId, from: from, to: to)) ?? []
         let rows = HealthKitBridge.mergeVitalRows(computed: computed, imported: imported)
+        // The #103 candidate lives in metricSeries rather than on the daily row, because it is
+        // instrumentation and deliberately not a `DailyMetric` field. Read once, keyed by day.
+        var spo2CandidateByDay: [String: Int] = [:]
+        if PuffinExperiment.spo2CandidateHealthWriteEnabled {
+            let points = (try? await whoopStore.metricSeries(
+                deviceId: noopDeviceId + "-noop", key: "spo2_candidate",
+                from: "0000-01-01", to: "9999-12-31")) ?? []
+            for point in points { spo2CandidateByDay[point.day] = Int(point.value.rounded()) }
+        }
 
         // HealthKit's HRV identifier is SDNN, while DailyMetric.avgHrv is NOOP's RMSSD. The SDNN this
         // exports is `DailyMetric.avgSdnn`, computed and stored by the analytics pass; nothing is
@@ -1032,6 +1041,17 @@ final class HealthKitBridge: ObservableObject {
             }
             if let spo2 = row.spo2Pct {
                 add(.oxygenSaturation, .percent(), spo2 / 100, row.day, at)
+            } else if PuffinExperiment.spo2CandidateHealthWriteEnabled,
+                      let candidate = spo2CandidateByDay[row.day] {
+                // #103: the WHOOP 5/MG strap-computed SpO₂ candidate at byte @82. `spo2Pct` is nil for
+                // every WHOOP row by design — NOOP does not derive a saturation percentage from raw
+                // red/IR, because that needs a calibration curve nobody has and guessing it manufactures
+                // a clinical-looking number. This is not derived: it is a value the strap itself banked,
+                // read out of the record.
+                //
+                // It is still not settled evidence, which is why it takes its own opt-in and never
+                // overrides a real `spo2Pct`. Both toggles have to be on to reach this line.
+                add(.oxygenSaturation, .percent(), Double(candidate) / 100, row.day, at)
             }
             if let rr = row.respRateBpm {
                 add(.respiratoryRate, HKUnit.count().unitDivided(by: .minute()), rr, row.day, at)

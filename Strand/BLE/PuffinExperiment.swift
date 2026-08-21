@@ -66,6 +66,28 @@ enum PuffinExperiment {
 
     static var spo2CandidateDisplayEnabled: Bool { UserDefaults.standard.bool(forKey: spo2CandidateDisplayKey) }
 
+    /// #103 follow-on, default OFF and only meaningful while the display toggle above is on: also publish
+    /// the strap's SpO₂ candidate to Apple Health as a blood-oxygen sample.
+    ///
+    /// Kept SEPARATE from the display toggle on purpose. Reading an uncertain number inside NOOP, where
+    /// its caveats are on the same screen, is a different act from writing it into Apple Health — where
+    /// it becomes a blood-oxygen reading like any other, indistinguishable from a medical-grade one, and
+    /// is read by whatever else the wearer has connected. The upstream position is that the @82 candidate
+    /// must not back a shipped SpO₂ metric while the cross-device evidence is split (an 8-night validation
+    /// correlates at +0.99, but two nights on the original device moved OPPOSITE to the app's value), and
+    /// that position is right for a shipped app.
+    ///
+    /// This fork is one person's, and that person can decide to publish their own uncertain number to
+    /// their own Health store. What they cannot do is decide it accidentally, so this is its own opt-in,
+    /// off by default, and the Settings copy states the contradiction rather than summarising it away.
+    static let spo2CandidateHealthWriteKey = "noopSpo2CandidateHealthWrite"
+
+    /// True only when BOTH toggles are on: publishing a value the app itself is not computing would be
+    /// incoherent, so the display toggle gates this one.
+    static var spo2CandidateHealthWriteEnabled: Bool {
+        spo2CandidateDisplayEnabled && UserDefaults.standard.bool(forKey: spo2CandidateHealthWriteKey)
+    }
+
     /// Opt-in "Personal daytime-stress baseline" (#463): score TODAY's intraday stress timeline against a
     /// PERSONAL cross-day rolling baseline (Oura-style `.baselineRelative`) instead of the day's own calm
     /// hours (`.dayRelative`, the default). Default OFF — the validated r≈0.6 HR-only margin is so far

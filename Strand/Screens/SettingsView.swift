@@ -104,6 +104,11 @@ struct SettingsView: View {
     /// writes nothing to the strap. See [PuffinExperiment.spo2CandidateDisplayKey].
     @AppStorage(PuffinExperiment.spo2CandidateDisplayKey) private var spo2CandidateDisplayEnabled = false
 
+    /// #103 follow-on, default off: also write the @82 candidate to Apple Health, which is what lets it
+    /// reach anything reading from Health. Gated behind the display toggle above and its own switch —
+    /// see [PuffinExperiment.spo2CandidateHealthWriteKey] for why the two are not one control.
+    @AppStorage(PuffinExperiment.spo2CandidateHealthWriteKey) private var spo2CandidateHealthWriteEnabled = false
+
     /// #463 opt-in: score the intraday stress timeline against a PERSONAL cross-day baseline
     /// (`.baselineRelative`) instead of the day's own calm hours. Default off — the r≈0.6 margin is
     /// single-subject so far. Display-only; never feeds recovery/illness. See
@@ -2214,6 +2219,20 @@ struct SettingsView: View {
                     .font(StrandFont.caption)
                     .foregroundStyle(StrandPalette.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if spo2CandidateDisplayEnabled {
+                    Toggle(isOn: $spo2CandidateHealthWriteEnabled) {
+                        Text("Also publish it to Apple Health")
+                            .font(StrandFont.subhead)
+                            .foregroundStyle(StrandPalette.textPrimary)
+                    }
+                    .toggleStyle(.switch)
+                    .tint(StrandPalette.accent)
+                    Text("Separate on purpose. Reading this number here, next to the caveat above, is not the same as writing it into Apple Health — there it becomes a blood-oxygen reading like any other, and anything else you have connected will read it without ever seeing this screen. The evidence above is genuinely split, so leave this off unless you have checked the number against a real pulse oximeter and want it in Health anyway. A calibrated import always wins; this only fills nights that have nothing.")
+                        .font(StrandFont.caption)
+                        .foregroundStyle(StrandPalette.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 // MARK: #463 Personal daytime-stress baseline — score today's timeline vs a personal
                 //       cross-day baseline instead of the day's own calm hours. Off by default.

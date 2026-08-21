@@ -855,7 +855,24 @@ final class IntelligenceEngine: ObservableObject {
         // window for regularity (a recent-behaviour signal); full history for the need's upper-quartile
         // "unrestricted nights" estimate. Both degrade honestly on thin history (consistency → nil →
         // neutral term; need → population default), so cold-start is unchanged.
-        let sleepConsistency = VitalityEngine.sleepConsistency(nightlyHours: Array(nightlyHours.suffix(28)))
+        // Session TIMING for the Sleep Regularity Index. Read once here and reused by the weekly Body Age
+        // pass below, so the two never measure regularity differently — which they did until now: Rest
+        // scored a duration proxy while Body Age scored SRI, and "how regular is your sleep" got two
+        // different answers in one app.
+        let sriTo = Int(Date().timeIntervalSince1970)
+        let sriSessions = ((try? await store.sleepSessions(deviceId: deviceId + "-noop",
+                                                           from: sriTo - 15 * 86_400, to: sriTo,
+                                                           limit: 400)) ?? [])
+            .map { (start: $0.effectiveStartTs, end: $0.endTs) }
+
+        // SRI where the timing supports it, the duration proxy where it does not. `1 − CV` over nightly
+        // LENGTHS cannot see the thing regularity means: a wearer who sleeps 7.5 h every night scores a
+        // perfect 1.0 whether they start at 23:00 or alternate 23:00 and 04:00. SRI compares each minute's
+        // asleep/awake state against the same minute 24 h later, which is what catches a shifted weekend.
+        // It needs a week of session timing, so the proxy stays as the cold-start fallback rather than
+        // being deleted — and a wearer with thin history keeps exactly the behaviour they had.
+        let sleepConsistency = SleepRegularity.consistency(sessions: sriSessions)
+            ?? VitalityEngine.sleepConsistency(nightlyHours: Array(nightlyHours.suffix(28)))
         let sleepNeedHours = AnalyticsEngine.Rest.personalizedNeedHours(nightlyHours: nightlyHours,
                                                                         age: profile.age)
 
@@ -2132,14 +2149,8 @@ final class IntelligenceEngine: ObservableObject {
         // and it is the term WHOOP Age leans on hardest too. The value is the one this same pass just wrote
         // to `vo2max_est` above (Nes waist-based, or the waist-free Uth fallback), compared against the
         // population age/sex norm rather than against either model's own reference person.
-        // Session TIMING for the Sleep Regularity Index — read over a fortnight rather than the seven
-        // days the vitals use, because SRI compares each day against the next and a 7-day window yields
-        // only six comparisons. Falls back to the duration proxy on its own if the read comes up short.
-        let sriTo = Int(Date().timeIntervalSince1970)
-        let sriFrom = sriTo - 15 * 86_400
-        let sriSessions = ((try? await store.sleepSessions(deviceId: computedId, from: sriFrom, to: sriTo,
-                                                           limit: 400)) ?? [])
-            .map { (start: $0.effectiveStartTs, end: $0.endTs) }
+        // `sriSessions` is the read hoisted above, shared with the Rest path so both measure regularity
+        // the same way.
         let vInputs = IntelligenceEngine.vitalityInputs(
             days: Array(fa7), age: profile.age, sex: profile.sex,
             vo2max: faPts.first { $0.key == "vo2max_est" }?.value,
