@@ -28,34 +28,59 @@ final class TodayLayoutPrefsTests: XCTestCase {
         XCTAssertEqual(TodayLayoutPrefs.decodeOrder(encoded), reordered)
     }
 
+    // These three test the INSERTION rule, not the default order itself. They used to restate
+    // `defaultOrder` as a literal, which meant reordering the screen broke three tests that were not
+    // about ordering — and, worse, invited "fix" by pasting the new order back in, which would have made
+    // them assert nothing. They now derive the expectation from `defaultOrder`, so they keep testing
+    // placement while `testDefaultOrderLeadsWithTheSynthesisSentence` is the one place the order is
+    // pinned.
+
+    /// Every section missing from the saved order must be reinserted at its DEFAULT position relative to
+    /// the sections that were saved — never appended to the bottom, which is where a naive merge puts
+    /// them and where a wearer would never find them.
+    private func expectedOrder(saved: [TodaySection]) -> [TodaySection] {
+        // Mirrors `decodeOrder`'s rule exactly: the saved order is kept verbatim, and each missing
+        // section is inserted before the first saved section that sits LATER in `defaultOrder` than it
+        // does — appended when there is none. Written out rather than called through so the test states
+        // the rule it is checking instead of asserting the implementation against itself.
+        func defaultIndex(_ section: TodaySection) -> Int {
+            TodaySection.defaultOrder.firstIndex(of: section) ?? TodaySection.defaultOrder.count
+        }
+        var result = saved
+        for missing in TodaySection.allCases where !saved.contains(missing) {
+            if let insertAt = result.firstIndex(where: { defaultIndex($0) > defaultIndex(missing) }) {
+                result.insert(missing, at: insertAt)
+            } else {
+                result.append(missing)
+            }
+        }
+        return result
+    }
+
     /// The v1 upgrade path: an order saved by the FIRST cut (6 sections — no hero/liveSession, which were
-    /// pinned then) must surface the newer sections at the TOP (their default position), not teleport
-    /// them to the bottom of the user's saved order. `coach` is the newest such section and leads the
-    /// default order, so it lands ahead of hero/liveSession.
+    /// pinned then) must surface the newer sections at their default position.
     func testSavedOrderFromFirstCutInsertsHeroAndSessionAtTheirDefaultPosition() {
-        let firstCut = "synthesis,keyMetrics,workouts,heartRate,recoveryVitals,yourCards"
+        let saved: [TodaySection] = [.synthesis, .keyMetrics, .workouts, .heartRate, .recoveryVitals, .yourCards]
         XCTAssertEqual(
-            TodayLayoutPrefs.decodeOrder(firstCut),
-            [.coach, .hero, .liveSession, .synthesis, .goals, .keyMetrics, .workouts, .heartRate,
-             .recoveryVitals, .yourCards, .menstrualCycle, .journal, .dataSources, .addedCards]
+            TodayLayoutPrefs.decodeOrder(saved.map(\.rawValue).joined(separator: ",")),
+            expectedOrder(saved: saved)
         )
     }
 
     func testInsertsAnyMissingSectionAtItsDefaultPositionRelativeToSaved() {
-        let partial = "heartRate,synthesis,keyMetrics,recoveryVitals"
+        let saved: [TodaySection] = [.heartRate, .synthesis, .keyMetrics, .recoveryVitals]
         XCTAssertEqual(
-            TodayLayoutPrefs.decodeOrder(partial),
-            [.coach, .hero, .liveSession, .goals, .workouts, .heartRate, .synthesis, .keyMetrics,
-             .recoveryVitals, .yourCards, .menstrualCycle, .journal, .dataSources, .addedCards]
+            TodayLayoutPrefs.decodeOrder(saved.map(\.rawValue).joined(separator: ",")),
+            expectedOrder(saved: saved)
         )
     }
 
     func testDropsUnknownTokensAndCollapsesDuplicates() {
         let messy = "yourCards,BOGUS,yourCards,heartRate, ,heartRate"
+        // The junk and the repeats collapse to exactly this saved pair, then the rest fills in.
         XCTAssertEqual(
             TodayLayoutPrefs.decodeOrder(messy),
-            [.coach, .hero, .liveSession, .synthesis, .goals, .keyMetrics, .workouts, .recoveryVitals,
-             .yourCards, .heartRate, .menstrualCycle, .journal, .dataSources, .addedCards]
+            expectedOrder(saved: [.yourCards, .heartRate])
         )
     }
 

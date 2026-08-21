@@ -375,6 +375,41 @@ extension WhoopStore {
     /// Oura channels and legacy NULL rows are unchanged.
     ///
     /// Rows are FILTERED, never deleted: excluded streams stay on disk as a cross-check.
+    /// One stored second carrying both a historical and a live R-R row: the raw material for settling
+    /// whether the v18 historical field is milliseconds or 1/1024-second ticks (#1008/#1118, ryanbr#1505).
+    ///
+    /// Returns the pair as `(ts, liveMs, historicalMs)` — both as STORED. The interpretation depends on
+    /// which build banked them, which is the caller's to know, and `RRUnitEvidence` documents all three
+    /// readings. Deliberately raw: this function measures, it does not conclude.
+    ///
+    /// Reads the rows directly rather than through `rrIntervals`, because that function applies the
+    /// transport SELECTION — which discards exactly the duplicate this measurement is looking for.
+    public nonisolated func rrTransportDuplicates(deviceId: String, from: Int, to: Int,
+                                                  limit: Int = 5_000) async throws
+        -> [(ts: Int, liveMs: Int, historicalMs: Int)] {
+        try await asyncRead { db in
+            // One row per second that has BOTH kinds. MIN() picks a stable representative when a second
+            // carries several of either; a second with three live beats and one historical is ambiguous
+            // for this purpose anyway, and the pile-up test does not need every pair, only unbiased ones.
+            try Row.fetchAll(db, sql: """
+                SELECT ts,
+                       MIN(CASE WHEN srcChannel IN (?, ?) THEN rrMs END) AS liveMs,
+                       MIN(CASE WHEN srcChannel = ? THEN rrMs END) AS historicalMs
+                FROM rrInterval
+                WHERE deviceId = ? AND ts >= ? AND ts <= ?
+                  AND (tsSuspect IS NULL OR tsSuspect <> 1)
+                GROUP BY ts
+                HAVING liveMs IS NOT NULL AND historicalMs IS NOT NULL
+                ORDER BY ts DESC
+                LIMIT ?
+                """, arguments: [RRSourceChannel.whoopStandardBLE.rawValue,
+                                 RRSourceChannel.whoopRealtime.rawValue,
+                                 RRSourceChannel.whoopHistorical.rawValue,
+                                 deviceId, from, to, limit])
+                .map { (ts: $0["ts"], liveMs: $0["liveMs"], historicalMs: $0["historicalMs"]) }
+        }
+    }
+
     /// Every R-R consumer reads through this one function, so the `hrv diag` trace moves with the scores
     /// rather than reporting a coverage nobody can reproduce.
     // `nonisolated` + `asyncRead`: this is the hottest read on the analyze path and it has no business

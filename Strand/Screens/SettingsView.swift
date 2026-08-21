@@ -1880,11 +1880,10 @@ struct SettingsView: View {
     // both Today-variant switches sit together with the rest of the look-and-feel controls instead of
     // being buried in the collapsed Advanced group — see `appearanceExperimentalSection` below.
     @ViewBuilder private var experimentalCard: some View {
-        // macOS-only: iPhone's Today is now Aura, which replaced the liquid/classic pair outright, so
-        // on iOS this toggle would switch nothing. macOS still branches on the key in `RootView`.
-        #if os(macOS)
-        liquidTodayCard
-        #endif
+        // The Liquid Today toggle is NOT re-listed here. It lives in `appearanceExperimentalSection`,
+        // which is itself macOS-only now — iPhone's Today is Aura, which replaced the liquid/classic pair
+        // outright, so on iOS the switch would change nothing. macOS still branches on the key in
+        // `RootView`, and one surface for one toggle is the whole point of having moved it.
         if shows(.liveSessions) { liveSessionsCard }
         if showFiveMGControls && shows(.experimentalWhoop5) { fiveMGCard }
         if shows(.sleepStaging) { sleepStagingCard }

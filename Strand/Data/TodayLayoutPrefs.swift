@@ -70,9 +70,23 @@ enum TodaySection: String, CaseIterable, Identifiable {
     /// The original, hard-coded section order — the default when the layout isn't customised. The journal
     /// widget (#656) sits above the data-sources card, which is last. Coach leads the list — the same spot
     /// its full-width banner has always held on classic Today, before the hero scores.
+    /// FORK: Today LEADS WITH THE ANSWER. `synthesis` — the greeting, the readiness pills and the
+    /// one-line "what to do about it" — comes first, with the hero scores immediately under it: the three
+    /// scores are what the app IS, but they are raw numbers, and the sentence is what a wearer reads
+    /// first. Bevel and WHOOP both open with the verdict and keep the detail below it.
+    ///
+    /// The coach's daily call sits third rather than first. It is a reading ABOUT the numbers, so it
+    /// belongs under them; leading with it would put a generated paragraph above the measurements it is
+    /// generated from. Goals follow, then the readings most-glanceable first. `liveSession` is an ACTION
+    /// rather than a reading, so it drops below the data it would be based on instead of interrupting at
+    /// position two.
+    ///
+    /// Only the ORDER differs from upstream. Every `rawValue` is untouched, so the "today.sectionOrder"
+    /// string stays a stable contract and a wearer who already arranged their own layout keeps it —
+    /// `decodeOrder` returns the saved order and only consults this for sections missing from it.
     static let defaultOrder: [TodaySection] = [
-        .coach, .hero, .liveSession, .synthesis, .goals, .keyMetrics, .workouts, .heartRate, .recoveryVitals,
-        .yourCards, .menstrualCycle, .journal, .dataSources, .addedCards,
+        .synthesis, .hero, .coach, .goals, .heartRate, .recoveryVitals, .keyMetrics, .liveSession,
+        .workouts, .yourCards, .menstrualCycle, .journal, .dataSources, .addedCards,
     ]
 
     /// Sections hidden by default on a new/never-customised install: none. The redesign originally

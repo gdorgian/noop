@@ -105,6 +105,7 @@ enum DebugDataDiagnostics {
         lines += await workoutSourceLines(repo: repo)
         lines += await dailyDataLines(repo: repo)
         lines += alarmLines()
+        lines += await rrUnitEvidenceLines(repo: repo)
 
         // Funnels for the latest night — best-effort, self-reporting.
         lines.append(String(repeating: "─", count: 40))
@@ -303,6 +304,38 @@ enum DebugDataDiagnostics {
     /// Alarm state for the debug export: the configured wake + the last arm's sent-vs-strap-reports (#34), so
     /// a "didn't buzz" report shows at a glance whether the strap accepted the time. Reads persisted defaults
     /// (written by BLEManager.armStrapAlarm + the FrameRouter readback); sync + guarded.
+    /// The measurement that settles whether the WHOOP 5 v18 historical R-R field is milliseconds or
+    /// 1/1024-second ticks (#1008/#1118, ryanbr/noop#1505).
+    ///
+    /// The physiological cross-check cannot answer it — the effect is 2.4 bpm and the check's own scatter
+    /// on a one- or two-beat mean is larger, which is why a WHOOP 4 v24 record, a layout that IS
+    /// milliseconds, reads "better" under a tick conversion. This does not use that check at all. It
+    /// finds seconds where the strap's two transports both banked a beat and reports how their values
+    /// cluster, which is a direct observation rather than an inference.
+    ///
+    /// Prints counts and refuses to conclude below `minimumPairsForAVerdict` — one pair landing on 1.024
+    /// is the shape of evidence that withdrew #194.
+    @MainActor static func rrUnitEvidenceLines(repo: Repository) async -> [String] {
+        guard let store = await repo.storeHandle() else { return [] }
+        let deviceId = (try? DeviceRegistryStore(dbQueue: store.registryWriter).activeDeviceId())
+            ?? Repository.whoopSource
+        let now = Int(Date().timeIntervalSince1970)
+        let rows = (try? await store.rrTransportDuplicates(
+            deviceId: deviceId, from: now - 30 * 86_400, to: now)) ?? []
+        let pairs = rows.map {
+            RRUnitEvidence.Pair(ts: $0.ts, liveMs: $0.liveMs, historicalRaw: $0.historicalMs)
+        }
+        let verdict = RRUnitEvidence.verdict(for: pairs)
+        var lines = [String(repeating: "─", count: 40), verdict.summary]
+        // A handful of raw pairs beside the summary, so the numbers can be checked by hand rather than
+        // taken on the summary's word.
+        for pair in pairs.prefix(6) {
+            lines.append("  \(pair.ts): live \(pair.liveMs) · hist \(pair.historicalRaw) · "
+                + "ratio \(String(format: "%.4f", pair.ratio))")
+        }
+        return lines
+    }
+
     static func alarmLines() -> [String] {
         var lines: [String] = []
         lines.append(String(repeating: "─", count: 40))
