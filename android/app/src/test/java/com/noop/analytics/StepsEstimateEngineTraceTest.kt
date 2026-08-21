@@ -94,9 +94,7 @@ class StepsEstimateEngineTraceTest {
         val lines = StepsEstimateEngineTrace.rawCounterTrace(
             daySteps = listOf(step(0, 100)), dayKey = dayUtc, tzOffsetSeconds = 0L, ticksPerStep = 1.0,
         )
-        assertEquals(1, lines.size)
-        assertTrue(lines[0].contains("counterSamples=1"))
-        assertTrue(lines[0].contains("need >=2"))
+        assertEquals(listOf("stepsRaw day=2026-01-02 counterSamples=1 (need >=2 for a delta)"), lines)
     }
 
     @Test fun emptyCounterReportsNoRawCounterNotBroken() {
@@ -106,24 +104,32 @@ class StepsEstimateEngineTraceTest {
         val lines = StepsEstimateEngineTrace.rawCounterTrace(
             daySteps = emptyList(), dayKey = dayUtc, tzOffsetSeconds = 0L, ticksPerStep = 1.0,
         )
-        assertEquals(1, lines.size)
-        assertTrue(lines[0].contains("counterSamples=0"))
-        assertTrue(lines[0].contains("noRawCounter"))
-        assertTrue(lines[0].contains("motion-estimated"))
-        assertFalse(lines[0].contains("need >=2")) // not the misleading "broken" line
-        assertFalse(lines[0].contains("\u2014")) // no em-dash
+        assertEquals(
+            listOf(
+                "stepsRaw day=2026-01-02 counterSamples=0 noRawCounter " +
+                    "(no step counter on this device; steps are motion-estimated, e.g. WHOOP 4.0)",
+            ),
+            lines,
+        )
     }
 
-    @Test fun emptyAfterDayFilterAlsoReportsNoRawCounter() {
-        // daySteps has rows, but none fall on the requested day (e.g. all on a neighbouring day). After the
-        // local-day filter the sorted list is empty, so the same honest noRawCounter line is emitted rather
-        // than a broken-looking counterSamples=0 ... need >=2.
+    @Test fun nonemptyInputWithNoRowsForDayReportsOnlyThatMismatch() {
+        // The supplied rows prove that a raw counter exists; they merely do not match the requested local day.
+        // Never turn that day-window mismatch into a device-capability or motion-estimation claim.
         val otherDay = listOf(step(2 * 86_400L, 100), step(2 * 86_400L + 60, 150))
         val lines = StepsEstimateEngineTrace.rawCounterTrace(
             daySteps = otherDay, dayKey = dayUtc, tzOffsetSeconds = 0L, ticksPerStep = 1.0,
         )
-        assertEquals(1, lines.size)
-        assertTrue(lines[0].contains("noRawCounter"))
+        assertEquals(
+            listOf(
+                "stepsRaw day=2026-01-02 counterSamples=0 inputSamples=2 noRowsForDay " +
+                    "(no counter rows matched the requested local day)",
+            ),
+            lines,
+        )
+        assertFalse(lines[0].contains("noRawCounter"))
+        assertFalse(lines[0].contains("no step counter on this device"))
+        assertFalse(lines[0].contains("motion-estimated"))
     }
 
     // MARK: WHOOP-4 calibration trace
@@ -165,6 +171,25 @@ class StepsEstimateEngineTraceTest {
         val fit = lines.first { it.startsWith("stepsCal fit ") }
         assertTrue(fit.contains("manual=true"))
         assertTrue(fit.contains("k=9.5"))
+        assertTrue(fit.contains("sampleDays=1"))
+        assertTrue(fit.contains("(user-set k)"))
+        assertFalse(fit.contains("motion-weighted median"))
+    }
+
+    @Test fun manualOverrideTraceUsesTheSingleUsablePointAndUserSetSource() {
+        val points = listOf(
+            StepsEstimateEngine.CalibrationPoint(0.5, 500.0),
+            StepsEstimateEngine.CalibrationPoint(10.0, 0.0),
+            StepsEstimateEngine.CalibrationPoint(10.0, 1_000.0),
+        )
+
+        assertEquals(
+            listOf(
+                "stepsCal point motion=10.0 phoneRef=1000 ratio=100.0 (steps/motion votes weighted by motion)",
+                "stepsCal fit k=9.5 sampleDays=1 confidence=1.0 manual=true (user-set k)",
+            ),
+            StepsEstimateEngineTrace.calibrationTrace(points, manualOverride = 9.5),
+        )
     }
 
     // MARK: readout parsers

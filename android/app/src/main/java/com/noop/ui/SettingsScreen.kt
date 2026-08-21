@@ -610,9 +610,6 @@ fun SettingsScreen(
     var continuousHrvOvernight by remember { mutableStateOf(NoopPrefs.continuousHrvOvernight(context)) }
 
     // #477 Power saving: battery-adaptive strap-sync cadence + optional HRV-capture pause. Local mirrors.
-    var powerSaving by remember { mutableStateOf(NoopPrefs.powerSaving(context)) }
-    var powerSavingBatteryPct by remember { mutableStateOf(NoopPrefs.powerSavingBatteryPct(context)) }
-    var pauseHrvOnPowerSave by remember { mutableStateOf(NoopPrefs.pauseHrvOnPowerSave(context)) }
 
     // --- v5 Health & wellness toggle group. All SharedPreferences-backed (not reactive), so each Switch
     // drives a local mirror that writes straight through to the same keys the v5 engine readers use.
@@ -951,9 +948,13 @@ fun SettingsScreen(
                 // estimate. Unset (0) by design — the headline Fitness Age never needs it — so it shows
                 // "Add" until entered, then steps like Height (inches in imperial, cm in metric).
                 // First tap from unset seeds a typical adult waist rather than 1 cm.
+                // The footnote sits BELOW the row (like Step calibration), never inside the control
+                // column: SettingsFormRow weights the LABEL and measures the control first, so a
+                // full-width helper text in the control starves the label to ~0 width — it then wrapped
+                // one character per line, rendering blank while inflating the row to ~300dp of dead space.
+                val hasWaist = profile.waistCm > 0.0
                 SettingsFormRow(label = uiString(R.string.l10n_settings_screen_waist_optional_d5356703)) {
                     Column(horizontalAlignment = Alignment.End) {
-                        val hasWaist = profile.waistCm > 0.0
                         if (unitSystem == UnitSystem.IMPERIAL) {
                             val totalInches = UnitFormatter.cmToInches(profile.waistCm).roundToInt()
                             StepperField(
@@ -961,7 +962,10 @@ fun SettingsScreen(
                                 accessibility = if (hasWaist) {
                                     "Waist, $totalInches inches"
                                 } else {
-                                    "Waist, not set. Optional: adds your VO₂max estimate"
+                                    // #1391: a waist does NOT unlock VO₂max (the Uth HR-ratio fallback
+                                    // needs none) — it upgrades it. The visible footnote was corrected
+                                    // for this; this screen-reader copy had been left behind.
+                                    "Waist, not set. Optional: your VO₂max is more accurate with it"
                                 },
                                 valueColor = if (hasWaist) Palette.textPrimary else Palette.textTertiary,
                                 onMinus = { mutate { profile.waistCm = waistInchesStep(profile.waistCm, up = false) } },
@@ -974,21 +978,32 @@ fun SettingsScreen(
                                 accessibility = if (hasWaist) {
                                     "Waist in centimetres"
                                 } else {
-                                    "Waist, not set. Optional: adds your VO₂max estimate"
+                                    // #1391: a waist does NOT unlock VO₂max (the Uth HR-ratio fallback
+                                    // needs none) — it upgrades it. The visible footnote was corrected
+                                    // for this; this screen-reader copy had been left behind.
+                                    "Waist, not set. Optional: your VO₂max is more accurate with it"
                                 },
                                 valueColor = if (hasWaist) Palette.textPrimary else Palette.textTertiary,
                                 onMinus = { mutate { profile.waistCm = waistCmStep(profile.waistCm, up = false) } },
                                 onPlus = { mutate { profile.waistCm = waistCmStep(profile.waistCm, up = true) } },
                             )
                         }
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = if (hasWaist) "Adds your VO₂max estimate" else "Optional · adds your VO₂max estimate",
-                            style = NoopType.footnote,
-                            color = if (hasWaist) Palette.accent else Palette.textTertiary,
-                        )
                     }
                 }
+                Text(
+                    // #1391: VO₂max is offered from heart rate alone (Uth HR-ratio) even without a
+                    // waist; a waist switches it to the more accurate body-composition estimate. So the
+                    // sub-text says what's used + how a waist helps, not "adds/unlocks". The unset copy
+                    // now also carries the Apple twin's two missing beats: the Fitness Age doesn't need a
+                    // waist, and WHERE to measure.
+                    text = if (hasWaist) {
+                        uiString(R.string.settings_waist_footnote_set)
+                    } else {
+                        uiString(R.string.settings_waist_footnote_unset)
+                    },
+                    style = NoopType.footnote,
+                    color = if (hasWaist) Palette.accent else Palette.textTertiary,
+                )
                 SettingsRowDivider()
                 SettingsFormRow(label = uiString(R.string.l10n_settings_screen_max_heart_rate_3d4ed858)) {
                     Column(horizontalAlignment = Alignment.End) {
@@ -2121,99 +2136,6 @@ fun SettingsScreen(
             }
         }
 
-        // #477 Power saving. Two BENIGN battery levers only: the offload-cadence stretch (%-gated) and
-        // the HRV-capture pause (Battery-Saver-gated). The riskier connection-priority idle throttle is
-        // deliberately not surfaced here — it stays dormant pending on-strap validation (#478).
-        SettingsCard(
-            icon = Icons.Filled.BatteryStd,
-            title = stringResource(R.string.power_saving),
-            blurb = stringResource(R.string.power_saving_blurb),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.power_saving_mode), style = NoopType.subhead, color = Palette.textPrimary)
-                    Text(
-                        stringResource(R.string.power_saving_mode_desc),
-                        style = NoopType.footnote,
-                        color = Palette.textTertiary,
-                    )
-                }
-                Switch(
-                    checked = powerSaving,
-                    onCheckedChange = {
-                        powerSaving = it
-                        vm.setPowerSaving(it)
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Palette.surfaceBase,
-                        checkedTrackColor = Palette.accent,
-                        uncheckedThumbColor = Palette.textSecondary,
-                        uncheckedTrackColor = Palette.surfaceInset,
-                        uncheckedBorderColor = Palette.hairline,
-                    ),
-                )
-            }
-            if (powerSaving) {
-                SettingsRowDivider()
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.power_saving_kick_in), style = NoopType.subhead, color = Palette.textPrimary)
-                        Text(stringResource(R.string.power_saving_pct, powerSavingBatteryPct), style = NoopType.subhead, color = Palette.accent)
-                    }
-                    Slider(
-                        value = powerSavingBatteryPct.toFloat(),
-                        // 10–30% snapping to 5% steps (10/15/20/25/30). steps = the 3 stops BETWEEN ends.
-                        onValueChange = { powerSavingBatteryPct = it.roundToInt() },
-                        onValueChangeFinished = { vm.setPowerSavingBatteryPct(powerSavingBatteryPct) },
-                        valueRange = 10f..30f,
-                        steps = 3,
-                        colors = SliderDefaults.colors(
-                            thumbColor = Palette.accent,
-                            activeTrackColor = Palette.accent,
-                            inactiveTrackColor = Palette.surfaceInset,
-                        ),
-                    )
-                }
-                SettingsRowDivider()
-                // HRV pause: a sub-option of power saving, ON by default when the master is on.
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.power_saving_hrv_pause), style = NoopType.subhead, color = Palette.textPrimary)
-                        Text(
-                            stringResource(R.string.power_saving_hrv_pause_desc),
-                            style = NoopType.footnote,
-                            color = Palette.textTertiary,
-                        )
-                    }
-                    Switch(
-                        checked = pauseHrvOnPowerSave,
-                        onCheckedChange = {
-                            pauseHrvOnPowerSave = it
-                            vm.setPauseHrvOnPowerSave(it)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Palette.surfaceBase,
-                            checkedTrackColor = Palette.accent,
-                            uncheckedThumbColor = Palette.textSecondary,
-                            uncheckedTrackColor = Palette.surfaceInset,
-                            uncheckedBorderColor = Palette.hairline,
-                        ),
-                    )
-                }
-            }
-        }
 
         // Lower-frequency sections collapse behind a single default-closed disclosure (S3) so the
         // screen opens at the everyday handful instead of the full wall of cards. Nothing is removed;
@@ -2720,6 +2642,48 @@ fun SettingsScreen(
                         "UNVERIFIED strap-computed value — it matched a reference device closely on most " +
                         "nights but moved in the opposite direction on some. Shown as an 'estimate' and " +
                         "never fed into recovery or illness scoring. Off by default.",
+                    style = NoopType.caption,
+                    color = Palette.textTertiary,
+                )
+
+                // --- #463: Personal daytime-stress baseline — OFF by default. ---
+                // Scores today's intraday stress timeline against a PERSONAL cross-day rolling baseline
+                // (Oura-style) instead of the day's own calm hours. The validated r≈0.6 HR-only margin is
+                // single-subject so far, so it ships behind a default-off toggle per the derived-biosignal
+                // rule. Display-only: never fed into recovery/illness. Mirrors the iOS toggle.
+                SettingsRowDivider()
+                var stressPersonalBaseline by remember { mutableStateOf(NoopPrefs.stressPersonalBaseline(context)) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text(
+                        "Stress: personal daytime baseline",
+                        style = NoopType.subhead,
+                        color = Palette.textPrimary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = stressPersonalBaseline,
+                        onCheckedChange = {
+                            stressPersonalBaseline = it
+                            NoopPrefs.setStressPersonalBaseline(context, it)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Palette.surfaceBase,
+                            checkedTrackColor = Palette.accent,
+                            uncheckedThumbColor = Palette.textSecondary,
+                            uncheckedTrackColor = Palette.surfaceInset,
+                            uncheckedBorderColor = Palette.hairline,
+                        ),
+                    )
+                }
+                Text(
+                    "Scores today's hour-by-hour stress timeline against YOUR own cross-day baseline " +
+                        "(how your days usually run, Oura-style) instead of the day's own calm hours. The " +
+                        "cutoff is tuned from a single-subject reference so far, so it's an alternative lens, " +
+                        "not the default. HR-only; never fed into recovery or illness scoring. Off by default.",
                     style = NoopType.caption,
                     color = Palette.textTertiary,
                 )

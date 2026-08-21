@@ -32,6 +32,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -42,11 +43,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.noop.BuildConfig
 import com.noop.analytics.Baselines
+import com.noop.analytics.BatteryEstimator
 import com.noop.analytics.HRVReadiness
 import com.noop.analytics.ReadinessTier
+import com.noop.ble.LiveState
 import com.noop.ble.PuffinExperiment
+import com.noop.ble.WhoopBleClient
 import com.noop.ble.WhoopModel
 import com.noop.data.DailyMetric
+import com.noop.data.GravitySample
+import com.noop.data.HrSample
 import com.noop.polar.PolarModel
 import com.noop.testcentre.CaptureAccumulator
 import com.noop.testcentre.CaptureKind
@@ -60,6 +66,9 @@ import com.noop.testcentre.TestMode
 import com.noop.testcentre.TestModeRegistry
 import com.noop.testcentre.TestReportFlow
 import com.noop.testcentre.TestReportLink
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -80,6 +89,8 @@ fun TestCentreScreen(vm: AppViewModel) {
 
     // The strap model the Settings #22 gate reads, mirrored here so the 5/MG block shows for a 5/MG only.
     val live by vm.live.collectAsStateWithLifecycle()
+    val publishedActiveStrapId by vm.activeStrapIdFlow.collectAsStateWithLifecycle()
+    val activeStrapId = publishedActiveStrapId ?: vm.activeStrapId
     val selectedModelName = remember {
         NoopPrefs.of(context).getString("noop.selectedWhoopModel", null)
     }
@@ -134,10 +145,10 @@ fun TestCentreScreen(vm: AppViewModel) {
                         mode = mode,
                         active = testCentre.active(mode.domain),
                         startedAtSeconds = testCentre.startedAt(mode.domain),
-                        // #965: the shareable strap log the report exports, so the row's "K of N" is the
-                        // HONEST per-mode captured-day count (CaptureAccumulator), not an elapsed-clock proxy.
-                        // Recomputes with `live` (collected above) so the count updates as new days land.
-                        logText = vm.ble.exportLogText(),
+                        live = live,
+                        activeStrapId = activeStrapId,
+                        is5MG = is5MG,
+                        vm = vm,
                         onToggle = { on ->
                             if (on) testCentre.activate(mode.domain) else testCentre.deactivate(mode.domain)
                             // Display & Performance owns a live frame monitor. It must run ONLY while the
@@ -247,6 +258,8 @@ private val MASTER_REPORT_MODE = TestMode(
 private suspend fun buildPending(
     context: android.content.Context,
     mode: TestMode,
+    // Stays a STRING: TestBundleAssembler renders a report file, the one consumer that genuinely wants the
+    // joined text. Its two callers are user taps, not the 250 ms refresh.
     logText: String,
     vm: AppViewModel,
 ): PendingReport {
@@ -294,12 +307,21 @@ private fun TestModeRow(
     mode: TestMode,
     active: Boolean,
     startedAtSeconds: Long?,
-    logText: String,
+    live: LiveState,
+    activeStrapId: String,
+    is5MG: Boolean,
+    vm: AppViewModel,
     onToggle: (Boolean) -> Unit,
     onReport: () -> Unit,
 ) {
     var on by remember { mutableStateOf(active) }
     val elapsed = startedAtSeconds?.let { (System.currentTimeMillis() / 1000.0) - it }
+    val refreshSources = TestCentreLiveRefreshPolicy.sources(mode, on)
+    // An active row observes the log's own revision, coalesced during bursty offloads. An inactive row
+    // creates no collector and never snapshots/export-formats the log.
+    // #1468 follow-up: LINES, not a joined string. Both consumers below immediately work line-wise, so the
+    // string this replaced was built (and re-split) on every 250 ms tick for nothing.
+    val logLines = if (refreshSources.observeLogRevision) rememberActiveLogLines(vm.ble) else emptyList()
     // #965: HONEST per-mode captured-day count for a guided row (distinct days THIS mode produced its own
     // trace on), read from the same log the report exports, so each active mode accumulates its OWN count
     // instead of every guided row sharing one elapsed number. null for a toggle mode (no "K of N") / when off.
@@ -307,7 +329,7 @@ private fun TestModeRow(
         if (on && mode.capture is CaptureKind.Guided) {
             CaptureAccumulator.capturedDays(
                 domain = mode.domain,
-                reportText = logText,
+                reportLines = logLines,
                 tzOffsetSeconds =
                     (java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 1000).toLong(),
             )
@@ -331,6 +353,16 @@ private fun TestModeRow(
             )
         }
         Text(mode.blurb, style = NoopType.footnote, color = Palette.textTertiary)
+        if (on) {
+            TestCentreLiveReadoutPanel(
+                mode = mode,
+                logLines = logLines,
+                live = live,
+                is5MG = is5MG,
+                activeStrapId = activeStrapId,
+                vm = vm,
+            )
+        }
         Row {
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onReport) {
@@ -338,6 +370,115 @@ private fun TestModeRow(
             }
         }
     }
+}
+
+/** Registry-driven live diagnostics for an active test row. The common presentation mapping is pure and
+ * JVM-tested; only Sleep and Battery need a small repository snapshot, loaded here while the row is on.
+ * Since this composable does not exist for an inactive row, inactive modes do no parsing or store reads. */
+@Composable
+private fun TestCentreLiveReadoutPanel(
+    mode: TestMode,
+    logLines: List<String>,
+    live: LiveState,
+    is5MG: Boolean,
+    activeStrapId: String,
+    vm: AppViewModel,
+) {
+    var hrSamples by remember(mode.id) { mutableStateOf(emptyList<HrSample>()) }
+    var gravitySamples by remember(mode.id) { mutableStateOf(emptyList<GravitySample>()) }
+    var batteryEstimate by remember(mode.id) { mutableStateOf<BatteryEstimator.Estimate?>(null) }
+    var nowUnix by remember(mode.id) { mutableStateOf(System.currentTimeMillis() / 1_000) }
+    val sources = TestCentreLiveRefreshPolicy.sources(mode, active = true)
+    val sleepRevision = if (sources.observeSleepSampleRevision) {
+        boundedRevision(vm.repo.sleepSampleRevision, coalesceMs = 250)
+    } else {
+        0L
+    }
+    val batteryRevision = if (sources.observeBatteryRevision) {
+        boundedRevision(vm.repo.batteryRevision, coalesceMs = 500)
+    } else {
+        0L
+    }
+
+    // Sleep reloads only after Room reports a successful HR/gravity insert or the active strap changes.
+    // Same-BPM HR and gravity-only inserts therefore refresh even when LiveState itself stays equal.
+    LaunchedEffect(mode.domain, activeStrapId, sleepRevision) {
+        if (mode.domain != TestDomain.SLEEP) return@LaunchedEffect
+        val now = System.currentTimeMillis() / 1_000
+        val from = now - 60 * 60
+        hrSamples = runCatching {
+            vm.repo.hrSamples(activeStrapId, from, now, limit = 10_000)
+        }.getOrDefault(emptyList())
+        gravitySamples = runCatching {
+            vm.repo.gravitySamples(activeStrapId, from, now, limit = 10_000)
+        }.getOrDefault(emptyList())
+    }
+
+    // Battery has its own event source and keys. It is deliberately not keyed on HR or Sleep revisions.
+    LaunchedEffect(mode.domain, activeStrapId, batteryRevision, live.batteryPct, is5MG, live.charging) {
+        if (mode.domain != TestDomain.BATTERY) return@LaunchedEffect
+        val now = System.currentTimeMillis() / 1_000
+        val from = now - 14L * 86_400
+        val samples = runCatching {
+            vm.repo.batterySamples(activeStrapId, from, now, limit = 2_000)
+                .mapNotNull { sample -> sample.soc?.let { sample.ts to it } }
+        }.getOrDefault(emptyList())
+        val rated = if (is5MG) BatteryEstimator.ratedLifeHoursWhoop5
+            else BatteryEstimator.ratedLifeHoursWhoop4
+        batteryEstimate = BatteryEstimator.estimate(samples, rated)
+    }
+
+    // Only Connection uptime needs wall-clock movement. Other modes create no timer.
+    LaunchedEffect(sources.connectionClockEveryMs) {
+        val everyMs = sources.connectionClockEveryMs ?: return@LaunchedEffect
+        while (isActive) {
+            nowUnix = System.currentTimeMillis() / 1_000
+            delay(everyMs)
+        }
+    }
+
+    val rows = TestCentreLiveReadouts.rows(
+        mode = mode,
+        active = true,
+        snapshot = TestCentreLiveSnapshot(
+            logLines = logLines,
+            nowUnix = nowUnix,
+            connected = live.connected,
+            batteryPct = live.batteryPct,
+            batteryEstimate = batteryEstimate,
+            hrSamples = hrSamples,
+            gravitySamples = gravitySamples,
+        ),
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 2.dp)) {
+        rows.forEach { row ->
+            Row(Modifier.fillMaxWidth()) {
+                Text(row.label, style = NoopType.footnote, color = Palette.textTertiary)
+                Spacer(Modifier.weight(1f))
+                Text(row.value, style = NoopType.mono, color = Palette.textSecondary)
+            }
+        }
+    }
+}
+
+/** Collect a monotonic source revision while this call is in composition. During an offload burst the
+ * collector emits at most once per [coalesceMs], always converging on the newest revision. No source event,
+ * no wake-up; this is event-driven throttling, not polling. */
+@Composable
+private fun boundedRevision(flow: StateFlow<Long>, coalesceMs: Long): Long {
+    val revision by produceState(initialValue = flow.value, flow, coalesceMs) {
+        flow.collect { next ->
+            value = next
+            delay(coalesceMs)
+        }
+    }
+    return revision
+}
+
+@Composable
+private fun rememberActiveLogLines(ble: WhoopBleClient): List<String> {
+    val revision = boundedRevision(ble.logRevision, coalesceMs = 250)
+    return remember(ble, revision) { ble.exportLogLines() }
 }
 
 @Composable
@@ -352,10 +493,13 @@ private fun DiagnosticToolsCard(vm: AppViewModel) {
     // non-Polar user never sees Polar debug. Loaded once from the registry.
     var polarIdentity by remember { mutableStateOf<String?>(null) }
     var polarDebugLogging by remember { mutableStateOf(NoopPrefs.polarDebugLogging(context)) }
+    // #1284 residual 3: the experimental Oura onset-keying toggle, shown only when an Oura ring is paired.
+    var ouraPaired by remember { mutableStateOf(false) }
+    var ouraOnsetKeying by remember { mutableStateOf(NoopPrefs.ouraOnsetKeying(context)) }
     LaunchedEffect(Unit) {
-        val name = runCatching { vm.pairedDevices() }.getOrDefault(emptyList())
-            .firstOrNull { PolarModel.isPolar(it.model) }?.model
-        polarIdentity = PolarModel.debugIdentification(name)
+        val paired = runCatching { vm.pairedDevices() }.getOrDefault(emptyList())
+        polarIdentity = PolarModel.debugIdentification(paired.firstOrNull { PolarModel.isPolar(it.model) }?.model)
+        ouraPaired = paired.any { it.brand.equals("Oura", ignoreCase = true) }
     }
     var detailedCapture by remember { mutableStateOf(NoopPrefs.detailedCapture(context)) }
     var captureShareBusy by remember { mutableStateOf(false) }
@@ -431,6 +575,18 @@ private fun DiagnosticToolsCard(vm: AppViewModel) {
                         "so a Polar bug report shows the model NOOP resolved your strap to.",
                     checked = polarDebugLogging,
                     onCheckedChange = { polarDebugLogging = it; vm.setPolarDebugLogging(it) },
+                )
+            }
+            // #1284 residual 3: experimental Oura 0x49-onset keying, only when an Oura ring is paired.
+            if (ouraPaired) {
+                ToggleRowTC(
+                    title = "Oura onset keying (experimental)",
+                    description = "Keys each Oura sleep night on its stable 0x49 onset and suppresses " +
+                        "duplicate re-serves at the source, instead of the shipped end-anchored persist " +
+                        "(#1284). Off by default — a hardware-validation toggle. Watch the strap log for " +
+                        "'onset-key(#1284)' lines.",
+                    checked = ouraOnsetKeying,
+                    onCheckedChange = { ouraOnsetKeying = it; vm.setOuraOnsetKeying(it) },
                 )
             }
             // #1121 Detailed capture: an adb-like rolling on-device log, no computer needed. Off by default.

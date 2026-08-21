@@ -129,9 +129,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val repo: WhoopRepository get() = repository
 
-    /** The registry's active strap id (the same id the read path resolves to). Public so the Test Centre
-     *  can read the right source for the CAPTURE-D data-volume snapshot. */
-    val activeStrapId: String get() = deviceId
+    /** The registry's active strap id (the same id the read path resolves to). The getter stays source
+     * compatible for existing call sites; reactive screens collect [activeStrapIdFlow]. */
+    val activeStrapId: String get() = noopApp.sourceCoordinator.activeDeviceId.value ?: noopApp.activeDeviceId
+    val activeStrapIdFlow: StateFlow<String?> get() = noopApp.sourceCoordinator.activeDeviceId
 
     // MARK: - Devices screen (multi-source Phase 1B)
     //
@@ -170,8 +171,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  (a no-op for a single-WHOOP install). Mirrors macOS DevicesView's `registry.setActive`. */
     suspend fun setActiveDevice(id: String) {
         noopApp.deviceRegistry.setActive(id)
-        noopApp.sourceCoordinator.onActiveDeviceChanged(id)
-        refreshActiveDeviceName()
+        // Publish only after BOTH authoritative mutations succeed. A registry/coordinator failure leaves
+        // observers on the last fully-applied id instead of advertising a half-switched source.
+        if (noopApp.sourceCoordinator.reconcileActiveDevice(id)) {
+            refreshActiveDeviceName()
+        }
     }
 
     /** The active band's display name (nickname, else collapsed brand+model), surfaced on the Live screen
@@ -199,6 +203,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000L),
                 com.noop.analytics.StreakCalculator.Streaks(0, 0),
             )
+
+    /** #1410: record an `APP_VERSION_CHANGED` event on the first launch after an update. `"noop-app"` is a
+     *  synthetic, non-strap deviceId sentinel (strap ids are BLE UUIDs, so it can't collide). */
+    private suspend fun recordAppVersionChange() {
+        val prefs = appContext.getSharedPreferences("noop_provenance", android.content.Context.MODE_PRIVATE)
+        val current = com.noop.BuildConfig.VERSION_NAME
+        val last = prefs.getString("lastSeenVersion", null)
+        if (com.noop.data.AppVersionEvent.shouldRecord(last, current)) {
+            // A real transition: advance the pointer only once the event is durably recorded, so a failed
+            // insert (or a not-yet-ready store) retries next launch instead of silently dropping the change.
+            val recorded = runCatching {
+                repository.recordEvent(
+                    deviceId = "noop-app",
+                    ts = System.currentTimeMillis() / 1000,
+                    kind = com.noop.data.AppVersionEvent.KIND,
+                    payloadJSON = com.noop.data.AppVersionEvent.payloadJson(
+                        from = last!!, to = current, schemaVersion = com.noop.data.WhoopDatabase.SCHEMA_VERSION,
+                    ),
+                )
+            }.isSuccess
+            if (recorded) prefs.edit().putString("lastSeenVersion", current).apply()
+        } else {
+            // First launch (last == null) or unchanged: nothing to record, just anchor the pointer.
+            prefs.edit().putString("lastSeenVersion", current).apply()
+        }
+    }
 
     /** Re-read the active device row and republish its display name. Called at launch + after a setActive. */
     fun refreshActiveDeviceName() {
@@ -635,6 +665,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var todayStressCache: Double? = null
     var todayFitnessAgeCache: Double? = null
     var todayVitalityCache: Double? = null
+    var todayVo2maxCache: Double? = null
 
     /**
      * Recent daily metrics (newest last), backing the Today grid + illness watch.
@@ -727,6 +758,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // existing WHOOP flow below runs unchanged; it only acts when a non-WHOOP strap is the active
         // device. The Devices screen (next task) calls onActiveDeviceChanged after a setActive.
         noopApp.sourceCoordinator.start()
+        // #1410: on the first launch after an update, append an APP_VERSION_CHANGED event so a single
+        // export can answer "what ran when". Idempotent — the stored last-seen version only advances
+        // once the transition is recorded, so a background-only launch is caught on the next UI open.
+        viewModelScope.launch { recordAppVersionChange() }
         // #1121: re-arm the opt-in detailed-capture rolling log on launch, so a capture the user started
         // keeps going across the process being killed (this phone class is not battery-exempt and Android
         // kills the background BLE overnight — the very window a battery capture needs to span).
@@ -1133,6 +1168,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // independent of the Power-saving master, and its own toggle so a field report can tell the two
         // apart (they have opposite battery profiles). No-op unless on.
         ble.setFastLinkPhy(NoopPrefs.fastLinkPhy(appContext))
+        // Low refresh is a sub-option too: only in effect while the master is on. Unlike the levers
+        // around it, it is NOT battery-gated once chosen — it moves the BASE cadence to hourly.
+        ble.setLowRefreshMode(on && NoopPrefs.lowRefresh(appContext))
         ble.setLowBatteryOffloadThrottle(if (on) NoopPrefs.powerSavingBatteryPct(appContext) else 0)
         // HRV pause is a sub-option: only effective while the master is on (defaults on when it is), and
         // now battery-%-aware like the offload lever — pass the same threshold.
@@ -1151,6 +1189,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Set the power-saving battery-% threshold (Settings). Persists + applies immediately. */
     fun setPowerSavingBatteryPct(pct: Int) {
         NoopPrefs.setPowerSavingBatteryPct(appContext, pct)
+        applyPowerSaving()
+    }
+
+    /** Flip "Low refresh" (Settings). Persists + applies immediately. */
+    fun setLowRefresh(enabled: Boolean) {
+        NoopPrefs.setLowRefresh(appContext, enabled)
         applyPowerSaving()
     }
 
@@ -2063,6 +2107,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  (via [SourceCoordinator]); no restart needed. Diagnostic-only — nothing gates behaviour on it. */
     fun setPolarDebugLogging(enabled: Boolean) {
         NoopPrefs.setPolarDebugLogging(appContext, enabled)
+    }
+
+    /** #1284 residual 3: toggle EXPERIMENTAL Oura 0x49-onset keying. Read live at persist by the Oura source
+     *  (via [SourceCoordinator]); no restart needed. Off = the shipped end-anchored persist. */
+    fun setOuraOnsetKeying(enabled: Boolean) {
+        NoopPrefs.setOuraOnsetKeying(appContext, enabled)
     }
 
     /** #1121: toggle the opt-in rolling "detailed capture" strap-log file. Persisted so it survives a

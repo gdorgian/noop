@@ -5,6 +5,9 @@ import androidx.room.withTransaction
 import com.noop.protocol.DroppedRtcEvent
 import com.noop.protocol.RrSourceChannel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlin.math.roundToInt
 
@@ -354,6 +357,21 @@ data class InsertCounts(
     val gravity: Int = 0,
 )
 
+/** Monotonic event revisions for Test Centre repository-backed readouts. Counts move only after Room
+ * reports at least one newly inserted relevant row; duplicate/no-op inserts leave them unchanged. */
+internal data class ReadoutDataRevisions(
+    val sleepSamples: Long = 0,
+    val battery: Long = 0,
+)
+
+internal fun advanceReadoutDataRevisions(
+    current: ReadoutDataRevisions,
+    inserted: InsertCounts,
+): ReadoutDataRevisions = current.copy(
+    sleepSamples = current.sleepSamples + if (inserted.hr > 0 || inserted.gravity > 0) 1 else 0,
+    battery = current.battery + if (inserted.battery > 0) 1 else 0,
+)
+
 /**
  * A compact snapshot of how much history each source holds, for the Data Sources "Freshness
  * Pipeline" card (PR#196). Counts only , no per-day rows leave the read. Port of macOS
@@ -424,6 +442,13 @@ class WhoopRepository(
      *  path banks v18 rows, so a plain map is enough. Swift twin: `WhoopStore.v18AuxRowsSincePrune`. */
     private val v18AuxRowsSincePrune = mutableMapOf<String, Int>()
 
+    private val _sleepSampleRevision = MutableStateFlow(0L)
+    val sleepSampleRevision: StateFlow<Long> = _sleepSampleRevision.asStateFlow()
+    private val _batteryRevision = MutableStateFlow(0L)
+    val batteryRevision: StateFlow<Long> = _batteryRevision.asStateFlow()
+    private val readoutRevisionLock = Any()
+    private var readoutRevisions = ReadoutDataRevisions()
+
     constructor(db: WhoopDatabase) : this(
         dao = db.whoopDao(),
         transactor = object : Transactor {
@@ -474,13 +499,24 @@ class WhoopRepository(
     ): InsertCounts {
         if (streams.isEmpty) return InsertCounts()
 
-        return transactor.run {
+        val counts = transactor.run {
             insertWithinTransaction(
                 streams = streams,
                 deviceId = deviceId,
                 v18AuxRetentionRows = v18AuxRetentionRows,
                 v18AuxPruneEveryRows = v18AuxPruneEveryRows,
             )
+        }
+        publishReadoutRevisions(counts)
+        return counts
+    }
+
+    private fun publishReadoutRevisions(inserted: InsertCounts) {
+        synchronized(readoutRevisionLock) {
+            val next = advanceReadoutDataRevisions(readoutRevisions, inserted)
+            readoutRevisions = next
+            if (_sleepSampleRevision.value != next.sleepSamples) _sleepSampleRevision.value = next.sleepSamples
+            if (_batteryRevision.value != next.battery) _batteryRevision.value = next.battery
         }
     }
 
@@ -612,6 +648,12 @@ class WhoopRepository(
      *  AppViewModel backstop) skips when this is unchanged since the last completed run. Any HR insert/delete
      *  moves it (count or maxTs), so a real change always rescores; mirrors Swift WhoopStore.hrFingerprint. */
     suspend fun hrFingerprint(): String = "${dao.countHr()}:${dao.maxHrTs()}"
+
+    /** #1005 — per-day (device + window) HR fingerprint as (count, newestTs) for analyzeRecent's per-day
+     *  reuse cache. Cheap COUNT/MAX aggregate, never a row fetch; mirrors Swift
+     *  WhoopStore.hrFingerprint(deviceId:from:to:). */
+    suspend fun hrFingerprintWindow(deviceId: String, from: Long, to: Long): Pair<Int, Long> =
+        Pair(dao.countHrInWindow(deviceId, from, to), dao.maxHrTsInWindow(deviceId, from, to))
 
     // MARK: - Server-derived caches (latest value wins on conflict)
 
@@ -897,7 +939,17 @@ class WhoopRepository(
 
     // MARK: - Live Sessions (silent guardian, v22). The runner banks the row at start (endTs null) and
     // again at end (totals); the summary reads the recent rows for its guarded-count / streak line.
-    suspend fun upsertLiveSession(row: LiveSessionRow) = dao.upsertLiveSession(row)
+    suspend fun upsertLiveSession(row: LiveSessionRow) = dao.upsertLiveSession(
+        deviceId = row.deviceId, startTs = row.startTs, endTs = row.endTs,
+        chargeAtStart = row.chargeAtStart, floorBpm = row.floorBpm, ceilingBpm = row.ceilingBpm,
+        inBandSec = row.inBandSec, belowSec = row.belowSec, aboveSec = row.aboveSec,
+        pushCount = row.pushCount, easeCount = row.easeCount, hrSource = row.hrSource,
+    )
+
+    /** #1410: append one app-level event (e.g. APP_VERSION_CHANGED) onto the event table. */
+    suspend fun recordEvent(deviceId: String, ts: Long, kind: String, payloadJSON: String) {
+        dao.insertEvents(listOf(EventRow(deviceId, ts, kind, payloadJSON)))
+    }
     suspend fun recentLiveSessions(deviceId: String, limit: Int): List<LiveSessionRow> =
         dao.recentLiveSessions(deviceId, limit)
 
@@ -1175,14 +1227,19 @@ class WhoopRepository(
      * edit started from:
      *  - editing a DETECTED bout replaces it with this manual row , the detected original is dismissed
      *    durably so the re-detector doesn't bring it back (else both would show);
-     *  - editing a MANUAL row whose natural key (startTs/sport) changed deletes the stale row first
-     *    (the (deviceId, startTs, sport) PK upsert would otherwise orphan it);
+     *  - editing a MANUAL row whose PRIMARY KEY moved deletes the stale row first (the
+     *    (deviceId, startTs, sport) PK upsert would otherwise orphan it). deviceId is part of that key,
+     *    so a row stored under a re-paired strap's active id counts as moved even when startTs and sport
+     *    are untouched: the edit lands on the "my-whoop" seed while the original stays put, and
+     *    `workoutsUnion` reads [activeDeviceId, "my-whoop"] keeping the FIRST row per (startTs, sport),
+     *    so the stale copy would shadow the edit forever. Comparing only startTs/sport missed exactly
+     *    that case and made a save look successful while changing nothing (#1488);
      *  - an IMPORTED row is never passed here as `replacing` (duplicating one is a pure add).
      */
     suspend fun saveManualWorkout(row: WorkoutRow, replacing: WorkoutRow? = null) {
         if (replacing != null && replacing.source.lowercase().endsWith("-noop")) {
             dismissDetected(replacing)
-        } else if (replacing != null && (replacing.startTs != row.startTs || replacing.sport != row.sport)) {
+        } else if (replacing != null && supersedesStoredRow(replacing, row)) {
             dao.deleteWorkoutByKey(replacing.deviceId, replacing.startTs, replacing.sport)
         }
         dao.upsertWorkouts(listOf(row))
@@ -1510,6 +1567,12 @@ class WhoopRepository(
             "battery" to dao.countBattery(), "spo2" to dao.countSpo2(),
             "skinTemp" to dao.countSkinTemp(), "steps" to dao.countSteps(),
             "resp" to dao.countResp(), "gravity" to dao.countGravity(),
+            // The rest of the accumulating decoded raw streams, so the Test-Centre footprint counts ALL of
+            // them (keep in sync with Swift storageStats / TimestampHeal's raw-table list). ppgHr/ppgWaveform
+            // /rawImu can each be large.
+            "ppgHr" to dao.countPpgHr(), "sleepState" to dao.countSleepState(),
+            "ppgWaveform" to dao.countPpgWaveform(), "rawImu" to dao.countRawImu(),
+            "v18Aux" to dao.countV18Aux(),
         )
     }.getOrDefault(emptyMap())
 
@@ -1840,7 +1903,11 @@ class WhoopRepository(
     /** Persist HR samples directly (e.g. a live-tracked workout's 1 Hz series). Dedup-safe:
      *  `insertHr` IGNOREs on the (deviceId, ts) primary key, so re-inserts / a later offload sync
      *  covering the same seconds are no-ops. (#528) */
-    suspend fun insertHr(rows: List<HrSample>) = dao.insertHr(rows)
+    suspend fun insertHr(rows: List<HrSample>): List<Long> {
+        val ids = dao.insertHr(rows)
+        publishReadoutRevisions(InsertCounts(hr = ids.countInserted()))
+        return ids
+    }
 
     suspend fun latestHrSampleTs(deviceId: String): Long? = dao.latestHrSampleTs(deviceId)
     suspend fun latestHr(deviceId: String): HrSample? = dao.latestHr(deviceId)
@@ -1988,6 +2055,16 @@ class WhoopRepository(
             val seen = HashSet<Pair<Long, Long>>()
             return sessions.filter { seen.add(it.startTs to it.endTs) }
         }
+
+        /** True when [replacing] is stored under a DIFFERENT primary key than the row about to be written,
+         *  so the upsert would leave it orphaned beside the new one instead of overwriting it. The key is
+         *  (deviceId, startTs, sport) — all three, which is the point: an edit whose startTs and sport are
+         *  untouched still moves when the original sits under a re-paired strap's active id and the edit is
+         *  built on the "my-whoop" seed. [dedupWorkoutsByKey] then hides the newer row behind the stale one,
+         *  so the save silently does nothing. (#1488) */
+        internal fun supersedesStoredRow(replacing: WorkoutRow, row: WorkoutRow): Boolean =
+            replacing.deviceId != row.deviceId || replacing.startTs != row.startTs ||
+                replacing.sport != row.sport
 
         /** Drop exact-duplicate workouts sharing an identical (startTs, sport) natural key — the same
          *  session read under two #814 union ids — keeping the FIRST seen (callers pass active-strap-first

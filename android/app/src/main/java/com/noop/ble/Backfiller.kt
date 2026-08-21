@@ -6,6 +6,7 @@ import com.noop.data.InsertCounts
 import com.noop.data.StreamBatch
 import com.noop.data.WhoopRepository
 import com.noop.protocol.BadClockDiagnostics
+import com.noop.protocol.ChunkClockDiag
 import com.noop.protocol.DeviceFamily
 import com.noop.protocol.Framing
 import com.noop.protocol.HistoricalMeta
@@ -179,6 +180,20 @@ class Backfiller(
      */
     var sessionRowsPersisted = 0
         private set
+
+    /** #1008/#1118 PRE-STORAGE R-R census, accumulated across the session. Twin of the Swift fields.
+     *  `offered` is what the decoder handed over; `inserted` is what survived the store's conflict key.
+     *  The per-second histogram sums per chunk (a second split across chunks counts in both — an edge
+     *  artifact only); `ratio`, built from exact sums over the exact span, is the decisive number. */
+    var sessionRrOffered = 0
+    var sessionRrInserted = 0
+    var sessionRrSumMs = 0
+    var sessionRrMinTs: Int? = null
+    var sessionRrMaxTs: Int? = null
+    val sessionRrHist = mutableListOf(0, 0, 0, 0)
+    val sessionRrGapHist = mutableListOf(0, 0, 0, 0, 0, 0, 0, 0)
+    val sessionRrFill = mutableListOf(0, 0, 0, 0)
+
     /** #42: set by [begin] when this session continues an auto-continue burst (#364) that already banked
      *  rows in an earlier session, so a trim=0xFFFFFFFF END here reads as "caught up", not "no history".
      *  Without it, the fresh session's `sessionRowsPersisted` is 0 and the scary "charge to 100%" line
@@ -239,6 +254,9 @@ class Backfiller(
      * [begin]; each distinct layout is logged once per session. (PR #241, ryanbr.)
      */
     private val loggedLayoutVersions = HashSet<Int>()
+    /** #1008: 1-based chunk counter for the per-chunk `hist clock` diag line, so a strap log can be read
+     *  as a trajectory across one offload. Reset per session. Twin of the Swift `chunkIndex`. */
+    private var chunkIndex = 0
 
     /** SpO2 RE dump (PR #945, reimplemented): how many full-record dumps this session emitted, bounded by
      *  [com.noop.analytics.Spo2ReTrace.MAX_SAMPLES]. Session-scoped so the cap spans chunks; reset in begin. */
@@ -286,6 +304,14 @@ class Backfiller(
         this.continuedAfterRows = continuedAfterRows
         isBackfilling = true
         sessionRowsPersisted = 0
+        sessionRrOffered = 0
+        sessionRrInserted = 0
+        sessionRrSumMs = 0
+        sessionRrMinTs = null
+        sessionRrMaxTs = null
+        for (i in 0 until 4) sessionRrHist[i] = 0
+        for (i in 0 until 8) sessionRrGapHist[i] = 0
+        for (i in 0 until 4) sessionRrFill[i] = 0
         sessionMotionRows = 0
         sessionSkinTempRows = 0
         sessionNightKeys.clear()
@@ -293,6 +319,7 @@ class Backfiller(
         loggedNoCursor = false
         loggedFutureRtc = false
         loggedLayoutVersions.clear()
+        chunkIndex = 0
         spo2Dumped = 0
         loggedImplausibleClock = false
         sessionDroppedImplausible = 0
@@ -376,6 +403,13 @@ class Backfiller(
                 sessionOldestUnix = sessionOldestUnix, sessionNewestUnix = sessionNewestUnix,
                 ppgHrSubLagInterp = ppgHrSubLagInterp(),
             )
+            // #1008: per-chunk clock basis + R-R packing. The session summary logs only the FIRST chunk's
+            // correlation, which cannot show the offset moving across a long offload nor separate "the same
+            // beats arrived twice" from "one record stamped 8 intervals on one second". Log-only. Twin of
+            // the Swift Backfiller emit.
+            chunkIndex += 1
+            ChunkClockDiag.line(chunkIndex, ref.device, ref.wall, decoded.rr.map { it.ts })
+                ?.let { log(it) }
             // Observability (PR #241): which historical layout does this strap emit? Only the unmapped/
             // reject path logged a version before, so a healthy sync never revealed v24/v25 (4.0) or
             // v18/v26 (5/MG). Sample the chunk's first genuine record (null ⇒ console/CRC-fail); log
@@ -411,7 +445,9 @@ class Backfiller(
                 for (f in frames) {
                     if (spo2Dumped >= com.noop.analytics.Spo2ReTrace.MAX_SAMPLES) break
                     val d = decodeHistorical(f, family) ?: continue
-                    val recUnix = d["unix"] as? Int ?: continue
+                    // `as? Long`, not `as? Int`: the decoder carries unix in the unsigned domain, so an
+                    // Int cast would miss on EVERY record and silently stop the dump. See `histU32`.
+                    val recUnix = d["unix"] as? Long ?: continue
                     connectionLog(
                         com.noop.analytics.Spo2ReTrace.recordLine(
                             frame = f,
@@ -523,6 +559,10 @@ class Backfiller(
             // later firmware-layout mapping triangulates against. (The old archive-first order was a
             // port slip: no data loss either way, but the insert-failure retry archived twice.)
             try {
+                // #1008/#1118: census the batch BEFORE it is stored — the only place the decoder's own
+                // emission can be measured, since every existing R-R number is taken after the conflict
+                // key has already absorbed part of it.
+                val rrCensus = com.noop.analytics.RrEmissionStats.compute(decoded.rr.map { it.ts.toInt() to it.rrMs })
                 val counts = repository.insert(decoded, deviceId)
                 committed = decoded
                 committedCounts = counts
@@ -530,6 +570,19 @@ class Backfiller(
                 // "persisted N rows (M with motion) across K night(s)" — the win-rate signal we never logged.
                 val (rows, motion, nights) = chunkTally(counts, decoded.gravity.map { it.ts } + decoded.hr.map { it.ts })
                 sessionRowsPersisted += rows
+                // #1008/#1118 census accumulation (pre-storage offered vs post-key inserted).
+                sessionRrOffered += rrCensus.intervals
+                sessionRrInserted += counts.rr
+                sessionRrSumMs += rrCensus.sumRrMs
+                if (rrCensus.intervals > 0) {
+                    val lo = decoded.rr.minOf { it.ts.toInt() }
+                    val hi = decoded.rr.maxOf { it.ts.toInt() }
+                    sessionRrMinTs = minOf(sessionRrMinTs ?: lo, lo)
+                    sessionRrMaxTs = maxOf(sessionRrMaxTs ?: hi, hi)
+                    for (i in 0 until 4) sessionRrHist[i] = sessionRrHist[i] + rrCensus.perSecond[i]
+                    for (i in 0 until 8) sessionRrGapHist[i] = sessionRrGapHist[i] + rrCensus.gapHist[i]
+                    for (i in 0 until 4) sessionRrFill[i] = sessionRrFill[i] + rrCensus.fill[i]
+                }
                 sessionMotionRows += motion
                 sessionSkinTempRows += counts.skinTemp
                 sessionNightKeys.addAll(nights)
@@ -627,6 +680,33 @@ class Backfiller(
             chunk.clear()
             chunkOpen = false
         }
+    }
+
+
+    /**
+     * #1008/#1118: the session's PRE-STORAGE R-R census. `ratio` is beat-time per second of wall time
+     * over the whole session — above 1.0 is physically impossible, and because it is measured on what the
+     * DECODER produced it separates an emission/decode defect (ratio already high here) from an ingest one
+     * (ratio ~1 here while the stored night still reads high). Null when the session banked no R-R.
+     * Twin of Swift `sessionRrEmissionLine`.
+     */
+    fun sessionRrEmissionLine(): String? {
+        val lo = sessionRrMinTs ?: return null
+        val hi = sessionRrMaxTs ?: return null
+        if (sessionRrOffered <= 0) return null
+        val span = maxOf(hi - lo + 1, 1)
+        val ratio = sessionRrSumMs / 1000.0 / span
+        val r = com.noop.analytics.RrEmissionStats.Result(
+            secondsWithRr = sessionRrHist.sum(),
+            intervals = sessionRrOffered,
+            sumRrMs = sessionRrSumMs,
+            spanSec = span,
+            ratio = ratio,
+            perSecond = sessionRrHist.toList(),
+            gapHist = sessionRrGapHist.toList(),
+            fill = sessionRrFill.toList(),
+        )
+        return com.noop.analytics.RrEmissionStats.logLine("historical", sessionRrOffered, sessionRrInserted, r)
     }
 
     companion object {

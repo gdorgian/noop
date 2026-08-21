@@ -149,7 +149,8 @@ extension RecoveryScorer {
         // full set, dropping one and renormalising returns the same score, collapsing the delta to
         // 0 even for a clearly good or bad term.
         func points(_ neutralised: Double?) -> Int {
-            Int((full - (neutralised ?? full)).rounded())
+            // Shared Swift/Kotlin rule: nearest integer, with exact half-ties away from zero.
+            Int((full - (neutralised ?? full)).rounded(.toNearestOrAwayFromZero))
         }
 
         var drivers: [ChargeDriver] = []
@@ -211,8 +212,8 @@ extension RecoveryScorer {
                                              hrvBaseline: hrvBaseline, rhrBaseline: rhrBaseline,
                                              respBaseline: respBaseline, sleepPerf: sleepPerf,
                                              skinTempDev: skinTempDev)),
-                valueText: String(format: "%.1f br/min", r),
-                baselineText: String(format: "%.1f br/min baseline", b.baseline),
+                valueText: String(format: "%.1f br/min", locale: Locale(identifier: "en_US_POSIX"), r),
+                baselineText: String(format: "%.1f br/min baseline", locale: Locale(identifier: "en_US_POSIX"), b.baseline),
                 verdict: respVerdict(value: r, baseline: b.baseline)))
         }
 
@@ -283,7 +284,15 @@ extension RecoveryScorer {
     }
 
     static func skinTempDevText(_ dev: Double) -> String {
-        let sign = dev >= 0 ? "+" : ""
-        return "\(sign)\(String(format: "%.1f", dev)) C vs baseline"
+        // Negative zero needs its sign taken from the IEEE bit, never from a comparison: `-0.0 >= 0` is
+        // TRUE, so the hand-built sign this replaced prepended "+" to a value that already formatted as
+        // "-0.0", printing "+-0.0". `%+.1f` on its own gets BOTH zeroes right (checked against C printf
+        // and Java's Formatter, which the Kotlin twin uses); the explicit branch is redundant there and
+        // kept only to pin this edge, so the two zeroes cannot drift apart from the twin on a Foundation
+        // whose formatter we have not checked.
+        if dev == 0 {
+            return dev.sign == .minus ? "-0.0 C vs baseline" : "+0.0 C vs baseline"
+        }
+        return String(format: "%+.1f C vs baseline", locale: Locale(identifier: "en_US_POSIX"), dev)
     }
 }

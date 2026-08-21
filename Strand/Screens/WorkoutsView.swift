@@ -132,6 +132,12 @@ struct WorkoutsView: View {
     /// Wraps the optional edited row so `.sheet(item:)` can present add (editing == nil) or edit.
     private struct WorkoutSheetTarget: Identifiable {
         let editing: WorkoutRow?
+        /// True for "Duplicate as manual": the form pre-fills FROM a read-only row, but the save is a pure
+        /// ADD. The pre-fill row is not a stored manual row, so it must never travel on as `replacing:` —
+        /// it carries the ORIGINAL's natural key while claiming source "manual", and the repository would
+        /// take that as an edit and retire the row it was copied from. `Repository.saveManualWorkout`
+        /// documents that an imported row is never passed as `replacing`; this is what makes that true.
+        var isCopy = false
         let id = UUID()
     }
 
@@ -235,7 +241,8 @@ struct WorkoutsView: View {
         .sheet(item: $sheet) { target in
             ManualWorkoutSheet(editing: target.editing) { row, replacing in
                 Task {
-                    await repo.saveManualWorkout(row, replacing: replacing)
+                    // A copy pre-fills the form but replaces nothing — see `WorkoutSheetTarget.isCopy`.
+                    await repo.saveManualWorkout(row, replacing: target.isCopy ? nil : replacing)
                     // #598: rescore the just-added workout from the strap's HR for its window NOW, so its
                     // average / peak HR, strain and calories appear immediately (from your own strap data)
                     // instead of waiting up to 15 minutes for the next analyze tick. No-ops when the strap
@@ -429,7 +436,9 @@ struct WorkoutsView: View {
 
     // MARK: - Row actions (edit · relabel · dismiss · delete)
 
-    private func editWorkout(_ row: WorkoutRow) { sheet = WorkoutSheetTarget(editing: row) }
+    private func editWorkout(_ row: WorkoutRow, isCopy: Bool = false) {
+        sheet = WorkoutSheetTarget(editing: row, isCopy: isCopy)
+    }
 
     private func relabel(_ row: WorkoutRow, to sport: String) {
         Task {
@@ -1574,7 +1583,7 @@ struct WorkoutsView: View {
             Button("Delete", role: .destructive) { delete(row) }
         case .whoop, .apple, .lifting, .activityFile:
             // Imported history is read-only; offer a copy-to-manual edit path that doesn't touch it.
-            Button("Duplicate as manual…") { editWorkout(asManualCopy(row)) }
+            Button("Duplicate as manual…") { editWorkout(asManualCopy(row), isCopy: true) }
         }
     }
 
@@ -1584,7 +1593,7 @@ struct WorkoutsView: View {
         WorkoutRow(startTs: row.startTs, endTs: row.endTs, sport: WorkoutSource.displaySport(row.sport),
                    source: "manual", durationS: row.durationS, energyKcal: row.energyKcal,
                    avgHr: row.avgHr, maxHr: row.maxHr, strain: row.strain, distanceM: row.distanceM,
-                   zonesJSON: row.zonesJSON, notes: row.notes)
+                   zonesJSON: row.zonesJSON, notes: row.notes, steps: row.steps)
     }
 
     /// #796 - the per-session Effort cell label: the stored 0-100 strain mapped to the user's Effort scale
@@ -1886,28 +1895,28 @@ private func previewWorkoutRows() -> [WorkoutRow] {
         WorkoutRow(startTs: now - day * 0 - 3600, endTs: now - day * 0,
                    sport: "Running", source: "whoop", durationS: 3600, energyKcal: 712,
                    avgHr: 152, maxHr: 178, strain: 14.2, distanceM: 10_400,
-                   zonesJSON: #"{"z1":12.5,"z2":28.0,"z3":33.5,"z4":18.0,"z5":6.0}"#, notes: nil),
+                   zonesJSON: #"{"z1":12.5,"z2":28.0,"z3":33.5,"z4":18.0,"z5":6.0}"#, notes: nil, steps: nil),
         WorkoutRow(startTs: now - day * 1 - 2700, endTs: now - day * 1,
                    sport: "Strength Training", source: "whoop", durationS: 2700, energyKcal: 388,
                    avgHr: 118, maxHr: 156, strain: 9.4, distanceM: nil,
-                   zonesJSON: nil, notes: nil),
+                   zonesJSON: nil, notes: nil, steps: nil),
         WorkoutRow(startTs: now - day * 2 - 1800, endTs: now - day * 2,
                    sport: "Cycling", source: "apple_health", durationS: 1800, energyKcal: 240,
                    avgHr: nil, maxHr: nil, strain: nil, distanceM: 12_800,
-                   zonesJSON: nil, notes: nil),
+                   zonesJSON: nil, notes: nil, steps: nil),
         WorkoutRow(startTs: now - day * 3 - 1500, endTs: now - day * 3,
                    sport: "Running", source: "apple_health", durationS: 1500, energyKcal: 310,
                    avgHr: nil, maxHr: nil, strain: nil, distanceM: 5_100,
-                   zonesJSON: nil, notes: nil),
+                   zonesJSON: nil, notes: nil, steps: nil),
         WorkoutRow(startTs: now - day * 4 - 3300, endTs: now - day * 4,
                    sport: "Cycling", source: "whoop", durationS: 3300, energyKcal: 540,
                    avgHr: 134, maxHr: 162, strain: 11.8, distanceM: 24_600,
                    // Android key shape on purpose — exercises the cross-platform parser.
-                   zonesJSON: #"{"zone1":20.0,"zone2":35.0,"zone3":30.0,"zone4":10.0}"#, notes: nil),
+                   zonesJSON: #"{"zone1":20.0,"zone2":35.0,"zone3":30.0,"zone4":10.0}"#, notes: nil, steps: nil),
         WorkoutRow(startTs: now - day * 6 - 2400, endTs: now - day * 6,
                    sport: "Yoga", source: "whoop", durationS: 2400, energyKcal: 165,
                    avgHr: 92, maxHr: 118, strain: 5.1, distanceM: nil,
-                   zonesJSON: nil, notes: nil),
+                   zonesJSON: nil, notes: nil, steps: nil),
     ]
 }
 

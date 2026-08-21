@@ -85,9 +85,46 @@ interface WhoopDao : DeviceRegistryDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertSleepState(rows: List<SleepStateSampleEntity>): List<Long>
 
-    /** Upsert one Live Session (v22). Natural key (deviceId, startTs) — start (endTs null) then end. */
-    @Upsert
-    suspend fun upsertLiveSession(row: LiveSessionRow)
+    /** Upsert one Live Session (v22). Natural key (deviceId, startTs) — start (endTs null) then end.
+     *  The `WHERE excluded.endTs IS NOT NULL OR liveSession.endTs IS NULL` guard makes a start-write
+     *  refuse to overwrite an already-ended row: start/end persist as independent, unordered coroutines,
+     *  so a late start-write would otherwise clobber the final row back to "in progress" and lose the
+     *  totals. Ordering-independent. Byte-parity with the Swift LiveSessionStore upsert. (@bhelm) */
+    @Query(
+        """
+        INSERT INTO liveSession
+            (deviceId, startTs, endTs, chargeAtStart, floorBpm, ceilingBpm,
+             inBandSec, belowSec, aboveSec, pushCount, easeCount, hrSource)
+        VALUES (:deviceId, :startTs, :endTs, :chargeAtStart, :floorBpm, :ceilingBpm,
+                :inBandSec, :belowSec, :aboveSec, :pushCount, :easeCount, :hrSource)
+        ON CONFLICT(deviceId, startTs) DO UPDATE SET
+            endTs = excluded.endTs,
+            chargeAtStart = excluded.chargeAtStart,
+            floorBpm = excluded.floorBpm,
+            ceilingBpm = excluded.ceilingBpm,
+            inBandSec = excluded.inBandSec,
+            belowSec = excluded.belowSec,
+            aboveSec = excluded.aboveSec,
+            pushCount = excluded.pushCount,
+            easeCount = excluded.easeCount,
+            hrSource = excluded.hrSource
+        WHERE excluded.endTs IS NOT NULL OR liveSession.endTs IS NULL
+        """
+    )
+    suspend fun upsertLiveSession(
+        deviceId: String,
+        startTs: Long,
+        endTs: Long?,
+        chargeAtStart: Double?,
+        floorBpm: Double,
+        ceilingBpm: Double,
+        inBandSec: Double,
+        belowSec: Double,
+        aboveSec: Double,
+        pushCount: Int,
+        easeCount: Int,
+        hrSource: String,
+    )
 
     /** Most-recent Live Sessions first, for the look-back summary + streak. */
     @Query("SELECT * FROM liveSession WHERE deviceId = :deviceId ORDER BY startTs DESC LIMIT :limit")
@@ -896,12 +933,27 @@ interface WhoopDao : DeviceRegistryDao {
     // #836: max raw-HR timestamp across all devices. Paired with countHr() as a cheap whole-history change
     // fingerprint so the 15-min idle rescore can skip when nothing new has landed (COALESCE → 0 when empty).
     @Query("SELECT COALESCE(MAX(ts), 0) FROM hrSample") suspend fun maxHrTs(): Long
+    // #1005: per-day (device + window) HR fingerprint — row count + newest ts — for analyzeRecent's per-day
+    // reuse cache. Cheap COUNT/MAX aggregate over the (deviceId, ts) index, never a row fetch; mirrors Swift
+    // WhoopStore.hrFingerprint(deviceId:from:to:). COALESCE(MAX) → 0 for an empty window.
+    @Query("SELECT COUNT(*) FROM hrSample WHERE deviceId = :deviceId AND ts >= :from AND ts <= :to")
+    suspend fun countHrInWindow(deviceId: String, from: Long, to: Long): Int
+    @Query("SELECT COALESCE(MAX(ts), 0) FROM hrSample WHERE deviceId = :deviceId AND ts >= :from AND ts <= :to")
+    suspend fun maxHrTsInWindow(deviceId: String, from: Long, to: Long): Long
     @Query("SELECT COUNT(*) FROM rrInterval") suspend fun countRr(): Int
     @Query("SELECT COUNT(*) FROM event") suspend fun countEvents(): Int
     @Query("SELECT COUNT(*) FROM battery") suspend fun countBattery(): Int
     @Query("SELECT COUNT(*) FROM spo2Sample") suspend fun countSpo2(): Int
     @Query("SELECT COUNT(*) FROM skinTempSample") suspend fun countSkinTemp(): Int
     @Query("SELECT COUNT(*) FROM stepSample") suspend fun countSteps(): Int
+    // The remaining accumulating decoded raw streams, so the Test-Centre footprint counts ALL of them
+    // (keep in sync with Swift storageStats / TimestampHeal's raw-table list). ppgHrSample (#156 v26
+    // PPG-derived HR), ppgWaveformSample (raw v26 optical waveform) and rawImuSample can each bank a lot.
+    @Query("SELECT COUNT(*) FROM ppgHrSample") suspend fun countPpgHr(): Int
+    @Query("SELECT COUNT(*) FROM sleepStateSample") suspend fun countSleepState(): Int
+    @Query("SELECT COUNT(*) FROM ppgWaveformSample") suspend fun countPpgWaveform(): Int
+    @Query("SELECT COUNT(*) FROM rawImuSample") suspend fun countRawImu(): Int
+    @Query("SELECT COUNT(*) FROM v18AuxSample") suspend fun countV18Aux(): Int
     @Query("SELECT COUNT(*) FROM respSample") suspend fun countResp(): Int
     @Query("SELECT COUNT(*) FROM gravitySample") suspend fun countGravity(): Int
 

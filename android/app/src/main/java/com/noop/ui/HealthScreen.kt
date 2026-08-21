@@ -628,7 +628,7 @@ private fun ContributorBar(
 // latest "fitness_age" the IntelligenceEngine writes into metricSeries under the computed "-noop"
 // source — this section only READS it; it never recomputes the headline. Honest framing throughout:
 // it's a fitness comparison (± 5 yr band), never a biological age, and weight/height/waist live under
-// "Unlocks your VO₂max", never as if they sharpen the age. When no value exists yet we show the
+// "Sharpens your VO₂max", never as if they sharpen the age. When no value exists yet we show the
 // readiness checklist instead, so the user knows exactly what's still needed.
 
 /** Fitness Age readiness from what a screen can see: RHR coverage over the last 7 merged daily rows
@@ -697,9 +697,9 @@ private fun FitnessAgeSection(vm: AppViewModel, days: List<DailyMetric>, profile
                 onHowAccurate = { showChecklist = !showChecklist },
                 checklistOpen = showChecklist,
             )
-            // #1: the weekly Fitness Age computed but VO₂max didn't — the one missing input is a waist
-            // measurement. Key on waist being unset (not vo2max == null, which is transiently null right
-            // after waist is set) — prompt for it (tap → Settings) instead of silently omitting the number.
+            // #1391: VO₂max is shown even without a waist (the Uth HR-ratio fallback), so a waist no longer
+            // "unlocks" the number — it upgrades it to the more accurate Nes waist-based estimate. Key on
+            // waist being unset and nudge for it (tap → Settings) to sharpen the figure already displayed.
             if (profile.waistCm <= 0.0) {
                 Row(
                     modifier = Modifier
@@ -713,7 +713,7 @@ private fun FitnessAgeSection(vm: AppViewModel, days: List<DailyMetric>, profile
                     Icon(Icons.Filled.MonitorHeart, contentDescription = null,
                         tint = Palette.metricCyan, modifier = Modifier.size(16.dp))
                     Text(
-                        uiString(R.string.l10n_health_screen_add_your_waist_to_unlock_your_vo_max_94c646cb),
+                        uiString(R.string.l10n_health_screen_add_your_waist_for_a_more_accurate_vo_max_829f5e1e),
                         style = NoopType.footnote, color = Palette.textSecondary,
                         modifier = Modifier.weight(1f),
                     )
@@ -1027,7 +1027,7 @@ private fun fitnessReadyLead(rhrDays: Int, hasAge: Boolean, hasSex: Boolean): St
 }
 
 /** The readiness checklist card: each input as a ✓ / ⚠ / ○ glyph + its detail, grouped by role into
- *  "Drives your Fitness Age" and "Unlocks your VO₂max". When [headed] (no value yet) it leads with the
+ *  "Drives your Fitness Age" and "Sharpens your VO₂max". When [headed] (no value yet) it leads with the
  *  [lead] countdown and floats the required-missing items to the top of their group. */
 @Composable
 private fun FitnessReadinessCard(
@@ -1088,7 +1088,7 @@ private fun FitnessReadinessCard(
             }
 
             ReadinessGroup(title = uiString(R.string.l10n_health_screen_drives_your_fitness_age_9d0d1219), items = drivesAge, onOpenSettings = onOpenSettings)
-            ReadinessGroup(title = uiString(R.string.l10n_health_screen_unlocks_your_vo_max_b3c67dda), items = unlocksVo2, onOpenSettings = onOpenSettings)
+            ReadinessGroup(title = uiString(R.string.l10n_health_screen_sharpens_your_vo_max_c9d52991), items = unlocksVo2, onOpenSettings = onOpenSettings)
 
             Text(
                 uiString(R.string.l10n_health_screen_weight_height_and_waist_add_a_fd2699f5),
@@ -1718,7 +1718,11 @@ private data class VitalDetailModel(
  *  (Fitness Age + Vitality under the computed strap, Steps estimate, Apple active energy). Each Today
  *  dashboard card taps through to ITS OWN focused trend here (2026-07-03), so these load their
  *  series from the repo on demand rather than off the cached `days` columns. Mirrors iOS metricDetail. */
-private val SERIES_BACKED_VITAL_KEYS = setOf("fitness_age", "vitality", "steps_est", "active_kcal", "rest")
+// #1391/#1404: vo2max_est is a COMPUTED weekly series under the "-noop" spine, like fitness_age/vitality —
+// so its detail must route to buildSeriesVitalDetail (which reads metricSeriesComputedUnion), NOT the
+// DailyMetric-backed buildVitalDetail. #1404 added the vo2max_est CASE to the series builder but omitted it
+// here, so isSeriesBacked was false and the tap-through fell to the DailyMetric builder → empty trend.
+private val SERIES_BACKED_VITAL_KEYS = setOf("fitness_age", "vitality", "steps_est", "active_kcal", "rest", "vo2max_est")
 
 @Composable
 fun VitalDetailScreen(vm: AppViewModel, key: String) {
@@ -2139,6 +2143,21 @@ private suspend fun buildSeriesVitalDetail(vm: AppViewModel, key: String): Vital
         unit = "",
         color = Palette.metricPurple,
         readings = vm.repo.metricSeriesComputedUnion(vm.activeStrapId, "vitality", "0000-01-01", "9999-12-31")
+            .map { VitalReading(it.day, it.value, it.deviceId) },
+        format = { it.roundToInt().toString() },
+    )
+    // #1391: the VO₂max card (opt-in, #1393) taps through here. Like its sibling computed metrics
+    // (fitness_age / vitality above), the weekly estimate is persisted under the "-noop" computed spine
+    // (IntelligenceEngine writes "vo2max_est"), so its trend reads the COMPUTED union — not the raw
+    // resolvedSeries the imported vitals use, which carries no vo2max_est. Without this case the tap-through
+    // fell to the default and the trend chart was empty (the reported bug). Parity with iOS, which handles
+    // `.vo2max` alongside `.fitnessAge` / `.vitality` and reads `exploreSeries("vo2max_est")`.
+    "vo2max_est" -> VitalDetailModel(
+        key = key,
+        title = uiString(R.string.l10n_health_screen_vo2max_21214fb6),
+        unit = "ml/kg",
+        color = Palette.chargeColor,
+        readings = vm.repo.metricSeriesComputedUnion(vm.activeStrapId, "vo2max_est", "0000-01-01", "9999-12-31")
             .map { VitalReading(it.day, it.value, it.deviceId) },
         format = { it.roundToInt().toString() },
     )

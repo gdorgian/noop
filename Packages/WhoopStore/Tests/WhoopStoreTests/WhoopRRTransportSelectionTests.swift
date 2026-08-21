@@ -69,7 +69,11 @@ final class WhoopRRTransportSelectionTests: XCTestCase {
         _ = try await store.insert(Streams(rr: rows), deviceId: "whoop")
         let scored = try await store.rrIntervals(
             deviceId: "whoop", from: base - 1, to: base + 2, limit: 100)
-        XCTAssertEqual(scored, rows)
+        // Compare the fields this test is about. Upstream widened the read to round-trip `ord` (#1008
+        // diagnostics), so a whole-struct compare against hand-built rows now trips on the stored default.
+        XCTAssertEqual(scored.map(\.ts), rows.map(\.ts))
+        XCTAssertEqual(scored.map(\.rrMs), rows.map(\.rrMs))
+        XCTAssertEqual(scored.map(\.srcChannel), rows.map(\.srcChannel))
     }
 
     func testSeparateBatchExactLiveCollisionPromotesToHistoryAndAdoptsHistoricalOrder() async throws {

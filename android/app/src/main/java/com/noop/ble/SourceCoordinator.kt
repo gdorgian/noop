@@ -103,7 +103,24 @@ class SourceCoordinator(
      *  generic-HR strap path (a footpod / bike sensor / power meter rides StandardHrSource). Default no-op
      *  keeps existing call sites + JVM tests compiling unchanged. */
     private val sensorSink: (StandardHrSource.SensorMetrics) -> Unit = {},
+    /** Initial registry id for process composition. Nullable keeps plain JVM harnesses honest until their
+     * first successful reconcile; production injects its already-resolved startup id. */
+    initialActiveDeviceId: String? = null,
+    /** Move Oura's install key alongside serial-identity adoption. Plain JVM tests inject a no-op;
+     * production retains the encrypted-store behavior through this default. */
+    private val migrateOuraInstallKey: (fromId: String, toId: String) -> Unit = { fromId, toId ->
+        context?.let { ctx ->
+            OuraInstallKeyStore.load(ctx, fromId)?.let { key ->
+                OuraInstallKeyStore.save(ctx, toId, key)
+                OuraInstallKeyStore.clear(ctx, fromId)
+            }
+        }
+    },
 ) {
+
+    /** The single success-only active-id publication for UI and internal identity-adoption consumers. */
+    private val _activeDeviceId = MutableStateFlow(initialActiveDeviceId)
+    val activeDeviceId: StateFlow<String?> = _activeDeviceId.asStateFlow()
 
     /** Latest instantaneous speed/cadence/power from the active standard fitness sensor (RSC/CSC/CPS),
      *  read ADDITIVELY alongside HR by [StandardHrSource]. The in-workout UI observes this to surface the
@@ -170,7 +187,7 @@ class SourceCoordinator(
     fun start() {
         scope.launch {
             val id = registry.activeDeviceId() ?: WhoopBleClient.DEFAULT_DEVICE_ID
-            reconcileLock.withLock { reconcile(id) }
+            reconcileActiveDevice(id)
         }
     }
 
@@ -180,8 +197,20 @@ class SourceCoordinator(
      * repeated call for the same id is dropped (the `removeDuplicates()` equivalent).
      */
     fun onActiveDeviceChanged(id: String) {
-        scope.launch { reconcileLock.withLock { reconcile(id) } }
+        scope.launch { reconcileActiveDevice(id) }
     }
+
+    /**
+     * Await the serialized source switch and report its completed outcome. Callers which publish active
+     * source state must use this API so they never advertise an id whose activation later failed.
+     * Re-selecting the already reconciled id is a successful, idempotent completion.
+     */
+    suspend fun reconcileActiveDevice(id: String): Boolean =
+        reconcileLock.withLock {
+            reconcile(id).also { success ->
+                if (success) _activeDeviceId.value = id
+            }
+        }
 
     /**
      * The BLE engine connected to a WHOOP strap at [address] (null on disconnect). Persist that stable
@@ -228,10 +257,9 @@ class SourceCoordinator(
         }
     }
 
-    private suspend fun reconcile(id: String) {
-        if (id == lastSeenId) return
+    private suspend fun reconcile(id: String): Boolean {
+        if (id == lastSeenId) return true
         lastSeenId = id
-        val devices = registry.all()
         // CONTAIN every device-switch failure here. reconcile is the single entry point for both
         // start() (launch, against the PERSISTED active id) and onActiveDeviceChanged(), and it runs
         // inside a bare `scope.launch {}` — a SupervisorJob does NOT stop an uncaught throw from
@@ -240,13 +268,16 @@ class SourceCoordinator(
         // regression: making a Polar H10 active bricked the app). A strap switch must never crash the
         // app. We log the exception into the EXPORTABLE strap log too, so the next shared log reveals
         // the exact underlying throw, and reset lastSeenId so the user can retry after switching away.
-        try {
+        return try {
+            val devices = registry.all()
             if (isWhoop(id, devices)) switchToWhoop(id, devices) else switchToStrap(id, devices)
+            true
         } catch (t: Throwable) {
             lastSeenId = null
             log("SourceCoordinator: device switch to '$id' failed: ${t.javaClass.simpleName}: ${t.message}")
             straplog("HR-strap: activating this device failed (${t.javaClass.simpleName}: ${t.message}) - " +
                 "staying on the previous source. Please share this log so we can fix it.")
+            false
         }
     }
 
@@ -476,10 +507,34 @@ class SourceCoordinator(
                                     straplog("Oura: dup-gen(#1284) persist ${dupGenShape(s.startTs, s.endTs, s.stagesJson)} duplicates stored ${dupGenShape(e.startTs, e.endTs, e.stagesJSON)} startDelta=${s.startTs - e.startTs}s (end-anchor drift) - cross-connection DB read")
                                 }
                         }
-                        repo.upsertSleepSessions(listOf(session))
+                        if (NoopPrefs.ouraOnsetKeying(ctx)) {
+                            // #1284 residual 3 (EXPERIMENTAL): completeness-guarded onset keying — suppress or
+                            // replace a duplicate re-serve BEFORE banking. UNFILTERED read so a fuller row at the
+                            // candidate's keyed PK suppresses it; a read failure falls back to empty → bank the
+                            // candidate (safe default). Mirrors the Swift twin's structure + FAILED log.
+                            val from = s.startTs - 16 * 3600 - 3600
+                            val to = s.endTs + 3600
+                            val nearby = runCatching { repo.sleepSessions(deviceId, from, to, 64) }.getOrDefault(emptyList())
+                            val plan = com.noop.analytics.SleepSessionDedup.planBank(session, nearby)
+                            if (plan.bank) {
+                                // Bank the survivor FIRST, retire what it supersedes only after it lands — so a
+                                // failed upsert never leaves the night with neither the candidate nor its deleted
+                                // duplicates; on failure the stored rows are kept and the heal reconciles next pass.
+                                runCatching {
+                                    repo.upsertSleepSessions(listOf(session))
+                                    nearby.filter { it.startTs in plan.supersededStarts }.forEach { row -> runCatching { repo.deleteSleepSessionRowOnly(row) } }
+                                    straplog("Oura: onset-key(#1284) banked ${dupGenShape(s.startTs, s.endTs, s.stagesJson)} superseded ${plan.supersededStarts.size} stored row(s) - generation keying")
+                                }.onFailure { straplog("Oura: onset-key(#1284) bank FAILED (${it.message}) - kept ${nearby.size} stored row(s); heal will reconcile") }
+                            } else {
+                                straplog("Oura: onset-key(#1284) suppressed ${dupGenShape(s.startTs, s.endTs, s.stagesJson)} - a stored same-night row is at least as complete")
+                            }
+                        } else {
+                            repo.upsertSleepSessions(listOf(session))
+                        }
                     }
                 }
             },
+            onsetKeying = { NoopPrefs.ouraOnsetKeying(ctx) },  // #1284 residual 3
             log = straplog,           // Oura connect/auth/stream lifecycle → the SAME exported strap log (#421)
             onBattery = batterySink,  // ring battery → the same live state the WHOOP strap battery uses
             onModel = { model -> scope.launch { runCatching { registry.setModel(id, model) } } },  // #772: correct a name-guessed gen
@@ -516,16 +571,12 @@ class SourceCoordinator(
      * off the BLE callback thread; re-checks it is still the active device before acting.
      */
     private fun adoptOuraSerial(currentId: String, serial: String) {
-        val ctx = context ?: return
         val serialId = "${ExperimentalBrand.OURA.idPrefix}-$serial"
         if (currentId == serialId) return
         scope.launch {
             if (registry.activeDeviceId() != currentId) return@launch
             if (registry.adoptSerialIdentity(currentId, serialId)) {
-                OuraInstallKeyStore.load(ctx, currentId)?.let { key ->
-                    OuraInstallKeyStore.save(ctx, serialId, key)
-                    OuraInstallKeyStore.clear(ctx, currentId)
-                }
+                migrateOuraInstallKey(currentId, serialId)
                 straplog("Oura: adopted stable serial id $serialId (was $currentId) - re-pointing onto the ring's serial (#771)")
                 registry.setActive(serialId)
                 onActiveDeviceChanged(serialId)

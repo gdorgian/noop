@@ -61,6 +61,36 @@ class HrvAnalyzerRollingTest {
         }
     }
 
+    /**
+     * #1448: a difference that STRADDLES a dropped beat is a splice, not a physiological delta, and the
+     * nightly [HrvAnalyzer.analyze] already excludes it via the gap-aware pair. The rolling trace must
+     * too. The 2400 ms beat is out of range and removed, joining a 1000 ms run to a 1150 ms run that were
+     * never adjacent; counting that 150 ms jump yields 50.0 ms of "variability" invented entirely by the
+     * filter. Twin of Swift `testRollingRmssdExcludesDifferencesStraddlingADroppedBeat`.
+     */
+    @Test fun excludesDifferencesStraddlingADroppedBeat() {
+        val raw = listOf(1000, 1000, 1000, 1000, 1000, 2400, 1150, 1150, 1150, 1150, 1150)
+        val series = raw.mapIndexed { i, ms -> rr(i.toLong(), ms) }
+        val out = HrvAnalyzer.rollingRmssd(series, windowSec = 300, stepSec = 0, minBeatsPerWindow = 8)
+        assertTrue(out.isNotEmpty())
+        // Ten survivors, every counted pair identical: the only non-zero difference was the splice.
+        assertEquals(0.0, out.last().second, 1e-9)
+    }
+
+    /**
+     * #1448 control: a window with NO dropped beat must be byte-identical to the old behaviour, so this
+     * is not a numbers-move for clean data. Same two runs, without the out-of-range beat between them —
+     * the 1000 -> 1150 step is now a REAL adjacent difference and is counted, giving sqrt(150^2/9) = 50.
+     * Twin of Swift `testRollingRmssdGaplessWindowIsUnchanged`.
+     */
+    @Test fun gaplessWindowIsUnchanged() {
+        val raw = listOf(1000, 1000, 1000, 1000, 1000, 1150, 1150, 1150, 1150, 1150)
+        val series = raw.mapIndexed { i, ms -> rr(i.toLong(), ms) }
+        val out = HrvAnalyzer.rollingRmssd(series, windowSec = 300, stepSec = 0, minBeatsPerWindow = 8)
+        assertTrue(out.isNotEmpty())
+        assertEquals(50.0, out.last().second, 1e-9)
+    }
+
     @Test fun rangeFilterDropsOutOfRangeBeatsFromWindows() {
         // Inject a physiologically-impossible 50 ms RR between clean beats. It must be range-filtered out,
         // so the rMSSD never sees the huge artifact jump (which would spike a raw-RR plot).
@@ -79,6 +109,38 @@ class HrvAnalyzerRollingTest {
         val out = HrvAnalyzer.rollingRmssd(a + b, windowSec = 60)
         assertTrue(out.isNotEmpty())
         assertTrue(out.all { (_, v) -> v < 30.0 })
+    }
+
+    @Test fun usesExclusiveLeftWindowBoundary() {
+        // Every candidate window has only seven beats under (t - windowSec, t]. Including the beat
+        // exactly at t - windowSec would incorrectly create qualifying eight-beat points at t=7 and t=8.
+        val series = (0L..8L).map { rr(it, if (it % 2L == 0L) 800 else 810) }
+        val out = HrvAnalyzer.rollingRmssd(
+            series, windowSec = 7, stepSec = 0, minBeatsPerWindow = 8,
+        )
+        assertTrue(out.isEmpty())
+    }
+
+    @Test fun cleansEachRawWindowIndependently() {
+        // The 1006 ms beat is acceptable in the local [845, 1006, 847] window at t=14, but not in
+        // [804, 845, 1006] at t=12. A whole-series clean incorrectly emits the t=12 window too.
+        val values = listOf(800, 821, 812, 783, 804, 845, 1006, 847)
+        val series = values.mapIndexed { index, value -> rr(index * 2L, value) }
+        val out = HrvAnalyzer.rollingRmssd(
+            series, windowSec = 5, stepSec = 0, minBeatsPerWindow = 3,
+        )
+        assertEquals(listOf(4L, 6L, 8L, 10L, 14L), out.map { it.first })
+    }
+
+    @Test fun repeatedValuesCannotReattachRejectedTimestamp() {
+        // Whole-series cleaning rejects the first 900 ms beat but keeps the second. Matching survivors
+        // back by RR value reattaches that survivor to t=12 and fabricates a 141.42 ms point there.
+        val values = listOf(700, 700, 700, 700, 700, 700, 900, 900)
+        val series = values.mapIndexed { index, value -> rr(index * 2L, value) }
+        val out = HrvAnalyzer.rollingRmssd(
+            series, windowSec = 5, stepSec = 0, minBeatsPerWindow = 3,
+        )
+        assertEquals(listOf(4L, 6L, 8L, 10L), out.map { it.first })
     }
 
     @Test fun honestNoEmDashAndNoFabricatedValuesOnEmpty() {

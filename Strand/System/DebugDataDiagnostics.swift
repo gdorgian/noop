@@ -27,12 +27,15 @@ enum DebugDataDiagnostics {
         lines.append(String(repeating: "─", count: 40))
         lines.append("Strap & data")
         let d = UserDefaults.standard
-        let model: String
-        switch d.string(forKey: "selectedWhoopModel") {
-        case "whoop5": model = "WHOOP 5.0 / MG"
-        case "whoop4": model = "WHOOP 4.0"
-        default:       model = "unknown (never paired)"
-        }
+        // Parse through the enum, never against string literals. `selectedWhoopModel` stores
+        // `WhoopModel.rawValue` ("WHOOP 4.0" / "WHOOP 5.0 / MG") — both writers use `.rawValue` — but this
+        // switch tested for "whoop5"/"whoop4", which are the CASE names, not the raw values. Neither ever
+        // matched, so this header reported "unknown (never paired)" for every strap, forever, including one
+        // actively syncing. The sibling block ~270 lines below already compares `.rawValue` and carries a
+        // comment warning about this exact trap; this site never got the same treatment. Going through
+        // `WhoopModel(rawValue:)` makes the enum the single parser, so a future rename cannot re-open it.
+        let model = WhoopModel(rawValue: d.string(forKey: "selectedWhoopModel") ?? "")?.displayName
+            ?? "unknown (never paired)"
         lines.append("Model:       \(model)")
         lines.append("Firmware:    \(d.string(forKey: "noop.lastFirmware") ?? "unknown (connect to record)")")
         let syncSec = d.double(forKey: "lastSyncedAt")
@@ -163,6 +166,9 @@ enum DebugDataDiagnostics {
         // anchor map on a strap the registry correctly labelled "WHOOP 5.0 / MG", reporting every sample
         // out of range while `analyzeDay` was converting the same rows correctly.
         let family = Repository.skinTempFamilies(store: store, ids: [did])[did] ?? .whoop5
+        // Upstream's twin (#1362-era) fixed the same bug by parsing `WhoopModel(rawValue:)` out of the
+        // pref instead. That is correct for an install that HAS the pref, but a strap paired through the
+        // modern wizard never writes one, so the registry is the only source that answers for every install.
         // Mirror the real per-device anchor (#404): learn it from the WHOLE recent window's raws — not just
         // this night — so a single sparse night (<100 in-band) can't misreport under the global fallback when
         // the window as a whole has enough in-band samples for analyzeDay to learn a device anchor.
@@ -249,11 +255,15 @@ enum DebugDataDiagnostics {
         var parts: [String] = []
         var spine: [DailyMetric] = []
         var activeRows: [DailyMetric] = []
+        var computedActive: [DailyMetric] = []
+        var computedSpine: [DailyMetric] = []
         for id in ids {
             let rows = (try? await store.dailyMetrics(deviceId: id, from: "0000-01-01", to: "9999-12-31")) ?? []
             parts.append("\(id)=\(rows.count)")
             if id == "my-whoop" { spine = rows }
             if id == did { activeRows = rows }
+            if id == "\(did)-noop" { computedActive = rows }
+            if id == "my-whoop-noop" { computedSpine = rows }
         }
         lines.append("Days: " + parts.joined(separator: "  "))
         // #731: this line used to read ONLY "my-whoop" and label it "Recent 7d". For a live-BLE user whose
@@ -276,6 +286,11 @@ enum DebugDataDiagnostics {
         var emitted = false
         if let l = recentLine(activeRows, id: did) { lines.append(l); emitted = true }
         if did != "my-whoop", let l = recentLine(spine, id: "my-whoop") { lines.append(l); emitted = true }
+        // The COMPUTED "-noop" spine, where steps/activeKcalEst are actually written — compare with the raw
+        // lines above: kcal/steps populated here but 0 there ⇒ the raw merge/view drops them (cosmetic); 0 on
+        // BOTH ⇒ genuinely not computed (a real gap). Mirrors the Android twin.
+        if let l = recentLine(computedActive, id: "\(did)-noop") { lines.append(l); emitted = true }
+        if did != "my-whoop", let l = recentLine(computedSpine, id: "my-whoop-noop") { lines.append(l); emitted = true }
         if !emitted {
             lines.append("Recent: no day rows")
         }
@@ -298,11 +313,17 @@ enum DebugDataDiagnostics {
         lines.append("Enabled: \(on ? "yes" : "no") · set \(String(format: "%02d:%02d", mins / 60, mins % 60))")
         // #3: model + the 5/MG experimental gate — a 5/MG firmware alarm is NOT armed unless Experimental is on.
         // (selectedWhoopModel stores the WhoopModel rawValue — "WHOOP 5.0 / MG" / "WHOOP 4.0" — not "whoop5".)
-        let model = d.string(forKey: "selectedWhoopModel") ?? WhoopModel.whoop4.rawValue
-        if model == WhoopModel.whoop5mg.rawValue {
-            lines.append("Model: \(model) · experimental: \(PuffinExperiment.isEnabled ? "on" : "off → firmware alarm NOT armed")")
-        } else {
-            lines.append("Model: \(model)")
+        // Same rule as the header above: parse through the enum, and ABSTAIN when nothing is known. This
+        // defaulted to `whoop4.rawValue`, so an unknown family was reported as a WHOOP 4.0 — the very
+        // fabrication this change removes on Android, and it would have left the two platforms disagreeing
+        // about the one case that matters. Three arms, mirroring the Kotlin `when`.
+        switch WhoopModel(rawValue: d.string(forKey: "selectedWhoopModel") ?? "") {
+        case .whoop5mg:
+            lines.append("Model: \(WhoopModel.whoop5mg.displayName) · experimental: \(PuffinExperiment.isEnabled ? "on" : "off → firmware alarm NOT armed")")
+        case .whoop4:
+            lines.append("Model: \(WhoopModel.whoop4.displayName)")
+        case nil:
+            lines.append("Model: unknown (family not yet detected)")
         }
         // #4 / #67: strap clock health — a reset/stale OR future-dated clock (the #34 / #928 causes) breaks
         // the alarm even when armed, AND misdates offloaded sleep: the strap banks last night with its wrong

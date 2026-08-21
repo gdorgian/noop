@@ -42,9 +42,7 @@ object StepsEstimateEngineTrace {
         val lines = ArrayList<String>()
 
         // Per-usable-day points: the SAME filter the fit applies, so the trace shows exactly the days that voted.
-        val usable = points.filter {
-            it.motion >= StepsEstimateEngine.MIN_MOTION_FOR_FIT && it.steps > 0
-        }
+        val usable = points.filter(StepsEstimateEngine::isUsableCalibrationPoint)
         for (p in usable) {
             val ratio = if (p.motion > 0) p.steps / p.motion else 0.0
             lines.add(
@@ -56,10 +54,11 @@ object StepsEstimateEngineTrace {
         // The calibration outcome, read from calibrate(...) verbatim so it matches the stored coefficient.
         val cal = StepsEstimateEngine.calibrate(points, manualOverride)
         if (cal != null && (usable.size >= StepsEstimateEngine.MIN_CALIBRATION_DAYS || cal.manual)) {
+            val source = if (cal.manual) "user-set k" else "k = motion-weighted median of steps/motion"
             lines.add(
                 "stepsCal fit k=${r2(cal.coefficient)} sampleDays=${cal.sampleDays} " +
                     "confidence=${r2(cal.confidence)} manual=${cal.manual} " +
-                    "(k = motion-weighted median of steps/motion)",
+                    "($source)",
             )
         } else {
             // Withheld: name the status the tile shows, via status(...) verbatim (SAME usable-day filter).
@@ -113,10 +112,19 @@ object StepsEstimateEngineTrace {
         // no counter sample at all, say so honestly so the trace reflects the model, not a fault. (A 5/MG
         // with a single counter sample still falls through to the "need >=2" line: it HAS a counter, just
         // one read this window.)
-        if (sorted.isEmpty()) {
+        if (daySteps.isEmpty()) {
             lines.add(
                 "stepsRaw day=$dayKey counterSamples=0 noRawCounter " +
                     "(no step counter on this device; steps are motion-estimated, e.g. WHOOP 4.0)",
+            )
+            return lines
+        }
+        // A non-empty input proves a counter exists. If its rows all fall outside the requested local day,
+        // report only that window mismatch; never infer device capability or motion-estimation semantics.
+        if (sorted.isEmpty()) {
+            lines.add(
+                "stepsRaw day=$dayKey counterSamples=0 inputSamples=${daySteps.size} noRowsForDay " +
+                    "(no counter rows matched the requested local day)",
             )
             return lines
         }

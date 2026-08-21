@@ -204,6 +204,13 @@ object NoopPrefs {
      *  Mirrors iOS `PuffinExperiment.spo2CandidateDisplayKey`. */
     const val KEY_SPO2_CANDIDATE_DISPLAY = "noop.spo2CandidateDisplay"
 
+    /** "Personal daytime-stress baseline" (#463). When ON, the intraday stress timeline scores TODAY
+     *  against a PERSONAL cross-day rolling baseline (Oura-style `.baselineRelative`) instead of the
+     *  day's own calm hours (`.dayRelative`, the default). Default OFF — the validated r≈0.6 HR-only
+     *  margin is single-subject so far, so it ships as a chooseable lens, not a silent default, per the
+     *  derived-biosignal rule (CLAUDE.md). Mirrors iOS `PuffinExperiment.stressPersonalBaselineKey`. */
+    const val KEY_STRESS_PERSONAL_BASELINE = "noop.stressPersonalBaseline"
+
     /** The calendar day (yyyy-MM-dd) on which the morning-journal nudge was last shown, keeps the
      *  Sleep screen's "Good morning" sheet to at most once per day. */
     const val KEY_LAST_JOURNAL_PROMPT = "noop.lastJournalPromptDay"
@@ -248,6 +255,7 @@ object NoopPrefs {
      *  Benign — the strap banks to flash meanwhile, so sync just batches; no data loss, no link risk.
      *  Default OFF. Drives [com.noop.ble.WhoopBleClient.setLowBatteryOffloadThrottle] via [AppViewModel]. */
     const val KEY_POWER_SAVING = "noop.powerSaving"
+    const val KEY_LOW_REFRESH = "low_refresh"
     /** Battery-% threshold for [KEY_POWER_SAVING] (10/15/20/25/30). Default 20. */
     const val KEY_POWER_SAVING_BATTERY_PCT = "noop.powerSavingBatteryPct"
     /** "Pause HRV capture when the strap is low" (#477): when on, NOOP releases the held-open background
@@ -277,6 +285,14 @@ object NoopPrefs {
 
     fun setPowerSaving(context: Context, enabled: Boolean) {
         of(context).edit().putBoolean(KEY_POWER_SAVING, enabled).apply()
+    }
+
+    /** "Low refresh": sub-option of Power saving. Hourly background sync at ANY strap charge. Default off. */
+    fun lowRefresh(context: Context): Boolean =
+        of(context).getBoolean(KEY_LOW_REFRESH, false)
+
+    fun setLowRefresh(context: Context, enabled: Boolean) {
+        of(context).edit().putBoolean(KEY_LOW_REFRESH, enabled).apply()
     }
 
     /** Battery-% threshold for power saving (default 20). */
@@ -486,6 +502,16 @@ object NoopPrefs {
         of(context).edit().putBoolean(KEY_SPO2_CANDIDATE_DISPLAY, enabled).apply()
     }
 
+    /** #463: whether the intraday stress timeline scores against a PERSONAL cross-day baseline
+     *  (`.baselineRelative`) instead of the day's own calm hours. Default false — single-subject
+     *  validated so far, so it ships behind a toggle. Mirrors iOS `stressPersonalBaselineEnabled`. */
+    fun stressPersonalBaseline(context: Context): Boolean =
+        of(context).getBoolean(KEY_STRESS_PERSONAL_BASELINE, false)
+
+    fun setStressPersonalBaseline(context: Context, enabled: Boolean) {
+        of(context).edit().putBoolean(KEY_STRESS_PERSONAL_BASELINE, enabled).apply()
+    }
+
     /** Whether the strap log is mirrored to logcat. Default false (normal users don't log to adb). */
     fun debugLogging(context: Context): Boolean =
         of(context).getBoolean(KEY_DEBUG_LOGGING, false)
@@ -504,6 +530,19 @@ object NoopPrefs {
 
     fun setPolarDebugLogging(context: Context, enabled: Boolean) {
         of(context).edit().putBoolean(KEY_POLAR_DEBUG_LOGGING, enabled).apply()
+    }
+
+    /** #1284 residual 3 (EXPERIMENTAL, default OFF): generation-side 0x49-onset keying for Oura sleep. When
+     *  on, an Oura hypnogram persist keys its startTs on the rounded 0x49 onset and a completeness guard
+     *  suppresses/replaces a duplicate re-serve BEFORE it is banked. A hardware-validation toggle; no effect
+     *  without an Oura ring. Twin of iOS AppModel.ouraOnsetKeyingKey. */
+    const val KEY_OURA_ONSET_KEYING = "noop.ouraOnsetKeying"
+
+    fun ouraOnsetKeying(context: Context): Boolean =
+        of(context).getBoolean(KEY_OURA_ONSET_KEYING, false)
+
+    fun setOuraOnsetKeying(context: Context, enabled: Boolean) {
+        of(context).edit().putBoolean(KEY_OURA_ONSET_KEYING, enabled).apply()
     }
 
     /** #1121: whether the opt-in "detailed capture" rolling strap-log file is on. Persisted so capture

@@ -176,6 +176,25 @@ extension WhoopStore {
         }
     }
 
+    /// Cross-device raw-HR fingerprint: `(count, maxTs)` over EVERY `hrSample` row, no `deviceId` filter.
+    /// The `analyzeRecent` re-score gate (#1392) only needs to answer "did the raw stream change AT ALL",
+    /// so it must see HR that lands under ANY id — an Oura ring, an Apple Watch, or a WHOOP re-added under a
+    /// fresh `whoop-<uuid>` — not only the literal "my-whoop" the engine is constructed with. The per-device
+    /// `hrFingerprint(deviceId:from:to:)` above stayed pinned to that literal (there is no setter to
+    /// re-point it when the active strap changes), so on a non-WHOOP install the fingerprint read 0 rows,
+    /// the watermark never advanced, and the idle-tick / post-offload gates always skipped. This mirrors the
+    /// Kotlin twin `WhoopRepository.hrFingerprint()`, which already has no device filter.
+    public func hrFingerprint() async throws -> (count: Int, maxTs: Int) {
+        try syncRead { db in
+            guard let row = try Row.fetchOne(db, sql: """
+                SELECT COUNT(*) AS c, COALESCE(MAX(ts), 0) AS m FROM hrSample
+                """) else { return (0, 0) }
+            let c: Int = row["c"]
+            let m: Int = row["m"]
+            return (c, m)
+        }
+    }
+
     /// Aggregate HR over a window: `(n, avg, max)` computed in SQLite over the same measured-∪-PPG rows
     /// [hrSamples] returns, WITHOUT materialising them and WITHOUT a row limit.
     ///
@@ -302,7 +321,7 @@ extension WhoopStore {
             // history gap; fetch-then-filter would let discarded copies consume the limit.
             let tolerance = RRScoringTransportSelector.historyBoundaryToleranceSec
             let rows = try Row.fetchAll(db, sql: """
-                SELECT r.ts, r.rrMs, r.srcChannel FROM rrInterval r
+                SELECT r.ts, r.rrMs, r.srcChannel, r.ord FROM rrInterval r
                 WHERE r.deviceId = ? AND r.ts >= ? AND r.ts <= ?
                   AND (r.srcChannel IS NULL OR r.srcChannel <> ?)
                   AND (r.tsSuspect IS NULL OR r.tsSuspect <> 1) -- #1073: future-stamped beats
@@ -322,7 +341,8 @@ extension WhoopStore {
                                   tolerance, tolerance, limit])
                 .map { row in
                     RRInterval(ts: row["ts"], rrMs: row["rrMs"],
-                               srcChannel: (row["srcChannel"] as Int?).flatMap(RRSourceChannel.init(rawValue:)))
+                               srcChannel: (row["srcChannel"] as Int?).flatMap(RRSourceChannel.init(rawValue:)),
+                               ord: row["ord"] as Int?)
                 }
             return RRScoringTransportSelector.select(rows)
         }
@@ -447,18 +467,25 @@ extension WhoopStore {
     /// Aggregate storage footprint: total decoded rows, raw batch count, total raw byteSize.
     public func storageStats() async throws -> (decodedRows: Int, rawBatches: Int, rawBytes: Int) {
         try syncRead { db in
-            let hr   = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM hrSample") ?? 0
-            let rr   = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM rrInterval") ?? 0
-            let ev   = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM event") ?? 0
-            let bat  = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM battery") ?? 0
-            let spo2 = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM spo2Sample") ?? 0
-            let skin = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM skinTempSample") ?? 0
-            let resp = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM respSample") ?? 0
-            let grav = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM gravitySample") ?? 0
+            // The COMPLETE set of accumulating decoded raw streams — KEEP IN SYNC with
+            // `TimestampHeal.rawTables` (its per-timestamp purge is the canonical list) and the Android
+            // `WhoopRepository.storageRowCounts`. Summed by iterating the list rather than a hand-written
+            // expression, because the old fixed sum silently under-reported: it omitted stepSample,
+            // ppgHrSample, sleepStateSample, ppgWaveformSample, rawImuSample and v18AuxSample — and a 4.0
+            // with PPG (ppgHrSample/ppgWaveformSample) or IMU capture (rawImuSample) banks millions of rows.
+            // Table names are compile-time constants (never user input), so the interpolation is safe.
+            let rawTables = ["hrSample", "rrInterval", "event", "battery",
+                             "spo2Sample", "skinTempSample", "respSample", "gravitySample",
+                             "stepSample", "ppgHrSample", "sleepStateSample", "ppgWaveformSample",
+                             "rawImuSample", "v18AuxSample"]
+            var decoded = 0
+            for t in rawTables {
+                decoded += try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(t)") ?? 0
+            }
             let batches = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM rawBatch") ?? 0
             let bytes   = try Int.fetchOne(db,
                 sql: "SELECT COALESCE(SUM(byteSize), 0) FROM rawBatch") ?? 0
-            return (hr + rr + ev + bat + spo2 + skin + resp + grav, batches, bytes)
+            return (decoded, batches, bytes)
         }
     }
 }
