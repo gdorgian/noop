@@ -223,7 +223,41 @@ final class IntelligenceEngine: ObservableObject {
     // active strap's live data at read time.
 
     /// Median of a list (0 when empty) , used to denoise the 7-day resting-HR for Fitness Age.
-    static func medianOf(_ xs: [Double]) -> Double {
+    /// The ONE aggregation of a 7-day window into `VitalityEngine.Inputs`.
+    ///
+    /// Three surfaces need these inputs: the weekly write that persists `body_age`/`vitality`, the
+    /// Health hub's "what's driving it" breakdown, and Aura's Age screen. They MUST agree — a breakdown
+    /// computed on different statistics than the headline it explains is worse than no breakdown, because
+    /// it looks authoritative while contradicting the number above it. That already happened once: the
+    /// breakdown meaned every input while the headline medianed resting HR and HRV, so one outlier night
+    /// pulled them apart. Keeping the aggregation in a single function is what stops it recurring.
+    ///
+    /// Resting HR and HRV are MEDIANED (robust to one bad night); sleep and steps are MEANED.
+    ///
+    /// `vo2max` is whatever the same pass wrote to `vo2max_est` — Nes waist-based, or the waist-free Uth
+    /// HR-ratio fallback. Its reference is the population age/sex norm, never either model's own reference
+    /// person, so the comparison measures the wearer rather than cancelling the estimator's terms. Absent
+    /// a VO₂max the whole term drops out: a fitness input with no reference is not evidence.
+    nonisolated static func vitalityInputs(days: [DailyMetric], age: Int, sex: String,
+                               vo2max: Double?) -> VitalityEngine.Inputs {
+        let nights = days.compactMap { $0.totalSleepMin }.map { $0 / 60.0 }.filter { $0 > 0 }
+        let hrvs = days.compactMap { $0.avgHrv }
+        let rhrs = days.compactMap { $0.restingHr }.map(Double.init)
+        let steps = days.compactMap { $0.steps }.map(Double.init)
+        func mean(_ xs: [Double]) -> Double? { xs.isEmpty ? nil : xs.reduce(0, +) / Double(xs.count) }
+        return VitalityEngine.Inputs(
+            chronoAge: Double(age),
+            restingHR: rhrs.isEmpty ? nil : medianOf(rhrs),
+            vo2max: vo2max,
+            expectedVO2max: vo2max.map { _ in VitalityEngine.vo2maxNorm(forAge: Double(age), sex: sex) },
+            sleepHours: mean(nights),
+            sleepConsistency: VitalityEngine.sleepConsistency(nightlyHours: nights),
+            rmssd: hrvs.isEmpty ? nil : medianOf(hrvs),
+            rmssdNorm: VitalityEngine.rmssdNorm(forAge: Double(age)),
+            steps: mean(steps))
+    }
+
+    nonisolated static func medianOf(_ xs: [Double]) -> Double {
         guard !xs.isEmpty else { return 0 }
         let s = xs.sorted(); let n = s.count
         return n % 2 == 1 ? s[n / 2] : (s[n / 2 - 1] + s[n / 2]) / 2
@@ -1815,22 +1849,9 @@ final class IntelligenceEngine: ObservableObject {
         // and it is the term WHOOP Age leans on hardest too. The value is the one this same pass just wrote
         // to `vo2max_est` above (Nes waist-based, or the waist-free Uth fallback), compared against the
         // population age/sex norm rather than against either model's own reference person.
-        let vNights = fa7.compactMap { $0.totalSleepMin }.map { Double($0) / 60.0 }.filter { $0 > 0 }
-        let vHRVs = fa7.compactMap { $0.avgHrv }
-        let vSteps = fa7.compactMap { $0.steps }.map(Double.init)
-        let vVO2 = faPts.first { $0.key == "vo2max_est" }?.value
-        let vInputs = VitalityEngine.Inputs(
-            chronoAge: Double(profile.age),
-            restingHR: faRHRs.isEmpty ? nil : IntelligenceEngine.medianOf(faRHRs),
-            vo2max: vVO2,
-            expectedVO2max: vVO2.map { _ in
-                VitalityEngine.vo2maxNorm(forAge: Double(profile.age), sex: profile.sex)
-            },
-            sleepHours: vNights.isEmpty ? nil : vNights.reduce(0, +) / Double(vNights.count),
-            sleepConsistency: VitalityEngine.sleepConsistency(nightlyHours: vNights),
-            rmssd: vHRVs.isEmpty ? nil : IntelligenceEngine.medianOf(vHRVs),
-            rmssdNorm: VitalityEngine.rmssdNorm(forAge: Double(profile.age)),
-            steps: vSteps.isEmpty ? nil : vSteps.reduce(0, +) / Double(vSteps.count))
+        let vInputs = IntelligenceEngine.vitalityInputs(
+            days: Array(fa7), age: profile.age, sex: profile.sex,
+            vo2max: faPts.first { $0.key == "vo2max_est" }?.value)
         if let vRes = VitalityEngine.compute(vInputs) {
             let satKey = IntelligenceEngine.saturdayKey(onOrBefore: newestDay)
             _ = try? await store.upsertMetricSeries([

@@ -17,6 +17,8 @@ enum AuraRoute: Hashable {
     case privacy
     case settings
     case manageStraps
+    /// Body Age, Fitness Age and the VO₂max behind them. Reached from Trends, not the tab bar.
+    case age
 
     #if DEBUG
     /// Direct-launch seam for simulator visual checks of routes that normally require a tap.
@@ -38,6 +40,7 @@ enum AuraRoute: Hashable {
         case "privacy": return .privacy
         case "settings": return .settings
         case "manage-straps": return .manageStraps
+        case "age": return .age
         default: return nil
         }
     }

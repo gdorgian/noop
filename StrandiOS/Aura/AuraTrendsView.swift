@@ -9,13 +9,17 @@ import StrandDesign
 
 struct AuraTrendsView: View {
     private let reading: AuraTrendsReading
+    /// Trends is where a multi-week view belongs, so the two age readings hang off it rather than
+    /// taking one of the five tab slots.
+    private let onOpenAge: () -> Void
 
     @State private var range: AuraTrendsReading.Range = .fortnight
     /// Which point the crosshair sits on. `nil` = the latest, which is where every range should open.
     @State private var point: Int?
 
-    init(reading: AuraTrendsReading = .prototype) {
+    init(reading: AuraTrendsReading = .prototype, onOpenAge: @escaping () -> Void = {}) {
         self.reading = reading
+        self.onOpenAge = onOpenAge
     }
 
     private var series: AuraTrendsReading.Series { reading.series(for: range) }
@@ -46,8 +50,23 @@ struct AuraTrendsView: View {
             overviewCard
             signalsCard
             debtCard
+            ageRow
             AuraReadCard(overline: String(localized: "The read"), text: series.read)
         }
+    }
+
+    /// The door to Body Age and Fitness Age. Deliberately a row, not a number: those readings update
+    /// weekly, and putting a stale-by-design figure among the daily charts above would invite reading it
+    /// as today's.
+    private var ageRow: some View {
+        VStack(spacing: 0) {
+            AuraListRow(key: String(localized: "Your ages"),
+                        subtitle: String(localized: "Body Age, Fitness Age and the VO₂max behind them"),
+                        showsDivider: false,
+                        action: onOpenAge)
+        }
+        .padding(.horizontal, 16)
+        .auraCard()
     }
 
     private var overviewCard: some View {

@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import StrandAnalytics
 import StrandDesign
 import WhoopStore
 
@@ -45,6 +46,11 @@ struct RootTabView: View {
     @State private var auraStressSeries: [(day: String, value: Double)] = []
     @State private var auraRestSeries: [(day: String, value: Double)] = []
     @State private var auraWorkouts: [WorkoutRow] = []
+    /// The weekly age series, written Saturday-keyed by IntelligenceEngine under the computed `-noop`
+    /// source. Loaded alongside the other Aura snapshots; the Age screen reads them back, never recomputes.
+    @State private var auraBodyAgeSeries: [(day: String, value: Double)] = []
+    @State private var auraFitnessAgeSeries: [(day: String, value: Double)] = []
+    @State private var auraVo2maxSeries: [(day: String, value: Double)] = []
     @AppStorage(UnitPrefs.effortScaleKey) private var auraEffortScaleRaw = EffortScale.hundred.rawValue
     @AppStorage(UnitPrefs.systemKey) private var auraUnitSystemRaw = UnitSystem.metric.rawValue
     @AppStorage(UnitPrefs.temperatureKey) private var auraTemperatureRaw = ""
@@ -76,6 +82,26 @@ struct RootTabView: View {
             workouts: auraWorkouts,
             scale: UnitPrefs.resolveEffortScale(auraEffortScaleRaw)
         )
+    }
+
+    /// Body Age / Fitness Age. The driver breakdown is the only live calculation, and it aggregates
+    /// through the SAME builder the stored headline used, so the explanation cannot contradict the number.
+    private var auraAgeReading: AuraAgeReading {
+        let last7 = Array(repo.days.suffix(7))
+        return .live(
+            bodyAgeSeries: auraBodyAgeSeries,
+            fitnessAgeSeries: auraFitnessAgeSeries,
+            vo2maxSeries: auraVo2maxSeries,
+            days: last7,
+            readiness: FitnessAgeEngine.assessReadiness(
+                hasAge: profile.age > 0,
+                hasSex: !profile.sex.isEmpty,
+                rhrDays: last7.compactMap { $0.restingHr }.count,
+                activityDays: last7.compactMap { $0.strain }.count,
+                hasHeightWeight: profile.heightCm > 0 && profile.weightKg > 0,
+                hasWaist: profile.waistCm > 0),
+            chronologicalAge: profile.age,
+            sex: profile.sex)
     }
 
     private var auraTrendsReading: AuraTrendsReading {
@@ -165,6 +191,7 @@ struct RootTabView: View {
             effortReading: auraUsesPrototypeData ? .prototype : auraEffortReading,
             trendsReading: auraUsesPrototypeData ? .prototype : auraTrendsReading,
             profileReading: auraUsesPrototypeData ? .prototype : auraProfileReading,
+            ageReading: auraUsesPrototypeData ? .prototype : auraAgeReading,
             onOpenMore: { showMore = true },
             onOpenSettings: { showSettings = true },
             onOpenDevices: { showDevices = true },
@@ -203,13 +230,22 @@ struct RootTabView: View {
                 days: 60
             )
             async let workouts = repo.workoutRows(days: 8)
+            // Weekly, so a year of history is ~52 points — cheap to read whole and it makes the Body Age
+            // trend show a real direction instead of the last fortnight.
+            async let bodyAge = repo.exploreSeries(key: "body_age", source: Repository.whoopSource, days: 400)
+            async let fitnessAge = repo.exploreSeries(key: "fitness_age", source: Repository.whoopSource, days: 400)
+            async let vo2max = repo.exploreSeries(key: "vo2max_est", source: Repository.whoopSource, days: 400)
             let loaded = await (sessions, habitual, stress, rest, workouts)
+            let ages = await (bodyAge, fitnessAge, vo2max)
             guard !Task.isCancelled else { return }
             auraSleepSessions = loaded.0
             auraHabitualMidsleepSec = loaded.1
             auraStressSeries = loaded.2
             auraRestSeries = loaded.3
             auraWorkouts = loaded.4
+            auraBodyAgeSeries = ages.0
+            auraFitnessAgeSeries = ages.1
+            auraVo2maxSeries = ages.2
         }
         // Quick-action sheet presents with the calm easing (~0.42s) per the README sheet spec —
         // the easing is applied where `quickAction` is set (see `presentQuickAction`), keeping the

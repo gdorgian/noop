@@ -41,6 +41,8 @@ struct AuraShell: View {
     private let trendsReading: AuraTrendsReading
     /// You's snapshot, derived from the persisted local profile and repository history.
     private let profileReading: AuraProfileReading
+    /// Body Age / Fitness Age, reached as a detail route off Trends.
+    private let ageReading: AuraAgeReading
 
     /// Written out rather than synthesized: a struct with any `private` stored property gets a PRIVATE
     /// memberwise initializer, which the app shell in another file could not call.
@@ -53,6 +55,7 @@ struct AuraShell: View {
         effortReading: AuraEffortReading,
         trendsReading: AuraTrendsReading,
         profileReading: AuraProfileReading,
+        ageReading: AuraAgeReading,
         onOpenMore: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
         onOpenDevices: @escaping () -> Void,
@@ -67,6 +70,7 @@ struct AuraShell: View {
         self.effortReading = effortReading
         self.trendsReading = trendsReading
         self.profileReading = profileReading
+        self.ageReading = ageReading
         self.onOpenMore = onOpenMore
         self.onOpenSettings = onOpenSettings
         self.onOpenDevices = onOpenDevices
@@ -174,7 +178,7 @@ struct AuraShell: View {
         case .effort:
             AuraEffortView(reading: effortReading)
         case .trends:
-            AuraTrendsView(reading: trendsReading)
+            AuraTrendsView(reading: trendsReading, onOpenAge: { push(.age) })
         case .band:
             AuraBandView(
                 onManageDevices: { push(.manageStraps) },
@@ -291,6 +295,12 @@ struct AuraShell: View {
                     onOpenPrivacy: { push(.privacy) },
                     onOpenAdvanced: onOpenSettings
                 )
+            }
+        case .age:
+            AuraDetailScaffold(title: String(localized: "Your ages"),
+                               subtitle: String(localized: "Weekly · on this device"),
+                               onBack: pop) {
+                AuraAgeView(reading: ageReading)
             }
         case .manageStraps:
             AuraDetailScaffold(title: String(localized: "Manage strap"),
