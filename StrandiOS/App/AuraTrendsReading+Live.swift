@@ -21,9 +21,9 @@ extension AuraTrendsReading {
             .sorted { $0.day < $1.day }
 
         let normal = personalNormal(Array(chargeRows.suffix(30)).compactMap(\.recovery))
-        let fortnight = series(days: 14, rows: chargeRows, todayKey: todayKey, normal: normal)
-        let month = series(days: 30, rows: chargeRows, todayKey: todayKey, normal: normal)
-        let quarter = series(days: 90, rows: chargeRows, todayKey: todayKey, normal: normal)
+        let sixWeeks = series(days: 42, rows: chargeRows, todayKey: todayKey, normal: normal)
+        let sixMonths = series(days: 183, rows: chargeRows, todayKey: todayKey, normal: normal)
+        let year = series(days: 365, rows: chargeRows, todayKey: todayKey, normal: normal)
 
         let navDays = SleepModel.navDays(navSessions: sessions)
         let naps = SleepModel.napSleepMinutesByDay(
@@ -31,17 +31,20 @@ extension AuraTrendsReading {
             habitualMidsleepSec: habitualMidsleepSec
         )
         let ledger = SleepModel.debtLedger(days: days, napSleepMinByDay: naps)
-        let trailing30 = Array(days.suffix(30))
+        let thirtyDayCutoff = dayKey(offset: -29, from: todayKey) ?? todayKey
+        let trailing30 = days
+            .filter { $0.day >= thirtyDayCutoff && $0.day <= todayKey }
+            .sorted { $0.day < $1.day }
         let chargeValues = trailing30.compactMap(\.recovery)
         let sleepValues = trailing30.compactMap { $0.totalSleepMin.map { $0 / 60 } }
 
         return AuraTrendsReading(
-            fortnight: fortnight,
-            month: month,
-            quarter: quarter,
+            sixWeeks: sixWeeks,
+            sixMonths: sixMonths,
+            year: year,
             debt: ledger.nights.map { max(-$0.deltaMin / 60, 0) },
             debtVerdict: debtVerdict(ledger),
-            headline: trendHeadline(fortnight.values),
+            headline: trendHeadline(sixWeeks.values),
             averageCharge: averageText(chargeValues, decimals: 0),
             averageSleep: averageText(sleepValues, decimals: 1),
             metrics: metricSummaries(trailing30)
@@ -116,10 +119,10 @@ extension AuraTrendsReading {
         )
     }
 
-    /// The middle 50% of the wearer's trailing 30 valid Charge readings. Four readings are the minimum
-    /// before a range is called "normal"; below that, the card reports only the honest reading count.
+    /// The middle 50% of the wearer's trailing 30 valid Charge readings. Two weeks is the minimum before
+    /// a range is called "normal"; below that, the card reports only the honest reading count.
     private static func personalNormal(_ values: [Double]) -> ClosedRange<Double>? {
-        guard values.count >= 4 else { return nil }
+        guard values.count >= 14 else { return nil }
         let sorted = values.sorted()
         return quantile(sorted, 0.25)...quantile(sorted, 0.75)
     }
@@ -134,10 +137,10 @@ extension AuraTrendsReading {
     }
 
     private static func trendRead(_ values: [Double], windowDays: Int) -> String {
-        guard values.count >= 4 else {
+        guard values.count >= 7 else {
             return values.isEmpty
                 ? String(localized: "No Charge readings fall inside this window yet.")
-                : String(localized: "Only \(values.count) Charge readings fall inside this window. Keep wearing the strap to reveal a reliable direction.")
+                : String(localized: "Only \(values.count) Charge readings fall inside this window. There is not enough data to compare its earlier and later halves yet.")
         }
         let split = values.count / 2
         let early = mean(Array(values.prefix(split)))
@@ -155,7 +158,7 @@ extension AuraTrendsReading {
     }
 
     private static func trendHeadline(_ values: [Double]) -> String {
-        guard values.count >= 4 else { return String(localized: "Your Charge history") }
+        guard values.count >= 7 else { return String(localized: "Too early to say") }
         let split = values.count / 2
         let delta = mean(Array(values.suffix(values.count - split))) - mean(Array(values.prefix(split)))
         if delta >= 5 { return String(localized: "Your Charge is trending up") }

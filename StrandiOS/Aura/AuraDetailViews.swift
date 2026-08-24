@@ -17,6 +17,7 @@ enum AuraRoute: Hashable {
     case privacy
     case settings
     case manageStraps
+    case comingSoon(AuraUpcomingFeature)
     /// Body Age, Fitness Age and the VO₂max behind them. Reached from Trends, not the tab bar.
     case age
 
@@ -40,11 +41,104 @@ enum AuraRoute: Hashable {
         case "privacy": return .privacy
         case "settings": return .settings
         case "manage-straps": return .manageStraps
+        case "daytime-charge": return .comingSoon(.daytimeCharge)
+        case "notification-mirroring": return .comingSoon(.notificationMirroring)
+        case "aura-widgets": return .comingSoon(.widgets)
+        case "goals-labs": return .comingSoon(.goalsAndLabs)
+        case "svea-memory": return .comingSoon(.sveaMemory)
+        case "body-clock": return .comingSoon(.bodyClock)
         case "age": return .age
         default: return nil
         }
     }
     #endif
+}
+
+/// Destinations present in the approved Aura information architecture whose underlying capability is not
+/// implemented yet. Keeping their copy here prevents a prototype number or promise from leaking into a
+/// placeholder screen.
+enum AuraUpcomingFeature: String, Hashable, Identifiable, CaseIterable {
+    case daytimeCharge
+    case notificationMirroring
+    case widgets
+    case goalsAndLabs
+    case sveaMemory
+    case bodyClock
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .daytimeCharge: return String(localized: "Daytime Charge")
+        case .notificationMirroring: return String(localized: "Phone notification mirroring")
+        case .widgets: return String(localized: "Aura widgets")
+        case .goalsAndLabs: return String(localized: "Goal journeys and lab interpretation")
+        case .sveaMemory: return String(localized: "Svea memory review")
+        case .bodyClock: return String(localized: "Body clock")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .daytimeCharge: return "battery.75percent"
+        case .notificationMirroring: return "bell.and.waves.left.and.right"
+        case .widgets: return "rectangle.3.group"
+        case .goalsAndLabs: return "target"
+        case .sveaMemory: return "brain.head.profile"
+        case .bodyClock: return "clock.arrow.circlepath"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .daytimeCharge:
+            return String(localized: "A daytime Charge model is planned. It will not replace morning Charge until its data, validation and missing-data rules are defined.")
+        case .notificationMirroring:
+            return String(localized: "A supported iOS and strap-firmware path is still being investigated. No phone-notification mirroring is active in this build.")
+        case .widgets:
+            return String(localized: "New Aura layouts for Charge and last night, backed only by the most recent completed sync.")
+        case .goalsAndLabs:
+            return String(localized: "New goal journeys, OCR-confidence review and evidence-backed lab visuals. The existing local Lab Book remains available in More.")
+        case .sveaMemory:
+            return String(localized: "A redesigned purpose-by-purpose view of coach consent and memory. Existing Coach controls remain available in More.")
+        case .bodyClock:
+            return String(localized: "A 24-hour view built from recorded sleep timing once its baseline and missing-data rules are final.")
+        }
+    }
+}
+
+struct AuraComingSoonView: View {
+    let feature: AuraUpcomingFeature
+
+    var body: some View {
+        VStack(spacing: AuraPalette.cardGap) {
+            VStack(alignment: .leading, spacing: 14) {
+                Image(systemName: feature.symbol)
+                    .font(.system(size: 25, weight: .regular))
+                    .foregroundStyle(AuraPalette.accent)
+                    .frame(width: 52, height: 52)
+                    .background(Circle().fill(AuraPalette.accent.opacity(0.12)))
+
+                Text(String(localized: "Coming soon"))
+                    .font(.system(size: 24, weight: .regular, design: .rounded))
+                    .foregroundStyle(AuraPalette.textPrimary)
+
+                Text(feature.summary)
+                    .font(.system(size: 14))
+                    .lineSpacing(3)
+                    .foregroundStyle(AuraPalette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+            .auraCard(surface: AuraCardSurface.coaching(accent: AuraPalette.accent))
+
+            AuraNoteBanner(
+                text: String(localized: "This Aura feature is not active in this build. Existing underlying data and tools remain available where noted; this screen shows no substitute or preview value."),
+                tint: AuraPalette.rest
+            )
+        }
+    }
 }
 
 /// Full-screen detail chrome shared by every route that hangs off Aura. It deliberately keeps Aura's
@@ -200,10 +294,10 @@ struct AuraMetricDetailView: View {
                         .font(.system(size: 15))
                         .foregroundStyle(AuraPalette.textQuiet)
                 }
+                Text(heroCaption)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(AuraPalette.textQuiet)
             }
-            Text(heroCaption)
-                .font(.system(size: 12.5))
-                .foregroundStyle(AuraPalette.textQuiet)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
@@ -274,7 +368,7 @@ struct AuraMetricDetailView: View {
 
     private var heroCaption: String {
         switch signal.id {
-        case "hr": return String(localized: "Live from your connected strap")
+        case "hr": return String(localized: "Heart rate")
         case "hrv": return String(localized: "Latest valid nightly reading")
         case "resp": return String(localized: "Latest valid nightly estimate")
         case "sleep": return String(localized: "Main sleep from your latest night")
@@ -290,32 +384,54 @@ struct AuraMetricDetailView: View {
     private var explanation: String {
         switch signal.id {
         case "hr":
-            return String(localized: "The large number is live heart rate. The chart uses one resting-heart-rate value per valid night, so it shows recovery trend rather than every beat.")
+            return String(localized: "When the strap is connected, the large number is measured live heart rate. Otherwise it shows the latest valid nightly resting heart rate. The chart uses one resting-heart-rate value per valid night.")
         case "hrv":
-            return String(localized: "Variability is NOOP's nightly HRV estimate. Compare it with your own baseline and direction, not another person's number.")
+            return String(localized: "Variability is Noop Aura's nightly HRV estimate. Compare it with your own baseline and direction, not another person's number.")
         case "resp":
-            return String(localized: "Breathing is estimated from respiratory sinus arrhythmia in clean R–R data. NOOP leaves it blank when beat integrity is not good enough instead of inventing a rate.")
+            return String(localized: "Breathing is estimated from respiratory sinus arrhythmia in clean R–R data. Noop Aura leaves it blank when beat integrity is not good enough instead of inventing a rate.")
         case "sleep":
             return String(localized: "This is asleep time, not simply time in bed. Open Rest for the stage timeline, sleep window and debt ledger.")
         default:
-            return String(localized: "This view uses your locally stored NOOP history.")
+            return String(localized: "This view uses your locally stored Noop Aura history.")
         }
     }
 }
 
 private struct AuraLiveHeartRateHero: View {
-    @EnvironmentObject private var live: LiveState
+    @EnvironmentObject private var model: AppModel
     let fallback: String
     let unit: String
 
+    private var liveBPM: Int? {
+        model.live.connected ? (model.bpm ?? model.live.heartRate) : nil
+    }
+
+    private var caption: String {
+        if liveBPM != nil { return String(localized: "Live from your connected strap") }
+        if model.live.connected {
+            return fallback == "—"
+                ? String(localized: "Waiting for the first live heart-rate sample")
+                : String(localized: "Waiting for a live sample · latest nightly resting heart rate shown")
+        }
+        return fallback == "—"
+            ? String(localized: "Strap disconnected · no nightly resting heart rate yet")
+            : String(localized: "Strap disconnected · latest nightly resting heart rate shown")
+    }
+
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 5) {
-            Text(live.connected ? live.heartRate.map(String.init) ?? fallback : fallback)
-                .font(.system(size: 52, weight: .ultraLight, design: .rounded).monospacedDigit())
-                .foregroundStyle(AuraPalette.textPrimary)
-            Text(unit)
-                .font(.system(size: 15))
+        VStack(spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(liveBPM.map(String.init) ?? fallback)
+                    .font(.system(size: 52, weight: .ultraLight, design: .rounded).monospacedDigit())
+                    .foregroundStyle(AuraPalette.textPrimary)
+                Text(unit)
+                    .font(.system(size: 15))
+                    .foregroundStyle(AuraPalette.textQuiet)
+            }
+            Text(caption)
+                .font(.system(size: 12.5))
                 .foregroundStyle(AuraPalette.textQuiet)
+                .multilineTextAlignment(.center)
         }
     }
 }
@@ -351,7 +467,7 @@ struct AuraProfileEditorView: View {
                         .accessibilityLabel(Text("Remove photo"))
                     }
                 }
-                Text(String(localized: "Your photo stays on this iPhone and is never uploaded."))
+                Text(String(localized: "Your photo is stored locally by Noop Aura. It is not included in Noop Aura backups or sent to Coach providers."))
                     .font(.system(size: 12))
                     .foregroundStyle(AuraPalette.textQuiet)
             }
@@ -396,6 +512,7 @@ struct AuraNotificationsView: View {
     @AppStorage(UnitPrefs.liveActivityKey) private var liveActivity = true
     @State private var sheet: Sheet?
     @Environment(\.openURL) private var openURL
+    let onOpenMirroring: () -> Void
 
     var body: some View {
         VStack(spacing: AuraPalette.cardGap) {
@@ -417,6 +534,11 @@ struct AuraNotificationsView: View {
             .auraCard()
 
             VStack(spacing: 0) {
+                AuraListRow(key: String(localized: "Phone notification mirroring"),
+                            value: String(localized: "Coming soon"),
+                            subtitle: String(localized: "iOS and strap-firmware feasibility under review"),
+                            showsDivider: true,
+                            action: onOpenMirroring)
                 AuraListRow(key: String(localized: "Wind-down & alarms"),
                             subtitle: String(localized: "Sleep schedule and evening reminder"),
                             showsDivider: true) { sheet = .alarms }
@@ -482,7 +604,7 @@ struct AuraUnitsView: View {
                 .pickerStyle(.segmented)
             }
             AuraNoteBanner(
-                text: String(localized: "These are display choices only. NOOP keeps the stored measurements unchanged."),
+                text: String(localized: "These are display choices only. Noop Aura keeps the stored measurements unchanged."),
                 tint: AuraPalette.rest
             )
         }
@@ -502,16 +624,54 @@ struct AuraUnitsView: View {
 
 struct AuraExportView: View {
     enum Sheet: String, Identifiable { case health, backup, sources, shortcuts; var id: String { rawValue } }
+    @EnvironmentObject private var health: HealthKitBridge
     @State private var sheet: Sheet?
+
+    private var healthSubtitle: String {
+        switch health.auth {
+        case .authorized:
+            return String(localized: "Native Apple Health bridge · permissions set in Health")
+        case .denied:
+            return String(localized: "Permission not granted · review Apple Health")
+        case .unknown:
+            return String(localized: "Enable Apple Health to allow native sync")
+        case .entitlementMissing:
+            return String(localized: "Native access unavailable in this signing build")
+        case .unavailable:
+            return String(localized: "Apple Health is unavailable on this device")
+        }
+    }
+
+    private var healthDestination: Sheet {
+        switch health.auth {
+        case .entitlementMissing, .unavailable: return .shortcuts
+        default: return .health
+        }
+    }
+
+    private var healthNote: String {
+        switch health.auth {
+        case .authorized:
+            return String(localized: "This build supports native Apple Health. Noop Aura attempts its supported Health records, and iOS decides which writes succeed from your permissions; Shortcuts Export remains optional.")
+        case .denied:
+            return String(localized: "Noop Aura can write supported data after you grant Apple Health permission. Nothing is written while access is denied.")
+        case .unknown:
+            return String(localized: "Apple Health has not been enabled. Noop Aura writes nothing there unless you grant permission.")
+        case .entitlementMissing:
+            return String(localized: "This signing build cannot use native HealthKit. Shortcuts Export can send heart rate, HRV and steps after you enable and run it.")
+        case .unavailable:
+            return String(localized: "Native Apple Health is unavailable on this device. Shortcuts Export is available where the Shortcuts and Health apps are supported.")
+        }
+    }
 
     var body: some View {
         VStack(spacing: AuraPalette.cardGap) {
             VStack(spacing: 0) {
                 AuraListRow(key: String(localized: "Apple Health"),
-                            subtitle: String(localized: "Review and sync the native HealthKit bridge"),
-                            showsDivider: true) { sheet = .health }
+                            subtitle: healthSubtitle,
+                            showsDivider: true) { sheet = healthDestination }
                 AuraListRow(key: String(localized: "Backup & Sync"),
-                            subtitle: String(localized: "Full local backup, restore and folder sync"),
+                            subtitle: String(localized: "Biometric database backup, restore and folder sync"),
                             showsDivider: true) { sheet = .backup }
                 AuraListRow(key: String(localized: "Import & data sources"),
                             subtitle: String(localized: "WHOOP, Mi Band, Apple Health and other exports"),
@@ -524,7 +684,7 @@ struct AuraExportView: View {
             .auraCard()
 
             AuraNoteBanner(
-                text: String(localized: "Your Arctic-signed build uses native HealthKit. Shortcuts Export can stay off while native Apple Health sync is working."),
+                text: healthNote,
                 tint: AuraPalette.accent
             )
         }
@@ -549,35 +709,65 @@ struct AuraExportView: View {
 // MARK: - Tracking and privacy
 
 struct AuraTrackingView: View {
+    @EnvironmentObject private var health: HealthKitBridge
     @State private var showLimitations = false
+
+    private var appleHealthCard: (title: String, rows: [(String, String, String)]) {
+        switch health.auth {
+        case .authorized:
+            return (
+                String(localized: "Supported by native Apple Health"),
+                [
+                    (String(localized: "Heart rate, resting HR and HRV"), String(localized: "Supported"), "heart.text.square.fill"),
+                    (String(localized: "Sleep stages and workouts"), String(localized: "Supported"), "bed.double.fill"),
+                    (String(localized: "Breathing when integrity passes"), String(localized: "Conditional"), "checkmark.shield.fill"),
+                ])
+        case .unknown, .denied:
+            return (
+                String(localized: "Can write to Apple Health"),
+                [
+                    (String(localized: "Heart rate, resting HR and HRV"), String(localized: "With permission"), "heart.text.square.fill"),
+                    (String(localized: "Sleep stages and workouts"), String(localized: "With permission"), "bed.double.fill"),
+                    (String(localized: "Breathing when integrity passes"), String(localized: "Conditional"), "checkmark.shield.fill"),
+                ])
+        case .entitlementMissing:
+            return (
+                String(localized: "Available through Shortcuts Export"),
+                [
+                    (String(localized: "Heart rate and HRV"), String(localized: "15-minute windows"), "heart.text.square.fill"),
+                    (String(localized: "Steps"), String(localized: "15-minute windows"), "figure.walk"),
+                    (String(localized: "Sleep, workouts and breathing"), String(localized: "Not exported"), "xmark.shield"),
+                ])
+        case .unavailable:
+            return (
+                String(localized: "Apple Health unavailable"),
+                [
+                    (String(localized: "Native Apple Health sync"), String(localized: "Unavailable"), "heart.text.square.fill"),
+                    (String(localized: "Shortcuts Export"), String(localized: "Check device support"), "square.and.arrow.up"),
+                ])
+        }
+    }
 
     var body: some View {
         VStack(spacing: AuraPalette.cardGap) {
             trackingCard(
                 title: String(localized: "Read from WHOOP 5.0"),
                 rows: [
-                    ("Live heart rate", "Live", "heart.fill"),
-                    ("R–R intervals", "Live", "waveform.path.ecg"),
-                    ("Motion, battery and skin temperature", "Recorded", "sensor.tag.radiowave.forward"),
+                    (String(localized: "Live heart rate"), String(localized: "Live"), "heart.fill"),
+                    (String(localized: "R–R intervals"), String(localized: "Live"), "waveform.path.ecg"),
+                    (String(localized: "Motion, battery and skin temperature"), String(localized: "Recorded"), "sensor.tag.radiowave.forward"),
                 ]
             )
             trackingCard(
                 title: String(localized: "Computed on iPhone"),
                 rows: [
-                    ("Charge, Effort and Rest", "Personal", "figure.mind.and.body"),
-                    ("Sleep stages and nightly HRV", "Estimated", "moon.stars.fill"),
-                    ("Breathing from clean R–R data", "Estimated", "lungs.fill"),
+                    (String(localized: "Charge, Effort and Rest"), String(localized: "Personal"), "figure.mind.and.body"),
+                    (String(localized: "Sleep stages and nightly HRV"), String(localized: "Estimated"), "moon.stars.fill"),
+                    (String(localized: "Breathing from clean R–R data"), String(localized: "Estimated"), "lungs.fill"),
                 ]
             )
-            trackingCard(
-                title: String(localized: "Written to Apple Health"),
-                rows: [
-                    ("Heart rate, resting HR and HRV", "Native", "heart.text.square.fill"),
-                    ("Sleep stages and workouts", "Native", "bed.double.fill"),
-                    ("Breathing when integrity passes", "Conditional", "checkmark.shield.fill"),
-                ]
-            )
-            AuraActionButton(title: String(localized: "Open NOOP limitations"),
+            trackingCard(title: appleHealthCard.title, rows: appleHealthCard.rows)
+            AuraActionButton(title: String(localized: "Open Noop Aura limitations"),
                              symbol: "list.bullet.rectangle") { showLimitations = true }
         }
         .sheet(isPresented: $showLimitations) {
@@ -620,11 +810,13 @@ struct AuraPrivacyView: View {
     var body: some View {
         VStack(spacing: AuraPalette.cardGap) {
             privacyCard(symbol: "iphone", title: String(localized: "On this iPhone"),
-                        text: String(localized: "WHOOP history, profile details, your photo and computed scores stay in NOOP's local storage unless you explicitly export or back them up."))
+                        text: String(localized: "WHOOP history, profile details, your photo and computed scores are stored locally by default. Data leaves Noop Aura only through destinations you enable, such as exports, backups, Apple Health or a Coach provider; the photo is not included in Noop Aura backups or Coach requests."))
             privacyCard(symbol: "heart.text.square", title: String(localized: "Apple Health"),
-                        text: String(localized: "Health access is controlled by iOS per data type. NOOP writes only the types you approved and never reads another app's private database directly."))
-            privacyCard(symbol: "icloud.slash", title: String(localized: "No NOOP cloud"),
-                        text: String(localized: "NOOP has no account server. A backup reaches iCloud, Drive or Dropbox only when you choose a folder managed by that service."))
+                        text: String(localized: "Apple Health controls access by data type. Noop Aura reads and writes through HealthKit only after you enable the connection, and iOS applies your permissions."))
+            privacyCard(symbol: "icloud.slash", title: String(localized: "No Noop Aura cloud"),
+                        text: String(localized: "Noop Aura has no account server. A backup reaches iCloud, Drive or Dropbox only when you choose a folder managed by that service."))
+            privacyCard(symbol: "bubble.left.and.text.bubble.right", title: String(localized: "Coach providers"),
+                        text: String(localized: "If you configure the Coach, messages and the data categories you consent to can be sent to your selected provider. Opt-in proactive summaries may contact that provider in the background. Local endpoints are also supported."))
             AuraActionButton(title: String(localized: "Review Apple Health"), symbol: "heart.fill") { showHealth = true }
             AuraActionButton(title: String(localized: "Open iOS app settings"), symbol: "gearshape") {
                 openURL(URL(string: UIApplication.openSettingsURLString)!)
@@ -663,20 +855,22 @@ struct AuraSettingsIndexView: View {
     let onOpenExport: () -> Void
     let onOpenTracking: () -> Void
     let onOpenPrivacy: () -> Void
+    let onOpenWidgets: () -> Void
     let onOpenAdvanced: () -> Void
 
     var body: some View {
         VStack(spacing: AuraPalette.cardGap) {
             VStack(spacing: 0) {
                 AuraListRow(key: String(localized: "Notifications"), subtitle: String(localized: "Dynamic Island, reminders and alerts"), showsDivider: true, action: onOpenNotifications)
+                AuraListRow(key: String(localized: "Aura widgets"), value: String(localized: "Coming soon"), subtitle: String(localized: "New Charge and last-night layouts"), showsDivider: true, action: onOpenWidgets)
                 AuraListRow(key: String(localized: "Units"), subtitle: String(localized: "Metric, temperature and Effort scale"), showsDivider: true, action: onOpenUnits)
                 AuraListRow(key: String(localized: "Export data"), subtitle: String(localized: "Apple Health, backup and imports"), showsDivider: true, action: onOpenExport)
-                AuraListRow(key: String(localized: "What NOOP tracks"), subtitle: String(localized: "Direct signals, estimates and Health output"), showsDivider: true, action: onOpenTracking)
+                AuraListRow(key: String(localized: "What Noop Aura tracks"), subtitle: String(localized: "Direct signals, estimates and Health output"), showsDivider: true, action: onOpenTracking)
                 AuraListRow(key: String(localized: "Privacy"), subtitle: String(localized: "Storage and system permissions"), showsDivider: false, action: onOpenPrivacy)
             }
             .padding(.horizontal, 17)
             .auraCard()
-            AuraActionButton(title: String(localized: "Advanced NOOP settings"), symbol: "slider.horizontal.3", tint: AuraPalette.textSecondary, action: onOpenAdvanced)
+            AuraActionButton(title: String(localized: "Advanced Noop Aura settings"), symbol: "slider.horizontal.3", tint: AuraPalette.textSecondary, action: onOpenAdvanced)
         }
     }
 }
@@ -694,8 +888,8 @@ struct AuraMoreView: View {
             }
             .padding(.horizontal, 17)
             .auraCard()
-            AuraActionButton(title: String(localized: "Open all NOOP tools"), symbol: "square.grid.2x2", action: onOpenAllTools)
-            AuraNoteBanner(text: String(localized: "These tools still use NOOP's original screens. The Aura index keeps every capability reachable while those deeper surfaces are redesigned one by one."), tint: AuraPalette.accent)
+            AuraActionButton(title: String(localized: "Open all Noop Aura tools"), symbol: "square.grid.2x2", action: onOpenAllTools)
+            AuraNoteBanner(text: String(localized: "These tools still use the original screens. The Aura index keeps every capability reachable while those deeper surfaces are redesigned one by one."), tint: AuraPalette.accent)
         }
     }
 }
@@ -718,7 +912,10 @@ struct AuraManageStrapsView: View {
                                symbolTint: AuraPalette.accent)
                 AuraListRow(key: String(localized: "Secure link"), value: live.encryptedBond ? String(localized: "Encrypted") : "—", showsDivider: true)
                 AuraListRow(key: String(localized: "Firmware"), value: live.strapFirmware ?? "—", showsDivider: true)
-                AuraListRow(key: String(localized: "Battery"), value: live.batteryPct.map { "\(Int($0.rounded()))%" } ?? "—", showsDivider: false)
+                AuraListRow(
+                    key: String(localized: "Battery"),
+                    value: live.connected ? (live.batteryPct.map { "\(Int($0.rounded()))%" } ?? "—") : "—",
+                    showsDivider: false)
             }
             .padding(18)
             .auraCard()

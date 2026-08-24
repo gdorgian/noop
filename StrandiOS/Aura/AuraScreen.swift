@@ -4,9 +4,8 @@ import StrandDesign
 
 // MARK: - Aura screens
 //
-// The seven screens of the Aura direction, and the floating pill bar that moves between five of them.
-// Band and You are NOT tabs — they hang off the header's two controls, which is what keeps the bar down
-// to the five things a user opens daily.
+// Aura's primary destinations plus the detail screens reached from them. Charge, Effort and Band remain
+// routable, but the persistent bar follows the Act handoff: Today, Trends, a centre action, Rest and You.
 
 enum AuraScreen: String, CaseIterable, Identifiable {
     case today
@@ -19,8 +18,8 @@ enum AuraScreen: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// The five that appear in the tab bar, in order.
-    static let tabs: [AuraScreen] = [.today, .rest, .charge, .effort, .trends]
+    /// Navigation destinations in the persistent bar. The centre `+` is an action, not a fifth tab.
+    static let tabs: [AuraScreen] = [.today, .trends, .rest, .profile]
 
     #if DEBUG
     /// Simulator-only visual regression seam. Launch with `--aura-screen rest` (or another raw value)
@@ -33,32 +32,6 @@ enum AuraScreen: String, CaseIterable, Identifiable {
         return screen
     }
     #endif
-
-    /// The quiet line above the headline.
-    var greeting: String {
-        switch self {
-        case .today:   return String(localized: "Hi, Gabriel")
-        case .rest:    return String(localized: "Last night")
-        case .charge:  return String(localized: "Right now")
-        case .effort:  return String(localized: "Saturday")
-        case .trends:  return String(localized: "Your own normal")
-        case .band:    return String(localized: "Your band")
-        case .profile: return String(localized: "Account")
-        }
-    }
-
-    /// The screen's one-line statement. Every screen opens with a sentence, never with a number.
-    var headline: String {
-        switch self {
-        case .today:   return String(localized: "Here’s your morning read")
-        case .rest:    return String(localized: "You slept 7h 12m")
-        case .charge:  return String(localized: "Your body is settled")
-        case .effort:  return String(localized: "Effort so far today")
-        case .trends:  return String(localized: "Where you’re trending")
-        case .band:    return String(localized: "Synced 4 minutes ago")
-        case .profile: return String(localized: "Gabriel D.")
-        }
-    }
 
     var tabLabel: String {
         switch self {
@@ -87,21 +60,24 @@ enum AuraScreen: String, CaseIterable, Identifiable {
 
 // MARK: - Tab bar
 
-/// The floating pill bar. The active tab is filled with the accent and is the ONLY one that shows a
-/// label — the fill carries the selection, so five labels would be five things to read for one bit of
-/// information.
+/// The floating Aura bar. Every navigation destination keeps its label visible; the centre `+` is an
+/// overlaid action that opens real quick actions and never changes the selected destination.
 struct AuraTabBar: View {
     let selection: AuraScreen
     let onSelect: (AuraScreen) -> Void
-    @State private var dragOriginIndex: Int?
+    let onAction: () -> Void
 
-    /// Width of an inactive, icon-only pill. The active pill takes whatever is left, which reproduces the
-    /// direction's wide-active proportion without a layout pass to measure it.
-    private static let inactiveWidth: CGFloat = 56
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var motion = NoopMotionState.shared
+
+    private var poseStill: Bool { motion.poseStill(reduceMotion) }
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(AuraScreen.tabs) { screen in
+        HStack(spacing: 3) {
+            ForEach(Array(AuraScreen.tabs.enumerated()), id: \.element.id) { index, screen in
+                if index == 2 {
+                    actionButton
+                }
                 tab(screen)
             }
         }
@@ -120,45 +96,25 @@ struct AuraTabBar: View {
                 .shadow(color: .black.opacity(0.5), radius: 13, y: 8)
         )
         .padding(.horizontal, 14)
-        .animation(NoopMotion.value, value: selection)
-        .simultaneousGesture(tabSwipeGesture)
-    }
-
-    /// Liquid-Glass-style scrubbing: keep a finger down on the bar and slide across destinations. The
-    /// ordinary buttons remain available, so this gesture is an enhancement rather than the only path.
-    private var tabSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 5)
-            .onChanged { value in
-                let current = AuraScreen.tabs.firstIndex(of: selection) ?? 0
-                if dragOriginIndex == nil { dragOriginIndex = current }
-                guard let origin = dragOriginIndex else { return }
-                let steps = Int((value.translation.width / Self.inactiveWidth).rounded())
-                let target = min(max(origin + steps, 0), AuraScreen.tabs.count - 1)
-                guard target != current else { return }
-                onSelect(AuraScreen.tabs[target])
-            }
-            .onEnded { _ in dragOriginIndex = nil }
+        .animation(NoopMotion.gated(NoopMotion.value, reduced: poseStill), value: selection)
     }
 
     private func tab(_ screen: AuraScreen) -> some View {
         let isOn = screen == selection
         return Button { onSelect(screen) } label: {
-            HStack(spacing: 7) {
+            VStack(spacing: 3) {
                 Image(systemName: screen.symbol)
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.system(size: 15, weight: isOn ? .semibold : .regular))
                     .foregroundStyle(isOn ? AuraPalette.onAccent : AuraPalette.textQuiet)
-                if isOn {
-                    Text(screen.tabLabel)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(AuraPalette.onAccent)
-                        .lineLimit(1)
-                        .fixedSize()
-                }
+                Text(screen.tabLabel)
+                    .font(.system(size: 9.5, weight: isOn ? .semibold : .medium))
+                    .foregroundStyle(isOn ? AuraPalette.onAccent : AuraPalette.textQuiet)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .frame(height: 46)
-            .frame(maxWidth: isOn ? .infinity : Self.inactiveWidth)
+            .frame(maxWidth: .infinity, minHeight: 48)
             .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: 19, style: .continuous)
                     .fill(isOn ? AnyShapeStyle(AuraPalette.accent) : AnyShapeStyle(Color.clear))
             )
             .contentShape(Rectangle())
@@ -166,6 +122,22 @@ struct AuraTabBar: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Text(screen.tabLabel))
         .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private var actionButton: some View {
+        Button(action: onAction) {
+            Image(systemName: "plus")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(AuraPalette.onAccent)
+                .frame(width: 50, height: 50)
+                .background(Circle().fill(AuraPalette.accent))
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+                .shadow(color: AuraPalette.accent.opacity(0.28), radius: 10, y: 4)
+        }
+        .buttonStyle(.plain)
+        .frame(minWidth: 52, minHeight: 52)
+        .accessibilityLabel(Text("Add or start"))
+        .accessibilityHint(Text("Opens quick actions"))
     }
 }
 

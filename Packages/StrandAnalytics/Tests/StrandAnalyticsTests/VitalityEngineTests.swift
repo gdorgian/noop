@@ -79,6 +79,17 @@ final class VitalityEngineTests: XCTestCase {
             .first { $0.key == "rhr" }!
         XCTAssertGreaterThan(highRHR.lnHazard, 0)
     }
+
+    func testContributionYearsUseTheSameMappingAsBodyAge() {
+        let inputs = VitalityEngine.Inputs(
+            chronoAge: 40, restingHR: 52, vo2max: 55.5, expectedVO2max: 45,
+            sleepHours: 7.5, sleepConsistency: 0.9, rmssd: 54, rmssdNorm: 45, steps: 11_000
+        )
+        let contributions = VitalityEngine.contributions(inputs)
+        let attributedYears = contributions.map { VitalityEngine.ageEffectYears(for: $0) }.reduce(0, +)
+        let result = VitalityEngine.compute(inputs)!
+        XCTAssertEqual(result.bodyAge - result.chronoAge, attributedYears, accuracy: 1e-9)
+    }
 }
 
 // MARK: - The VO₂max term (added when Body Age was finally given its strongest input)

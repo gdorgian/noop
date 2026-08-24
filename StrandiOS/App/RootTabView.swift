@@ -166,18 +166,33 @@ struct RootTabView: View {
     /// Full Settings, opened from the You screen's rows and tiles.
     @State private var showSettings = false
 
-    /// The newest SCORED day, falling back to the newest row. A wearer opening the app before the first
-    /// analytics pass of the morning has today's row present but unscored, and blanking the screen for
-    /// that window reads as data loss rather than as "not computed yet".
-    private var auraDay: DailyMetric? { repo.days.last(where: { $0.recovery != nil }) ?? repo.days.last }
+    /// The same scored anchor used by Today, widgets, watch and Live Activity. It may deliberately carry
+    /// the freshest prior score while today's analytics are pending, but never adopts a stray future row.
+    private var auraDay: DailyMetric? {
+        Repository.widgetAnchor(days: repo.days) ?? repo.today ?? repo.days.last
+    }
+
+    /// Whether the scored Rest/Charge snapshot belongs to the day the repository currently calls Today.
+    /// Carried scores remain visible, but their copy is dated rather than described as today's result.
+    private var auraDayIsCurrent: Bool {
+        guard let auraDay, let today = repo.today else { return false }
+        return auraDay.day == today.day
+    }
 
     /// Aura's visual shell receives one immutable snapshot assembled from the same repository and live
     /// state as the incumbent screens. Keeping this adaptation here prevents any UI-only redesign from
     /// reaching into BLE, storage, analytics or HealthKit ownership.
     private var auraTodayReading: AuraTodayReading {
-        AuraTodayReading.live(
+        let restByDay = Dictionary(auraRestSeries.map { ($0.day, $0.value) },
+                                   uniquingKeysWith: { _, last in last })
+        let restPerformance = auraDay.flatMap {
+            restByDay[$0.day] ?? Repository.dailyColumn(key: "sleep_performance", day: $0)
+        }
+        return AuraTodayReading.live(
             day: auraDay,
+            dayIsCurrent: auraDayIsCurrent,
             effortDay: repo.today,
+            restPerformance: restPerformance,
             history: Array(repo.days.suffix(14)),
             displayName: profile.displayName ?? "",
             effortScale: UnitPrefs.resolveEffortScale(auraEffortScaleRaw)
@@ -194,8 +209,12 @@ struct RootTabView: View {
     /// The weekly age series, written Saturday-keyed by IntelligenceEngine under the computed `-noop`
     /// source. Loaded alongside the other Aura snapshots; the Age screen reads them back, never recomputes.
     @State private var auraBodyAgeSeries: [(day: String, value: Double)] = []
+    @State private var auraBodyAgeChronologicalAgeSeries: [(day: String, value: Double)] = []
     @State private var auraFitnessAgeSeries: [(day: String, value: Double)] = []
     @State private var auraVo2maxSeries: [(day: String, value: Double)] = []
+    /// Exact weekly log-hazard contributions persisted beside Body Age, keyed by engine factor.
+    /// An absent snapshot means the UI withholds drivers; it never rebuilds an old explanation.
+    @State private var auraBodyAgeContributionSeries: [String: [(day: String, value: Double)]] = [:]
     /// The five-domain Fitness Age. Recomputed on each refresh rather than persisted: it is a pure
     /// function of data already stored, and the HealthKit half can change without NOOP being told.
     @State private var auraDomainResult: BioAge.DomainResult?
@@ -225,23 +244,22 @@ struct RootTabView: View {
     private var auraEffortReading: AuraEffortReading {
         AuraEffortReading.live(
             day: repo.today,
-            targetRecovery: Repository.widgetAnchor(days: repo.days)?.recovery,
+            targetDay: Repository.widgetAnchor(days: repo.days),
             history: repo.days,
             workouts: auraWorkouts,
             scale: UnitPrefs.resolveEffortScale(auraEffortScaleRaw)
         )
     }
 
-    /// Body Age / Fitness Age. The driver breakdown is the only live calculation, and it aggregates
-    /// through the SAME builder the stored headline used, so the explanation cannot contradict the number.
+    /// Body Age / Fitness Age, including the contribution snapshot stored with the headline week.
     private var auraAgeReading: AuraAgeReading {
         let last7 = Array(repo.days.suffix(7))
         return .live(
             bodyAgeSeries: auraBodyAgeSeries,
+            chronologicalAgeSeries: auraBodyAgeChronologicalAgeSeries,
             fitnessAgeSeries: auraFitnessAgeSeries,
             vo2maxSeries: auraVo2maxSeries,
-            days: last7,
-            sleepSessions: auraSleepSessions.map { (start: $0.effectiveStartTs, end: $0.endTs) },
+            contributionSeries: auraBodyAgeContributionSeries,
             domainResult: auraDomainResult,
             readiness: FitnessAgeEngine.assessReadiness(
                 hasAge: profile.age > 0,
@@ -250,8 +268,7 @@ struct RootTabView: View {
                 activityDays: last7.compactMap { $0.strain }.count,
                 hasHeightWeight: profile.heightCm > 0 && profile.weightKg > 0,
                 hasWaist: profile.waistCm > 0),
-            chronologicalAge: profile.age,
-            sex: profile.sex)
+            chronologicalAge: profile.age)
     }
 
     private var auraTrendsReading: AuraTrendsReading {
@@ -282,33 +299,89 @@ struct RootTabView: View {
         #endif
     }()
     /// The More index, presented as a sheet from the Aura You screen — it is no longer a tab.
+    #if DEBUG
     private var auraUsesPrototypeData: Bool {
-        #if DEBUG
         ProcessInfo.processInfo.arguments.contains("--aura-prototype")
-        #else
-        false
+    }
+    #endif
+
+    /// Prototype fixtures are compiled and selectable only in Debug builds. Release builds cannot take
+    /// a code path that substitutes a designer value for a repository-backed reading.
+    private var auraDisplayBodyState: AuraBodyState {
+        #if DEBUG
+        if auraUsesPrototypeData { return .restored }
         #endif
+        return AuraBodyState.forCharge(auraDayIsCurrent ? auraDay?.recovery : nil)
+    }
+
+    private var auraDisplayTodayReading: AuraTodayReading {
+        #if DEBUG
+        if auraUsesPrototypeData { return .prototype }
+        #endif
+        return auraTodayReading
+    }
+
+    private var auraDisplayRestReading: AuraRestReading {
+        #if DEBUG
+        if auraUsesPrototypeData { return .prototype }
+        #endif
+        return auraRestReading
+    }
+
+    private var auraDisplayChargeReading: AuraChargeReading {
+        #if DEBUG
+        if auraUsesPrototypeData { return .prototype }
+        #endif
+        return auraChargeReading
+    }
+
+    private var auraDisplayEffortReading: AuraEffortReading {
+        #if DEBUG
+        if auraUsesPrototypeData { return .prototype }
+        #endif
+        return auraEffortReading
+    }
+
+    private var auraDisplayTrendsReading: AuraTrendsReading {
+        #if DEBUG
+        if auraUsesPrototypeData { return .prototype }
+        #endif
+        return auraTrendsReading
+    }
+
+    private var auraDisplayProfileReading: AuraProfileReading {
+        #if DEBUG
+        if auraUsesPrototypeData { return .prototype }
+        #endif
+        return auraProfileReading
+    }
+
+    private var auraDisplayAgeReading: AuraAgeReading {
+        #if DEBUG
+        if auraUsesPrototypeData { return .prototype }
+        #endif
+        return auraAgeReading
     }
 
 
     var body: some View {
         // The iPhone shell is the Aura design: seven screens behind a floating pill bar that AuraShell
-        // owns, replacing the platform TabView the liquid design used. The pill bar overlaps content and
-        // labels only its active tab, neither of which a native tab bar can express.
+        // owns, replacing the platform TabView the liquid design used. Its four destinations keep their
+        // labels visible, and the centre `+` is a quick-action button rather than a fake fifth tab.
         //
         // Everything the Aura screens do NOT cover — Coach, Live, Workouts, Health, Lab Book, Backup,
         // Settings, Devices — is still reached from the You screen, which opens the More index as a
         // sheet. Nothing that was reachable before became unreachable here.
         AuraShell(
             screen: $auraScreen,
-            bodyState: auraUsesPrototypeData ? .restored : AuraBodyState.forCharge(auraDay?.recovery),
-            todayReading: auraUsesPrototypeData ? .prototype : auraTodayReading,
-            restReading: auraUsesPrototypeData ? .prototype : auraRestReading,
-            chargeReading: auraUsesPrototypeData ? .prototype : auraChargeReading,
-            effortReading: auraUsesPrototypeData ? .prototype : auraEffortReading,
-            trendsReading: auraUsesPrototypeData ? .prototype : auraTrendsReading,
-            profileReading: auraUsesPrototypeData ? .prototype : auraProfileReading,
-            ageReading: auraUsesPrototypeData ? .prototype : auraAgeReading,
+            bodyState: auraDisplayBodyState,
+            todayReading: auraDisplayTodayReading,
+            restReading: auraDisplayRestReading,
+            chargeReading: auraDisplayChargeReading,
+            effortReading: auraDisplayEffortReading,
+            trendsReading: auraDisplayTrendsReading,
+            profileReading: auraDisplayProfileReading,
+            ageReading: auraDisplayAgeReading,
             onOpenMore: { showMore = true },
             onOpenSettings: { showSettings = true },
             onOpenDevices: { showDevices = true },
@@ -324,6 +397,9 @@ struct RootTabView: View {
                 morePath.append(MoreDestination.coach)
             },
             onStartLiveSession: { showLiveSession = true },
+            onOpenQuickActions: {
+                withAnimation(Self.sheetEase) { quickAction = .menu }
+            },
             onSyncHealth: {
                 Task {
                     health.refreshAuthIfPreviouslyGranted()
@@ -358,10 +434,33 @@ struct RootTabView: View {
             // Weekly, so a year of history is ~52 points — cheap to read whole and it makes the Body Age
             // trend show a real direction instead of the last fortnight.
             async let bodyAge = repo.exploreSeries(key: "body_age", source: Repository.whoopSource, days: 400)
+            async let bodyAgeChronologicalAge = repo.exploreSeries(
+                key: IntelligenceEngine.vitalityChronologicalAgeMetricKey,
+                source: Repository.whoopSource, days: 400)
             async let fitnessAge = repo.exploreSeries(key: "fitness_age", source: Repository.whoopSource, days: 400)
             async let vo2max = repo.exploreSeries(key: "vo2max_est", source: Repository.whoopSource, days: 400)
+            async let bodyAgeRHR = repo.exploreSeries(
+                key: IntelligenceEngine.vitalityContributionMetricKey("rhr"),
+                source: Repository.whoopSource, days: 400)
+            async let bodyAgeVO2max = repo.exploreSeries(
+                key: IntelligenceEngine.vitalityContributionMetricKey("vo2max"),
+                source: Repository.whoopSource, days: 400)
+            async let bodyAgeSleep = repo.exploreSeries(
+                key: IntelligenceEngine.vitalityContributionMetricKey("sleep"),
+                source: Repository.whoopSource, days: 400)
+            async let bodyAgeConsistency = repo.exploreSeries(
+                key: IntelligenceEngine.vitalityContributionMetricKey("consistency"),
+                source: Repository.whoopSource, days: 400)
+            async let bodyAgeHRV = repo.exploreSeries(
+                key: IntelligenceEngine.vitalityContributionMetricKey("hrv"),
+                source: Repository.whoopSource, days: 400)
+            async let bodyAgeSteps = repo.exploreSeries(
+                key: IntelligenceEngine.vitalityContributionMetricKey("steps"),
+                source: Repository.whoopSource, days: 400)
             let loaded = await (sessions, habitual, stress, rest, workouts)
-            let ages = await (bodyAge, fitnessAge, vo2max)
+            let ages = await (
+                bodyAge, bodyAgeChronologicalAge, fitnessAge, vo2max, bodyAgeRHR, bodyAgeVO2max,
+                bodyAgeSleep, bodyAgeConsistency, bodyAgeHRV, bodyAgeSteps)
             guard !Task.isCancelled else { return }
             auraSleepSessions = loaded.0
             auraHabitualMidsleepSec = loaded.1
@@ -369,8 +468,17 @@ struct RootTabView: View {
             auraRestSeries = loaded.3
             auraWorkouts = loaded.4
             auraBodyAgeSeries = ages.0
-            auraFitnessAgeSeries = ages.1
-            auraVo2maxSeries = ages.2
+            auraBodyAgeChronologicalAgeSeries = ages.1
+            auraFitnessAgeSeries = ages.2
+            auraVo2maxSeries = ages.3
+            auraBodyAgeContributionSeries = [
+                "rhr": ages.4,
+                "vo2max": ages.5,
+                "sleep": ages.6,
+                "consistency": ages.7,
+                "hrv": ages.8,
+                "steps": ages.9,
+            ]
 
             // The five-domain Fitness Age. The strap half comes from rows already loaded; the phone half
             // is read from HealthKit, and returns empty unless the wearer granted it — in which case the

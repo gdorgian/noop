@@ -180,14 +180,14 @@ is PUBLIC — never write them into a tracked file, a commit message, a release 
 - **If `Config/BundleIdSecrets.xcconfig` is missing, stop and ask.** A build without it falls back to
   the tracked defaults and produces an installable-looking IPA with the wrong identity. Verify after
   packaging rather than trusting the build:
-  `unzip -p <ipa> "Payload/NOOP Staging.app/Info.plist" > /tmp/p.plist && /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" /tmp/p.plist`
+  `unzip -p <ipa> "Payload/Noop Aura.app/Info.plist" > /tmp/p.plist && /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" /tmp/p.plist`
 
 ### Naming
 
-- **The app is always `NOOP`** — `CFBundleName` and `CFBundleDisplayName` both. Upstream merges have
-  renamed it before (the DX23876 sync set the display name to "NOOP AI", that fork's branding); check
-  after every sync.
-- **GitHub releases are always titled `NOOP Aura`.**
+- **The iOS app is always `Noop Aura`** — `PRODUCT_NAME`, `CFBundleName`, and
+  `CFBundleDisplayName`. Upstream merges have renamed it before; check the packaged IPA after every
+  sync. The macOS target keeps its upstream product identity unless a release explicitly includes it.
+- **GitHub releases are always titled `Noop Aura <version>`.**
 - **The release version always matches the upstream `ryanbr/noop` version it is built from.** A
   release tracking upstream 10.5.0 is 10.5.0 here — the fork does not carry its own version line.
   Build numbers increment independently.

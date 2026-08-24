@@ -5,7 +5,7 @@
 #
 # Why: Swift/clang bake source-file path literals (e.g. GRDB's `#file` defaults) into the
 # compiled binary; on a release build those include the *builder's* home directory — i.e.
-# your username. NOOP ships anonymously, so this must be stripped from every Mach-O in the
+# your username. Noop Aura ships anonymously, so this must be stripped from every Mach-O in the
 # bundle (main executable, the widget .appex, embedded frameworks/dylibs).
 #
 # Unlike the macOS script this does NOT code-sign: the iOS .ipa is distributed UNSIGNED and
@@ -14,10 +14,10 @@
 #
 #     xcodebuild -scheme NOOPiOS -configuration Release -destination 'generic/platform=iOS' \
 #         -derivedDataPath build/ios-dd CODE_SIGNING_ALLOWED=NO build
-#     Tools/anonymize-ios-app.sh build/ios-dd/Build/Products/Release-iphoneos/NOOP.app
+#     Tools/anonymize-ios-app.sh "build/ios-dd/Build/Products/Release-iphoneos/Noop Aura.app"
 #
-# os.walk below recurses the WHOLE bundle, so the embedded watch app (NOOP.app/Watch/NOOPWatch.app)
-# and its complication .appex are scrubbed and residual-checked along with everything else.
+# os.walk below recurses the whole iOS bundle, so the widget extension and embedded frameworks are
+# scrubbed and residual-checked along with the main executable.
 #
 # The replacement is the SAME byte length as the original path, so all Mach-O offsets stay
 # valid; only the read-only string section changes. The script reads $HOME at runtime and

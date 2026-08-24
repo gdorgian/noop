@@ -509,7 +509,7 @@ struct CoachView: View {
             Text("Connect a provider to start")
                 .font(StrandFont.headline)
                 .foregroundStyle(StrandPalette.textPrimary)
-            Text("Coach uses your own API key. Nothing leaves \(Platform.deviceNounPhrase) until you connect and ask a question.")
+            Text("Coach uses your own API key. Nothing is sent to a provider until you connect one. After that, Coach sends only the data categories you consent to when it answers or runs an optional proactive feature you enable.")
                 .font(StrandFont.subhead)
                 .foregroundStyle(StrandPalette.textSecondary)
                 .multilineTextAlignment(.center)

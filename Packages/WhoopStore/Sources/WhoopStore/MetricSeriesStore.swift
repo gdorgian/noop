@@ -69,6 +69,36 @@ extension WhoopStore {
         return n
     }
 
+    /// Atomically replace a bounded set of metric points for one day.
+    ///
+    /// Weekly computed snapshots use this when the set of factors can shrink between passes. A plain
+    /// upsert would leave a factor from the previous pass behind when that input becomes unavailable;
+    /// deleting and inserting in separate actor calls would expose a transient half-snapshot. Keeping
+    /// both operations in one database write means readers see either the old complete snapshot or the
+    /// new complete snapshot, never a mixture.
+    @discardableResult
+    public func replaceMetricSeriesPoints(
+        _ rows: [MetricPoint],
+        deviceId: String,
+        day: String,
+        replacingKeys keys: [String]
+    ) async throws -> Int {
+        try syncWrite { db in
+            var changed = 0
+            for key in Set(keys) {
+                try db.execute(sql: """
+                    DELETE FROM metricSeries
+                    WHERE deviceId = ? AND day = ? AND key = ?
+                    """, arguments: [deviceId, day, key])
+                changed += db.changesCount
+            }
+            let allowed = Set(keys)
+            let replacement = rows.filter { $0.day == day && allowed.contains($0.key) }
+            changed += try Self.upsertMetricSeries(replacement, deviceId: deviceId, in: db)
+            return changed
+        }
+    }
+
     // MARK: - Reads
 
     /// Points for a single `key` on days in [from, to] (lexicographic YYYY-MM-DD compare),

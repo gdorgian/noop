@@ -13,11 +13,16 @@ struct AuraTrendsView: View {
     /// taking one of the five tab slots.
     private let onOpenAge: () -> Void
 
-    @State private var range: AuraTrendsReading.Range = .fortnight
+    @State private var range: AuraTrendsReading.Range = .sixWeeks
     /// Which point the crosshair sits on. `nil` = the latest, which is where every range should open.
     @State private var point: Int?
 
-    init(reading: AuraTrendsReading = .prototype, onOpenAge: @escaping () -> Void = {}) {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var motion = NoopMotionState.shared
+
+    private var poseStill: Bool { motion.poseStill(reduceMotion) }
+
+    init(reading: AuraTrendsReading, onOpenAge: @escaping () -> Void = {}) {
         self.reading = reading
         self.onOpenAge = onOpenAge
     }
@@ -39,7 +44,7 @@ struct AuraTrendsView: View {
                 options: AuraTrendsReading.Range.allCases.map { (value: $0, label: $0.label) },
                 selection: range
             ) { newRange in
-                withAnimation(NoopMotion.value) {
+                withAnimation(NoopMotion.gated(NoopMotion.value, reduced: poseStill)) {
                     range = newRange
                     // A new range has a different point count, so an index from the old one is meaningless.
                     point = nil
@@ -71,9 +76,9 @@ struct AuraTrendsView: View {
 
     private var overviewCard: some View {
         HStack(spacing: 8) {
-            AuraStatTile(label: String(localized: "Avg Charge"),
+            AuraStatTile(label: String(localized: "30-day avg Charge"),
                          value: reading.averageCharge, unit: "%", valueTint: AuraPalette.accent)
-            AuraStatTile(label: String(localized: "Avg sleep"),
+            AuraStatTile(label: String(localized: "30-day avg sleep"),
                          value: reading.averageSleep, unit: "h", valueTint: AuraPalette.rest)
         }
     }
@@ -201,17 +206,17 @@ struct AuraTrendsReading {
     }
 
     enum Range: String, CaseIterable, Identifiable, Hashable {
-        case fortnight
-        case month
-        case quarter
+        case sixWeeks
+        case sixMonths
+        case year
 
         var id: String { rawValue }
 
         var label: String {
             switch self {
-            case .fortnight: return String(localized: "14 days")
-            case .month:     return String(localized: "30 days")
-            case .quarter:   return String(localized: "3 months")
+            case .sixWeeks:  return String(localized: "6 weeks")
+            case .sixMonths: return String(localized: "6 months")
+            case .year:      return String(localized: "1 year")
             }
         }
     }
@@ -228,9 +233,9 @@ struct AuraTrendsReading {
         let chargeNote: String
     }
 
-    let fortnight: Series
-    let month: Series
-    let quarter: Series
+    let sixWeeks: Series
+    let sixMonths: Series
+    let year: Series
     let debt: [Double]
     let debtVerdict: String
     let headline: String
@@ -240,14 +245,15 @@ struct AuraTrendsReading {
 
     func series(for range: Range) -> Series {
         switch range {
-        case .fortnight: return fortnight
-        case .month:     return month
-        case .quarter:   return quarter
+        case .sixWeeks:  return sixWeeks
+        case .sixMonths: return sixMonths
+        case .year:      return year
         }
     }
 
+    #if DEBUG
     static let prototype = AuraTrendsReading(
-        fortnight: Series(
+        sixWeeks: Series(
             values: [62, 71, 58, 49, 66, 74, 81, 77, 64, 55, 68, 79, 84, 88],
             labels: ["3 Aug", "4 Aug", "5 Aug", "6 Aug", "7 Aug", "8 Aug", "9 Aug",
                      "10 Aug", "11 Aug", "12 Aug", "13 Aug", "14 Aug", "15 Aug",
@@ -257,7 +263,7 @@ struct AuraTrendsReading {
             normalRange: 58...76,
             chargeNote: String(localized: "Your normal 58–76")
         ),
-        month: Series(
+        sixMonths: Series(
             values: [48, 55, 61, 52, 44, 58, 66, 71, 63, 57, 49, 62, 70, 78, 74, 66, 59, 68, 75, 82, 88],
             labels: ["Wk 1", "Wk 1", "Wk 1", "Wk 1", "Wk 2", "Wk 2", "Wk 2", "Wk 2",
                      "Wk 3", "Wk 3", "Wk 3", "Wk 3", "Wk 3", "Wk 4", "Wk 4", "Wk 4",
@@ -267,7 +273,7 @@ struct AuraTrendsReading {
             normalRange: 56...75,
             chargeNote: String(localized: "Your normal 56–75")
         ),
-        quarter: Series(
+        year: Series(
             values: [40, 46, 52, 49, 58, 63, 57, 51, 62, 70, 66, 59, 68, 74, 71, 65, 72, 79, 84, 88],
             labels: ["May", "May", "May", "Jun", "Jun", "Jun", "Jun", "Jun",
                      "Jul", "Jul", "Jul", "Jul", "Jul", "Aug", "Aug", "Aug",
@@ -297,5 +303,6 @@ struct AuraTrendsReading {
                    series: [5.5, 7.3, 5.5, 6.1, 7.0, 6.6, 7.2]),
         ]
     )
+    #endif
 }
 #endif

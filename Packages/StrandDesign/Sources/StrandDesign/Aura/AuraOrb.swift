@@ -16,15 +16,17 @@ import SwiftUI
 public struct AuraOrb: View {
     private let state: AuraBodyState
     private let poseStill: Bool
+    private let available: Bool
 
     /// - Parameters:
     ///   - state: the body state to render — drives colour, glow and the marker's position together.
     ///   - poseStill: pass `NoopMotionState.shared.poseStill(reduceMotion)` from the hosting view. The
     ///     host must read `\.accessibilityReduceMotion` itself; the environment is the only place SwiftUI
     ///     publishes it, and reading it imperatively here would not invalidate on a settings change.
-    public init(state: AuraBodyState, poseStill: Bool) {
+    public init(state: AuraBodyState, poseStill: Bool, available: Bool = true) {
         self.state = state
         self.poseStill = poseStill
+        self.available = available
     }
 
     /// Drives the breath. Starts at rest so a posed-still render is the resting frame.
@@ -70,15 +72,15 @@ public struct AuraOrb: View {
     // MARK: Ring
 
     private var tickRing: some View {
-        let active = AuraGaugeMath.activeIndex(fraction: state.gaugeFraction)
+        let active = available ? AuraGaugeMath.activeIndex(fraction: state.gaugeFraction) : -1
         return ZStack {
             ForEach(0..<AuraGaugeMath.tickCount, id: \.self) { i in
                 tick(at: i, activeIndex: active)
             }
-            marker
+            if available { marker }
         }
         // The lit arc grows to its new length when the state changes, rather than cutting.
-        .animation(NoopMotion.value, value: state)
+        .animation(NoopMotion.gated(NoopMotion.value, reduced: poseStill), value: state)
     }
 
     private func tick(at index: Int, activeIndex: Int) -> some View {
@@ -114,8 +116,8 @@ public struct AuraOrb: View {
                 // chrome accent, which would leave a blue glow around a clay sphere.
                 RadialGradient(
                     stops: [
-                        .init(color: state.orbTint.opacity(state.glowOpacity), location: 0),
-                        .init(color: state.orbTint.opacity(0), location: 0.68),
+                        .init(color: orbTint.opacity(available ? state.glowOpacity : 0.2), location: 0),
+                        .init(color: orbTint.opacity(0), location: 0.68),
                     ],
                     center: .center,
                     startRadius: 0,
@@ -129,11 +131,13 @@ public struct AuraOrb: View {
     }
 
     private var orb: some View {
-        let shadow = state.orbShadow
+        let shadow: (color: Color, radius: CGFloat, y: CGFloat) = available
+            ? state.orbShadow
+            : (Color.black.opacity(0.32), 14, 8)
         return Circle()
             .fill(
                 RadialGradient(
-                    stops: state.orbStops,
+                    stops: orbStops,
                     center: UnitPoint(x: 0.38, y: 0.32),
                     startRadius: 0,
                     // CSS sizes a `radial-gradient(circle at 38% 32%, …)` to the farthest corner, which for
@@ -145,6 +149,21 @@ public struct AuraOrb: View {
             .frame(width: Self.orbSize, height: Self.orbSize)
             .shadow(color: shadow.color, radius: shadow.radius, x: 0, y: shadow.y)
             .scaleEffect(breathing ? Self.breathScale : 1)
+    }
+
+    private var orbTint: Color {
+        available ? state.orbTint : AuraPalette.textDim
+    }
+
+    private var orbStops: [Gradient.Stop] {
+        guard available else {
+            return [
+                .init(color: Color.white.opacity(0.16), location: 0),
+                .init(color: AuraPalette.textDim.opacity(0.6), location: 0.48),
+                .init(color: AuraPalette.canvas, location: 1),
+            ]
+        }
+        return state.orbStops
     }
 
     /// A soft specular arc drifting around the orb, so a still sphere still has life in it.

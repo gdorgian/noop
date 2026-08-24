@@ -29,7 +29,7 @@ final class MoreCatalogTests: XCTestCase {
             .insightsHub, .intelligence, .goalJourney, .insights, .explore, .compare, .coachSettings,
             .live, .workouts, .health, .labBook, .stress, .breathe, .intervals, .rhythm,
             .fusedRecord, .appleHealth, .miBand, .dataSources, .backupSync, .shortcutsExport, .noopLimitations,
-            .alarms, .automations, .testCentre, .siriShortcuts, .settings,
+            .alarms, .automations, .testCentre, .siriShortcuts, .powerSaving, .settings,
         ]
         XCTAssertEqual(Set(MoreCatalog.allEntries.map(\.route)), expected)
     }

@@ -30,6 +30,21 @@ final class RespRateRsaTests: XCTestCase {
         XCTAssertTrue(est.isFinite, "expected finite resp estimate, got \(est)")
         // RSA peak-pick should land within ~3 bpm of the true 15 breaths/min.
         XCTAssertEqual(est, 15.0, accuracy: 3.0)
+
+        let diagnostic = SleepStager.respRateFromRRDiagnostic(rows, start: start, end: end)
+        XCTAssertEqual(diagnostic.rejection, .none)
+        XCTAssertEqual(try XCTUnwrap(diagnostic.rateBpm), est, accuracy: 1e-9)
+        XCTAssertEqual(diagnostic.inputRowCount, rows.count)
+        XCTAssertEqual(diagnostic.inBedRowCount, rows.count)
+        XCTAssertEqual(diagnostic.usableRowCount, rows.count)
+        XCTAssertNotNil(diagnostic.beatAccurateFraction)
+        XCTAssertGreaterThan(diagnostic.acceptedWindowCount, 0)
+        XCTAssertEqual(diagnostic.acceptedWindowCount
+                       + diagnostic.skippedSpliceWindowCount
+                       + diagnostic.skippedShortWindowCount
+                       + diagnostic.skippedPeakWindowCount
+                       + diagnostic.skippedIntervalWindowCount,
+                       diagnostic.totalWindowCount)
     }
 
     /// #958 regression: a slow breather (11 breaths/min, the value in the report) must read back
@@ -78,6 +93,11 @@ final class RespRateRsaTests: XCTestCase {
         }
         let est = SleepStager.respRateFromRR(rows, start: start, end: start + 600)
         XCTAssertTrue(est.isNaN, "batched (non-beat-accurate) timestamps must gate to NaN, got \(est)")
+        let diagnostic = SleepStager.respRateFromRRDiagnostic(rows, start: start, end: start + 600)
+        XCTAssertEqual(diagnostic.rejection, .untrustworthyBeatTiming)
+        XCTAssertNil(diagnostic.rateBpm)
+        XCTAssertNotNil(diagnostic.beatAccurateFraction)
+        XCTAssertEqual(diagnostic.totalWindowCount, 0)
     }
 
     /// The gate is on BANKED-ness, not on the output value — because the value a banked stream produces
@@ -202,5 +222,14 @@ final class RespRateRsaTests: XCTestCase {
         ]
         XCTAssertTrue(SleepStager.respRateFromRR(rows, start: start, end: start + 10).isNaN)
         XCTAssertTrue(SleepStager.respRateFromRR([], start: start, end: start + 10).isNaN)
+        XCTAssertEqual(SleepStager.respRateFromRRDiagnostic(rows, start: start,
+                                                            end: start + 10).rejection,
+                       .tooFewUsableBeats)
+        XCTAssertEqual(SleepStager.respRateFromRRDiagnostic([], start: start,
+                                                            end: start + 10).rejection,
+                       .tooFewUsableBeats)
+        XCTAssertEqual(SleepStager.respRateFromRRDiagnostic(rows, start: start,
+                                                            end: start).rejection,
+                       .invalidSession)
     }
 }

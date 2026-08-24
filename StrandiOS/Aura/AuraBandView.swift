@@ -206,7 +206,7 @@ struct AuraBandReading {
         if live.charging == true {
             chargingNote = String(localized: "Live readings and recording continue while the battery pack charges.")
         } else if live.connected {
-            chargingNote = String(localized: "NOOP keeps recording and syncs history in the background.")
+            chargingNote = String(localized: "Noop Aura keeps recording and syncs history in the background.")
         } else {
             chargingNote = String(localized: "Reconnect your band to update battery and history.")
         }
@@ -270,6 +270,7 @@ struct AuraBandReading {
         return String(localized: "\(days.formatted(.number.precision(.fractionLength(1)))) days available")
     }
 
+    #if DEBUG
     static let prototype = AuraBandReading(
         batteryPercent: 62,
         remaining: String(localized: "about 2 days left"),
@@ -287,5 +288,6 @@ struct AuraBandReading {
         canSync: true,
         isSyncing: false
     )
+    #endif
 }
 #endif

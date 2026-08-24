@@ -147,4 +147,79 @@ final class WhoopRRTransportSelectionTests: XCTestCase {
             .whoopHistorical, nil, .greenQuality, .ibiAmplitude,
         ])
     }
+
+    func testTransportObservationsKeepEverySameSecondBeatInEmissionOrder() async throws {
+        let store = try await WhoopStore.inMemory()
+        try await store.upsertDevice(id: "lag-fixture", mac: nil, name: nil)
+        _ = try await store.insert(Streams(rr: [
+            RRInterval(ts: base, rrMs: 900, srcChannel: .whoopHistorical),
+            RRInterval(ts: base, rrMs: 700, srcChannel: .whoopHistorical),
+            RRInterval(ts: base + 3, rrMs: 900, srcChannel: .whoopStandardBLE),
+            RRInterval(ts: base + 3, rrMs: 700, srcChannel: .whoopStandardBLE),
+            RRInterval(ts: base + 3, rrMs: 800, srcChannel: .whoopStandardBLE),
+        ]), deviceId: "lag-fixture")
+
+        let observations = try await store.rrTransportObservations(
+            deviceId: "lag-fixture", from: base - 1, to: base + 4, limitPerTransport: 100)
+
+        XCTAssertEqual(observations.historical.map(\.rrMs), [900, 700])
+        XCTAssertEqual(observations.historical.map(\.ord), [0, 1])
+        XCTAssertEqual(observations.live.map(\.rrMs), [900, 700, 800])
+        XCTAssertEqual(observations.live.map(\.ord), [0, 1, 2])
+    }
+
+    func testNightlyTransportCensusAccountsForRawSelectedSuppressedAndFallbackRows() async throws {
+        let store = try await WhoopStore.inMemory()
+        try await store.upsertDevice(id: "census-fixture", mac: nil, name: nil)
+        _ = try await store.insert(Streams(rr: [
+            RRInterval(ts: base - 5, rrMs: 780),                                      // legacy: retained
+            RRInterval(ts: base - 3, rrMs: 790, srcChannel: .whoopStandardBLE),      // before: retained
+            RRInterval(ts: base, rrMs: 800, srcChannel: .whoopHistorical),
+            RRInterval(ts: base + 1, rrMs: 801, srcChannel: .whoopRealtime),         // local: suppressed
+            RRInterval(ts: base + 2, rrMs: 802, srcChannel: .greenQuality),          // other: retained
+            RRInterval(ts: base + 5, rrMs: 805, srcChannel: .whoopRealtime),         // gap: retained
+            RRInterval(ts: base + 10, rrMs: 810, srcChannel: .whoopHistorical),
+            RRInterval(ts: base + 12, rrMs: 812, srcChannel: .whoopStandardBLE),     // local: suppressed
+            RRInterval(ts: base + 13, rrMs: 813, srcChannel: .whoopRealtime),        // after: retained
+        ]), deviceId: "census-fixture")
+
+        let census = try await store.rrTransportCensus(
+            deviceId: "census-fixture", from: base - 10, to: base + 20)
+
+        XCTAssertEqual(census.raw,
+                       RRTransportCounts(unknown: 1, standard: 2, realtime: 3,
+                                         historical: 2, other: 1))
+        XCTAssertEqual(census.selected,
+                       RRTransportCounts(unknown: 1, standard: 1, realtime: 2,
+                                         historical: 2, other: 1))
+        XCTAssertEqual(census.suppressedStandard, 1)
+        XCTAssertEqual(census.suppressedRealtime, 1)
+        XCTAssertEqual(census.suppressedLive, 2)
+        XCTAssertEqual(census.selectedLiveBoundaryLeakage, 0)
+        XCTAssertEqual(census.selectedLiveBeforeHistory, 1)
+        XCTAssertEqual(census.selectedLiveInternalGap, 1)
+        XCTAssertEqual(census.selectedLiveAfterHistory, 1)
+        XCTAssertEqual(census.selectedLiveWithoutHistory, 0)
+        XCTAssertEqual(census.firstHistoricalTs, base)
+        XCTAssertEqual(census.lastHistoricalTs, base + 10)
+    }
+
+    func testNightlyTransportCensusPreservesLiveAndLegacyWhenHistoryIsAbsent() async throws {
+        let store = try await WhoopStore.inMemory()
+        try await store.upsertDevice(id: "census-live-only", mac: nil, name: nil)
+        _ = try await store.insert(Streams(rr: [
+            RRInterval(ts: base, rrMs: 800),
+            RRInterval(ts: base + 1, rrMs: 801, srcChannel: .whoopStandardBLE),
+            RRInterval(ts: base + 2, rrMs: 802, srcChannel: .whoopRealtime),
+        ]), deviceId: "census-live-only")
+
+        let census = try await store.rrTransportCensus(
+            deviceId: "census-live-only", from: base - 1, to: base + 3)
+
+        XCTAssertEqual(census.raw, census.selected)
+        XCTAssertEqual(census.suppressedLive, 0)
+        XCTAssertEqual(census.selectedLiveWithoutHistory, 2)
+        XCTAssertNil(census.firstHistoricalTs)
+        XCTAssertNil(census.lastHistoricalTs)
+    }
 }

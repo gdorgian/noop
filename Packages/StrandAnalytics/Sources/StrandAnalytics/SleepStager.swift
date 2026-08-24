@@ -58,6 +58,75 @@ public struct SleepSession: Equatable, Sendable {
     }
 }
 
+/// Evidence emitted by the WHOOP 5 R-R respiration estimator.
+///
+/// This is intentionally a diagnostic record, not another score. `rateBpm` is present only when the
+/// existing RSA estimator accepted the input; otherwise `rejection` names the exact gate that withheld
+/// it. Counts let a strap log distinguish missing input, untrustworthy beat timing, a spliced night, and
+/// a signal that simply contained no usable breathing windows.
+public struct RespRateRRDiagnostic: Equatable, Sendable {
+    public enum Rejection: String, Equatable, Sendable {
+        case none
+        case invalidSession
+        case tooFewUsableBeats
+        case untrustworthyBeatTiming
+        case tooShortSpan
+        case insufficientResampleGrid
+        case flatTachogram
+        case noValidWindows
+        case implausibleRate
+    }
+
+    public internal(set) var rateBpm: Double?
+    public internal(set) var candidateRateBpm: Double?
+    public internal(set) var rejection: Rejection
+    public internal(set) var inputRowCount: Int
+    public internal(set) var inBedRowCount: Int
+    public internal(set) var usableRowCount: Int
+    public internal(set) var beatAccurateFraction: Double?
+    public internal(set) var totalSpanSeconds: Double?
+    public internal(set) var spliceCount: Int
+    public internal(set) var totalWindowCount: Int
+    public internal(set) var acceptedWindowCount: Int
+    public internal(set) var skippedSpliceWindowCount: Int
+    public internal(set) var skippedShortWindowCount: Int
+    public internal(set) var skippedPeakWindowCount: Int
+    public internal(set) var skippedIntervalWindowCount: Int
+
+    init(inputRowCount: Int) {
+        rateBpm = nil
+        candidateRateBpm = nil
+        rejection = .none
+        self.inputRowCount = inputRowCount
+        inBedRowCount = 0
+        usableRowCount = 0
+        beatAccurateFraction = nil
+        totalSpanSeconds = nil
+        spliceCount = 0
+        totalWindowCount = 0
+        acceptedWindowCount = 0
+        skippedSpliceWindowCount = 0
+        skippedShortWindowCount = 0
+        skippedPeakWindowCount = 0
+        skippedIntervalWindowCount = 0
+    }
+
+    /// One privacy-safe strap-log line. It reports evidence and a gate result, never a physiological
+    /// interpretation.
+    public var summary: String {
+        let rate = rateBpm.map { String(format: "%.1f", $0) } ?? "nil"
+        let candidate = candidateRateBpm.map { String(format: "%.1f", $0) } ?? "nil"
+        let accurate = beatAccurateFraction.map { String(format: "%.3f", $0) } ?? "n/a"
+        let span = totalSpanSeconds.map { String(format: "%.0f", $0) } ?? "n/a"
+        return "Resp RSA: rate=\(rate) candidate=\(candidate) reason=\(rejection.rawValue) "
+            + "rows(input=\(inputRowCount),inBed=\(inBedRowCount),usable=\(usableRowCount)) "
+            + "beatAcc=\(accurate) span=\(span)s splices=\(spliceCount) "
+            + "windows(kept=\(acceptedWindowCount)/\(totalWindowCount),"
+            + "splice=\(skippedSpliceWindowCount),short=\(skippedShortWindowCount),"
+            + "peaks=\(skippedPeakWindowCount),intervals=\(skippedIntervalWindowCount))"
+    }
+}
+
 public enum SleepStager {
 
     // MARK: - Stage 0 constants (sleep.py)
@@ -1742,8 +1811,18 @@ public enum SleepStager {
     /// single spurious peak among a five-minute window's worth.
     /// Returns NaN when too few intervals survive (honest no-data).
     static func respRateFromRR(_ rr: [RRInterval], start: Int, end: Int) -> Double {
-        let nan = Double.nan
-        if end <= start { return nan }
+        respRateFromRRDiagnostic(rr, start: start, end: end).rateBpm ?? .nan
+    }
+
+    /// Runs the same RSA estimator as `respRateFromRR` and exposes why it accepted or withheld a value.
+    /// The wrapper above remains the scoring API, so adding this instrument cannot change a stored score.
+    public static func respRateFromRRDiagnostic(_ rr: [RRInterval], start: Int,
+                                                end: Int) -> RespRateRRDiagnostic {
+        var diagnostic = RespRateRRDiagnostic(inputRowCount: rr.count)
+        guard end > start else {
+            diagnostic.rejection = .invalidSession
+            return diagnostic
+        }
 
         // 1. In-bed RR rows in chronological order, range-filtered. STABLE sort: step 2 reconstructs
         // beat times by cumulative sum, so the order of a second's beats moves every subsequent beat
@@ -1754,9 +1833,12 @@ public enum SleepStager {
         // (cleanRRGapAware) cannot see them - it takes only [Double] and has no clock. Filtering the rows
         // by the same predicate `HRVAnalyzer.rangeFilter` applies keeps the surviving VALUES identical
         // (it is an order-preserving range test), which RespRateGapAwareTests pins.
-        let inBedRows = rowsBetween(rr, start: start, end: end) { $0.ts }
+        let rawInBedRows = rowsBetween(rr, start: start, end: end) { $0.ts }
             .sortedByTsStable()
+        diagnostic.inBedRowCount = rawInBedRows.count
+        let inBedRows = rawInBedRows
             .filter { Double($0.rrMs) >= HRVAnalyzer.rrMinMs && Double($0.rrMs) <= HRVAnalyzer.rrMaxMs }
+        diagnostic.usableRowCount = inBedRows.count
 
         // Beat-accuracy gate (#882/#883): RSA needs per-beat-accurate TIMING - each row's wall-clock gap
         // must be ≈ its own R-R value. A BANKED stream (an Oura overnight IBI stamps a whole record of
@@ -1791,11 +1873,18 @@ public enum SleepStager {
         if inBedRows.count >= 30 {
             let fraction = HRVAnalyzer.beatAccurateFraction(tsSec: inBedRows.map { $0.ts },
                                                             rrMs: inBedRows.map { Double($0.rrMs) })
-            if !HRVAnalyzer.beatValuesAreTrustworthy(beatAccurateFraction: fraction) { return nan }
+            diagnostic.beatAccurateFraction = fraction
+            if !HRVAnalyzer.beatValuesAreTrustworthy(beatAccurateFraction: fraction) {
+                diagnostic.rejection = .untrustworthyBeatTiming
+                return diagnostic
+            }
         }
 
         let filtered = inBedRows.map { Double($0.rrMs) }
-        if filtered.count < 30 { return nan }  // need enough beats for any RSA estimate
+        guard filtered.count >= 30 else {
+            diagnostic.rejection = .tooFewUsableBeats
+            return diagnostic
+        }
 
         // 2. Reconstruct beat times (seconds from session start) by cumulative sum.
         // #977: a dropout is where the WALL CLOCK outran the beat - ts jumps 30-45 s while the RR only
@@ -1820,13 +1909,21 @@ public enum SleepStager {
             acc += filtered[i] / 1000.0
             beatTimes[i] = acc
         }
+        diagnostic.spliceCount = spliceAtS.count
         let totalSpanS = beatTimes[beatTimes.count - 1]
-        if totalSpanS < rsaWindowS / 2.0 { return nan }  // < ~2.5 min of beats
+        diagnostic.totalSpanSeconds = totalSpanS
+        guard totalSpanS >= rsaWindowS / 2.0 else {
+            diagnostic.rejection = .tooShortSpan
+            return diagnostic
+        }
 
         // 3. Resample onto a uniform grid by linear interpolation.
         let dt = 1.0 / rsaResampleHz
         let nGrid = Int(totalSpanS / dt) + 1
-        if nGrid < 8 { return nan }
+        guard nGrid >= 8 else {
+            diagnostic.rejection = .insufficientResampleGrid
+            return diagnostic
+        }
         var grid = [Double](repeating: 0, count: nGrid)
         var seg = 0
         for g in 0..<nGrid {
@@ -1850,7 +1947,10 @@ public enum SleepStager {
             for j in lo...hi { sum += grid[j] }
             detrended[i] = grid[i] - sum / Double(hi - lo + 1)
         }
-        if standardDeviation(detrended) <= 1e-9 { return nan }  // flat → no RSA
+        guard standardDeviation(detrended) > 1e-9 else {
+            diagnostic.rejection = .flatTachogram
+            return diagnostic
+        }
 
         // 5. Per ~5-min window peak-pick → 60/median(breath interval); median across.
         let spliceGrid = spliceAtS.map { Int($0 / dt) }
@@ -1859,17 +1959,24 @@ public enum SleepStager {
         var perWindowRates: [Double] = []
         var w = 0
         while w < nGrid {
+            diagnostic.totalWindowCount += 1
             let wEnd = min(nGrid, w + windowSamples)
             // #977: a window straddling a splice is measuring a discontinuity, not a breath. Dropping it
             // costs one window; keeping it puts a fabricated interval into the median. All windows spliced
             // leaves perWindowRates empty and the function returns NaN, which is the honest answer.
             let spliced = spliceGrid.contains { $0 >= w && $0 < wEnd }
-            if !spliced && wEnd - w >= minDistSamples * 3 {
+            if spliced {
+                diagnostic.skippedSpliceWindowCount += 1
+            } else if wEnd - w < minDistSamples * 3 {
+                diagnostic.skippedShortWindowCount += 1
+            } else {
                 let winSeg = Array(detrended[w..<wEnd])
                 // findPeaks with height = 0.0 selects the positive RSA peaks (one per
                 // breath) on the zero-mean detrended tachogram.
                 let peaks = findPeaks(winSeg, distance: minDistSamples, height: 0.0)
-                if peaks.count >= 3 {
+                if peaks.count < 3 {
+                    diagnostic.skippedPeakWindowCount += 1
+                } else {
                     var intervals: [Double] = []
                     for i in 1..<peaks.count {
                         let ivS = Double(peaks[i] - peaks[i - 1]) * dt
@@ -1879,17 +1986,33 @@ public enum SleepStager {
                     }
                     if intervals.count >= 2 {
                         let med = HRVAnalyzer.median(intervals)
-                        if med > 0.0 { perWindowRates.append(60.0 / med) }
+                        if med > 0.0 {
+                            perWindowRates.append(60.0 / med)
+                            diagnostic.acceptedWindowCount += 1
+                        } else {
+                            diagnostic.skippedIntervalWindowCount += 1
+                        }
+                    } else {
+                        diagnostic.skippedIntervalWindowCount += 1
                     }
                 }
             }
             w += windowSamples
         }
-        if perWindowRates.isEmpty { return nan }
+        guard !perWindowRates.isEmpty else {
+            diagnostic.rejection = .noValidWindows
+            return diagnostic
+        }
         // Reject estimates outside the canonical consumer band (NaN = "no usable estimate") so the
         // persisted value never silently disagrees with the illness/readiness plausibility gate.
         let median = HRVAnalyzer.median(perWindowRates)
-        return respPlausibleRangeBpm.contains(median) ? median : nan
+        diagnostic.candidateRateBpm = median
+        guard respPlausibleRangeBpm.contains(median) else {
+            diagnostic.rejection = .implausibleRate
+            return diagnostic
+        }
+        diagnostic.rateBpm = median
+        return diagnostic
     }
 
     // MARK: - Per-epoch features

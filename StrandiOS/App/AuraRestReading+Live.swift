@@ -17,7 +17,9 @@ extension AuraRestReading {
     ) -> AuraRestReading {
         let trailingDays = Array(days.suffix(30))
         let baselineMinutes = trailingDays.compactMap(\.totalSleepMin).filter { $0 > 0 }
-        let deepMinutes = trailingDays.compactMap(\.deepMin).filter { $0 > 0 }
+        // Zero is a valid observed result. Dropping it would inflate the displayed average; only
+        // impossible negative values and missing readings are excluded.
+        let deepMinutes = trailingDays.compactMap(\.deepMin).filter { $0 >= 0 }
 
         let navDays = SleepModel.navDays(navSessions: sessions)
         let decodedNewestFirst = navDays.prefix(7).compactMap {
@@ -25,16 +27,21 @@ extension AuraRestReading {
         }
         let decoded = Array(decodedNewestFirst.reversed())
 
-        let fallbackAverage = mean(decoded.map { $0.stages.asleep })
-        let personalAverageMinutes = mean(baselineMinutes) ?? fallbackAverage
+        let decodedMinutes = decoded.map { $0.stages.asleep }
+        // Prefer whichever real source has more recorded nights. A single daily aggregate beside a
+        // fuller decoded session history must not make every night read as a one-night "normal".
+        let personalSamples = baselineMinutes.count >= decodedMinutes.count ? baselineMinutes : decodedMinutes
+        let personalAverageMinutes = mean(personalSamples)
         let personalAverageHours = (personalAverageMinutes ?? 0) / 60
 
         let nights = decoded.map { night in
             mappedNight(
                 night,
-                personalAverageMinutes: personalAverageMinutes
+                personalAverageMinutes: personalAverageMinutes,
+                personalAverageCount: personalSamples.count
             )
         }
+        let recency = periodLabels(wakeDayKeys: nights.map(\.wakeDayKey), now: Date())
 
         let naps = SleepModel.napSleepMinutesByDay(
             navDays: navDays,
@@ -44,10 +51,12 @@ extension AuraRestReading {
 
         return AuraRestReading(
             nights: nights,
+            periodTitle: recency.periodTitle,
+            latestNightTitle: recency.latestNightTitle,
             personalAverage: personalAverageHours,
             averageNote: averageNote(
                 baselineMinutes: personalAverageMinutes,
-                baselineCount: baselineMinutes.count,
+                baselineCount: personalSamples.count,
                 nights: nights
             ),
             averageSleepValue: decimalHours(personalAverageMinutes),
@@ -61,19 +70,56 @@ extension AuraRestReading {
 
     private static func mappedNight(
         _ night: Night,
-        personalAverageMinutes: Double?
+        personalAverageMinutes: Double?,
+        personalAverageCount: Int
     ) -> AuraRestReading.NightReading {
         let minutes = night.stages.asleep
+        let wakeDate = Date(timeIntervalSince1970: TimeInterval(night.session.endTs))
         return AuraRestReading.NightReading(
             id: night.session.effectiveStartTs,
-            day: dayFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(night.session.endTs))),
-            dateLabel: shortDateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(night.session.endTs))),
+            wakeDayKey: dayParser.string(from: wakeDate),
+            day: dayFormatter.string(from: wakeDate),
+            dateLabel: shortDateFormatter.string(from: wakeDate),
             hours: minutes / 60,
-            note: note(for: night, minutes: minutes, personalAverageMinutes: personalAverageMinutes),
+            note: note(
+                for: night,
+                minutes: minutes,
+                personalAverageMinutes: personalAverageMinutes,
+                personalAverageCount: personalAverageCount),
             window: "\(night.onsetText) – \(night.wakeText)",
             hypnogram: hypnogram(for: night),
             hypnogramAxis: axisLabels(for: night),
             stages: stageRows(night.stages)
+        )
+    }
+
+    /// Calendar claims are validated against the actual wake day. Seven recorded nights can span
+    /// months after a wear gap, so count alone is never enough to call them "this week".
+    static func periodLabels(
+        wakeDayKeys: [String],
+        now: Date
+    ) -> (periodTitle: String, latestNightTitle: String, isCurrentWeek: Bool, isLastNight: Bool) {
+        guard let latest = wakeDayKeys.last else {
+            return (
+                String(localized: "Recent nights"),
+                String(localized: "Latest recorded night"),
+                false,
+                false)
+        }
+        let calendar = Calendar.current
+        let today = dayParser.string(from: now)
+        let weekStart = calendar.date(byAdding: .day, value: -6, to: now).map {
+            dayParser.string(from: $0)
+        } ?? today
+        let isLastNight = latest == today
+        let isCurrentWeek = isLastNight && wakeDayKeys.allSatisfy {
+            $0 >= weekStart && $0 <= today
+        }
+        return (
+            isCurrentWeek ? String(localized: "This week") : String(localized: "Recent nights"),
+            isLastNight ? String(localized: "Last night") : String(localized: "Latest recorded night"),
+            isCurrentWeek,
+            isLastNight
         )
     }
 
@@ -131,11 +177,16 @@ extension AuraRestReading {
         }
     }
 
-    private static func note(for night: Night, minutes: Double, personalAverageMinutes: Double?) -> String {
+    private static func note(
+        for night: Night,
+        minutes: Double,
+        personalAverageMinutes: Double?,
+        personalAverageCount: Int
+    ) -> String {
         if night.sourceBlocks.contains(where: { $0.stagingSparse == true }) {
             return String(localized: "Sleep staging may be incomplete because strap coverage was sparse.")
         }
-        guard let personalAverageMinutes else {
+        guard let personalAverageMinutes, personalAverageCount > 1 else {
             return String(localized: "This is your first recorded night.")
         }
         let delta = Int((minutes - personalAverageMinutes).rounded())
@@ -180,7 +231,7 @@ extension AuraRestReading {
 
     private static func debtExplanation(_ ledger: SleepDebtLedger) -> String {
         guard ledger.nightCount > 0 else {
-            return String(localized: "Sleep debt appears after NOOP has enough recorded nights to compare with your sleep need.")
+            return String(localized: "Sleep debt appears after Noop Aura has enough recorded nights to compare with your sleep need.")
         }
         let need = durationText(ledger.needMin)
         return String(localized: "Running balance across \(ledger.nightCount) recorded nights against a \(need) nightly need. Short nights add debt; longer nights pay it back.")
@@ -209,7 +260,9 @@ extension AuraRestReading {
     private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = AppLanguage.activeLocale
-        formatter.setLocalizedDateFormatFromTemplate("EEEEE")
+        // Abbreviated localized weekdays stay distinguishable; narrow initials collide for
+        // Tuesday/Thursday and Saturday/Sunday in English and in several other locales.
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
         return formatter
     }()
 

@@ -70,9 +70,9 @@ final class ProfileStore: ObservableObject {
 
     // ── Profile picture (optional, on-device only) ──────────────────────────────────────────────
     /// The user's chosen profile photo as JPEG bytes, or nil for the default SF-Symbol fallback.
-    /// LOCAL-ONLY — like every other field here it lives in UserDefaults on this device; NOOP is
-    /// fully offline so this is never uploaded anywhere. Always set via ``setAvatar(_:)`` (which
-    /// downscales) rather than written directly, so the persisted blob stays small (~256px).
+    /// LOCAL APP STORAGE — this lives in UserDefaults and is deliberately excluded from `.noopbak`
+    /// and Coach payloads. Always set via ``setAvatar(_:)`` (which downscales) rather than written
+    /// directly, so the persisted blob stays small (~256px).
     @Published var avatarImageData: Data? {
         didSet {
             if let avatarImageData { d.set(avatarImageData, forKey: K.avatar) }
@@ -85,7 +85,7 @@ final class ProfileStore: ObservableObject {
     /// ("Good morning, Marc"). Empty = no name set, and every surface falls back to the bare greeting.
     /// LOCAL-ONLY and deliberately NOT part of the `.noopbak` whitelist: the backup contract is
     /// byte-identical across Swift and Kotlin, and a cosmetic greeting isn't worth widening it (a
-    /// restore simply starts again with no name). NOOP is offline, so this never leaves the device.
+    /// restore simply starts again with no name). It is not included in `.noopbak`.
     @Published var name: String {
         didSet {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -4,8 +4,8 @@ import StrandDesign
 
 // MARK: - Aura Rest
 //
-// Sleep, answered in the order a person actually asks: how was last night, how does that compare to my
-// own week, what happened inside it, and what does that mean. The week chart is tappable, and the two
+// Sleep, answered in the order a person actually asks: how was my latest recorded night, how does that
+// compare to recent nights, what happened inside it, and what does that mean. The chart is tappable, and the two
 // cards below it re-read for whichever night is selected — so the screen is one story about one night,
 // not a dashboard of seven.
 
@@ -15,7 +15,12 @@ struct AuraRestView: View {
     /// Stable onset id of the night selected in the week chart. Defaults to the most recent.
     @State private var selectedNightID: Int
 
-    init(reading: AuraRestReading = .prototype) {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var motion = NoopMotionState.shared
+
+    private var poseStill: Bool { motion.poseStill(reduceMotion) }
+
+    init(reading: AuraRestReading) {
         self.reading = reading
         _selectedNightID = State(initialValue: reading.nights.last?.id ?? 0)
     }
@@ -52,7 +57,7 @@ struct AuraRestView: View {
 
     private var weekCard: some View {
         VStack(spacing: 20) {
-            AuraCardHeader(title: String(localized: "This week"),
+            AuraCardHeader(title: reading.periodTitle,
                            note: String(localized: "Tap a night"),
                            symbol: "moon")
             AuraSleepBars(
@@ -62,7 +67,9 @@ struct AuraRestView: View {
                 selected: selectedNightID,
                 average: reading.personalAverage
             ) { id in
-                withAnimation(NoopMotion.value) { selectedNightID = id }
+                withAnimation(NoopMotion.gated(NoopMotion.value, reduced: poseStill)) {
+                    selectedNightID = id
+                }
             }
         }
         .padding(.horizontal, 18)
@@ -77,7 +84,7 @@ struct AuraRestView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Text(night?.id == reading.nights.last?.id
-                     ? String(localized: "Last night")
+                     ? reading.latestNightTitle
                      : (night?.dateLabel ?? "—"))
                     .font(.system(size: 14.5, weight: .semibold))
                     .foregroundStyle(AuraPalette.textPrimary)
@@ -183,6 +190,8 @@ struct AuraRestReading {
 
     struct NightReading: Identifiable {
         let id: Int
+        /// Local civil day on which the session ended, used to validate recency claims.
+        let wakeDayKey: String
         let day: String
         let dateLabel: String
         let hours: Double
@@ -202,6 +211,8 @@ struct AuraRestReading {
     }
 
     let nights: [NightReading]
+    let periodTitle: String
+    let latestNightTitle: String
     let personalAverage: Double
     let averageNote: String
     let averageSleepValue: String
@@ -221,23 +232,26 @@ struct AuraRestReading {
         return String(localized: "\(rounded / 60)h \(rounded % 60)m")
     }
 
+    #if DEBUG
     static let prototype = AuraRestReading(
         nights: [
-            NightReading(id: 0, day: String(localized: "S"), dateLabel: "10/8", hours: 5.5, note: String(localized: "Late night, short."),
+            NightReading(id: 0, wakeDayKey: "2026-08-10", day: String(localized: "S"), dateLabel: "10/8", hours: 5.5, note: String(localized: "Late night, short."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 1, day: String(localized: "M"), dateLabel: "11/8", hours: 7.3, note: String(localized: "Best night of the week."),
+            NightReading(id: 1, wakeDayKey: "2026-08-11", day: String(localized: "M"), dateLabel: "11/8", hours: 7.3, note: String(localized: "Best night of the week."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 2, day: String(localized: "T"), dateLabel: "12/8", hours: 5.5, note: String(localized: "Woke twice after midnight."),
+            NightReading(id: 2, wakeDayKey: "2026-08-12", day: String(localized: "T"), dateLabel: "12/8", hours: 5.5, note: String(localized: "Woke twice after midnight."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 3, day: String(localized: "W"), dateLabel: "13/8", hours: 6.1, note: String(localized: "Fine, a little short."),
+            NightReading(id: 3, wakeDayKey: "2026-08-13", day: String(localized: "W"), dateLabel: "13/8", hours: 6.1, note: String(localized: "Fine, a little short."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 4, day: String(localized: "T"), dateLabel: "14/8", hours: 7.0, note: String(localized: "Solid and unbroken."),
+            NightReading(id: 4, wakeDayKey: "2026-08-14", day: String(localized: "T"), dateLabel: "14/8", hours: 7.0, note: String(localized: "Solid and unbroken."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 5, day: String(localized: "F"), dateLabel: "15/8", hours: 6.6, note: String(localized: "Late to bed, slept through."),
+            NightReading(id: 5, wakeDayKey: "2026-08-15", day: String(localized: "F"), dateLabel: "15/8", hours: 6.6, note: String(localized: "Late to bed, slept through."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
-            NightReading(id: 6, day: String(localized: "S"), dateLabel: "16/8", hours: 7.2, note: String(localized: "Full night, deep came early."),
+            NightReading(id: 6, wakeDayKey: "2026-08-16", day: String(localized: "S"), dateLabel: "16/8", hours: 7.2, note: String(localized: "Full night, deep came early."),
                   window: "23:14 – 06:41", hypnogram: prototypeHypnogram, hypnogramAxis: ["11pm", "2am", "4am", "6am"], stages: prototypeStages),
         ],
+        periodTitle: String(localized: "This week"),
+        latestNightTitle: String(localized: "Last night"),
         personalAverage: 6.46,
         averageNote: String(localized: "The dashed line is your own normal, 6h 28m — you’re above it four nights out of seven."),
         averageSleepValue: "6.8",
@@ -267,5 +281,6 @@ struct AuraRestReading {
         Stage(id: "awake", name: String(localized: "Awake"), duration: "8m",
               fraction: 0.07, tint: AuraHypnogram.stageColors[0]),
     ]
+    #endif
 }
 #endif

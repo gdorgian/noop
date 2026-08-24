@@ -17,9 +17,10 @@ struct AuraProfileView: View {
     let onOpenTracking: () -> Void
     let onOpenPrivacy: () -> Void
     let onOpenSettings: () -> Void
+    let onOpenComingSoon: (AuraUpcomingFeature) -> Void
 
     init(
-        reading: AuraProfileReading = .prototype,
+        reading: AuraProfileReading,
         onEditProfile: @escaping () -> Void,
         onOpenNotifications: @escaping () -> Void,
         onOpenUnits: @escaping () -> Void,
@@ -27,7 +28,8 @@ struct AuraProfileView: View {
         onOpenMore: @escaping () -> Void,
         onOpenTracking: @escaping () -> Void,
         onOpenPrivacy: @escaping () -> Void,
-        onOpenSettings: @escaping () -> Void
+        onOpenSettings: @escaping () -> Void,
+        onOpenComingSoon: @escaping (AuraUpcomingFeature) -> Void
     ) {
         self.reading = reading
         self.onEditProfile = onEditProfile
@@ -38,6 +40,7 @@ struct AuraProfileView: View {
         self.onOpenTracking = onOpenTracking
         self.onOpenPrivacy = onOpenPrivacy
         self.onOpenSettings = onOpenSettings
+        self.onOpenComingSoon = onOpenComingSoon
     }
 
     var body: some View {
@@ -45,6 +48,7 @@ struct AuraProfileView: View {
             identityCard
             tiles
             settingsCard
+            comingSoonCard
         }
     }
 
@@ -103,7 +107,7 @@ struct AuraProfileView: View {
 
     private var settingsCard: some View {
         VStack(spacing: 0) {
-            AuraListRow(key: String(localized: "Everything else in NOOP"),
+            AuraListRow(key: String(localized: "Everything else in Noop Aura"),
                         subtitle: String(localized: "Coach, Live, Workouts, Health, Lab Book, Backup"),
                         showsDivider: true,
                         action: onOpenMore)
@@ -122,6 +126,25 @@ struct AuraProfileView: View {
         }
         .padding(.horizontal, 17)
         .auraCard()
+    }
+
+    private var comingSoonCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(String(localized: "Coming soon")).auraOverline()
+            VStack(spacing: 0) {
+                ForEach(Array(AuraUpcomingFeature.allCases.enumerated()), id: \.element.id) { index, feature in
+                    AuraListRow(
+                        key: feature.title,
+                        value: String(localized: "Coming soon"),
+                        subtitle: feature.summary,
+                        showsDivider: index < AuraUpcomingFeature.allCases.count - 1,
+                        action: { onOpenComingSoon(feature) }
+                    )
+                }
+            }
+            .padding(.horizontal, 17)
+            .auraCard()
+        }
     }
 }
 
@@ -152,7 +175,8 @@ struct AuraProfileReading {
         let name = trimmed.isEmpty ? String(localized: "You") : trimmed
         let initial = name.first.map { String($0).uppercased() } ?? "Y"
         let sexLabel = sex.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let details = [String(localized: "\(age) years"), sexLabel].filter { !$0.isEmpty }
+        let ageLabel = age > 0 ? String(localized: "\(age) years") : ""
+        let details = [ageLabel, sexLabel].filter { !$0.isEmpty }
         let tracking = earliestDay.flatMap(monthYear).map { String(localized: "Tracking since \($0)") }
         let memberSince = ([tracking] + details.map(Optional.some)).compactMap { $0 }.joined(separator: " · ")
 
@@ -185,6 +209,7 @@ struct AuraProfileReading {
         return date.formatted(.dateTime.month(.abbreviated).year())
     }
 
+    #if DEBUG
     static let prototype = AuraProfileReading(
         name: "Gabriel D.",
         initial: "G",
@@ -198,5 +223,6 @@ struct AuraProfileReading {
         exportTag: String(localized: "Local"),
         exportDetail: String(localized: "Backup or Apple Health")
     )
+    #endif
 }
 #endif

@@ -80,6 +80,13 @@ public enum VitalityEngine {
     public static let minFactors = 3
     public static let bandYears = 5.0
 
+    /// Converts one signed log-hazard contribution through the same overlap correction and Gompertz
+    /// years mapping as `compute`. Positive values add modelled years; negative values subtract them.
+    /// This is a model attribution before the final 20...90 Body Age clamp, not an uncertainty bound.
+    public static func ageEffectYears(for contribution: Contribution) -> Double {
+        contribution.lnHazard * overlapShrink / lnHazardPerYear
+    }
+
     private static func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double { min(hi, max(lo, v)) }
 
     /// Nocturnal RMSSD ~50th-percentile by age (ms), piecewise-linear between decade anchors (the WHOOP-

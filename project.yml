@@ -22,6 +22,9 @@ settings:
     # SAME value — they must match or iOS warns "extension version must match parent app" (#416).
     # macOS sets its own CFBundleVersion on the Strand target and is unaffected by this.
     CURRENT_PROJECT_VERSION: "230"
+    # Overridden by the release/local xcodebuild command with the exact git revision. Keeping an explicit
+    # fallback makes an ad-hoc Xcode build say "unknown" rather than leaking an unresolved $(...) token.
+    NOOP_COMMIT_SHA: "unknown"
     SWIFT_VERSION: "5.0"
     # Emit localizable strings so Xcode auto-extracts every LocalizedStringKey into the
     # String Catalog on build (the English (US) base entries).
@@ -270,14 +273,13 @@ targets:
     info:
       path: StrandiOS/Resources/Info.plist
       properties:
-        CFBundleName: NOOP
-        # The home-screen name. The DX23876 merge renamed this to "NOOP AI" — their fork's branding,
-        # not this one's — which silently changed what the icon says on a wearer's phone. The bundle
-        # identifier was never affected (it stayed `com.noopapp.noop` through the merge, so existing
-        # installs and their data are untouched), but the label is what a person actually sees.
-        CFBundleDisplayName: NOOP
+        CFBundleName: Noop Aura
+        # The approved installed name for this fork. Keep both keys in lockstep and verify the packaged
+        # Info.plist; upstream/fork merges have changed the Home Screen label before.
+        CFBundleDisplayName: Noop Aura
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NoopCommitSHA: "$(NOOP_COMMIT_SHA)"
         # Surfaces APP_GROUP_ID to runtime (WidgetSnapshot.suiteName) so the App Group id isn't
         # hard-coded in Swift; stays in sync with the application-groups entitlement (both $(APP_GROUP_ID)).
         AppGroupIdentifier: "$(APP_GROUP_ID)"
@@ -334,18 +336,18 @@ targets:
           # Best-effort fallback that writes already-banked WHOOP data to HealthKit when iOS grants
           # background time. Fresh offloads also write immediately from their completion hook.
           - $(PRODUCT_BUNDLE_IDENTIFIER).healthwriteback
-        NSBluetoothAlwaysUsageDescription: "NOOP connects directly to your WHOOP strap over Bluetooth to read heart rate, R-R intervals, battery, and sensor data locally on your iPhone. Nothing leaves your device."
-        NSLocationWhenInUseUsageDescription: "NOOP records your route during an outdoor workout to show distance, pace, and a map, and keeps recording while the screen is off. The route stays on your device. Nothing leaves it."
-        NSHealthShareUsageDescription: "NOOP reads your own Apple Health data on-device to compute recovery, strain, and sleep. Nothing leaves your device."
-        NSHealthUpdateUsageDescription: "NOOP writes the metrics it computes from your strap back into Apple Health, on-device and only when you allow it."
+        NSBluetoothAlwaysUsageDescription: "Noop Aura connects directly to your WHOOP strap to read heart rate, R-R intervals, battery and sensor data on your iPhone. Sharing occurs only through an export, backup, Apple Health write or Coach provider you explicitly enable."
+        NSLocationWhenInUseUsageDescription: "Noop Aura records your route during an outdoor workout to show distance, pace and a map, including while the screen is off. The route is stored locally unless you export or back it up."
+        NSHealthShareUsageDescription: "Noop Aura reads the Apple Health data types you approve to compute recovery, strain and sleep. They stay local unless you explicitly export, back up or consent to share a category with a configured Coach provider."
+        NSHealthUpdateUsageDescription: "Noop Aura writes the metrics it computes from your strap back into Apple Health, on-device and only when you allow it."
         # NOOP does not read clinical health records. This string is declared anyway because the
         # entitlement that would require it is not always ours to choose: a signing identity whose
         # provisioning profile carries `com.apple.developer.healthkit.access = [health-records]` has that
         # entitlement applied to the app at SIGNING time, and iOS terminates an app holding it without a
         # matching usage string. Declaring it costs nothing (no prompt is shown unless the app actually
         # requests records) and turns an unexplained launch failure into a non-event.
-        NSHealthClinicalHealthRecordsShareUsageDescription: "NOOP does not read clinical health records. This appears only because the certificate NOOP was signed with grants that capability."
-        NSMotionUsageDescription: "NOOP reads your iPhone's step count for a walking or running workout to show steps in the activity summary. It stays on your device. Nothing leaves it."
+        NSHealthClinicalHealthRecordsShareUsageDescription: "Noop Aura does not read clinical health records. This appears only because the certificate used to sign Noop Aura grants that capability."
+        NSMotionUsageDescription: "Noop Aura reads your iPhone's step count for a walking or running workout and shows it in the activity summary. It stays local unless you export or back up the activity."
         # #187: the opt-in AI Coach's "Custom (OpenAI-compatible)" provider can point at a LOCAL LLM on
         # the LAN (Ollama / LM Studio at http://192.168.x.x:11434). ATS blocks cleartext by default;
         # NSAllowsLocalNetworking exempts loopback/.local/private-LAN hosts ONLY — public HTTPS endpoints
@@ -378,7 +380,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(IOS_BUNDLE_ID)
-        PRODUCT_NAME: "NOOP Staging"
+        PRODUCT_NAME: "Noop Aura"
+        # Keep the Swift module stable while changing the installed product name. The iOS tests and
+        # downstream source imports predate Aura and intentionally use this identifier.
+        PRODUCT_MODULE_NAME: NOOP_Staging
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Ship every *.appiconset (not just the primary AppIcon) so the alternate "AppIcon-Navy"
         # set is compiled into the bundle and is available to UIApplication.setAlternateIconName.
@@ -419,7 +424,7 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).noop.ios.tests
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/NOOP Staging.app/NOOP Staging"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Noop Aura.app/Noop Aura"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
   # WidgetKit + Live Activity extension — the iOS analogue of the macOS menu-bar
@@ -437,7 +442,7 @@ targets:
     info:
       path: StrandiOSWidgets/Info.plist
       properties:
-        CFBundleDisplayName: NOOP
+        CFBundleDisplayName: Noop Aura
         # Version keys MUST live here in the generated-Info.plist properties — NOT hand-edited into the
         # file — because xcodegen regenerates StrandiOSWidgets/Info.plist on every `xcodegen generate`
         # (which every release runs for the version bump) and would otherwise rewrite them to its

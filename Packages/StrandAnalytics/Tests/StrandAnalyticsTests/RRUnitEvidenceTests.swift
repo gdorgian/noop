@@ -98,4 +98,58 @@ final class RRUnitEvidenceTests: XCTestCase {
         let verdict = RRUnitEvidence.verdict(for: [pair(0, 893), pair(872, 0), pair(872, 893)])
         XCTAssertEqual(verdict.pairs, 1, "a missing side is not a ratio")
     }
+
+    // MARK: Lag search
+
+    func testLagSearchFindsReceiveTimeSkewAcrossContinuousRows() {
+        let base = 1_780_916_000
+        let historical = (0..<40).map {
+            RRUnitEvidence.TimedValue(ts: base + $0, value: 650 + ($0 * 17) % 271)
+        }
+        let live = historical.map {
+            RRUnitEvidence.TimedValue(ts: $0.ts + 3, value: $0.value)
+        }
+
+        let search = RRUnitEvidence.lagSearch(live: live, historical: historical)
+
+        XCTAssertEqual(search.candidates.map(\.lagSeconds), Array(-5...5))
+        XCTAssertEqual(search.best?.lagSeconds, 3)
+        XCTAssertEqual(search.best?.verdict.pairs, 40)
+        XCTAssertEqual(search.best?.verdict.exactValueMatches, 40)
+        XCTAssertEqual(search.best?.verdict.mismatches, 0)
+        XCTAssertEqual(search.best?.coverage ?? 0, 1, accuracy: 1e-12)
+    }
+
+    func testLagSearchPreservesSameSecondOrderAndDoesNotCollapseExtraBeats() throws {
+        let base = 1_780_916_000
+        // Deliberately not value-sorted. MIN/MAX or rrMs sorting would change this sequence.
+        let historical = [
+            RRUnitEvidence.TimedValue(ts: base, value: 900),
+            RRUnitEvidence.TimedValue(ts: base, value: 700),
+        ]
+        let live = [
+            RRUnitEvidence.TimedValue(ts: base + 3, value: 900),
+            RRUnitEvidence.TimedValue(ts: base + 3, value: 700),
+            RRUnitEvidence.TimedValue(ts: base + 3, value: 800),
+        ]
+
+        let result = try XCTUnwrap(
+            RRUnitEvidence.lagSearch(live: live, historical: historical).best)
+
+        XCTAssertEqual(result.lagSeconds, 3)
+        XCTAssertEqual(result.pairs.map(\.liveMs), [900, 700])
+        XCTAssertEqual(result.pairs.map(\.historicalRaw), [900, 700])
+        XCTAssertEqual(result.verdict.pairs, 2, "pair every ordered row available, not one MIN row")
+        XCTAssertEqual(result.coverage, 2.0 / 3.0, accuracy: 1e-12,
+                       "the unmatched third live row remains visible in coverage")
+    }
+
+    func testLagSearchReturnsNoBestWhenTheTransportsDoNotOverlap() {
+        let live = [RRUnitEvidence.TimedValue(ts: 100, value: 800)]
+        let historical = [RRUnitEvidence.TimedValue(ts: 1_000, value: 800)]
+        let search = RRUnitEvidence.lagSearch(live: live, historical: historical)
+
+        XCTAssertNil(search.best)
+        XCTAssertTrue(search.candidates.allSatisfy { $0.verdict.pairs == 0 })
+    }
 }

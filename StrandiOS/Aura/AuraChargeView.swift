@@ -10,19 +10,35 @@ import StrandDesign
 
 struct AuraChargeView: View {
     private let reading: AuraChargeReading
+    private let onOpenDaytimeCharge: () -> Void
     @State private var selectedVariabilityPoint: Int?
 
-    init(reading: AuraChargeReading = .prototype) {
+    init(reading: AuraChargeReading, onOpenDaytimeCharge: @escaping () -> Void = {}) {
         self.reading = reading
+        self.onOpenDaytimeCharge = onOpenDaytimeCharge
         _selectedVariabilityPoint = State(initialValue: nil)
     }
 
     var body: some View {
         VStack(spacing: AuraPalette.cardGap) {
+            morningChargeCard
+
+            VStack(spacing: 0) {
+                AuraListRow(
+                    key: String(localized: "Daytime Charge"),
+                    value: String(localized: "Coming soon"),
+                    subtitle: String(localized: "Planned only after the daytime model and its missing-data rules are validated"),
+                    showsDivider: false,
+                    action: onOpenDaytimeCharge
+                )
+            }
+            .padding(.horizontal, 16)
+            .auraCard()
+
             variabilityCard
 
             HStack(spacing: 8) {
-                AuraStatTile(label: String(localized: "Stress today"),
+                AuraStatTile(label: String(localized: "Stress"),
                              value: reading.stress, valueTint: AuraPalette.accent)
                 AuraStatTile(label: String(localized: "Your normal"),
                              value: reading.baseline, unit: "ms")
@@ -36,6 +52,52 @@ struct AuraChargeView: View {
 
             AuraInfoBanner(text: reading.banner, accent: AuraPalette.accent)
         }
+    }
+
+    private var morningChargeCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(String(localized: "Morning Charge")).auraOverline()
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(reading.score)
+                            .font(.system(size: 52, weight: .ultraLight, design: .rounded).monospacedDigit())
+                            .foregroundStyle(reading.scoreAvailable ? AuraPalette.accent : AuraPalette.textQuiet)
+                        if reading.scoreAvailable {
+                            Text(verbatim: "%")
+                                .font(.system(size: 16))
+                                .foregroundStyle(AuraPalette.textQuiet)
+                        }
+                    }
+                }
+                Spacer(minLength: 12)
+                Text(reading.scoreBand)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(AuraPalette.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(AuraPalette.accent.opacity(0.12)))
+            }
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.07))
+                    Capsule()
+                        .fill(AuraPalette.accent)
+                        .frame(width: geometry.size.width * reading.scoreFraction)
+                }
+            }
+            .frame(height: 10)
+
+            Text(String(localized: "Scored from your latest valid night. It does not drain during the day in this build."))
+                .font(.system(size: 12.5))
+                .lineSpacing(2)
+                .foregroundStyle(AuraPalette.textQuiet)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(18)
+        .auraCard(surface: AuraCardSurface.coaching(accent: AuraPalette.accent))
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Variability
@@ -167,6 +229,10 @@ struct AuraChargeReading {
         let plain: String
     }
 
+    let score: String
+    let scoreFraction: Double
+    let scoreAvailable: Bool
+    let scoreBand: String
     let variability: String
     let variabilityCaption: String
     let dayHigh: String
@@ -183,7 +249,12 @@ struct AuraChargeReading {
 
     let headline: String
 
+    #if DEBUG
     static let prototype = AuraChargeReading(
+        score: "78",
+        scoreFraction: 0.78,
+        scoreAvailable: true,
+        scoreBand: String(localized: "High recovery"),
         variability: "56",
         variabilityCaption: String(localized: "Each point is one night. The shaded band is your normal range."),
         dayHigh: "62",
@@ -212,5 +283,6 @@ struct AuraChargeReading {
         banner: String(localized: "Your variability is 17% above your own 30-day normal — the strongest it’s been this month."),
         headline: String(localized: "Your body is settled")
     )
+    #endif
 }
 #endif

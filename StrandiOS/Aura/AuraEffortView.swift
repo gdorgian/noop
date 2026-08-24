@@ -16,7 +16,7 @@ struct AuraEffortView: View {
     /// says how much is left.
     private let onStartLiveSession: () -> Void
 
-    init(reading: AuraEffortReading = .prototype, onStartLiveSession: @escaping () -> Void = {}) {
+    init(reading: AuraEffortReading, onStartLiveSession: @escaping () -> Void = {}) {
         self.reading = reading
         self.onStartLiveSession = onStartLiveSession
     }
@@ -137,7 +137,7 @@ struct AuraEffortView: View {
                            note: reading.weekVerdict,
                            noteTint: AuraPalette.accent)
             AuraWeekBars(values: reading.weekLoad, days: reading.weekDays,
-                         highlighted: reading.weekLoad.count - 1,
+                         highlighted: reading.weekHighlighted,
                          ceiling: reading.weekCeiling)
         }
         .padding(18)
@@ -166,10 +166,13 @@ struct AuraEffortReading {
     let activities: [Activity]
     let weekLoad: [Double]
     let weekDays: [String]
+    /// Index of today's real reading, or -1 when today has no Effort yet.
+    let weekHighlighted: Int
     let weekVerdict: String
     let weekCeiling: Double
     let headline: String
 
+    #if DEBUG
     static let prototype = AuraEffortReading(
         greeting: String(localized: "Saturday"),
         effort: "6.2",
@@ -197,9 +200,11 @@ struct AuraEffortReading {
             String(localized: "T"), String(localized: "F"), String(localized: "S"),
             String(localized: "S"),
         ],
-        weekVerdict: String(localized: "Balanced"),
+        weekHighlighted: 6,
+        weekVerdict: String(localized: "3 of 7 target days in range · 2 below · 2 above"),
         weekCeiling: 21,
         headline: String(localized: "Effort so far today")
     )
+    #endif
 }
 #endif

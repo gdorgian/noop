@@ -29,8 +29,8 @@ struct AuraTodayView: View {
     private var poseStill: Bool { motion.poseStill(reduceMotion) }
 
     init(
-        state: AuraBodyState = .restored,
-        reading: AuraTodayReading = .prototype,
+        state: AuraBodyState,
+        reading: AuraTodayReading,
         onNavigate: @escaping (AuraScreen) -> Void,
         onOpenSignal: @escaping (AuraTodayReading.Signal) -> Void,
         onOpenCoach: @escaping () -> Void = {}
@@ -56,8 +56,16 @@ struct AuraTodayView: View {
 
     private var orbSection: some View {
         VStack(spacing: 8) {
-            AuraOrb(state: state, poseStill: poseStill)
+            Button { onNavigate(.charge) } label: {
+                ZStack {
+                    AuraOrb(state: state, poseStill: poseStill, available: reading.chargeAvailable)
+                    AuraLivePulseOverlay()
+                }
                 .frame(height: 272)
+                .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text("Opens your Charge detail"))
             Text(reading.verdict)
                 .font(.system(size: 34, weight: .light, design: .rounded))
                 .foregroundStyle(AuraPalette.textPrimary)
@@ -82,6 +90,7 @@ struct AuraTodayView: View {
             // `AuraPillarCard` takes plain strings (its values are dynamic), so the titles are localized
             // here rather than relying on a LocalizedStringKey inside the component.
             AuraPillarCard(title: String(localized: "Rest"), value: reading.restValue,
+                           unit: reading.restUnit,
                            fraction: reading.restFraction, tint: AuraPalette.rest) {
                 onNavigate(.rest)
             }
@@ -111,7 +120,7 @@ struct AuraTodayView: View {
                     )
                     .frame(width: 22, height: 22)
                     .shadow(color: AuraPalette.accent.opacity(0.5), radius: 6)
-                Text("Svea · today’s call").auraOverline()
+                Text(String(localized: "Recovery-matched target")).auraOverline()
             }
             .padding(.bottom, 12)
 
@@ -170,22 +179,88 @@ struct AuraTodayView: View {
     }
 }
 
+/// The handoff mock generated this number from its breathing timer. Production uses AppModel's
+/// spike-filtered, rolling live heart rate and explicitly renders an unavailable state when the strap is
+/// offline. The four-second phase words are breathing guidance only; they never alter the BPM value.
+private struct AuraLivePulseOverlay: View {
+    @EnvironmentObject private var model: AppModel
+
+    private var bpm: Int? {
+        model.live.connected ? (model.bpm ?? model.live.heartRate) : nil
+    }
+
+    private var statusLabel: String {
+        guard model.live.connected else { return String(localized: "STRAP OFFLINE") }
+        return bpm == nil ? String(localized: "WAITING FOR BPM") : String(localized: "LIVE BPM")
+    }
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let phase = breathingPhase(at: context.date)
+            VStack(spacing: 5) {
+                Text(verbatim: bpm.map(String.init) ?? "—")
+                    .font(.system(size: 50, weight: .ultraLight, design: .rounded).monospacedDigit())
+                    .foregroundStyle(AuraPalette.textPrimary)
+                    .contentTransition(.numericText())
+                Text(statusLabel)
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(AuraPalette.textQuiet)
+                Text(phase)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .tracking(1.0)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AuraPalette.textSecondary)
+                    .padding(.top, 2)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel(phase: phase))
+        }
+    }
+
+    private func breathingPhase(at date: Date) -> String {
+        let second = Int(date.timeIntervalSinceReferenceDate) % 16
+        switch second / 4 {
+        case 0: return String(localized: "In")
+        case 1: return String(localized: "Hold")
+        case 2: return String(localized: "Out")
+        default: return String(localized: "Hold")
+        }
+    }
+
+    private func accessibilityLabel(phase: String) -> Text {
+        if let bpm {
+            return Text("Live heart rate \(bpm) beats per minute. Breathing prompt: \(phase)")
+        }
+        if model.live.connected {
+            return Text("Strap connected. Waiting for a heart-rate sample. Breathing prompt: \(phase)")
+        }
+        return Text("Live heart rate unavailable. Strap offline. Breathing prompt: \(phase)")
+    }
+}
+
 /// Isolates the one-second strap publisher to the single row that needs it. Today, its orb and every
 /// other chart stay still while this leaf updates from the live WHOOP stream.
 private struct AuraLiveHeartRateSignalRow: View {
-    @EnvironmentObject private var live: LiveState
+    @EnvironmentObject private var model: AppModel
     let signal: AuraTodayReading.Signal
     let showsDivider: Bool
     let action: () -> Void
 
     private var value: String {
-        guard live.connected, let bpm = live.heartRate else { return signal.value }
+        guard model.live.connected, let bpm = model.bpm ?? model.live.heartRate else { return signal.value }
         return String(bpm)
+    }
+
+    private var name: String {
+        model.live.connected && (model.bpm ?? model.live.heartRate) != nil
+            ? String(localized: "Live heart rate")
+            : signal.name
     }
 
     var body: some View {
         AuraSignalRow(
-            name: signal.name,
+            name: name,
             value: value,
             unit: signal.unit,
             systemImage: signal.systemImage,
@@ -211,9 +286,11 @@ struct AuraTodayReading {
     let initial: String
 
     let restValue: String
+    let restUnit: String
     let restFraction: Double
     let chargeValue: String
     let chargeUnit: String
+    let chargeAvailable: Bool
     let chargeFraction: Double
     let effortValue: String
     let effortUnit: String
@@ -236,6 +313,7 @@ struct AuraTodayReading {
         let labels: [String]
     }
 
+    #if DEBUG
     /// The values from the Claude Design prototype, verbatim. Not live data.
     static let prototype = AuraTodayReading(
         greeting: String(localized: "Good morning"),
@@ -243,9 +321,11 @@ struct AuraTodayReading {
         profileName: "Gabriel D.",
         initial: "G",
         restValue: "7h 12m",
+        restUnit: "",
         restFraction: 0.96,
         chargeValue: "56",
         chargeUnit: "%",
+        chargeAvailable: true,
         chargeFraction: 0.78,
         effortValue: "6.2",
         effortUnit: "/12",
@@ -270,5 +350,6 @@ struct AuraTodayReading {
         session: String(localized: "Aim for your recovery-matched Effort range"),
         sessionRationale: String(localized: "The target follows today’s Charge. The activity is your choice.")
     )
+    #endif
 }
 #endif

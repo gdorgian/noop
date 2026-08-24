@@ -17,8 +17,8 @@ import UniformTypeIdentifiers
 // compact Today header and the large Settings row reuse the same view. Pure presentation — it's
 // handed the stored JPEG bytes (`ProfileStore.avatarImageData`); it never touches storage.
 //
-// LOCAL-ONLY: the photo lives in UserDefaults on this device and is never uploaded (NOOP is
-// fully offline). This view just draws whatever bytes it's given.
+// LOCAL APP STORAGE: the photo lives in UserDefaults and is excluded from `.noopbak` and Coach
+// payloads. This view just draws whatever bytes it's given.
 
 struct ProfileAvatarView: View {
     /// The stored profile photo bytes, or nil to show the default icon.

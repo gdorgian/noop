@@ -1,20 +1,20 @@
 {
-  "name": "NOOP AI",
-  "identifier": "com.noopapp.noopai.source",
-  "sourceURL": "https://raw.githubusercontent.com/DX23876/noop/main/altstore-source.json",
+  "name": "Noop Aura",
+  "identifier": "com.noopapp.noopaura.source",
+  "sourceURL": "https://raw.githubusercontent.com/gdorgian/noop/main/altstore-source.json",
   "subtitle": "Your strap, your data, on your device.",
-  "description": "An AltStore and SideStore source for NOOP AI. This source uses the phone/iPad IPA with Home and Lock Screen widgets; the separate Full IPA adds the Apple Watch app and complication. Both are unsigned by design. NOOP AI has no account, cloud service, or distribution signing identity.",
-  "iconURL": "https://raw.githubusercontent.com/DX23876/noop/main/Strand/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
-  "website": "https://github.com/DX23876/noop",
+  "description": "An AltStore and SideStore source for Noop Aura on iPhone and iPad. Releases are unsigned by design and include Home and Lock Screen widgets plus the live heart-rate Live Activity.",
+  "iconURL": "https://raw.githubusercontent.com/gdorgian/noop/main/Strand/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
+  "website": "https://github.com/gdorgian/noop",
   "tintColor": "44E2B0",
   "apps": [
     {
-      "name": "NOOP AI",
-      "bundleIdentifier": "com.noopapp.noopai",
-      "developerName": "NOOP AI",
+      "name": "Noop Aura",
+      "bundleIdentifier": "com.noopapp.noop",
+      "developerName": "Noop Aura",
       "subtitle": "A local-first companion for your WHOOP strap.",
-      "localizedDescription": "NOOP AI reads a WHOOP 4.0 or 5.0/MG strap you own directly over Bluetooth. Scores, history, goals, and coach memory stay on your device. The optional coach uses only the provider and API key you choose when you send a message.\n\nThis phone/iPad IPA is unsigned on purpose, includes Home and Lock Screen widgets, and omits only the Watch app for reliable AltStore/SideStore signing with a free Apple ID. The separate Full IPA adds the Watch app and complication.",
-      "iconURL": "https://raw.githubusercontent.com/DX23876/noop/main/Strand/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
+      "localizedDescription": "Noop Aura reads a WHOOP 4.0 or 5.0/MG strap you own directly over Bluetooth and stores its scores, history, goals and coach memory locally by default. The optional Coach sends only consented data categories to the provider you configure; opt-in proactive summaries may contact that provider in the background. Exports, backups and Apple Health access remain under your control.\n\nThe iPhone/iPad IPA is unsigned on purpose and includes Home and Lock Screen widgets plus the live heart-rate Live Activity.",
+      "iconURL": "https://raw.githubusercontent.com/gdorgian/noop/main/Strand/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
       "tintColor": "44E2B0",
       "category": "healthcare-fitness",
       "screenshotURLs": [],
@@ -108,9 +108,9 @@
           "com.apple.security.application-groups"
         ],
         "privacy": {
-          "NSBluetoothAlwaysUsageDescription": "NOOP connects directly to your WHOOP strap over Bluetooth to read heart rate, R-R intervals, battery, and sensor data locally on your iPhone. Nothing leaves your device.",
-          "NSHealthShareUsageDescription": "NOOP reads your own Apple Health data on-device to compute recovery, strain, and sleep. Nothing leaves your device.",
-          "NSHealthUpdateUsageDescription": "NOOP writes the metrics it computes from your strap back into Apple Health, on-device and only when you allow it."
+          "NSBluetoothAlwaysUsageDescription": "Noop Aura connects directly to your WHOOP strap to read heart rate, R-R intervals, battery and sensor data on your iPhone. Sharing occurs only through an export, backup, Apple Health write or Coach provider you explicitly enable.",
+          "NSHealthShareUsageDescription": "Noop Aura reads the Apple Health data types you approve to compute recovery, strain and sleep. They stay local unless you explicitly export, back up or consent to share a category with a configured Coach provider.",
+          "NSHealthUpdateUsageDescription": "Noop Aura writes the metrics it computes from your strap back into Apple Health, on-device and only when you allow it."
         }
       },
       "version": "10.1.2",

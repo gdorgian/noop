@@ -13,7 +13,6 @@ extension AuraChargeReading {
         stressSeries: [(day: String, value: Double)],
         restSeries: [(day: String, value: Double)]
     ) -> AuraChargeReading {
-        let recentHRV = history.suffix(30).compactMap(\.avgHrv).filter { $0 > 0 }
         let hrvPoints = history.suffix(30).compactMap { row -> (day: String, value: Double)? in
             guard let value = row.avgHrv, value > 0 else { return nil }
             return (row.day, value)
@@ -29,7 +28,8 @@ extension AuraChargeReading {
         let restPct = day.flatMap { restByDay[$0.day] ?? Repository.dailyColumn(key: "sleep_performance", day: $0) }
 
         let canonicalDrivers: [ChargeDriver]
-        if let day, let hrv = day.avgHrv, let rhr = day.restingHr, hrvBaseline.usable {
+        if let day, day.recovery != nil,
+           let hrv = day.avgHrv, let rhr = day.restingHr, hrvBaseline.usable {
             canonicalDrivers = RecoveryScorer.chargeDrivers(
                 hrv: hrv,
                 rhr: Double(rhr),
@@ -64,12 +64,18 @@ extension AuraChargeReading {
             : nil
 
         return AuraChargeReading(
+            score: day?.recovery.map { String(Int($0.rounded())) } ?? "—",
+            scoreFraction: day?.recovery.map { min(max($0 / 100, 0), 1) } ?? 0,
+            scoreAvailable: day?.recovery != nil,
+            scoreBand: chargeBand(day?.recovery),
             variability: day?.avgHrv.map { String(format: "%.0f", $0) } ?? "—",
             variabilityCaption: axisPoints.isEmpty
                 ? String(localized: "Nightly variability will appear after a valid sleep.")
-                : String(localized: "Each point is one night. The shaded band is your personal normal across \(axisPoints.count) readings."),
-            dayHigh: recentHRV.max().map { String(format: "%.0f", $0) } ?? "—",
-            dayLow: recentHRV.min().map { String(format: "%.0f", $0) } ?? "—",
+                : String(localized: "Each point is one night. The shaded band is your normal range."),
+            // These extrema describe the chart currently on screen (the last 22 valid points), not a
+            // different hidden 30-reading window.
+            dayHigh: hrvValues.max().map { String(format: "%.0f", $0) } ?? "—",
+            dayLow: hrvValues.min().map { String(format: "%.0f", $0) } ?? "—",
             stress: stress.map { stressLabel($0.band) } ?? "—",
             baseline: hrvBaseline.usable ? String(format: "%.0f", hrvBaseline.baseline) : "—",
             variabilitySeries: hrvValues,
@@ -197,7 +203,7 @@ extension AuraChargeReading {
 
     private static func chargeBanner(day: DailyMetric?, drivers: [ChargeDriver]) -> String {
         guard day?.recovery != nil else {
-            return String(localized: "Charge is still calibrating. NOOP needs more valid nights before it can compare you with your own baseline.")
+            return String(localized: "Charge is still calibrating. Noop Aura needs more valid nights before it can compare you with your own baseline.")
         }
         guard let strongest = drivers.first else {
             return String(localized: "Charge is available, but there are not enough complete inputs to explain its drivers yet.")
@@ -208,10 +214,17 @@ extension AuraChargeReading {
     private static func chargeHeadline(_ recovery: Double?) -> String {
         guard let recovery else { return String(localized: "Charge is calibrating") }
         switch recovery {
-        case 67...: return String(localized: "Your body is ready")
-        case 34..<67: return String(localized: "Your body is steady")
-        default: return String(localized: "Your body needs recovery")
+        case 67...: return String(localized: "High recovery")
+        case 34..<67: return String(localized: "Moderate recovery")
+        default: return String(localized: "Low recovery")
         }
+    }
+
+    private static func chargeBand(_ recovery: Double?) -> String {
+        guard let recovery else { return String(localized: "Calibrating") }
+        if recovery >= 67 { return String(localized: "High recovery") }
+        if recovery >= 34 { return String(localized: "Moderate recovery") }
+        return String(localized: "Low recovery")
     }
 
     private static let dayParser: DateFormatter = {

@@ -3,14 +3,13 @@ import SwiftUI
 import StrandAnalytics
 import SuperAgeCore
 import StrandDesign
-import WhoopStore
 
 // MARK: - Aura Age, wired to real data
 //
-// Nothing is computed here. Both ages are written weekly by `IntelligenceEngine` under the computed
-// `-noop` source, and this adapter reads them back and dresses them. The one live calculation is the
-// driver breakdown, and it goes through `IntelligenceEngine.vitalityInputs` — the same builder the
-// stored headline used — so the explanation can never disagree with the number it explains.
+// Body Age, its chronological-age input and its exact signed contributions are written weekly by
+// `IntelligenceEngine` under the computed `-noop` source. This adapter reads one coherent weekly
+// snapshot back and formats it; a historical headline is never explained with current inputs. The
+// separately labelled health-domain result is current and independent of that weekly snapshot.
 //
 // The screen degrades on its own: no scored week produces the readiness checklist rather than zeros,
 // and any single missing value renders as an em-dash beside the ones that are present.
@@ -21,53 +20,68 @@ extension AuraAgeReading {
     ///   - bodyAgeSeries: the `body_age` weekly series, oldest → newest.
     ///   - fitnessAgeSeries: the `fitness_age` weekly series, oldest → newest.
     ///   - vo2maxSeries: the `vo2max_est` weekly series, oldest → newest.
-    ///   - days: the trailing daily rows the driver breakdown aggregates (the last 7 are used).
+    ///   - contributionSeries: exact `VitalityEngine` log-hazard snapshots, keyed by factor.
     static func live(
         bodyAgeSeries: [(day: String, value: Double)],
+        chronologicalAgeSeries: [(day: String, value: Double)],
         fitnessAgeSeries: [(day: String, value: Double)],
         vo2maxSeries: [(day: String, value: Double)],
-        days: [DailyMetric],
-        sleepSessions: [(start: Int, end: Int)],
+        contributionSeries: [String: [(day: String, value: Double)]],
         domainResult: BioAge.DomainResult?,
         readiness: FitnessAgeReadiness,
-        chronologicalAge: Int,
-        sex: String
+        chronologicalAge: Int
     ) -> AuraAgeReading {
-        let bodyAge = bodyAgeSeries.last?.value
-        let fitnessAge = fitnessAgeSeries.last?.value
-        let vo2max = vo2maxSeries.last?.value
-
         // Ready means there is a stored Body Age to show. The Fitness Age readiness checklist is what
         // explains an absence, because both engines run off the same weekly gate.
-        guard let bodyAge else {
+        guard let latestBodyAge = bodyAgeSeries.last else {
             return notReady(readiness: readiness, chronologicalAge: chronologicalAge)
         }
+        let snapshotDay = latestBodyAge.day
+        let bodyAge = latestBodyAge.value
+        let snapshotChronologicalAge = chronologicalAgeSeries
+            .last(where: { $0.day == snapshotDay })?.value
+        // These cards describe the same weekly calculation. A newer or older independent point would
+        // look related while coming from different inputs, so unmatched weeks deliberately render blank.
+        let fitnessAge = fitnessAgeSeries.last(where: { $0.day == snapshotDay })?.value
+        let vo2max = vo2maxSeries.last(where: { $0.day == snapshotDay })?.value
 
-        let delta = Double(chronologicalAge) - bodyAge
-        let years = Int(abs(delta).rounded())
+        let delta = snapshotChronologicalAge.map { $0 - bodyAge }
         let deltaText: String
         let deltaTint: Color
-        switch (years, delta > 0) {
-        case (0, _):
-            deltaText = String(localized: "About your age")
+        if let delta {
+            let years = Int(abs(delta).rounded())
+            switch (years, delta > 0) {
+            case (0, _):
+                deltaText = String(localized: "About your age")
+                deltaTint = AuraPalette.textSecondary
+            case (1, true):
+                deltaText = String(localized: "1 year younger than your age")
+                deltaTint = AuraPalette.accent
+            case (_, true):
+                deltaText = String(localized: "\(years) years younger than your age")
+                deltaTint = AuraPalette.accent
+            case (1, false):
+                deltaText = String(localized: "1 year older than your age")
+                deltaTint = AuraPalette.effort
+            default:
+                deltaText = String(localized: "\(years) years older than your age")
+                deltaTint = AuraPalette.effort
+            }
+        } else {
+            deltaText = String(localized: "Comparison unavailable for this stored week")
             deltaTint = AuraPalette.textSecondary
-        case (1, true):
-            deltaText = String(localized: "1 year younger than your age")
-            deltaTint = AuraPalette.accent
-        case (_, true):
-            deltaText = String(localized: "\(years) years younger than your age")
-            deltaTint = AuraPalette.accent
-        case (1, false):
-            deltaText = String(localized: "1 year older than your age")
-            deltaTint = AuraPalette.effort
-        default:
-            deltaText = String(localized: "\(years) years older than your age")
-            deltaTint = AuraPalette.effort
         }
 
-        let contributions = VitalityEngine.contributions(IntelligenceEngine.vitalityInputs(
-            days: Array(days.suffix(7)), age: chronologicalAge, sex: sex, vo2max: vo2max,
-            sleepSessions: sleepSessions))
+        let contributions: [VitalityEngine.Contribution] =
+            IntelligenceEngine.vitalityContributionFactorKeys.compactMap { factor -> VitalityEngine.Contribution? in
+            guard let point = contributionSeries[factor]?.last(where: { $0.day == snapshotDay }) else {
+                return nil
+            }
+            return VitalityEngine.Contribution(
+                key: factor,
+                label: Self.driverLabel(factor),
+                lnHazard: point.value)
+            }
         let drivers = Self.drivers(from: contributions)
 
         // The weekly rows are already Saturday-keyed; show the trailing ten so a run of weeks reads as a
@@ -90,12 +104,12 @@ extension AuraAgeReading {
             bodyAgeOverline: String(localized: "Body Age"),
             bodyAge: String(Int(bodyAge.rounded())),
             bodyAgeUnit: String(localized: "years"),
-            bodyAgeBand: String(localized: "± \(Int(VitalityEngine.bandYears)) yr · updated weekly"),
+            bodyAgeBand: String(localized: "Wellness estimate · updated weekly"),
             delta: deltaText,
             deltaTint: deltaTint,
             drivers: drivers,
             driversNote: contributions.isEmpty
-                ? String(localized: "No inputs yet")
+                ? String(localized: "Driver snapshot unavailable")
                 : String(localized: "\(contributions.count) inputs"),
             history: values,
             historyLabels: history.map { Self.weekLabel($0.day) },
@@ -105,14 +119,18 @@ extension AuraAgeReading {
             fitnessAgeUnit: fitnessAge == nil ? "" : String(localized: "yrs"),
             vo2max: vo2max.map { String(format: "%.1f", $0) } ?? "—",
             vo2maxUnit: vo2max == nil ? "" : "ml/kg/min",
-            fitnessNote: String(localized: "± \(Int(FitnessAgeEngine.displayBandYears)) yr"),
+            fitnessNote: String(localized: "Estimate · updated weekly"),
             fitnessCaveat: String(localized: "A cardiorespiratory comparison — how your estimated fitness compares to a typical person, expressed in years. It is not a biological age and carries no medical meaning."),
             domains: Self.domains(from: domainResult),
             domainsNote: Self.domainsNote(from: domainResult),
             readiness: [],
             readinessNote: "",
             readinessLead: "",
-            read: Self.read(delta: delta, drivers: drivers, weeks: values.count),
+            read: Self.read(
+                delta: delta,
+                drivers: drivers,
+                hasDriverSnapshot: !contributions.isEmpty,
+                weeks: values.count),
             disclaimer: Self.disclaimer
         )
     }
@@ -120,9 +138,9 @@ extension AuraAgeReading {
     // MARK: Drivers
 
     private static func drivers(from contributions: [VitalityEngine.Contribution]) -> [Driver] {
-        // The engine reports each factor as a signed log-hazard. Years is what the wearer reads, so
-        // convert through the model's OWN mapping rather than inventing a second one: Body Age is the
-        // hazard sum scaled into years, so a factor's share of the sum is its share of the offset.
+        // The engine reports each factor as a signed log-hazard. Convert through the exact same overlap
+        // shrink and hazard-to-years mapping as Body Age; the earlier UI multiplied by the unrelated
+        // five-year display band and therefore reported incorrect per-driver effects.
         let total = contributions.map { abs($0.lnHazard) }.reduce(0, +)
         guard total > 0 else { return [] }
         let largest = contributions.map { abs($0.lnHazard) }.max() ?? 1
@@ -132,7 +150,7 @@ extension AuraAgeReading {
             .map { contribution in
                 // Negative log-hazard is protective; the engine's `deltaYears` is positive when younger,
                 // so a protective factor takes years off.
-                let years = contribution.lnHazard * VitalityEngine.bandYears
+                let years = VitalityEngine.ageEffectYears(for: contribution)
                 let protective = contribution.lnHazard < 0
                 return Driver(
                     id: contribution.key,
@@ -142,6 +160,18 @@ extension AuraAgeReading {
                     magnitude: min(abs(contribution.lnHazard) / largest, 1)
                 )
             }
+    }
+
+    private static func driverLabel(_ key: String) -> String {
+        switch key {
+        case "rhr":         return String(localized: "Resting heart rate")
+        case "vo2max":      return String(localized: "Cardio fitness")
+        case "sleep":       return String(localized: "Sleep duration")
+        case "consistency": return String(localized: "Sleep regularity")
+        case "hrv":         return String(localized: "Heart-rate variability")
+        case "steps":       return String(localized: "Daily steps")
+        default:             return key
+        }
     }
 
     // MARK: Domains
@@ -189,28 +219,38 @@ extension AuraAgeReading {
 
     /// The paragraph under the chart. It states only what the numbers on this screen support: the
     /// direction, the biggest protective factor, and the biggest one working against it.
-    private static func read(delta: Double, drivers: [Driver], weeks: Int) -> String {
+    private static func read(
+        delta: Double?,
+        drivers: [Driver],
+        hasDriverSnapshot: Bool,
+        weeks: Int
+    ) -> String {
+        if !hasDriverSnapshot {
+            return String(localized: "This Body Age predates exact per-factor snapshots, so Noop Aura cannot explain its drivers without recomputing historical inputs. The next weekly calculation will include them.")
+        }
         guard !drivers.isEmpty else {
-            return String(localized: "Your Body Age is recorded but no single factor stands out yet. A few more weeks of wear will separate them.")
+            return String(localized: "No measured factor moved the model away from its reference this week.")
         }
         let best = drivers.first { $0.isProtective }
         let worst = drivers.first { !$0.isProtective }
 
         var sentences: [String] = []
-        if delta > 0.5 {
-            sentences.append(String(localized: "Your Body Age is reading younger than your years."))
-        } else if delta < -0.5 {
-            sentences.append(String(localized: "Your Body Age is reading older than your years."))
+        if let delta, delta > 0.5 {
+            sentences.append(String(localized: "Your Body Age is reading younger than the age stored with this calculation."))
+        } else if let delta, delta < -0.5 {
+            sentences.append(String(localized: "Your Body Age is reading older than the age stored with this calculation."))
+        } else if delta != nil {
+            sentences.append(String(localized: "Your Body Age is sitting close to the age stored with this calculation."))
         } else {
-            sentences.append(String(localized: "Your Body Age is sitting close to your actual age."))
+            sentences.append(String(localized: "The chronological-age snapshot is unavailable for this stored week."))
         }
         if let best {
-            sentences.append(String(localized: "\(best.label) is doing the most for you."))
+            sentences.append(String(localized: "\(best.label) has the largest protective contribution in this model."))
         }
         if let worst {
-            sentences.append(String(localized: "\(worst.label) is the one factor pushing the other way — and usually the cheapest to change."))
+            sentences.append(String(localized: "\(worst.label) has the largest adverse contribution in this model."))
         } else {
-            sentences.append(String(localized: "Nothing measured is currently working against you."))
+            sentences.append(String(localized: "No measured factor currently adds modelled years."))
         }
         if weeks < 4 {
             sentences.append(String(localized: "With \(weeks) week(s) recorded, treat this as a starting point rather than a trend."))
@@ -243,7 +283,7 @@ extension AuraAgeReading {
         if chronologicalAge <= 0 {
             lead = String(localized: "Set your date of birth in your profile — every age reading is measured against it.")
         } else {
-            lead = String(localized: "Body Age is computed once a week from at least four scored nights. Wear your strap overnight and it will appear on its own.")
+            lead = String(localized: "Body Age is computed weekly after enough valid inputs are available. Wear your strap overnight and it will appear on its own.")
         }
         return AuraAgeReading(
             isReady: false,

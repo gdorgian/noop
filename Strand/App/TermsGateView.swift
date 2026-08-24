@@ -18,7 +18,7 @@ struct TermsGateView: View {
 
             VStack(spacing: 0) {
                 VStack(spacing: 6) {
-                    Text("Before you use NOOP")
+                    Text("Before you use Noop Aura")
                         .font(StrandFont.title1)
                         .foregroundStyle(StrandPalette.textPrimary)
                     Text("Please read the points below, then confirm each statement.")
@@ -65,7 +65,7 @@ struct TermsGateView: View {
                             #endif
                         }
 
-                        Text("The full terms are in TERMS.md, shipped with NOOP. This is not legal advice.")
+                        Text("The full terms are in TERMS.md, shipped with Noop Aura. This is not legal advice.")
                             .font(StrandFont.footnote)
                             .foregroundStyle(StrandPalette.textTertiary)
                             .padding(.top, 2)

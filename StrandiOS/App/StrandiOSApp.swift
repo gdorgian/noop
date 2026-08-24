@@ -3,6 +3,7 @@ import SwiftUI
 import StrandDesign
 import UserNotifications
 import UIKit
+import Combine
 
 /// iOS entry point. Unlike the macOS app (which adds a `MenuBarExtra` scene), iOS uses a single
 /// `WindowGroup`; the glanceable menu-bar role is filled by the Home/Lock-Screen widget instead.
@@ -26,9 +27,11 @@ struct StrandiOSApp: App {
     /// observes it and presents the Devices manager.
     @StateObject private var router = NavRouter()
     @State private var liveActivity = LiveActivityController()
+    /// Refreshes an unchanged measured BPM before ActivityKit's 120-second stale date. BLE suppresses
+    /// duplicate integer values, so an event-only pipeline could otherwise mark a genuinely steady live
+    /// heart rate stale even while the strap remained connected.
+    private let liveActivityKeepAlive = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     @Environment(\.scenePhase) private var scenePhase
-    /// Appearance preference (System/Light/Dark). Default follows the OS; the Settings picker writes it.
-    @AppStorage(AppearanceMode.storageKey) private var appearanceRaw = AppearanceMode.system.rawValue
     /// Chart data-colour style (Titanium / Classic throwback). Re-colours gauges + charts.
     @AppStorage(ChartStyle.storageKey) private var chartStyleRaw = ChartStyle.fallback.rawValue
     /// Chrome accent colour (mint / WHOOP blue / custom). Chrome only — never the data colour worlds.
@@ -136,7 +139,9 @@ struct StrandiOSApp: App {
                 // v5 L3: the shared stress check-in nudge surface, so the Breathe screen's passive
                 // card observes the SAME instance the central detector (AppModel.evaluateStress) posts to.
                 .environment(\.stressNudgeCenter, model.stressNudgeCenter)
-                .preferredColorScheme(AppearanceMode.resolve(appearanceRaw).colorScheme)
+                // Noop Aura 10.5.0 ships in its approved dark visual direction. Accessibility contrast
+                // and Reduce Motion still follow iOS; only the colour scheme is fixed.
+                .preferredColorScheme(.dark)
                 // Match SwiftUI format styles to the localization selected by the app's bundles. Language
                 // changes are process-wide on Apple and are applied after the documented reopen.
                 .environment(\.locale, AppLanguage.activeLocale)
@@ -185,6 +190,17 @@ struct StrandiOSApp: App {
                         bpm: isConnected ? (model.bpm ?? model.live.heartRate) : nil,
                         recovery: day?.recovery.map { Int($0.rounded()) },
                         connected: isConnected,
+                        effort: day?.strain.map { Int($0.rounded()) }
+                    )
+                }
+                .onReceive(liveActivityKeepAlive) { _ in
+                    guard model.live.connected,
+                          let bpm = model.bpm ?? model.live.heartRate else { return }
+                    let day = model.repo.cachedWidgetAnchor()
+                    liveActivity.update(
+                        bpm: bpm,
+                        recovery: day?.recovery.map { Int($0.rounded()) },
+                        connected: true,
                         effort: day?.strain.map { Int($0.rounded()) }
                     )
                 }

@@ -84,7 +84,7 @@ struct NOOPRingsWidget: Widget {
                     .background(StrandPalette.surfaceBase)
             }
         }
-        .configurationDisplayName("NOOP Rings")
+        .configurationDisplayName("Noop Aura Rings")
         .description("Charge, Effort and Rest as three rings, just like Today.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }

@@ -140,4 +140,11 @@ final class LiveStateLogGenerationsTests: XCTestCase {
         XCTAssertTrue(text.contains("previous app session"), "the previous session keeps its header")
         XCTAssertEqual(LiveState.persistedLogTail(), [], "the roll clears the live slot")
     }
+
+    func testExportHeaderCarriesBuildProvenance() {
+        let text = LiveState.scheduledExportText()
+        XCTAssertTrue(text.contains("\nApp: "))
+        XCTAssertTrue(text.contains("\nBuild: "))
+        XCTAssertTrue(text.contains("\nCommit: "))
+    }
 }

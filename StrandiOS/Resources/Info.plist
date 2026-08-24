@@ -15,7 +15,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>NOOP</string>
+	<string>Noop Aura</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIcons</key>
@@ -36,7 +36,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>NOOP</string>
+	<string>Noop Aura</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -62,19 +62,21 @@
 		<true/>
 	</dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>NOOP connects directly to your WHOOP strap over Bluetooth to read heart rate, R-R intervals, battery, and sensor data locally on your iPhone. Nothing leaves your device.</string>
+	<string>Noop Aura connects directly to your WHOOP strap to read heart rate, R-R intervals, battery and sensor data on your iPhone. Sharing occurs only through an export, backup, Apple Health write or Coach provider you explicitly enable.</string>
 	<key>NSHealthClinicalHealthRecordsShareUsageDescription</key>
-	<string>NOOP does not read clinical health records. This appears only because the certificate NOOP was signed with grants that capability.</string>
+	<string>Noop Aura does not read clinical health records. This appears only because the certificate used to sign Noop Aura grants that capability.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>NOOP reads your own Apple Health data on-device to compute recovery, strain, and sleep. Nothing leaves your device.</string>
+	<string>Noop Aura reads the Apple Health data types you approve to compute recovery, strain and sleep. They stay local unless you explicitly export, back up or consent to share a category with a configured Coach provider.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>NOOP writes the metrics it computes from your strap back into Apple Health, on-device and only when you allow it.</string>
+	<string>Noop Aura writes the metrics it computes from your strap back into Apple Health, on-device and only when you allow it.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>NOOP records your route during an outdoor workout to show distance, pace, and a map, and keeps recording while the screen is off. The route stays on your device. Nothing leaves it.</string>
+	<string>Noop Aura records your route during an outdoor workout to show distance, pace and a map, including while the screen is off. The route is stored locally unless you export or back it up.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>NOOP reads your iPhone's step count for a walking or running workout to show steps in the activity summary. It stays on your device. Nothing leaves it.</string>
+	<string>Noop Aura reads your iPhone's step count for a walking or running workout and shows it in the activity summary. It stays local unless you export or back up the activity.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NoopCommitSHA</key>
+	<string>$(NOOP_COMMIT_SHA)</string>
 	<key>OURA_CLIENT_ID</key>
 	<string>$(OURA_CLIENT_ID)</string>
 	<key>OURA_CLIENT_SECRET</key>

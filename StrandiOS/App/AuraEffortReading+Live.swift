@@ -10,7 +10,7 @@ extension AuraEffortReading {
     /// Recovery chooses the already-shipped optimal band; no load, workout or target is recomputed here.
     @MainActor static func live(
         day: DailyMetric?,
-        targetRecovery: Double?,
+        targetDay: DailyMetric?,
         history: [DailyMetric],
         workouts: [WorkoutRow],
         scale: EffortScale,
@@ -19,9 +19,11 @@ extension AuraEffortReading {
         let anchorKey = day?.day ?? Repository.logicalDayKey(now)
         let storedEffort = day?.strain
         let displayEffort = storedEffort.map { UnitFormatter.effortValue($0, scale: scale) }
-        let target21 = CoupledView.optimalStrainRange(recovery: targetRecovery)
+        let target21 = CoupledView.optimalStrainRange(recovery: targetDay?.recovery)
         let target = target21.map { displayRange($0, scale: scale) }
+        let targetIsCurrent = targetDay?.day == anchorKey
         let week = weekReadings(endingOn: anchorKey, history: history, scale: scale)
+        let weekHighlighted = week.rows.lastIndex(where: { $0.day == anchorKey }) ?? -1
 
         let todayWorkouts = workouts
             .filter {
@@ -32,24 +34,31 @@ extension AuraEffortReading {
         return AuraEffortReading(
             greeting: fullWeekdayLabel(anchorKey),
             effort: storedEffort.map { UnitFormatter.effortDisplay($0, scale: scale) } ?? "—",
-            targetCaption: target.map { String(localized: "target \(format($0.lowerBound))–\(format($0.upperBound))") }
+            targetCaption: target.map {
+                targetIsCurrent
+                    ? String(localized: "target \(format($0.lowerBound))–\(format($0.upperBound))")
+                    : String(localized: "latest target \(format($0.lowerBound))–\(format($0.upperBound))")
+            }
                 ?? String(localized: "target pending"),
             fraction: min(max((storedEffort ?? 0) / 100, 0), 1),
-            stops: [
-                (label: String(localized: "Minimal"), position: 8),
-                (label: String(localized: "Moderate"), position: 52),
-                (label: String(localized: "All out"), position: 92),
-            ],
-            note: targetNote(effort: displayEffort, target: target),
+            stops: scaleStops(scale),
+            note: targetNote(
+                effort: displayEffort,
+                target: target,
+                targetDay: targetDay?.day,
+                targetIsCurrent: targetIsCurrent),
             activities: todayWorkouts.enumerated().map { index, row in
                 mappedActivity(row, index: index, scale: scale)
             },
             weekLoad: week.values,
             weekDays: week.labels,
+            weekHighlighted: weekHighlighted,
             weekVerdict: weekVerdict(rows: week.rows, scale: scale),
             weekCeiling: scale == .whoop ? 21 : 100,
-            headline: effortHeadline(effort21: storedEffort.map { UnitFormatter.effortValue($0, scale: .whoop) },
-                                     target21: target21)
+            headline: effortHeadline(
+                effort21: storedEffort.map { UnitFormatter.effortValue($0, scale: .whoop) },
+                target21: target21,
+                targetIsCurrent: targetIsCurrent)
         )
     }
 
@@ -74,9 +83,20 @@ extension AuraEffortReading {
         )
     }
 
-    private static func targetNote(effort: Double?, target: ClosedRange<Double>?) -> String {
+    private static func targetNote(
+        effort: Double?,
+        target: ClosedRange<Double>?,
+        targetDay: String?,
+        targetIsCurrent: Bool
+    ) -> String {
         guard let target else {
             return String(localized: "Charge is still calibrating. Your recovery-matched Effort range will appear when it is ready.")
+        }
+        if !targetIsCurrent {
+            let date = targetDay.map(shortDateLabel) ?? String(localized: "an earlier day")
+            let effortText = effort.map { String(localized: "Today’s Effort is \(format($0)).") }
+                ?? String(localized: "Today’s Effort has not been scored yet.")
+            return String(localized: "\(effortText) The \(format(target.lowerBound))–\(format(target.upperBound)) range comes from your latest scored Charge on \(date); no new target is available yet.")
         }
         guard let effort else {
             return String(localized: "Effort will appear as today’s heart-rate data accumulates. Your current target range is \(format(target.lowerBound))–\(format(target.upperBound)).")
@@ -92,10 +112,11 @@ extension AuraEffortReading {
 
     private static func effortHeadline(
         effort21: Double?,
-        target21: ClosedRange<Int>?
+        target21: ClosedRange<Int>?,
+        targetIsCurrent: Bool
     ) -> String {
         guard let effort21 else { return String(localized: "No Effort scored yet") }
-        guard let target21 else { return String(localized: "Effort so far today") }
+        guard let target21, targetIsCurrent else { return String(localized: "Effort so far today") }
         if effort21 < Double(target21.lowerBound) { return String(localized: "You have room to move") }
         if effort21 <= Double(target21.upperBound) { return String(localized: "You’re in today’s range") }
         return String(localized: "You’ve passed today’s range")
@@ -118,9 +139,9 @@ extension AuraEffortReading {
         scale: EffortScale
     ) -> (values: [Double], labels: [String], rows: [DailyMetric]) {
         guard let anchor = dayParser.date(from: anchorKey) else {
-            let rows = Array(history.filter { $0.day <= anchorKey }.suffix(7))
+            let rows = Array(history.filter { $0.day <= anchorKey && $0.strain != nil }.suffix(7))
             return (
-                rows.map { $0.strain.map { UnitFormatter.effortValue($0, scale: scale) } ?? 0 },
+                rows.compactMap { $0.strain.map { UnitFormatter.effortValue($0, scale: scale) } },
                 rows.map { dayLabel($0.day) },
                 rows
             )
@@ -132,17 +153,33 @@ extension AuraEffortReading {
                 dayParser.string(from: $0)
             }
         }
-        let rows = keys.compactMap { byDay[$0] }
+        let rows = keys.compactMap { key -> DailyMetric? in
+            guard let row = byDay[key], row.strain != nil else { return nil }
+            return row
+        }
         return (
-            keys.map { key in
-                byDay[key]?.strain.map { UnitFormatter.effortValue($0, scale: scale) } ?? 0
-            },
-            keys.map(dayLabel),
+            rows.compactMap { $0.strain.map { UnitFormatter.effortValue($0, scale: scale) } },
+            rows.map { dayLabel($0.day) },
             rows
         )
     }
 
-    private static func weekVerdict(rows: [DailyMetric], scale: EffortScale) -> String {
+    /// Axis anchors only. The earlier labels (Minimal/Moderate/All out at 8/52/92) looked scientific but
+    /// had no model behind those cutoffs.
+    private static func scaleStops(_ scale: EffortScale) -> [(label: String, position: Double)] {
+        let maximum = scale == .whoop ? 21.0 : 100.0
+        return [
+            (label: "0", position: 0),
+            (label: format(maximum / 2), position: 50),
+            (label: format(maximum), position: 100),
+        ]
+    }
+
+    @MainActor
+    static func weekTargetCounts(
+        rows: [DailyMetric],
+        scale: EffortScale
+    ) -> (recorded: Int, comparable: Int, inRange: Int, below: Int, above: Int) {
         let recorded = rows.compactMap { row -> (effort: Double, target: ClosedRange<Double>?)? in
             guard let strain = row.strain else { return nil }
             let target = CoupledView.optimalStrainRange(recovery: row.recovery).map {
@@ -150,22 +187,27 @@ extension AuraEffortReading {
             }
             return (UnitFormatter.effortValue(strain, scale: scale), target)
         }
-        guard !recorded.isEmpty else { return String(localized: "No recorded Effort") }
-
         let comparable = recorded.compactMap { row -> (Double, ClosedRange<Double>)? in
             guard let target = row.target else { return nil }
             return (row.effort, target)
         }
-        guard !comparable.isEmpty else {
-            return String(localized: "\(recorded.count) recorded days")
-        }
+        // Classify each day against that day's own recovery-matched target. Averaging efforts and
+        // target bounds separately lets a very high day cancel a very low one into a false "Balanced"
+        // verdict, even when no individual day was in range.
+        let below = comparable.filter { $0.0 < $0.1.lowerBound }.count
+        let above = comparable.filter { $0.0 > $0.1.upperBound }.count
+        let inRange = comparable.count - below - above
+        return (recorded.count, comparable.count, inRange, below, above)
+    }
 
-        let effortAverage = comparable.map(\.0).reduce(0, +) / Double(comparable.count)
-        let lowerAverage = comparable.map { $0.1.lowerBound }.reduce(0, +) / Double(comparable.count)
-        let upperAverage = comparable.map { $0.1.upperBound }.reduce(0, +) / Double(comparable.count)
-        if effortAverage < lowerAverage { return String(localized: "Below your range") }
-        if effortAverage > upperAverage { return String(localized: "Above your range") }
-        return String(localized: "Balanced")
+    @MainActor
+    private static func weekVerdict(rows: [DailyMetric], scale: EffortScale) -> String {
+        let counts = weekTargetCounts(rows: rows, scale: scale)
+        guard counts.recorded > 0 else { return String(localized: "No recorded Effort") }
+        guard counts.comparable > 0 else {
+            return String(localized: "\(counts.recorded) recorded days · no recovery targets")
+        }
+        return String(localized: "\(counts.inRange) of \(counts.comparable) target days in range · \(counts.below) below · \(counts.above) above")
     }
 
     private static func durationText(_ seconds: Double) -> String {
@@ -194,6 +236,11 @@ extension AuraEffortReading {
         return fullWeekdayFormatter.string(from: date)
     }
 
+    private static func shortDateLabel(_ day: String) -> String {
+        guard let date = dayParser.date(from: day) else { return day }
+        return shortDateFormatter.string(from: date)
+    }
+
     private static let dayParser: DateFormatter = {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -205,7 +252,11 @@ extension AuraEffortReading {
     private static let weekdayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = AppLanguage.activeLocale
-        formatter.setLocalizedDateFormatFromTemplate("EEEEE")
+        // Use the locale's abbreviated weekday rather than a one-letter initial. In English,
+        // narrow symbols make both Tuesday/Thursday "T" and Saturday/Sunday "S", which turns a
+        // seven-day chart into an ambiguous label sequence and cannot be repaired in a string
+        // catalog. DateFormatter keeps this correct for every selected app language.
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
         return formatter
     }()
 
@@ -213,6 +264,13 @@ extension AuraEffortReading {
         let formatter = DateFormatter()
         formatter.locale = AppLanguage.activeLocale
         formatter.setLocalizedDateFormatFromTemplate("EEEE")
+        return formatter
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.activeLocale
+        formatter.setLocalizedDateFormatFromTemplate("dMMM")
         return formatter
     }()
 }

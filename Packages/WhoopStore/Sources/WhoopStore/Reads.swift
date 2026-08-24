@@ -53,15 +53,104 @@ public struct ScoringInputFingerprint: Sendable, Equatable {
     }
 }
 
+/// One raw WHOOP R-R transport row for diagnostics. Unlike the scoring read, this retains both live and
+/// historical copies, and unlike the former duplicate query it retains every same-second beat in the
+/// store's deterministic emission/storage order.
+public struct RRTransportObservation: Sendable, Equatable {
+    public let ts: Int
+    public let rrMs: Int
+    public let sourceChannel: RRSourceChannel
+    public let ord: Int?
+
+    public init(ts: Int, rrMs: Int, sourceChannel: RRSourceChannel, ord: Int?) {
+        self.ts = ts
+        self.rrMs = rrMs
+        self.sourceChannel = sourceChannel
+        self.ord = ord
+    }
+}
+
+/// Independently capped transport samples from the newest part of a diagnostic window. The separate caps
+/// prevent a dense transport from consuming a shared LIMIT and hiding the other side of the comparison.
+public struct RRTransportObservationWindow: Sendable, Equatable {
+    public let live: [RRTransportObservation]
+    public let historical: [RRTransportObservation]
+
+    public init(live: [RRTransportObservation], historical: [RRTransportObservation]) {
+        self.live = live
+        self.historical = historical
+    }
+}
+
+/// Row counts by durable R-R provenance. `unknown` is the intentionally preserved SQL NULL/legacy stream;
+/// `other` is any non-WHOOP channel (including a future appended raw value this build does not recognise).
+public struct RRTransportCounts: Sendable, Equatable {
+    public let unknown: Int
+    public let standard: Int
+    public let realtime: Int
+    public let historical: Int
+    public let other: Int
+
+    public init(unknown: Int, standard: Int, realtime: Int, historical: Int, other: Int) {
+        self.unknown = unknown
+        self.standard = standard
+        self.realtime = realtime
+        self.historical = historical
+        self.other = other
+    }
+
+    public var live: Int { standard + realtime }
+    public var total: Int { unknown + standard + realtime + historical + other }
+}
+
+/// A diagnostic census over one explicit night/window. `selected` is produced by the existing WHOOP
+/// transport selector; none of these numbers alter the scoring read or stored rows.
+public struct RRTransportCensus: Sendable, Equatable {
+    public let raw: RRTransportCounts
+    public let selected: RRTransportCounts
+    public let suppressedStandard: Int
+    public let suppressedRealtime: Int
+    /// Selected live rows that still sit within the selector's local historical tolerance. This should be
+    /// zero; a nonzero value exposes a selector/query divergence rather than silently calling it fallback.
+    public let selectedLiveBoundaryLeakage: Int
+    public let selectedLiveBeforeHistory: Int
+    public let selectedLiveInternalGap: Int
+    public let selectedLiveAfterHistory: Int
+    public let selectedLiveWithoutHistory: Int
+    public let firstHistoricalTs: Int?
+    public let lastHistoricalTs: Int?
+
+    public init(raw: RRTransportCounts, selected: RRTransportCounts,
+                suppressedStandard: Int, suppressedRealtime: Int,
+                selectedLiveBoundaryLeakage: Int, selectedLiveBeforeHistory: Int,
+                selectedLiveInternalGap: Int, selectedLiveAfterHistory: Int,
+                selectedLiveWithoutHistory: Int, firstHistoricalTs: Int?, lastHistoricalTs: Int?) {
+        self.raw = raw
+        self.selected = selected
+        self.suppressedStandard = suppressedStandard
+        self.suppressedRealtime = suppressedRealtime
+        self.selectedLiveBoundaryLeakage = selectedLiveBoundaryLeakage
+        self.selectedLiveBeforeHistory = selectedLiveBeforeHistory
+        self.selectedLiveInternalGap = selectedLiveInternalGap
+        self.selectedLiveAfterHistory = selectedLiveAfterHistory
+        self.selectedLiveWithoutHistory = selectedLiveWithoutHistory
+        self.firstHistoricalTs = firstHistoricalTs
+        self.lastHistoricalTs = lastHistoricalTs
+    }
+
+    public var suppressedLive: Int { suppressedStandard + suppressedRealtime }
+}
+
 /// Chooses WHOOP's historical beat transport over its live copies where they locally overlap.
 /// Pure so the boundary policy is pinned without involving SQLite; `rrIntervals` applies the same
 /// predicate in SQL before `LIMIT`, then runs this once more defensively on the decoded rows.
 enum RRScoringTransportSelector {
-    /// Paired captures put every 0x2A37 receive timestamp exactly 1 or 2 seconds AFTER the matching
-    /// v18 embedded unix (14,322/14,322 pairs). Expanding both ends by two seconds prevents the final
-    /// receive-time copy from leaking just beyond an observed historical second; custom REALTIME_DATA is
-    /// strap-clock mapped and falls within the same bound. Symmetry tolerates boundary rounding too. This
-    /// is transport alignment, not per-beat/value de-duplication.
+    /// The reproducible public capture in `docs/fork/rr-transport-evidence.md` put all 14,322 matched
+    /// 0x2A37 values 1 or 2 seconds AFTER v18 embedded time once its known clock offset was removed.
+    /// Field lag is not universal: a later log contains checkable +3 s pairs, so the diagnostic searches
+    /// -5...+5 and the nightly census measures what this deployed two-second scoring policy suppresses or
+    /// retains. Do not widen scoring from a few pairs alone. Symmetry tolerates boundary rounding. This is
+    /// transport alignment, not per-beat/value de-duplication.
     static let historyBoundaryToleranceSec = 2
 
     static func select(_ rows: [RRInterval]) -> [RRInterval] {
@@ -369,44 +458,175 @@ extension WhoopStore {
     /// two: it is quantised to an 8 ms grid, applies no quality gate, and runs only while an SpO2
     /// measurement is on — so scoring off it would make HRV coverage a function of the SpO2 duty cycle.
     ///
-    /// WHOOP TRANSPORT selection is local coverage, not beat-value de-duplication. A historical row wins
-    /// over either tagged live transport within +/- the observed 2 s receive skew. Live rows with no nearby
-    /// history survive, including internal offload gaps as well as the periods before/after banked history.
-    /// Oura channels and legacy NULL rows are unchanged.
+    /// WHOOP TRANSPORT selection is local coverage, not beat-value de-duplication. Under the currently
+    /// deployed policy, a historical row wins over either tagged live transport within +/- 2 s. Field lag
+    /// can be wider; `rrTransportObservations` measures -5...+5 without changing this selector, and
+    /// `rrTransportCensus` reports retained/suppressed boundary rows per night. Live rows with no nearby
+    /// history survive, including internal offload gaps and periods before/after banked history. Oura
+    /// channels and legacy NULL rows are unchanged. Evidence: `docs/fork/rr-transport-evidence.md`.
     ///
     /// Rows are FILTERED, never deleted: excluded streams stay on disk as a cross-check.
-    /// One stored second carrying both a historical and a live R-R row: the raw material for settling
-    /// whether the v18 historical field is milliseconds or 1/1024-second ticks (#1008/#1118, ryanbr#1505).
+    /// Raw material for the lag-aware v18 units diagnostic (#1008/#1118, ryanbr#1505).
     ///
-    /// Returns the pair as `(ts, liveMs, historicalMs)` — both as STORED. The interpretation depends on
-    /// which build banked them, which is the caller's to know, and `RRUnitEvidence` documents all three
-    /// readings. Deliberately raw: this function measures, it does not conclude.
+    /// Reads the transports independently and does not pair or collapse anything in SQL. Receive-time live
+    /// rows and embedded-time history rows need not land in the same second, and one second can legitimately
+    /// carry several beats. Each side is capped independently, newest first, then returned oldest-to-newest
+    /// in deterministic emission/storage order for the pure lag matcher in `RRUnitEvidence`.
     ///
-    /// Reads the rows directly rather than through `rrIntervals`, because that function applies the
-    /// transport SELECTION — which discards exactly the duplicate this measurement is looking for.
-    public nonisolated func rrTransportDuplicates(deviceId: String, from: Int, to: Int,
-                                                  limit: Int = 5_000) async throws
-        -> [(ts: Int, liveMs: Int, historicalMs: Int)] {
+    /// Reads directly rather than through `rrIntervals`, because that function applies transport selection
+    /// and deliberately discards the overlapping live rows this measurement needs.
+    public nonisolated func rrTransportObservations(deviceId: String, from: Int, to: Int,
+                                                     limitPerTransport: Int = 5_000) async throws
+        -> RRTransportObservationWindow {
         try await asyncRead { db in
-            // One row per second that has BOTH kinds. MIN() picks a stable representative when a second
-            // carries several of either; a second with three live beats and one historical is ambiguous
-            // for this purpose anyway, and the pile-up test does not need every pair, only unbiased ones.
-            try Row.fetchAll(db, sql: """
-                SELECT ts,
-                       MIN(CASE WHEN srcChannel IN (?, ?) THEN rrMs END) AS liveMs,
-                       MIN(CASE WHEN srcChannel = ? THEN rrMs END) AS historicalMs
+            let live = try Row.fetchAll(db, sql: """
+                SELECT ts, rrMs, srcChannel, ord, storageOrder FROM (
+                    SELECT rowid AS storageOrder, ts, rrMs, srcChannel, ord
+                    FROM rrInterval
+                    WHERE deviceId = ? AND ts >= ? AND ts <= ?
+                      AND srcChannel IN (?, ?)
+                      AND (tsSuspect IS NULL OR tsSuspect <> 1)
+                    ORDER BY ts DESC, rowid DESC
+                    LIMIT ?
+                )
+                ORDER BY ts ASC,
+                         CASE WHEN ord IS NULL THEN 1 ELSE 0 END ASC,
+                         ord ASC, storageOrder ASC
+                """, arguments: [deviceId, from, to,
+                                  RRSourceChannel.whoopStandardBLE.rawValue,
+                                  RRSourceChannel.whoopRealtime.rawValue,
+                                  max(0, limitPerTransport)])
+                .compactMap { row -> RRTransportObservation? in
+                    guard let raw: Int = row["srcChannel"],
+                          let source = RRSourceChannel(rawValue: raw) else { return nil }
+                    return RRTransportObservation(ts: row["ts"], rrMs: row["rrMs"],
+                                                  sourceChannel: source, ord: row["ord"] as Int?)
+                }
+            let historical = try Row.fetchAll(db, sql: """
+                SELECT ts, rrMs, srcChannel, ord, storageOrder FROM (
+                    SELECT rowid AS storageOrder, ts, rrMs, srcChannel, ord
+                    FROM rrInterval
+                    WHERE deviceId = ? AND ts >= ? AND ts <= ?
+                      AND srcChannel = ?
+                      AND (tsSuspect IS NULL OR tsSuspect <> 1)
+                    ORDER BY ts DESC, rowid DESC
+                    LIMIT ?
+                )
+                ORDER BY ts ASC,
+                         CASE WHEN ord IS NULL THEN 1 ELSE 0 END ASC,
+                         ord ASC, storageOrder ASC
+                """, arguments: [deviceId, from, to,
+                                  RRSourceChannel.whoopHistorical.rawValue,
+                                  max(0, limitPerTransport)])
+                .compactMap { row -> RRTransportObservation? in
+                    guard let raw: Int = row["srcChannel"],
+                          let source = RRSourceChannel(rawValue: raw) else { return nil }
+                    return RRTransportObservation(ts: row["ts"], rrMs: row["rrMs"],
+                                                  sourceChannel: source, ord: row["ord"] as Int?)
+                }
+            return RRTransportObservationWindow(live: live, historical: historical)
+        }
+    }
+
+    /// Counts raw vs selector-retained rows over one explicit night/window. Legacy NULL rows and every
+    /// non-WHOOP channel remain in both counts; only tagged WHOOP live rows can be suppressed here.
+    public nonisolated func rrTransportCensus(deviceId: String, from: Int, to: Int) async throws
+        -> RRTransportCensus {
+        try await asyncRead { db in
+            let stored = try Row.fetchAll(db, sql: """
+                SELECT ts, rrMs, srcChannel, ord
                 FROM rrInterval
                 WHERE deviceId = ? AND ts >= ? AND ts <= ?
                   AND (tsSuspect IS NULL OR tsSuspect <> 1)
-                GROUP BY ts
-                HAVING liveMs IS NOT NULL AND historicalMs IS NOT NULL
-                ORDER BY ts DESC
-                LIMIT ?
-                """, arguments: [RRSourceChannel.whoopStandardBLE.rawValue,
-                                 RRSourceChannel.whoopRealtime.rawValue,
-                                 RRSourceChannel.whoopHistorical.rawValue,
-                                 deviceId, from, to, limit])
-                .map { (ts: $0["ts"], liveMs: $0["liveMs"], historicalMs: $0["historicalMs"]) }
+                ORDER BY ts ASC,
+                         CASE WHEN ord IS NULL THEN 1 ELSE 0 END ASC,
+                         ord ASC, rowid ASC
+                """, arguments: [deviceId, from, to])
+
+            func counts(_ rawSources: [Int?]) -> RRTransportCounts {
+                var unknown = 0
+                var standard = 0
+                var realtime = 0
+                var historical = 0
+                var other = 0
+                for raw in rawSources {
+                    guard let raw else {
+                        unknown += 1
+                        continue
+                    }
+                    switch RRSourceChannel(rawValue: raw) {
+                    case .whoopStandardBLE?: standard += 1
+                    case .whoopRealtime?: realtime += 1
+                    case .whoopHistorical?: historical += 1
+                    default: other += 1 // known non-WHOOP or an appended value unknown to this build
+                    }
+                }
+                return RRTransportCounts(unknown: unknown, standard: standard, realtime: realtime,
+                                         historical: historical, other: other)
+            }
+
+            let rawSources: [Int?] = stored.map { $0["srcChannel"] as Int? }
+            let rawCounts = counts(rawSources)
+            let intervals = stored.map { row in
+                let raw = row["srcChannel"] as Int?
+                return RRInterval(ts: row["ts"], rrMs: row["rrMs"],
+                                  srcChannel: raw.flatMap(RRSourceChannel.init(rawValue:)),
+                                  ord: row["ord"] as Int?)
+            }
+            let selectedIntervals = RRScoringTransportSelector.select(intervals)
+            let selectedStandard = selectedIntervals.filter { $0.srcChannel == .whoopStandardBLE }.count
+            let selectedRealtime = selectedIntervals.filter { $0.srcChannel == .whoopRealtime }.count
+            // The selector preserves every non-live row, including SQL NULL and unrecognised numeric
+            // provenance. Carry their raw categories through exactly instead of decoding unknown numbers
+            // as nil and accidentally relabelling them as legacy.
+            let selectedCounts = RRTransportCounts(
+                unknown: rawCounts.unknown,
+                standard: selectedStandard,
+                realtime: selectedRealtime,
+                historical: rawCounts.historical,
+                other: rawCounts.other)
+
+            let historicalTimes = Set(intervals.lazy
+                .filter { $0.srcChannel == .whoopHistorical }
+                .map(\.ts))
+            let selectedLive = selectedIntervals.filter {
+                $0.srcChannel == .whoopStandardBLE || $0.srcChannel == .whoopRealtime
+            }
+            let tolerance = RRScoringTransportSelector.historyBoundaryToleranceSec
+            let leakage = selectedLive.filter { live in
+                (-tolerance...tolerance).contains { historicalTimes.contains(live.ts + $0) }
+            }.count
+
+            let firstHistorical = historicalTimes.min()
+            let lastHistorical = historicalTimes.max()
+            var before = 0
+            var internalGap = 0
+            var after = 0
+            var withoutHistory = 0
+            if let firstHistorical, let lastHistorical {
+                for live in selectedLive where !(-tolerance...tolerance).contains(where: {
+                    historicalTimes.contains(live.ts + $0)
+                }) {
+                    if live.ts < firstHistorical { before += 1 }
+                    else if live.ts > lastHistorical { after += 1 }
+                    else { internalGap += 1 }
+                }
+            } else {
+                withoutHistory = selectedLive.count
+            }
+
+            return RRTransportCensus(
+                raw: rawCounts,
+                selected: selectedCounts,
+                suppressedStandard: rawCounts.standard - selectedCounts.standard,
+                suppressedRealtime: rawCounts.realtime - selectedCounts.realtime,
+                selectedLiveBoundaryLeakage: leakage,
+                selectedLiveBeforeHistory: before,
+                selectedLiveInternalGap: internalGap,
+                selectedLiveAfterHistory: after,
+                selectedLiveWithoutHistory: withoutHistory,
+                firstHistoricalTs: firstHistorical,
+                lastHistoricalTs: lastHistorical)
         }
     }
 

@@ -4,15 +4,17 @@ import StrandDesign
 
 // MARK: - Aura shell
 //
-// The chrome all seven Aura screens share: the fixed canvas and its ambient wash, the header, the
+// The chrome all Aura screens share: the fixed canvas and its ambient wash, the header, the
 // scrolling content, and the floating pill bar. Screens themselves are pure content — they own no
 // background, no header and no navigation.
 //
-// The shell is deliberately NOT a `TabView`. The direction's bar is a floating pill that overlaps the
-// content and shows a label only on the active tab, which the platform bar cannot express. It also
-// carries seven destinations behind five tabs: Band and You hang off the header.
+// The shell is deliberately not a `TabView`: the design's centre `+` is an action, while Charge, Effort
+// and Band are detail destinations that must remain outside the persistent navigation set.
 
 struct AuraShell: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var motion = NoopMotionState.shared
+
     /// Which screen is showing. Owned by the app shell so a deep link (`NavRouter`) can move Aura
     /// without the router needing to know anything about it.
     @Binding var screen: AuraScreen
@@ -28,6 +30,8 @@ struct AuraShell: View {
     let onOpenCoach: () -> Void
     /// Starts a Live Session from the Effort screen.
     let onStartLiveSession: () -> Void
+    /// Opens NOOP's existing live, workout, journal and breathing actions from the centre `+`.
+    let onOpenQuickActions: () -> Void
 
     /// Today's body state. Fixed until the screens are wired to `Repository`; it drives the orb's colour
     /// and the gauge marker's position.
@@ -66,6 +70,7 @@ struct AuraShell: View {
         onSync: @escaping () -> Void,
         onOpenCoach: @escaping () -> Void,
         onStartLiveSession: @escaping () -> Void,
+        onOpenQuickActions: @escaping () -> Void,
         onSyncHealth: @escaping () -> Void
     ) {
         self._screen = screen
@@ -84,6 +89,7 @@ struct AuraShell: View {
         self.onSyncHealth = onSyncHealth
         self.onOpenCoach = onOpenCoach
         self.onStartLiveSession = onStartLiveSession
+        self.onOpenQuickActions = onOpenQuickActions
         #if DEBUG
         self._routeStack = State(initialValue: AuraRoute.debugLaunchRoute.map { [$0] } ?? [])
         #endif
@@ -97,6 +103,8 @@ struct AuraShell: View {
     @State private var scrollToTopToken = 0
     @State private var routeStack: [AuraRoute] = []
 
+    private var poseStill: Bool { motion.poseStill(reduceMotion) }
+
     var body: some View {
         Group {
             if let route = routeStack.last {
@@ -107,7 +115,13 @@ struct AuraShell: View {
                     .transition(.opacity)
             }
         }
-        .animation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.28), value: routeStack)
+        .animation(
+            NoopMotion.gated(
+                .timingCurve(0.22, 1, 0.36, 1, duration: 0.28),
+                reduced: poseStill
+            ),
+            value: routeStack
+        )
     }
 
     private var rootShell: some View {
@@ -153,7 +167,11 @@ struct AuraShell: View {
                 }
                 .scrollIndicators(.hidden)
                 .onChangeCompat(of: scrollToTopToken) { _ in
-                    withAnimation(.easeOut(duration: 0.35)) { proxy.scrollTo(Self.topAnchorID, anchor: .top) }
+                    withAnimation(
+                        NoopMotion.gated(.easeOut(duration: 0.35), reduced: poseStill)
+                    ) {
+                        proxy.scrollTo(Self.topAnchorID, anchor: .top)
+                    }
                 }
                 .onChangeCompat(of: screen) { _ in
                     // A new screen always starts at its own top; carrying Today's scroll offset into
@@ -162,7 +180,7 @@ struct AuraShell: View {
                 }
             }
 
-            AuraTabBar(selection: screen) { go($0) }
+            AuraTabBar(selection: screen, onSelect: { go($0) }, onAction: onOpenQuickActions)
                 .padding(.bottom, 8)
         }
     }
@@ -183,7 +201,10 @@ struct AuraShell: View {
         case .rest:
             AuraRestView(reading: restReading)
         case .charge:
-            AuraChargeView(reading: chargeReading)
+            AuraChargeView(
+                reading: chargeReading,
+                onOpenDaytimeCharge: { push(.comingSoon(.daytimeCharge)) }
+            )
         case .effort:
             AuraEffortView(reading: effortReading, onStartLiveSession: onStartLiveSession)
         case .trends:
@@ -204,7 +225,8 @@ struct AuraShell: View {
                 onOpenMore: { push(.more) },
                 onOpenTracking: { push(.tracking) },
                 onOpenPrivacy: { push(.privacy) },
-                onOpenSettings: { push(.settings) }
+                onOpenSettings: { push(.settings) },
+                onOpenComingSoon: { push(.comingSoon($0)) }
             )
         }
     }
@@ -214,10 +236,12 @@ struct AuraShell: View {
     private var headerGreeting: String {
         switch screen {
         case .today: return todayReading.greeting
+        case .rest: return restReading.latestNightTitle
+        case .charge: return String(localized: "Your recovery")
         case .effort: return effortReading.greeting
+        case .trends: return String(localized: "Your own history")
         case .band: return String(localized: "Your band")
         case .profile: return String(localized: "Account")
-        default: return screen.greeting
         }
     }
 
@@ -260,13 +284,13 @@ struct AuraShell: View {
             }
         case .editProfile:
             AuraDetailScaffold(title: String(localized: "Your profile"),
-                               subtitle: String(localized: "Name and photo stay on this iPhone."), onBack: pop) {
+                               subtitle: String(localized: "Name and photo use local app storage."), onBack: pop) {
                 AuraProfileEditorView()
             }
         case .notifications:
             AuraDetailScaffold(title: String(localized: "Notifications"),
                                subtitle: String(localized: "Live heart rate, reminders and strap alerts."), onBack: pop) {
-                AuraNotificationsView()
+                AuraNotificationsView(onOpenMirroring: { push(.comingSoon(.notificationMirroring)) })
             }
         case .units:
             AuraDetailScaffold(title: String(localized: "Units"),
@@ -280,11 +304,11 @@ struct AuraShell: View {
             }
         case .more:
             AuraDetailScaffold(title: String(localized: "Everything else"),
-                               subtitle: String(localized: "The deeper NOOP toolkit, kept within reach."), onBack: pop) {
+                               subtitle: String(localized: "The deeper Noop Aura toolkit, kept within reach."), onBack: pop) {
                 AuraMoreView(onOpenAllTools: onOpenMore)
             }
         case .tracking:
-            AuraDetailScaffold(title: String(localized: "What NOOP tracks"),
+            AuraDetailScaffold(title: String(localized: "What Noop Aura tracks"),
                                subtitle: String(localized: "Direct WHOOP signals, on-device estimates and Health output."), onBack: pop) {
                 AuraTrackingView()
             }
@@ -302,6 +326,7 @@ struct AuraShell: View {
                     onOpenExport: { push(.export) },
                     onOpenTracking: { push(.tracking) },
                     onOpenPrivacy: { push(.privacy) },
+                    onOpenWidgets: { push(.comingSoon(.widgets)) },
                     onOpenAdvanced: onOpenSettings
                 )
             }
@@ -316,12 +341,17 @@ struct AuraShell: View {
                                subtitle: String(localized: "WHOOP 5.0 connection, controls and diagnostics."), onBack: pop) {
                 AuraManageStrapsView(onOpenDeviceManager: onOpenDevices)
             }
+        case .comingSoon(let feature):
+            AuraDetailScaffold(title: feature.title,
+                               subtitle: String(localized: "Planned for Noop Aura"), onBack: pop) {
+                AuraComingSoonView(feature: feature)
+            }
         }
     }
 
     private func metricSubtitle(_ id: String) -> String {
         switch id {
-        case "hr": return String(localized: "Live now, with resting history below")
+        case "hr": return String(localized: "Live when connected · resting history below")
         case "hrv": return String(localized: "Nightly variability against your own history")
         case "resp": return String(localized: "Nightly breathing estimate from clean R–R intervals")
         case "sleep": return String(localized: "Asleep duration, not time in bed")
@@ -330,14 +360,24 @@ struct AuraShell: View {
     }
 
     private func push(_ route: AuraRoute) {
-        withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.28)) {
+        withAnimation(
+            NoopMotion.gated(
+                .timingCurve(0.22, 1, 0.36, 1, duration: 0.28),
+                reduced: poseStill
+            )
+        ) {
             routeStack.append(route)
         }
     }
 
     private func pop() {
         guard !routeStack.isEmpty else { return }
-        withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.28)) {
+        withAnimation(
+            NoopMotion.gated(
+                .timingCurve(0.22, 1, 0.36, 1, duration: 0.28),
+                reduced: poseStill
+            )
+        ) {
             _ = routeStack.removeLast()
         }
     }
@@ -348,7 +388,14 @@ struct AuraShell: View {
             scrollToTopToken += 1
             return
         }
-        withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.24)) { screen = destination }
+        withAnimation(
+            NoopMotion.gated(
+                .timingCurve(0.22, 1, 0.36, 1, duration: 0.24),
+                reduced: poseStill
+            )
+        ) {
+            screen = destination
+        }
     }
 
     // MARK: Background
@@ -362,8 +409,8 @@ struct AuraShell: View {
                     .fill(
                         RadialGradient(
                             stops: [
-                                .init(color: bodyState.orbTint.opacity(bodyState.ambientOpacity), location: 0),
-                                .init(color: bodyState.orbTint.opacity(0), location: 0.7),
+                                .init(color: ambientTint.opacity(todayReading.chargeAvailable ? bodyState.ambientOpacity : 0.07), location: 0),
+                                .init(color: ambientTint.opacity(0), location: 0.7),
                             ],
                             center: .center,
                             startRadius: 0,
@@ -377,6 +424,10 @@ struct AuraShell: View {
             .ignoresSafeArea()
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+    }
+
+    private var ambientTint: Color {
+        todayReading.chargeAvailable ? bodyState.orbTint : AuraPalette.textDim
     }
 }
 #endif

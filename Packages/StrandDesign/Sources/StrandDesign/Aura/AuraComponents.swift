@@ -542,6 +542,11 @@ public struct AuraSegmentedChips<Value: Hashable>: View {
     private let selection: Value
     private let onSelect: (Value) -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var motion = NoopMotionState.shared
+
+    private var poseStill: Bool { motion.poseStill(reduceMotion) }
+
     public init(options: [(value: Value, label: String)], selection: Value, onSelect: @escaping (Value) -> Void) {
         self.options = options
         self.selection = selection
@@ -572,7 +577,7 @@ public struct AuraSegmentedChips<Value: Hashable>: View {
                 .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
             }
         }
-        .animation(NoopMotion.value, value: selection)
+        .animation(NoopMotion.gated(NoopMotion.value, reduced: poseStill), value: selection)
     }
 }
 

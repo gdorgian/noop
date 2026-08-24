@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Numeric app version already committed to source (for example 10.1.1)"
+        description: "Numeric app version already committed to source (for example 10.5.0)"
         required: true
-        default: "10.1.1"
+        default: "10.5.0"
 
 permissions:
   contents: write
@@ -20,8 +20,8 @@ jobs:
     name: Build and publish unsigned IPA
     if: github.ref == 'refs/heads/main'
     runs-on: macos-26
-    timeout-minutes: 60
-    # Exposed so the macOS and finalize jobs below attach to the SAME release without re-deriving the
+    timeout-minutes: 90
+    # Exposed so the finalize job below promotes the SAME release without re-deriving the
     # tag from the input (one place to be wrong is better than three).
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
@@ -41,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           # MARKETING_VERSION must stay numeric (Apple rejects anything else in
-          # CFBundleShortVersionString), so the fork's `-dx` marker lives only in the tag and the asset
+          # CFBundleShortVersionString), so the fork's Aura marker lives only in the tag and asset
           # name — never in the version the app reports, and no longer in the title either. The suffix
           # is a NAMESPACE, not a quality claim: upstream tags `vX.Y.Z` into the same tag space this
           # repo fetches from, so a bare `v10.1.0` here would collide with theirs.
@@ -64,16 +64,27 @@ jobs:
             echo "Missing release notes: $NOTES" >&2; exit 1;
           }
 
+          # AltStore requires this value to match the IPA's CFBundleIdentifier exactly. The public
+          # source intentionally uses the tracked fallback identity; the Full IPA is built later from
+          # the private signing-service identity reconstructed from encrypted repository secrets.
+          PUBLIC_BUNDLE_ID=$(jq -er '.apps[0].bundleIdentifier' altstore-source.json)
+          [[ "$PUBLIC_BUNDLE_ID" == "com.noopapp.noop" ]] || {
+            echo "AltStore source does not contain the expected public fallback identity" >&2
+            exit 1
+          }
+
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "BUILD=$BUILD" >> "$GITHUB_ENV"
-          echo "TAG=v${VERSION}-dx" >> "$GITHUB_ENV"
+          echo "TAG=v${VERSION}-aura.${BUILD}" >> "$GITHUB_ENV"
           echo "NOTES=$NOTES" >> "$GITHUB_ENV"
-          echo "IPA=NOOP-ios-unsigned-v${VERSION}-dx.ipa" >> "$GITHUB_ENV"
-          echo "FULL_IPA=NOOP-ios-full-unsigned-v${VERSION}-dx.ipa" >> "$GITHUB_ENV"
+          echo "IPA=Noop-Aura-iOS-unsigned-v${VERSION}-aura.${BUILD}.ipa" >> "$GITHUB_ENV"
+          echo "FULL_IPA=Noop-Aura-iOS-full-unsigned-v${VERSION}-aura.${BUILD}.ipa" >> "$GITHUB_ENV"
+          echo "PUBLIC_BUNDLE_ID=$PUBLIC_BUNDLE_ID" >> "$GITHUB_ENV"
+          echo "PUBLIC_APP_GROUP_ID=group.com.noopapp.noop.staging" >> "$GITHUB_ENV"
 
           # Same two values as job outputs — $GITHUB_ENV is per-job and invisible to the jobs below.
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v${VERSION}-dx" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}-aura.${BUILD}" >> "$GITHUB_OUTPUT"
 
       - name: Select Xcode
         run: |
@@ -114,44 +125,112 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
-      - name: Build unsigned iOS Release app
+      - name: Build public unsigned iOS Release app
+        # A hosted runner starts from a clean checkout, but make the identity boundary explicit: the
+        # public AltStore build must be complete before the private override file exists.
         run: >-
+          test ! -e Config/BundleIdSecrets.xcconfig &&
           xcodebuild -project Strand.xcodeproj -scheme NOOPiOS -configuration Release
-          -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/noop-dd"
+          -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/noop-public-dd"
+          NOOP_COMMIT_SHA="$GITHUB_SHA"
           CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
           DEVELOPMENT_TEAM="" build
 
-      - name: Package AltStore and Full unsigned IPAs
+      - name: Reconstruct private iOS identity
+        env:
+          AURA_IOS_BUNDLE_ID: ${{ secrets.AURA_IOS_BUNDLE_ID }}
+          AURA_APP_GROUP_ID: ${{ secrets.AURA_APP_GROUP_ID }}
         run: |
           set -euo pipefail
-          APP=$(find "$RUNNER_TEMP/noop-dd/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -type d | head -1)
-          [[ -n "$APP" ]] || { echo "iOS .app not found" >&2; exit 1; }
-          [[ ! -e "$APP/embedded.mobileprovision" ]] || {
-            echo "Refusing to publish a provisioned IPA" >&2; exit 1;
+          [[ -n "$AURA_IOS_BUNDLE_ID" && -n "$AURA_APP_GROUP_ID" ]] || {
+            echo "Required private iOS identity secrets are not configured" >&2
+            exit 1
           }
+          [[ "$AURA_IOS_BUNDLE_ID" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || {
+            echo "Private iOS bundle-id secret has an invalid format" >&2
+            exit 1
+          }
+          [[ "$AURA_APP_GROUP_ID" =~ ^group\.[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || {
+            echo "Private App Group secret has an invalid format" >&2
+            exit 1
+          }
+          [[ "$AURA_IOS_BUNDLE_ID" != "$PUBLIC_BUNDLE_ID" && \
+             "$AURA_APP_GROUP_ID" != "$PUBLIC_APP_GROUP_ID" ]] || {
+            echo "Private iOS identity must differ from the public AltStore identity" >&2
+            exit 1
+          }
+          git check-ignore -q Config/BundleIdSecrets.xcconfig || {
+            echo "Refusing to reconstruct identity into a tracked path" >&2
+            exit 1
+          }
+
+          umask 077
+          printf 'IOS_BUNDLE_ID = %s\nAPP_GROUP_ID = %s\n' \
+            "$AURA_IOS_BUNDLE_ID" "$AURA_APP_GROUP_ID" \
+            > Config/BundleIdSecrets.xcconfig
+
+      - name: Build private unsigned iOS Release app
+        run: >-
+          xcodebuild -project Strand.xcodeproj -scheme NOOPiOS -configuration Release
+          -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/noop-private-dd"
+          NOOP_COMMIT_SHA="$GITHUB_SHA"
+          CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+          DEVELOPMENT_TEAM="" build
+
+      - name: Remove reconstructed private identity
+        if: always()
+        run: rm -f Config/BundleIdSecrets.xcconfig
+
+      - name: Package public AltStore and private Full unsigned IPAs
+        env:
+          AURA_IOS_BUNDLE_ID: ${{ secrets.AURA_IOS_BUNDLE_ID }}
+          AURA_APP_GROUP_ID: ${{ secrets.AURA_APP_GROUP_ID }}
+        run: |
+          set -euo pipefail
+          PUBLIC_APP="$RUNNER_TEMP/noop-public-dd/Build/Products/Release-iphoneos/Noop Aura.app"
+          PRIVATE_APP="$RUNNER_TEMP/noop-private-dd/Build/Products/Release-iphoneos/Noop Aura.app"
+          [[ -d "$PUBLIC_APP" ]] || { echo "Public iOS .app not found" >&2; exit 1; }
+          [[ -d "$PRIVATE_APP" ]] || { echo "Private iOS .app not found" >&2; exit 1; }
 
           # The on-device coach model must actually be IN the bundle. A resource that XcodeGen never saw
           # (see the bootstrap-before-generate note above) produces a perfectly successful build whose
           # semantic memory has no model to load — invisible in the log, and only obvious from the IPA
           # being ~20 MB instead of ~350 MB. Assert the file, not the size, so the check stays true if
           # the model is ever re-quantized.
-          MODEL=$(find "$APP" -maxdepth 1 -name '*.gguf' | head -1)
-          [[ -n "$MODEL" ]] || {
-            echo "No .gguf model in the app bundle — did bootstrap-nomic.sh run before xcodegen?" >&2
-            exit 1
-          }
-          echo "Bundled model: $(basename "$MODEL") ($(du -h "$MODEL" | cut -f1))"
+          for APP in "$PUBLIC_APP" "$PRIVATE_APP"; do
+            [[ ! -e "$APP/embedded.mobileprovision" ]] || {
+              echo "Refusing to publish a provisioned IPA" >&2
+              exit 1
+            }
+            MODEL=$(find "$APP" -maxdepth 1 -name '*.gguf' | head -1)
+            [[ -n "$MODEL" ]] || {
+              echo "No .gguf model in an app bundle — did bootstrap-nomic.sh run before xcodegen?" >&2
+              exit 1
+            }
+          done
 
-          # Scrub the complete bundle first, including the nested Watch and Widget executables. The
-          # packager then preserves that bundle as the Full IPA and strips extensions only from a copy
-          # used by AltStore/SideStore with free Apple IDs.
-          Tools/anonymize-ios-app.sh "$APP"
-          Tools/package-ios-ipas.sh "$APP" "$IPA" "$FULL_IPA"
+          # Scrub both complete iOS bundles, including their widget executables. The packager checks
+          # the source bundle and then re-opens the resulting IPA to enforce the expected name,
+          # version, build, bundle identity and App Group without printing private values.
+          Tools/anonymize-ios-app.sh "$PUBLIC_APP"
+          Tools/anonymize-ios-app.sh "$PRIVATE_APP"
+
+          NOOP_EXPECTED_VERSION="$VERSION" \
+          NOOP_EXPECTED_BUILD="$BUILD" \
+          NOOP_EXPECTED_BUNDLE_ID="$PUBLIC_BUNDLE_ID" \
+          NOOP_EXPECTED_APP_GROUP_ID="$PUBLIC_APP_GROUP_ID" \
+            Tools/package-ios-ipas.sh "$PUBLIC_APP" "$IPA" -
+
+          NOOP_EXPECTED_VERSION="$VERSION" \
+          NOOP_EXPECTED_BUILD="$BUILD" \
+          NOOP_EXPECTED_BUNDLE_ID="$AURA_IOS_BUNDLE_ID" \
+          NOOP_EXPECTED_APP_GROUP_ID="$AURA_APP_GROUP_ID" \
+            Tools/package-ios-ipas.sh "$PRIVATE_APP" - "$FULL_IPA"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NOOP-iOS-${{ env.VERSION }}
+          name: Noop-Aura-iOS-${{ env.VERSION }}
           path: |
             ${{ env.IPA }}
             ${{ env.FULL_IPA }}
@@ -167,7 +246,7 @@ jobs:
 
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --prerelease --title "NOOP AI $VERSION" --notes-file "$BODY"
+              --prerelease --title "Noop Aura $VERSION" --notes-file "$BODY"
           fi
           gh release upload "$TAG" "$IPA" "$FULL_IPA" --repo "$GITHUB_REPOSITORY" --clobber
 
@@ -179,7 +258,7 @@ jobs:
           SIZE=$(stat -f%z "$IPA")
           DATE=$(date -u +%Y-%m-%d)
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${IPA}"
-          DESCRIPTION="NOOP AI ${VERSION}. See the release notes for what changed."
+          DESCRIPTION="Noop Aura ${VERSION}. See the release notes for what changed."
           tmp=$(mktemp)
 
           jq --arg version "$VERSION" --arg build "$BUILD" --arg date "$DATE" \
@@ -215,6 +294,9 @@ jobs:
   # runner. Steps mirror fork-release.yml's proven macOS job rather than inventing a second recipe.
   macos:
     name: Build and attach macOS app
+    # Noop Aura releases are iOS-only. The historical recipe remains readable for upstream syncs, but
+    # is deliberately never scheduled by this workflow.
+    if: ${{ false }}
     needs: publish
     runs-on: macos-15
     timeout-minutes: 40
@@ -278,10 +360,10 @@ jobs:
   # `publish` creates the release as a PRERELEASE so a half-uploaded release is never the newest thing
   # users see. GitHub's releases/latest EXCLUDES prereleases, and the in-app update check reads exactly
   # that endpoint — so a release left as a prerelease is invisible to every installed app. Flip it only
-  # once BOTH artifacts are attached.
+  # once both iOS IPA variants are attached.
   finalize:
     name: Mark the release latest
-    needs: [publish, macos]
+    needs: publish
     runs-on: ubuntu-latest
     steps:
       - name: Promote out of prerelease

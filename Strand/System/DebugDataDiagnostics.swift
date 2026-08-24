@@ -148,6 +148,7 @@ enum DebugDataDiagnostics {
         let rr = (try? await store.rrIntervals(deviceId: did, from: cs.startTs, to: cs.endTs, limit: 200_000)) ?? []
         let resp = (try? await store.respSamples(deviceId: did, from: cs.startTs, to: cs.endTs, limit: 200_000)) ?? []
         lines.append("Night \(dayStamp(cs.startTs)): grav=\(grav.count) hr=\(hr.count) rr=\(rr.count) resp=\(resp.count) skin=\(skin.count)")
+        lines.append(SleepStager.respRateFromRRDiagnostic(rr, start: cs.startTs, end: cs.endTs).summary)
         if grav.isEmpty && hr.isEmpty {
             lines.append("(no raw biometric samples under '\(did)' for this night — expected on a freshly re-added strap; reconnect + let a history sync run, then re-export)")
             return lines
@@ -304,14 +305,15 @@ enum DebugDataDiagnostics {
     /// Alarm state for the debug export: the configured wake + the last arm's sent-vs-strap-reports (#34), so
     /// a "didn't buzz" report shows at a glance whether the strap accepted the time. Reads persisted defaults
     /// (written by BLEManager.armStrapAlarm + the FrameRouter readback); sync + guarded.
-    /// The measurement that settles whether the WHOOP 5 v18 historical R-R field is milliseconds or
-    /// 1/1024-second ticks (#1008/#1118, ryanbr/noop#1505).
+    /// Direct transport evidence for the WHOOP 5 v18 R-R units question
+    /// (#1008/#1118, ryanbr/noop#1505), plus the nightly selector census for #1331.
     ///
     /// The physiological cross-check cannot answer it — the effect is 2.4 bpm and the check's own scatter
     /// on a one- or two-beat mean is larger, which is why a WHOOP 4 v24 record, a layout that IS
     /// milliseconds, reads "better" under a tick conversion. This does not use that check at all. It
-    /// finds seconds where the strap's two transports both banked a beat and reports how their values
-    /// cluster, which is a direct observation rather than an inference.
+    /// searches the observed receive-vs-embedded timestamp lag and reports how ordered transport pairs
+    /// cluster, which is a direct observation rather than an inference. Exact-same-second pairing is not
+    /// used: the store returns every row and the matcher evaluates integer lags -5...+5 seconds.
     ///
     /// Prints counts and refuses to conclude below `minimumPairsForAVerdict` — one pair landing on 1.024
     /// is the shape of evidence that withdrew #194.
@@ -320,18 +322,101 @@ enum DebugDataDiagnostics {
         let deviceId = (try? DeviceRegistryStore(dbQueue: store.registryWriter).activeDeviceId())
             ?? Repository.whoopSource
         let now = Int(Date().timeIntervalSince1970)
-        let rows = (try? await store.rrTransportDuplicates(
-            deviceId: deviceId, from: now - 30 * 86_400, to: now)) ?? []
-        let pairs = rows.map {
-            RRUnitEvidence.Pair(ts: $0.ts, liveMs: $0.liveMs, historicalRaw: $0.historicalMs)
+        var nights = await repo.sleepSessions(from: now - 14 * 86_400, to: now, limit: 200)
+        if nights.isEmpty {
+            nights = await repo.computedSleepSessions(from: now - 14 * 86_400, to: now, limit: 200)
         }
-        let verdict = RRUnitEvidence.verdict(for: pairs)
-        var lines = [String(repeating: "─", count: 40), verdict.summary]
-        // A handful of raw pairs beside the summary, so the numbers can be checked by hand rather than
-        // taken on the summary's word.
-        for pair in pairs.prefix(6) {
-            lines.append("  \(pair.ts): live \(pair.liveMs) · hist \(pair.historicalRaw) · "
-                + "ratio \(String(format: "%.4f", pair.ratio))")
+        nights.sort { $0.startTs < $1.startTs }
+        let recentNights = Array(nights.suffix(5))
+        var lines = [String(repeating: "─", count: 40), "R-R transport lag search"]
+        var chosenSample: (startTs: Int, endTs: Int, rows: RRTransportObservationWindow,
+                           search: RRUnitEvidence.LagSearchResult)?
+        var newestReadableSample: (startTs: Int, endTs: Int, rows: RRTransportObservationWindow,
+                                   search: RRUnitEvidence.LagSearchResult)?
+        for night in recentNights.reversed() {
+            do {
+                // An eight-hour night is commonly around 30k beats. Read the whole sleep window from
+                // each transport independently so a daytime tail cannot displace the overlapping rows.
+                let rows = try await store.rrTransportObservations(
+                    deviceId: deviceId, from: night.startTs, to: night.endTs,
+                    limitPerTransport: 60_000)
+                let search = RRUnitEvidence.lagSearch(
+                    live: rows.live.map { .init(ts: $0.ts, value: $0.rrMs) },
+                    historical: rows.historical.map { .init(ts: $0.ts, value: $0.rrMs) })
+                let sample = (night.startTs, night.endTs, rows, search)
+                if newestReadableSample == nil { newestReadableSample = sample }
+                if search.best != nil {
+                    chosenSample = sample
+                    break
+                }
+            } catch {
+                continue
+            }
+        }
+
+        if let sample = chosenSample ?? newestReadableSample {
+            let rows = sample.rows
+            let search = sample.search
+            lines.append("Night \(dayStamp(sample.startTs)) [\(sample.startTs)…\(sample.endTs)]: "
+                         + "live=\(rows.live.count) hist=\(rows.historical.count); "
+                         + "lag = live.ts - hist.ts")
+            for candidate in search.candidates {
+                let verdict = candidate.verdict
+                let marker = candidate.lagSeconds == search.best?.lagSeconds ? " best" : ""
+                let lag = String(format: "%+d", candidate.lagSeconds)
+                let ratios = verdict.pairs > 0
+                    ? "\(String(format: "%.4f", verdict.lowerQuartileRatio))/"
+                        + "\(String(format: "%.4f", verdict.medianRatio))/"
+                        + "\(String(format: "%.4f", verdict.upperQuartileRatio))"
+                    : "—"
+                lines.append("  lag \(lag)s\(marker): paired=\(verdict.pairs) "
+                    + "exact=\(verdict.exactValueMatches) mismatch=\(verdict.mismatches) "
+                    + "coverage=\(String(format: "%.3f", candidate.coverage)) "
+                    + "ratio[q1/med/q3]=\(ratios) "
+                    + "clusters[tick/id/over]=\(verdict.matchingTickConversion)/"
+                    + "\(verdict.matchingIdentity)/\(verdict.matchingOverConversion) "
+                    + "verdict=\(verdict.conclusion.rawValue)")
+            }
+            if let best = search.best {
+                lines.append("Best lag \(String(format: "%+d", best.lagSeconds))s: \(best.verdict.summary)")
+                // A handful of actual ordered pairs beside the summary so lag sign and value identity can
+                // be checked by hand rather than taken on the ranking's word.
+                for pair in best.pairs.prefix(6) {
+                    lines.append("  hist[\(pair.historicalTs)]=\(pair.historicalRaw) → "
+                        + "live[\(pair.ts)]=\(pair.liveMs) · ratio \(String(format: "%.4f", pair.ratio))")
+                }
+            } else {
+                lines.append("Best lag: none — no live/history timestamp buckets overlap within ±5 s.")
+            }
+        } else if recentNights.isEmpty {
+            lines.append("No sleep session in the last 14 days; no lag-search window available.")
+        } else {
+            lines.append("Could not read R-R transport rows for the five latest nights; no units verdict was computed.")
+        }
+
+        lines.append("R-R transport census by night")
+        if recentNights.isEmpty {
+            lines.append("  no sleep session in the last 14 days; no nightly census window available.")
+        }
+        for night in recentNights {
+            do {
+                let census = try await store.rrTransportCensus(
+                    deviceId: deviceId, from: night.startTs, to: night.endTs)
+                let raw = census.raw
+                let selected = census.selected
+                lines.append("  \(dayStamp(night.startTs)) [\(night.startTs)…\(night.endTs)] "
+                    + "raw[nil/std/rt/hist/other]=\(raw.unknown)/\(raw.standard)/\(raw.realtime)/"
+                    + "\(raw.historical)/\(raw.other) selected=\(selected.unknown)/\(selected.standard)/"
+                    + "\(selected.realtime)/\(selected.historical)/\(selected.other)")
+                lines.append("    suppressed live=\(census.suppressedLive) "
+                    + "(std=\(census.suppressedStandard), rt=\(census.suppressedRealtime)); "
+                    + "retained live pre/gap/post/no-history=\(census.selectedLiveBeforeHistory)/"
+                    + "\(census.selectedLiveInternalGap)/\(census.selectedLiveAfterHistory)/"
+                    + "\(census.selectedLiveWithoutHistory); "
+                    + "boundary leakage=\(census.selectedLiveBoundaryLeakage)")
+            } catch {
+                lines.append("  \(dayStamp(night.startTs)): census read failed; counts unavailable.")
+            }
         }
         return lines
     }

@@ -134,6 +134,38 @@ final class MetricSeriesStoreTests: XCTestCase {
         XCTAssertEqual(foreignRows.map(\.day), ["2026-07-20"])
     }
 
+    func testReplacePointsDropsMissingSnapshotFactorsWithoutTouchingOtherRows() async throws {
+        let store = try await WhoopStore.inMemory()
+        try await store.upsertMetricSeries([
+            MetricPoint(day: "2026-08-22", key: "body_age", value: 38),
+            MetricPoint(day: "2026-08-22", key: "body_age_driver_rhr", value: -0.10),
+            MetricPoint(day: "2026-08-22", key: "body_age_driver_sleep", value: 0.08),
+            MetricPoint(day: "2026-08-22", key: "unrelated", value: 7),
+            MetricPoint(day: "2026-08-15", key: "body_age_driver_sleep", value: 0.04),
+        ], deviceId: "my-whoop-noop")
+
+        _ = try await store.replaceMetricSeriesPoints([
+            MetricPoint(day: "2026-08-22", key: "body_age", value: 37),
+            MetricPoint(day: "2026-08-22", key: "body_age_driver_rhr", value: -0.12),
+        ], deviceId: "my-whoop-noop", day: "2026-08-22", replacingKeys: [
+            "body_age", "body_age_driver_rhr", "body_age_driver_sleep",
+        ])
+
+        let bodyAge = try await store.metricSeries(
+            deviceId: "my-whoop-noop", key: "body_age", from: "2026-08-01", to: "2026-08-31")
+        let rhr = try await store.metricSeries(
+            deviceId: "my-whoop-noop", key: "body_age_driver_rhr", from: "2026-08-01", to: "2026-08-31")
+        let sleep = try await store.metricSeries(
+            deviceId: "my-whoop-noop", key: "body_age_driver_sleep", from: "2026-08-01", to: "2026-08-31")
+        let unrelated = try await store.metricSeries(
+            deviceId: "my-whoop-noop", key: "unrelated", from: "2026-08-01", to: "2026-08-31")
+
+        XCTAssertEqual(bodyAge.map(\.value), [37])
+        XCTAssertEqual(rhr.map(\.value), [-0.12])
+        XCTAssertEqual(sleep.map(\.day), ["2026-08-15"], "missing current factor must be removed")
+        XCTAssertEqual(unrelated.map(\.value), [7], "unlisted keys must remain untouched")
+    }
+
     func testDeleteSeriesIsAtomicToSourceAndKey() async throws {
         let store = try await WhoopStore.inMemory()
         try await store.upsertMetricSeries([

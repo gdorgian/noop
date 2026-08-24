@@ -851,6 +851,11 @@ def scan_ios() -> tuple[list[tuple[str, int, str]], dict[str, list[str]]]:
     lang_gaps: dict[str, list[str]] = {lang: [] for lang in LANGS}
 
     for dirs, catalog_path in CATALOGS:
+        # Some forks intentionally omit an Apple target (for example the retired Watch app). Its
+        # catalog disappears with the target, so skip the pair only when none of its source roots exist.
+        # A present target with a missing catalog must still fail loudly below.
+        if not any(base.exists() for base in dirs):
+            continue
         cat = load_catalog(catalog_path)
         for base in dirs:
             if not base.exists():
@@ -1096,7 +1101,9 @@ def ci_check(base_ref: str) -> int:
         print(f"  {len(ios_fixed)} baseline entr(y/ies) no longer found — run --update-baseline to shrink the backlog")
     allowance = extra_locale_allowance()
     extra_apple_gaps: dict[str, int] = {}
-    for _dirs, catalog_path in CATALOGS:
+    for dirs, catalog_path in CATALOGS:
+        if not any(base.exists() for base in dirs):
+            continue
         cat = load_catalog(catalog_path)
         # #844: count the shipped locales OUTSIDE the focus set while the catalog is already parsed,
         # and gate them below. Reloading each catalog for a second pass wasted a full re-parse of a
@@ -1222,7 +1229,9 @@ def ci_check(base_ref: str) -> int:
 
 def catalog_summary() -> None:
     print("\n--- Apple catalogs: translated-key coverage (existing keys, any source) ---")
-    for _dirs, catalog_path in CATALOGS:
+    for dirs, catalog_path in CATALOGS:
+        if not any(base.exists() for base in dirs):
+            continue
         cat = load_catalog(catalog_path)
         strings = cat.get("strings", {})
         total = len(strings)

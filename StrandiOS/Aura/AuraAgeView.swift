@@ -17,19 +17,19 @@ import StrandDesign
 //   VO₂max      — the estimate underneath both, shown so the wearer can see the input rather than
 //                 only its consequences.
 //
-// Every number here is weekly and lands on a Saturday. That is the engines' own cadence, not a
-// presentation choice: the inputs are 7-day medians, so a daily readout would be showing noise.
+// Body Age, Fitness Age and VO₂max are weekly and land on a Saturday. The separately labelled current
+// health-domain card is a live 30-day coverage view and must not be read as part of that stored snapshot.
 //
 // The honesty rules this screen keeps:
-//   • No number appears without its ± band. Both engines publish one; hiding it would be a claim to
-//     precision neither model has.
+//   • Estimates are labelled as estimates and keep their readiness/missing-data states. The model's
+//     legacy ±5 presentation band is not shown as though it were a validated confidence interval.
 //   • A missing reading says what is missing and how far off it is, never an em-dash alone.
 //   • The drivers are the model's own signed contributions, not a re-derived narrative.
 
 struct AuraAgeView: View {
     private let reading: AuraAgeReading
 
-    init(reading: AuraAgeReading = .prototype) {
+    init(reading: AuraAgeReading) {
         self.reading = reading
     }
 
@@ -62,7 +62,7 @@ struct AuraAgeView: View {
     /// of the score and a 55 in one worth 28% are not the same finding.
     private var domainsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            AuraCardHeader(title: String(localized: "Health domains"), note: reading.domainsNote)
+            AuraCardHeader(title: String(localized: "Current health domains"), note: reading.domainsNote)
                 .padding(.horizontal, 2)
                 .padding(.bottom, 14)
 
@@ -100,8 +100,9 @@ struct AuraAgeView: View {
                 }
                 .padding(.vertical, 6)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(Text("\(domain.label), \(Int(domain.score.rounded())) out of 100, "
-                    + "\(domain.weight) of the score"))
+                .accessibilityLabel(
+                    Text("\(domain.label), \(Int(domain.score.rounded())) out of 100, \(domain.weight) of the score")
+                )
             }
         }
         .padding(.horizontal, 16)
@@ -373,6 +374,7 @@ struct AuraAgeReading {
     let read: String
     let disclaimer: String
 
+    #if DEBUG
     /// The design prototype's values. Not live data — used by isolated previews and the simulator's
     /// `--aura-prototype` visual-regression seam.
     static let prototype = AuraAgeReading(
@@ -420,5 +422,6 @@ struct AuraAgeReading {
         read: String(localized: "Your Body Age has come down about three years over six weeks, and cardio fitness is doing most of that work. Sleep regularity is the one factor still pushing the other way — it is also the cheapest one to change."),
         disclaimer: String(localized: "Estimates from your own wearable data, computed on this device. Not a medical assessment, a diagnosis, or a prediction about your health.")
     )
+    #endif
 }
 #endif

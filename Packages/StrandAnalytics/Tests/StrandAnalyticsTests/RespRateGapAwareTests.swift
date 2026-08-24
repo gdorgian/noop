@@ -56,6 +56,11 @@ final class RespRateGapAwareTests: XCTestCase {
         let spliced = series(beats: 330, gapAfter: 165)
         XCTAssertEqual(clean.map(\.rrMs), spliced.map(\.rrMs), "the fixture must differ only in ts")
         XCTAssertTrue(SleepStager.respRateFromRR(spliced, start: 0, end: 2_000_000).isNaN)
+        let diagnostic = SleepStager.respRateFromRRDiagnostic(spliced, start: 0, end: 2_000_000)
+        XCTAssertEqual(diagnostic.rejection, .noValidWindows)
+        XCTAssertEqual(diagnostic.spliceCount, 1)
+        XCTAssertEqual(diagnostic.skippedSpliceWindowCount, 1)
+        XCTAssertEqual(diagnostic.acceptedWindowCount, 0)
     }
 
     /// A one-second discrepancy is `ts` quantisation, not a dropout: `ts` is whole seconds while beats
@@ -63,6 +68,8 @@ final class RespRateGapAwareTests: XCTestCase {
     func testSecondLevelJitterIsNotTreatedAsAGap() {
         let jittered = series(beats: 330, gapAfter: 165, gapS: 1)
         XCTAssertFalse(SleepStager.respRateFromRR(jittered, start: 0, end: 2_000_000).isNaN)
+        XCTAssertEqual(SleepStager.respRateFromRRDiagnostic(jittered, start: 0,
+                                                            end: 2_000_000).spliceCount, 0)
     }
 
     /// The row filter must keep exactly what `HRVAnalyzer.rangeFilter` keeps — the fix filters rows

@@ -285,6 +285,21 @@ final class IntelligenceEngine: ObservableObject {
             steps: mean(steps))
     }
 
+    /// Metric-series keys that make one persisted Body Age explanation a self-contained snapshot.
+    /// The values are the exact signed log-hazard contributions returned by `VitalityEngine.compute`;
+    /// presentation converts them to years later without rebuilding inputs from a different week.
+    nonisolated static let vitalityContributionFactorKeys = [
+        "rhr", "vo2max", "sleep", "consistency", "hrv", "steps",
+    ]
+
+    /// The chronological age used by the weekly Body Age calculation. Persisting it beside the
+    /// headline prevents a later birthday or profile restore from changing a historical comparison.
+    nonisolated static let vitalityChronologicalAgeMetricKey = "body_age_chrono_age"
+
+    nonisolated static func vitalityContributionMetricKey(_ factorKey: String) -> String {
+        "body_age_driver_\(factorKey)"
+    }
+
     nonisolated static func medianOf(_ xs: [Double]) -> Double {
         guard !xs.isEmpty else { return 0 }
         let s = xs.sorted(); let n = s.count
@@ -2184,10 +2199,24 @@ final class IntelligenceEngine: ObservableObject {
             sleepSessions: sriSessions)
         if let vRes = VitalityEngine.compute(vInputs) {
             let satKey = IntelligenceEngine.saturdayKey(onOrBefore: newestDay)
-            _ = try? await store.upsertMetricSeries([
+            let contributionPoints = vRes.contributions.map {
+                MetricPoint(
+                    day: satKey,
+                    key: IntelligenceEngine.vitalityContributionMetricKey($0.key),
+                    value: $0.lnHazard)
+            }
+            let replacementKeys = [
+                "vitality", "body_age", IntelligenceEngine.vitalityChronologicalAgeMetricKey,
+            ]
+                + IntelligenceEngine.vitalityContributionFactorKeys.map(
+                    IntelligenceEngine.vitalityContributionMetricKey)
+            _ = try? await store.replaceMetricSeriesPoints([
                 MetricPoint(day: satKey, key: "vitality", value: vRes.vitality),
                 MetricPoint(day: satKey, key: "body_age", value: vRes.bodyAge),
-            ], deviceId: computedId)
+                MetricPoint(day: satKey,
+                            key: IntelligenceEngine.vitalityChronologicalAgeMetricKey,
+                            value: vRes.chronoAge),
+            ] + contributionPoints, deviceId: computedId, day: satKey, replacingKeys: replacementKeys)
         }
 
         // ── Stress proxy (#R-stress-chart), DAILY, gap-filled under the canonical "my-whoop" source ─────

@@ -219,8 +219,10 @@ struct SettingsView: View {
     // Alternate app icon (iOS only) — false = Titanium (primary AppIcon), true = Blue Titanium
     // ("AppIcon-Navy"). Display-only preference; the live switch goes through setAlternateIconName.
     @AppStorage("appIcon.alt") private var useNavyIcon = false
-    // Light/Dark/System theme. Read by both app roots' .preferredColorScheme; default follows the OS.
+    #if !os(iOS)
+    // Light/Dark/System remains available on desktop. Noop Aura's iOS release is intentionally dark.
     @AppStorage(AppearanceMode.storageKey) private var appearanceRaw = AppearanceMode.system.rawValue
+    #endif
     // App-owned copy language. Apple binds a bundle localization at process launch, so this writes the
     // standard AppleLanguages override and takes effect after the user reopens NOOP.
     @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = AppLanguage.system.rawValue
@@ -476,7 +478,8 @@ struct SettingsView: View {
 
     /// Set / change / remove an optional profile picture. PhotosUI's `PhotosPicker` works on both
     /// iOS 16+ and macOS 13+ (NOOP's floor), so the same control serves both platforms — no
-    /// availability gating needed. The photo is stored only on this device (NOOP is fully offline).
+    /// availability gating needed. The photo is stored in local app storage and excluded from NOOP
+    /// backups and Coach payloads.
     private var profilePhotoCard: some View {
         // #153: resolve the whole blurb through `String(localized:)` first, then hand SwiftUI the plain
         // String via `LocalizedStringKey(_:)`. Interpolating `Platform.deviceNounPhrase` (itself an
@@ -484,7 +487,7 @@ struct SettingsView: View {
         // confused SwiftUI's text-measurement pass — the blurb rendered with zero trailing margin and
         // clipped to the card edge instead of wrapping inside the card padding. The localization key is
         // unchanged (`…Stored only on %@…`), so the existing translations still apply.
-        let blurbText = String(localized: "Optional. Add a photo and a name for the header on Today. Stored only on \(Platform.deviceNounPhrase). NOOP is offline, so it's never uploaded.")
+        let blurbText = String(localized: "Optional. Add a photo and a name for the header on Today. Stored in NOOP's local app storage. The photo is not included in NOOP backups or sent to Coach providers.")
         return SettingsSection(
             icon: "person.crop.circle",
             title: "Photo and name",
@@ -747,7 +750,7 @@ struct SettingsView: View {
                 }
             }
 
-            Text("Optional. Add a photo for your avatar. It stays on \(Platform.deviceNounPhrase) and is never uploaded.")
+            Text("Optional. Add a photo for your avatar. It is stored in NOOP's local app storage and is not included in NOOP backups or sent to Coach providers.")
                 .font(StrandFont.footnote)
                 .foregroundStyle(StrandPalette.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -791,7 +794,7 @@ struct SettingsView: View {
 
     /// Custom background image controls (#custom-background): pick from Photos or Browse the files,
     /// choose the fill mode, and (once set) enable / remove. The store downscales + persists a
-    /// device-local file — nothing here is uploaded (NOOP is offline), and it is left out of `.noopbak`.
+    /// device-local file. It is left out of `.noopbak` and is not sent to Coach providers.
     /// Wrapped in a layout-transparent `Group` so the picker `onChange` + the file importer can hang off
     /// the whole cluster while it still flows inside the appearance VStack.
     @ViewBuilder
@@ -864,7 +867,7 @@ struct SettingsView: View {
                 .accessibilityHint("Removes the custom background and restores the day-cycle sky")
             }
 
-            Text("Optional. Use your own photo behind every tab, in place of the day-cycle sky. It stays on \(Platform.deviceNounPhrase) and is never uploaded. Pair it with Transparent cards above to let it show through.")
+            Text("Optional. Use your own photo behind every tab, in place of the day-cycle sky. It is stored in NOOP's local app storage and is not included in NOOP backups or sent to Coach providers. Pair it with Transparent cards above to let it show through.")
                 .font(StrandFont.caption)
                 .foregroundStyle(StrandPalette.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1196,7 +1199,7 @@ struct SettingsView: View {
         SettingsSection(
             icon: "circle.lefthalf.filled",
             title: "Appearance",
-            blurb: "Choose Light, Dark, or follow your system. Dark is the signature near-black; Light keeps the same clean look on a bright canvas."
+            blurb: appearanceBlurb
         ) {
             VStack(spacing: 0) {
                 // App-owned copy language. Apple binds a bundle localization at process launch, so this
@@ -1236,6 +1239,11 @@ struct SettingsView: View {
                 }
                 rowDivider
                 FormRow(label: "Theme") {
+                    #if os(iOS)
+                    Text("Dark")
+                        .foregroundStyle(StrandPalette.textSecondary)
+                        .accessibilityLabel("Theme, Dark")
+                    #else
                     Picker("Theme", selection: $appearanceRaw) {
                         ForEach(AppearanceMode.allCases) { mode in
                             Text(mode.label).tag(mode.rawValue)
@@ -1245,6 +1253,7 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .appleInspiredTint("settings.controls")
                     .accessibilityLabel("Theme")
+                    #endif
                 }
                 rowDivider   // #79: the segmented rows sat flush against each other (missing separator)
                 FormRow(label: "Chart colours") {
@@ -1453,6 +1462,14 @@ struct SettingsView: View {
                 #endif
             }
         }
+    }
+
+    private var appearanceBlurb: LocalizedStringKey {
+        #if os(iOS)
+        return "Noop Aura uses its signature near-black canvas. Colour, contrast and motion controls below remain adjustable."
+        #else
+        return "Choose Light, Dark, or follow your system. Dark is the signature near-black; Light keeps the same clean look on a bright canvas."
+        #endif
     }
 
     /// One preference for leading identity icons and primary controls. Data visualisations, functional
@@ -2808,11 +2825,11 @@ struct SettingsView: View {
         SettingsSection(
             icon: "info.circle.fill",
             title: "About",
-            blurb: "NOOP: all your data, none of the cloud."
+            blurb: "Noop Aura: local by default, with sharing you control."
         ) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 10) {
-                    Text("NOOP")
+                    Text("Noop Aura")
                         .font(StrandFont.title2)
                         .foregroundStyle(StrandPalette.textPrimary)
                     StatePill("v\(bundleVersionString)", tone: .neutral, showsDot: false)
@@ -2833,7 +2850,7 @@ struct SettingsView: View {
                             .appleInspiredForeground("intelligence")
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("How NOOP works")
+                            Text("How Noop Aura works")
                                 .font(StrandFont.body)
                                 .foregroundStyle(StrandPalette.textPrimary)
                             Text("Sleep sorting, scores, recording, and where your numbers come from.")
@@ -3022,8 +3039,8 @@ struct SettingsView: View {
                         .foregroundStyle(StrandPalette.textSecondary)
                 }
 
-                // Project home — NOOP's code, releases, issues and wiki live on GitHub.
-                Link(destination: URL(string: "https://github.com/ryanbr/noop")!) {
+                // Project home — this Aura fork's code, releases and issues live on GitHub.
+                Link(destination: URL(string: "https://github.com/gdorgian/noop")!) {
                     HStack(spacing: 10) {
                         Image(systemName: "chevron.left.forwardslash.chevron.right")
                             .appleInspiredForeground("settings.about")
@@ -3047,7 +3064,7 @@ struct SettingsView: View {
                 }
                 .accessibilityLabel("Project home and source code on GitHub")
 
-                Text("A standalone companion for your WHOOP. Everything stays on this device: your history, your live stream, your numbers. Nothing is uploaded. NOOP is an independent, experimental project, not the WHOOP app.")
+                Text("A standalone companion for your WHOOP. Your history, live stream and scores are stored on this device by default. Data leaves only when you choose a backup or export, write to Apple Health, or enable a Coach provider and consent to the categories it can use. Noop Aura is an independent, experimental project, not the WHOOP app.")
                     .font(StrandFont.subhead)
                     .foregroundStyle(StrandPalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -3058,7 +3075,7 @@ struct SettingsView: View {
                         .foregroundStyle(StrandPalette.statusWarning)
                         .font(.system(size: 13))
                         .accessibilityHidden(true)
-                    Text("NOOP is not a medical device. It is for informational and personal-insight purposes only and is not intended to diagnose, treat, cure or prevent any condition. Talk to a clinician for medical advice.")
+                    Text("Noop Aura is not a medical device. It is for informational and personal-insight purposes only and is not intended to diagnose, treat, cure or prevent any condition. Talk to a clinician for medical advice.")
                         .font(StrandFont.footnote)
                         .foregroundStyle(StrandPalette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)

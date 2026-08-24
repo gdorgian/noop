@@ -684,10 +684,10 @@ public final class LiveState: ObservableObject {
     /// scheduled export can read the last day's lines even with no live BLE session open. Small and
     /// bounded: capped to the tail (`tailLimit`, well under `maxLogLines`) of short redacted strings, so
     /// the persisted blob stays a few hundred KB at most. On-device only; nothing is sent anywhere.
-    private static let tailKey = "strapLog.tail"
+    nonisolated private static let tailKey = "strapLog.tail"
     /// How many recent lines the durable tail retains — a sensible day's worth for a scheduled export,
     /// smaller than the live `maxLogLines` ring so the persisted copy stays modest.
-    static let tailLimit = 2_000
+    nonisolated static let tailLimit = 2_000
 
     /// Mirror the most recent `tailLimit` lines to UserDefaults (called from `append`). Synchronous and
     /// cheap (a single small array write); UserDefaults coalesces the disk flush. `nonisolated` (touches
@@ -721,13 +721,13 @@ public final class LiveState: ObservableObject {
     /// generations (and the live slot cleared, so a generation is never double-counted). Exports render the
     /// generations oldest-first ahead of the current process, which keeps `report.txt` in chronological
     /// order — the log-parsing tools read it unchanged, they simply get more of the night.
-    private static let generationsKey = "strapLog.generations"
+    nonisolated private static let generationsKey = "strapLog.generations"
     /// How many previous processes to keep. Three covers the observed failure shape (a wake-time restart,
     /// occasionally two) without turning a debug tail into a database.
-    static let maxLogGenerations = 3
+    nonisolated static let maxLogGenerations = 3
     /// Per-generation line cap — smaller than the live `tailLimit` because what explains a stop is the END
     /// of the previous session. 3 × 1,000 short redacted lines ≈ 300 KB of UserDefaults, bounded.
-    static let generationTailLimit = 1_000
+    nonisolated static let generationTailLimit = 1_000
     /// Once-per-process latch: the roll must happen BEFORE the first `persistTail` of this process, and
     /// exactly once, or a second roll would push this process's own partial tail in as a "previous" one.
     nonisolated(unsafe) private static var didRollGenerations = false
@@ -786,18 +786,30 @@ public final class LiveState: ObservableObject {
     /// Tests only: clear the once-per-process latch so a test can stand in for a fresh app launch.
     nonisolated static func resetGenerationRollLatchForTesting() { didRollGenerations = false }
 
+    /// App build provenance shared by manual and scheduled strap-log exports. The commit comes from the
+    /// built Info.plist (`NoopCommitSHA` in project.yml), stamped by release/local xcodebuild. It is metadata
+    /// about the binary, not mutable repository state, so a log remains attributable after the checkout moves.
+    nonisolated static func buildProvenanceLines() -> [String] {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        let rawCommit = info?["NoopCommitSHA"] as? String ?? "unknown"
+        let commit = rawCommit.isEmpty || rawCommit.hasPrefix("$(") ? "unknown" : rawCommit
+        return ["App: \(version)", "Build: \(build)", "Commit: \(commit)"]
+    }
+
     /// A shareable strap-log body sourced from the DURABLE tail, for a background / scheduled export that
     /// runs with no live `LiveState` instance. Mirrors `exportableLogText()`'s header so a scheduled drop
     /// reads the same as a manual share; falls back to the live `log` is not available here by design
     /// (this is a `static` so a background task needs no main-actor instance).
     nonisolated public static func scheduledExportText(extraHeaderLines: [String] = []) -> String {
-        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         #if os(iOS)
         let osName = "iOS"
         #else
         let osName = "macOS"
         #endif
-        var header = "NOOP strap log (scheduled export) — \(osName)\nApp: \(v)\n\(osName): "
+        var header = "NOOP strap log (scheduled export) — \(osName)\n"
+            + buildProvenanceLines().joined(separator: "\n") + "\n\(osName): "
             + ProcessInfo.processInfo.operatingSystemVersionString + "\n"
         if !extraHeaderLines.isEmpty { header += extraHeaderLines.joined(separator: "\n") + "\n" }
         header += String(repeating: "-", count: 40) + "\n"
@@ -842,13 +854,13 @@ public final class LiveState: ObservableObject {
         // `log` is empty, so `previousSessionsText()` below would miss it. The roll is latched + a no-op on
         // an empty tail, so this is harmless when `append` already ran.
         Self.rollLogGenerationsIfNeeded()
-        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         #if os(iOS)
         let osName = "iOS"
         #else
         let osName = "macOS"
         #endif
-        var header = "NOOP strap log - \(osName)\nApp: \(v)\n\(osName): "
+        var header = "NOOP strap log - \(osName)\n"
+            + Self.buildProvenanceLines().joined(separator: "\n") + "\n\(osName): "
             + ProcessInfo.processInfo.operatingSystemVersionString + "\n"
         #if os(iOS)
         let diagLines = IOSDiagnostics.capture().summaryLines()

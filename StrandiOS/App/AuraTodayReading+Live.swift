@@ -14,15 +14,14 @@ import WhoopStore
 // 7h 12m to a user who has not slept in the app yet is worse than showing nothing.
 
 extension AuraBodyState {
-    /// The design's four states over NOOP's 0–100 Charge, at the thresholds its own `gaugeFraction`
-    /// values imply (.16 / .38 / .60 / .84 → the midpoints between them).
+    /// Maps NOOP's canonical RecoveryScorer bands onto the orb. We do not invent a fourth clinical band
+    /// just because the visual component supports four colours.
     static func forCharge(_ pct: Double?) -> AuraBodyState {
         guard let pct else { return .ready }        // no reading: the neutral middle, never a verdict
         switch pct {
-        case ..<27:  return .depleted
-        case ..<49:  return .strained
-        case ..<72:  return .ready
-        default:     return .restored
+        case 67...:  return .restored
+        case 34..<67: return .ready
+        default:     return .strained
         }
     }
 }
@@ -37,7 +36,9 @@ extension AuraTodayReading {
     ///   - displayName: the wearer's name, or empty.
     static func live(
         day: DailyMetric?,
+        dayIsCurrent: Bool,
         effortDay: DailyMetric?,
+        restPerformance: Double?,
         history: [DailyMetric],
         displayName: String,
         effortScale: EffortScale,
@@ -53,17 +54,22 @@ extension AuraTodayReading {
         let name = displayName.trimmingCharacters(in: .whitespaces)
 
         let headline: String
-        switch hour {
-        case ..<12:  headline = String(localized: "Here's your morning read")
-        case ..<18:  headline = String(localized: "Here's where you stand")
-        default:     headline = String(localized: "Here's how today went")
+        if day != nil, !dayIsCurrent {
+            headline = String(localized: "Here's your latest recorded read")
+        } else {
+            switch hour {
+            case ..<12:  headline = String(localized: "Here's your morning read")
+            case ..<18:  headline = String(localized: "Here's where you stand")
+            default:     headline = String(localized: "Here's how today went")
+            }
         }
 
-        // Rest: the night's duration against an 8h reference, which is the fraction the design's bar
-        // expresses. Not a goal or a judgement — just the scale the bar is drawn on.
+        // Rest: the canonical 0–100 sleep-performance composite. The earlier Aura tile displayed sleep
+        // duration over an arbitrary eight-hour bar, which visually implied a target that was not used by
+        // the model. Duration remains in the evidence banner and Sleep signal below.
         let sleepMin = day?.totalSleepMin
-        let restValue = sleepMin.map { "\(Int($0) / 60)h \(Int($0) % 60)m" } ?? "—"
-        let restFraction = sleepMin.map { min($0 / 480, 1) } ?? 0
+        let restValue = restPerformance.map { String(Int($0.rounded())) } ?? "—"
+        let restFraction = restPerformance.map { min(max($0 / 100, 0), 1) } ?? 0
 
         // Charge: show the actual 0–100 Charge score. An earlier Aura pass put HRV in this tile while
         // still labelling it "Charge"; HRV remains visible in Signals and on the Charge detail screen.
@@ -92,7 +98,7 @@ extension AuraTodayReading {
         let sleepSeries = labelledSeries { $0.totalSleepMin.map { $0 / 60 } }
 
         let signals: [Signal] = [
-            Signal(id: "hr", name: String(localized: "Heart rate"),
+            Signal(id: "hr", name: String(localized: "Resting heart rate"),
                    value: day?.restingHr.map(String.init) ?? "—", unit: "bpm",
                    systemImage: "heart", tint: AuraPalette.accent,
                    series: hrSeries.0, labels: hrSeries.1),
@@ -113,12 +119,19 @@ extension AuraTodayReading {
         // The banner states what the screen is actually reading, so a stale or absent night is visible
         // rather than implied by em-dashes the wearer has to notice.
         let banner: String
-        if let sleepMin {
-            banner = String(localized: "Read from your last night — \(durationText(sleepMin)) asleep.")
+        if let day, let sleepMin {
+            // `day` can be a carried scored night while today's analytics are still pending (or after a
+            // longer gap in wear). Stamp its real date instead of calling an arbitrarily old row "last
+            // night".
+            banner = String(localized: "Latest recorded night (\(detailDayLabel(day.day))) — \(durationText(sleepMin)) asleep.")
         } else {
             banner = String(localized: "Wear your strap overnight for a reading in the morning.")
         }
-        let bodyCopy = truthfulBodyCopy(recovery: recovery, effortScale: effortScale)
+        let bodyCopy = truthfulBodyCopy(
+            recovery: recovery,
+            scoreDayLabel: day.map { detailDayLabel($0.day) },
+            scoreIsCurrent: dayIsCurrent,
+            effortScale: effortScale)
 
         return AuraTodayReading(
             greeting: greeting,
@@ -126,9 +139,11 @@ extension AuraTodayReading {
             profileName: name,
             initial: name.first.map { String($0).uppercased() } ?? "N",
             restValue: restValue,
+            restUnit: "%",
             restFraction: restFraction,
             chargeValue: chargeValue,
             chargeUnit: "%",
+            chargeAvailable: recovery != nil,
             chargeFraction: chargeFraction,
             effortValue: effortValue,
             effortUnit: "/\(UnitFormatter.effortScaleMax(effortScale))",
@@ -175,12 +190,14 @@ extension AuraTodayReading {
     /// not supplied to this adapter.
     private static func truthfulBodyCopy(
         recovery: Double?,
+        scoreDayLabel: String?,
+        scoreIsCurrent: Bool,
         effortScale: EffortScale
     ) -> (verdict: String, coaching: String, session: String, rationale: String) {
         guard let recovery else {
             return (
                 String(localized: "Waiting for data"),
-                String(localized: "Your next body read will appear after NOOP has a valid scored night."),
+                String(localized: "Your next body read will appear after Noop Aura has a valid scored night."),
                 String(localized: "No Effort target yet"),
                 String(localized: "A recovery-matched target needs a valid Charge first.")
             )
@@ -188,21 +205,21 @@ extension AuraTodayReading {
 
         let score = Int(recovery.rounded())
         let verdict: String
-        let coaching: String
+        let currentCoaching: String
         switch recovery {
-        case 72...:
-            verdict = String(localized: "Well restored")
-            coaching = String(localized: "Your Charge is \(score) today. You have room for a demanding day if you want it.")
-        case 49..<72:
-            verdict = String(localized: "Steady")
-            coaching = String(localized: "Your Charge is \(score) today. Train as planned and let how you feel set the ceiling.")
-        case 27..<49:
-            verdict = String(localized: "Running warm")
-            coaching = String(localized: "Your Charge is \(score) today. A lighter day better matches your current recovery.")
+        case 67...:
+            verdict = String(localized: "High recovery")
+            currentCoaching = String(localized: "Your Charge is \(score) today. You have room for a demanding day if you want it.")
+        case 34..<67:
+            verdict = String(localized: "Moderate recovery")
+            currentCoaching = String(localized: "Your Charge is \(score) today. Let how you feel set the ceiling on activity.")
         default:
-            verdict = String(localized: "Needs a day")
-            coaching = String(localized: "Your Charge is \(score) today. Recovery is the useful priority.")
+            verdict = String(localized: "Low recovery")
+            currentCoaching = String(localized: "Your Charge is \(score) today. Recovery is the useful priority.")
         }
+        let coaching = scoreIsCurrent
+            ? currentCoaching
+            : String(localized: "Your latest Charge is \(score), recorded \(scoreDayLabel ?? String(localized: "on an earlier day")). Treat it as history until a new night is scored.")
 
         guard let target = CoupledView.optimalStrainRange(recovery: recovery) else {
             return (verdict, coaching, String(localized: "No Effort target yet"),
@@ -210,11 +227,19 @@ extension AuraTodayReading {
         }
         let lower = displayTarget(target.lowerBound, scale: effortScale)
         let upper = displayTarget(target.upperBound, scale: effortScale)
+        if scoreIsCurrent {
+            return (
+                verdict,
+                coaching,
+                String(localized: "Aim for Effort \(lower)–\(upper)"),
+                String(localized: "Matched to today’s Charge of \(score). The activity is your choice.")
+            )
+        }
         return (
             verdict,
             coaching,
-            String(localized: "Aim for Effort \(lower)–\(upper)"),
-            String(localized: "Matched to today’s Charge of \(score). The activity is your choice.")
+            String(localized: "Latest recorded target \(lower)–\(upper)"),
+            String(localized: "Matched to the Charge recorded \(scoreDayLabel ?? String(localized: "on an earlier day")); no new target is available yet.")
         )
     }
 
