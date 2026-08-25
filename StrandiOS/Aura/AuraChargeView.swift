@@ -4,75 +4,55 @@ import StrandDesign
 
 // MARK: - Aura Charge
 //
-// The one screen in Aura that is allowed to be dense, because it is the screen a user opens when they
-// have already decided they want the numbers. Even here the rule holds: every driver gets a sentence in
-// plain language under it, and none of them is presented as a verdict on its own.
+// The Act 2 ledger composition, with one deliberate production distinction: NOOP currently computes a
+// morning recovery score, not a validated battery that drains through the day. The visual hierarchy is
+// preserved while the unsupported spending ledger stays explicitly dormant.
 
 struct AuraChargeView: View {
     private let reading: AuraChargeReading
     private let onOpenDaytimeCharge: () -> Void
-    @State private var selectedVariabilityPoint: Int?
 
     init(reading: AuraChargeReading, onOpenDaytimeCharge: @escaping () -> Void = {}) {
         self.reading = reading
         self.onOpenDaytimeCharge = onOpenDaytimeCharge
-        _selectedVariabilityPoint = State(initialValue: nil)
     }
 
     var body: some View {
-        VStack(spacing: AuraPalette.cardGap) {
-            morningChargeCard
-
-            VStack(spacing: 0) {
-                AuraListRow(
-                    key: String(localized: "Daytime Charge"),
-                    value: String(localized: "Coming soon"),
-                    subtitle: String(localized: "Planned only after the daytime model and its missing-data rules are validated"),
-                    showsDivider: false,
-                    action: onOpenDaytimeCharge
-                )
-            }
-            .padding(.horizontal, 16)
-            .auraCard()
-
-            variabilityCard
-
-            HStack(spacing: 8) {
-                AuraStatTile(label: String(localized: "Stress"),
-                             value: reading.stress, valueTint: AuraPalette.accent)
-                AuraStatTile(label: String(localized: "Your normal"),
-                             value: reading.baseline, unit: "ms")
-            }
-
-            VStack(spacing: 9) {
-                ForEach(reading.drivers) { driver in
-                    driverCard(driver)
-                }
-            }
-
-            AuraInfoBanner(text: reading.banner, accent: AuraPalette.accent)
+        VStack(spacing: 16) {
+            chargeHero
+            whereItWent
+            tonightCard
+            Text(String(localized: "Morning Charge is scored from the latest valid night. It does not drain during the day in this build; the daytime ledger remains off until its model and missing-data rules are validated."))
+                .font(AuraFont.ui(11.5))
+                .lineSpacing(4)
+                .foregroundStyle(AuraPalette.textDim)
+                .padding(.horizontal, 2)
         }
     }
 
-    private var morningChargeCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
+    private var chargeHero: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(String(localized: "Morning Charge")).auraOverline()
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(String(localized: "Morning Charge"))
+                        .font(AuraFont.ui(10, weight: .semibold))
+                        .tracking(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AuraPalette.textLabel)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(reading.score)
-                            .font(.system(size: 52, weight: .ultraLight, design: .rounded).monospacedDigit())
+                            .font(AuraFont.display(58, weight: .thin))
+                            .tracking(-2.3)
+                            .monospacedDigit()
                             .foregroundStyle(reading.scoreAvailable ? AuraPalette.accent : AuraPalette.textQuiet)
-                        if reading.scoreAvailable {
-                            Text(verbatim: "%")
-                                .font(.system(size: 16))
-                                .foregroundStyle(AuraPalette.textQuiet)
-                        }
+                        Text(reading.scoreAvailable ? String(localized: "of 100") : String(localized: "not scored"))
+                            .font(AuraFont.ui(13))
+                            .foregroundStyle(AuraPalette.textQuiet)
                     }
                 }
                 Spacer(minLength: 12)
                 Text(reading.scoreBand)
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(AuraFont.ui(11.5, weight: .semibold))
                     .foregroundStyle(AuraPalette.accent)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -81,136 +61,95 @@ struct AuraChargeView: View {
 
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.07))
+                    Capsule().fill(Color.white.opacity(0.08))
+                    Capsule()
+                        .fill(AuraPalette.accent.opacity(0.20))
+                        .frame(width: geometry.size.width * reading.scoreFraction)
                     Capsule()
                         .fill(AuraPalette.accent)
-                        .frame(width: geometry.size.width * reading.scoreFraction)
+                        .frame(width: geometry.size.width * reading.scoreFraction, height: 8)
                 }
             }
-            .frame(height: 10)
+            .frame(height: 12)
 
-            Text(String(localized: "Scored from your latest valid night. It does not drain during the day in this build."))
-                .font(.system(size: 12.5))
-                .lineSpacing(2)
-                .foregroundStyle(AuraPalette.textQuiet)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(18)
-        .auraCard(surface: AuraCardSurface.coaching(accent: AuraPalette.accent))
-        .accessibilityElement(children: .combine)
-    }
-
-    // MARK: Variability
-
-    private var variabilityCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(reading.variability)
-                        .font(.system(size: 46, weight: .ultraLight, design: .rounded).monospacedDigit())
-                        .foregroundStyle(AuraPalette.textPrimary)
-                    Text(verbatim: "ms")
-                        .font(.system(size: 16))
-                        .foregroundStyle(AuraPalette.textQuiet)
-                }
-                Spacer(minLength: 8)
-                HStack(alignment: .firstTextBaseline, spacing: 11) {
-                    extremum(reading.dayHigh, label: String(localized: "max"))
-                    extremum(reading.dayLow, label: String(localized: "min"))
-                }
-            }
-            .padding(.bottom, 14)
-
-            Text(reading.variabilityCaption)
-                .font(.system(size: 11.5))
-                .foregroundStyle(AuraPalette.textQuiet)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 14)
-
-            if reading.variabilitySeries.isEmpty {
-                Text(String(localized: "No nightly variability readings yet."))
-                    .font(.system(size: 13.5))
-                    .foregroundStyle(AuraPalette.textQuiet)
-                    .frame(maxWidth: .infinity, minHeight: 140, alignment: .center)
-            } else {
-                AuraTrendChart(
-                    values: reading.variabilitySeries,
-                    labels: reading.variabilityLabels,
-                    selected: selectedVariabilityIndex,
-                    window: reading.variabilityWindow,
-                    normalRange: reading.variabilityNormalRange
-                ) { selectedVariabilityPoint = $0 }
-                .padding(.bottom, 11)
-            }
-
-            HStack {
-                ForEach(Array(reading.axis.enumerated()), id: \.offset) { index, label in
-                    Text(label)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(AuraPalette.textDim)
-                    if index < reading.axis.count - 1 { Spacer(minLength: 4) }
-                }
-            }
-        }
-        .padding(.horizontal, 18)
-        .padding(.top, 19)
-        .padding(.bottom, 16)
-        .auraCard()
-    }
-
-    private var selectedVariabilityIndex: Int {
-        guard let selectedVariabilityPoint,
-              reading.variabilitySeries.indices.contains(selectedVariabilityPoint) else {
-            return max(reading.variabilitySeries.count - 1, 0)
-        }
-        return selectedVariabilityPoint
-    }
-
-    private func extremum(_ value: String, label: String) -> some View {
-        HStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 12).monospacedDigit())
-                .foregroundStyle(AuraPalette.textQuiet)
-            Text(label)
-                .font(.system(size: 12))
-                .foregroundStyle(AuraPalette.textDim)
-        }
-    }
-
-    // MARK: Drivers
-
-    private func driverCard(_ driver: AuraChargeReading.Driver) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(driver.name)
-                    .font(.system(size: 13.5, weight: .medium))
-                    .foregroundStyle(AuraPalette.textPrimary)
-                Spacer(minLength: 8)
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(driver.value)
-                        .font(.system(size: 22, design: .rounded).monospacedDigit())
-                        .foregroundStyle(AuraPalette.textPrimary)
-                    Text(driver.unit)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(AuraPalette.textFaint)
-                }
-            }
-            .padding(.bottom, 12)
-
-            AuraRangeBar(position: driver.position, baseline: driver.baseline, tint: AuraPalette.accent)
-                .padding(.bottom, 10)
-
-            Text(driver.plain)
-                .font(.system(size: 13))
-                .lineSpacing(2)
+            Text(reading.scoreAvailable
+                 ? String(localized: "Your latest valid night produced this morning recovery score.")
+                 : String(localized: "A valid scored night is needed before Morning Charge appears."))
+                .font(AuraFont.ui(13))
+                .lineSpacing(3)
                 .foregroundStyle(AuraPalette.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 17)
-        .padding(.vertical, 16)
-        .auraCard(cornerRadius: AuraPalette.tileRadius)
+        .padding(.top, 8)
         .accessibilityElement(children: .combine)
+    }
+
+    private var whereItWent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(String(localized: "Where it went"))
+                .font(AuraFont.ui(10, weight: .semibold))
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(AuraPalette.textFaint)
+                .padding(.horizontal, 4)
+
+            Button(action: onOpenDaytimeCharge) {
+                HStack(spacing: 13) {
+                    ZStack {
+                        Circle().fill(AuraPalette.accent.opacity(0.10)).frame(width: 38, height: 38)
+                        Image(systemName: "battery.50percent")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(AuraPalette.accent)
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(String(localized: "Daytime Charge"))
+                            .font(AuraFont.ui(13.5, weight: .medium))
+                            .foregroundStyle(AuraPalette.textPrimary)
+                        Text(String(localized: "Awake time, sessions, stress, and movement ledger"))
+                            .font(AuraFont.ui(11.5))
+                            .foregroundStyle(AuraPalette.textQuiet)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(String(localized: "Coming soon"))
+                        .font(AuraFont.ui(11, weight: .semibold))
+                        .foregroundStyle(AuraPalette.accent)
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 74)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .auraCard()
+        }
+    }
+
+    private var tonightCard: some View {
+        HStack(spacing: 13) {
+            Image(systemName: "moon.stars.fill")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(Color(hex: "#C9D0EE"))
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(String(localized: "Tonight's recharge model"))
+                    .font(AuraFont.ui(13.5, weight: .semibold))
+                    .foregroundStyle(AuraPalette.textPrimary)
+                Text(String(localized: "Coming soon — no recharge amount or bedtime is estimated in this build."))
+                    .font(AuraFont.ui(12))
+                    .lineSpacing(3)
+                    .foregroundStyle(Color(hex: "#C9D0EE"))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(AuraPalette.rest.opacity(0.09))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(AuraPalette.rest.opacity(0.24), lineWidth: 0.5)
+                )
+        )
     }
 }
 

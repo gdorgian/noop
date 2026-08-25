@@ -864,6 +864,15 @@ public enum StrandPalette {
             case .deep:  return gSleepDeep
             case .rem:   return gSleepREM
             }
+        case .auraRest:
+            // Noop Aura's Rest chart is intentionally one lavender data family. Alpha, rather than a
+            // second hue system, distinguishes stages exactly as the Act 1 handoff specifies.
+            switch stage {
+            case .deep:  return NoopSpecTokens.lavender
+            case .light: return NoopSpecTokens.lavender.opacity(0.60)
+            case .rem:   return NoopSpecTokens.lavender.opacity(0.82)
+            case .awake: return NoopSpecTokens.lavender.opacity(0.26)
+            }
         }
     }
 

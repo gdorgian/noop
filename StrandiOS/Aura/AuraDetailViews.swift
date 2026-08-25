@@ -7,7 +7,13 @@ import StrandDesign
 // MARK: - Aura detail navigation
 
 enum AuraRoute: Hashable {
+    /// Act 1 child reached from Rest's closing planning card.
+    case restTonight
+    case restWhy(Int?)
+    case restDebt
     case metric(String)
+    case vitals
+    case stress
     case editProfile
     case notifications
     case units
@@ -28,9 +34,14 @@ enum AuraRoute: Hashable {
         guard let flag = arguments.firstIndex(of: "--aura-route"),
               arguments.indices.contains(flag + 1) else { return nil }
         switch arguments[flag + 1] {
+        case "rest-tonight": return .restTonight
+        case "rest-why": return .restWhy(nil)
+        case "rest-debt": return .restDebt
         case "heart-rate": return .metric("hr")
         case "variability": return .metric("hrv")
         case "breathing": return .metric("resp")
+        case "vitals": return .vitals
+        case "stress": return .stress
         case "sleep": return .metric("sleep")
         case "edit-profile": return .editProfile
         case "notifications": return .notifications
@@ -135,6 +146,89 @@ struct AuraComingSoonView: View {
 
             AuraNoteBanner(
                 text: String(localized: "This Aura feature is not active in this build. Existing underlying data and tools remain available where noted; this screen shows no substitute or preview value."),
+                tint: AuraPalette.rest
+            )
+        }
+    }
+}
+
+struct AuraVitalsDetailView: View {
+    let signals: [AuraTodayReading.Signal]
+    let onOpen: (AuraTodayReading.Signal) -> Void
+
+    var body: some View {
+        VStack(spacing: 9) {
+            ForEach(signals) { signal in
+                Button { onOpen(signal) } label: {
+                    HStack(spacing: 13) {
+                        Image(systemName: signal.systemImage)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(signal.tint)
+                            .frame(width: 34, height: 34)
+                            .background(Circle().fill(signal.tint.opacity(0.11)))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(signal.name)
+                                .font(AuraFont.ui(14, weight: .semibold))
+                                .foregroundStyle(AuraPalette.textPrimary)
+                            Text(signal.value == "—"
+                                 ? String(localized: "No latest recorded value")
+                                 : String(localized: "Latest recorded overnight value"))
+                                .font(AuraFont.ui(11.5))
+                                .foregroundStyle(AuraPalette.textQuiet)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            Text(signal.value)
+                                .font(AuraFont.display(22, weight: .light))
+                                .monospacedDigit()
+                                .foregroundStyle(AuraPalette.textPrimary)
+                            Text(signal.unit)
+                                .font(AuraFont.ui(10.5))
+                                .foregroundStyle(AuraPalette.textFaint)
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(AuraPalette.textDim)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .auraCard(cornerRadius: 20)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+struct AuraStressDetailView: View {
+    let band: String
+    let available: Bool
+
+    var body: some View {
+        VStack(spacing: 12) {
+            VStack(spacing: 8) {
+                Image(systemName: "waveform.path.ecg")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(available ? AuraPalette.accent : AuraPalette.textQuiet)
+                Text(available ? band : String(localized: "Unavailable"))
+                    .font(AuraFont.display(42, weight: .light))
+                    .foregroundStyle(AuraPalette.textPrimary)
+                Text(available
+                     ? String(localized: "This band comes from Noop's stored daily 0–3 stress series for the selected day.")
+                     : String(localized: "No stored stress value is available for the selected day."))
+                    .font(AuraFont.ui(13))
+                    .lineSpacing(4)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(AuraPalette.textTertiary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 26)
+            .auraCard(surface: AuraCardSurface.coaching(accent: AuraPalette.accent))
+
+            AuraNoteBanner(
+                text: String(localized: "Stress is an autonomic-load proxy, not a diagnosis or a direct measure of emotion."),
                 tint: AuraPalette.rest
             )
         }

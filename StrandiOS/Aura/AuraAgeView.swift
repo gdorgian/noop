@@ -29,24 +29,140 @@ import StrandDesign
 struct AuraAgeView: View {
     private let reading: AuraAgeReading
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var motion = NoopMotionState.shared
+
     init(reading: AuraAgeReading) {
         self.reading = reading
     }
 
+    private var poseStill: Bool { motion.poseStill(reduceMotion) }
+
     var body: some View {
-        VStack(spacing: AuraPalette.cardGap) {
+        VStack(spacing: 12) {
             if reading.isReady {
-                headline
+                ageSummary
+                bodyAgeCard
                 driversCard
                 if !reading.history.isEmpty { trendCard }
-                if !reading.domains.isEmpty { domainsCard }
                 fitnessCard
-                AuraReadCard(overline: String(localized: "The read"), text: reading.read)
+                domainsSection
+                readCard
             } else {
+                notReadyHero
                 notReadyCard
             }
             disclaimer
         }
+    }
+
+    // MARK: Summary
+
+    private var ageSummary: some View {
+        VStack(spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(String(localized: "Weekly"))
+                        .font(AgeDesign.number(23, weight: .light))
+                        .foregroundStyle(AgeDesign.mint)
+                    Text(String(localized: "stored snapshot"))
+                        .font(AgeDesign.ui(9.5, weight: .semibold))
+                        .tracking(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AuraPalette.textQuiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                BodyAgeAura(value: reading.bodyAge, available: true, reduceMotion: poseStill)
+                    .frame(width: 138, height: 138)
+
+                VStack(alignment: .trailing, spacing: 5) {
+                    Text(String(localized: "Not calculated"))
+                        .font(AgeDesign.ui(11.5, weight: .medium))
+                        .foregroundStyle(AuraPalette.textDim)
+                        .multilineTextAlignment(.trailing)
+                    Text(String(localized: "pace of aging"))
+                        .font(AgeDesign.ui(9.5, weight: .semibold))
+                        .tracking(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AuraPalette.textQuiet)
+                        .multilineTextAlignment(.trailing)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+
+            Text(reading.delta)
+                .font(AgeDesign.number(26, weight: .light))
+                .tracking(-0.7)
+                .lineSpacing(2)
+                .foregroundStyle(AuraPalette.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Text("Pace of aging is not calculated from the current snapshot"))
+    }
+
+    // MARK: Body Age
+
+    /// The prototype draws a ±5 band. The production model does not expose a validated confidence
+    /// interval, so the shipped surface keeps the exact weekly value and the adapter's own status line
+    /// without turning that presentation convention into scientific certainty.
+    private var bodyAgeCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(reading.bodyAgeOverline)
+                    .font(AgeDesign.ui(10, weight: .semibold))
+                    .tracking(1.4)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AuraPalette.textFaint)
+                Spacer()
+                Text(String(localized: "Updated weekly"))
+                    .font(AgeDesign.ui(11))
+                    .foregroundStyle(AuraPalette.textDim)
+            }
+
+            HStack(alignment: .lastTextBaseline, spacing: 10) {
+                Text(reading.bodyAge)
+                    .font(AgeDesign.number(76, weight: .ultraLight))
+                    .tracking(-3.2)
+                    .monospacedDigit()
+                    .foregroundStyle(AuraPalette.textPrimary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(reading.bodyAgeUnit)
+                        .font(AgeDesign.ui(13))
+                        .foregroundStyle(AuraPalette.textSecondary)
+                    Text(reading.delta)
+                        .font(AgeDesign.ui(11.5, weight: .semibold))
+                        .foregroundStyle(reading.deltaTint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.bottom, 8)
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(AgeDesign.mint)
+                Text(reading.bodyAgeBand)
+                    .font(AgeDesign.ui(11.5))
+                    .foregroundStyle(AuraPalette.textQuiet)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
+            .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            Text(String(localized: "No confidence band is shown because this model does not expose a validated confidence interval."))
+                .font(AgeDesign.ui(11.5))
+                .lineSpacing(3)
+                .foregroundStyle(AuraPalette.textQuiet)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(18)
+        .background(ageCard(radius: 24))
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Domains
@@ -62,52 +178,100 @@ struct AuraAgeView: View {
     /// of the score and a 55 in one worth 28% are not the same finding.
     private var domainsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            AuraCardHeader(title: String(localized: "Current health domains"), note: reading.domainsNote)
-                .padding(.horizontal, 2)
-                .padding(.bottom, 14)
+            HStack(alignment: .firstTextBaseline) {
+                Text("0").font(AgeDesign.ui(10)).foregroundStyle(AuraPalette.textDim)
+                Spacer()
+                Text("50").font(AgeDesign.ui(10)).foregroundStyle(AuraPalette.textDim)
+                Spacer()
+                Text("100").font(AgeDesign.ui(10)).foregroundStyle(AuraPalette.textDim)
+            }
+            .padding(.bottom, 15)
 
             ForEach(Array(reading.domains.enumerated()), id: \.element.id) { index, domain in
                 VStack(spacing: 0) {
                     HStack(spacing: 10) {
                         Text(domain.label)
-                            .font(.system(size: 15))
+                            .font(AgeDesign.ui(13))
                             .foregroundStyle(AuraPalette.textPrimary)
-                        Text(domain.weight)
-                            .font(.system(size: 11.5, weight: .medium))
-                            .monospacedDigit()
-                            .foregroundStyle(AuraPalette.textFaint)
                         Spacer(minLength: 8)
-                        Text(String(Int(domain.score.rounded())))
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(AuraPalette.textPrimary)
+                        HStack(alignment: .firstTextBaseline, spacing: 9) {
+                            Text(String(localized: "\(domain.weight) of score"))
+                                .font(AgeDesign.ui(11))
+                                .foregroundStyle(AuraPalette.textQuiet)
+                            Text(String(Int(domain.score.rounded())))
+                                .font(AgeDesign.number(19, weight: .light))
+                                .monospacedDigit()
+                                .foregroundStyle(AuraPalette.textPrimary)
+                                .frame(minWidth: 26, alignment: .trailing)
+                        }
                     }
                     .padding(.bottom, 8)
 
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            Capsule().fill(AuraPalette.track).frame(height: 3)
+                            Capsule().fill(AuraPalette.track).frame(height: 5)
                             Capsule()
-                                .fill(AuraPalette.rest)
-                                .frame(width: max(2, geo.size.width * domain.score / 100), height: 3)
+                                .fill(AgeDesign.ageGreen)
+                                .frame(width: max(2, geo.size.width * min(max(domain.score, 0), 100) / 100), height: 5)
                         }
                     }
-                    .frame(height: 3)
+                    .frame(height: 5)
 
                     if index < reading.domains.count - 1 {
-                        Rectangle().fill(AuraPalette.cardBorder).frame(height: 1).padding(.top, 14)
+                        Color.clear.frame(height: 12)
                     }
                 }
-                .padding(.vertical, 6)
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(
                     Text("\(domain.label), \(Int(domain.score.rounded())) out of 100, \(domain.weight) of the score")
                 )
             }
+
+            Text(String(localized: "A domain is a 0–100 standing from a separate scorer. It is not a signed contribution to Body Age."))
+                .font(AgeDesign.ui(11.5))
+                .lineSpacing(3)
+                .foregroundStyle(AuraPalette.textQuiet)
+                .padding(.top, 14)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
-        .auraCard()
+        .padding(16)
+        .background(ageCard(radius: 24))
+    }
+
+    private var domainsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(String(localized: "Health domains"))
+                    .font(AgeDesign.ui(10, weight: .semibold))
+                    .tracking(1.4)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AuraPalette.textFaint)
+                Spacer()
+                if !reading.domainsNote.isEmpty {
+                    Text(reading.domainsNote)
+                        .font(AgeDesign.ui(10.5))
+                        .foregroundStyle(AuraPalette.textDim)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+            .padding(.horizontal, 2)
+
+            if reading.domains.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("—")
+                        .font(AgeDesign.number(34, weight: .ultraLight))
+                        .foregroundStyle(AuraPalette.textDim)
+                    Text(String(localized: "Not enough instruments to score the health domains yet."))
+                        .font(AgeDesign.ui(13))
+                        .lineSpacing(4)
+                        .foregroundStyle(AuraPalette.textSecondary)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ageCard(radius: 24))
+            } else {
+                domainsCard
+            }
+        }
     }
 
     /// Fine print, drawn as fine print.
@@ -119,102 +283,104 @@ struct AuraAgeView: View {
     /// disclaimer, and the contrast was poor in the bargain.
     private var disclaimer: some View {
         Text(reading.disclaimer)
-            .font(.system(size: 12.5))
-            .lineSpacing(2)
-            .foregroundStyle(AuraPalette.textFaint)
+            .font(AgeDesign.ui(11))
+            .lineSpacing(3)
+            .foregroundStyle(AuraPalette.textDim)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 4)
-            .padding(.top, 4)
-    }
-
-    // MARK: Headline
-
-    private var headline: some View {
-        VStack(spacing: 6) {
-            Text(reading.bodyAgeOverline).auraOverline()
-                .padding(.bottom, 10)
-
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(reading.bodyAge)
-                    .font(.system(size: 68, weight: .light, design: .rounded))
-                    .foregroundStyle(AuraPalette.textPrimary)
-                    .monospacedDigit()
-                Text(reading.bodyAgeUnit)
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(AuraPalette.textSecondary)
-            }
-
-            Text(reading.bodyAgeBand)
-                .font(.system(size: 12.5))
-                .foregroundStyle(AuraPalette.textFaint)
-
-            Text(reading.delta)
-                .font(.system(size: 15.5, weight: .medium))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(reading.deltaTint)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 26)
-        .auraCard()
+            .padding(.horizontal, 2)
+            .padding(.top, 2)
     }
 
     // MARK: Drivers
 
     private var driversCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            AuraCardHeader(title: String(localized: "What's moving it"),
-                           note: reading.driversNote)
-                .padding(.horizontal, 2)
-                .padding(.bottom, 14)
-
-            ForEach(Array(reading.drivers.enumerated()), id: \.element.id) { index, driver in
-                driverRow(driver, showsDivider: index < reading.drivers.count - 1)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(String(localized: "What's moving it"))
+                    .font(AgeDesign.ui(10, weight: .semibold))
+                    .tracking(1.4)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AuraPalette.textFaint)
+                Spacer()
+                Text(reading.driversNote)
+                    .font(AgeDesign.ui(11))
+                    .foregroundStyle(AuraPalette.textDim)
             }
+            .padding(.horizontal, 2)
+
+            VStack(alignment: .leading, spacing: 11) {
+                HStack {
+                    Text(String(localized: "← takes years off"))
+                        .font(AgeDesign.ui(10, weight: .semibold))
+                        .tracking(0.6)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AgeDesign.mint)
+                    Spacer()
+                    Text(String(localized: "adds years →"))
+                        .font(AgeDesign.ui(10, weight: .semibold))
+                        .tracking(0.6)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AgeDesign.adverse)
+                }
+
+                if reading.drivers.isEmpty {
+                    Text(String(localized: "The exact driver snapshot is unavailable for this stored week."))
+                        .font(AgeDesign.ui(13))
+                        .lineSpacing(4)
+                        .foregroundStyle(AuraPalette.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+                } else {
+                    ForEach(reading.drivers) { driver in
+                        driverRow(driver)
+                    }
+                }
+
+                Text(String(localized: "Each row is the model's stored signed contribution for that factor. The rows are not recomputed from today's data."))
+                    .font(AgeDesign.ui(11.5))
+                    .lineSpacing(3)
+                    .foregroundStyle(AuraPalette.textQuiet)
+            }
+            .padding(16)
+            .background(ageCard(radius: 24))
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
-        .auraCard()
     }
 
     /// A signed contribution, drawn as a bar that leaves centre in the direction it pushes. Direction is
     /// carried by the label and the side the bar sits on, never by colour alone — a wearer who cannot
     /// separate the two hues still reads "adds years" / "takes years off" from the text.
-    private func driverRow(_ driver: AuraAgeReading.Driver, showsDivider: Bool) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Text(driver.label)
-                    .font(.system(size: 15))
-                    .foregroundStyle(AuraPalette.textPrimary)
-                Spacer(minLength: 8)
-                Text(driver.effect)
-                    .font(.system(size: 13.5, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(driver.isProtective ? AuraPalette.accent : AuraPalette.effort)
-            }
-            .padding(.bottom, 8)
+    private func driverRow(_ driver: AuraAgeReading.Driver) -> some View {
+        HStack(spacing: 10) {
+            Text(driver.label)
+                .font(AgeDesign.ui(12.5))
+                .lineLimit(2)
+                .foregroundStyle(AuraPalette.textSecondary)
+                .frame(width: 98, alignment: .leading)
 
             GeometryReader { geo in
                 let half = geo.size.width / 2
-                let width = max(2, half * driver.magnitude)
+                let width = max(2, half * min(max(driver.magnitude, 0), 1))
                 ZStack(alignment: .leading) {
-                    Capsule().fill(AuraPalette.track).frame(height: 3)
+                    Rectangle()
+                        .fill(Color.white.opacity(0.16))
+                        .frame(width: 1, height: 20)
+                        .offset(x: half)
                     Capsule()
-                        .fill(driver.isProtective ? AuraPalette.accent : AuraPalette.effort)
-                        .frame(width: width, height: 3)
+                        .fill(driver.isProtective ? AgeDesign.ageGreen : AgeDesign.adverse)
+                        .frame(width: width, height: 5)
                         .offset(x: driver.isProtective ? half - width : half)
                 }
+                .frame(maxHeight: .infinity, alignment: .center)
             }
-            .frame(height: 3)
+            .frame(height: 20)
 
-            if showsDivider {
-                Rectangle().fill(AuraPalette.cardBorder).frame(height: 1).padding(.top, 14)
-            }
+            Text(driver.effect)
+                .font(AgeDesign.ui(11.5, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(driver.isProtective ? AgeDesign.mint : AgeDesign.adverse)
+                .frame(width: 51, alignment: .trailing)
         }
-        .padding(.vertical, 6)
+        .frame(minHeight: 34)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text("\(driver.label), \(driver.effect)"))
     }
@@ -223,10 +389,18 @@ struct AuraAgeView: View {
 
     private var trendCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            AuraCardHeader(title: String(localized: "Body Age over time"),
-                           note: reading.historyNote)
-                .padding(.horizontal, 2)
-                .padding(.bottom, 16)
+            HStack(alignment: .firstTextBaseline) {
+                Text(String(localized: "Body Age over time"))
+                    .font(AgeDesign.ui(10, weight: .semibold))
+                    .tracking(1.4)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AuraPalette.textFaint)
+                Spacer()
+                Text(historyDelta)
+                    .font(AgeDesign.ui(11, weight: .semibold))
+                    .foregroundStyle(historyDeltaTint)
+            }
+            .padding(.bottom, 16)
 
             AuraTrendChart(
                 values: reading.history,
@@ -235,43 +409,127 @@ struct AuraAgeView: View {
                 window: reading.historyWindow,
                 onSelect: { _ in }
             )
-            .frame(height: 132)
+            .frame(height: 112)
             .allowsHitTesting(false)
+
+            HStack {
+                ForEach(historyAxis, id: \.self) { label in
+                    Text(label)
+                        .font(AgeDesign.ui(10.5))
+                        .foregroundStyle(AuraPalette.textDim)
+                    if label != historyAxis.last { Spacer(minLength: 4) }
+                }
+            }
+            .padding(.top, 8)
+
+            Text(historyNote)
+                .font(AgeDesign.ui(11.5))
+                .lineSpacing(3)
+                .foregroundStyle(AuraPalette.textQuiet)
+                .padding(.top, 12)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
-        .auraCard()
+        .padding(16)
+        .background(ageCard(radius: 24))
+    }
+
+    private var historyDelta: String {
+        guard let first = reading.history.first, let last = reading.history.last, reading.history.count > 1 else {
+            return String(localized: "Starting point")
+        }
+        return String(format: "%+.1f yr", last - first)
+    }
+
+    private var historyDeltaTint: Color {
+        guard let first = reading.history.first, let last = reading.history.last else { return AuraPalette.textDim }
+        if abs(last - first) < 0.05 { return AuraPalette.textQuiet }
+        return last < first ? AgeDesign.mint : AgeDesign.adverse
+    }
+
+    private var historyAxis: [String] {
+        guard !reading.historyLabels.isEmpty else { return [] }
+        let last = reading.historyLabels.count - 1
+        let indexes = [0, last / 3, last * 2 / 3, last]
+        var seen = Set<Int>()
+        return indexes.compactMap { seen.insert($0).inserted ? reading.historyLabels[$0] : nil }
+    }
+
+    private var historyNote: String {
+        reading.history.count < 4
+            ? String(localized: "There are \(reading.history.count) weekly snapshots. Treat this as a starting point, not a trend.")
+            : String(localized: "Each point is one stored weekly Body Age. Noop does not fill missing weeks or draw a confidence ribbon the model did not provide.")
     }
 
     // MARK: Fitness Age + VO₂max
 
     private var fitnessCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            AuraCardHeader(title: String(localized: "Fitness Age"),
-                           note: reading.fitnessNote)
-                .padding(.horizontal, 2)
-                .padding(.bottom, 14)
-
-            HStack(spacing: 8) {
-                AuraStatTile(label: String(localized: "Fitness Age"),
-                             value: reading.fitnessAge, unit: reading.fitnessAgeUnit,
-                             valueTint: AuraPalette.rest)
-                AuraStatTile(label: String(localized: "VO₂max"),
-                             value: reading.vo2max, unit: reading.vo2maxUnit,
-                             valueTint: AuraPalette.accent)
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(String(localized: "A different question"))
+                    .font(AgeDesign.ui(10, weight: .semibold))
+                    .tracking(1.4)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AuraPalette.textFaint)
+                Spacer()
+                Text(reading.fitnessNote)
+                    .font(AgeDesign.ui(10.5))
+                    .foregroundStyle(AuraPalette.textDim)
             }
-            .padding(.bottom, 12)
+
+            HStack(spacing: 9) {
+                ageStat(
+                    label: String(localized: "Fitness Age"),
+                    value: reading.fitnessAge,
+                    unit: reading.fitnessAgeUnit
+                )
+                ageStat(
+                    label: String(localized: "VO₂ max"),
+                    value: reading.vo2max,
+                    unit: reading.vo2maxUnit
+                )
+            }
 
             Text(reading.fitnessCaveat)
-                .font(.system(size: 13))
-                .lineSpacing(2)
-                .foregroundStyle(AuraPalette.textTertiary)
+                .font(AgeDesign.ui(11.5))
+                .lineSpacing(3)
+                .foregroundStyle(AuraPalette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 2)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
-        .auraCard()
+        .padding(16)
+        .background(ageCard(radius: 24))
+    }
+
+    private func ageStat(label: String, value: String, unit: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(AgeDesign.ui(10, weight: .semibold))
+                .tracking(1)
+                .textCase(.uppercase)
+                .foregroundStyle(Color(hex: "#A9B4E0"))
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(value)
+                    .font(AgeDesign.number(34, weight: .ultraLight))
+                    .monospacedDigit()
+                    .foregroundStyle(value == "—" ? AuraPalette.textDim : AuraPalette.textPrimary)
+                if !unit.isEmpty {
+                    Text(unit)
+                        .font(AgeDesign.ui(10.5))
+                        .foregroundStyle(AuraPalette.textTertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+            }
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(AuraPalette.rest.opacity(0.07))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(AuraPalette.rest.opacity(0.22), lineWidth: 0.5)
+                }
+        )
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Not ready
@@ -280,17 +538,24 @@ struct AuraAgeView: View {
     /// as the ready one: what is missing, whether it blocks the number, and how far off it is.
     private var notReadyCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            AuraCardHeader(title: String(localized: "Not enough yet"),
-                           note: reading.readinessNote)
-                .padding(.horizontal, 2)
-                .padding(.bottom, 8)
+            HStack(alignment: .firstTextBaseline) {
+                Text(String(localized: "What is needed"))
+                    .font(AgeDesign.ui(10, weight: .semibold))
+                    .tracking(1.4)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AuraPalette.textFaint)
+                Spacer()
+                Text(reading.readinessNote)
+                    .font(AgeDesign.ui(11))
+                    .foregroundStyle(AuraPalette.textDim)
+            }
+            .padding(.bottom, 8)
 
             Text(reading.readinessLead)
-                .font(.system(size: 14.5))
-                .lineSpacing(2)
+                .font(AgeDesign.ui(14.5))
+                .lineSpacing(4)
                 .foregroundStyle(AuraPalette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 2)
                 .padding(.bottom, 16)
 
             ForEach(Array(reading.readiness.enumerated()), id: \.element.id) { index, item in
@@ -300,9 +565,212 @@ struct AuraAgeView: View {
                             showsDivider: index < reading.readiness.count - 1)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
-        .auraCard()
+        .padding(16)
+        .background(ageCard(radius: 24))
+    }
+
+    private var notReadyHero: some View {
+        VStack(spacing: 10) {
+            BodyAgeAura(value: "—", available: false, reduceMotion: true)
+                .frame(width: 178, height: 178)
+            Text(String(localized: "Not enough yet"))
+                .font(AgeDesign.number(28, weight: .light))
+                .foregroundStyle(AuraPalette.textPrimary)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var readCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(String(localized: "The read"))
+                .font(AgeDesign.ui(10, weight: .semibold))
+                .tracking(1.4)
+                .textCase(.uppercase)
+                .foregroundStyle(AgeDesign.mint)
+            Text(reading.read)
+                .font(AgeDesign.ui(13.5))
+                .lineSpacing(5)
+                .foregroundStyle(Color(hex: "#D2E2D8"))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color(hex: "#14201B"))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(AgeDesign.ageGreen.opacity(0.22), lineWidth: 0.5)
+                }
+        )
+    }
+
+    private func ageCard(radius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+            .fill(AuraPalette.card)
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(AuraPalette.cardBorder, lineWidth: 0.5)
+            }
+    }
+}
+
+// MARK: - Handoff graphic
+
+private enum AgeDesign {
+    static let ageGreen = Color(hex: "#2ECC80")
+    static let mint = Color(hex: "#8FEFC0")
+    static let adverse = Color(hex: "#F3C888")
+
+    static func number(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("Outfit", size: size).weight(weight)
+    }
+
+    static func ui(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("Instrument Sans", size: size).weight(weight)
+    }
+}
+
+private struct BodyAgeAura: View {
+    let value: String
+    let available: Bool
+    let reduceMotion: Bool
+
+    @State private var breathing = false
+    @State private var spinning = false
+
+    private var tint: Color { available ? AgeDesign.ageGreen : AuraPalette.textDim }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let side = min(proxy.size.width, proxy.size.height)
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [tint.opacity(available ? 0.30 : 0.13), tint.opacity(0)],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: side * 0.58
+                        )
+                    )
+                    .frame(width: side * 1.16, height: side * 1.16)
+                    .blur(radius: side * 0.075)
+                    .scaleEffect(breathing ? 1.04 : 0.97)
+
+                BodyAgeBlobShape()
+                    .fill(
+                        RadialGradient(
+                            stops: [
+                                .init(color: Color(hex: "#080B0A"), location: 0),
+                                .init(color: Color(hex: "#080B0A"), location: 0.30),
+                                .init(color: tint.opacity(0.10), location: 0.40),
+                                .init(color: tint.opacity(0.38), location: 0.56),
+                                .init(color: tint.opacity(0.82), location: 0.72),
+                                .init(color: available ? Color(hex: "#9EF0CC").opacity(0.42) : tint.opacity(0.20), location: 0.86),
+                                .init(color: tint.opacity(0), location: 1),
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: side * 0.50
+                        )
+                    )
+                    .frame(width: side * 0.92, height: side * 0.92)
+                    .blur(radius: side * 0.022)
+                    .rotationEffect(.degrees(breathing ? 5 : -4))
+
+                BodyAgeBlobShape()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.clear, tint.opacity(available ? 0.16 : 0.08), Color.clear],
+                            center: .center,
+                            startRadius: side * 0.16,
+                            endRadius: side * 0.48
+                        )
+                    )
+                    .frame(width: side * 0.98, height: side * 0.98)
+                    .blur(radius: side * 0.045)
+                    .rotationEffect(.degrees(breathing ? -8 : 7))
+
+                if available {
+                    BodyAgeSpecks()
+                        .frame(width: side * 0.90, height: side * 0.90)
+                        .rotationEffect(.degrees(spinning ? 360 : 0))
+                }
+
+                Text(value)
+                    .font(AgeDesign.number(side * 0.29, weight: .ultraLight))
+                    .tracking(-1.2)
+                    .monospacedDigit()
+                    .foregroundStyle(available ? AuraPalette.textPrimary : AuraPalette.textDim)
+                    .shadow(color: .black.opacity(0.6), radius: 13, y: 2)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 8).repeatForever(autoreverses: true)) {
+                breathing = true
+            }
+            withAnimation(.linear(duration: 60).repeatForever(autoreverses: false)) {
+                spinning = true
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct BodyAgeBlobShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY + rect.height * 0.025))
+        path.addCurve(
+            to: CGPoint(x: rect.maxX - rect.width * 0.04, y: rect.midY - rect.height * 0.04),
+            control1: CGPoint(x: rect.maxX - rect.width * 0.12, y: rect.minY),
+            control2: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.28)
+        )
+        path.addCurve(
+            to: CGPoint(x: rect.midX + rect.width * 0.02, y: rect.maxY - rect.height * 0.02),
+            control1: CGPoint(x: rect.maxX - rect.width * 0.01, y: rect.maxY - rect.height * 0.19),
+            control2: CGPoint(x: rect.maxX - rect.width * 0.23, y: rect.maxY)
+        )
+        path.addCurve(
+            to: CGPoint(x: rect.minX + rect.width * 0.05, y: rect.midY + rect.height * 0.03),
+            control1: CGPoint(x: rect.minX + rect.width * 0.25, y: rect.maxY),
+            control2: CGPoint(x: rect.minX, y: rect.maxY - rect.height * 0.25)
+        )
+        path.addCurve(
+            to: CGPoint(x: rect.midX, y: rect.minY + rect.height * 0.025),
+            control1: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.25),
+            control2: CGPoint(x: rect.minX + rect.width * 0.23, y: rect.minY)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct BodyAgeSpecks: View {
+    private static let points: [(CGFloat, CGFloat, CGFloat, Double)] = [
+        (0.17,0.25,1.4,0.72),(0.28,0.12,0.9,0.45),(0.42,0.08,1.3,0.70),(0.59,0.12,0.9,0.55),
+        (0.73,0.18,1.6,0.75),(0.84,0.31,1.0,0.50),(0.90,0.47,1.4,0.62),(0.82,0.63,0.8,0.48),
+        (0.75,0.79,1.5,0.72),(0.59,0.88,1.0,0.57),(0.43,0.91,1.7,0.74),(0.29,0.82,0.9,0.50),
+        (0.16,0.72,1.4,0.66),(0.10,0.55,0.9,0.54),(0.12,0.38,1.7,0.78),(0.34,0.27,0.7,0.50),
+        (0.65,0.27,0.8,0.55),(0.71,0.47,1.0,0.62),(0.58,0.70,0.8,0.50),(0.35,0.67,1.0,0.58),
+    ]
+
+    var body: some View {
+        Canvas { context, size in
+            for point in Self.points {
+                let radius = point.2
+                let rect = CGRect(
+                    x: size.width * point.0 - radius,
+                    y: size.height * point.1 - radius,
+                    width: radius * 2,
+                    height: radius * 2
+                )
+                context.fill(Path(ellipseIn: rect), with: .color(AgeDesign.mint.opacity(point.3)))
+            }
+        }
     }
 }
 

@@ -95,7 +95,7 @@ public enum SleepChartStyle: String, CaseIterable, Identifiable, Sendable {
 
 /// Which stage-colour ramp a sleep chart draws with: NOOP's own tokens, Oura's ramp (Ribbon), or Garmin's
 /// (Garmin Fill). Twin of the Kotlin `SleepStagePalette`.
-public enum SleepStagePalette: String, Sendable { case noop, oura, garmin }
+public enum SleepStagePalette: String, Sendable { case noop, oura, garmin, auraRest }
 
 /// Applies the chart style: sets the global `StrandPalette.chartStyle` (read by the data-ramp
 /// accessors) AND keys the content on the raw value so a flip re-renders the visible charts. The

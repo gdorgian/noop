@@ -83,6 +83,13 @@
 	<string>$(OURA_CLIENT_SECRET)</string>
 	<key>OURA_REDIRECT_URI</key>
 	<string>$(OURA_REDIRECT_URI)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Fonts/Outfit.ttf</string>
+		<string>Fonts/InstrumentSans.ttf</string>
+		<string>Fonts/InstrumentSerif-Regular.ttf</string>
+		<string>Fonts/InstrumentSerif-Italic.ttf</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>

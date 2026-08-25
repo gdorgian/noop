@@ -226,6 +226,9 @@ public struct OnboardingWizard: View {
     /// already determined (so a re-run/upgrade doesn't re-prompt), and advance once the OS dialog is
     /// dismissed either way — the per-feature toggles still handle a later denial on their own.
     private func advance() {
+        if step == .profile {
+            ProfileStore.confirmCurrentCoreProfile()
+        }
         guard step != .notifications else {
             UNUserNotificationCenter.current().getNotificationSettings { settings in
                 guard settings.authorizationStatus == .notDetermined else {

@@ -42,6 +42,9 @@ extension AuraTodayReading {
         history: [DailyMetric],
         displayName: String,
         effortScale: EffortScale,
+        stress: Double? = nil,
+        selectedDayKey: String? = nil,
+        currentDayKey: String? = nil,
         now: Date = Date()
     ) -> AuraTodayReading {
         let hour = Calendar.current.component(.hour, from: now)
@@ -95,7 +98,8 @@ extension AuraTodayReading {
         let hrSeries = labelledSeries { $0.restingHr.map(Double.init) }
         let hrvSeries = labelledSeries { $0.avgHrv }
         let respSeries = labelledSeries { $0.respRateBpm }
-        let sleepSeries = labelledSeries { $0.totalSleepMin.map { $0 / 60 } }
+        let spo2Series = labelledSeries { $0.spo2Pct }
+        let skinTempSeries = labelledSeries { $0.skinTempDevC }
 
         let signals: [Signal] = [
             Signal(id: "hr", name: String(localized: "Resting heart rate"),
@@ -110,11 +114,40 @@ extension AuraTodayReading {
                    value: day?.respRateBpm.map { String(format: "%.1f", $0) } ?? "—", unit: "rpm",
                    systemImage: "lungs", tint: AuraPalette.rest,
                    series: respSeries.0, labels: respSeries.1),
-            Signal(id: "sleep", name: String(localized: "Sleep"),
-                   value: sleepMin.map { String(format: "%.1f", $0 / 60) } ?? "—", unit: "h",
-                   systemImage: "moon", tint: AuraPalette.effort,
-                   series: sleepSeries.0, labels: sleepSeries.1),
+            Signal(id: "spo2", name: String(localized: "Blood oxygen"),
+                   value: day?.spo2Pct.map { String(format: "%.1f", $0) } ?? "—", unit: "%",
+                   systemImage: "drop.fill", tint: AuraPalette.accent,
+                   series: spo2Series.0, labels: spo2Series.1),
+            Signal(id: "temp", name: String(localized: "Skin temperature"),
+                   value: day?.skinTempDevC.map { String(format: "%+.1f", $0) } ?? "—", unit: "°C",
+                   systemImage: "thermometer.medium", tint: AuraPalette.accent,
+                   series: skinTempSeries.0, labels: skinTempSeries.1),
         ]
+
+        let stressBand: String
+        switch stress {
+        case .some(let value) where value < 1:
+            stressBand = String(localized: "low")
+        case .some(let value) where value < 2:
+            stressBand = String(localized: "medium")
+        case .some:
+            stressBand = String(localized: "high")
+        case .none:
+            stressBand = String(localized: "waiting")
+        }
+
+        let selectedID = selectedDayKey ?? currentDayKey ?? day?.day
+        let browsingPastDay = selectedDayKey != nil && selectedDayKey != currentDayKey
+        let selectedDayLabel: String = browsingPastDay
+            ? selectedID.map(detailDayLabel) ?? String(localized: "Earlier")
+            : String(localized: "Today")
+        let dayCells: [DayCell] = Array(history.suffix(8)).map { row in
+            DayCell(
+                id: row.day,
+                weekday: compactWeekdayLabel(row.day),
+                number: dayNumberLabel(row.day)
+            )
+        }
 
         // The banner states what the screen is actually reading, so a stale or absent night is visible
         // rather than implied by em-dashes the wearer has to notice.
@@ -148,6 +181,13 @@ extension AuraTodayReading {
             effortValue: effortValue,
             effortUnit: "/\(UnitFormatter.effortScaleMax(effortScale))",
             effortFraction: effortFraction,
+            stressBand: stressBand,
+            stressAvailable: stress != nil,
+            selectedDayLabel: selectedDayLabel,
+            selectedDayID: selectedID,
+            currentDayID: currentDayKey,
+            browsingPastDay: browsingPastDay,
+            dayCells: dayCells,
             signals: signals,
             banner: banner,
             verdict: bodyCopy.verdict,
@@ -185,6 +225,30 @@ extension AuraTodayReading {
         return formatter
     }()
 
+    private static func compactWeekdayLabel(_ day: String) -> String {
+        guard let date = detailDayParser.date(from: day) else { return "—" }
+        return compactWeekdayFormatter.string(from: date)
+    }
+
+    private static func dayNumberLabel(_ day: String) -> String {
+        guard let date = detailDayParser.date(from: day) else { return "—" }
+        return dayNumberFormatter.string(from: date)
+    }
+
+    private static let compactWeekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.activeLocale
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
+        return formatter
+    }()
+
+    private static let dayNumberFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.activeLocale
+        formatter.setLocalizedDateFormatFromTemplate("d")
+        return formatter
+    }()
+
     /// Copy backed only by the recorded Charge and NOOP's established recovery-to-Effort mapping. It
     /// never claims an HRV direction, sleep streak, prior training streak, or workout modality that was
     /// not supplied to this adapter.
@@ -209,17 +273,17 @@ extension AuraTodayReading {
         switch recovery {
         case 67...:
             verdict = String(localized: "High recovery")
-            currentCoaching = String(localized: "Your Charge is \(score) today. You have room for a demanding day if you want it.")
+            currentCoaching = String(localized: "Your latest scored night is in the high recovery band. You have room for a demanding day if you want it.")
         case 34..<67:
             verdict = String(localized: "Moderate recovery")
-            currentCoaching = String(localized: "Your Charge is \(score) today. Let how you feel set the ceiling on activity.")
+            currentCoaching = String(localized: "Your latest scored night is in the moderate recovery band. Let how you feel set the ceiling on activity.")
         default:
             verdict = String(localized: "Low recovery")
-            currentCoaching = String(localized: "Your Charge is \(score) today. Recovery is the useful priority.")
+            currentCoaching = String(localized: "Your latest scored night is in the low recovery band. Recovery is the useful priority.")
         }
         let coaching = scoreIsCurrent
             ? currentCoaching
-            : String(localized: "Your latest Charge is \(score), recorded \(scoreDayLabel ?? String(localized: "on an earlier day")). Treat it as history until a new night is scored.")
+            : String(localized: "This state comes from the Charge recorded \(scoreDayLabel ?? String(localized: "on an earlier day")). It is history, not a live daytime balance.")
 
         guard let target = CoupledView.optimalStrainRange(recovery: recovery) else {
             return (verdict, coaching, String(localized: "No Effort target yet"),

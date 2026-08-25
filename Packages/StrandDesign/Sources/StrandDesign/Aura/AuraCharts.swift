@@ -132,10 +132,10 @@ public struct AuraHypnogram: View {
     /// Awake · Light · REM · Deep, in ascending bar height. Each stage gets a distinct hue as well as
     /// a distinct height, so a night remains readable in a dense strip and never relies on shade alone.
     public static let stageColors: [Color] = [
-        Color(hex: "#F2B45C"),
-        Color(hex: "#5874D8"),
-        Color(hex: "#B26DE8"),
-        Color(hex: "#2FB2E8"),
+        Color.white.opacity(0.22),
+        Color(hex: "#9AA7E0"),
+        Color(hex: "#4FB8E8"),
+        Color(hex: "#5D6BC4"),
     ]
     public static let stageHeights: [CGFloat] = [20, 40, 60, 82]
 

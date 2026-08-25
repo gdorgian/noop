@@ -333,14 +333,14 @@ extension SleepModel {
     /// Rest/Intelligence score against. Deliberately NOT the descriptive `sleepNeedMin` (mean total
     /// sleep): the mean drifts DOWN toward a chronic under-sleeper's own deficit and quietly erases
     /// their debt, whereas the upper-quartile floored at the ~8 h adult target only adjusts UP for
-    /// genuine long sleepers. Age isn't plumbed to this screen (age: nil → adult target); wiring it
-    /// would only raise it for under-18s. One need across every debt surface, agreeing with the engine.
+    /// genuine long sleepers. A confirmed age may be supplied; nil keeps the honest adult target.
+    /// One need across every debt surface, agreeing with the engine.
     /// (#242; need-unification from #464 by @vishk23. The descriptive `sleepNeedMin` still drives the
     /// non-debt "hours vs needed" performance tile.)
-    static func debtNeedMin(days: [DailyMetric]) -> Double {
+    static func debtNeedMin(days: [DailyMetric], age: Int? = nil) -> Double {
         AnalyticsEngine.Rest.personalizedNeedHours(
             nightlyHours: days.compactMap { $0.totalSleepMin.map { $0 / 60.0 } },
-            age: nil) * 60.0
+            age: age) * 60.0
     }
 
     // MARK: Per-tile series (latest, typical mean, sparkline history)
@@ -473,14 +473,18 @@ extension SleepModel {
     /// normative `debtNeedMin` (the engine's `personalizedNeedHours`) — the SAME need the per-night
     /// "Sleep Debt" tile uses, so the running-balance card and the tile agree — over each main night's
     /// `totalSleepMin` plus actual asleep minutes from separately-recorded naps. (#242)
-    static func debtLedger(days: [DailyMetric], napSleepMinByDay: [String: Double]) -> SleepDebtLedger {
+    static func debtLedger(
+        days: [DailyMetric],
+        napSleepMinByDay: [String: Double],
+        age: Int? = nil
+    ) -> SleepDebtLedger {
         SleepDebt.ledger(
             series: days.map { day in
                 (day: day.day, totalSleepMin: SleepDebt.creditedSleepMin(
                     mainSleepMin: day.totalSleepMin,
                     napSleepMin: napSleepMinByDay[day.day] ?? 0))
             },
-            needHours: debtNeedMin(days: days) / 60.0)
+            needHours: debtNeedMin(days: days, age: age) / 60.0)
     }
 
     // MARK: - Build

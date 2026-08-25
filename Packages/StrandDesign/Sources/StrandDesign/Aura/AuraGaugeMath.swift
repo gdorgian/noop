@@ -29,11 +29,11 @@ public enum AuraGaugeMath {
     public static let majorTickStride = 5
 
     /// Distance from the ring's centre to the centre of a tick, in points.
-    public static let tickRadius: CGFloat = 124
+    public static let tickRadius: CGFloat = 142
 
     /// Distance from the ring's centre to the centre of the marker. Slightly inside `tickRadius` so the
     /// marker sits against the ticks and points out through them, rather than overlapping them.
-    public static let markerRadius: CGFloat = 113
+    public static let markerRadius: CGFloat = 131
 
     /// Length of a major / minor tick, in points.
     public static let majorTickLength: CGFloat = 15
@@ -41,7 +41,7 @@ public enum AuraGaugeMath {
     public static let tickWidth: CGFloat = 2
 
     /// The ring's overall square footprint. Large enough to hold `tickRadius` plus half a major tick.
-    public static let ringSize: CGFloat = 270
+    public static let ringSize: CGFloat = 306
 
     /// The angle of tick `index`, in degrees clockwise from straight up.
     /// Out-of-range indices are clamped rather than trapping — this feeds a view, not a calculation.

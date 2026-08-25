@@ -12,6 +12,7 @@ final class ProfileStore: ObservableObject {
     @Published var dateOfBirth: Date {
         didSet {
             d.set(dateOfBirth, forKey: K.dateOfBirth)
+            d.set(true, forKey: K.dateOfBirthConfirmed)
             // Mirror the DERIVED age under the legacy `profile.age` key so the `.noopbak` backup
             // whitelist (which carries an Int age, not a Date) keeps exporting a correct value with no
             // change to the cross-platform backup contract. `BackupSettings.apply` clears
@@ -22,14 +23,14 @@ final class ProfileStore: ObservableObject {
     /// Display name, for the Aura greeting and header avatar. Empty = not set, which is the default and
     /// stays the default: NOOP has never asked for a name and needs none to compute anything, so this is
     /// presentation only and every consumer must handle it being blank.
-    @Published var sex: String { didSet { d.set(sex, forKey: K.sex) } }          // "male" | "female" | "nonbinary"
-    @Published var weightKg: Double { didSet { d.set(weightKg, forKey: K.weight) } }
-    @Published var heightCm: Double { didSet { d.set(heightCm, forKey: K.height) } }
+    @Published var sex: String { didSet { d.set(sex, forKey: K.sex); d.set(true, forKey: K.sexConfirmed) } }          // "male" | "female" | "nonbinary"
+    @Published var weightKg: Double { didSet { d.set(weightKg, forKey: K.weight); d.set(true, forKey: K.weightConfirmed) } }
+    @Published var heightCm: Double { didSet { d.set(heightCm, forKey: K.height); d.set(true, forKey: K.heightConfirmed) } }
     /// Optional waist circumference (cm); 0 = not set. Only used to ALSO show an estimated VO₂max
     /// alongside Fitness Age — the Fitness Age itself does not need it (the body term cancels).
     @Published var waistCm: Double { didSet { d.set(waistCm, forKey: K.waist) } }
     /// 0 = auto-estimate from age.
-    @Published var hrMaxOverride: Int { didSet { d.set(hrMaxOverride, forKey: K.hrMax) } }
+    @Published var hrMaxOverride: Int { didSet { d.set(hrMaxOverride, forKey: K.hrMax); if hrMaxOverride > 0 { d.set(true, forKey: K.hrMaxConfirmed) } } }
     // ── HR zone bands ───────────────────────────────────────────────────────────────────────────
     // Three stored fields rather than one, because the two custom modes hold DIFFERENT quantities
     // (fractions vs bpm) and a wearer who tries both should not lose the first set by switching. The
@@ -97,11 +98,16 @@ final class ProfileStore: ObservableObject {
     private enum K {
         static let name = "profile.name"
         static let dateOfBirth = "profile.dateOfBirth"
+        static let dateOfBirthConfirmed = "profile.dateOfBirthConfirmed"
         /// Pre-#146 age key. No longer the source of truth; kept mirrored from `dateOfBirth` so the
         /// cross-platform `.noopbak` whitelist keeps round-tripping an Int age unchanged.
         static let legacyAge = "profile.age"
         static let sex = "profile.sex", weight = "profile.weightKg"
         static let height = "profile.heightCm", hrMax = "profile.hrMaxOverride"
+        static let sexConfirmed = "profile.sexConfirmed"
+        static let weightConfirmed = "profile.weightConfirmed"
+        static let heightConfirmed = "profile.heightConfirmed"
+        static let hrMaxConfirmed = "profile.hrMaxConfirmed"
         static let zoneMode = "profile.zoneMode"
         static let zonePercentEdges = "profile.zonePercentEdges"
         static let zoneBpmEdges = "profile.zoneBpmEdges"
@@ -235,6 +241,23 @@ final class ProfileStore: ObservableObject {
     /// to remember to update. Every existing caller (HR zones, calories, Fitness/Body Age) reads this
     /// unchanged.
     var age: Int { Self.years(from: dateOfBirth, to: Date()) }
+
+    /// Defaults keep legacy calculations stable but are not evidence about the wearer. Aura may show a
+    /// profile value only after the user has explicitly saved it (or a trusted source wrote it).
+    var hasConfirmedAge: Bool { d.bool(forKey: K.dateOfBirthConfirmed) }
+    var hasConfirmedSex: Bool { d.bool(forKey: K.sexConfirmed) }
+    var hasConfirmedWeight: Bool { d.bool(forKey: K.weightConfirmed) }
+    var hasConfirmedHeight: Bool { d.bool(forKey: K.heightConfirmed) }
+    var hasConfirmedHRMax: Bool { d.bool(forKey: K.hrMaxConfirmed) || (hasConfirmedAge && hrMax > 0) }
+
+    /// Called only after the onboarding Profile screen's explicit “Save & Continue” action.
+    nonisolated static func confirmCurrentCoreProfile() {
+        let defaults = UserDefaults.standard
+        defaults.set(true, forKey: K.dateOfBirthConfirmed)
+        defaults.set(true, forKey: K.sexConfirmed)
+        defaults.set(true, forKey: K.weightConfirmed)
+        defaults.set(true, forKey: K.heightConfirmed)
+    }
 
     /// Whole years elapsed `from`→`to` (floor — a birthday not yet reached this year doesn't count).
     nonisolated static func years(from: Date, to: Date) -> Int {

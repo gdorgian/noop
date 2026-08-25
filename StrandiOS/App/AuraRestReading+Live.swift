@@ -13,7 +13,10 @@ extension AuraRestReading {
     static func live(
         days: [DailyMetric],
         sessions: [CachedSleepSession],
-        habitualMidsleepSec: Int?
+        habitualMidsleepSec: Int?,
+        restScores: [(day: String, value: Double)] = [],
+        profileAge: Int? = nil,
+        isLoading: Bool = false
     ) -> AuraRestReading {
         let trailingDays = Array(days.suffix(30))
         let baselineMinutes = trailingDays.compactMap(\.totalSleepMin).filter { $0 > 0 }
@@ -34,11 +37,13 @@ extension AuraRestReading {
         let personalAverageMinutes = mean(personalSamples)
         let personalAverageHours = (personalAverageMinutes ?? 0) / 60
 
+        let scoreByDay = Dictionary(restScores.map { ($0.day, $0.value) }, uniquingKeysWith: { _, newest in newest })
         let nights = decoded.map { night in
             mappedNight(
                 night,
                 personalAverageMinutes: personalAverageMinutes,
-                personalAverageCount: personalSamples.count
+                personalAverageCount: personalSamples.count,
+                score: scoreByDay[dayParser.string(from: Date(timeIntervalSince1970: TimeInterval(night.session.endTs)))]
             )
         }
         let recency = periodLabels(wakeDayKeys: nights.map(\.wakeDayKey), now: Date())
@@ -47,10 +52,12 @@ extension AuraRestReading {
             navDays: navDays,
             habitualMidsleepSec: habitualMidsleepSec
         )
-        let ledger = SleepModel.debtLedger(days: days, napSleepMinByDay: naps)
+        let ledger = SleepModel.debtLedger(days: days, napSleepMinByDay: naps, age: profileAge)
+        let needSampleCount = days.compactMap(\.totalSleepMin).filter { $0 > 0 }.count
 
         return AuraRestReading(
             nights: nights,
+            isLoading: isLoading,
             periodTitle: recency.periodTitle,
             latestNightTitle: recency.latestNightTitle,
             personalAverage: personalAverageHours,
@@ -61,9 +68,15 @@ extension AuraRestReading {
             ),
             averageSleepValue: decimalHours(personalAverageMinutes),
             averageDeepValue: decimalHours(mean(deepMinutes)),
+            sleepNeedMinutes: ledger.needMin,
+            sleepNeedIsPersonalized: needSampleCount >= AnalyticsEngine.Rest.minNeedNights,
+            sleepNeedSampleCount: needSampleCount,
             debtHeadline: debtHeadline(ledger),
             debtExplanation: debtExplanation(ledger),
             debtIsDebt: ledger.isDebt,
+            debtBalanceMinutes: ledger.balanceMin,
+            debtNeedMinutes: ledger.needMin,
+            debtNightCount: ledger.nightCount,
             debtNights: ledger.nights.map(debtNight)
         )
     }
@@ -71,7 +84,8 @@ extension AuraRestReading {
     private static func mappedNight(
         _ night: Night,
         personalAverageMinutes: Double?,
-        personalAverageCount: Int
+        personalAverageCount: Int,
+        score: Double?
     ) -> AuraRestReading.NightReading {
         let minutes = night.stages.asleep
         let wakeDate = Date(timeIntervalSince1970: TimeInterval(night.session.endTs))
@@ -81,6 +95,7 @@ extension AuraRestReading {
             day: dayFormatter.string(from: wakeDate),
             dateLabel: shortDateFormatter.string(from: wakeDate),
             hours: minutes / 60,
+            score: score.flatMap { $0.isFinite ? min(max($0, 0), 100) : nil },
             note: note(
                 for: night,
                 minutes: minutes,
@@ -89,6 +104,8 @@ extension AuraRestReading {
             window: "\(night.onsetText) – \(night.wakeText)",
             hypnogram: hypnogram(for: night),
             hypnogramAxis: axisLabels(for: night),
+            stageIntervals: night.realSegments ?? [],
+            nightStart: night.realSegments == nil ? nil : night.onsetDate,
             stages: stageRows(night.stages)
         )
     }
@@ -124,20 +141,21 @@ extension AuraRestReading {
     }
 
     private static func stageRows(_ stages: Stages) -> [AuraRestReading.Stage] {
-        let values: [(String, String, Double, Int)] = [
-            ("deep", String(localized: "Deep"), stages.deep, 3),
-            ("rem", String(localized: "REM"), stages.rem, 2),
-            ("light", String(localized: "Light"), stages.light, 1),
-            ("awake", String(localized: "Awake"), stages.awake, 0),
+        let values: [(String, String, Double, Double)] = [
+            ("deep", String(localized: "Deep"), stages.deep, 1.00),
+            ("rem", String(localized: "REM"), stages.rem, 0.82),
+            ("light", String(localized: "Light"), stages.light, 0.60),
+            ("awake", String(localized: "Awake"), stages.awake, 0.26),
         ]
         let widest = max(values.map(\.2).max() ?? 0, 1)
-        return values.map { id, name, minutes, colorIndex in
+        return values.map { id, name, minutes, alpha in
             AuraRestReading.Stage(
                 id: id,
                 name: name,
                 duration: durationText(minutes),
+                minutes: minutes,
                 fraction: minutes / widest,
-                tint: AuraHypnogram.stageColors[colorIndex]
+                tint: NoopSpecTokens.lavender.opacity(alpha)
             )
         }
     }
@@ -190,9 +208,14 @@ extension AuraRestReading {
             return String(localized: "This is your first recorded night.")
         }
         let delta = Int((minutes - personalAverageMinutes).rounded())
-        if abs(delta) < 15 { return String(localized: "This night was close to your normal.") }
-        if delta > 0 { return String(localized: "You slept \(durationText(Double(delta))) above your normal.") }
-        return String(localized: "You slept \(durationText(Double(-delta))) below your normal.")
+        let baseline = durationText(personalAverageMinutes)
+        if abs(delta) < 15 {
+            return String(localized: "This night was close to your \(personalAverageCount)-night average of \(baseline).")
+        }
+        if delta > 0 {
+            return String(localized: "You slept \(durationText(Double(delta))) above your \(personalAverageCount)-night average of \(baseline).")
+        }
+        return String(localized: "You slept \(durationText(Double(-delta))) below your \(personalAverageCount)-night average of \(baseline).")
     }
 
     private static func averageNote(
@@ -240,15 +263,22 @@ extension AuraRestReading {
     private static func debtNight(_ night: SleepDebtNight) -> AuraRestReading.DebtNight {
         let added = night.deltaMin < 0
         let magnitude = durationText(abs(night.deltaMin))
-        let change = added
-            ? String(localized: "+\(magnitude) debt")
-            : String(localized: "−\(magnitude) debt")
+        let change: String
+        if night.deltaMin == 0 {
+            change = String(localized: "On need")
+        } else if added {
+            change = String(localized: "+\(magnitude) debt")
+        } else {
+            change = String(localized: "−\(magnitude) debt")
+        }
         return AuraRestReading.DebtNight(
             id: night.day,
             date: shortDayKey(night.day),
             slept: String(localized: "\(durationText(night.sleptMin)) slept"),
             change: change,
-            addedDebt: added
+            addedDebt: added,
+            sleptMinutes: night.sleptMin,
+            deltaMinutes: night.deltaMin
         )
     }
 

@@ -4,9 +4,9 @@ import StrandDesign
 
 // MARK: - Aura Effort
 //
-// Effort against a target, not against other people. The slider is a read-out rather than a control —
-// you do not choose your strain — and the note under it says what would close the gap, which is the only
-// actionable thing on the screen.
+// The handoff's Session root is preserved as a single hero and a short explanation of today's real data.
+// AuraEffortReading does not contain a prescribed workout, HR band or predicted load, so this screen never
+// borrows those prototype values: it offers the existing live tracker and displays only stored readings.
 
 struct AuraEffortView: View {
     private let reading: AuraEffortReading
@@ -22,126 +22,381 @@ struct AuraEffortView: View {
     }
 
     var body: some View {
-        VStack(spacing: AuraPalette.cardGap) {
-            targetCard
-            liveSessionRow
-            loggedCard
-            weekCard
+        VStack(spacing: 9) {
+            sessionHero
+            whyCard
+            loadCard
+            latestSessionCard
+            restDecisionCard
+            Text(String(localized: "Live sessions record what happened. A prescribed workout will appear only when Noop has a validated model and the data it needs."))
+                .font(.custom("Instrument Sans", fixedSize: 11.5))
+                .lineSpacing(3)
+                .foregroundStyle(AuraPalette.textDim)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 2)
         }
     }
 
-    /// An ACTION, so it reads as one — a row with a chevron, under the reading it acts on rather than
-    /// above it. Aura's rule is that a screen opens with what is true, not with what to press.
-    private var liveSessionRow: some View {
-        VStack(spacing: 0) {
-            AuraListRow(key: String(localized: "Start a live session"),
-                        subtitle: String(localized: "Guided effort with live heart rate"),
-                        showsDivider: false,
-                        action: onStartLiveSession)
-        }
-        .padding(.horizontal, 16)
-        .auraCard()
-    }
+    // MARK: Live-session hero
 
-    // MARK: Today against target
-
-    private var targetCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(reading.effort)
-                    .font(.system(size: 54, weight: .ultraLight, design: .rounded).monospacedDigit())
-                    .foregroundStyle(AuraPalette.textPrimary)
-                Text(reading.targetCaption)
-                    .font(.system(size: 14.5))
+    private var sessionHero: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(String(localized: "Live session"))
+                    .font(.custom("Instrument Sans", fixedSize: 10).weight(.semibold))
+                    .tracking(1.2)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AuraPalette.accent)
+                Spacer(minLength: 8)
+                Text(String(localized: "uses current strap data"))
+                    .font(.custom("Instrument Sans", fixedSize: 11))
                     .foregroundStyle(AuraPalette.textQuiet)
             }
-            .padding(.bottom, 6)
 
-            Text(String(localized: "Effort so far today"))
-                .font(.system(size: 13))
-                .foregroundStyle(AuraPalette.textTertiary)
-                .padding(.bottom, 24)
-
-            AuraEffortSlider(fraction: reading.fraction, stops: reading.stops)
-                .padding(.bottom, 20)
-
-            HStack(alignment: .top, spacing: 10) {
-                Circle()
-                    .fill(RadialGradient(colors: [Color(hex: "#8FDCFA"), Color(hex: "#0B6FA8")],
-                                         center: UnitPoint(x: 0.34, y: 0.3), startRadius: 0, endRadius: 18))
-                    .frame(width: 18, height: 18)
-                    .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 7) {
+                Text(String(localized: "Track your effort live"))
+                    .font(.custom("Outfit", fixedSize: 29).weight(.light))
+                    .tracking(-0.9)
+                    .foregroundStyle(AuraPalette.textPrimary)
                 Text(reading.note)
-                    .font(.system(size: 13.5))
-                    .lineSpacing(2)
-                    .foregroundStyle(AuraPalette.textPrimary.opacity(0.82))
+                    .font(.custom("Instrument Sans", fixedSize: 13.5))
+                    .lineSpacing(3.5)
+                    .foregroundStyle(Color(hex: "#B7C3C9"))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(15)
+
+            HStack(spacing: 14) {
+                heroStat(value: reading.effort, label: String(localized: "Effort now"))
+                heroDivider
+                heroStat(value: String(reading.activities.count), label: String(localized: "sessions today"))
+                heroDivider
+                heroStat(
+                    value: reading.weekLoad.isEmpty ? "—" : formattedLoad(weekTotal),
+                    label: String(localized: "7-day load")
+                )
+            }
+            .padding(.vertical, 2)
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(String(localized: "Today’s range"))
+                        .font(.custom("Instrument Sans", fixedSize: 10).weight(.semibold))
+                        .tracking(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AuraPalette.textFaint)
+                    Spacer(minLength: 8)
+                    Text(reading.targetCaption)
+                        .font(.custom("Instrument Sans", fixedSize: 11))
+                        .foregroundStyle(AuraPalette.textQuiet)
+                        .multilineTextAlignment(.trailing)
+                }
+
+                if reading.effort == "—" {
+                    Capsule(style: .continuous)
+                        .fill(Color.white.opacity(0.09))
+                        .frame(height: 8)
+                    Text(String(localized: "Effort position pending"))
+                        .font(.custom("Instrument Sans", fixedSize: 11.5))
+                        .foregroundStyle(AuraPalette.textDim)
+                } else {
+                    AuraEffortSlider(fraction: reading.fraction, stops: reading.stops)
+                }
+            }
+            .padding(13)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.white.opacity(0.05))
+                    .fill(Color.white.opacity(0.04))
             )
+
+            VStack(spacing: 8) {
+                Button(action: onStartLiveSession) {
+                    Text(String(localized: "Start live session"))
+                        .font(.custom("Instrument Sans", fixedSize: 15).weight(.semibold))
+                        .foregroundStyle(AuraPalette.onAccent)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 54)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(AuraPalette.accent)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                HStack(spacing: 8) {
+                    Text(String(localized: "Choose something else"))
+                        .foregroundStyle(Color(hex: "#C6CEC9"))
+                    Text(String(localized: "Coming soon"))
+                        .foregroundStyle(AuraPalette.accent)
+                }
+                .font(.custom("Instrument Sans", fixedSize: 13.5))
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5)
+                )
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 18)
-        .padding(.vertical, 20)
-        .auraCard()
+        .padding(.top, 18)
+        .padding(.bottom, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [AuraPalette.accent.opacity(0.16), AuraPalette.accent.opacity(0.03)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(AuraPalette.accent.opacity(0.30), lineWidth: 0.5)
+                )
+        )
     }
 
-    // MARK: Logged
-
-    private var loggedCard: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text(String(localized: "Logged today")).auraOverline()
-            if reading.activities.isEmpty {
-                Text(String(localized: "No workouts logged today."))
-                    .font(.system(size: 13.5))
-                    .foregroundStyle(AuraPalette.textQuiet)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 4)
-            } else {
-                ForEach(reading.activities) { activity in
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(activity.tint)
-                            .frame(width: 10, height: 10)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(activity.name)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(AuraPalette.textPrimary)
-                            Text(activity.detail)
-                                .font(.system(size: 11.5))
-                                .foregroundStyle(AuraPalette.textQuiet)
-                        }
-                        Spacer(minLength: 8)
-                        Text(activity.load)
-                            .font(.system(size: 19, design: .rounded).monospacedDigit())
-                            .foregroundStyle(AuraPalette.textPrimary)
-                    }
-                    .accessibilityElement(children: .combine)
-                }
-            }
+    private func heroStat(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.custom("Outfit", fixedSize: 21).weight(.light))
+                .tracking(-0.5)
+                .monospacedDigit()
+                .foregroundStyle(AuraPalette.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(.custom("Instrument Sans", fixedSize: 10.5))
+                .foregroundStyle(AuraPalette.textFaint)
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .auraCard()
     }
 
-    // MARK: Week
+    private var heroDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.12))
+            .frame(width: 0.5, height: 30)
+    }
 
-    private var weekCard: some View {
-        VStack(spacing: 18) {
-            AuraCardHeader(title: String(localized: "Load this week"),
-                           note: reading.weekVerdict,
-                           noteTint: AuraPalette.accent)
-            AuraWeekBars(values: reading.weekLoad, days: reading.weekDays,
-                         highlighted: reading.weekHighlighted,
-                         ceiling: reading.weekCeiling)
+    // MARK: What today's data says
+
+    private var whyCard: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Text(String(localized: "What today’s data says")).auraOverline()
+
+            VStack(spacing: 11) {
+                dataRow(
+                    label: String(localized: "Effort so far"),
+                    note: String(localized: "Stored from today’s heart-rate load."),
+                    chip: reading.effort == "—" ? String(localized: "pending") : reading.effort,
+                    tint: reading.effort == "—" ? AuraPalette.textQuiet : AuraPalette.accent,
+                    isMuted: reading.effort == "—"
+                )
+
+                dataRow(
+                    label: String(localized: "Recovery-matched range"),
+                    note: reading.note,
+                    chip: reading.targetCaption,
+                    tint: targetPending ? AuraPalette.textQuiet : AuraPalette.accent,
+                    isMuted: targetPending
+                )
+
+                dataRow(
+                    label: String(localized: "Sessions recorded today"),
+                    note: latestActivity?.detail ?? String(localized: "No workouts recorded today."),
+                    chip: String(reading.activities.count),
+                    tint: reading.activities.isEmpty ? AuraPalette.textQuiet : AuraPalette.accent,
+                    isMuted: reading.activities.isEmpty
+                )
+            }
         }
-        .padding(18)
-        .auraCard()
+        .padding(.horizontal, 16)
+        .padding(.top, 15)
+        .padding(.bottom, 14)
+        .auraCard(cornerRadius: 20)
+    }
+
+    private var targetPending: Bool {
+        reading.targetCaption == String(localized: "target pending")
+    }
+
+    private func dataRow(
+        label: String,
+        note: String,
+        chip: String,
+        tint: Color,
+        isMuted: Bool
+    ) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Circle()
+                .fill(tint)
+                .frame(width: 9, height: 9)
+                .overlay(Circle().stroke(tint.opacity(0.14), lineWidth: 4))
+                .padding(.top, 5)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.custom("Instrument Sans", fixedSize: 13))
+                    .foregroundStyle(AuraPalette.textPrimary)
+                Text(note)
+                    .font(.custom("Instrument Sans", fixedSize: 11.5))
+                    .lineSpacing(2.5)
+                    .foregroundStyle(AuraPalette.textQuiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 6)
+            Text(chip)
+                .font(.custom("Instrument Sans", fixedSize: 10.5).weight(.semibold))
+                .foregroundStyle(isMuted ? AuraPalette.textSecondary : Color(hex: "#8FD3F5"))
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(tint.opacity(0.13)))
+        }
+    }
+
+    // MARK: Real seven-day load
+
+    private var loadCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(String(localized: "Load, last seven days")).auraOverline()
+                Spacer(minLength: 8)
+                Text(reading.weekLoad.isEmpty
+                     ? String(localized: "no recorded load")
+                     : String(localized: "\(formattedLoad(weekTotal)) total"))
+                    .font(.custom("Instrument Sans", fixedSize: 11).monospacedDigit())
+                    .foregroundStyle(AuraPalette.textDim)
+            }
+
+            if reading.weekLoad.isEmpty {
+                Text(String(localized: "No Effort has been recorded in this window."))
+                    .font(.custom("Instrument Sans", fixedSize: 12))
+                    .foregroundStyle(AuraPalette.textQuiet)
+                    .frame(maxWidth: .infinity, minHeight: 62, alignment: .center)
+            } else {
+                HStack(alignment: .bottom, spacing: 6) {
+                    ForEach(Array(reading.weekLoad.enumerated()), id: \.offset) { index, value in
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(loadTint(index: index, value: value))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: max(3, 62 * CGFloat(min(max(value / max(reading.weekCeiling, 1), 0), 1))))
+                    }
+                }
+                .frame(height: 62, alignment: .bottom)
+
+                HStack(spacing: 6) {
+                    ForEach(Array(reading.weekLoad.enumerated()), id: \.offset) { index, _ in
+                        Text(reading.weekDays.indices.contains(index) ? reading.weekDays[index] : "")
+                            .font(.custom("Instrument Sans", fixedSize: 9.5).weight(index == reading.weekHighlighted ? .semibold : .regular))
+                            .foregroundStyle(index == reading.weekHighlighted ? Color(hex: "#8FD3F5") : AuraPalette.textDim)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+
+            Text(reading.weekVerdict)
+                .font(.custom("Instrument Sans", fixedSize: 11.5))
+                .lineSpacing(3)
+                .foregroundStyle(AuraPalette.textQuiet)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 15)
+        .padding(.bottom, 13)
+        .auraCard(cornerRadius: 20)
+    }
+
+    private var weekTotal: Double { reading.weekLoad.reduce(0, +) }
+
+    private func loadTint(index: Int, value: Double) -> Color {
+        if index == reading.weekHighlighted { return AuraPalette.accent }
+        if value / max(reading.weekCeiling, 1) > 0.78 { return Color(hex: "#F2B45C") }
+        return value > 0 ? AuraPalette.accent.opacity(0.50) : Color.white.opacity(0.07)
+    }
+
+    private func formattedLoad(_ value: Double) -> String {
+        if value.rounded() == value { return String(Int(value)) }
+        return String(format: "%.1f", value)
+    }
+
+    // MARK: Latest recorded session
+
+    private var latestActivity: AuraEffortReading.Activity? { reading.activities.first }
+
+    private var latestSessionCard: some View {
+        HStack(spacing: 13) {
+            Image(systemName: latestActivity == nil ? "figure.walk.motion" : "activity.rings")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(latestActivity?.tint ?? AuraPalette.textDim)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill((latestActivity?.tint ?? AuraPalette.textQuiet).opacity(0.12)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(latestActivity.map { String(localized: "Latest today · \($0.name)") }
+                     ?? String(localized: "No session recorded today"))
+                    .font(.custom("Instrument Sans", fixedSize: 13.5).weight(.semibold))
+                    .foregroundStyle(AuraPalette.textPrimary)
+                Text(latestActivity?.detail ?? String(localized: "Start a live session when you are ready."))
+                    .font(.custom("Instrument Sans", fixedSize: 11.5))
+                    .foregroundStyle(AuraPalette.textQuiet)
+            }
+            Spacer(minLength: 8)
+            if let latestActivity {
+                Text(latestActivity.load)
+                    .font(.custom("Outfit", fixedSize: 17))
+                    .monospacedDigit()
+                    .foregroundStyle(AuraPalette.textSecondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
+        .auraCard(cornerRadius: 20)
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Rest decision
+
+    private var restDecisionCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(String(localized: "Rather not today?"))
+                .font(.custom("Instrument Sans", fixedSize: 13.5).weight(.semibold))
+                .foregroundStyle(AuraPalette.textPrimary)
+            Text(String(localized: "Skipping costs you nothing. There is no streak to break here — a rest day is a training decision."))
+                .font(.custom("Instrument Sans", fixedSize: 12))
+                .lineSpacing(3)
+                .foregroundStyle(AuraPalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 7) {
+                Image(systemName: "moon.fill")
+                    .font(.system(size: 11))
+                Text(String(localized: "Mark a rest day"))
+                Text(String(localized: "Coming soon"))
+                    .foregroundStyle(Color(hex: "#C9D0EE"))
+            }
+            .font(.custom("Instrument Sans", fixedSize: 12.5).weight(.semibold))
+            .foregroundStyle(AuraPalette.textSecondary)
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(AuraPalette.rest.opacity(0.12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(AuraPalette.rest.opacity(0.24), lineWidth: 0.5)
+                    )
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.top, 15)
+        .padding(.bottom, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(AuraPalette.rest.opacity(0.07))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(AuraPalette.rest.opacity(0.18), lineWidth: 0.5)
+                )
+        )
     }
 }
 

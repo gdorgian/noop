@@ -42,6 +42,11 @@ struct StrandiOSApp: App {
     @AppStorage(UnitPrefs.effortScaleKey) private var effortScaleRaw = EffortScale.hundred.rawValue
 
     init() {
+        // Register the exact Outfit / Instrument Sans named instances before any Aura view resolves a
+        // custom font. The files live in StrandDesign's resource bundle, so previews and Release use the
+        // same faces and never silently fall back to San Francisco.
+        NoopSpecType.registerFonts()
+
         // One-time migration off the retired card/button/both Coach-entry picker onto the three
         // independent entry toggles (banner/header-icon/floating-button). No-op after the first launch
         // that has them. Must run before any Today/RootTabView reads its @AppStorage default.

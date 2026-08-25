@@ -165,11 +165,19 @@ struct RootTabView: View {
     @State private var showMore = false
     /// Full Settings, opened from the You screen's rows and tiles.
     @State private var showSettings = false
+    /// Nil means the live/current Today mode. A key means the user deliberately opened that historical
+    /// day from Aura's seven-day navigator; it never changes the canonical latest scored anchor.
+    @State private var auraSelectedTodayDay: String?
 
     /// The same scored anchor used by Today, widgets, watch and Live Activity. It may deliberately carry
     /// the freshest prior score while today's analytics are pending, but never adopts a stray future row.
     private var auraDay: DailyMetric? {
         Repository.widgetAnchor(days: repo.days) ?? repo.today ?? repo.days.last
+    }
+
+    private var auraTodayDisplayDay: DailyMetric? {
+        guard let selected = auraSelectedTodayDay else { return auraDay }
+        return repo.days.last(where: { $0.day == selected }) ?? auraDay
     }
 
     /// Whether the scored Rest/Charge snapshot belongs to the day the repository currently calls Today.
@@ -179,23 +187,33 @@ struct RootTabView: View {
         return auraDay.day == today.day
     }
 
+    private var auraTodayDisplayIsCurrent: Bool {
+        guard auraSelectedTodayDay == nil else { return false }
+        return auraDayIsCurrent
+    }
+
     /// Aura's visual shell receives one immutable snapshot assembled from the same repository and live
     /// state as the incumbent screens. Keeping this adaptation here prevents any UI-only redesign from
     /// reaching into BLE, storage, analytics or HealthKit ownership.
     private var auraTodayReading: AuraTodayReading {
         let restByDay = Dictionary(auraRestSeries.map { ($0.day, $0.value) },
                                    uniquingKeysWith: { _, last in last })
-        let restPerformance = auraDay.flatMap {
+        let restPerformance = auraTodayDisplayDay.flatMap {
             restByDay[$0.day] ?? Repository.dailyColumn(key: "sleep_performance", day: $0)
         }
         return AuraTodayReading.live(
-            day: auraDay,
-            dayIsCurrent: auraDayIsCurrent,
-            effortDay: repo.today,
+            day: auraTodayDisplayDay,
+            dayIsCurrent: auraTodayDisplayIsCurrent,
+            effortDay: auraSelectedTodayDay.flatMap { key in repo.days.last(where: { $0.day == key }) } ?? repo.today,
             restPerformance: restPerformance,
             history: Array(repo.days.suffix(14)),
             displayName: profile.displayName ?? "",
-            effortScale: UnitPrefs.resolveEffortScale(auraEffortScaleRaw)
+            effortScale: UnitPrefs.resolveEffortScale(auraEffortScaleRaw),
+            stress: auraTodayDisplayDay.flatMap { selected in
+                auraStressSeries.last(where: { $0.day == selected.day })?.value
+            },
+            selectedDayKey: auraSelectedTodayDay,
+            currentDayKey: repo.today?.day
         )
     }
 
@@ -226,7 +244,10 @@ struct RootTabView: View {
         AuraRestReading.live(
             days: repo.days,
             sessions: auraSleepSessions.isEmpty ? repo.sleeps : auraSleepSessions,
-            habitualMidsleepSec: auraHabitualMidsleepSec
+            habitualMidsleepSec: auraHabitualMidsleepSec,
+            restScores: auraRestSeries,
+            profileAge: profile.hasConfirmedAge ? profile.age : nil,
+            isLoading: !repo.loaded
         )
     }
 
@@ -284,7 +305,15 @@ struct RootTabView: View {
         return AuraProfileReading.live(
             displayName: profile.displayName ?? "",
             age: profile.age,
+            ageConfirmed: profile.hasConfirmedAge,
             sex: profile.sex,
+            sexConfirmed: profile.hasConfirmedSex,
+            heightCm: profile.heightCm,
+            heightConfirmed: profile.hasConfirmedHeight,
+            weightKg: profile.weightKg,
+            weightConfirmed: profile.hasConfirmedWeight,
+            hrMax: profile.hrMax,
+            hrMaxConfirmed: profile.hasConfirmedHRMax,
             earliestDay: repo.freshness.earliestDay,
             unitSystem: unitSystem,
             temperature: UnitPrefs.resolveTemperature(system: unitSystem, override: auraTemperatureRaw)
@@ -399,6 +428,9 @@ struct RootTabView: View {
             onStartLiveSession: { showLiveSession = true },
             onOpenQuickActions: {
                 withAnimation(Self.sheetEase) { quickAction = .menu }
+            },
+            onSelectTodayDay: { day in
+                auraSelectedTodayDay = day == repo.today?.day ? nil : day
             },
             onSyncHealth: {
                 Task {

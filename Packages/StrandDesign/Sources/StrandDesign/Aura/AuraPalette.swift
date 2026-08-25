@@ -27,9 +27,9 @@ public enum AuraPalette {
     /// Hairline around a card. Half-point at the use site, so it reads as an edge and not a border.
     public static let cardBorder = Color.white.opacity(0.06)
     /// Fill for secondary controls (Swap / Rest buttons, chevron discs, unselected range chips).
-    public static let controlFill = Color.white.opacity(0.07)
+    public static let controlFill = Color.white.opacity(0.06)
     /// The unlit portion of a track — gauge ticks, pillar bars, week bars.
-    public static let track = Color.white.opacity(0.13)
+    public static let track = Color.white.opacity(0.09)
 
     /// The coaching card's gradient, which lifts it off the flat card fill so Svea's call reads as the
     /// screen's one instruction rather than one more panel.
@@ -39,15 +39,17 @@ public enum AuraPalette {
     // MARK: Text — a five-step ramp down from the state label to axis ticks
 
     public static let textPrimary = Color(hex: "#EDF1EF")
-    public static let textSecondary = Color(hex: "#939C97")
-    public static let textTertiary = Color(hex: "#8B958F")
+    public static let textSecondary = Color(hex: "#C6CEC9")
+    public static let textTertiary = Color(hex: "#939C97")
+    /// Uppercase captions and eyebrow labels.
+    public static let textLabel = Color(hex: "#8B958F")
     public static let textQuiet = Color(hex: "#7F8A85")
     public static let textFaint = Color(hex: "#6C7570")
     /// Axis labels and other type that should be present but never read first.
     public static let textDim = Color(hex: "#57605C")
 
     /// Ink for type sitting ON an accent fill (the info banner, the Accept button, the active tab).
-    public static let onAccent = Color(hex: "#08120F")
+    public static let onAccent = Color(hex: "#04121A")
 
     /// The chrome accent. Fixed — see `AuraBodyState.accent` for why it does not follow body state.
     public static let accent = Color(hex: "#17A2E6")
@@ -63,7 +65,7 @@ public enum AuraPalette {
 
     // MARK: Metrics
 
-    public static let cardRadius: CGFloat = 24
+    public static let cardRadius: CGFloat = 22
     public static let pillarRadius: CGFloat = 20
     public static let tileRadius: CGFloat = 22
     public static let controlRadius: CGFloat = 14
@@ -77,6 +79,25 @@ public enum AuraPalette {
     /// One rotation of the orb's specular sheen. Deliberately incommensurate with `breathDuration`, so
     /// the two never resynchronise into a visible beat.
     public static let sheenDuration: Double = 24
+}
+
+// MARK: - Aura typography
+
+/// The exact local type families named by the Aura handoff. The iOS app bundles their OFL font files,
+/// while the system fallback keeps package previews and non-iOS clients readable if those resources are
+/// not present in a host. Keeping the names here prevents screen-by-screen approximations from drifting.
+public enum AuraFont {
+    public static func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("Outfit", size: size).weight(weight)
+    }
+
+    public static func ui(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("Instrument Sans", size: size).weight(weight)
+    }
+
+    public static func editorial(_ size: CGFloat, italic: Bool = false) -> Font {
+        .custom(italic ? "Instrument Serif Italic" : "Instrument Serif", size: size)
+    }
 }
 
 // MARK: - Aura body state

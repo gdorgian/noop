@@ -32,6 +32,9 @@ struct AuraShell: View {
     let onStartLiveSession: () -> Void
     /// Opens NOOP's existing live, workout, journal and breathing actions from the centre `+`.
     let onOpenQuickActions: () -> Void
+    /// Changes only Aura Today's historical selection. The repository's canonical Today and widgets stay
+    /// anchored to the current logical day.
+    let onSelectTodayDay: (String) -> Void
 
     /// Today's body state. Fixed until the screens are wired to `Repository`; it drives the orb's colour
     /// and the gauge marker's position.
@@ -71,6 +74,7 @@ struct AuraShell: View {
         onOpenCoach: @escaping () -> Void,
         onStartLiveSession: @escaping () -> Void,
         onOpenQuickActions: @escaping () -> Void,
+        onSelectTodayDay: @escaping (String) -> Void,
         onSyncHealth: @escaping () -> Void
     ) {
         self._screen = screen
@@ -90,6 +94,7 @@ struct AuraShell: View {
         self.onOpenCoach = onOpenCoach
         self.onStartLiveSession = onStartLiveSession
         self.onOpenQuickActions = onOpenQuickActions
+        self.onSelectTodayDay = onSelectTodayDay
         #if DEBUG
         self._routeStack = State(initialValue: AuraRoute.debugLaunchRoute.map { [$0] } ?? [])
         #endif
@@ -102,6 +107,8 @@ struct AuraShell: View {
     /// longer a `TabView` and the `scrollToTopSignal` environment key no longer reaches it.
     @State private var scrollToTopToken = 0
     @State private var routeStack: [AuraRoute] = []
+    @State private var dayPickerOpen = false
+    @State private var ambientBreathing = false
 
     private var poseStill: Bool { motion.poseStill(reduceMotion) }
 
@@ -109,19 +116,25 @@ struct AuraShell: View {
         Group {
             if let route = routeStack.last {
                 detail(route)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .transition(specScreenTransition)
             } else {
                 rootShell
-                    .transition(.opacity)
+                    .transition(specScreenTransition)
             }
         }
-        .animation(
-            NoopMotion.gated(
-                .timingCurve(0.22, 1, 0.36, 1, duration: 0.28),
-                reduced: poseStill
-            ),
-            value: routeStack
-        )
+        .animation(poseStill ? NoopSpecMotion.enterReduced : NoopSpecMotion.enter, value: routeStack)
+        .onAppear {
+            guard !poseStill else { return }
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) {
+                ambientBreathing = true
+            }
+        }
+    }
+
+    private var specScreenTransition: AnyTransition {
+        poseStill
+            ? .opacity
+            : .opacity.combined(with: .offset(y: NoopSpecMotion.enterRise))
     }
 
     private var rootShell: some View {
@@ -133,14 +146,45 @@ struct AuraShell: View {
                     VStack(alignment: .leading, spacing: AuraPalette.cardGap) {
                         Color.clear.frame(height: 0).id(Self.topAnchorID)
 
-                        AuraHeader(
-                            screen: screen,
-                            greeting: headerGreeting,
-                            headline: headerHeadline,
-                            initial: todayReading.initial,
-                            onOpenBand: { go(.band) },
-                            onOpenProfile: { go(.profile) }
-                        )
+                        if screen != .profile && screen != .rest {
+                            AuraHeader(
+                                screen: screen,
+                                greeting: headerGreeting,
+                                headline: headerHeadline,
+                                dayLabel: todayReading.selectedDayLabel,
+                                dayPickerOpen: dayPickerOpen,
+                                onToggleDayPicker: {
+                                    withAnimation(.easeInOut(duration: 0.18)) { dayPickerOpen.toggle() }
+                                },
+                                onBackToParent: {
+                                    if screen == .band { go(.profile) }
+                                    else { go(.today) }
+                                },
+                                onOpenBand: { go(.band) },
+                                onOpenProfile: { go(.profile) }
+                            )
+                        }
+
+                        if screen == .today, dayPickerOpen {
+                            AuraDayNavigator(
+                                cells: todayReading.dayCells,
+                                selectedID: todayReading.selectedDayID,
+                                onSelect: { id in
+                                    onSelectTodayDay(id)
+                                    withAnimation(.easeInOut(duration: 0.18)) { dayPickerOpen = false }
+                                }
+                            )
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+
+                        if screen == .today, todayReading.browsingPastDay {
+                            AuraPastDayBanner(
+                                label: todayReading.selectedDayLabel,
+                                onReturnToday: {
+                                    if let current = todayReading.currentDayID { onSelectTodayDay(current) }
+                                }
+                            )
+                        }
 
                         // The strain/illness early-warning banner and the live-workout indicator. Both
                         // belong to the SHELL, not to Today: the liquid rewrite once dropped the banner
@@ -159,7 +203,7 @@ struct AuraShell: View {
                             // A fresh identity per screen so each one gets the house fade-and-rise on
                             // arrival instead of the layout visibly rearranging in place.
                             .id(screen)
-                            .transition(.opacity)
+                            .transition(.opacity.combined(with: .offset(y: 9)))
 
                         Color.clear.frame(height: 110)
                     }
@@ -176,13 +220,28 @@ struct AuraShell: View {
                 .onChangeCompat(of: screen) { _ in
                     // A new screen always starts at its own top; carrying Today's scroll offset into
                     // Trends would drop the user into the middle of a chart.
+                    dayPickerOpen = false
                     proxy.scrollTo(Self.topAnchorID, anchor: .top)
                 }
             }
 
             AuraTabBar(selection: screen, onSelect: { go($0) }, onAction: onOpenQuickActions)
-                .padding(.bottom, 8)
+                .padding(.bottom, 0)
         }
+        .simultaneousGesture(backSwipe)
+        // The HTML positions the floating bar 26pt from the physical screen edge. Let the
+        // shell extend through the home-indicator inset so SwiftUI does not add that inset twice.
+        .ignoresSafeArea(.container, edges: .bottom)
+    }
+
+    private var backSwipe: some Gesture {
+        DragGesture(minimumDistance: 22)
+            .onEnded { value in
+                guard screen == .charge || screen == .band,
+                      value.translation.width > 78,
+                      abs(value.translation.height) < 58 else { return }
+                go(screen == .band ? .profile : .today)
+            }
     }
 
     // MARK: Screens
@@ -196,10 +255,18 @@ struct AuraShell: View {
                 reading: todayReading,
                 onNavigate: { go($0) },
                 onOpenSignal: { push(.metric($0.id)) },
+                onOpenVitals: { push(.vitals) },
+                onOpenStress: { push(.stress) },
                 onOpenCoach: onOpenCoach
             )
         case .rest:
-            AuraRestView(reading: restReading)
+            AuraRestView(
+                reading: restReading,
+                onOpenWhy: { push(.restWhy($0)) },
+                onOpenDebt: { push(.restDebt) },
+                onOpenTonight: { push(.restTonight) },
+                onOpenBand: { go(.band) }
+            )
         case .charge:
             AuraChargeView(
                 reading: chargeReading,
@@ -218,6 +285,7 @@ struct AuraShell: View {
         case .profile:
             AuraProfileView(
                 reading: profileReading,
+                restReading: restReading,
                 onEditProfile: { push(.editProfile) },
                 onOpenNotifications: { push(.notifications) },
                 onOpenUnits: { push(.units) },
@@ -226,6 +294,8 @@ struct AuraShell: View {
                 onOpenTracking: { push(.tracking) },
                 onOpenPrivacy: { push(.privacy) },
                 onOpenSettings: { push(.settings) },
+                onOpenAge: { push(.age) },
+                onOpenBand: { go(.band) },
                 onOpenComingSoon: { push(.comingSoon($0)) }
             )
         }
@@ -250,20 +320,18 @@ struct AuraShell: View {
         case .today:
             return todayReading.headline
         case .rest:
-            return restReading.headline
+            return String(localized: "Rest")
         case .charge:
             return chargeReading.headline
         case .effort:
-            return effortReading.headline
+            return String(localized: "Session")
         case .trends:
-            return trendsReading.headline
+            return String(localized: "Trends")
         case .band:
             // Rendered by a LiveState-isolated leaf in AuraHeader.
             return String(localized: "Band status")
         case .profile:
-            return todayReading.profileName.isEmpty
-                ? String(localized: "Your profile")
-                : todayReading.profileName
+            return String(localized: "You")
         }
     }
 
@@ -272,6 +340,15 @@ struct AuraShell: View {
     @ViewBuilder
     private func detail(_ route: AuraRoute) -> some View {
         switch route {
+        case .restTonight:
+            AuraRestTonightView(
+                reading: restReading,
+                onBack: pop
+            )
+        case .restWhy(let nightID):
+            AuraRestWhyView(reading: restReading, nightID: nightID, onBack: pop)
+        case .restDebt:
+            AuraRestDebtView(reading: restReading, onBack: pop)
         case .metric(let id):
             if let signal = todayReading.signals.first(where: { $0.id == id }) {
                 AuraDetailScaffold(title: signal.name, subtitle: metricSubtitle(id), onBack: pop) {
@@ -281,6 +358,25 @@ struct AuraShell: View {
                 AuraDetailScaffold(title: String(localized: "Signal"), onBack: pop) {
                     AuraNoteBanner(text: String(localized: "This signal is not available yet."), tint: AuraPalette.accent)
                 }
+            }
+        case .vitals:
+            AuraDetailScaffold(
+                title: String(localized: "Vitals"),
+                subtitle: String(localized: "Your latest overnight signals, each shown only when recorded."),
+                onBack: pop
+            ) {
+                AuraVitalsDetailView(
+                    signals: todayReading.signals,
+                    onOpen: { push(.metric($0.id)) }
+                )
+            }
+        case .stress:
+            AuraDetailScaffold(
+                title: String(localized: "Stress"),
+                subtitle: String(localized: "The stored 0–3 autonomic-load signal for the selected day."),
+                onBack: pop
+            ) {
+                AuraStressDetailView(band: todayReading.stressBand, available: todayReading.stressAvailable)
             }
         case .editProfile:
             AuraDetailScaffold(title: String(localized: "Your profile"),
@@ -382,6 +478,20 @@ struct AuraShell: View {
         }
     }
 
+    /// A child screen retains Aura's floating navigation. Choosing a destination closes the child first,
+    /// then changes the root, so a stale detail route can never remain over the newly selected tab.
+    private func leaveDetail(_ destination: AuraScreen) {
+        withAnimation(
+            NoopMotion.gated(
+                .timingCurve(0.22, 0.61, 0.36, 1, duration: 0.30),
+                reduced: poseStill
+            )
+        ) {
+            routeStack.removeAll()
+            screen = destination
+        }
+    }
+
     private func go(_ destination: AuraScreen) {
         // Tapping the screen you are already on scrolls it back to the top, rather than doing nothing.
         guard destination != screen else {
@@ -390,7 +500,7 @@ struct AuraShell: View {
         }
         withAnimation(
             NoopMotion.gated(
-                .timingCurve(0.22, 1, 0.36, 1, duration: 0.24),
+                .timingCurve(0.22, 0.61, 0.36, 1, duration: 0.30),
                 reduced: poseStill
             )
         ) {
@@ -409,7 +519,7 @@ struct AuraShell: View {
                     .fill(
                         RadialGradient(
                             stops: [
-                                .init(color: ambientTint.opacity(todayReading.chargeAvailable ? bodyState.ambientOpacity : 0.07), location: 0),
+                                .init(color: ambientTint.opacity(ambientOpacity), location: 0),
                                 .init(color: ambientTint.opacity(0), location: 0.7),
                             ],
                             center: .center,
@@ -420,6 +530,7 @@ struct AuraShell: View {
                     .frame(width: 460, height: 400)
                     .offset(y: -140)
                     .blur(radius: 18)
+                    .opacity(screen == .rest && !poseStill ? (ambientBreathing ? 0.90 : 0.55) : 1)
             }
             .ignoresSafeArea()
             .allowsHitTesting(false)
@@ -427,7 +538,22 @@ struct AuraShell: View {
     }
 
     private var ambientTint: Color {
-        todayReading.chargeAvailable ? bodyState.orbTint : AuraPalette.textDim
+        switch screen {
+        case .profile: return Color(hex: "#E08A9B")
+        case .rest: return AuraPalette.rest
+        case .charge, .band: return AuraPalette.accent
+        default: return todayReading.chargeAvailable ? bodyState.orbTint : AuraPalette.textDim
+        }
+    }
+
+    private var ambientOpacity: Double {
+        switch screen {
+        case .profile: return 0.24
+        case .rest: return 0.20
+        case .charge: return 0.17
+        case .band: return 0.14
+        default: return todayReading.chargeAvailable ? bodyState.ambientOpacity : 0.07
+        }
     }
 }
 #endif

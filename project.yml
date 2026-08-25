@@ -21,7 +21,7 @@ settings:
     # iOS build number (CFBundleVersion). GLOBAL so the iOS app AND its widget extension inherit the
     # SAME value — they must match or iOS warns "extension version must match parent app" (#416).
     # macOS sets its own CFBundleVersion on the Strand target and is unaffected by this.
-    CURRENT_PROJECT_VERSION: "230"
+    CURRENT_PROJECT_VERSION: "231"
     # Overridden by the release/local xcodebuild command with the exact git revision. Keeping an explicit
     # fallback makes an ad-hoc Xcode build say "unknown" rather than leaking an unresolved $(...) token.
     NOOP_COMMIT_SHA: "unknown"
@@ -280,6 +280,13 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NoopCommitSHA: "$(NOOP_COMMIT_SHA)"
+        # The Aura handoff specifies Outfit for titles/numerals and Instrument Sans for UI copy.
+        # These are bundled OFL fonts: release builds never depend on a network font request.
+        UIAppFonts:
+          - Fonts/Outfit.ttf
+          - Fonts/InstrumentSans.ttf
+          - Fonts/InstrumentSerif-Regular.ttf
+          - Fonts/InstrumentSerif-Italic.ttf
         # Surfaces APP_GROUP_ID to runtime (WidgetSnapshot.suiteName) so the App Group id isn't
         # hard-coded in Swift; stays in sync with the application-groups entitlement (both $(APP_GROUP_ID)).
         AppGroupIdentifier: "$(APP_GROUP_ID)"
