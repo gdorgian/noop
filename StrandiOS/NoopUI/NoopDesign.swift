@@ -110,10 +110,24 @@ extension Color {
 
 // MARK: - Shared screen chrome
 
+/// 52 pt while a session is running: the live bar's 46 pt plus its 6 pt gap. Set once by the shell.
+private struct NoopLiveBarInsetKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    var noopLiveBarInset: CGFloat {
+        get { self[NoopLiveBarInsetKey.self] }
+        set { self[NoopLiveBarInsetKey.self] = newValue }
+    }
+}
+
 struct NoopScreen<Content: View>: View {
     var bottomInset: CGFloat = 116
     var topInset: CGFloat = 10
     @ViewBuilder var content: Content
+
+    @Environment(\.noopLiveBarInset) private var liveBarInset
 
     var body: some View {
         GeometryReader { proxy in
@@ -124,7 +138,7 @@ struct NoopScreen<Content: View>: View {
                         .frame(width: max(0, viewportWidth - 40), alignment: .topLeading)
                         .padding(.horizontal, 20)
                         .padding(.top, topInset)
-                        .padding(.bottom, bottomInset)
+                        .padding(.bottom, bottomInset + liveBarInset)
                         .id("noop-screen-top")
                 }
                 .scrollIndicators(.hidden)

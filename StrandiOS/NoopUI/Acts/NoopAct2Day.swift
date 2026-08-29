@@ -8,6 +8,7 @@ struct NoopAct2Screens: View {
     @SceneStorage("noop.act2.day-rail-open") private var dayRailOpen = false
     @SceneStorage("noop.act2.heart-point") private var selectedHeartPoint = 23
     @SceneStorage("noop.act2.stress-level") private var selectedStress = 0
+    @SceneStorage("noop.act3.rest-day") private var restDay = false
     @State private var todayPulseAnchor = Date()
     @State private var heartPulseAnchor = Date()
 
@@ -31,6 +32,27 @@ struct NoopAct2Screens: View {
     }
 
     // MARK: - Today
+
+    private var sessionCardTitle: String {
+        if let finished = navigation.finishedWorkout { return finished.act3.name }
+        return restDay ? "Rest" : navigation.selectedWorkout.act3.name
+    }
+
+    private var sessionCardLine: String {
+        // Change 3. After a session the card reads what was done and what it cost, in the same
+        // currency the rest of the day screen speaks.
+        if let finished = navigation.finishedWorkout {
+            let detail = finished.act3.detail
+            return "Cost you \(detail.sleepCost) charge · recovered by \(detail.recoveredBy)"
+        }
+        return restDay
+            ? "Nothing today. Tomorrow is the earliest this pays off."
+            : navigation.selectedWorkout.act3.note
+    }
+
+    private var sessionCardRoute: NoopRoute {
+        navigation.finishedWorkout == nil ? .session : .detail
+    }
 
     private var todayScreen: some View {
         NoopScreen(topInset: 58) {
@@ -180,6 +202,36 @@ struct NoopAct2Screens: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
                         .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+
+                    // Change 1, door one. `today` already answers "can I train"; this is the door to
+                    // acting on it. Always present — an empty slot where a card was yesterday reads
+                    // as a bug — so a rest day changes the copy rather than removing the card.
+                    Button { navigation.reset(to: sessionCardRoute) } label: {
+                        HStack(spacing: 13) {
+                            VStack(alignment: .leading, spacing: 7) {
+                                NoopSectionLabel("Today's session")
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(sessionCardTitle)
+                                        .font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                                        .foregroundStyle(NoopHTMLColor.ink)
+                                    Text(sessionCardLine)
+                                        .font(NoopHTMLFont.sans(12))
+                                        .foregroundStyle(NoopHTMLColor.copy)
+                                        .lineSpacing(3.36)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .multilineTextAlignment(.leading)
+                                }
+                            }
+                            Spacer(minLength: 4)
+                            Act2CSSChevron(size: 8, color: NoopHTMLColor.faint)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 15)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
 

@@ -39,8 +39,15 @@ struct NoopAppShell: View {
                     )
 
                 if !navigation.route.hidesBottomBar {
-                    VStack {
+                    VStack(spacing: 6) {
                         Spacer()
+                        // Change 2. Directly above the tab bar, on every screen, while a session runs
+                        // or is paused. Not dismissible: a running session the app has quietly
+                        // forgotten is worse than a bar that will not go away.
+                        if navigation.sessionRunning {
+                            NoopLiveBar(navigation: navigation)
+                                .frame(width: max(0, viewportWidth - 28))
+                        }
                         NoopBottomNavigation(navigation: navigation)
                             .frame(width: max(0, viewportWidth - 28))
                             .padding(.bottom, 26)
@@ -63,6 +70,8 @@ struct NoopAppShell: View {
             .preferredColorScheme(.dark)
             .contentShape(Rectangle())
             .simultaneousGesture(backGesture)
+            // Content ends above the bar: its 46 pt plus the 6 pt gap.
+            .environment(\.noopLiveBarInset, navigation.sessionRunning && !navigation.route.hidesBottomBar ? 52 : 0)
         }
         .frame(width: UIScreen.main.bounds.width)
         // Every act uses the canonical 402 x 874 canvas behind both system bars. Their
@@ -203,6 +212,65 @@ struct NoopAppShell: View {
                 )
                 dragTranslation = .zero
             }
+    }
+}
+
+/// Change 2 · the live bar. Left the workout, centre the ticking clock, right the pulse — or
+/// `Paused` where the pulse was. Tapping it returns to the session's own screen.
+private struct NoopLiveBar: View {
+    @ObservedObject var navigation: NoopNavigation
+
+    private var model: Act3WorkoutModel { navigation.selectedWorkout.act3 }
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let elapsed = navigation.sessionElapsed(at: timeline.date)
+            let shown = navigation.sessionElapsedDisplay(at: timeline.date)
+            Button { navigation.push(navigation.liveRoute) } label: {
+                HStack(spacing: 12) {
+                    Text(model.name)
+                        .font(NoopHTMLFont.sans(13, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                        .lineLimit(1)
+                    Text(Self.clock(shown))
+                        .font(NoopHTMLFont.sans(13, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(NoopHTMLColor.blueLight)
+                    Spacer(minLength: 4)
+                    if navigation.sessionPaused {
+                        Text("Paused")
+                            .font(NoopHTMLFont.sans(12, weight: .semibold))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
+                    } else {
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            Text("\(Self.bpm(model: model, elapsed: elapsed))")
+                                .font(NoopHTMLFont.sans(13, weight: .semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            Text("bpm")
+                                .font(NoopHTMLFont.sans(11))
+                                .foregroundStyle(Color(hex: 0x7F8A85))
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 46)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(NoopHTMLColor.blue.opacity(0.32), lineWidth: 0.5))
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+        }
+    }
+
+    private static func clock(_ seconds: Int) -> String {
+        String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    /// The same fixture pulse the live screen draws, so the bar and the screen agree.
+    private static func bpm(model: Act3WorkoutModel, elapsed: Int) -> Int {
+        let middle = Double(model.low + model.high) / 2
+        return Int((middle + 9 * sin(Double(elapsed) / 7) + 4 * sin(Double(elapsed) / 2.4)).rounded())
     }
 }
 
@@ -1289,6 +1357,27 @@ private struct NoopDayLogSheet: View {
                         Text("One tap each. Tap twice for two.")
                             .font(NoopHTMLFont.sans(12.5))
                             .foregroundStyle(Color(hex: 0x7F8A85))
+                    }
+
+                    // Change 1, door two. The global shortcut: reachable from all five tabs without
+                    // going home first. The + still opens this sheet — it does not become a session
+                    // button. `reset` makes it a tab-level arrival, and clears this overlay on the way.
+                    VStack(spacing: 12) {
+                        Button { navigation.reset(to: .session) } label: {
+                            HStack(spacing: 12) {
+                                Text("Start a session")
+                                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Spacer(minLength: 4)
+                                NoopChevron()
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+
+                        Divider().overlay(NoopHTMLColor.border)
                     }
 
                     LazyVGrid(

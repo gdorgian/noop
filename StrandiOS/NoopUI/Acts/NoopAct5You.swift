@@ -829,22 +829,7 @@ private extension NoopAct5Screens {
                             dividedCard {
                                 VStack(spacing: 0) {
                                     ForEach(Array(day.items.enumerated()), id: \.offset) { index, item in
-                                        HStack(spacing: 12) {
-                                            NoopCanonicalGlyph(
-                                                name: item.symbol,
-                                                size: 18,
-                                                color: item.kind == .log ? Color(hex: 0x7F8A85) : item.kind == .sleep ? Self.lavender : NoopHTMLColor.blue
-                                            )
-                                                .frame(width: 20)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(item.name).font(NoopHTMLFont.sans(13.5, weight: item.kind == .log ? .regular : .semibold))
-                                                    .foregroundStyle(item.kind == .log ? NoopHTMLColor.inkSoft : NoopHTMLColor.ink)
-                                                Text(item.detail).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
-                                            }
-                                            Spacer()
-                                            Text(item.value).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
-                                        }
-                                        .frame(minHeight: 55)
+                                        historyRow(item)
                                         if index < day.items.count - 1 { Divider().overlay(NoopHTMLColor.border) }
                                     }
                                 }
@@ -858,6 +843,47 @@ private extension NoopAct5Screens {
                     .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
         }
+    }
+
+    /// Change 4. A session row with an identity opens its record; a sleep row opens the night.
+    /// Everything else is inert, and only rows that navigate carry a chevron.
+    @ViewBuilder
+    func historyRow(_ item: NoopA5HistoryItem) -> some View {
+        let glyphTint: Color = item.kind == .log
+            ? Color(hex: 0x7F8A85)
+            : item.kind == .sleep ? Self.lavender : NoopHTMLColor.blue
+        Button {
+            if item.kind == .sleep {
+                navigation.push(.why)
+            } else if let workout = item.workout {
+                navigation.historyWorkout = workout
+                navigation.push(.detail)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                NoopCanonicalGlyph(name: item.symbol, size: 18, color: glyphTint)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.name)
+                        .font(NoopHTMLFont.sans(13.5, weight: item.kind == .log ? .regular : .semibold))
+                        .foregroundStyle(item.kind == .log ? NoopHTMLColor.inkSoft : NoopHTMLColor.ink)
+                    Text(item.detail)
+                        .font(NoopHTMLFont.sans(11))
+                        .foregroundStyle(Color(hex: 0x7F8A85))
+                }
+                Spacer()
+                Text(item.value)
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(Color(hex: 0x7F8A85))
+                if item.opensSomething {
+                    NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                }
+            }
+            .frame(minHeight: 55)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .disabled(!item.opensSomething)
     }
 
     var filteredHistory: [NoopA5HistoryDay] {
@@ -899,7 +925,7 @@ private extension NoopAct5Screens {
 
     static let history: [NoopA5HistoryDay] = [
         .init(day: "Today", summary: "", items: [
-            .init(kind: .session, name: "Steady ride", detail: "17:04 · 42 min · avg 126 bpm", value: "load 48", symbol: .bike),
+            .init(kind: .session, name: "Steady ride", detail: "17:04 · 42 min · avg 126 bpm", value: "load 48", symbol: .bike, workout: .steadyRide),
             .init(kind: .log, name: "Coffee", detail: "07:20", value: "", symbol: .cup),
             .init(kind: .log, name: "Water", detail: "09:40 · 11:15", value: "×2", symbol: .drop),
             .init(kind: .log, name: "Meal", detail: "12:05", value: "", symbol: .plate)
@@ -910,12 +936,12 @@ private extension NoopAct5Screens {
             .init(kind: .log, name: "Alcohol", detail: "20:30 · one glass", value: "", symbol: .drop)
         ]),
         .init(day: "Monday 18 August", summary: "", items: [
-            .init(kind: .session, name: "6 × 1 min hard", detail: "18:10 · 22 min · max 174 bpm", value: "load 86", symbol: .bolt),
+            .init(kind: .session, name: "6 × 1 min hard", detail: "18:10 · 22 min · max 174 bpm", value: "load 86", symbol: .bolt, workout: .intervals),
             .init(kind: .sleep, name: "Slept 6h 48m", detail: "23:52 → 06:40 · 24 min under", value: "", symbol: .bed),
             .init(kind: .log, name: "Nap", detail: "15:10 · 26 min", value: "", symbol: .bed)
         ]),
         .init(day: "Sunday 17 August", summary: "", items: [
-            .init(kind: .session, name: "Long walk", detail: "10:20 · 68 min", value: "load 22", symbol: .walk),
+            .init(kind: .session, name: "Long walk", detail: "10:20 · 68 min", value: "load 22", symbol: .walk, workout: .longWalk),
             .init(kind: .session, name: "Strength, lower body", detail: "17:40 · 35 min", value: "load 62", symbol: .weight),
             .init(kind: .sleep, name: "Slept 7h 26m", detail: "23:05 → 06:31", value: "", symbol: .bed)
         ])
@@ -930,6 +956,12 @@ private struct NoopA5HistoryItem {
     let detail: String
     let value: String
     let symbol: NoopCanonicalGlyphName
+    /// Change 4. Written when the session is logged. A row without one has no record to open, keeps
+    /// no chevron, and does nothing — the honest state for anything logged before this existed.
+    /// Sleep rows carry no workout and open the night instead.
+    var workout: NoopWorkout? = nil
+
+    var opensSomething: Bool { kind == .sleep || workout != nil }
 }
 
 private struct NoopA5HistoryDay: Identifiable {

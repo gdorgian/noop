@@ -6,9 +6,6 @@ struct NoopAct3Screens: View {
 
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     @SceneStorage("noop.act3.rest-day") private var restDay = false
-    @State private var liveStartedAt = Date()
-    @State private var paused = false
-    @State private var pausedElapsed = 0
     @State private var detailWorkout: NoopWorkout?
 
     var body: some View {
@@ -439,10 +436,8 @@ struct NoopAct3Screens: View {
 
             VStack(spacing: 8) {
                 Act3ActionButton("Start", height: 60, radius: 20, fontSize: 16, primary: true) {
-                    liveStartedAt = Date()
-                    pausedElapsed = 0
-                    paused = false
-                    navigation.push(workoutModel.isIntervals ? .intervals : .live)
+                    navigation.beginSession(at: Date())
+                    navigation.push(navigation.liveRoute)
                 }
                 .shadow(color: NoopHTMLColor.blue.opacity(0.3), radius: 13, y: 8)
                 Button("Not now") { navigation.reset(to: .session) }
@@ -517,11 +512,11 @@ struct NoopAct3Screens: View {
             let bpm = liveBPM(elapsed: elapsed)
             Act3LiveScreen(
                 model: workoutModel,
-                elapsed: elapsed + 872,
+                elapsed: navigation.sessionElapsedDisplay(at: timeline.date),
                 bpm: bpm,
-                paused: paused,
+                paused: navigation.sessionPaused,
                 pauseAction: { togglePause(at: timeline.date) },
-                endAction: { showDetail(for: navigation.selectedWorkout) }
+                endAction: { navigation.endSession(navigation.selectedWorkout) }
             )
         }
     }
@@ -532,15 +527,15 @@ struct NoopAct3Screens: View {
             Act3IntervalsScreen(
                 model: workoutModel,
                 elapsed: elapsed,
-                paused: paused,
+                paused: navigation.sessionPaused,
                 pauseAction: { togglePause(at: timeline.date) },
-                endAction: { showDetail(for: navigation.selectedWorkout) }
+                endAction: { navigation.endSession(navigation.selectedWorkout) }
             )
         }
     }
 
     private func liveElapsed(at date: Date) -> Int {
-        paused ? pausedElapsed : max(0, Int(date.timeIntervalSince(liveStartedAt)))
+        navigation.sessionElapsed(at: date)
     }
 
     private func liveBPM(elapsed: Int) -> Int {
@@ -549,23 +544,23 @@ struct NoopAct3Screens: View {
     }
 
     private func togglePause(at date: Date) {
-        if paused {
-            liveStartedAt = date.addingTimeInterval(TimeInterval(-pausedElapsed))
-            paused = false
-        } else {
-            pausedElapsed = max(0, Int(date.timeIntervalSince(liveStartedAt)))
-            paused = true
-        }
+        navigation.toggleSessionPause(at: date)
     }
 
     // MARK: - Detail
 
     private var detailScreen: some View {
-        let detailModel = (detailWorkout ?? navigation.selectedWorkout).act3
+        let detailModel = (detailWorkout ?? navigation.historyWorkout ?? navigation.finishedWorkout ?? navigation.selectedWorkout).act3
         let detail = detailModel.detail
         return NoopScreen(topInset: 56) {
             VStack(spacing: 0) {
-                Act3BackHeader(label: "Session") { navigation.reset(to: .session) }
+                // Change 3. From the finished-session arrival the user did not come from `session`,
+                // so sending them there is a lie; every other arrival keeps the Act 3 back map.
+                Act3BackHeader(label: detailBackLabel) {
+                    // A push (from `session` or `history`) pops; the finished-session arrival is a
+                    // reset, so it falls back to `today` rather than lying about where it came from.
+                    navigation.canGoBack ? navigation.back() : navigation.reset(to: .today)
+                }
                     .padding(.horizontal, -2)
 
                 VStack(spacing: 14) {
@@ -705,9 +700,15 @@ struct NoopAct3Screens: View {
     }
 
     private var workoutModel: Act3WorkoutModel { navigation.selectedWorkout.act3 }
+
+    private var detailBackLabel: String {
+        if navigation.historyWorkout != nil { return "Everything you logged" }
+        return navigation.canGoBack ? "Session" : "Today"
+    }
     private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
 
     private func showDetail(for workout: NoopWorkout) {
+        navigation.historyWorkout = nil
         detailWorkout = workout
         navigation.push(.detail)
     }
@@ -1350,7 +1351,7 @@ private struct Act3Zone {
     }
 }
 
-private struct Act3WorkoutDetail {
+struct Act3WorkoutDetail {
     let durationLabel: String
     let distance: String
     let average: Int
@@ -1370,7 +1371,7 @@ private struct Act3WorkoutDetail {
     }
 }
 
-private struct Act3WorkoutModel {
+struct Act3WorkoutModel {
     let name: String
     let symbol: String
     let duration: Int
@@ -1386,7 +1387,7 @@ private struct Act3WorkoutModel {
     let detail: Act3WorkoutDetail
 }
 
-private extension NoopWorkout {
+extension NoopWorkout {
     var act3: Act3WorkoutModel {
         switch self {
         case .steadyRide:

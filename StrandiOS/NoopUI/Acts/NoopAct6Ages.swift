@@ -3,11 +3,14 @@ import SwiftUI
 struct NoopAct6Screens: View {
     @ObservedObject var navigation: NoopNavigation
     @AppStorage("noop.html.selected-age-driver") private var selectedDriver = 0
+    @AppStorage("noop.html.nights-recorded") private var nightsRecorded = 221
 
     var body: some View {
         switch navigation.route {
         case .ages:
-            ages
+            // Change 8.1. Under seven recorded nights `ages` shows this INSTEAD of itself — it is a
+            // state, not a destination, and is never reachable again after the seventh night.
+            if nightsRecorded < 7 { building } else { ages }
         case .building:
             building
         case .driver:
@@ -224,6 +227,9 @@ struct NoopAct6Screens: View {
                             .lineSpacing(4)
                     }
                 }
+
+                // Change 5. `ages/health` was built and specified but nothing routed to it.
+                NoopAgeHealthHubRow { navigation.push(.health) }
 
                 NoopAgeMethodRow { navigation.push(.method) }
 
@@ -995,6 +1001,37 @@ private struct NoopAgeDriverRow: View {
         }
         .frame(minHeight: 40)
         .contentShape(Rectangle())
+    }
+}
+
+private struct NoopAgeHealthHubRow: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 13) {
+                NoopCanonicalGlyph(name: .heart, size: 19, color: NoopHTMLColor.green)
+                    .frame(width: 24, height: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Health hub")
+                        .font(NoopHTMLFont.sans(13.5))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                    Text("your record, your markers, and what they add up to")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(Color(hex: 0x7F8A85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                Spacer(minLength: 0)
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+            .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+        }
+        .buttonStyle(NoopHTMLPressStyle())
     }
 }
 

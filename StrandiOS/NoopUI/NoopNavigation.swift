@@ -227,6 +227,62 @@ final class NoopNavigation: ObservableObject {
     @Published var overlay: NoopOverlay?
     @Published var selectedWorkout: NoopWorkout = .steadyRide
     @Published var workoutChosenByUser = false
+
+    // Change 2+3. The session is owned above the tab bar, not by `live`: the shell destroys a screen
+    // when you navigate away, so a clock held by the screen ends the session the moment a tab is
+    // tapped. Held here, the live bar can carry it across every screen in the app.
+    @Published var sessionStartedAt: Date?
+    @Published var sessionPaused = false
+    @Published var sessionPausedElapsed = 0
+    @Published var finishedWorkout: NoopWorkout?
+    /// Change 4. The session a `history` row opened, so `detail` renders that one.
+    @Published var historyWorkout: NoopWorkout?
+
+    var sessionRunning: Bool { sessionStartedAt != nil }
+
+    func beginSession(at date: Date) {
+        sessionStartedAt = date
+        sessionPausedElapsed = 0
+        sessionPaused = false
+        finishedWorkout = nil
+    }
+
+    func sessionElapsed(at date: Date) -> Int {
+        guard let started = sessionStartedAt else { return 0 }
+        return sessionPaused ? sessionPausedElapsed : max(0, Int(date.timeIntervalSince(started)))
+    }
+
+    /// The canonical fixture opens part-way into a steady ride, so its clock starts at 14:32. The
+    /// live bar and the live screen read the same number rather than disagreeing by that offset.
+    private var sessionDisplayOffset: Int { selectedWorkout.act3.isIntervals ? 0 : 872 }
+
+    func sessionElapsedDisplay(at date: Date) -> Int {
+        sessionElapsed(at: date) + sessionDisplayOffset
+    }
+
+    func toggleSessionPause(at date: Date) {
+        guard let started = sessionStartedAt else { return }
+        if sessionPaused {
+            sessionStartedAt = date.addingTimeInterval(TimeInterval(-sessionPausedElapsed))
+            sessionPaused = false
+        } else {
+            sessionPausedElapsed = max(0, Int(date.timeIntervalSince(started)))
+            sessionPaused = true
+        }
+    }
+
+    /// The session ends, the bar goes, and `detail` opens on what was just done.
+    func endSession(_ workout: NoopWorkout) {
+        sessionStartedAt = nil
+        sessionPaused = false
+        sessionPausedElapsed = 0
+        finishedWorkout = workout
+        historyWorkout = nil
+        reset(to: .detail)
+    }
+
+    /// The live workout's own screen — intervals get theirs.
+    var liveRoute: NoopRoute { selectedWorkout.act3.isIntervals ? .intervals : .live }
     @Published var selectedRestDay = 0
     @Published var selectedTodayDay = 0
     @Published var nightJournalSaved = false
