@@ -764,6 +764,14 @@ struct NoopGoalEditorSheet: View {
 private struct NoopLabsHome: View {
     @ObservedObject var navigation: NoopNavigation
     private var markers: [NoopLabMarker] { NoopLabMarker.all }
+    private var inBandCount: Int { markers.filter { !$0.isOutside }.count }
+    private var outOfBandLine: String {
+        switch markers.count - inBandCount {
+        case 0: "every marker inside the lab\u{2019}s band"
+        case 1: "one marker outside the lab\u{2019}s band"
+        case let count: "\(count) markers outside the lab\u{2019}s band"
+        }
+    }
     var body: some View {
         NoopScreen(bottomInset: 118, topInset: 56) {
             VStack(alignment: .leading, spacing: 2) {
@@ -782,7 +790,35 @@ private struct NoopLabsHome: View {
                 }
                 .padding(.horizontal, -2)
                 HStack { NoopSectionLabel("Biomarkers"); Spacer(); Text("drawn 14 August · Karolinska").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint) }.padding(.top, 8)
-                NoopLabGalaxy(markers: markers)
+                NoopHelixHero(markers: markers.map { NoopHelixMarker(id: $0.id, outOfBand: $0.isOutside) })
+                    .padding(.top, 6)
+
+                // The helix has no centre to hold the count, so the reading sits under it: the
+                // numeral on the left, the caption naming what a rung is on the right.
+                HStack(alignment: .bottom, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("\(inBandCount)")
+                                .font(NoopHTMLFont.outfit200(38))
+                                .tracking(-1.71)
+                                .monospacedDigit()
+                            Text("of \(markers.count) in band")
+                                .font(NoopHTMLFont.sans(12))
+                                .foregroundStyle(Color(hex: 0x7F8A85))
+                                .fixedSize()
+                        }
+                        Text(outOfBandLine)
+                            .font(NoopHTMLFont.sans(10.5))
+                            .foregroundStyle(NoopHTMLColor.faint)
+                            .fixedSize()
+                    }
+                    Spacer(minLength: 0)
+                    Text("each rung is one marker")
+                        .font(NoopHTMLFont.sans(10.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .multilineTextAlignment(.trailing)
+                        .lineSpacing(3)
+                }
 
                 VStack(spacing: 0) {
                     ForEach(Array(markers.enumerated()), id: \.offset) { index, marker in
@@ -1277,165 +1313,6 @@ private struct NoopLabMarker: Identifiable {
         .init(id: "alt", name: "ALT", unit: "U/L", low: 10, high: 50, defaultValue: 41, trend: [35, 38, 44, 41], trendText: "below the preceding draw", contextCopy: "This result is inside the laboratory’s band and below the preceding draw. Noop shows the dated series without attributing the change to training or anything else.")
     ]
     static var all: [NoopLabMarker] { definitions }
-}
-
-private struct NoopLabGalaxy: View {
-    let markers: [NoopLabMarker]
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
-            let now = timeline.date.timeIntervalSinceReferenceDate
-            let spin = reduceMotion ? 0 : now.truncatingRemainder(dividingBy: 120) / 120 * 360
-            let pulsePhase = now.truncatingRemainder(dividingBy: 9) / 9
-            let pulse = reduceMotion ? 0.70 : 0.70 + 0.30 * ((1 - cos(pulsePhase * 2 * .pi)) / 2)
-            let accent = hasOutside ? NoopHTMLColor.warm : NoopHTMLColor.green
-
-            ZStack {
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            stops: [
-                                .init(color: accent.opacity(0.20), location: 0),
-                                .init(color: accent.opacity(0), location: 0.62)
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 145
-                        )
-                    )
-                    .frame(width: 290, height: 290)
-                    .blur(radius: 18)
-                    .opacity(pulse)
-
-                specks
-                    .rotationEffect(.degrees(spin))
-
-                Canvas { context, size in
-                    let center = CGPoint(x: size.width / 2, y: size.height / 2)
-                    let scale = min(size.width, size.height) / 240
-
-                    let outer = CGRect(
-                        x: center.x - 74 * scale,
-                        y: center.y - 74 * scale,
-                        width: 148 * scale,
-                        height: 148 * scale
-                    )
-                    context.fill(Path(ellipseIn: outer), with: .color(NoopHTMLColor.green.opacity(0.06)))
-                    context.stroke(
-                        Path(ellipseIn: outer),
-                        with: .color(NoopHTMLColor.green.opacity(0.34)),
-                        style: StrokeStyle(lineWidth: scale, dash: [3 * scale, 4 * scale])
-                    )
-
-                    let inner = CGRect(
-                        x: center.x - 40 * scale,
-                        y: center.y - 40 * scale,
-                        width: 80 * scale,
-                        height: 80 * scale
-                    )
-                    context.stroke(Path(ellipseIn: inner), with: .color(Color.white.opacity(0.07)), lineWidth: scale)
-
-                    for (index, marker) in markers.enumerated() {
-                        let span = max(0.001, marker.high - marker.low)
-                        let midpoint = (marker.low + marker.high) / 2
-                        let over = marker.value < marker.low
-                            ? marker.low - marker.value
-                            : marker.value > marker.high ? marker.value - marker.high : 0
-                        let deviation = marker.isOutside
-                            ? 1.06 + min(0.4, over / (span * 0.25))
-                            : min(0.92, (abs(marker.value - midpoint) / (span / 2)) * 0.92)
-                        let radius = marker.isOutside
-                            ? 78 + min(0.4, deviation - 1.06) * 35
-                            : 58 + (deviation / 0.92) * 13
-                        let angle = (-90 + Double(index) * (360 / Double(max(1, markers.count)))) * .pi / 180
-                        let point = CGPoint(
-                            x: center.x + CGFloat(cos(angle) * radius) * scale,
-                            y: center.y + CGFloat(sin(angle) * radius) * scale
-                        )
-                        var spoke = Path()
-                        spoke.move(to: center)
-                        spoke.addLine(to: point)
-                        context.stroke(
-                            spoke,
-                            with: .color((marker.isOutside ? NoopHTMLColor.warm : NoopHTMLColor.green).opacity(marker.isOutside ? 0.40 : 0.28)),
-                            lineWidth: scale
-                        )
-                        let radiusDot: CGFloat = (marker.isOutside ? 6 : 4.6) * scale
-                        context.fill(
-                            Path(ellipseIn: CGRect(x: point.x - radiusDot, y: point.y - radiusDot, width: radiusDot * 2, height: radiusDot * 2)),
-                            with: .color(marker.color)
-                        )
-                    }
-                }
-                .frame(width: 240, height: 240)
-
-                VStack(spacing: 3) {
-                    Text("\(markers.filter { !$0.isOutside }.count)")
-                        .font(NoopHTMLFont.outfit200(40))
-                        .tracking(-1.8)
-                    Text("of \(markers.count) in band")
-                        .font(NoopHTMLFont.sans(9.5, weight: .semibold))
-                        .tracking(1.33)
-                        .textCase(.uppercase)
-                        .foregroundStyle(Color(hex: 0x93A0A6))
-                        .fixedSize()
-                }
-                .shadow(color: .black.opacity(0.75), radius: 11, y: 2)
-
-                VStack {
-                    Spacer()
-                    Text("outside the dashed edge is outside the lab's band")
-                        .font(NoopHTMLFont.sans(10.5))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .fixedSize()
-                        .offset(y: -7)
-                }
-            }
-            .frame(height: 266)
-        }
-    }
-
-    private var hasOutside: Bool { markers.contains(where: \.isOutside) }
-
-    private var specks: some View {
-        Canvas { context, size in
-            for index in 0..<26 {
-                let angle = Double(index) * 2.39996 + hash(index + 71) * 1.3
-                let radius = 0.8 + hash(index + 20) * 0.3
-                let diameter = 1 + hash(index + 5) * 1.9
-                let warm = hasOutside && index.isMultiple(of: 3)
-                let center = CGPoint(
-                    x: size.width * (0.5 + cos(angle) * radius * 0.47),
-                    y: size.height * (0.5 + sin(angle) * radius * 0.47)
-                )
-                let rect = CGRect(
-                    x: center.x - diameter / 2,
-                    y: center.y - diameter / 2,
-                    width: diameter,
-                    height: diameter
-                )
-                context.drawLayer { dot in
-                    dot.addFilter(
-                        .shadow(
-                            color: (warm ? NoopHTMLColor.warm : NoopHTMLColor.green).opacity(warm ? 0.70 : 0.65),
-                            radius: diameter * 2.6
-                        )
-                    )
-                    dot.fill(
-                        Path(ellipseIn: rect),
-                        with: .color((warm ? Color(hex: 0xFFE8C4) : Color(hex: 0xD8FFEC)).opacity(warm ? 0.42 : 0.34))
-                    )
-                }
-            }
-        }
-        .frame(width: 250, height: 250)
-    }
-
-    private func hash(_ number: Int) -> Double {
-        let value = sin(Double(number) * 127.1 + 311.7) * 43_758.5453
-        return value - floor(value)
-    }
 }
 
 private enum NoopOCRStatus { case pending, confirmed, corrected, discarded
