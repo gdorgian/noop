@@ -68,7 +68,7 @@ struct NoopAct5Screens: View {
             case .history: historyScreen
             case .strap: strapScreen
             case .devices: devicesScreen
-            case .data: dataScreen
+            case .data: NoopDataScreen(navigation: navigation)
             case .settings: settingsScreen
             case .widgets: widgetsScreen
             case .lab: labScreen
@@ -1340,74 +1340,6 @@ private extension NoopAct5Screens {
 // MARK: Data and permissions
 
 private extension NoopAct5Screens {
-    var dataScreen: some View {
-        NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 13) {
-                act5BackHeader("You") { navigation.reset(to: .you) }
-                pageTitle("Data and permissions", copy: "What is collected, where it sits, and how to take it with you.")
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.92)
-                    .padding(.bottom, 5)
-
-                NoopHTMLCard(radius: 22, padding: 16) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        NoopSectionLabel("What the strap records")
-                        bullet("Pulse, and the gap between beats", "Continuously while worn. This is where sleep stages, stress and recovery all come from.")
-                        bullet("Movement", "To tell sleep from lying still, and to auto-pause a session.")
-                        bullet("Skin temperature and blood oxygen", "Overnight, as deviations from your own normal rather than absolute figures.")
-                        bullet("What you log", "Coffee, drinks, meals, naps, intimacy. Only what you tap.")
-                    }
-                    .padding(.vertical, 3)
-                }
-
-                NoopHTMLCard(radius: 22, padding: 16) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        NoopSectionLabel("Where it lives")
-                        place("On your phone", "Everything raw: every beat, every night, the whole 221. It never has to leave to be useful.", glyph: .watch)
-                        place("On Noop’s servers", "Nothing. There is no account and no server — a restore comes from your own backup file.", glyph: .cloud)
-                    }
-                    .padding(.vertical, 3)
-                }
-
-                dividedCard {
-                    VStack(spacing: 0) {
-                        toggleRow("Apple Health", detail: "writes sleep, workouts and vitals", tint: NoopHTMLColor.blue)
-                        Divider().overlay(NoopHTMLColor.border)
-                        toggleRow("Strava", detail: "would write sessions only", tint: NoopHTMLColor.blue)
-                        Divider().overlay(NoopHTMLColor.border)
-                        toggleRow("Google Fit", detail: "not connected", tint: NoopHTMLColor.blue)
-                    }
-                }
-
-                VStack(spacing: 8) {
-                    Button {
-                        actionNotice = "Your export is ready: every beat, night, session and log across 221 nights."
-                    } label: {
-                        Label("Export everything, 221 nights", systemImage: "arrow.down.to.line")
-                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
-                            .foregroundStyle(NoopHTMLColor.inkSoft)
-                            .frame(maxWidth: .infinity).frame(height: 52)
-                            .overlay(RoundedRectangle(cornerRadius: 17).stroke(Color.white.opacity(0.14), lineWidth: 0.5))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-
-                    Button { navigation.show(.destructiveConfirmation("your account and data")) } label: {
-                        Label("Delete my account and data", systemImage: "trash")
-                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
-                            .foregroundStyle(Color(hex: 0xF3A472))
-                            .frame(maxWidth: .infinity).frame(height: 52)
-                            .background(NoopHTMLColor.amber.opacity(0.1), in: RoundedRectangle(cornerRadius: 17))
-                            .overlay(RoundedRectangle(cornerRadius: 17).stroke(NoopHTMLColor.amber.opacity(0.3), lineWidth: 0.5))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                }
-
-                Text("Nothing here is sold, and there is no advertising identifier in the app. Deleting takes effect immediately and the export is a plain file you can read yourself.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
-            }
-        }
-    }
-
     func bullet(_ title: String, _ detail: String) -> some View {
         HStack(alignment: .top, spacing: 11) {
             Circle().fill(NoopHTMLColor.blue).frame(width: 7, height: 7).padding(.top, 6)

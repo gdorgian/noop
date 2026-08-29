@@ -185,6 +185,10 @@ private struct NoopStoredDayLog: Codable {
     let counts: [String: Int]
 }
 
+enum NoopDataState: String {
+    case idle, reading, written, rejected
+}
+
 enum NoopOverlay: Identifiable, Equatable {
     case nightJournal
     case dayLog
@@ -193,10 +197,12 @@ enum NoopOverlay: Identifiable, Equatable {
     case goalEditor
     case deepInsightsConfirmation
     case destructiveConfirmation(String)
+    case importCatalog
 
     var id: String {
         switch self {
         case .nightJournal: "night-journal"
+        case .importCatalog: "import-catalog"
         case .dayLog: "day-log"
         case .loggedItems: "logged-items"
         case .addRecord: "add-record"
@@ -237,6 +243,16 @@ final class NoopNavigation: ObservableObject {
     @Published var finishedWorkout: NoopWorkout?
     /// Change 4. The session a `history` row opened, so `detail` renders that one.
     @Published var historyWorkout: NoopWorkout?
+
+    /// `plumbing/data` is one screen with two doors and three transient states between them.
+    /// Reading, written and rejected are what the screen BECOMES during an import — never routes.
+    @Published var dataState: NoopDataState = .idle
+    @Published var importStartedAt: Date?
+
+    func beginImport(at date: Date) {
+        importStartedAt = date
+        dataState = .reading
+    }
 
     var sessionRunning: Bool { sessionStartedAt != nil }
 
@@ -329,6 +345,12 @@ final class NoopNavigation: ObservableObject {
             case "swim": selectedWorkout = .easySwim
             default: selectedWorkout = .steadyRide
             }
+        }
+        if let flag = arguments.firstIndex(of: "--noop-data"),
+           arguments.indices.contains(flag + 1),
+           let requested = NoopDataState(rawValue: arguments[flag + 1]) {
+            dataState = requested
+            if requested == .reading { importStartedAt = Date() }
         }
         if let flag = arguments.firstIndex(of: "--noop-goal"),
            arguments.indices.contains(flag + 1),

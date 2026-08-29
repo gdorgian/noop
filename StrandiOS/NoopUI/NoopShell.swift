@@ -1042,6 +1042,8 @@ private struct NoopOverlayHost: View {
         switch overlay {
         case .nightJournal:
             NoopNightJournalSheet(navigation: navigation)
+        case .importCatalog:
+            NoopImportCatalogSheet(navigation: navigation)
         case .dayLog:
             NoopDayLogSheet(navigation: navigation)
         case .loggedItems:
