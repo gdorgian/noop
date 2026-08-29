@@ -8,6 +8,7 @@
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).debugexport</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).semanticmemory</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).sveaproactive</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).healthwriteback</string>
 	</array>
 	<key>CADisableMinimumFrameDuration</key>
@@ -15,7 +16,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Noop Aura</string>
+	<string>Noop</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIcons</key>
@@ -36,7 +37,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Noop Aura</string>
+	<string>Noop</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -62,17 +63,17 @@
 		<true/>
 	</dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Noop Aura connects directly to your WHOOP strap to read heart rate, R-R intervals, battery and sensor data on your iPhone. Sharing occurs only through an export, backup, Apple Health write or Coach provider you explicitly enable.</string>
+	<string>Noop connects directly to your WHOOP strap to read heart rate, R-R intervals, battery and sensor data on your iPhone. Sharing occurs only through an export, backup, Apple Health write or Svea provider you explicitly enable.</string>
 	<key>NSHealthClinicalHealthRecordsShareUsageDescription</key>
-	<string>Noop Aura does not read clinical health records. This appears only because the certificate used to sign Noop Aura grants that capability.</string>
+	<string>Noop does not read clinical health records. This appears only because the certificate used to sign Noop grants that capability.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Noop Aura reads the Apple Health data types you approve to compute recovery, strain and sleep. They stay local unless you explicitly export, back up or consent to share a category with a configured Coach provider.</string>
+	<string>Noop reads the Apple Health data types you approve to compute recovery, effort and sleep. They stay local unless you explicitly export, back up or consent to share a category with a configured Svea provider.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Noop Aura writes the metrics it computes from your strap back into Apple Health, on-device and only when you allow it.</string>
+	<string>Noop writes the metrics it computes from your strap back into Apple Health, on-device and only when you allow it.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Noop Aura records your route during an outdoor workout to show distance, pace and a map, including while the screen is off. The route is stored locally unless you export or back it up.</string>
+	<string>Noop records your route during an outdoor workout to show distance, pace and a map, including while the screen is off. The route is stored locally unless you export or back up the activity.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>Noop Aura reads your iPhone's step count for a walking or running workout and shows it in the activity summary. It stays local unless you export or back up the activity.</string>
+	<string>Noop reads your iPhone's step count for a walking or running workout and shows it in the activity summary. It stays local unless you export or back up the activity.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NoopCommitSHA</key>
@@ -83,6 +84,13 @@
 	<string>$(OURA_CLIENT_SECRET)</string>
 	<key>OURA_REDIRECT_URI</key>
 	<string>$(OURA_REDIRECT_URI)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Outfit.ttf</string>
+		<string>InstrumentSans.ttf</string>
+		<string>InstrumentSerif-Regular.ttf</string>
+		<string>InstrumentSerif-Italic.ttf</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>

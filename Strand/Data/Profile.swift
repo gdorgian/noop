@@ -19,9 +19,6 @@ final class ProfileStore: ObservableObject {
             d.set(age, forKey: K.legacyAge)
         }
     }
-    /// Display name, for the Aura greeting and header avatar. Empty = not set, which is the default and
-    /// stays the default: NOOP has never asked for a name and needs none to compute anything, so this is
-    /// presentation only and every consumer must handle it being blank.
     @Published var sex: String { didSet { d.set(sex, forKey: K.sex) } }          // "male" | "female" | "nonbinary"
     @Published var weightKg: Double { didSet { d.set(weightKg, forKey: K.weight) } }
     @Published var heightCm: Double { didSet { d.set(heightCm, forKey: K.height) } }

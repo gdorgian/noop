@@ -193,7 +193,7 @@ need adding by hand.
 - [`DETAILS.md`](DETAILS.md) — this page.
 
 **Inherited from upstream** (still accurate, except `FEATURES.md`, which now also documents this
-fork's own additions — Heute, App icon colors — alongside the inherited content)
+fork's own additions — including App icon colors — alongside the inherited content)
 - [`FEATURES.md`](../FEATURES.md) — the full feature guide for NOOP itself.
 - [`ARCHITECTURE.md`](../ARCHITECTURE.md) — how the whole thing fits together.
 - [`ANALYTICS.md`](../ANALYTICS.md) — the recovery/strain/sleep maths, with citations.

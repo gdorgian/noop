@@ -245,9 +245,9 @@ final class IntelligenceEngine: ObservableObject {
     /// Median of a list (0 when empty) , used to denoise the 7-day resting-HR for Fitness Age.
     /// The ONE aggregation of a 7-day window into `VitalityEngine.Inputs`.
     ///
-    /// Three surfaces need these inputs: the weekly write that persists `body_age`/`vitality`, the
-    /// Health hub's "what's driving it" breakdown, and Aura's Age screen. They MUST agree — a breakdown
-    /// computed on different statistics than the headline it explains is worse than no breakdown, because
+    /// Every consumer needs the same inputs: the weekly write that persists `body_age`/`vitality` and the
+    /// Health hub's "what's driving it" breakdown. They MUST agree — a breakdown computed on different
+    /// statistics than the headline it explains is worse than no breakdown, because
     /// it looks authoritative while contradicting the number above it. That already happened once: the
     /// breakdown meaned every input while the headline medianed resting HR and HRV, so one outlier night
     /// pulled them apart. Keeping the aggregation in a single function is what stops it recurring.

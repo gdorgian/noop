@@ -280,6 +280,13 @@ final class GoalActionStore: ObservableObject {
         }
     }
 
+    /// Account/data deletion is the one operation that removes the action catalogue and its check-offs
+    /// together. Normal goal deletion deliberately keeps an unlinked action available for reuse.
+    func clearAll() {
+        actions = []
+        checkoffs = []
+    }
+
     func toggleManual(_ actionId: UUID, day: String, now: Date = Date()) {
         let id = "\(actionId.uuidString):\(day)"
         if checkoffs.contains(where: { $0.id == id }) { checkoffs.removeAll { $0.id == id } }
@@ -350,6 +357,13 @@ final class GoalContributionStore: ObservableObject {
             copy.goalIds.removeAll { $0 == goalId }
             return copy.goalIds.isEmpty ? nil : copy
         }
+    }
+
+    /// Full local reset only. A normal removal records a dismissal so the same workout is not offered
+    /// again; deleting the account must remove both the contributions and that dismissal history.
+    func clearAll() {
+        contributions = []
+        dismissedWorkoutKeys = []
     }
 
     private func save() {

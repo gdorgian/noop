@@ -466,12 +466,15 @@ final class AICoachEngine: ObservableObject {
     /// A memory choice is meaningful only when the master data-consent switch is also on. Keep this as
     /// one predicate so tool use, prompt context and background summarisation cannot drift apart.
     var memoryContextAllowed: Bool {
-        dataConsent && toolConsent.allows(.searchPastConversations)
+        // The seven-category HTML contract says the local memory index stays on the phone. None of its
+        // categories is a proxy for cross-conversation memory, so it is never folded into provider text.
+        false
     }
 
     private var semanticAllowedScopes: Set<SemanticConsentScope> {
-        guard dataConsent else { return [] }
-        return CoachSemanticMemory.allowedScopes(for: toolConsent)
+        // Keep already-stored local memory available to the UI, but do not index a seven-category data
+        // source for provider retrieval through the older coarse-purpose consent model.
+        []
     }
 
     /// Called from the Coach screen. It only reconciles text metadata and begins an asynchronous warm-up;
@@ -1472,8 +1475,6 @@ final class AICoachEngine: ObservableObject {
         }
 
         clearError()
-        // The current question becomes searchable for the NEXT turn, not its own retrieval.
-        let conversationsBeforeCurrentQuestion = conversations
         // Route through `appendMessage` for upstream's `maxStoredMessages` cap (unbounded-RAM fix, #741)
         // while keeping the fork's richer clear-error + card-suggestion reset.
         appendMessage(ChatMessage(role: .user, text: trimmed))
@@ -1496,27 +1497,12 @@ final class AICoachEngine: ObservableObject {
         // instead of pre-baking the whole summary into the prompt.
         // Only read journal labels locally when their separate consent exists; those labels are used by
         // the local policy only and never appended to the provider prompt.
-        let semanticJournalEntries = semanticAllowedScopes.contains(.personalLogs)
-            || semanticAllowedScopes.contains(.sensitiveLogs)
-            ? await repo.journalEntries()
-            : []
-        let journalQuestions = toolConsent.allows(.myLogs)
-            ? semanticJournalEntries.map(\.question)
-            : []
-        let semanticRetrieval: CoachSemanticRetrieval
-        if dataConsent {
-            semanticRetrieval = await CoachSemanticMemory.shared.retrieve(
-                question: trimmed,
-                conversations: conversationsBeforeCurrentQuestion,
-                journalEntries: semanticJournalEntries,
-                allowedScopes: semanticAllowedScopes
-            )
-            // Queue the just-added user turn immediately, but do not start another model operation.
-            // Only the conversations changed since the reconcile inside `retrieve` a moment ago — this
-            // used to be a second FULL reconcile of every source, doubling that work on every message.
-            await CoachSemanticMemory.shared.conversationsChanged(conversations)
+        let sveaGrants = SveaDataGrants.load()
+        let journalQuestions: [String]
+        if dataConsent && (sveaGrants.allows(.journal) || sveaGrants.allows(.tender)) {
+            journalQuestions = (await repo.journalEntries()).map(\.question)
         } else {
-            semanticRetrieval = CoachSemanticRetrieval(context: "", mode: .unavailable)
+            journalQuestions = []
         }
         // Resolved before the tool list is built: on a language the routing lexicon doesn't speak this
         // asks the cheap model instead of silently answering "no" to every history/catalog/log question.
@@ -1529,27 +1515,11 @@ final class AICoachEngine: ObservableObject {
         let context: String
         var localContextUsed: [ChatMessage.LocalContextCategory] = []
         if toolsActiveForTurn {
-            context = [toolModeContext, semanticRetrieval.context]
-                .filter { !$0.isEmpty }
-                .joined(separator: "\n\n")
-            if !semanticRetrieval.context.isEmpty {
-                localContextUsed.append(semanticRetrieval.mode == .semantic
-                    ? .semanticMemory : .keywordMemory)
-            }
+            context = toolModeContext
         } else if dataConsent {
             let prepared = await buildNonToolContext(for: trimmed)
-            var full = prepared.text
+            let full = prepared.text
             localContextUsed = prepared.categories
-            let localEvidence = await nonToolLocalEvidence(for: trimmed)
-            if !localEvidence.isEmpty {
-                full += "\n\n" + localEvidence
-                localContextUsed.append(.longTermHistory)
-            }
-            if !semanticRetrieval.context.isEmpty {
-                full += "\n\n" + semanticRetrieval.context
-                localContextUsed.append(semanticRetrieval.mode == .semantic
-                    ? .semanticMemory : .keywordMemory)
-            }
             context = full
         } else {
             context = noConsentNote
@@ -1933,7 +1903,7 @@ final class AICoachEngine: ObservableObject {
             return lines.joined(separator: "\n")
 
         case "lab":
-            guard toolConsent.enabled.contains(.logs) else {
+            guard dataConsent, SveaDataGrants.load().allows(.labs) else {
                 return "The user hasn't shared their Lab Book, so this isn't available."
             }
             guard let store = await repo.storeHandle() else { return "Couldn't open the local store." }
@@ -2048,7 +2018,7 @@ final class AICoachEngine: ObservableObject {
 
     /// `get_sleep_detail`: per-night stages/efficiency from the daily roll-up plus the rolling
     /// 14-night sleep-debt ledger (`SleepDebt.ledger`). Summary text only, never raw samples.
-    func sleepDetailTool(nights: Int) async -> String {
+    func sleepDetailTool(nights: Int, includeVitals: Bool = true) async -> String {
         let n = max(1, min(nights, 14))
         let all = repo.days
         let recent = Array(all.suffix(n))
@@ -2060,7 +2030,8 @@ final class AICoachEngine: ObservableObject {
         let now = Int(Date().timeIntervalSince1970)
         let sessions = await repo.sleepSessions(from: now - (n + 2) * 86_400, to: now + 86_400, limit: n + 5)
         let habitual = await repo.habitualMidsleepSec()
-        var text = Self.formatSleepDetail(recentDays: recent, sessions: sessions, habitualMidsleepSec: habitual)
+        var text = Self.formatSleepDetail(recentDays: recent, sessions: sessions,
+                                          habitualMidsleepSec: habitual, includeVitals: includeVitals)
 
         // Rolling sleep-debt ledger over the last 30 nights (14-night window inside the engine).
         let ledger = SleepDebt.ledger(series: all.suffix(30).map { ($0.day, $0.totalSleepMin) })
@@ -2082,7 +2053,7 @@ final class AICoachEngine: ObservableObject {
     /// have learned a habit, and only when the shift is large enough to be worth a line. Kept free of
     /// `repo`/store reads so it's unit-testable without a database.
     nonisolated static func formatSleepDetail(recentDays: [DailyMetric], sessions: [CachedSleepSession],
-                                              habitualMidsleepSec: Int?) -> String {
+                                              habitualMidsleepSec: Int?, includeVitals: Bool = true) -> String {
         guard !recentDays.isEmpty else { return "No sleep data recorded yet." }
 
         func wakeDay(_ s: CachedSleepSession) -> String {
@@ -2095,7 +2066,9 @@ final class AICoachEngine: ObservableObject {
         clockFmt.timeZone = .current
         func clock(_ ts: Int) -> String { clockFmt.string(from: Date(timeIntervalSince1970: TimeInterval(ts))) }
 
-        var lines = ["SLEEP DETAIL (newest first) — bed→wake, asleep(h), efficiency(%), deep/REM/light(min), disturbances, RHR, HRV:"]
+        var lines = [includeVitals
+                     ? "SLEEP DETAIL (newest first) — bed→wake, asleep(h), efficiency(%), deep/REM/light(min), disturbances, RHR, HRV:"
+                     : "SLEEP DETAIL (newest first) — bed→wake, asleep(h), efficiency(%), deep/REM/light(min), disturbances:"]
         for d in recentDays.reversed() {
             var parts = ["  \(d.day):"]
             if let s = sessionByDay[d.day] {
@@ -2109,8 +2082,10 @@ final class AICoachEngine: ObservableObject {
             parts.append("REM " + (d.remMin.map { "\(Int($0.rounded()))m" } ?? "—"))
             parts.append("light " + (d.lightMin.map { "\(Int($0.rounded()))m" } ?? "—"))
             parts.append("disturbances " + (d.disturbances.map { "\($0)" } ?? "—"))
-            parts.append("RHR " + (d.restingHr.map { "\($0)" } ?? "—"))
-            parts.append("HRV " + (d.avgHrv.map { "\(Int($0.rounded()))ms" } ?? "—"))
+            if includeVitals {
+                parts.append("RHR " + (d.restingHr.map { "\($0)" } ?? "—"))
+                parts.append("HRV " + (d.avgHrv.map { "\(Int($0.rounded()))ms" } ?? "—"))
+            }
             lines.append(parts.joined(separator: ", "))
         }
 
@@ -2181,20 +2156,17 @@ final class AICoachEngine: ObservableObject {
     /// `get_data_catalog`: metadata-only local discovery. This is the router's first step when it needs
     /// to know whether a long-running or imported metric exists, before asking for a compact analysis.
     func dataCatalogTool(query: String? = nil) async -> String {
-        let includesLabBook = toolConsent.allows(.myLogs)
+        let grants = SveaDataGrants.load()
+        let includesLabBook = grants.allows(.labs)
         let entries = CoachDataCatalog.entriesVisibleToCoach(await repo.metricCatalog(), includesLabBook: includesLabBook)
         var areas: [CoachDataCatalog.Area] = []
-        if toolConsent.allows(.recentWorkouts) {
+        if grants.allows(.effort) {
             let workouts = await repo.workoutRows(days: 4_000)
             if !workouts.isEmpty { areas.append(.init(name: "Workout history", summary: "\(workouts.count) recorded sessions")) }
         }
-        if toolConsent.allows(.planAdherence) {
-            let proposals = CoachPlanStore.shared.proposals
-            if !proposals.isEmpty { areas.append(.init(name: "Training plan", summary: "\(proposals.count) local plan proposals/decisions")) }
-        }
-        if toolConsent.allows(.myLogs) {
+        if grants.allows(.journal) || grants.allows(.tender) || grants.allows(.labs) {
             let journalCount = (await repo.journalEntries()).filter {
-                toolConsent.allows(.sensitiveLogs)
+                grants.allows(.tender)
                     || !CoachSensitiveJournalPolicy.isSensitive(label: $0.question)
             }.count
             let caffeineCount = CaffeineLogStore.shared.intakes.count
@@ -2205,17 +2177,11 @@ final class AICoachEngine: ObservableObject {
             if caffeineCount > 0 { parts.append("\(caffeineCount) caffeine entries") }
             if hydrationDays > 0 { parts.append("\(hydrationDays) hydration days") }
             if moodDays > 0 { parts.append("\(moodDays) mood check-ins") }
-            if let store = await repo.storeHandle() {
+            if grants.allows(.labs), let store = await repo.storeHandle() {
                 let markerTypes = (try? await store.markerKeysPresent(deviceId: repo.deviceId).count) ?? 0
                 if markerTypes > 0 { parts.append("\(markerTypes) Lab Book marker types") }
             }
             if !parts.isEmpty { areas.append(.init(name: "Personal logs", summary: parts.joined(separator: ", "))) }
-        }
-        if toolConsent.allows(.searchPastConversations) {
-            let facts = CoachMemory.shared.facts.count
-            if facts > 0 || !conversations.isEmpty {
-                areas.append(.init(name: "Coach memory", summary: "\(facts) saved facts, \(conversations.count) local conversations"))
-            }
         }
         return CoachDataCatalog.report(entries: entries, areas: areas, query: query)
     }
@@ -2225,7 +2191,7 @@ final class AICoachEngine: ObservableObject {
     func metricHistoryTool(metric rawMetric: String, days: Int, source requestedSource: String?) async -> String {
         let metric = Self.normalizedHistoryMetric(rawMetric)
         guard !metric.isEmpty else { return "Choose a metric to analyse, for example weight or hrv." }
-        let includesLabBook = toolConsent.allows(.myLogs)
+        let includesLabBook = SveaDataGrants.load().allows(.labs)
         let sourceRequest = requestedSource?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         if ["lab-book", "lab book"].contains(sourceRequest), !includesLabBook {
             return "The user hasn't shared their Lab Book, so this history isn't available."
@@ -2530,7 +2496,7 @@ final class AICoachEngine: ObservableObject {
     @discardableResult
     private func generateBrief() async -> Bool {
         var spoke = false
-        guard isConfigured, dataConsent, !sending else { return spoke }
+        guard isConfigured, dataConsent, !SveaDataGrants.load().allowed.isEmpty, !sending else { return spoke }
         guard let key = resolvedKey else { return spoke }
         clearError()
         memoryWrites = []
@@ -2610,7 +2576,7 @@ final class AICoachEngine: ObservableObject {
     /// relevant memory folded in, exactly like a normal `send()` turn. Stamps `lastCheckInDayKey` only on
     /// success.
     private func generateCheckIn() async {
-        guard isConfigured, dataConsent, !sending else { return }
+        guard isConfigured, dataConsent, !SveaDataGrants.load().allowed.isEmpty, !sending else { return }
         guard let key = resolvedKey else { return }
         clearError()
         memoryWrites = []
@@ -2729,7 +2695,8 @@ final class AICoachEngine: ObservableObject {
     /// date), so this stays quiet on ordinary days.
     @discardableResult
     func runProactiveNudgeIfNeeded() async -> Bool {
-        guard CoachFeaturePrefs.isEnabled, proactiveLevel != .off, isConfigured, dataConsent, !sending else { return false }
+        guard CoachFeaturePrefs.isEnabled, proactiveLevel != .off, isConfigured, dataConsent,
+              !SveaDataGrants.load().allowed.isEmpty, !sending else { return false }
         let today = Repository.logicalDayKey(Date())
         guard UserDefaults.standard.string(forKey: Self.lastProactiveDayKey) != today else { return false }
         guard let signal = ProactiveCoach.detect(proposals: CoachPlanStore.shared.proposals,
@@ -2794,7 +2761,8 @@ final class AICoachEngine: ObservableObject {
     /// the target date makes a moved date a genuinely new moment. See `CoachGoalNudgeStamps`.
     @discardableResult
     func runGoalReviewIfNeeded() async -> Bool {
-        guard CoachFeaturePrefs.isEnabled, proactiveLevel != .off, isConfigured, dataConsent, !sending else { return false }
+        guard CoachFeaturePrefs.isEnabled, proactiveLevel != .off, isConfigured, dataConsent,
+              !SveaDataGrants.load().allowed.isEmpty, !sending else { return false }
         guard let goal = ProactiveCoach.expiredGoalNeedingReview(CoachGoalStore.shared.goals) else {
             return false
         }
@@ -2813,7 +2781,8 @@ final class AICoachEngine: ObservableObject {
     /// there's plan activity to review (#P10 13.2).
     @discardableResult
     func runWeeklyReviewIfNeeded() async -> Bool {
-        guard CoachFeaturePrefs.isEnabled, proactiveLevel == .normal, isConfigured, dataConsent, !sending else { return false }
+        guard CoachFeaturePrefs.isEnabled, proactiveLevel == .normal, isConfigured, dataConsent,
+              !SveaDataGrants.load().allowed.isEmpty, !sending else { return false }
         // `logicalDayKey`, matching what the generator STAMPS. This used to read `localDayKey` while the
         // stamp was written as a logical key, so a review that ran between midnight and 04:00 recorded
         // the previous day and the seven-day gate opened a day early.
@@ -2888,7 +2857,7 @@ final class AICoachEngine: ObservableObject {
                                     stampValue: String? = nil,
                                     origin: ChatMessage.Origin) async -> Bool {
         var spoke = false
-        guard isConfigured, dataConsent, !sending else { return spoke }
+        guard isConfigured, dataConsent, !SveaDataGrants.load().allowed.isEmpty, !sending else { return spoke }
         guard let key = resolvedKey else { return spoke }
         clearError()
         memoryWrites = []
@@ -2968,7 +2937,10 @@ final class AICoachEngine: ObservableObject {
     func runCardAnalysisIfNeeded() async {
         guard let context = pendingCardContext else { return }
         pendingCardContext = nil
-        guard isConfigured, dataConsent, !sending else { return }
+        let grants = SveaDataGrants.load()
+        guard isConfigured, dataConsent, !sending,
+              let category = SveaDataGrantPolicy.grantForMetric(context.title),
+              grants.allows(category) else { return }
         clearError()
         memoryWrites = []
         sending = true
@@ -3006,53 +2978,7 @@ final class AICoachEngine: ObservableObject {
     /// question-specific non-tool context below, it includes every *granted* purpose, but never silently
     /// crosses a granular data-access boundary.
     func buildFullContext() async -> String {
-        var blocks: [String] = []
-        if toolConsent.allows(.biometricSummary) {
-            blocks.append(buildContext(includeGoals: toolConsent.allows(.planAdherence)))
-        } else {
-            blocks.append("NOTE: The user has not shared core biometrics. Do not infer health metrics.")
-        }
-        if toolConsent.allows(.recentWorkouts) {
-            blocks.append(await recentWorkoutsBlock())
-        }
-        // Readiness (the SAME verdict Today's synthesis card shows) rides every full-context request —
-        // not just the tool path — so a non-tool-calling provider (OpenAI/Gemini/Custom) can't drift from
-        // what the user sees on Today either. Includes the health-signal safety note when relevant.
-        if toolConsent.allows(.readiness) { blocks.append(readinessBlock()) }
-        // Charge confidence: whether today's number is a real, baseline-trusted score or still a
-        // cold-start placeholder, so the coach never states progress/trends off a "calibrating" number.
-        if toolConsent.allows(.readiness), let confidence = await chargeConfidenceBlock() { blocks.append(confidence) }
-        // What's already proposed/agreed, so the coach doesn't talk over a plan the user is mid-way
-        // through, plus how the last week actually went (skips carry their reason).
-        if toolConsent.allows(.planAdherence) {
-            if let plan = planContextBlock() { blocks.append(plan) }
-            blocks.append(await planAdherenceBlock())
-        }
-        // Derived stress: a single Baevsky Stress Index summary line over today's R-R, computed the same
-        // way StressView does. Gated here under `dataConsent` (the caller only reaches buildFullContext()
-        // with consent on), so it rides the SAME consent + text-only channel as the HRV/RHR summary, a
-        // derived number, never raw R-R egress. Omitted when there aren't enough clean beats yet.
-        if toolConsent.allows(.stressIndex), let line = await stressIndexLine() { blocks.append(line) }
-        if toolConsent.allows(.personalPatterns) {
-            let block = await onDeviceSignalsBlock(includeLabBook: toolConsent.allows(.myLogs),
-                                                   includeSensitiveLogs: toolConsent.allows(.sensitiveLogs))
-            if !block.isEmpty { blocks.append(block) }
-        }
-        // Cross-conversation memory: a short digest of the user's recent past conversations, so the coach
-        // has continuity across chats even on providers without tool-calling. Empty until chats are
-        // summarised by the memory maintainer. Rides the same consent channel (buildFullContext only runs
-        // with dataConsent on).
-        if toolConsent.allows(.searchPastConversations) {
-            let digest = recentSummariesDigest()
-            if !digest.isEmpty { blocks.append(digest) }
-        // The thread INDEX on top of the digest: a summary only exists once the memory maintainer has
-        // run, so a thread from yesterday the user never left cleanly has none. Its title does exist —
-        // and `CoachConversation.autoTitle` derives it from the user's FIRST question, so even on a
-        // provider with no tool-calling this alone can answer "what did I ask you yesterday" in outline.
-            let threads = recentThreadsIndex()
-            if !threads.isEmpty { blocks.append(threads) }
-        }
-        return blocks.joined(separator: "\n\n")
+        await buildSveaGrantedContext(SveaDataGrants.load()).text
     }
 
     /// Context for a provider without a tool protocol. A small local planner selects only the sections
@@ -3063,65 +2989,95 @@ final class AICoachEngine: ObservableObject {
         let categories: [ChatMessage.LocalContextCategory]
     }
 
-    private func buildNonToolContext(for question: String) async -> PreparedNonToolContext {
-        let sections = CoachLocalContextPlanner.sections(for: question)
-        var blocks: [String] = []
+    private func buildNonToolContext(for _: String) async -> PreparedNonToolContext {
+        await buildSveaGrantedContext(SveaDataGrants.load())
+    }
+
+    /// Assemble each HTML grant independently. No helper that mixes sleep, activity, vitals, profile,
+    /// journal and Lab Book is used here; each block is constructed/read only after its own typed grant.
+    private func buildSveaGrantedContext(_ grants: SveaDataGrants) async -> PreparedNonToolContext {
+        guard dataConsent else {
+            return PreparedNonToolContext(text: noConsentNote, categories: [])
+        }
+        guard !grants.allowed.isEmpty else {
+            return PreparedNonToolContext(
+                text: "NOTE: The user has not shared any health-data category. Do not infer personal metrics.",
+                categories: []
+            )
+        }
+
+        var blocks = [clockLine()]
         var categories: [ChatMessage.LocalContextCategory] = []
-        let grantsCore = toolConsent.allows(.biometricSummary)
-        if grantsCore, sections.contains(.compactBiometrics) {
-            if sections.contains(.detailedBiometrics) {
-                blocks.append(buildContext(includeGoals: false))
-                categories.append(.biometricSnapshot)
-            } else {
-                blocks.append(buildCompactContext())
-                categories.append(.biometricSnapshot)
-            }
-        } else if !grantsCore {
-            blocks.append("NOTE: The user has not shared core biometrics. Do not infer health metrics.")
+        if grants.allows(.sleep) {
+            blocks.append(await sleepDetailTool(nights: 14, includeVitals: false))
+            categories.append(.biometricSnapshot)
         }
-        if sections.contains(.readiness), toolConsent.allows(.readiness) {
-            blocks.append(readinessBlock())
-            if let confidence = await chargeConfidenceBlock() { blocks.append(confidence) }
-            categories.append(.readiness)
-        }
-        if sections.contains(.workouts), toolConsent.allows(.recentWorkouts) {
+        if grants.allows(.effort) {
             blocks.append(await recentWorkoutsBlock())
             categories.append(.recentWorkouts)
         }
-        if sections.contains(.planning), toolConsent.allows(.planAdherence) {
-            let profile = ProfileStore()
-            if let goals = goalsBlock(profile: profile) { blocks.append(goals) }
-            if let plan = planContextBlock() { blocks.append(plan) }
-            blocks.append(await planAdherenceBlock())
-            categories.append(.planning)
+        if grants.allows(.vitals) {
+            blocks.append(sveaVitalsBlock())
+            if let stress = await stressIndexLine() { blocks.append(stress) }
+            categories.append(.biometricSnapshot)
         }
-        if sections.contains(.trainingPreferences), toolConsent.allows(.trainingPreferences) {
-            let reports = CoachTrainingPreferences.longitudinalReports(
-                proposals: CoachPlanStore.shared.proposals
-            )
-            if reports.contains(where: \.hasHypothesis) {
-                blocks.append(longitudinalTrainingPreferences())
-                categories.append(.trainingPreferences)
-            }
+        if grants.allows(.journal) {
+            blocks.append(await myLogsTool(kind: "journal", days: 14))
+            categories.append(.personalPatterns)
         }
-        if sections.contains(.stress), toolConsent.allows(.stressIndex), let stress = await stressIndexLine() {
-            blocks.append(stress)
-            categories.append(.stress)
+        if grants.allows(.tender) {
+            blocks.append(await myLogsTool(kind: "journal", days: 14, onlySensitive: true))
+            categories.append(.personalPatterns)
         }
-        if sections.contains(.patterns), toolConsent.allows(.personalPatterns) {
-            let patterns = await onDeviceSignalsBlock(includeLabBook: toolConsent.allows(.myLogs),
-                                                       includeSensitiveLogs: toolConsent.allows(.sensitiveLogs))
-            if !patterns.isEmpty { blocks.append(patterns) }
-            if !patterns.isEmpty { categories.append(.personalPatterns) }
+        if grants.allows(.ages) {
+            blocks.append(await sveaAgesBlock())
+            categories.append(.longTermHistory)
         }
-        if sections.contains(.conversationMemory), toolConsent.allows(.searchPastConversations) {
-            let digest = recentSummariesDigest()
-            if !digest.isEmpty { blocks.append(digest) }
-            let threads = recentThreadsIndex()
-            if !threads.isEmpty { blocks.append(threads) }
-            if !digest.isEmpty || !threads.isEmpty { categories.append(.conversationMemory) }
+        if grants.allows(.labs) {
+            blocks.append(await myLogsTool(kind: "lab", days: 90))
+            categories.append(.personalPatterns)
         }
-        return PreparedNonToolContext(text: blocks.joined(separator: "\n\n"), categories: categories)
+        return PreparedNonToolContext(text: blocks.joined(separator: "\n\n"),
+                                      categories: Array(Set(categories)))
+    }
+
+    private func sveaVitalsBlock() -> String {
+        let recent = Array(repo.days.suffix(14))
+        guard !recent.isEmpty else { return "VITALS: no recorded data yet." }
+        var lines = ["VITALS (last 14 recorded days; no sleep, workout, journal, age or lab data):"]
+        if let latest = recent.last {
+            let hrv = latest.avgHrv.map { "\(Int($0.rounded())) ms" } ?? "—"
+            let rhr = latest.restingHr.map(String.init) ?? "—"
+            let spo2 = latest.spo2Pct.map { String(format: "%.0f%%", $0) } ?? "—"
+            let respiration = latest.respRateBpm.map { String(format: "%.1f/min", $0) } ?? "—"
+            let temperature = latest.skinTempDevC.map { String(format: "%+.1f°C", $0) } ?? "—"
+            lines.append("Latest (\(latest.day)): HRV \(hrv), resting pulse \(rhr) bpm, "
+                         + "SpO2 \(spo2), respiration \(respiration), "
+                         + "skin-temperature deviation \(temperature).")
+        }
+        lines.append("14-day averages: HRV \(avgInt(recent.compactMap { $0.avgHrv })) ms, "
+                     + "resting pulse \(avgInt(recent.compactMap { $0.restingHr.map(Double.init) })) bpm, "
+                     + "SpO2 \(avgInt(recent.compactMap { $0.spo2Pct }))%, "
+                     + "respiration \(avgOne(recent.compactMap { $0.respRateBpm }))/min, "
+                     + "skin-temperature deviation \(avgOne(recent.compactMap { $0.skinTempDevC }))°C.")
+        return lines.joined(separator: "\n")
+    }
+
+    private func sveaAgesBlock() async -> String {
+        async let body = repo.exploreSeries(key: "body_age", source: Repository.whoopSource, days: 365)
+        async let fitness = repo.exploreSeries(key: "fitness_age", source: Repository.whoopSource, days: 365)
+        async let vitality = repo.exploreSeries(key: "vitality", source: Repository.whoopSource, days: 365)
+        let (bodyRows, fitnessRows, vitalityRows) = await (body, fitness, vitality)
+        let latestBody = bodyRows.last
+        let latestFitness = fitnessRows.last
+        let latestVitality = vitalityRows.last
+        var parts: [String] = []
+        if let value = latestBody?.value { parts.append(String(format: "body age %.1f years", value)) }
+        if let value = latestFitness?.value { parts.append(String(format: "fitness age %.1f years", value)) }
+        if let value = latestVitality?.value { parts.append(String(format: "vitality %.0f/100", value)) }
+        return parts.isEmpty
+            ? "AGES: no body-age or fitness-age estimate is available yet."
+            : "AGES (latest local estimates; not diagnoses): " + parts.joined(separator: ", ") + "."
     }
 
     // MARK: - Readiness / Charge drivers / clock
@@ -4199,6 +4155,10 @@ final class AICoachEngine: ObservableObject {
     /// Internal so `MemoryMaintainer` (and the card-AI feature) can drive short calls without touching the
     /// private key. Returns nil on ANY failure — this work is best-effort and never surfaces an error.
     func cheapComplete(system: String, user: String, role: CoachModelRole = .summary) async -> String? {
+        // The old summary role can carry whole transcripts or arbitrary journal rows, neither of which
+        // maps safely to one of the seven HTML grants. Keep that index/local cleanup work on-device. The
+        // card role has its own typed category check in `runCardAnalysisIfNeeded`.
+        if case .summary = role { return nil }
         guard let key = resolvedKey else { return nil }
         do {
             return try await provider.client.send(
@@ -4412,10 +4372,33 @@ final class AICoachEngine: ObservableObject {
     /// a large model simply gets more when the turns are short. (Android still uses the flat count; this
     /// is a fork-side divergence, and the floor keeps the two agreeing on the small-model case.)
     private func windowedMessages() -> [ChatMessage] {
+        let currentGrants = dataConsent ? SveaDataGrants.load() : .none
+        let needsFreshHistory = currentGrants.requiresFreshProviderHistory()
+        if needsFreshHistory {
+            let boundary = messages.last?.role == .user ? (messages.last?.date ?? Date()) : Date()
+            currentGrants.markProviderHistoryBoundary(boundary)
+        }
+        currentGrants.recordProviderVisibility()
+
+        // If a category was revoked (or this is the first request after migrating to the seven-grant
+        // contract), preserve the local transcript but send no old provider-visible turn. For an ordinary
+        // user send the newly appended question is the sole safe turn; an auto turn appends its synthetic
+        // prompt after this and therefore starts from an empty wire history.
+        let providerSafeMessages: [ChatMessage]
+        if needsFreshHistory {
+            if let last = messages.last, last.role == .user {
+                providerSafeMessages = [last]
+            } else {
+                providerSafeMessages = []
+            }
+        } else {
+            let cutoff = SveaDataGrants.providerHistoryCutoff() ?? .distantFuture
+            providerSafeMessages = messages.filter { $0.date >= cutoff }
+        }
         // `requestModel`, not `model`: a deep re-run may go to a model with a different context window,
         // and the window has to match the model the request is actually sent to.
-        Self.windowedMessages(
-            messages,
+        return Self.windowedMessages(
+            providerSafeMessages,
             budgetTokens: CoachHistoryBudget.tokens(provider: provider, model: requestModel))
     }
 
@@ -4453,12 +4436,7 @@ final class AICoachEngine: ObservableObject {
     /// `context` is passed to the ranking so a fact the semantic index already retrieved isn't restated
     /// here — the two retrievers hold the same facts and neither knew about the other.
     private func wireMessages(context: String) -> [(role: ChatMessage.Role, content: String)] {
-        let question = messages.last(where: { $0.role == .user })?.text ?? ""
-        let relevant = memoryContextAllowed
-            ? CoachMemory.shared.relevantBlock(for: question, limit: 8, alreadyInContext: context)
-            : ""
-        let fullContext = relevant.isEmpty ? context : context + "\n\n" + relevant
-        return Self.wirePairs(from: windowedMessages(), context: fullContext)
+        Self.wirePairs(from: windowedMessages(), context: context)
     }
 
     /// Pure: fold the windowed transcript into wire pairs. Split from `wireMessages` so the

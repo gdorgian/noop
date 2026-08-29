@@ -4,13 +4,8 @@ import StrandDesign
 // MARK: - Shared ActivityStatus sheet (StrandPalette-styled)
 //
 // The activity-status concept (Active / Sick / Injured / On break, with a validity window and a silent
-// reset) was born on the Heute redesign; its data model (`ActivityStatus` / `ActivityStatusStore`,
-// Strand/Data/) is screen-neutral, but Heute's own sheet UI (StrandiOS/Redesign/HeuteHeaderView.swift)
-// is styled in the fixed `HeuteRedesignPalette` and cannot be reused on the other two Today screens,
-// which live in the theme-aware `StrandPalette`. This is the SAME sheet in StrandPalette tokens, so
-// Liquid Today and classic Today can offer the exact same set/duration flow without duplicating it or
-// borrowing Heute's fork palette. Behaviour (state rows → duration pills → Apply, writing through
-// `ActivityStatusStore`) is identical to Heute's; only the chrome differs.
+// reset) is screen-neutral. This shared sheet lets both Today presentations offer the same set/duration
+// flow without duplicating it. Applying a choice writes through `ActivityStatusStore`.
 //
 // Cross-platform: `Strand/Screens` compiles into both the macOS Strand and the iOS NOOPiOS targets, so
 // this stays free of `UIKit`/`AppKit` and uses only shared SwiftUI + design tokens.
@@ -28,8 +23,8 @@ struct SharedActivityStatusSheet: View {
         _pendingState = State(initialValue: status.wrappedValue.state)
     }
 
-    /// The duration choices offered, 1:1 onto `ActivityStatus.Duration`. Kept local to the sheet (like
-    /// Heute's own copy) so the picker's UI order is independent of the model enum's declaration order.
+    /// The duration choices offered, 1:1 onto `ActivityStatus.Duration`. Kept local to the sheet so the
+    /// picker's UI order is independent of the model enum's declaration order.
     enum DurationChoice: CaseIterable {
         case untilChanged, today, threeDays, thisWeek, custom
 
@@ -130,7 +125,7 @@ struct SharedActivityStatusSheet: View {
                 .foregroundStyle(StrandPalette.textTertiary)
                 .padding(.horizontal, 8)
 
-            // A handful of short pills; a plain wrapping HStack is enough (same rationale as Heute's).
+            // A handful of short pills; a plain wrapping HStack is enough.
             FlowRow(spacing: 8) {
                 ForEach(DurationChoice.allCases, id: \.self) { choice in
                     Button(choice.label) { pendingDuration = choice }
@@ -174,8 +169,7 @@ private struct DurationPillStyle: ButtonStyle {
     }
 }
 
-/// A minimal wrapping row — the duration row only ever has 5 short pills, so a simple wrap suffices (same
-/// rationale as Heute's own `FlowRow`; kept private here so the two screens don't depend on Heute's file).
+/// A minimal wrapping row — the duration row only ever has 5 short pills, so a simple row suffices.
 private struct FlowRow<Content: View>: View {
     let spacing: CGFloat
     @ViewBuilder let content: () -> Content
@@ -188,8 +182,7 @@ private struct FlowRow<Content: View>: View {
 
 /// A small tappable status chip for the two Today screens' headers/synthesis: an icon + the state label,
 /// tinted by its own fixed Apple Health-style colour (green/red/orange/yellow, `ActivityStatusColors`).
-/// Opens the shared sheet. Kept deliberately simple — the elaborate expand-on-tap chip is Heute's
-/// signature; here it's just a labelled button.
+/// Opens the shared sheet as a compact labelled button.
 struct ActivityStatusChipCompact: View {
     @Binding var status: ActivityStatus
     @State private var showSheet = false

@@ -2,7 +2,7 @@ import XCTest
 @testable import Strand
 
 /// Pins `Repository.resolveWeightKg`'s three-tier fallback (imported Apple Health reading → 90-day series
-/// fallback → profile weight) — the shared selector classic Today, Liquid Today, and Heute all now call,
+/// fallback → profile weight) — the shared selector every Today presentation now calls,
 /// so the three screens can't disagree about which weight to show for the same day.
 final class RepositoryWeightResolutionTests: XCTestCase {
 

@@ -7,9 +7,9 @@ answer "why is X built this way" or "what's worth improving" by reading this fil
 reconstructing it from git log or commit history. Its entries below happen to all be redesign-dated
 so far, but that's a starting point, not a scope limit; add non-redesign decisions here too rather
 than starting a separate file (see [`CLAUDE.md`](../../CLAUDE.md) § Documentation & session workflow).
-One row per decision. Supersedes any conflicting rows in `redesign-prompts.md` (the original handoff
-doc, kept for its screen specs but written against an upstream-close fork whose assumptions no longer
-hold).
+One row per decision. Later rows supersede conflicting earlier rows. Earlier entries remain as
+historical context even when the implementation or design-source files they name have since been
+removed.
 
 | Date | Decision | Why |
 |---|---|---|
@@ -109,3 +109,4 @@ hold).
 | 2026-08-20 | Upstream's **in-memory per-day analyze cache (#1005) is NOT carried**; this fork keeps the persisted `dayScanFingerprint` / `analysisInputRevision` skip (v38–v40) | Two skip layers with different invalidation would be one too many, and the fork's is strictly stronger: it survives relaunch (upstream's is session-local) and is invalidated by the write-side sensor revision rather than by a per-session HR key. `AnalyzeRecentDayCache` (StrandAnalytics) still merges in with upstream's key derivation, unused, so a later reconsideration costs nothing. Consequence: upstream's `v38-apple-step-hour` is registered here as **`v41-apple-step-hour`** — v38–v40 are taken, and `SchemaOracleTests` requires the vN to match registration order. Safe to renumber because this fork never shipped the upstream id, and upstream's own `ifNotExists` anticipates exactly this |
 | 2026-08-20 | Upstream's **Power saving screen (#1431) is adopted**, so the Settings card and its `SettingsSearchCatalog` entry are deleted rather than kept alongside | The @AppStorage properties the card read were moved out by the same upstream change, so keeping the card would not even compile; two surfaces for one setting also breaks the redesign's "one value, one place". Discovery survives through the More-tab row (`MoreCatalog`, keywords battery / low power) and the macOS sidebar, and `SettingsSearchCatalogTests` pins its narrowing property on a query that is still a Settings question |
 | 2026-08-20 | Where upstream re-bounded a stream read to `limit: 200_000`, this fork keeps `limit: Int.max`, and takes the rest of the hunk | The 200k cap is the truncation 10.1.1 removed on purpose (dense R-R/HR nights lose their newest samples to it). Upstream's actual fixes in those same lines — reading gravity from the same source id as the R-R (#1360), splitting an Oura ring's vendor respiration rate out of the stager's input (`OuraRespScale.forScoring` / `forVendorRate`) — are taken in full |
+| 2026-08-25 | Remove the obsolete Aura/Heute presentation modules and their standalone feature, visual-specification and mockup documents; use the native Today / Trends / Sleep / More shell as the interim UI baseline | The existing presentation is no longer the intended direction. Keeping unreachable implementations and binding mockups would make the next design inherit stale constraints. Future UI work starts from a clean seam; the Noop Aura product name, behavior and data layers, and historical release notes are unchanged |

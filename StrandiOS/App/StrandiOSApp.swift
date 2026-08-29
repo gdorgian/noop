@@ -8,7 +8,7 @@ import Combine
 /// iOS entry point. Unlike the macOS app (which adds a `MenuBarExtra` scene), iOS uses a single
 /// `WindowGroup`; the glanceable menu-bar role is filled by the Home/Lock-Screen widget instead.
 ///
-/// The iOS shell is `RootTabView` (a `TabView`), NOT the macOS `ContentView`. `ContentView` embeds
+/// The iOS shell is `RootTabView`, NOT the macOS `ContentView`. `ContentView` embeds
 /// `RootView()` — the `NavigationSplitView` sidebar shell — and `RootView.swift` is excluded from the
 /// iOS target in `project.yml` (the sidebar has no iPhone analogue), so `ContentView` cannot compile
 /// on iOS. The first-run onboarding/pairing wizard, the Terms acknowledgment gate, and the post-update
@@ -76,6 +76,7 @@ struct StrandiOSApp: App {
         // never fires; the macOS timer, foreground catch-up, and "Run now" already work without it.
         ScheduledDebugExport.register()
         SemanticMemoryBackgroundTask.register()
+        SveaProactiveBackgroundTask.register()
         // Foreground presentation: without a delegate, iOS suppresses a notification's banner while the app
         // is open, so a user testing the wind-down reminder with NOOP foregrounded sees nothing. Register
         // before the first scene so any early-fired notification is presented.
@@ -85,6 +86,7 @@ struct StrandiOSApp: App {
         CoachCheckIn.registerCategory()
         let model = AppModel()
         SemanticMemoryBackgroundTask.attach(coach: model.coach)
+        SveaProactiveBackgroundTask.attach(coach: model.coach)
         _model = StateObject(wrappedValue: model)
         let bridge = HealthKitBridge(
             repo: model.repo,
@@ -139,12 +141,9 @@ struct StrandiOSApp: App {
                 // v5 L3: the shared stress check-in nudge surface, so the Breathe screen's passive
                 // card observes the SAME instance the central detector (AppModel.evaluateStress) posts to.
                 .environment(\.stressNudgeCenter, model.stressNudgeCenter)
-                // Noop Aura 10.5.0 ships in its approved dark visual direction. Accessibility contrast
-                // and Reduce Motion still follow iOS; only the colour scheme is fixed.
+                // The canonical HTML is a fixed dark, English-only interface.
                 .preferredColorScheme(.dark)
-                // Match SwiftUI format styles to the localization selected by the app's bundles. Language
-                // changes are process-wide on Apple and are applied after the documented reopen.
-                .environment(\.locale, AppLanguage.activeLocale)
+                .environment(\.locale, Locale(identifier: "en_US"))
                 .chartStyle(chartStyleRaw)
                 // "Health always wins" (user decision): every successful sync overwrites the profile
                 // weight with the freshest Health reading, not just once when unset.
@@ -417,7 +416,7 @@ private struct iOSRootView: View {
                 demoBypass || (onboarded && acceptedTerms == Terms.currentVersion
                     && automaticLaunchSheetResolved))
             if !onboarded && !demoBypass {
-                OnboardingWizard(onFinished: {
+                NoopOnboardingView(onFinished: {
                     onboarded = true
                     // A brand-new user just saw the expectations in onboarding — don't also pop the
                     // changelog at them; mark them current.

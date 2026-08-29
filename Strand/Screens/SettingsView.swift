@@ -219,10 +219,8 @@ struct SettingsView: View {
     // Alternate app icon (iOS only) — false = Titanium (primary AppIcon), true = Blue Titanium
     // ("AppIcon-Navy"). Display-only preference; the live switch goes through setAlternateIconName.
     @AppStorage("appIcon.alt") private var useNavyIcon = false
-    #if !os(iOS)
-    // Light/Dark/System remains available on desktop. Noop Aura's iOS release is intentionally dark.
+    // Light/Dark/System theme. Read by both app roots' .preferredColorScheme; default follows the OS.
     @AppStorage(AppearanceMode.storageKey) private var appearanceRaw = AppearanceMode.system.rawValue
-    #endif
     // App-owned copy language. Apple binds a bundle localization at process launch, so this writes the
     // standard AppleLanguages override and takes effect after the user reopens NOOP.
     @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = AppLanguage.system.rawValue
@@ -1199,7 +1197,7 @@ struct SettingsView: View {
         SettingsSection(
             icon: "circle.lefthalf.filled",
             title: "Appearance",
-            blurb: appearanceBlurb
+            blurb: "Choose Light, Dark, or follow your system. Dark is the signature near-black; Light keeps the same clean look on a bright canvas."
         ) {
             VStack(spacing: 0) {
                 // App-owned copy language. Apple binds a bundle localization at process launch, so this
@@ -1239,11 +1237,6 @@ struct SettingsView: View {
                 }
                 rowDivider
                 FormRow(label: "Theme") {
-                    #if os(iOS)
-                    Text("Dark")
-                        .foregroundStyle(StrandPalette.textSecondary)
-                        .accessibilityLabel("Theme, Dark")
-                    #else
                     Picker("Theme", selection: $appearanceRaw) {
                         ForEach(AppearanceMode.allCases) { mode in
                             Text(mode.label).tag(mode.rawValue)
@@ -1253,7 +1246,6 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .appleInspiredTint("settings.controls")
                     .accessibilityLabel("Theme")
-                    #endif
                 }
                 rowDivider   // #79: the segmented rows sat flush against each other (missing separator)
                 FormRow(label: "Chart colours") {
@@ -1453,23 +1445,10 @@ struct SettingsView: View {
                 appIconColorSection
                 rowDivider
                 backgroundImageControls
-                // macOS only: the section's one control is the liquid-Today toggle, and iPhone's Today
-                // is Aura now — the toggle would switch nothing, so the whole section (and its
-                // @AppStorage) is compiled out on iOS rather than rendering an empty EXPERIMENTAL header.
-                #if os(macOS)
                 rowDivider
                 appearanceExperimentalSection
-                #endif
             }
         }
-    }
-
-    private var appearanceBlurb: LocalizedStringKey {
-        #if os(iOS)
-        return "Noop Aura uses its signature near-black canvas. Colour, contrast and motion controls below remain adjustable."
-        #else
-        return "Choose Light, Dark, or follow your system. Dark is the signature near-black; Light keeps the same clean look on a bright canvas."
-        #endif
     }
 
     /// One preference for leading identity icons and primary controls. Data visualisations, functional
@@ -1897,35 +1876,22 @@ struct SettingsView: View {
     /// Entry point used by `body`. The 5/MG probe card only renders for a 5/MG (see `showFiveMGControls`,
     /// #22); the raw-sensor CSV diagnostic is split into its own card so it stays available on every
     /// model — a 4.0 owner still needs the export to share decoded streams.
-    // NOTE: the two Today-variant toggles (Liquid Today / Heute Redesign) used to live here as their
-    // own cards. Moved into `appearanceCard`'s own "Experimental" subsection (on-device feedback) so
-    // both Today-variant switches sit together with the rest of the look-and-feel controls instead of
-    // being buried in the collapsed Advanced group — see `appearanceExperimentalSection` below.
+    // The Today variant toggle lives in Appearance rather than being duplicated in this Advanced group.
     @ViewBuilder private var experimentalCard: some View {
-        // The Liquid Today toggle is NOT re-listed here. It lives in `appearanceExperimentalSection`,
-        // which is itself macOS-only now — iPhone's Today is Aura, which replaced the liquid/classic pair
-        // outright, so on iOS the switch would change nothing. macOS still branches on the key in
-        // `RootView`, and one surface for one toggle is the whole point of having moved it.
         if shows(.liveSessions) { liveSessionsCard }
         if showFiveMGControls && shows(.experimentalWhoop5) { fiveMGCard }
         if shows(.sleepStaging) { sleepStagingCard }
         if shows(.diagnostics) { rawSensorDiagnosticsCard }
     }
 
-    #if os(macOS)
     /// Opt-in liquid Today redesign (default ON in this build). Off falls back to the
-    /// classic dashboard immediately, no rebuild. Same data either way. macOS-only since iPhone moved
-    /// to Aura — see `experimentalCard`.
+    /// classic dashboard immediately, no rebuild. Same data either way.
     @AppStorage("noop.liquidTodayEnabled") private var liquidTodayEnabled = true
 
     /// The Today-variant toggle, appended to the bottom of `appearanceCard`'s own section (on-device
     /// feedback: this belongs with Appearance, not buried in the collapsed Advanced → Experimental
     /// group). Kept as a private helper rather than inline in `appearanceCard` so the toggle body stays
     /// readable next to its `@AppStorage` declaration above.
-    ///
-    /// The Heute-screen redesign toggle (StrandiOS/Redesign/) used to live here too — removed, since the
-    /// prototype never got past off-by-default/untested-on-a-real-strap. `RootTabView` no longer reads
-    /// its flag at all, so the fork's code is unreachable but left in place rather than deleted.
     private var appearanceExperimentalSection: some View {
         VStack(alignment: .leading, spacing: NoopMetrics.rowSpacing) {
             Text("EXPERIMENTAL")
@@ -1947,7 +1913,6 @@ struct SettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
-    #endif
 
     /// Live Sessions (beta) — the silent-guardian in-workout coach. Default ON (the entry itself is
     /// BETA-labelled on the Liquid Today); off removes the Start-session control entirely. Same key the

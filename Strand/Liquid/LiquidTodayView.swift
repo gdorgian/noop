@@ -80,7 +80,7 @@ struct LiquidTodayView: View {
     @State private var importedStepsDay: Int?      // Apple Health steps for the selected day (middle tier)
     @State private var importedActiveKcalDay: Double?  // #616: Apple Health active energy for the day (calorie fallback)
     /// The Weight tile's resolved value, or nil before the first `load()`. Was a permanent hardcoded "—"
-    /// placeholder before — `Repository.resolveWeightKg` gives the same 3-tier fallback classic/Heute use.
+    /// placeholder before — `Repository.resolveWeightKg` gives every Today presentation the same 3-tier fallback.
     @State private var resolvedWeightKg: (kg: Double, isFromProfile: Bool)?
     @State private var hrValues: [Double] = []     // hrBuckets since midnight → 5-min means
     /// The bucket START time for each `hrValues` entry, index-aligned. Kept as its own array rather
@@ -165,7 +165,7 @@ struct LiquidTodayView: View {
     @State private var selectedDayOffset = 0
     @State private var showDayPicker = false
     /// Manual activity status (sick/injured/onBreak/active), owned here and threaded to the Synthesis
-    /// card's header chip — same pattern as `HeuteRedesignView.status`.
+    /// card's header chip so every Today presentation reads the same persisted state.
     @State private var status = ActivityStatusStore.load()
     /// The rotating one-word "this is tappable / swipeable" hint under the headline; nil shows the date.
     /// Same two words and cadence the classic Today uses, so the affordance is learned once.
@@ -1371,8 +1371,8 @@ struct LiquidTodayView: View {
     private var synthesisCard: some View {
             // Expand-on-tap is an `.onTapGesture` on the card, NOT an outer `Button` wrapping the whole
             // label: the status chip below is itself a Button, and a Button nested inside another Button's
-            // hit-testing tree doesn't reliably receive taps in SwiftUI (the same pitfall documented at
-            // `HeuteVitalsGridView`). A tap gesture on a plain container composes correctly with a child
+            // hit-testing tree doesn't reliably receive taps in SwiftUI. A tap gesture on a plain container
+            // composes correctly with a child
             // Button — the chip gets its own taps, the rest of the card toggles expand. The card's former
             // `LiquidPressStyle` press-scale is intentionally dropped: reproducing it needs a 0-distance
             // drag recognizer that would compete with the page's day-swipe and vertical scroll, a worse
@@ -1406,7 +1406,7 @@ struct LiquidTodayView: View {
                                 .accessibilityHidden(true)
                         }
                         // A set exception status is an explicit user statement, so it wins even against
-                        // the calibration-progress line — the same priority Heute's Basiskarte gives it.
+                        // the calibration-progress line.
                         // While the baseline calibrates (and no status override applies), the honest
                         // "N of 4 nights" progress replaces the readiness one-liner here — the same swap
                         // classic makes (`calibrationDetail ?? synthesisCardDetail`), so the count the
@@ -1706,7 +1706,7 @@ struct LiquidTodayView: View {
     /// One editor-selected Key-Metric tile: the metric's value/tint/fill exactly as the old hard-coded
     /// tiles read them (Android's descriptor map is the twin), plus the metric-catalog `key` that names
     /// both its 14-day spark series and its tap-through detail. Weight now resolves through the same
-    /// 3-tier fallback classic/Heute use (`resolvedWeightKg`), no longer a permanent "—" placeholder.
+    /// shared 3-tier fallback (`resolvedWeightKg`), no longer a permanent "—" placeholder.
     @ViewBuilder
     private func ktileFor(_ metric: KeyMetric, hrv: Double?, rhr: Double?) -> some View {
         switch metric {
@@ -1978,8 +1978,8 @@ struct LiquidTodayView: View {
         // Readiness anchors on the day whose row carries today's vitals (#543): normally today, but while
         // carrying, the last SCORED day — otherwise `evaluate` reads `.insufficient` right after the
         // rollover and the readiness word would vanish/blank instead of carrying forward. Same anchor as
-        // `TodayView.computeReadiness` / `HeuteRedesignView.load` — was previously anchored on `day?.day`
-        // here only, which is what let this screen disagree with the other two (on-device feedback).
+        // `TodayView.computeReadiness` — this was previously anchored on `day?.day` here only, which let
+        // the two Today presentations disagree (on-device feedback).
         cachedReadiness = ReadinessEngine.evaluate(days: repo.days,
                                                    today: priorScored?.day ?? Repository.logicalDayKey(Date()))
         cachedPriorScored = priorScored
@@ -2056,7 +2056,7 @@ struct LiquidTodayView: View {
         // matching the imported-first VALUE. Union of imported days + strap-row days. Mirrors Android's
         // caloriesSpark (windowed caloriesByDay).
         let appleRowsForSpark = await appleA
-        // Weight: same 3-tier resolution as classic/Heute (`Repository.resolveWeightKg`) — this tile was
+        // Weight: shared 3-tier resolution (`Repository.resolveWeightKg`) — this tile was
         // permanently hardcoded to "—" before (never wired), unlike every other Key Metric here.
         let latestAppleWeightKg = appleRowsForSpark.filter { ($0.weightKg ?? 0) > 10 }.max { $0.day < $1.day }?.weightKg
         let weightSeries = await weightSeriesA

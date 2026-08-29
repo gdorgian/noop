@@ -232,4 +232,10 @@ enum CoachTranscriptStore {
               let msgs = try? JSONDecoder().decode([ChatMessage].self, from: data) else { return [] }
         return msgs.filter { !($0.role == .assistant && $0.text.isEmpty) }
     }
+
+    /// Full local reset only. Prevents the legacy transcript from being migrated back into a newly
+    /// emptied conversation store on the next launch.
+    static func clear() {
+        try? FileManager.default.removeItem(at: fileURL)
+    }
 }

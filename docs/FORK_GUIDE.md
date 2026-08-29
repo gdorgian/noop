@@ -220,10 +220,6 @@ Fork-only docs, under [`fork/`](fork/):
 | [`fork/decisions.md`](fork/decisions.md) | Project memory — see below |
 | [`fork/COACH.md`](fork/COACH.md) | The AI coach's design and tools |
 | [`fork/DETAILS.md`](fork/DETAILS.md) | Long-form reference |
-| [`fork/feature-spec.md`](fork/feature-spec.md) | What the Heute screen does (states, data, persistence) |
-| [`fork/design/design-spec.md`](fork/design/design-spec.md) | How it looks (colour, spacing, animation) |
-| [`fork/design/mockup-today.html`](fork/design/mockup-today.html) | Binding visual reference where text and image disagree |
-| [`fork/redesign-briefing.md`](fork/redesign-briefing.md) | Redesign specs |
 | [`fork/releases/`](fork/releases/) | Release notes — `publish-ios-release.yml` reads `fork/releases/v<VERSION>.md` and refuses to publish without it. NOT tag-named: `Tools/appchangelog-gen.py` derives the in-app "What's New" version from the filename |
 
 When you add a doc, file it into the matching group in the same change — this map stays current
@@ -274,28 +270,17 @@ Write or update one before switching sessions mid-task: goal, current status, do
 architecture decisions not yet in `fork/decisions.md`, known risks, the single concrete next step,
 and the docs it depends on. **Promote and discard on merge** — the handfile dies with the branch.
 
-## Redesign (in progress)
+## UI redesign reset (2026-08-25)
 
-An iOS/macOS-focused redesign is underway. Specs: [`fork/redesign-briefing.md`](fork/redesign-briefing.md);
-visual reference, binding where text and image disagree:
-[`fork/design/mockup-today.html`](fork/design/mockup-today.html); durable decisions:
-[`fork/decisions.md`](fork/decisions.md).
+The obsolete Aura/Heute presentation layer and its standalone feature, visual-specification and
+mockup documents have been removed. They are not references for future UI work. Historical release
+notes and the earlier rows in [`fork/decisions.md`](fork/decisions.md) remain as records of what
+shipped or was tried, not as current implementation guidance.
 
-**Strategy — evolve in place, do NOT fork parallel screens.** The screens are shared `Strand/` code
-and `StrandDesign` is already fork-owned, so the redesign edits the existing screens and Palette.
-Re-theming happens by changing values behind the frozen `StrandPalette` token API (≈3,170 call sites
-update for free) — never hardcode hex at a call site.
+The native iOS Today / Trends / Sleep / More tab shell is the interim baseline. A future replacement
+design starts from that clean seam and the current source tree. Keep shared behavior in `Strand/`,
+use `StrandDesign` tokens instead of hardcoded presentation values, and update `FEATURES.md` when the
+new screen behavior is actually defined.
 
-**Design rules:**
-1. One value, one place. Each metric appears once per screen.
-2. No empty tiles. Without data, render nothing — no "—", no placeholder.
-3. Colour codes family via the "Signature" `ChartStyle`. Colour only re-skins data encodings
-   (rings/charts/scales), never chrome/surfaces.
-4. Size codes importance. Exactly one element per screen is clearly the largest.
-5. Tabs are places, not actions. The coach hangs on content, not a tab.
-6. Units are small, in a secondary colour, exactly once per value. All numbers `.monospacedDigit()`.
-7. All trend charts go through Swift Charts.
-8. iOS 26 Liquid Glass (`glassEffect`, `.navigationTransition(.zoom)`, Material) is the design language.
-
-**Localization:** see the project-wide "Localization" section above (DE/ES/FR/PT-PT are zero-tolerance
-for any new string, redesign included).
+**Localization:** see the project-wide "Localization" section above (DE/ES/FR/PT-PT are
+zero-tolerance for any new UI string).

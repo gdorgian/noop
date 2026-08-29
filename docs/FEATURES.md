@@ -31,8 +31,8 @@ NOOP is built on community interoperability and protocol-documentation work, wit
 
 NOOP is a `NavigationSplitView`: a left sidebar of screens, a live connection status pill
 pinned to the sidebar's bottom (bonded / connecting / disconnected, with battery %), and a
-detail pane. A menu-bar item gives a glanceable live heart rate from anywhere. The whole UI is
-dark, and a first-run wizard walks you through pairing.
+detail pane. A menu-bar item gives a glanceable live heart rate from anywhere. The interface follows
+the selected system, light or dark appearance, and a first-run wizard walks you through pairing.
 
 Screens are grouped below by whether they need a connected strap:
 
@@ -117,8 +117,8 @@ The home dashboard (`TodayView.swift`, titled "Control Center"). A tight, gaples
 **Tab bar: Today (first tab) · works from imported data; live status/battery in the header.**
 
 iOS uses a bottom tab bar (`RootTabView.swift`: Today, Trends, Sleep, More) instead of macOS's
-sidebar. The Today tab hosts one of three interchangeable home-screen presentations, picked under
-**Settings → Appearance → Experimental**:
+sidebar. The Today tab hosts one of two interchangeable home-screen presentations, selected under
+**Settings → Appearance**:
 
 - **Liquid Today** (default, `LiquidTodayView.swift`) — a sky-gradient hero with three fluid,
   count-up "vessel" circles for Charge / Effort / Rest, a synthesis line ("Charge is strong and
@@ -131,41 +131,18 @@ sidebar. The Today tab hosts one of three interchangeable home-screen presentati
   shared saved order, a live heart-rate badge over the HR trend chart with a one-tap **Full day**
   link into the Deep Timeline, and Recovery Vitals as its own movable section instead of being fixed
   inside Synthesis.
-- **Customize Today** (`TodayCustomizationSheet.swift`) — one editor behind every Today layout
-  affordance on both Today screens, replacing the separate Arrange / Key Metrics / Your Cards sheets
-  (upstream #940, adopted 2026-07-31). A **Shown / Hidden** list with drag-to-reorder, Cancel/Save
-  over a draft so nothing is half-applied, and "Edit" rows that deep-link to the Key Metrics and
-  Your Cards child pages. Every section is a row, the Coach banner included — drag it anywhere or
-  move it to Hidden. The Key Metrics page also carries **Tiles per row** (2 or 3), **Detailed
-  tiles**, and the trend window.
-- **Heute** (`StrandiOS/Redesign/HeuteRedesignView.swift` and friends) — a from-scratch redesign on
-  its own fixed green/blue/violet token set (`HeuteRedesignPalette`, independent of the selected
-  chart style). **Its Settings toggle was removed (2026-07-25)** — the prototype never got past
-  off-by-default/untested-on-a-real-strap, so `RootTabView` no longer reads its flag at all and the
-  screen is unreachable. The code is left in place, not deleted, in case it's revisited later:
-  - **Header** — a greeting + tappable date (opens day navigation; swiping the screen
-    left/right also changes the day) and three status chips: **Activity status** (Active / Sick /
-    Injured / On break, each with a duration — Today / 3 days / This week / Custom date / Until
-    changed), strap **battery**, and **coach** entry.
-  - **Rings** — Charge / Effort / Rest as three glow rings. **Charge is tappable** — even while
-    calibrating or empty — and opens a breakdown sheet naming which drivers (HRV, resting HR,
-    respiration, sleep quality, skin temperature) pulled the score up or down versus your personal
-    baseline, with the same confidence tier (Calibrating / Est. / Reliable) the ring itself shows.
-    Effort and Rest stay display-only.
-  - **Card zone** — a fixed base card (today's readiness statement, or the current activity-status
-    exception) behind a swipeable stack of the coach's real pending training-plan proposals; a
-    swipe hides a card locally without declining the proposal, tapping one opens the full
-    accept/modify/decline sheet.
-  - **Vitals grid** — HRV, resting heart rate, blood oxygen, respiratory rate, Fitness Age, steps,
-    and the day's workout as a tappable tile.
-  - **Heart rate** — a live beat-by-beat trace (when connected) over the day's banked 5-minute
-    trace, scrubbable by dragging along it.
-  - **Journal reminder + Data Sources footer** — shown only on today, not on a navigated past day.
+Both presentations share **Customize Today** (`TodayCustomizationSheet.swift`), one editor behind
+every Today layout affordance. It replaces the separate Arrange / Key Metrics / Your Cards sheets
+(upstream #940, adopted 2026-07-31) with a **Shown / Hidden** list, drag-to-reorder and Cancel/Save
+over a draft so nothing is half-applied. Its "Edit" rows deep-link to the Key Metrics and Your Cards
+child pages. Every section is a row, the Coach banner included — drag it anywhere or move it to
+Hidden. The Key Metrics page also carries **Tiles per row** (2 or 3), **Detailed tiles**, and the
+trend window.
 
-All three presentations read the SAME carry-over rules: an unscored today shows the last scored
+Both presentations read the SAME carry-over rules: an unscored today shows the last scored
 night's Charge (labelled whose it is), a mid-calibration baseline shows "Learning your baseline,
 N of 4 nights" instead of a stale number, and each vital falls back per-field to the freshest
-prior reading independent of whether that night scored a Charge — so switching between the three
+prior reading independent of whether that night scored a Charge — so switching between the two
 never changes what number you see for the same day.
 
 ---

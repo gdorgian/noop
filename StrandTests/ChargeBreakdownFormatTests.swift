@@ -150,7 +150,7 @@ final class ChargeBreakdownFormatTests: XCTestCase {
         XCTAssertFalse(ChargeBreakdownFormat.chargeDeepWindowGap(hrvWindow: .deep, avgHrv: nil, deepMin: 12.0))
     }
 
-    // MARK: - compute(row:days:restScore:) — the shared classic+Heute extraction (D3)
+    // MARK: - compute(row:days:restScore:) — shared Today extraction (D3)
 
     /// A day carrying the overnight vitals `compute` folds over.
     private func vitalsDay(_ key: String, hrv: Double?, rhr: Int?, resp: Double?,
@@ -172,7 +172,7 @@ final class ChargeBreakdownFormatTests: XCTestCase {
 
     /// The extraction must forward its inputs to the engine UNCHANGED: composing the same folded baselines
     /// and calling `RecoveryScorer.chargeDrivers` / `ScoreConfidence.charge` here must reproduce exactly
-    /// what `compute` returns. This is what stops classic Today and Heute (its two only callers) from
+    /// what `compute` returns. This is what stops Today presentations from
     /// drifting — any change to how the row/history/restScore are folded or forwarded fails this.
     func testComputeMatchesTheEngineCompositionVerbatim() {
         var days = usableHistory()

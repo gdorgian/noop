@@ -738,8 +738,8 @@ struct TodayView: View {
     /// fold while actually recomputing it. One call folds each series exactly once (three passes), and the
     /// sheet reads drivers + confidence out of a single sheet-local `let`.
     private func chargeBreakdown() -> (drivers: [ChargeDriver], confidence: ScoreConfidence)? {
-        // The composition lives in the shared pure `ChargeBreakdownFormat.compute` so classic Today and the
-        // Heute redesign read ONE breakdown and can't drift (the P5 shared-selector principle). `restScore`
+        // The composition lives in the shared pure `ChargeBreakdownFormat.compute` so every Today
+        // presentation reads ONE breakdown and cannot drift. `restScore`
         // is the same merged sleep_performance value the Rest ring reads, so the sleep-quality term stays
         // consistent; `chargeBreakdownRow` mirrors the ring (today's own row, else the carried last-scored).
         ChargeBreakdownFormat.compute(row: chargeBreakdownRow, days: repo.days, restScore: restScore)
@@ -4018,7 +4018,7 @@ struct TodayView: View {
     private func loadAll() async {
         // Paket 4: re-resolve the silent `validUntil` fallback on every (re)load, not just once at view
         // creation — a screen left open across the expiry would otherwise keep showing the stale
-        // exception state. Mirrors HeuteRedesignView.load().
+        // exception state.
         let resolvedStatus = ActivityStatusStore.load()
         if resolvedStatus != status { status = resolvedStatus }
 

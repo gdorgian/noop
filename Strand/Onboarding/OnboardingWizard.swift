@@ -1059,29 +1059,13 @@ private struct DoneStep: View {
 /// app live (the shared `@AppStorage(AppearanceMode.storageKey)` drives `preferredColorScheme`), so
 /// the wizard itself IS the preview.
 private struct AppearanceStep: View {
-    #if !os(iOS)
     @AppStorage(AppearanceMode.storageKey) private var appearanceRaw = AppearanceMode.system.rawValue
     private var binding: Binding<AppearanceMode> {
         Binding(get: { AppearanceMode(rawValue: appearanceRaw) ?? .system },
                 set: { appearanceRaw = $0.rawValue })
     }
-    #endif
+
     var body: some View {
-        #if os(iOS)
-        StepShell(title: String(localized: "Noop Aura after dark"),
-                  subtitle: String(localized: "Aura uses a calm near-black canvas so your live signals and nightly readings stay in focus.")) {
-            VStack(spacing: 28) {
-                Image(systemName: "moon.stars.fill")
-                    .font(.system(size: 56, weight: .light))
-                    .foregroundStyle(StrandPalette.accent)
-                    .frame(height: 96)
-                Text(String(localized: "Dark appearance"))
-                    .font(StrandFont.headline)
-                    .foregroundStyle(StrandPalette.textPrimary)
-            }
-            .frame(maxWidth: 460)
-        }
-        #else
         StepShell(title: String(localized: "Make it yours"),
                   subtitle: String(localized: "Choose how NOOP looks. The whole app updates as you tap. You can change this any time in Settings → Appearance.")) {
             VStack(spacing: 28) {
@@ -1098,7 +1082,6 @@ private struct AppearanceStep: View {
             }
             .frame(maxWidth: 460)
         }
-        #endif
     }
 }
 

@@ -44,8 +44,6 @@ provenance. Those references do not imply that the files still exist in this for
 - `docs/fork/releases/` — released fork notes, including 10.1.1.
 - `docs/fork/decisions.md` — chronological decisions; later rows may supersede earlier rows.
 - `docs/superpowers/` — dated plans and specifications.
-- `docs/fork/redesign-*` and `docs/fork/feature-spec.md` — implementation inputs retained for
-  design provenance.
 - [Android status](ANDROID.md) — redirect explaining removal of the former Android tree.
 - [R-R optimization](RR-OPTIMIZATION.md) — historical experiment record plus current Swift outcome.
 

@@ -746,7 +746,9 @@ extension AICoachEngine {
     /// a tool whose `CoachPurpose` group isn't enabled is left OUT of the offered list entirely, rather
     /// than offered and then refused — the model never spends a round discovering it can't call something.
     var coachTools: [CoachTool] {
-        CoachTool.allCases.filter { toolConsent.allows($0) }
+        guard dataConsent else { return [] }
+        let grants = SveaDataGrants.load()
+        return CoachTool.allCases.filter { SveaDataGrantPolicy.mayOffer($0, grants: grants) }
     }
 
     /// The locally enforced first decision before a tool-capable provider sees its tool list. Purpose
@@ -870,7 +872,8 @@ extension AICoachEngine {
     /// OpenRouter connection safely uses the context path rather than guessing a model can take tools
     /// and sending it a request it silently mishandles.
     var toolCallingActive: Bool {
-        guard dataConsent, !coachTools.isEmpty, provider.client is ToolCallingClient else { return false }
+        guard dataConsent, !SveaDataGrants.load().allowed.isEmpty,
+              !coachTools.isEmpty, provider.client is ToolCallingClient else { return false }
         if provider == .openRouter { return openRouterToolCapableModels.contains(model) }
         return true
     }
@@ -895,8 +898,10 @@ extension AICoachEngine {
     /// Neither belongs in the system prompt: that block carries Anthropic's `cache_control` breakpoint,
     /// and a per-request clock would invalidate the prefix cache on every turn.
     var toolModeContext: String {
-        let includeMemory = memoryContextAllowed
-        let includePlanning = toolConsent.allows(.planAdherence)
+        // The seven HTML grants contain neither past-conversation memory nor a general goals/planning
+        // category. Both stay local; offering an Effort grant is not permission to send saved goals.
+        let includeMemory = false
+        let includePlanning = false
         return Self.assembledToolModeContext(
             clock: clockLine(),
             threadIndex: includeMemory ? recentThreadsIndex() : "",
@@ -939,10 +944,12 @@ extension AICoachEngine {
         guard let tool = CoachTool(rawValue: name) else {
             return "Unknown tool \"\(name)\"."
         }
-        // Belt-and-suspenders: `coachTools` already excludes anything ungranted from the offered list, so
-        // this should rarely trip — but a stale wire (a round begun before a setting changed mid-chat)
-        // could still name a tool the model was offered a moment ago.
-        guard toolConsent.allows(tool) else {
+        // Read the seven-category policy FRESH for every tool round. A person can revoke a grant while a
+        // request is in flight; a stale provider tool call must then fail locally rather than execute
+        // under the grant snapshot from the start of the request.
+        let sveaGrants = SveaDataGrants.load()
+        guard SveaDataGrantPolicy.mayOffer(tool, grants: sveaGrants),
+              sveaRuntimeAllows(tool, input: input, grants: sveaGrants) else {
             return "The user hasn't enabled that kind of access in Privacy & data → Data access, so this "
                 + "isn't available."
         }
@@ -954,7 +961,7 @@ extension AICoachEngine {
         case .dataCatalog:
             return await dataCatalogTool(query: input["query"] as? String)
         case .biometricSummary:
-            var block = buildContext()
+            var block = buildContext(includeGoals: false)
             if let confidence = await chargeConfidenceBlock() { block += "\n\n" + confidence }
             return block
         case .recentWorkouts:
@@ -971,8 +978,8 @@ extension AICoachEngine {
             let limit = max(1, min(raw, 10))
             let block = await onDeviceSignalsBlock(
                 limit: limit,
-                includeLabBook: toolConsent.allows(.myLogs),
-                includeSensitiveLogs: toolConsent.allows(.sensitiveLogs)
+                includeLabBook: sveaGrants.allows(.labs),
+                includeSensitiveLogs: sveaGrants.allows(.tender)
             )
             return block.isEmpty ? "No strong personal patterns have emerged yet." : block
         case .plotMetric:
@@ -1052,7 +1059,7 @@ extension AICoachEngine {
             )
         case .sleepDetail:
             let nights = (input["nights"] as? Int) ?? Int(input["nights"] as? Double ?? 7)
-            return await sleepDetailTool(nights: nights)
+            return await sleepDetailTool(nights: nights, includeVitals: sveaGrants.allows(.vitals))
         case .rangeReport:
             let days = (input["days"] as? Int) ?? Int(input["days"] as? Double ?? 7)
             return await rangeReportTool(days: days)
@@ -1113,6 +1120,38 @@ extension AICoachEngine {
         case .estimateSessionEffort:
             return await estimateSessionEffortTool(zone: Self.intArg(input["zone"]),
                                                    durationMin: Self.intArg(input["duration_min"]))
+        }
+    }
+
+    /// Runtime half of the seven-grant boundary for tools whose result depends on an argument. Unknown
+    /// kinds and metrics are denied here before any local store is read.
+    private func sveaRuntimeAllows(_ tool: CoachTool, input: [String: Any],
+                                   grants: SveaDataGrants) -> Bool {
+        if let required = SveaDataGrantPolicy.fixedRequirements(for: tool) {
+            return !SveaDataGrantPolicy.isExplicitlyBlocked(tool) && grants.allowsAll(required)
+        }
+        switch tool {
+        case .myLogs:
+            switch ((input["kind"] as? String) ?? "").lowercased() {
+            case "caffeine", "journal", "hydration": return grants.allows(.journal)
+            case "mood": return grants.allows(.tender)
+            case "lab": return grants.allows(.labs)
+            default: return false
+            }
+        case .logJournal:
+            let behavior = (input["behavior"] as? String) ?? ""
+            return CoachSensitiveJournalPolicy.isSensitive(label: behavior)
+                ? grants.allows(.tender) : grants.allows(.journal)
+        case .metricHistory, .plotMetric:
+            if let source = input["source"] as? String,
+               ["lab-book", "lab book"].contains(source.lowercased()) {
+                return grants.allows(.labs)
+            }
+            guard let grant = SveaDataGrantPolicy.grantForMetric((input["metric"] as? String) ?? "")
+            else { return false }
+            return grants.allows(grant)
+        default:
+            return false
         }
     }
 }

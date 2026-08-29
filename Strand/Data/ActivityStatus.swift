@@ -49,8 +49,8 @@ struct ActivityStatus: Codable, Equatable {
     var suppressesTrainingSuggestions: Bool { state != .active }
 
     /// The duration choices offered when the user sets a non-active status, and how each maps to a
-    /// concrete `validUntil`. Spec §1: "Heute" → end of today, "3 Tage" → +3 days, "Diese Woche" → end
-    /// of the current calendar week, "Eigenes Datum" → the chosen date, "Bis geändert" → nil.
+    /// concrete `validUntil`: today → end of today, three days → +3 days, this week → end of the current
+    /// calendar week, custom → the chosen date, and until changed → nil.
     enum Duration: Equatable {
         case today, threeDays, thisWeek, custom(Date), untilChanged
 
