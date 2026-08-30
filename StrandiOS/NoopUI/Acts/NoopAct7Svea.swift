@@ -46,6 +46,11 @@ private struct NoopSveaCoach: View {
     @EnvironmentObject private var coach: AICoachEngine
     @ObservedObject private var memoryStore = CoachMemory.shared
     @AppStorage("noop.html.svea-grant-count") private var grantCount = 5
+    // Onboarding step 2's answer. Svea's framing follows it: for a night worker "last night" is
+    // the wrong name for the sleep she has just read.
+    @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
+
+    private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
     @State private var proposal = "open"
     @State private var question = ""
     @State private var asked = ""
@@ -287,7 +292,7 @@ private struct NoopSveaCoach: View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
                 suggestion("Should I lift today?", kind: "answer")
-                suggestion("Brief me on last night", kind: "declined")
+                suggestion(briefLabel, kind: "declined")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -377,6 +382,13 @@ private struct NoopSveaCoach: View {
         }
     }
 
+    /// The declined-brief chip, and the phrase `sendQuestion` recognises when it is typed.
+    private var briefLabel: String {
+        isNightWorker ? "Brief me on my last sleep" : "Brief me on last night"
+    }
+
+    private var briefPhrase: String { isNightWorker ? "last sleep" : "last night" }
+
     private func suggestion(_ label: String, kind: String) -> some View {
         let selected = asked == label
         return Button { beginAnswer(label, kind: kind) } label: {
@@ -402,7 +414,7 @@ private struct NoopSveaCoach: View {
     private func sendQuestion() {
         let clean = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
-        beginAnswer(clean, kind: clean.localizedCaseInsensitiveContains("last night") ? "declined" : "answer")
+        beginAnswer(clean, kind: clean.localizedCaseInsensitiveContains(briefPhrase) ? "declined" : "answer")
         question = ""
         askFocused = false
     }
@@ -535,11 +547,22 @@ private struct NoopSveaDataAnswer: View {
 
 private struct NoopSveaDeclinedAnswer: View {
     let ask: (String) -> Void
-    private let alternatives = [
-        "Read the night before instead — that one is complete",
-        "Tell me what the missing stretch would have had to be",
-        "Brief me on the week and leave last night out"
-    ]
+
+    @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
+
+    private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
+
+    private var alternatives: [String] {
+        [
+            isNightWorker
+                ? "Read the sleep before instead — that one is complete"
+                : "Read the night before instead — that one is complete",
+            "Tell me what the missing stretch would have had to be",
+            isNightWorker
+                ? "Brief me on the week and leave that sleep out"
+                : "Brief me on the week and leave last night out"
+        ]
+    }
 
     var body: some View {
         NoopSveaTintCard(fillOpacity: 0.06, borderOpacity: 0.22, radius: 22, horizontalPadding: 16, topPadding: 15, bottomPadding: 16) {
@@ -548,7 +571,9 @@ private struct NoopSveaDeclinedAnswer: View {
                     NoopSveaGlyph(name: .pause, size: 15, color: Color(hex: 0xA9B4E0))
                     NoopSveaEyebrow("Svea is not going to answer this one", size: 9, tracking: 1.08, color: Color(hex: 0xA9B4E0))
                 }
-                Text("I can see last night, but I do not think it is a night worth reading. The strap was off your wrist between 02:10 and 04:40, so about two and a half hours of it are missing rather than light.")
+                Text(isNightWorker
+                     ? "I can see your last sleep, but I do not think it is one worth reading. The strap was off your wrist between 02:10 and 04:40, so about two and a half hours of it are missing rather than light."
+                     : "I can see last night, but I do not think it is a night worth reading. The strap was off your wrist between 02:10 and 04:40, so about two and a half hours of it are missing rather than light.")
                     .font(NoopHTMLFont.sans(13.5))
                     .foregroundStyle(Color(hex: 0xDCE3E0))
                     .noopSveaLineBox(fontSize: 13.5, ratio: 1.62)
@@ -1044,6 +1069,7 @@ private struct NoopSveaConsent: View {
     @ObservedObject var navigation: NoopNavigation
     @EnvironmentObject private var coach: AICoachEngine
     @AppStorage("noop.html.svea-preset") private var preset = "Personal"
+    @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     @AppStorage("noop.html.svea-grant-count") private var grantCount = 5
     @AppStorage("noop.html.svea-granted-purpose-ids") private var savedGrantIDs = ""
     @AppStorage("noop.html.svea-proactive") private var proactive = "Never"
@@ -1236,7 +1262,9 @@ private struct NoopSveaConsent: View {
             VStack(alignment: .leading, spacing: 10) {
                 NoopSveaEyebrow("The prompt, as it would go out")
                 VStack(alignment: .leading, spacing: 6) {
-                    promptLine("Last night: 7h 12m, need 7h 05m, deep 1h 34m.", grant: "sleep")
+                    promptLine(NoopScheduleInference.isNightWorker(kind: scheduleKind)
+                               ? "Last sleep: 7h 12m, need 7h 05m, deep 1h 34m."
+                               : "Last night: 7h 12m, need 7h 05m, deep 1h 34m.", grant: "sleep")
                     promptLine("HRV 68 ms (4-night rise), resting pulse 52.", grant: "vitals")
                     promptLine("Journal: no alcohol, coffee before 11:00, late meal Friday.", grant: "journal")
                     promptLine("Private entries: mood 3, medication logged.", grant: "tender")

@@ -4,6 +4,11 @@ struct NoopAct6Screens: View {
     @ObservedObject var navigation: NoopNavigation
     @AppStorage("noop.html.selected-age-driver") private var selectedDriver = 0
     @AppStorage("noop.html.nights-recorded") private var nightsRecorded = 221
+    // Onboarding step 2's answer. `ages` says "night" in two places that mean the time of day
+    // rather than a count of sleeps, and both have to follow a rotating or permanent-nights answer.
+    @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
+
+    private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
 
     var body: some View {
         switch navigation.route {
@@ -475,11 +480,13 @@ struct NoopAct6Screens: View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
                 NoopAgeBackHeader(label: "You") { navigation.reset(to: .you) }
-                NoopAgeLead("What was measured last night, and nothing estimated from it.")
+                NoopAgeLead(isNightWorker
+                    ? "What was measured during your last sleep, and nothing estimated from it."
+                    : "What was measured last night, and nothing estimated from it.")
 
                 NoopHTMLCard(radius: 24, padding: 0) {
                     VStack(alignment: .leading, spacing: 0) {
-                        NoopSectionLabel("Overnight vitals")
+                        NoopSectionLabel(isNightWorker ? "Vitals while you slept" : "Overnight vitals")
                         ForEach(Array(NoopHealthVital.all.enumerated()), id: \.offset) { index, vital in
                             HStack {
                                 Text(vital.name).font(NoopHTMLFont.sans(13.5))
