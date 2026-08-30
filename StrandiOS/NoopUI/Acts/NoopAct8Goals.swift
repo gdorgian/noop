@@ -883,49 +883,52 @@ private struct NoopLabReview: View {
     @State private var saveError: String?
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            NoopScreen(bottomInset: 150, topInset: 56) {
-                VStack(alignment: .leading, spacing: 12) {
-                    NoopBackHeader(label: "Biomarkers") { navigation.reset(to: .labs) }
-                        .padding(.horizontal, -2)
-                        .padding(.bottom, -14)
-                    VStack(alignment: .leading, spacing: 9) {
-                        HStack {
-                            NoopSectionLabel("Nothing is stored yet", color: Color(hex: 0xF3C888)); Spacer()
-                            NoopPill(text: "read, not measured", color: Color(hex: 0xF3C888))
-                        }
-                        Text("Four candidates were read off your photo. Confirm the ones that are right.")
-                            .font(NoopHTMLFont.outfit(25, weight: .light)).tracking(-0.7).lineSpacing(2)
-                        Text("Read on this phone, nothing uploaded. Check each number against your report, fix anything misread, and discard what you would rather not keep.")
-                            .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
+        NoopScreen(bottomInset: 150, topInset: 56) {
+            VStack(alignment: .leading, spacing: 12) {
+                NoopBackHeader(label: "Biomarkers") { navigation.reset(to: .labs) }
+                    .padding(.horizontal, -2)
+                    .padding(.bottom, -14)
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack {
+                        NoopSectionLabel("Nothing is stored yet", color: Color(hex: 0xF3C888)); Spacer()
+                        NoopPill(text: "read, not measured", color: Color(hex: 0xF3C888))
                     }
-                    .padding(.top, -10)
-                    if let saveError {
-                        Text(saveError)
-                            .font(NoopHTMLFont.sans(11.5))
-                            .foregroundStyle(NoopHTMLColor.red)
-                            .lineSpacing(3)
-                    }
+                    Text("Four candidates were read off your photo. Confirm the ones that are right.")
+                        .font(NoopHTMLFont.outfit(25, weight: .light)).tracking(-0.7).lineSpacing(2)
+                    Text("Read on this phone, nothing uploaded. Check each number against your report, fix anything misread, and discard what you would rather not keep.")
+                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
+                }
+                .padding(.top, -10)
+                if let saveError {
+                    Text(saveError)
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.red)
+                        .lineSpacing(3)
+                }
 
-                    VStack(spacing: 11) {
-                        ForEach($candidates) { $candidate in
-                            NoopOCRCandidateCard(candidate: $candidate, error: errorID == candidate.id ? "Enter a known marker, numeric value and compatible unit." : nil) {
-                                if validate(candidate) { candidate.status = .corrected; candidate.editing = false; errorID = nil }
-                                else { errorID = candidate.id }
-                            }
-                        }
-                    }
-
-                    NoopHTMLCard(radius: 24, padding: 16) {
-                        VStack(alignment: .leading, spacing: 9) {
-                            NoopSectionLabel("What happens to the file")
-                            NoopLabFileFact("The photo and the text read from it are deleted when you leave this screen, whatever you decide.")
-                            NoopLabFileFact("Discarded rows are not remembered — not as a value, and not as “you declined this”.")
-                            NoopLabFileFact("Nothing was uploaded. The read happened on this phone, and it is the one part of the app that would rather be slow than remote.")
+                VStack(spacing: 11) {
+                    ForEach($candidates) { $candidate in
+                        NoopOCRCandidateCard(candidate: $candidate, error: errorID == candidate.id ? "Enter a known marker, numeric value and compatible unit." : nil) {
+                            if validate(candidate) { candidate.status = .corrected; candidate.editing = false; errorID = nil }
+                            else { errorID = candidate.id }
                         }
                     }
                 }
+
+                NoopHTMLCard(radius: 24, padding: 16) {
+                    VStack(alignment: .leading, spacing: 9) {
+                        NoopSectionLabel("What happens to the file")
+                        NoopLabFileFact("The photo and the text read from it are deleted when you leave this screen, whatever you decide.")
+                        NoopLabFileFact("Discarded rows are not remembered — not as a value, and not as “you declined this”.")
+                        NoopLabFileFact("Nothing was uploaded. The read happened on this phone, and it is the one part of the app that would rather be slow than remote.")
+                    }
+                }
             }
+        }
+        // Keep the fixed action bar out of the scroll view's layout calculation. As a ZStack
+        // sibling its intrinsic width expands the root and the bar overhangs the screen —
+        // the same trap Act 7's composer documents.
+        .overlay(alignment: .bottom) {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(confirmedCount == 0 ? "Nothing confirmed yet" : "\(confirmedCount) \(confirmedCount == 1 ? "result" : "results") will be stored")
