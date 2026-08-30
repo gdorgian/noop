@@ -786,7 +786,7 @@ private struct NoopLabsHome: View {
                     }.buttonStyle(.plain)
                     Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
-                    Button("Add results") { navigation.push(.review) }.buttonStyle(NoopGoalWarmButtonStyle())
+                    Button("Enter results") { navigation.push(.review) }.buttonStyle(NoopGoalWarmButtonStyle())
                 }
                 .padding(.horizontal, -2)
                 HStack { NoopSectionLabel("Biomarkers"); Spacer(); Text("drawn 14 August · Karolinska").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint) }.padding(.top, 8)
@@ -896,7 +896,7 @@ private struct NoopLabReview: View {
                         }
                         Text("Four candidates were read off your photo. Confirm the ones that are right.")
                             .font(NoopHTMLFont.outfit(25, weight: .light)).tracking(-0.7).lineSpacing(2)
-                        Text("Read on this phone, nothing uploaded. Each row shows the strip of the page it came from — check the number against it, fix it if the read is wrong, and discard anything you would rather not keep.")
+                        Text("Read on this phone, nothing uploaded. Check each number against your report, fix anything misread, and discard what you would rather not keep.")
                             .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
                     }
                     .padding(.top, -10)
@@ -1051,10 +1051,6 @@ private struct NoopOCRCandidateCard: View {
                         Text(candidate.shownValue).font(NoopHTMLFont.outfit(30, weight: .light))
                         Text(candidate.shownUnit).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
                     }
-                    Text(candidate.confidence)
-                        .font(NoopHTMLFont.sans(11))
-                        .foregroundStyle(candidate.lowConfidence ? Color(hex: 0xF3C888) : Color(hex: 0x7F8A85))
-                        .lineSpacing(1.5)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .trailing, spacing: 5) {
@@ -1064,7 +1060,7 @@ private struct NoopOCRCandidateCard: View {
                         .lineLimit(1)
                         .frame(width: 156, height: 34)
                         .background(Color.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 9))
-                    Text("FROM THE PAGE")
+                    Text("AS READ")
                         .font(NoopHTMLFont.sans(9.5, weight: .semibold))
                         .tracking(0.95)
                         .foregroundStyle(NoopHTMLColor.faint)
@@ -1319,6 +1315,9 @@ private enum NoopOCRStatus { case pending, confirmed, corrected, discarded
     var message: String { switch self { case .confirmed: "Will be stored, dated 14 August"; case .corrected: "Corrected by hand — stored as you entered it"; case .discarded: "Discarded. Not stored, and the file is not kept either"; case .pending: "" } }
 }
 private struct NoopOCRCandidate: Identifiable {
+    // `confidence` and `lowConfidence` are not rendered on the interim path — nothing was read off a
+    // photo, so there is no confidence to report. They return with Change 7 piece 1, together with
+    // the source rect the per-row strip is cut from.
     let id: String; let name: String; let value: String; let unit: String; let raw: String; let confidence: String; let lowConfidence: Bool
     var status: NoopOCRStatus = .pending; var editing = false; var draftName = ""; var draftValue = ""; var draftUnit = ""
     var shownName: String { status == .corrected ? draftName : name }
