@@ -947,8 +947,8 @@ private struct NoopLabReview: View {
             .background(Color(hex: 0x171C1A, alpha: 0.92), in: RoundedRectangle(cornerRadius: 22))
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.45), radius: 13, y: 8)
-            .padding(.horizontal, 14).padding(.bottom, 82)
+            .shadow(color: .black.opacity(0.45), radius: 13, y: 4)
+            .padding(.horizontal, 14).padding(.bottom, 92)
         }
         .onDisappear(perform: scrubDraft)
     }
