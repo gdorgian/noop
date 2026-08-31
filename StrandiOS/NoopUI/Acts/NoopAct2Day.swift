@@ -212,6 +212,8 @@ struct NoopAct2Screens: View {
                         HStack(spacing: 13) {
                             VStack(alignment: .leading, spacing: 7) {
                                 NoopSectionLabel("Today's session")
+                                // Three states, one card. Title and line crossfade; the card, its
+                                // tint, its eyebrow and its chevron never move, and it is never absent.
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(sessionCardTitle)
                                         .font(NoopHTMLFont.sans(14.5, weight: .semibold))
@@ -223,6 +225,9 @@ struct NoopAct2Screens: View {
                                         .fixedSize(horizontal: false, vertical: true)
                                         .multilineTextAlignment(.leading)
                                 }
+                                .id(sessionCardTitle + sessionCardLine)
+                                .transition(.opacity)
+                                .animation(NoopMotion.swap, value: sessionCardTitle + sessionCardLine)
                             }
                             Spacer(minLength: 4)
                             Act2CSSChevron(size: 8, color: NoopHTMLColor.faint)

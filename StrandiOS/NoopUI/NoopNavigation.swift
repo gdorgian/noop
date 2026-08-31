@@ -41,6 +41,31 @@ enum NoopTab: String, CaseIterable, Identifiable {
 
 /// Canonical HTML routes. Notification mirroring is intentionally absent: the user removed that
 /// feature because the strap firmware has no support for it.
+
+/// §10's six curves, named so a transition can be referred to rather than re-typed. Nothing here
+/// is new: four of them simply had no name, which is why they were being missed.
+enum NoopMotion {
+    /// Every pushed screen. 300 ms, 9 pt rise + fade.
+    static let enter = Animation.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)
+    /// Full-screen covers and sheets — anything arriving from the bottom edge over what stays.
+    static let coverIn = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.34)
+    static let coverOut = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.3)
+    /// Content changing inside a container that stays: the session card's three states, the paused
+    /// word, the tab tint, and a tab-level arrival — which came from nowhere, so it does not rise.
+    static let swap = Animation.easeInOut(duration: 0.22)
+    static let arrive = Animation.easeInOut(duration: 0.2)
+    /// Things arriving into the chrome rather than over it: the live bar, and the bottom inset
+    /// growing with it — one animation, two properties.
+    static let settle = Animation.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)
+    /// Anything that snaps into a detent.
+    static let overshoot = Animation.timingCurve(0.34, 1.25, 0.64, 1, duration: 0.24)
+    // `tick` is linear and continuous — the elapsed numeral, the import fill, the charge drain.
+    // It is deliberately not an Animation: easing a clock makes it run fast in the middle.
+
+    /// How the last route change arrived, which is what decides whether the screen rises.
+    enum Arrival { case pushed, arrived }
+}
+
 enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 1
     case rest, tonight, why, debt
@@ -238,6 +263,9 @@ final class NoopNavigation: ObservableObject {
     // Change 2+3. The session is owned above the tab bar, not by `live`: the shell destroys a screen
     // when you navigate away, so a clock held by the screen ends the session the moment a tab is
     // tapped. Held here, the live bar can carry it across every screen in the app.
+    /// How the current route was reached. A push rises; a tab-level arrival crossfades in place.
+    @Published var arrival: NoopMotion.Arrival = .arrived
+
     @Published var sessionStartedAt: Date?
     @Published var sessionPaused = false
     @Published var sessionPausedElapsed = 0
@@ -258,10 +286,14 @@ final class NoopNavigation: ObservableObject {
     var sessionRunning: Bool { sessionStartedAt != nil }
 
     func beginSession(at date: Date) {
-        sessionStartedAt = date
-        sessionPausedElapsed = 0
-        sessionPaused = false
-        finishedWorkout = nil
+        // The bar rises and the bottom inset grows 52 in the same frames. If the inset lags,
+        // the last card jumps.
+        withAnimation(NoopMotion.settle) {
+            sessionStartedAt = date
+            sessionPausedElapsed = 0
+            sessionPaused = false
+            finishedWorkout = nil
+        }
     }
 
     func sessionElapsed(at date: Date) -> Int {
@@ -279,23 +311,32 @@ final class NoopNavigation: ObservableObject {
 
     func toggleSessionPause(at date: Date) {
         guard let started = sessionStartedAt else { return }
-        if sessionPaused {
-            sessionStartedAt = date.addingTimeInterval(TimeInterval(-sessionPausedElapsed))
-            sessionPaused = false
-        } else {
-            sessionPausedElapsed = max(0, Int(date.timeIntervalSince(started)))
-            sessionPaused = true
+        // The heart rate crossfades to the word in place. The numeral simply stops, at full
+        // contrast — a dimmed clock reads as a disconnected strap.
+        withAnimation(NoopMotion.swap) {
+            if sessionPaused {
+                sessionStartedAt = date.addingTimeInterval(TimeInterval(-sessionPausedElapsed))
+                sessionPaused = false
+            } else {
+                sessionPausedElapsed = max(0, Int(date.timeIntervalSince(started)))
+                sessionPaused = true
+            }
         }
     }
 
     /// The session ends, the bar goes, and `detail` opens on what was just done.
     func endSession(_ workout: NoopWorkout) {
-        sessionStartedAt = nil
-        sessionPaused = false
-        sessionPausedElapsed = 0
         finishedWorkout = workout
         historyWorkout = nil
         reset(to: .detail)
+        // The bar is never animated out. It is removed once `detail` is already over it, so the
+        // user never sees it go and the inset shrinks in covered frames.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self else { return }
+            self.sessionStartedAt = nil
+            self.sessionPaused = false
+            self.sessionPausedElapsed = 0
+        }
     }
 
     /// The live workout's own screen — intervals get theirs.
@@ -415,10 +456,23 @@ final class NoopNavigation: ObservableObject {
         persistDayLog()
     }
 
+    /// A tab-level arrival. It did not come from anywhere, so it crossfades rather than rises,
+    /// and the tab bar's tint travels over the same 200 ms — that tint move is the only signal
+    /// that the tab changed, and without it a crossfade reads as a dropped frame.
     func reset(to route: NoopRoute) {
         overlay = nil
-        withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) {
+        arrival = .arrived
+        withAnimation(NoopMotion.arrive) {
             path = [route]
+        }
+    }
+
+    /// The + door: the sheet goes down on `cover`, then 60 ms of nothing, then the arrival.
+    /// Overlapping them shows a push behind a dismissing sheet.
+    func dismissSheetThenArrive(at route: NoopRoute) {
+        withAnimation(NoopMotion.coverOut) { overlay = nil }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { [weak self] in
+            self?.reset(to: route)
         }
     }
 
@@ -429,14 +483,16 @@ final class NoopNavigation: ObservableObject {
     func push(_ route: NoopRoute) {
         overlay = nil
         guard self.route != route else { return }
-        withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) {
+        arrival = .pushed
+        withAnimation(NoopMotion.enter) {
             path.append(route)
         }
     }
 
     func replace(with route: NoopRoute) {
         overlay = nil
-        withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) {
+        arrival = .pushed
+        withAnimation(NoopMotion.enter) {
             if path.isEmpty { path = [route] } else { path[path.count - 1] = route }
         }
     }

@@ -33,7 +33,11 @@ struct NoopAppShell: View {
                     .id(navigation.route.rawValue)
                     .transition(
                         .asymmetric(
-                            insertion: reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 9)),
+                            // A push rises 9 pt. A tab-level arrival did not come from anywhere,
+                            // so it crossfades in place and the tab bar's tint carries the change.
+                            insertion: reduceMotion || navigation.arrival == .arrived
+                                ? .opacity
+                                : .opacity.combined(with: .offset(y: 9)),
                             removal: .identity
                         )
                     )
@@ -47,6 +51,12 @@ struct NoopAppShell: View {
                         if navigation.sessionRunning {
                             NoopLiveBar(navigation: navigation)
                                 .frame(width: max(0, viewportWidth - 28))
+                                .transition(.asymmetric(
+                                    insertion: reduceMotion
+                                        ? .opacity
+                                        : .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .identity
+                                ))
                         }
                         NoopBottomNavigation(navigation: navigation)
                             .frame(width: max(0, viewportWidth - 28))
@@ -980,8 +990,12 @@ struct NoopBottomNavigation: View {
             case .night: return NoopHTMLColor.night
             case .picture: return NoopHTMLColor.green
             case .plumbing: return NoopHTMLColor.blush
-            case .ages: return navigation.route == .health ? NoopHTMLColor.warm : NoopHTMLColor.green
+            case .ages: return NoopHTMLColor.green
             case .svea: return NoopHTMLColor.night
+            // Both doors into Act 3 are tab-level arrivals, so the crossfade has no rise to carry
+            // it. The tint travelling to the effort's amber is what makes it read as a change of
+            // place rather than a dropped frame.
+            case .effort: return NoopHTMLColor.warm
             case .goals: return NoopHTMLColor.warm
             default: return NoopHTMLColor.blue
             }
@@ -1005,6 +1019,7 @@ struct NoopBottomNavigation: View {
             .foregroundStyle(selected ? selectedInk : Color(hex: 0x7F8A85))
             .frame(width: unit * (selected ? 1.7 : 1), height: 46)
             .background(selected ? tint : .clear, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .animation(NoopMotion.arrive, value: navigation.route.act)
         }
         .buttonStyle(NoopHTMLPressStyle())
         .accessibilityLabel(sveaSlot ? "Svea" : tab.rawValue)
@@ -1025,7 +1040,8 @@ struct NoopBottomNavigation: View {
         case .night: Color(hex: 0x0D1120)
         case .picture: Color(hex: 0x04140C)
         case .plumbing: NoopHTMLColor.blushInk
-        case .ages: navigation.route == .health ? NoopHTMLColor.warmInk : Color(hex: 0x04140C)
+        case .ages: Color(hex: 0x04140C)
+        case .effort: NoopHTMLColor.warmInk
         case .goals: NoopHTMLColor.warmInk
         default: NoopHTMLColor.blueInk
         }
@@ -1366,7 +1382,7 @@ private struct NoopDayLogSheet: View {
                     // going home first. The + still opens this sheet — it does not become a session
                     // button. `reset` makes it a tab-level arrival, and clears this overlay on the way.
                     VStack(spacing: 12) {
-                        Button { navigation.reset(to: .session) } label: {
+                        Button { navigation.dismissSheetThenArrive(at: .session) } label: {
                             HStack(spacing: 12) {
                                 Text("Start a session")
                                     .font(NoopHTMLFont.sans(13.5, weight: .semibold))
