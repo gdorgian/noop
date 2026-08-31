@@ -74,6 +74,7 @@ struct NoopAct5Screens: View {
             case .lab: labScreen
             case .onboard: onboardingScreen
             case .pair: pairingScreen
+            case .position: positionScreen
             default: youScreen
             }
         }
@@ -106,6 +107,7 @@ private extension NoopAct5Screens {
     static var blush: Color { Color(hex: 0xE08A9B) }
     static var blushLight: Color { Color(hex: 0xF6D3DA) }
     static var blushDark: Color { Color(hex: 0x2A0E14) }
+    static var blushLabel: Color { Color(hex: 0xC08E98) }
     static var green: Color { Color(hex: 0x2ECC80) }
     static var lavender: Color { Color(hex: 0x8B99D6) }
     static var warm: Color { Color(hex: 0xF2B45C) }
@@ -328,10 +330,14 @@ private extension NoopAct5Screens {
                             copyRow("Data and permissions", detail: "what is kept, and what leaves", symbol: "shield", tint: Self.blush) { navigation.push(.data) }
                             Divider().overlay(NoopHTMLColor.border)
                             copyRow("Settings", detail: "every switch Noop has, in eleven groups", symbol: "ruler", tint: Self.blush) { navigation.push(.settings) }
+                            Divider().overlay(NoopHTMLColor.border)
+                            // 8.2b. The only row here that is a position rather than a place, which is
+                            // why it sits last and why its icon is the one non-neutral glyph on `you`.
+                            copyRow("What Noop will not ask you", detail: "no weight goal, no step target, no score", symbol: "nosign", tint: Self.blushLabel) { navigation.push(.position) }
                         }
                     }
 
-                    Text("Noop is told six things about your body and works the rest out. There is no weight goal, no step target and no daily score, because none of them would change what it says to you.")
+                    Text("Noop is told six things about your body and works the rest out.")
                         .font(NoopHTMLFont.sans(11.5))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(4)
@@ -2028,8 +2034,12 @@ private extension NoopAct5Screens {
 
                         VStack(alignment: .leading, spacing: 9) {
                             Text("What Noop will not ask you").font(NoopHTMLFont.sans(12.5, weight: .semibold))
-                            Text("Your weight goal, a calorie target, a step count to beat, or who you would like to compare yourself with. None of them would change a word of what it tells you.")
+                            Text(NoopPositionCopy.inlineList)
+                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(4.5)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(NoopPositionCopy.inlineClosing)
                                 .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4.5)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 17)
@@ -2240,5 +2250,78 @@ private struct NoopA5PairPulse: View {
         }
         let t = (lower + upper) / 2
         return 3 * (1 - t) * t * t + t * t * t
+    }
+}
+
+private extension NoopAct5Screens {
+    var positionScreen: some View {
+        NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 0) {
+                NoopBackHeader(label: "You") { navigation.reset(to: .you) }
+
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("What Noop will not ask you")
+                            .font(NoopHTMLFont.outfit(25))
+                            .tracking(-0.625)
+                            .foregroundStyle(NoopHTMLColor.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(NoopPositionCopy.lead)
+                            .font(NoopHTMLFont.sans(13.5))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                            .lineSpacing(4)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    VStack(spacing: 0) {
+                        ForEach(Array(NoopPositionCopy.denials.enumerated()), id: \.offset) { index, denial in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(denial.title)
+                                    .font(NoopHTMLFont.sans(14, weight: .semibold))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Text(denial.reason)
+                                    .font(NoopHTMLFont.sans(12.5))
+                                    .foregroundStyle(NoopHTMLColor.copy)
+                                    .lineSpacing(4.2)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 15)
+                            if index < NoopPositionCopy.denials.count - 1 {
+                                Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 22).fill(NoopHTMLColor.card))
+                    .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+
+                    // The counterweight, so the screen is not five refusals and nothing else.
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(NoopPositionCopy.asksTitle)
+                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            .foregroundStyle(NoopHTMLColor.ink)
+                        Text(NoopPositionCopy.asks)
+                            .font(NoopHTMLFont.sans(12.5))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                            .lineSpacing(4.2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 22).fill(Self.blush.opacity(0.07)))
+                    .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Self.blush.opacity(0.20), lineWidth: 0.5))
+
+                    Text(NoopPositionCopy.foot)
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 2)
+                }
+            }
+        }
     }
 }

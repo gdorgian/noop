@@ -140,10 +140,16 @@ struct NoopOnboardingView: View {
                 VStack(alignment: .leading, spacing: 9) {
                     Text("What Noop will not ask you")
                         .font(NoopHTMLFont.sans(12.5, weight: .semibold))
-                    Text("Your weight goal, a calorie target, a step count to beat, or who you would like to compare yourself with. None of them would change a word of what it tells you.")
+                    Text(NoopPositionCopy.inlineList)
+                        .font(NoopHTMLFont.sans(12))
+                        .foregroundStyle(NoopHTMLColor.inkSoft)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(NoopPositionCopy.inlineClosing)
                         .font(NoopHTMLFont.sans(12))
                         .foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         } footer: {

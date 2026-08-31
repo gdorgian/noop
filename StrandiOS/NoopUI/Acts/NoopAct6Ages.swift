@@ -479,7 +479,7 @@ struct NoopAct6Screens: View {
     private var health: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
-                NoopAgeBackHeader(label: "You") { navigation.reset(to: .you) }
+                NoopAgeBackHeader(label: "Your ages") { navigation.reset(to: .ages) }
                 NoopAgeLead(isNightWorker
                     ? "What was measured during your last sleep, and nothing estimated from it."
                     : "What was measured last night, and nothing estimated from it.")

@@ -496,6 +496,7 @@ private struct NoopVerifiedRouteScreen: View {
         case .strap: "Your strap"
         case .devices: "Manage straps"
         case .data: "Your data"
+        case .position: "What Noop will not ask you"
         case .settings: "Settings"
         case .widgets: "Widgets"
         case .lab: "The Lab"

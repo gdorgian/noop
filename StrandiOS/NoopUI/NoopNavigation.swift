@@ -51,7 +51,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 4
     case trends, capacity, rhythm, year
     // Act 5
-    case you, record, zones, history, strap, devices, data, settings, widgets, lab, onboard, pair
+    case you, record, zones, history, strap, devices, data, settings, widgets, lab, onboard, pair, position
     // Act 6
     case ages, building, driver, method, health
     // Act 7
@@ -67,7 +67,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .today, .charge, .day, .vitals, .stress, .heart: .day
         case .session, .pick, .ready, .live, .intervals, .detail: .effort
         case .trends, .capacity, .rhythm, .year: .picture
-        case .you, .record, .zones, .history, .strap, .devices, .data, .settings, .widgets, .lab, .onboard, .pair: .plumbing
+        case .you, .record, .zones, .history, .strap, .devices, .data, .settings, .widgets, .lab, .onboard, .pair,
+             .position: .plumbing
         case .ages, .building, .driver, .method, .health: .ages
         case .coach, .gate, .setup, .consent, .memory: .svea
         case .goal, .setGoal, .labs, .review, .marker: .goals
@@ -84,10 +85,10 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .coach, .gate, .setup, .consent, .memory:
             .today
         case .trends, .capacity, .rhythm, .year,
-             .ages, .building, .driver, .method:
+             .ages, .building, .driver, .method, .health:
             .trends
         case .you, .record, .zones, .history, .strap, .devices, .data, .settings,
-             .widgets, .lab, .onboard, .pair, .health,
+             .widgets, .lab, .onboard, .pair, .position,
              .goal, .setGoal, .labs, .review, .marker:
             .you
         }
