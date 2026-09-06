@@ -125,6 +125,9 @@ extension EnvironmentValues {
 struct NoopScreen<Content: View>: View {
     var bottomInset: CGFloat = 116
     var topInset: CGFloat = 10
+    /// Optional deterministic launch anchor used by Debug visual-parity fixtures. Production
+    /// screens leave this nil and always arrive at the top.
+    var initialScrollID: String? = nil
     @ViewBuilder var content: Content
 
     @Environment(\.noopLiveBarInset) private var liveBarInset
@@ -144,7 +147,11 @@ struct NoopScreen<Content: View>: View {
                 .scrollIndicators(.hidden)
                 .onAppear {
                     DispatchQueue.main.async {
-                        scrollProxy.scrollTo("noop-screen-top", anchor: .top)
+                        if let initialScrollID {
+                            scrollProxy.scrollTo(initialScrollID, anchor: .center)
+                        } else {
+                            scrollProxy.scrollTo("noop-screen-top", anchor: .top)
+                        }
                     }
                 }
             }

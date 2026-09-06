@@ -10,6 +10,7 @@ enum NoopAct: Int, CaseIterable {
     case ages
     case svea
     case goals
+    case instrument
 }
 
 enum NoopTab: String, CaseIterable, Identifiable {
@@ -63,16 +64,21 @@ enum NoopMotion {
     // It is deliberately not an Animation: easing a clock makes it run fast in the middle.
 
     /// How the last route change arrived, which is what decides whether the screen rises.
-    enum Arrival { case pushed, arrived }
+    enum Arrival {
+        case pushed
+        case arrived
+        case coverIn
+        case coverOut
+    }
 }
 
 enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 1
     case rest, tonight, why, debt
     // Act 2
-    case today, charge, day, vitals, stress, heart
+    case today, inbox, charge, day, vitals, stress, heart
     // Act 3
-    case session, pick, ready, live, intervals, detail
+    case session, pick, ready, live, intervals, detail, across
     // Act 4
     case trends, capacity, rhythm, year
     // Act 5
@@ -83,20 +89,23 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case coach, gate, setup, consent, memory
     // Act 8
     case goal, setGoal = "set", labs, review, marker
+    // Act 9
+    case instrumentIndex = "index", instrumentMetric = "metric", instrumentCompare = "compare", instrumentEffects = "effects"
 
     var id: String { rawValue }
 
     var act: NoopAct {
         switch self {
         case .rest, .tonight, .why, .debt: .night
-        case .today, .charge, .day, .vitals, .stress, .heart: .day
-        case .session, .pick, .ready, .live, .intervals, .detail: .effort
+        case .today, .inbox, .charge, .day, .vitals, .stress, .heart: .day
+        case .session, .pick, .ready, .live, .intervals, .detail, .across: .effort
         case .trends, .capacity, .rhythm, .year: .picture
         case .you, .record, .zones, .history, .strap, .devices, .data, .settings, .widgets, .lab, .onboard, .pair,
              .position: .plumbing
         case .ages, .building, .driver, .method, .health: .ages
         case .coach, .gate, .setup, .consent, .memory: .svea
         case .goal, .setGoal, .labs, .review, .marker: .goals
+        case .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects: .instrument
         }
     }
 
@@ -105,12 +114,13 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         switch self {
         case .rest, .tonight, .why, .debt:
             .rest
-        case .today, .charge, .day, .vitals, .stress, .heart,
-             .session, .pick, .ready, .live, .intervals, .detail,
+        case .today, .inbox, .charge, .day, .vitals, .stress, .heart,
+             .session, .pick, .ready, .live, .intervals, .detail, .across,
              .coach, .gate, .setup, .consent, .memory:
             .today
         case .trends, .capacity, .rhythm, .year,
-             .ages, .building, .driver, .method, .health:
+             .ages, .building, .driver, .method, .health,
+             .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects:
             .trends
         case .you, .record, .zones, .history, .strap, .devices, .data, .settings,
              .widgets, .lab, .onboard, .pair, .position,
@@ -127,7 +137,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     }
 }
 
-enum NoopWorkout: String, CaseIterable, Identifiable {
+enum NoopWorkout: String, CaseIterable, Identifiable, Codable {
     case steadyRide = "Steady ride"
     case intervals = "Intervals"
     case longWalk = "Long walk"
@@ -163,6 +173,33 @@ enum NoopWorkout: String, CaseIterable, Identifiable {
         case .longWalk: "figure.walk"
         case .strength: "dumbbell"
         case .easySwim: "figure.pool.swim"
+        }
+    }
+}
+
+/// The one completed-session record shared by Today, Session and Detail.  Keeping the measured
+/// facts together prevents those three surfaces from silently recomputing different answers.
+struct NoopFinishedSessionRecord: Codable, Equatable {
+    let day: String
+    let workout: NoopWorkout
+    let endedAt: Date
+    let durationSeconds: Int
+    let distanceKilometres: Double?
+    let chargeCost: Int?
+    let sleepNeedMinutes: Int?
+
+    var minutes: Int {
+        max(1, Int((Double(durationSeconds) / 60).rounded()))
+    }
+
+    func whenLabel(relativeTo now: Date = Date()) -> String {
+        if now.timeIntervalSince(endedAt) < 5 * 60 { return "Just now" }
+        return endedAt.formatted(date: .omitted, time: .shortened)
+    }
+
+    var distanceLabel: String? {
+        distanceKilometres.map { value in
+            value.formatted(.number.precision(.fractionLength(1)))
         }
     }
 }
@@ -239,10 +276,30 @@ enum NoopOverlay: Identifiable, Equatable {
     }
 }
 
+struct NoopSessionDetailSelection {
+    let workout: NoopWorkout
+    let headerLine: String?
+    let durationLabel: String?
+    let load: Int?
+
+    init(
+        workout: NoopWorkout,
+        headerLine: String? = nil,
+        durationLabel: String? = nil,
+        load: Int? = nil
+    ) {
+        self.workout = workout
+        self.headerLine = headerLine
+        self.durationLabel = durationLabel
+        self.load = load
+    }
+}
+
 @MainActor
 final class NoopNavigation: ObservableObject {
     private static let coachVoiceKey = "noop.html.svea-voice"
     private static let dayLogKey = "noop.html.day-log"
+    private static let finishedSessionKey = "noop.html.finished-session"
 
     private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -254,6 +311,7 @@ final class NoopNavigation: ObservableObject {
     }()
 
     private let defaults: UserDefaults
+    private var pendingSheetTransition: UUID?
 
     @Published private(set) var path: [NoopRoute] = [.today]
     @Published var overlay: NoopOverlay?
@@ -269,7 +327,10 @@ final class NoopNavigation: ObservableObject {
     @Published var sessionStartedAt: Date?
     @Published var sessionPaused = false
     @Published var sessionPausedElapsed = 0
-    @Published var finishedWorkout: NoopWorkout?
+    @Published private(set) var finishedSession: NoopFinishedSessionRecord?
+    /// The exact record selected from Act 3's session/across screens. It must outlive the source
+    /// screen because the shell intentionally recreates child screens on every route change.
+    @Published var detailSession: NoopSessionDetailSelection?
     /// Change 4. The session a `history` row opened, so `detail` renders that one.
     @Published var historyWorkout: NoopWorkout?
 
@@ -285,6 +346,15 @@ final class NoopNavigation: ObservableObject {
 
     var sessionRunning: Bool { sessionStartedAt != nil }
 
+    /// A completed session is meaningful only on the same app-day that produced it.
+    var finishedSessionToday: NoopFinishedSessionRecord? {
+        guard let finishedSession,
+              finishedSession.day == Self.dayFormatter.string(from: Date()) else { return nil }
+        return finishedSession
+    }
+
+    var finishedWorkout: NoopWorkout? { finishedSessionToday?.workout }
+
     func beginSession(at date: Date) {
         // The bar rises and the bottom inset grows 52 in the same frames. If the inset lags,
         // the last card jumps.
@@ -292,7 +362,8 @@ final class NoopNavigation: ObservableObject {
             sessionStartedAt = date
             sessionPausedElapsed = 0
             sessionPaused = false
-            finishedWorkout = nil
+            finishedSession = nil
+            defaults.removeObject(forKey: Self.finishedSessionKey)
         }
     }
 
@@ -325,10 +396,40 @@ final class NoopNavigation: ObservableObject {
     }
 
     /// The session ends, the bar goes, and `detail` opens on what was just done.
-    func endSession(_ workout: NoopWorkout) {
-        finishedWorkout = workout
+    func endSession(_ workout: NoopWorkout, at endedAt: Date = Date()) {
+        let measuredSeconds = sessionElapsed(at: endedAt)
+        let isDemo = NoopContentPolicy.allowsPrototypeContent
+        // The prototype deliberately holds a tap-through session at its canonical measured record;
+        // synthetic values remain unreachable outside an explicit Debug `--demo-seed` process.
+        let durationSeconds = isDemo && measuredSeconds < 120
+            ? workout.minutes * 60
+            : max(60, measuredSeconds)
+        let minutes = max(1, Int((Double(durationSeconds) / 60).rounded()))
+        let detailDistance = Double(workout.act3.detail.distance)
+        let record = NoopFinishedSessionRecord(
+            day: Self.dayFormatter.string(from: endedAt),
+            workout: workout,
+            endedAt: endedAt,
+            durationSeconds: durationSeconds,
+            distanceKilometres: isDemo ? detailDistance : nil,
+            chargeCost: isDemo ? Int((Double(minutes) * 0.43).rounded()) : nil,
+            sleepNeedMinutes: isDemo ? Int((Double(minutes) * 0.29).rounded()) : nil
+        )
+        finishedSession = record
+        if let data = try? JSONEncoder().encode(record) {
+            defaults.set(data, forKey: Self.finishedSessionKey)
+        }
+        detailSession = nil
         historyWorkout = nil
-        reset(to: .detail)
+        overlay = nil
+        arrival = .coverIn
+        withAnimation(NoopMotion.coverIn) {
+            path = [.detail]
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { [weak self] in
+            guard let self, self.route == .detail else { return }
+            self.arrival = .arrived
+        }
         // The bar is never animated out. It is removed once `detail` is already over it, so the
         // user never sees it go and the inset shrinks in covered frames.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
@@ -339,11 +440,41 @@ final class NoopNavigation: ObservableObject {
         }
     }
 
+    /// A session-end landing is a cover, not a push. Its back action therefore reveals Today by
+    /// dismissing the landing down the same edge it arrived from.
+    func dismissFinishedSessionDetail() {
+        if canGoBack {
+            back()
+            return
+        }
+        guard route == .detail, finishedSessionToday != nil else {
+            reset(to: .today)
+            return
+        }
+        arrival = .coverOut
+        withAnimation(NoopMotion.coverOut) {
+            path = [.today]
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.arrival = .arrived
+        }
+    }
+
     /// The live workout's own screen — intervals get theirs.
     var liveRoute: NoopRoute { selectedWorkout.act3.isIntervals ? .intervals : .live }
     @Published var selectedRestDay = 0
     @Published var selectedTodayDay = 0
+    /// Updates is recreated when its route changes, so transient decisions must live above the
+    /// screen just like an in-progress session. Release proposals still write their real stores;
+    /// these values only preserve the current navigation session and Debug design fixture.
+    @Published var inboxDecisionValues: [String: String] = [:]
+    @Published var inboxRestored = false
     @Published var nightJournalSaved = false
+    // The journal sheet is recreated on every + tap. Keep its committed choices with the
+    // navigation owner so Edit restores what was saved and Cancel discards only the draft.
+    @Published var nightJournalMood = 3
+    @Published var nightJournalDrinks = 0
+    @Published var nightJournalNotes: Set<String> = ["Screens in bed"]
     @Published private(set) var dayLogCounts: [NoopDayLogKind: Int]
     @Published var askFocusRequest = 0
     @Published var coachVoice: NoopCoachVoice {
@@ -351,6 +482,13 @@ final class NoopNavigation: ObservableObject {
     }
     @Published var selectedGoal: NoopGoalKind = .distance
     @Published var selectedMarker = "Ferritin"
+    /// Act 9 carries the chosen signal above its four routes so a dossier opened from Trends or
+    /// Svea survives the shell's deliberate per-route view recreation.
+    @Published var instrumentMetricKey = "hrv"
+    @Published var instrumentCompareAKey = "hrv"
+    @Published var instrumentCompareBKey = "reg"
+    @Published var instrumentCompareShift = 0
+    @Published private(set) var labPhotoRequestID = 0
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -368,6 +506,15 @@ final class NoopNavigation: ObservableObject {
             }
         } else {
             dayLogCounts = [:]
+        }
+
+        if let data = defaults.data(forKey: Self.finishedSessionKey),
+           let stored = try? JSONDecoder().decode(NoopFinishedSessionRecord.self, from: data),
+           stored.day == today {
+            finishedSession = stored
+        } else {
+            finishedSession = nil
+            defaults.removeObject(forKey: Self.finishedSessionKey)
         }
 
         #if DEBUG
@@ -417,6 +564,19 @@ final class NoopNavigation: ObservableObject {
            arguments.contains("--noop-night-journal") {
             overlay = .nightJournal
         }
+        if NoopContentPolicy.allowsPrototypeContent,
+           arguments.contains("--noop-finished-session") {
+            selectedWorkout = .steadyRide
+            finishedSession = NoopFinishedSessionRecord(
+                day: today,
+                workout: .steadyRide,
+                endedAt: Date(),
+                durationSeconds: 42 * 60,
+                distanceKilometres: 14.8,
+                chargeCost: 18,
+                sleepNeedMinutes: 12
+            )
+        }
         // Deterministic Simulator QA for the context-sensitive centre action. This is compiled
         // only into Debug and still requires the explicit demo seed, so Release cannot expose a
         // prototype sheet or synthetic route state.
@@ -460,6 +620,7 @@ final class NoopNavigation: ObservableObject {
     /// and the tab bar's tint travels over the same 200 ms — that tint move is the only signal
     /// that the tab changed, and without it a crossfade reads as a dropped frame.
     func reset(to route: NoopRoute) {
+        pendingSheetTransition = nil
         overlay = nil
         arrival = .arrived
         withAnimation(NoopMotion.arrive) {
@@ -470,9 +631,23 @@ final class NoopNavigation: ObservableObject {
     /// The + door: the sheet goes down on `cover`, then 60 ms of nothing, then the arrival.
     /// Overlapping them shows a push behind a dismissing sheet.
     func dismissSheetThenArrive(at route: NoopRoute) {
+        dismissSheet(then: route, pushed: false)
+    }
+
+    /// A sheet choice preserves the page it came from, after the sheet finishes closing.
+    func dismissSheetThenPush(_ route: NoopRoute) {
+        dismissSheet(then: route, pushed: true)
+    }
+
+    private func dismissSheet(then route: NoopRoute, pushed: Bool) {
+        let transition = UUID()
+        pendingSheetTransition = transition
         withAnimation(NoopMotion.coverOut) { overlay = nil }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { [weak self] in
-            self?.reset(to: route)
+            guard let self, self.pendingSheetTransition == transition else { return }
+            self.pendingSheetTransition = nil
+            if pushed { self.push(route) }
+            else { self.reset(to: route) }
         }
     }
 
@@ -481,6 +656,7 @@ final class NoopNavigation: ObservableObject {
     }
 
     func push(_ route: NoopRoute) {
+        pendingSheetTransition = nil
         overlay = nil
         guard self.route != route else { return }
         arrival = .pushed
@@ -490,6 +666,7 @@ final class NoopNavigation: ObservableObject {
     }
 
     func replace(with route: NoopRoute) {
+        pendingSheetTransition = nil
         overlay = nil
         arrival = .pushed
         withAnimation(NoopMotion.enter) {
@@ -498,6 +675,7 @@ final class NoopNavigation: ObservableObject {
     }
 
     func back() {
+        pendingSheetTransition = nil
         if overlay != nil {
             withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.32)) { overlay = nil }
             return
@@ -508,11 +686,19 @@ final class NoopNavigation: ObservableObject {
         }
     }
 
+    /// Follow the real entry path; the canonical parent is only a fallback for a root arrival.
+    func back(or fallback: NoopRoute) {
+        if canGoBack || overlay != nil { back() }
+        else { reset(to: fallback) }
+    }
+
     func show(_ overlay: NoopOverlay) {
+        pendingSheetTransition = nil
         withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) { self.overlay = overlay }
     }
 
     func dismissOverlay() {
+        pendingSheetTransition = nil
         withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) { overlay = nil }
     }
 
@@ -536,8 +722,15 @@ final class NoopNavigation: ObservableObject {
             reset(to: .coach)
             askFocusRequest += 1
         case .goals:
-            push(.review)
+            if route != .labs { reset(to: .labs) }
+            labPhotoRequestID += 1
+        case .instrument:
+            reset(to: .history)
         }
+    }
+
+    func consumeLabPhotoRequest() {
+        labPhotoRequestID = 0
     }
 
     func selectWorkout(_ workout: NoopWorkout) {

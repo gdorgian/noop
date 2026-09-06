@@ -336,7 +336,7 @@ struct NoopAct1Screens: View {
                 .foregroundStyle(NoopHTMLColor.blueInk)
                 .frame(width: 16, height: 16)
                 .background(NoopHTMLColor.blue, in: Circle())
-            Text("Logged \(isNightWorker ? "06:50" : "22:41") — good day, no drinks, 1 note")
+            Text(savedJournalSummary)
                 .font(NoopHTMLFont.sans(12.5))
                 .foregroundStyle(NoopHTMLColor.inkSoft)
             Spacer()
@@ -350,12 +350,22 @@ struct NoopAct1Screens: View {
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(NoopHTMLColor.blue.opacity(0.22), lineWidth: 0.5))
     }
 
+    private var savedJournalSummary: String {
+        let moodNames = ["rough", "off", "fine", "good", "great"]
+        let mood = moodNames[max(0, min(moodNames.count - 1, navigation.nightJournalMood))]
+        let drinks = navigation.nightJournalDrinks
+        let drinkSummary = drinks == 0 ? "no drinks" : "\(drinks == 3 ? "3+" : String(drinks)) \(drinks == 1 ? "drink" : "drinks")"
+        let count = navigation.nightJournalNotes.count
+        let noteSummary = count == 0 ? "" : ", \(count) \(count == 1 ? "note" : "notes")"
+        return "Logged \(isNightWorker ? "06:50" : "22:41") — \(mood) day, \(drinkSummary)\(noteSummary)"
+    }
+
     // MARK: - Tonight
 
     private var tonightScreen: some View {
         NoopScreen(bottomInset: 124, topInset: 56) {
             VStack(spacing: 0) {
-                Act1BackHeader(label: isNightWorker ? "Before you sleep" : "Tonight") { navigation.reset(to: .rest) }
+                Act1BackHeader(label: isNightWorker ? "Before you sleep" : "Tonight") { navigation.back(or: .rest) }
 
                 VStack(spacing: 9) {
                     Text("LIGHTS OUT BY")

@@ -131,6 +131,8 @@ private struct NoopTrendsScreen: View {
                             trendLink("Rhythm", detail: "sleep, and how regular it has been", symbol: "moon", route: .rhythm)
                             Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
                             trendLink("The year so far", detail: "eight months in four chapters", symbol: "chart.bar.xaxis", route: .year)
+                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                            trendLink("Ask it something", detail: "every signal you keep, and what moves it", symbol: "ask", route: .instrumentIndex)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
@@ -275,9 +277,10 @@ private struct NoopTrendsScreen: View {
     }
 
     private func trendLink(_ title: String, detail: String, symbol: String, route: NoopRoute) -> some View {
-        Button { navigation.push(route) } label: {
+        let tint = symbol == "ask" ? NoopA4.lavender : NoopA4.green
+        return Button { navigation.push(route) } label: {
             HStack(spacing: 13) {
-                NoopCanonicalGlyph(name: glyph(for: symbol), size: 20, color: NoopA4.green)
+                NoopCanonicalGlyph(name: glyph(for: symbol), size: 20, color: tint)
                     .frame(width: 22)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
@@ -295,6 +298,7 @@ private struct NoopTrendsScreen: View {
         switch symbol {
         case "lungs": .lungs
         case "moon": .moon
+        case "ask": .ask
         default: .trends
         }
     }

@@ -18,6 +18,7 @@ enum NoopContentPolicy {
 struct NoopAppShell: View {
     @ObservedObject var navigation: NoopNavigation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @StateObject private var labDraft = NoopLabReviewDraft()
     @State private var dragTranslation: CGSize = .zero
 
     var body: some View {
@@ -28,6 +29,7 @@ struct NoopAppShell: View {
                 ambientGlow
 
                 screen
+                    .accessibilityHidden(navigation.overlay != nil)
                     // Every HTML `.scr` enters from opacity 0 / y +9 on the full child route.
                     // Durable Act state lives in navigation/scene storage, outside this visual identity.
                     .id(navigation.route.rawValue)
@@ -35,10 +37,8 @@ struct NoopAppShell: View {
                         .asymmetric(
                             // A push rises 9 pt. A tab-level arrival did not come from anywhere,
                             // so it crossfades in place and the tab bar's tint carries the change.
-                            insertion: reduceMotion || navigation.arrival == .arrived
-                                ? .opacity
-                                : .opacity.combined(with: .offset(y: 9)),
-                            removal: .identity
+                            insertion: screenInsertion,
+                            removal: screenRemoval
                         )
                     )
 
@@ -64,6 +64,7 @@ struct NoopAppShell: View {
                     }
                     .ignoresSafeArea(edges: .bottom)
                     .ignoresSafeArea(.keyboard)
+                    .accessibilityHidden(navigation.overlay != nil)
                     .zIndex(5)
                 }
 
@@ -88,8 +89,30 @@ struct NoopAppShell: View {
         // own HTML paddings place content at y=58/56 and the nav 26pt from the true bottom.
         .ignoresSafeArea(
             .container,
-            edges: navigation.route.act == .night || navigation.route.act == .day || navigation.route.act == .effort || navigation.route.act == .picture || navigation.route.act == .plumbing || navigation.route.act == .ages || navigation.route.act == .svea || navigation.route.act == .goals ? .all : []
+            edges: navigation.route.act == .night || navigation.route.act == .day || navigation.route.act == .effort || navigation.route.act == .picture || navigation.route.act == .plumbing || navigation.route.act == .ages || navigation.route.act == .svea || navigation.route.act == .goals || navigation.route.act == .instrument ? .all : []
         )
+        .onChange(of: navigation.route) { oldRoute, newRoute in
+            if oldRoute == .review, newRoute != .review {
+                labDraft.scrub()
+            }
+        }
+    }
+
+    private var screenInsertion: AnyTransition {
+        if reduceMotion { return .opacity }
+        switch navigation.arrival {
+        case .coverIn:
+            return .move(edge: .bottom)
+        case .pushed:
+            return .opacity.combined(with: .offset(y: 9))
+        case .arrived, .coverOut:
+            return .opacity
+        }
+    }
+
+    private var screenRemoval: AnyTransition {
+        guard !reduceMotion else { return .identity }
+        return navigation.arrival == .coverOut ? .move(edge: .bottom) : .identity
     }
 
     @ViewBuilder
@@ -102,7 +125,8 @@ struct NoopAppShell: View {
         case .plumbing: NoopAct5Screens(navigation: navigation)
         case .ages: NoopAct6Screens(navigation: navigation)
         case .svea: NoopAct7Screens(navigation: navigation)
-        case .goals: NoopAct8Screens(navigation: navigation)
+        case .goals: NoopAct8Screens(navigation: navigation, labDraft: labDraft)
+        case .instrument: NoopAct9Screens(navigation: navigation)
         }
     }
 
@@ -121,6 +145,7 @@ struct NoopAppShell: View {
             }
         case .svea: NoopHTMLColor.night
         case .goals: NoopHTMLColor.warm
+        case .instrument: NoopHTMLColor.night
         case .effort: usesWarmEffortAmbient ? NoopHTMLColor.warm : NoopHTMLColor.blue
         default: NoopHTMLColor.blue
         }
@@ -133,6 +158,7 @@ struct NoopAppShell: View {
     private var ambientOpacity: Double {
         switch navigation.route.act {
         case .picture, .ages, .goals: 0.15
+        case .instrument: 0.16
         case .svea: 0.16
         case .effort: usesWarmEffortAmbient ? 0.15 : 0.17
         case .plumbing:
@@ -474,6 +500,7 @@ private struct NoopVerifiedRouteScreen: View {
         case .ages: "Your ages"
         case .svea: "Svea"
         case .goals: "Goals and labs"
+        case .instrument: "The instrument"
         }
     }
 
@@ -484,6 +511,7 @@ private struct NoopVerifiedRouteScreen: View {
         case .why: "Why"
         case .debt: "Sleep debt"
         case .today: "Today"
+        case .inbox: "Updates"
         case .charge: "Charge"
         case .day: "The day so far"
         case .vitals: "Vitals"
@@ -495,6 +523,7 @@ private struct NoopVerifiedRouteScreen: View {
         case .live: "Live session"
         case .intervals: "Intervals"
         case .detail: "Session detail"
+        case .across: "Every session"
         case .trends: "Trends"
         case .capacity: "Capacity"
         case .rhythm: "Rhythm"
@@ -527,6 +556,10 @@ private struct NoopVerifiedRouteScreen: View {
         case .labs: "Biomarkers"
         case .review: "Review lab results"
         case .marker: "Biomarker"
+        case .instrumentIndex: "Ask it something"
+        case .instrumentMetric: "One signal"
+        case .instrumentCompare: "Two at once"
+        case .instrumentEffects: "What moves you"
         }
     }
 }
@@ -539,7 +572,7 @@ enum NoopCanonicalGlyphName {
     case read, scale, alarm, bell, screen, watch, cloud
     case shield, download, upload, trash, globe, ruler, sparkSingle, camera
     case person, sync, link, copy, share, x, flask, search, file
-    case plus, grid, key, chart, gauge
+    case plus, grid, key, chart, gauge, ask, overlay, chat
 }
 
 /// The HTML uses one 24 × 24 stroked SVG alphabet throughout. Drawing those paths directly keeps
@@ -888,6 +921,23 @@ struct NoopCanonicalGlyph: View {
             path.move(to: CGPoint(x: 4.6, y: 17.4))
             addCircularArc(&path, from: CGPoint(x: 4.6, y: 17.4), to: CGPoint(x: 19.4, y: 17.4), radius: 8, largeArc: true, sweep: true)
             path.move(to: CGPoint(x: 12, y: 12.4)); path.addLine(to: CGPoint(x: 15.4, y: 9))
+        case .ask:
+            path.addEllipse(in: CGRect(x: 4.4, y: 4.4, width: 12.4, height: 12.4))
+            path.move(to: CGPoint(x: 15.2, y: 15.2)); path.addLine(to: CGPoint(x: 20, y: 20))
+        case .overlay:
+            path.move(to: CGPoint(x: 3, y: 16.4))
+            path.addCurve(to: CGPoint(x: 11.6, y: 7.4), control1: CGPoint(x: 6.4, y: 16.4), control2: CGPoint(x: 7.6, y: 7.4))
+            path.addCurve(to: CGPoint(x: 20, y: 13.8), control1: CGPoint(x: 15.6, y: 7.4), control2: CGPoint(x: 16.4, y: 13.8))
+            path.move(to: CGPoint(x: 3, y: 8.6))
+            path.addCurve(to: CGPoint(x: 11.6, y: 17.6), control1: CGPoint(x: 6.4, y: 8.6), control2: CGPoint(x: 7.6, y: 17.6))
+        case .chat:
+            path.move(to: CGPoint(x: 12, y: 4.4))
+            path.addCurve(to: CGPoint(x: 4.4, y: 10.4), control1: CGPoint(x: 7.7, y: 4.4), control2: CGPoint(x: 4.4, y: 7))
+            path.addCurve(to: CGPoint(x: 7.4, y: 15.3), control1: CGPoint(x: 4.4, y: 12.4), control2: CGPoint(x: 5.6, y: 14.2))
+            path.addLine(to: CGPoint(x: 6.6, y: 19)); path.addLine(to: CGPoint(x: 10.3, y: 17))
+            path.addCurve(to: CGPoint(x: 12, y: 17.2), control1: CGPoint(x: 10.9, y: 17.1), control2: CGPoint(x: 11.5, y: 17.2))
+            path.addCurve(to: CGPoint(x: 19.6, y: 11.3), control1: CGPoint(x: 16.3, y: 17.2), control2: CGPoint(x: 19.6, y: 14.6))
+            path.addCurve(to: CGPoint(x: 12, y: 4.4), control1: CGPoint(x: 19.6, y: 7.9), control2: CGPoint(x: 16.3, y: 4.4))
         }
         return path
     }
@@ -952,7 +1002,7 @@ struct NoopBottomNavigation: View {
 
                 Button { navigation.plus() } label: {
                     Group {
-                        if navigation.route.act == .picture {
+                        if navigation.route.act == .picture || navigation.route.act == .instrument {
                             NoopCanonicalGlyph(name: .spark, size: 21, color: NoopHTMLColor.blueInk)
                         } else {
                             Text("+")
@@ -967,6 +1017,7 @@ struct NoopBottomNavigation: View {
                 }
                 .buttonStyle(NoopHTMLPressStyle())
                 .padding(.horizontal, 2)
+                .accessibilityLabel(navigation.route.act == .picture || navigation.route.act == .instrument ? "Everything you logged" : "Add")
 
                 tab(.rest, unit: unit)
                 tab(.you, unit: unit)
@@ -992,11 +1043,11 @@ struct NoopBottomNavigation: View {
             case .plumbing: return NoopHTMLColor.blush
             case .ages: return NoopHTMLColor.green
             case .svea: return NoopHTMLColor.night
-            // Both doors into Act 3 are tab-level arrivals, so the crossfade has no rise to carry
-            // it. The tint travelling to the effort's amber is what makes it read as a change of
-            // place rather than a dropped frame.
-            case .effort: return NoopHTMLColor.warm
+            // Act 3 keeps the Today key in the shared Aura blue. Amber belongs to the effort
+            // content itself; the prototype never moves the global navigation key into that hue.
+            case .effort: return NoopHTMLColor.blue
             case .goals: return NoopHTMLColor.warm
+            case .instrument: return NoopHTMLColor.night
             default: return NoopHTMLColor.blue
             }
         }()
@@ -1041,8 +1092,9 @@ struct NoopBottomNavigation: View {
         case .picture: Color(hex: 0x04140C)
         case .plumbing: NoopHTMLColor.blushInk
         case .ages: Color(hex: 0x04140C)
-        case .effort: NoopHTMLColor.warmInk
+        case .effort: NoopHTMLColor.blueInk
         case .goals: NoopHTMLColor.warmInk
+        case .instrument: Color(hex: 0x0B0E1A)
         default: NoopHTMLColor.blueInk
         }
     }
@@ -1101,23 +1153,24 @@ private struct NoopAddRecordSheet: View {
                             .tracking(-0.525)
                             .foregroundStyle(NoopHTMLColor.ink)
                         Text("The four things Noop cannot work out by watching you.")
-                            .font(NoopHTMLFont.sans(12))
+                            .font(.custom("Instrument Sans", fixedSize: 12))
                             .foregroundStyle(Color(hex: 0x7F8A85))
+                            .modifier(NoopSheetLineBox(fontSize: 12, ratio: 1.55))
                     }
                     .padding(.horizontal, 2)
                     .padding(.top, 6)
                     .padding(.bottom, 2)
 
                     VStack(spacing: 7) {
-                        choice("Body measurements", "height, weight, and the optional waist", "ruler", "RECORD", .record)
-                        choice("Profile photo", "stays on this phone, never uploaded", "camera", "NOT SET", .record)
-                        choice("Date of birth and sex", "the two facts the models need", "person", "RECORD", .record)
-                        choice("A lab result to import", "photograph the sheet — Noop reads it and asks you to confirm", "doc", "LABS", .review)
+                        choice("Body measurements", "height, weight, and the optional waist", .ruler, "RECORD", .record)
+                        choice("Profile photo", "stays on this phone, never uploaded", .camera, "NOT SET", .record)
+                        choice("Date of birth and sex", "the two facts the models need", .person, "RECORD", .record)
+                        choice("A lab result to import", "photograph the sheet — Noop reads it and asks you to confirm", .file, "LABS", .review)
                     }
 
                     Button(action: navigation.dismissOverlay) {
                         Text("Not now")
-                            .font(NoopHTMLFont.sans(13.5))
+                            .font(.custom("Instrument Sans", fixedSize: 13.5))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                             .frame(maxWidth: .infinity)
                             .frame(height: 46)
@@ -1133,7 +1186,7 @@ private struct NoopAddRecordSheet: View {
                     UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
                         .stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5)
                 }
-                .shadow(color: .black.opacity(0.6), radius: 22, y: -8)
+                .shadow(color: .black.opacity(0.6), radius: 22, y: -14)
             }
             .frame(width: viewportWidth, height: proxy.size.height)
         }
@@ -1144,41 +1197,56 @@ private struct NoopAddRecordSheet: View {
     private func choice(
         _ title: String,
         _ detail: String,
-        _ symbol: String,
+        _ symbol: NoopCanonicalGlyphName,
         _ chip: String,
         _ route: NoopRoute
     ) -> some View {
         Button {
-            navigation.dismissOverlay()
-            navigation.push(route)
+            navigation.dismissSheetThenPush(route)
         } label: {
             HStack(spacing: 13) {
-                Image(systemName: symbol)
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(NoopHTMLColor.blush)
-                    .frame(width: 20)
+                NoopCanonicalGlyph(name: symbol, size: 21, color: NoopHTMLColor.blush)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(NoopHTMLFont.sans(14, weight: .semibold))
+                        .font(.custom("Instrument Sans", fixedSize: 14).weight(.semibold))
                         .foregroundStyle(NoopHTMLColor.ink)
+                        .modifier(NoopSheetLineBox(fontSize: 14, ratio: 18 / 14))
                     Text(detail)
-                        .font(NoopHTMLFont.sans(11.5))
-                        .foregroundStyle(NoopHTMLColor.copy)
+                        .font(.custom("Instrument Sans", fixedSize: 11.5))
+                        .foregroundStyle(Color(hex: 0x7F8A85))
                         .multilineTextAlignment(.leading)
+                        .modifier(NoopSheetLineBox(fontSize: 11.5, ratio: 1.45))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Text(chip)
-                    .font(NoopHTMLFont.sans(9.5, weight: .medium))
-                    .tracking(0.55)
-                    .foregroundStyle(NoopHTMLColor.copy)
+                    .font(.custom("Instrument Sans", fixedSize: 10).weight(.semibold))
+                    .tracking(0.8)
+                    .foregroundStyle(Color(hex: 0x8B958F))
+                    .fixedSize()
             }
-            .padding(.horizontal, 14)
-            .frame(minHeight: 68)
-            .background(NoopHTMLColor.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(NoopHTMLColor.blush.opacity(0.24), lineWidth: 0.5))
+            // Include the reference border's layout space around its 15 × 16 px padding.
+            .padding(.horizontal, 17)
+            .padding(.vertical, 15)
+            .frame(minHeight: 18 + 2 + 11.5 * 1.45 * (route == .review ? 2 : 1) + 32)
+            .background(NoopHTMLColor.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.blush.opacity(0.2), lineWidth: 0.5))
         }
         .buttonStyle(NoopHTMLPressStyle())
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct NoopSheetLineBox: ViewModifier {
+    let fontSize: CGFloat
+    let ratio: CGFloat
+
+    func body(content: Content) -> some View {
+        let nativeHeight = UIFont(name: "Instrument Sans", size: fontSize)?.lineHeight ?? fontSize * 1.22
+        let leading = max(0, fontSize * ratio - nativeHeight)
+        content
+            .lineSpacing(leading)
+            .padding(.vertical, leading / 2)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -1191,6 +1259,13 @@ private struct NoopNightJournalSheet: View {
     @State private var notes: Set<String> = ["Screens in bed"]
     private let moods = ["Rough", "Off", "Fine", "Good", "Great"]
     private let noteItems = ["Coffee after 2pm", "Big meal late", "Screens in bed", "Hard day"]
+
+    init(navigation: NoopNavigation) {
+        self.navigation = navigation
+        _mood = State(initialValue: navigation.nightJournalMood)
+        _drinks = State(initialValue: navigation.nightJournalDrinks)
+        _notes = State(initialValue: navigation.nightJournalNotes)
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -1213,9 +1288,34 @@ private struct NoopNightJournalSheet: View {
                             .tracking(-0.46)
                             .foregroundStyle(NoopHTMLColor.ink)
                         Text("Ten seconds. Skip anything.")
-                            .font(NoopHTMLFont.sans(12.5))
+                            .font(.custom("Instrument Sans", fixedSize: 12.5))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                     }
+
+                    Button { navigation.dismissSheetThenArrive(at: .session) } label: {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Start a session")
+                                    .font(NoopHTMLFont.sans(14, weight: .semibold))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Text("Today’s recommendation, from wherever you are")
+                                    .font(.custom("Instrument Sans", fixedSize: 11.5))
+                                    .foregroundStyle(Color(hex: 0x7F8A85))
+                            }
+                            Spacer(minLength: 4)
+                            NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.faint)
+                        }
+                        .padding(.horizontal, 2)
+                        .padding(.bottom, 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .overlay(alignment: .bottom) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.08))
+                                .frame(height: 0.5)
+                        }
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
 
                     VStack(alignment: .leading, spacing: 10) {
                         Text("HOW WAS IT")
@@ -1230,7 +1330,7 @@ private struct NoopNightJournalSheet: View {
                                             .fill(index == mood ? NoopHTMLColor.blue : Color.white.opacity(0.16))
                                             .frame(width: 14 + CGFloat(index) * 2.5, height: 14 + CGFloat(index) * 2.5)
                                         Text(moods[index])
-                                            .font(NoopHTMLFont.sans(10.5, weight: index == mood ? .semibold : .medium))
+                                            .font(.custom("Instrument Sans", fixedSize: 10.5).weight(index == mood ? .semibold : .medium))
                                             .foregroundStyle(index == mood ? NoopHTMLColor.ink : Color(hex: 0x7F8A85))
                                     }
                                     .frame(maxWidth: .infinity)
@@ -1255,7 +1355,7 @@ private struct NoopNightJournalSheet: View {
                             ForEach(Array(["None", "1", "2", "3+"].enumerated()), id: \.offset) { index, label in
                                 Button { drinks = index } label: {
                                     Text(label)
-                                        .font(NoopHTMLFont.sans(13.5, weight: index == drinks ? .semibold : .medium))
+                                        .font(.custom("Instrument Sans", fixedSize: 13.5).weight(index == drinks ? .semibold : .medium))
                                         .foregroundStyle(index == drinks ? NoopHTMLColor.blueInk : NoopHTMLColor.copy)
                                         .frame(maxWidth: .infinity)
                                         .frame(height: 48)
@@ -1290,6 +1390,9 @@ private struct NoopNightJournalSheet: View {
 
                     VStack(spacing: 10) {
                         Button {
+                            navigation.nightJournalMood = mood
+                            navigation.nightJournalDrinks = drinks
+                            navigation.nightJournalNotes = notes
                             navigation.nightJournalSaved = true
                             navigation.dismissOverlay()
                         } label: {
@@ -1303,11 +1406,16 @@ private struct NoopNightJournalSheet: View {
                         .buttonStyle(NoopHTMLPressStyle())
 
                         Button {
-                            if navigation.nightJournalSaved { navigation.nightJournalSaved = false }
+                            if navigation.nightJournalSaved {
+                                navigation.nightJournalSaved = false
+                                navigation.nightJournalMood = 3
+                                navigation.nightJournalDrinks = 0
+                                navigation.nightJournalNotes = ["Screens in bed"]
+                            }
                             navigation.dismissOverlay()
                         } label: {
                             Text(navigation.nightJournalSaved ? "Delete this entry" : "Nothing to log tonight")
-                                .font(NoopHTMLFont.sans(13.5))
+                                .font(.custom("Instrument Sans", fixedSize: 13.5))
                                 .foregroundStyle(navigation.nightJournalSaved ? NoopHTMLColor.red : Color(hex: 0x7F8A85))
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 44)
@@ -1343,7 +1451,7 @@ private struct NoopNightJournalSheet: View {
         case "Coffee after 2pm": .cup
         case "Big meal late": .plate
         case "Screens in bed": .screen
-        default: .spark
+        default: .sparkSingle
         }
     }
 }
@@ -1377,27 +1485,36 @@ private struct NoopDayLogSheet: View {
                             .font(NoopHTMLFont.sans(12.5))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                     }
+                    .frame(height: 48, alignment: .top)
 
                     // Change 1, door two. The global shortcut: reachable from all five tabs without
                     // going home first. The + still opens this sheet — it does not become a session
                     // button. `reset` makes it a tab-level arrival, and clears this overlay on the way.
-                    VStack(spacing: 12) {
-                        Button { navigation.dismissSheetThenArrive(at: .session) } label: {
-                            HStack(spacing: 12) {
+                    Button { navigation.dismissSheetThenArrive(at: .session) } label: {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text("Start a session")
-                                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                    .font(NoopHTMLFont.sans(14, weight: .semibold))
                                     .foregroundStyle(NoopHTMLColor.ink)
-                                Spacer(minLength: 4)
-                                NoopChevron()
+                                Text("Today’s recommendation, from wherever you are")
+                                    .font(NoopHTMLFont.sans(11.5))
+                                    .foregroundStyle(Color(hex: 0x7F8A85))
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 44)
-                            .contentShape(Rectangle())
+                            Spacer(minLength: 4)
+                            NoopChevron()
                         }
-                        .buttonStyle(NoopHTMLPressStyle())
-
-                        Divider().overlay(NoopHTMLColor.border)
+                        .padding(.horizontal, 2)
+                        .padding(.top, 2)
+                        .padding(.bottom, 14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .overlay(alignment: .bottom) {
+                            Rectangle()
+                                .fill(NoopHTMLColor.border)
+                                .frame(height: 0.5)
+                        }
                     }
+                    .buttonStyle(NoopHTMLPressStyle())
 
                     LazyVGrid(
                         columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 0)],
@@ -1413,6 +1530,7 @@ private struct NoopDayLogSheet: View {
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(4.6)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(height: 37, alignment: .top)
 
                     VStack(spacing: 8) {
                         Button("Done", action: navigation.dismissOverlay)
@@ -1549,7 +1667,12 @@ private struct NoopDayLogSheetTopBorder: Shape {
 
 private struct NoopLoggedItemsSheet: View {
     @ObservedObject var navigation: NoopNavigation
-    @State private var filter: NoopLoggedFilter = .all
+    @SceneStorage("noop.trends.logged-filter") private var storedFilter = NoopLoggedFilter.all.rawValue
+
+    private var filter: NoopLoggedFilter {
+        get { NoopLoggedFilter(rawValue: storedFilter) ?? .all }
+        nonmutating set { storedFilter = newValue.rawValue }
+    }
 
     private var filteredDays: [NoopLoggedDay] {
         NoopLoggedDay.canonical.compactMap { day in
@@ -1584,7 +1707,7 @@ private struct NoopLoggedItemsSheet: View {
                                     .font(NoopHTMLFont.outfit(21, weight: .regular))
                                     .tracking(-0.52)
                                 Text("\(filteredCount) in the last three days · \(filter.summarySuffix)")
-                                    .font(NoopHTMLFont.sans(11.5))
+                                    .font(.custom("Instrument Sans", fixedSize: 11.5))
                                     .foregroundStyle(Color(hex: 0x7F8A85))
                             }
                             Spacer(minLength: 8)
@@ -1601,14 +1724,15 @@ private struct NoopLoggedItemsSheet: View {
                             ForEach(NoopLoggedFilter.allCases, id: \.self) { item in
                                 Button { filter = item } label: {
                                     Text(item.rawValue)
-                                        .font(NoopHTMLFont.sans(11.5, weight: .medium))
+                                        .font(.custom("Instrument Sans", fixedSize: 11.5).weight(.medium))
                                         .foregroundStyle(filter == item ? Color(hex: 0x8FEFC0) : NoopHTMLColor.copy)
-                                        .padding(.horizontal, 12)
-                                        .frame(height: 32)
+                                        .padding(.horizontal, 13)
+                                        .frame(height: 35)
                                         .background(filter == item ? NoopHTMLColor.green.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 11))
                                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(filter == item ? NoopHTMLColor.green.opacity(0.4) : Color.white.opacity(0.07), lineWidth: 0.5))
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityAddTraits(filter == item ? .isSelected : [])
                             }
                         }
                     }
@@ -1628,17 +1752,16 @@ private struct NoopLoggedItemsSheet: View {
                     .scrollIndicators(.hidden)
 
                     Button {
-                        navigation.dismissOverlay()
-                        navigation.push(.history)
+                        navigation.dismissSheetThenPush(.history)
                     } label: {
                         HStack(spacing: 8) {
                             Text("Open the full list")
                             NoopA4CSSChevron(direction: .right, color: Color(hex: 0x8FEFC0))
                         }
-                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                        .font(.custom("Instrument Sans", fixedSize: 13.5).weight(.semibold))
                         .foregroundStyle(Color(hex: 0x8FEFC0))
                         .frame(maxWidth: .infinity)
-                        .frame(height: 48)
+                        .frame(height: 50)
                         .background(NoopHTMLColor.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(NoopHTMLColor.green.opacity(0.3), lineWidth: 0.5))
                     }
@@ -1654,7 +1777,7 @@ private struct NoopLoggedItemsSheet: View {
                     UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
                         .stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5)
                 }
-                .shadow(color: .black.opacity(0.6), radius: 22, y: -8)
+                .shadow(color: .black.opacity(0.6), radius: 22, y: -14)
             }
         }
         .ignoresSafeArea()
@@ -1665,11 +1788,11 @@ private struct NoopLoggedItemsSheet: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(day.label)
-                    .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                    .font(.custom("Instrument Sans", fixedSize: 11.5).weight(.semibold))
                     .foregroundStyle(NoopHTMLColor.inkSoft)
                 Spacer()
                 Text(day.summary)
-                    .font(NoopHTMLFont.sans(10.5))
+                    .font(.custom("Instrument Sans", fixedSize: 10.5))
                     .foregroundStyle(NoopHTMLColor.faint)
             }
             .padding(.horizontal, 2)
@@ -1678,13 +1801,12 @@ private struct NoopLoggedItemsSheet: View {
                 ForEach(Array(day.items.enumerated()), id: \.offset) { index, item in
                     HStack(spacing: 12) {
                         NoopCanonicalGlyph(name: item.glyph, size: 17, color: item.tint)
-                            .frame(width: 20)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(item.name)
                                 .font(NoopHTMLFont.sans(13, weight: item.kind == .log ? .regular : .semibold))
                                 .foregroundStyle(item.kind == .log ? NoopHTMLColor.inkSoft : NoopHTMLColor.ink)
                             Text(item.detail)
-                                .font(NoopHTMLFont.sans(10.5))
+                                .font(.custom("Instrument Sans", fixedSize: 10.5))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.86)
@@ -1696,11 +1818,11 @@ private struct NoopLoggedItemsSheet: View {
                             .monospacedDigit()
                     }
                     .frame(minHeight: 50)
-                    if index < day.items.count - 1 { Divider().overlay(NoopHTMLColor.border) }
+                    if index < day.items.count - 1 { Color.white.opacity(0.055).frame(height: 1) }
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 3)
             .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(NoopHTMLColor.border, lineWidth: 0.5))
         }
@@ -1787,10 +1909,18 @@ private struct NoopLoggedDay: Identifiable {
 
 private struct NoopLoggedCloseGlyph: View {
     var body: some View {
-        ZStack {
-            Capsule().fill(NoopHTMLColor.inkSoft).frame(width: 13, height: 1.4).rotationEffect(.degrees(45))
-            Capsule().fill(NoopHTMLColor.inkSoft).frame(width: 13, height: 1.4).rotationEffect(.degrees(-45))
+        Canvas { context, _ in
+            var path = Path()
+            path.move(to: CGPoint(x: 7, y: 7)); path.addLine(to: CGPoint(x: 17, y: 17))
+            path.move(to: CGPoint(x: 17, y: 7)); path.addLine(to: CGPoint(x: 7, y: 17))
+            let scale: CGFloat = 14 / 24
+            context.stroke(
+                path.applying(CGAffineTransform(scaleX: scale, y: scale)),
+                with: .color(NoopHTMLColor.inkSoft),
+                style: StrokeStyle(lineWidth: 1.7 * scale, lineCap: .round)
+            )
         }
+        .frame(width: 14, height: 14)
     }
 }
 

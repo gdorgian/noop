@@ -14,7 +14,7 @@ struct NoopAct5Screens: View {
     @AppStorage(PuffinExperiment.broadcastHrKey) private var broadcastHrEnabled = false
     @AppStorage(PuffinExperiment.ecgRawDataKey) private var ecgRawDataEnabled = false
 
-    @State private var historyFilter = "All"
+    @SceneStorage("noop.act5.history-filter") private var historyFilter = "All"
     @State private var openZone: Int?
     @State private var hasPhoto = false
     @State private var sex = "Male"
@@ -513,7 +513,7 @@ private extension NoopAct5Screens {
     var recordScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 13) {
-                act5BackHeader("You") { navigation.reset(to: .you) }
+                act5BackHeader("You") { navigation.back(or: .you) }
                 pageTitle("Your record", copy: "Six facts and two calibrations. These set your zones, your calorie estimate and your body age — nothing else in the app asks you anything.")
                     .padding(.bottom, 6)
 
@@ -615,7 +615,7 @@ private extension NoopAct5Screens {
             HStack {
                 Text("Date of birth").font(NoopHTMLFont.sans(13.5))
                 Spacer()
-                Text("\(birthDay) \(monthName) \(birthYear) · 29 years")
+                Text("\(birthDay) \(monthName) \(String(birthYear)) · 29 years")
                     .font(NoopHTMLFont.sans(12)).foregroundStyle(Self.blushLight)
             }
             HStack(spacing: 7) {
@@ -707,7 +707,7 @@ private extension NoopAct5Screens {
     var zonesScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 14) {
-                act5BackHeader("Your record") { navigation.reset(to: .record) }
+                act5BackHeader("Your record") { navigation.back(or: .record) }
                 pageTitle("Your zones", copy: "Built from two numbers Noop has actually seen on you, not from your age.")
                     .padding(.bottom, 3)
 
@@ -798,7 +798,7 @@ private extension NoopAct5Screens {
     var historyScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 13) {
-                act5BackHeader("You") { navigation.reset(to: .you) }
+                act5BackHeader("You") { navigation.back(or: .you) }
                 pageTitle("Everything you logged", copy: "Sessions, sleeps and every coffee, in one list. This is where the + button's taps end up.")
                     .padding(.bottom, 6)
 
@@ -822,6 +822,33 @@ private extension NoopAct5Screens {
                     historyMetricTile("8h 40m", label: "moving")
                     historyMetricTile("302", label: "load")
                 }
+
+                Button {
+                    navigation.push(.across)
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Every session, in aggregate")
+                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            Text("A window rather than a list — how much you rode, walked and lifted in it.")
+                                .font(NoopHTMLFont.sans(11.5))
+                                .foregroundStyle(Color(hex: 0x7F8A85))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                    }
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5)
+                    )
+                }
+                .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(filteredHistory) { day in
@@ -862,6 +889,12 @@ private extension NoopAct5Screens {
             if item.kind == .sleep {
                 navigation.push(.why)
             } else if let workout = item.workout {
+                navigation.detailSession = NoopSessionDetailSelection(
+                    workout: workout,
+                    headerLine: item.sessionHeaderLine,
+                    durationLabel: item.sessionDurationLabel,
+                    load: item.sessionLoad
+                )
                 navigation.historyWorkout = workout
                 navigation.push(.detail)
             }
@@ -931,7 +964,17 @@ private extension NoopAct5Screens {
 
     static let history: [NoopA5HistoryDay] = [
         .init(day: "Today", summary: "", items: [
-            .init(kind: .session, name: "Steady ride", detail: "17:04 · 42 min · avg 126 bpm", value: "load 48", symbol: .bike, workout: .steadyRide),
+            .init(
+                kind: .session,
+                name: "Steady ride",
+                detail: "17:04 · 42 min · avg 126 bpm",
+                value: "load 48",
+                symbol: .bike,
+                workout: .steadyRide,
+                sessionHeaderLine: "Today, 17:04 · 42 min · 14.8 km",
+                sessionDurationLabel: "42:10",
+                sessionLoad: 48
+            ),
             .init(kind: .log, name: "Coffee", detail: "07:20", value: "", symbol: .cup),
             .init(kind: .log, name: "Water", detail: "09:40 · 11:15", value: "×2", symbol: .drop),
             .init(kind: .log, name: "Meal", detail: "12:05", value: "", symbol: .plate)
@@ -942,12 +985,32 @@ private extension NoopAct5Screens {
             .init(kind: .log, name: "Alcohol", detail: "20:30 · one glass", value: "", symbol: .drop)
         ]),
         .init(day: "Monday 18 August", summary: "", items: [
-            .init(kind: .session, name: "6 × 1 min hard", detail: "18:10 · 22 min · max 174 bpm", value: "load 86", symbol: .bolt, workout: .intervals),
+            .init(
+                kind: .session,
+                name: "6 × 1 min hard",
+                detail: "18:10 · 22 min · max 174 bpm",
+                value: "load 86",
+                symbol: .bolt,
+                workout: .intervals,
+                sessionHeaderLine: "Monday 18 August, 18:10 · 22 min · 7.1 km",
+                sessionDurationLabel: "22:08",
+                sessionLoad: 86
+            ),
             .init(kind: .sleep, name: "Slept 6h 48m", detail: "23:52 → 06:40 · 24 min under", value: "", symbol: .bed),
             .init(kind: .log, name: "Nap", detail: "15:10 · 26 min", value: "", symbol: .bed)
         ]),
         .init(day: "Sunday 17 August", summary: "", items: [
-            .init(kind: .session, name: "Long walk", detail: "10:20 · 68 min", value: "load 22", symbol: .walk, workout: .longWalk),
+            .init(
+                kind: .session,
+                name: "Long walk",
+                detail: "10:20 · 68 min",
+                value: "load 22",
+                symbol: .walk,
+                workout: .longWalk,
+                sessionHeaderLine: "Sunday 17 August, 10:20 · 68 min",
+                sessionDurationLabel: "68:00",
+                sessionLoad: 22
+            ),
             .init(kind: .session, name: "Strength, lower body", detail: "17:40 · 35 min", value: "load 62", symbol: .weight),
             .init(kind: .sleep, name: "Slept 7h 26m", detail: "23:05 → 06:31", value: "", symbol: .bed)
         ])
@@ -966,6 +1029,9 @@ private struct NoopA5HistoryItem {
     /// no chevron, and does nothing — the honest state for anything logged before this existed.
     /// Sleep rows carry no workout and open the night instead.
     var workout: NoopWorkout? = nil
+    var sessionHeaderLine: String? = nil
+    var sessionDurationLabel: String? = nil
+    var sessionLoad: Int? = nil
 
     var opensSomething: Bool { kind == .sleep || workout != nil }
 }
@@ -983,7 +1049,7 @@ private extension NoopAct5Screens {
     var strapScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
-                act5BackHeader("You") { navigation.reset(to: .you) }
+                act5BackHeader("You") { navigation.back(or: .you) }
                 pageTitle("Your strap", copy: "\(activeStrapName) · left wrist")
 
                 NoopHTMLCard(radius: 24, padding: 18) {
@@ -1195,7 +1261,7 @@ private extension NoopAct5Screens {
     var devicesScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 13) {
-                act5BackHeader("Your strap") { navigation.reset(to: .strap) }
+                act5BackHeader("Your strap") { navigation.back(or: .strap) }
                 pageTitle("Manage straps", copy: "Noop can hold several bands and remembers each one's nights. Only one is connected at a time.")
                     .padding(.bottom, 5)
 
@@ -1373,7 +1439,7 @@ private extension NoopAct5Screens {
     var settingsScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
-                act5BackHeader("You") { navigation.reset(to: .you) }
+                act5BackHeader("You") { navigation.back(or: .you) }
                 pageTitle("Settings", copy: "Eleven groups, every switch written with what it costs you. The sharp edges live in the Lab at the foot.")
                     .padding(.bottom, 5)
 
@@ -2257,7 +2323,7 @@ private extension NoopAct5Screens {
     var positionScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 0) {
-                NoopBackHeader(label: "You") { navigation.reset(to: .you) }
+                NoopBackHeader(label: "You") { navigation.back(or: .you) }
 
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {

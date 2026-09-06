@@ -3,6 +3,8 @@ import SwiftUI
 
 struct NoopAct2Screens: View {
     @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var updateStore: UpdateStore
+    @ObservedObject private var planStore = CoachPlanStore.shared
 
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     @SceneStorage("noop.act2.day-rail-open") private var dayRailOpen = false
@@ -11,11 +13,12 @@ struct NoopAct2Screens: View {
     @SceneStorage("noop.act3.rest-day") private var restDay = false
     @State private var todayPulseAnchor = Date()
     @State private var heartPulseAnchor = Date()
-
     var body: some View {
         switch navigation.route {
         case .today:
             todayScreen
+        case .inbox:
+            inboxScreen
         case .charge:
             chargeScreen
         case .day:
@@ -34,16 +37,20 @@ struct NoopAct2Screens: View {
     // MARK: - Today
 
     private var sessionCardTitle: String {
-        if let finished = navigation.finishedWorkout { return finished.act3.name }
+        if let finished = navigation.finishedSessionToday { return finished.workout.act3.name }
         return restDay ? "Rest" : navigation.selectedWorkout.act3.name
     }
 
     private var sessionCardLine: String {
         // Change 3. After a session the card reads what was done and what it cost, in the same
         // currency the rest of the day screen speaks.
-        if let finished = navigation.finishedWorkout {
-            let detail = finished.act3.detail
-            return "Cost you \(detail.sleepCost) charge · recovered by \(detail.recoveredBy)"
+        if let finished = navigation.finishedSessionToday,
+           let chargeCost = finished.chargeCost,
+           let sleepNeedMinutes = finished.sleepNeedMinutes {
+            return "\(finished.minutes) min · \(chargeCost) of today’s charge, and \(sleepNeedMinutes) minutes on tonight’s need."
+        }
+        if let finished = navigation.finishedSessionToday {
+            return "\(finished.minutes) min · saved from this session’s measured record."
         }
         return restDay
             ? "Nothing today. Tomorrow is the earliest this pays off."
@@ -51,11 +58,19 @@ struct NoopAct2Screens: View {
     }
 
     private var sessionCardRoute: NoopRoute {
-        navigation.finishedWorkout == nil ? .session : .detail
+        navigation.finishedSessionToday == nil ? .session : .detail
+    }
+
+    private var todayInitialScrollID: String? {
+        #if DEBUG
+        CommandLine.arguments.contains("--noop-scroll-session-card") ? "noop-today-session" : nil
+        #else
+        nil
+        #endif
     }
 
     private var todayScreen: some View {
-        NoopScreen(topInset: 58) {
+        NoopScreen(topInset: 58, initialScrollID: todayInitialScrollID) {
             VStack(spacing: 0) {
                 todayHeader
 
@@ -210,35 +225,37 @@ struct NoopAct2Screens: View {
                     // as a bug — so a rest day changes the copy rather than removing the card.
                     Button { navigation.reset(to: sessionCardRoute) } label: {
                         HStack(spacing: 13) {
-                            VStack(alignment: .leading, spacing: 7) {
-                                NoopSectionLabel("Today's session")
+                            VStack(alignment: .leading, spacing: 4) {
+                                NoopSectionLabel("Today's session", color: Color(hex: 0xC8934B))
                                 // Three states, one card. Title and line crossfade; the card, its
                                 // tint, its eyebrow and its chevron never move, and it is never absent.
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(sessionCardTitle)
-                                        .font(NoopHTMLFont.sans(14.5, weight: .semibold))
-                                        .foregroundStyle(NoopHTMLColor.ink)
-                                    Text(sessionCardLine)
-                                        .font(NoopHTMLFont.sans(12))
-                                        .foregroundStyle(NoopHTMLColor.copy)
-                                        .lineSpacing(3.36)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .multilineTextAlignment(.leading)
-                                }
-                                .id(sessionCardTitle + sessionCardLine)
-                                .transition(.opacity)
-                                .animation(NoopMotion.swap, value: sessionCardTitle + sessionCardLine)
+                                Text(sessionCardTitle)
+                                    .font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Text(sessionCardLine)
+                                    .font(NoopHTMLFont.sans(12))
+                                    .foregroundStyle(NoopHTMLColor.copy)
+                                    .lineSpacing(3.36)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .multilineTextAlignment(.leading)
                             }
-                            Spacer(minLength: 4)
+                            .id(sessionCardTitle + sessionCardLine)
+                            .transition(.opacity)
+                            .animation(NoopMotion.swap, value: sessionCardTitle + sessionCardLine)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             Act2CSSChevron(size: 8, color: NoopHTMLColor.faint)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 15)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5)
+                        )
                     }
                     .buttonStyle(NoopHTMLPressStyle())
+                    .id("noop-today-session")
 
                     Act2TodayHeartRow(
                         anchor: todayPulseAnchor,
@@ -302,13 +319,13 @@ struct NoopAct2Screens: View {
                 Text(dayContext.eyebrow)
                     .font(NoopHTMLFont.sans(13.5))
                     .foregroundStyle(NoopHTMLColor.copy)
-                Text(isHistorical ? dayContext.header : "Take four breaths\nfirst")
+                Text(isHistorical ? dayContext.header : "Take four breaths first")
                     .font(NoopHTMLFont.outfit(23))
                     .tracking(-0.46)
-                    // CSS: Outfit 23px / 1.15. At this width the canonical headline
-                    // occupies two 26.45pt line boxes; never shrink it onto one line.
+                    // CSS: Outfit 23px / 1.15. The final header also carries the Updates
+                    // bell, so flexbox gives the copy the remaining width and wraps it there.
                     .lineSpacing(-2.53)
-                    .fixedSize(horizontal: !isHistorical, vertical: true)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(height: 52.9, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -330,8 +347,40 @@ struct NoopAct2Screens: View {
                     .overlay(Capsule().stroke(dayRailOpen || isHistorical ? NoopHTMLColor.blue.opacity(0.34) : Color.white.opacity(0.1), lineWidth: 0.5))
                 }
                 .buttonStyle(.plain)
+
+                Button { navigation.push(.inbox) } label: {
+                    ZStack(alignment: .topTrailing) {
+                        NoopCanonicalGlyph(name: .bell, size: 15, color: NoopHTMLColor.inkSoft)
+                            .frame(width: 32, height: 32)
+                            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 11))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 11)
+                                    .stroke(Color.white.opacity(0.09), lineWidth: 0.5)
+                            )
+
+                        if inboxUnreadCount > 0 {
+                            Text("\(min(inboxUnreadCount, 99))")
+                                .font(NoopHTMLFont.sans(9.5, weight: .bold))
+                                .foregroundStyle(Color(hex: 0x03212F))
+                                .monospacedDigit()
+                                .padding(.horizontal, 4)
+                                .frame(minWidth: 16, minHeight: 16)
+                                .background(NoopHTMLColor.blue, in: Capsule())
+                                .overlay(Capsule().stroke(NoopHTMLColor.canvas, lineWidth: 1.5))
+                                .offset(x: 4, y: -4)
+                        }
+                    }
+                    .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    inboxUnreadCount > 0
+                        ? "Updates, \(inboxUnreadCount) unread"
+                        : "Updates"
+                )
             }
             .padding(.top, 4)
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.bottom, 4)
     }
@@ -403,6 +452,426 @@ struct NoopAct2Screens: View {
             .padding(.horizontal, 20)
         }
         .scrollIndicators(.hidden)
+    }
+
+    // MARK: - Updates
+
+    private var inboxScreen: some View {
+        NoopScreen(topInset: 58) {
+            VStack(spacing: 0) {
+                Act2BackBar(label: "Today", action: { back(to: .today) })
+                    .padding(.bottom, 16)
+
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Updates")
+                            .font(NoopHTMLFont.outfit(25))
+                            .tracking(-0.625)
+                        Text(inboxSubtitle)
+                            .font(NoopHTMLFont.sans(13.5))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                            .lineSpacing(5.13)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    // The browser's two-line intro occupies four more vertical pixels than
+                    // SwiftUI's identically sized text. Preserve the HTML's following anchor.
+                    .padding(.bottom, 4)
+
+                    if inboxGroups.isEmpty {
+                        VStack(spacing: 9) {
+                            Text("Nothing waiting")
+                                .font(NoopHTMLFont.sans(14, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.inkSoft)
+                            Text("Proposals, notices and anything you put away land here. Nothing is repeated, and a run of the same finding counts once.")
+                                .font(NoopHTMLFont.sans(12))
+                                .foregroundStyle(Color(hex: 0x7F8A85))
+                                .lineSpacing(4.56)
+                                .multilineTextAlignment(.center)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 26)
+                        .frame(maxWidth: .infinity)
+                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                    }
+
+                    ForEach(inboxGroups) { group in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                NoopSectionLabel(group.title)
+                                Spacer()
+                                Text(group.note)
+                                    .font(NoopHTMLFont.sans(11))
+                                    .foregroundStyle(NoopHTMLColor.faint)
+                            }
+                            .padding(.horizontal, 2)
+                            .padding(.top, 6)
+
+                            VStack(spacing: 0) {
+                                ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
+                                    if index > 0 {
+                                        Divider().overlay(NoopHTMLColor.border)
+                                    }
+                                    inboxRow(item)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                            .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                        }
+                    }
+
+                    Text("A proposal waits here until you answer it, and answering it here is the same as answering it on the card. Nothing in this list is a notification — the bell only fills, it never buzzes.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .lineSpacing(4.39)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 2)
+                        .padding(.top, 2)
+                        .padding(.bottom, 20)
+                }
+            }
+        }
+        .onAppear {
+            if !NoopContentPolicy.allowsPrototypeContent {
+                updateStore.pruneExpired()
+            }
+        }
+    }
+
+    private func inboxRow(_ item: Act2InboxItem) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Circle()
+                .fill(item.showsUnreadDot ? NoopHTMLColor.blue : Color.clear)
+                .frame(width: 6, height: 6)
+                .padding(.top, 6)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(item.title)
+                        .font(NoopHTMLFont.sans(13.5, weight: item.titleIsBold ? .semibold : .regular))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(item.when)
+                        .font(NoopHTMLFont.sans(10.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .monospacedDigit()
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+
+                Text(item.subtitle)
+                    .font(NoopHTMLFont.sans(12))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .lineSpacing(3.96)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                inboxActions(for: item)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        // CSS line boxes match, but SwiftUI collapses the rows' normal leading around their
+        // controls. These asymmetric half-point paddings reproduce the measured HTML row
+        // bounds without changing wrapping or the 14px visual inset at either edge.
+        .padding(.top, 15)
+        .padding(.bottom, item.usesActionSpacing ? 17.5 : 16.5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func inboxActions(for item: Act2InboxItem) -> some View {
+        if let decision = item.decision {
+            Text(inboxResolution(for: item, decision: decision))
+                .font(NoopHTMLFont.sans(11.5))
+                .foregroundStyle(decision == .accept ? Color(hex: 0x8FE3B4) : Color(hex: 0x7F8A85))
+                .lineSpacing(3.26)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
+        } else {
+            switch item.action {
+            case .proposal:
+                HStack(spacing: 7) {
+                    inboxActionButton("Accept", tint: NoopHTMLColor.blue, ink: NoopHTMLColor.blueLight) {
+                        decideInbox(item, as: .accept)
+                    }
+                    inboxActionButton("Change", tint: NoopHTMLColor.night, ink: Color(hex: 0xC9D0EE)) {
+                        decideInbox(item, as: .change)
+                    }
+                    inboxActionButton("Decline", tint: Color.white, ink: NoopHTMLColor.inkSoft) {
+                        decideInbox(item, as: .decline)
+                    }
+                }
+                .padding(.top, 6)
+            case .restore:
+                HStack {
+                    inboxActionButton("Put it back", tint: NoopHTMLColor.blue, ink: NoopHTMLColor.blueLight) {
+                        restoreInboxItem(item)
+                    }
+                    Spacer()
+                }
+                .padding(.top, 6)
+            case .none:
+                EmptyView()
+            }
+        }
+    }
+
+    private func inboxActionButton(
+        _ label: String,
+        tint: Color,
+        ink: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                .foregroundStyle(ink)
+                .padding(.horizontal, 12)
+                .frame(height: 29)
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(tint.opacity(0.34), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var inboxUnreadCount: Int {
+        if NoopContentPolicy.allowsPrototypeContent {
+            return demoInboxPendingCount + (navigation.inboxRestored ? 0 : 1)
+        }
+        return updateStore.unreadCount
+    }
+
+    private var inboxSubtitle: String {
+        if NoopContentPolicy.allowsPrototypeContent {
+            return "\(demoInboxPendingCount) to answer, and \(navigation.inboxRestored ? "two" : "three") things to know. A proposal stays here until you say yes or no to it."
+        }
+        guard !updateStore.items.isEmpty else {
+            return "Everything is answered. This is where proposals, notices and anything you put away collect."
+        }
+        let pending = liveInboxItems.filter { item in
+            if case .proposal = item.action { return item.decision == nil }
+            return false
+        }.count
+        let known = max(0, liveInboxItems.count - pending)
+        return "\(pending) to answer, and \(countWord(known)) things to know. A proposal stays here until you say yes or no to it."
+    }
+
+    private var inboxGroups: [Act2InboxGroup] {
+        NoopContentPolicy.allowsPrototypeContent ? demoInboxGroups : liveInboxGroups
+    }
+
+    private var demoInboxPendingCount: Int {
+        ["anchor", "thursday"].filter { inboxDecision(for: $0) == nil }.count
+    }
+
+    private var demoInboxGroups: [Act2InboxGroup] {
+        let proposals = [
+            Act2InboxItem(
+                id: "anchor",
+                title: "Move your anchor to 22:40",
+                subtitle: "Twenty minutes earlier for the next four nights. It costs you the end of one episode and buys back about 25 minutes of the debt.",
+                when: "Svea · 07:12",
+                action: .proposal(planProposalID: nil),
+                decision: inboxDecision(for: "anchor"),
+                acceptedCopy: "Accepted. Tonight’s anchor reads 22:40, and the bedtime nudge moves with it.",
+                sourceItemID: nil,
+                showsUnreadDot: inboxDecision(for: "anchor") == nil,
+                titleIsBold: true
+            ),
+            Act2InboxItem(
+                id: "thursday",
+                title: "Make Thursday easy instead of hard",
+                subtitle: "Two hard days back to back is what put you here last month. Zone 2 for forty minutes keeps the week’s load and drops the cost.",
+                when: "Svea · 07:12",
+                action: .proposal(planProposalID: nil),
+                decision: inboxDecision(for: "thursday"),
+                acceptedCopy: "Accepted. Thursday now reads Easy 40 min in the effort.",
+                sourceItemID: nil,
+                showsUnreadDot: inboxDecision(for: "thursday") == nil,
+                titleIsBold: true
+            )
+        ]
+
+        let worthKnowing = [
+            Act2InboxItem(
+                id: "resting-line",
+                title: "Six days under your resting line",
+                subtitle: "Your pulse has sat two beats under your own baseline all week. Usually fitness, sometimes the start of a cold — it is neither yet.",
+                when: "Today · 06:40"
+            ),
+            Act2InboxItem(
+                id: "pace-old",
+                title: "Your pace is a month old",
+                subtitle: "You swept on 12 August at 5.5 a minute. Your resting pulse has moved three beats since, which is enough to move the pace.",
+                when: "Yesterday"
+            )
+        ]
+
+        let putAway: [Act2InboxItem]
+        if navigation.inboxRestored {
+            putAway = [
+                Act2InboxItem(
+                    id: "restored",
+                    title: "Back on Today",
+                    subtitle: "Something is off is on the home screen again, priced in the ledger where it was.",
+                    when: "Just now"
+                ),
+                Act2InboxItem(
+                    id: "backup",
+                    title: "Backup ran at 03:10",
+                    subtitle: "41 nights, 2.1 MB, to the folder you chose. The next one is due Sunday.",
+                    when: "Today · 03:10"
+                )
+            ]
+        } else {
+            putAway = [
+                Act2InboxItem(
+                    id: "put-away",
+                    title: "You swiped away Something is off",
+                    subtitle: "It is still in the charge ledger, priced at 12. Putting it back only restores the card on Today.",
+                    when: "Today · 07:20",
+                    action: .restore
+                ),
+                Act2InboxItem(
+                    id: "backup",
+                    title: "Backup ran at 03:10",
+                    subtitle: "41 nights, 2.1 MB, to the folder you chose. The next one is due Sunday.",
+                    when: "Today · 03:10"
+                )
+            ]
+        }
+
+        return [
+            Act2InboxGroup(id: "decision", title: "Needs a decision", note: demoInboxPendingCount == 0 ? "all answered" : "\(demoInboxPendingCount) waiting", items: proposals),
+            Act2InboxGroup(id: "knowing", title: "Worth knowing", note: "nothing to answer", items: worthKnowing),
+            Act2InboxGroup(id: "away", title: "Put away", note: "kept for seven days", items: putAway)
+        ]
+    }
+
+    private var liveInboxItems: [Act2InboxItem] {
+        updateStore.sortedItems.map { item in
+            let key = item.id.uuidString
+            let decision = inboxDecision(for: key) ?? storedDecision(for: item.planProposalId)
+            let action: Act2InboxAction
+            if item.category == .actionable, decision == nil {
+                action = .proposal(planProposalID: item.planProposalId)
+            } else if item.category == .statusReminder, item.kind == .dismissedCard {
+                action = .restore
+            } else {
+                action = .none
+            }
+            return Act2InboxItem(
+                id: key,
+                title: item.title,
+                subtitle: item.message,
+                when: inboxWhen(item.date),
+                action: action,
+                decision: decision,
+                acceptedCopy: "Accepted.",
+                sourceItemID: item.id,
+                showsUnreadDot: !item.read,
+                titleIsBold: item.category == .actionable
+            )
+        }
+    }
+
+    private var liveInboxGroups: [Act2InboxGroup] {
+        let needs = liveInboxItems.filter { item in
+            guard let sourceID = item.sourceItemID,
+                  let source = updateStore.items.first(where: { $0.id == sourceID }) else { return false }
+            return source.category == .actionable
+        }
+        let knowing = liveInboxItems.filter { item in
+            guard let sourceID = item.sourceItemID,
+                  let source = updateStore.items.first(where: { $0.id == sourceID }) else { return false }
+            return source.category == .informative
+        }
+        let away = liveInboxItems.filter { item in
+            guard let sourceID = item.sourceItemID,
+                  let source = updateStore.items.first(where: { $0.id == sourceID }) else { return false }
+            return source.category == .statusReminder
+        }
+        let pending = needs.filter { $0.decision == nil }.count
+        return [
+            needs.isEmpty ? nil : Act2InboxGroup(id: "decision", title: "Needs a decision", note: pending == 0 ? "all answered" : "\(pending) waiting", items: needs),
+            knowing.isEmpty ? nil : Act2InboxGroup(id: "knowing", title: "Worth knowing", note: "nothing to answer", items: knowing),
+            away.isEmpty ? nil : Act2InboxGroup(id: "away", title: "Put away", note: "kept for seven days", items: away)
+        ].compactMap { $0 }
+    }
+
+    private func decideInbox(_ item: Act2InboxItem, as decision: Act2InboxDecision) {
+        navigation.inboxDecisionValues[item.id] = decision.rawValue
+        if case let .proposal(planProposalID) = item.action, let planProposalID {
+            switch decision {
+            case .accept:
+                planStore.accept(planProposalID)
+            case .decline:
+                planStore.decline(planProposalID)
+            case .change:
+                break
+            }
+        }
+        if let sourceID = item.sourceItemID {
+            updateStore.markRead(sourceID)
+        }
+    }
+
+    private func restoreInboxItem(_ item: Act2InboxItem) {
+        guard let sourceID = item.sourceItemID,
+              let source = updateStore.items.first(where: { $0.id == sourceID }) else {
+            navigation.inboxRestored = true
+            return
+        }
+        if let payload = source.restorePayload {
+            UserDefaults.standard.set(false, forKey: TodayCardDismissal.flagKey(payload))
+        }
+        updateStore.requestRestore(source)
+    }
+
+    private func inboxResolution(for item: Act2InboxItem, decision: Act2InboxDecision) -> String {
+        switch decision {
+        case .accept:
+            return item.acceptedCopy
+        case .change:
+            return "Opened for editing — nothing changes until you save it."
+        case .decline:
+            return "Declined. Svea will not raise it again this week."
+        }
+    }
+
+    private func inboxDecision(for id: String) -> Act2InboxDecision? {
+        navigation.inboxDecisionValues[id].flatMap(Act2InboxDecision.init(rawValue:))
+    }
+
+    private func storedDecision(for proposalID: UUID?) -> Act2InboxDecision? {
+        guard let proposalID,
+              let proposal = planStore.proposals.first(where: { $0.id == proposalID }) else { return nil }
+        switch proposal.status {
+        case .proposed:
+            return nil
+        case .accepted, .completed:
+            return .accept
+        case .declined, .skipped:
+            return .decline
+        case .modifiedByUser, .paused, .rescheduled:
+            return .change
+        }
+    }
+
+    private func inboxWhen(_ date: Date) -> String {
+        let calendar = Calendar.autoupdatingCurrent
+        if calendar.isDateInToday(date) {
+            return "Today · \(Self.inboxTimeFormatter.string(from: date))"
+        }
+        if calendar.isDateInYesterday(date) { return "Yesterday" }
+        return Self.inboxDateFormatter.string(from: date)
+    }
+
+    private func countWord(_ count: Int) -> String {
+        let words = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+        return count < words.count ? words[count] : "\(count)"
     }
 
     // MARK: - Charge
@@ -1001,6 +1470,43 @@ struct NoopAct2Screens: View {
 }
 
 // MARK: - Act 2 graphic components
+
+private enum Act2InboxDecision: String {
+    case accept, change, decline
+}
+
+private enum Act2InboxAction {
+    case none
+    case proposal(planProposalID: UUID?)
+    case restore
+}
+
+private struct Act2InboxItem: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let when: String
+    var action: Act2InboxAction = .none
+    var decision: Act2InboxDecision? = nil
+    var acceptedCopy: String = "Accepted."
+    var sourceItemID: UUID? = nil
+    var showsUnreadDot = false
+    var titleIsBold = false
+
+    var usesActionSpacing: Bool {
+        switch action {
+        case .none: false
+        case .proposal, .restore: true
+        }
+    }
+}
+
+private struct Act2InboxGroup: Identifiable {
+    let id: String
+    let title: String
+    let note: String
+    let items: [Act2InboxItem]
+}
 
 private enum Act2GlyphKind { case calendar, clock, moon, heart, lungs, spark }
 
@@ -1998,6 +2504,22 @@ private struct Act2Vital {
 }
 
 private extension NoopAct2Screens {
+    static let inboxTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+
+    static let inboxDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.dateFormat = "d MMM"
+        return formatter
+    }()
+
     static let heartValues: [Double] = [58, 60, 62, 74, 88, 96, 92, 78, 72, 70, 74, 80, 76, 72, 70, 68, 72, 78, 74, 70, 68, 66, 70, 72]
     static let stressValues = [0, 0, 1, 1, 2, 2, 1, 1, 0, 1, 1, 2, 3, 2, 1, 1, 0, 1, 2, 1, 1, 1]
 

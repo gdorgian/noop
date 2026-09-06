@@ -1,10 +1,341 @@
 import SwiftUI
 import UIKit
+import PhotosUI
+import UniformTypeIdentifiers
 import StrandImport
 import WhoopStore
 
+@MainActor
+final class NoopLabReviewDraft: ObservableObject {
+    fileprivate enum ReadState: Equatable {
+        case empty
+        case reading
+        case read
+        case nothingLegible
+    }
+
+    @Published fileprivate var image: UIImage?
+    @Published fileprivate var filename = ""
+    @Published fileprivate var reportDay: String?
+    @Published fileprivate var state: ReadState = .empty
+    @Published fileprivate var candidates: [NoopOCRCandidate] = []
+
+    private var generation = UUID()
+
+    var isEmpty: Bool { image == nil }
+
+    fileprivate func begin(_ photo: NoopPickedLabPhoto) -> Bool {
+        guard let image = UIImage(data: photo.data) else { return false }
+        generation = UUID()
+        self.image = image
+        filename = photo.filename.trimmingCharacters(in: .whitespacesAndNewlines)
+        reportDay = nil
+        candidates = []
+        state = .reading
+        return true
+    }
+
+    func read(_ data: Data) async {
+        let activeGeneration = generation
+        do {
+            let lines = try await LabReportImageTextExtractor.observations(from: data)
+            guard activeGeneration == generation else { return }
+            reportDay = Self.reportDay(in: lines.map(\.text))
+            candidates = Self.candidates(from: lines)
+            state = candidates.isEmpty ? .nothingLegible : .read
+        } catch {
+            guard activeGeneration == generation else { return }
+            candidates = []
+            state = .nothingLegible
+        }
+    }
+
+    func scrub() {
+        generation = UUID()
+        image = nil
+        filename = ""
+        reportDay = nil
+        candidates = []
+        state = .empty
+    }
+
+    #if DEBUG
+    func seedDemoReviewIfNeeded() {
+        guard image == nil, NoopContentPolicy.allowsPrototypeContent else { return }
+        let size = CGSize(width: 1000, height: 720)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let rendered = renderer.image { context in
+            UIColor(red: 0.86, green: 0.83, blue: 0.76, alpha: 1).setFill()
+            context.cgContext.fill(CGRect(origin: .zero, size: size))
+            UIColor(red: 0.12, green: 0.10, blue: 0.08, alpha: 0.72).setFill()
+            "HAEMATOLOGY · SERUM                         14 AUGUST 2026".draw(
+                at: CGPoint(x: 72, y: 66),
+                withAttributes: [.font: UIFont.monospacedSystemFont(ofSize: 25, weight: .semibold), .foregroundColor: UIColor.black.withAlphaComponent(0.66)]
+            )
+            context.cgContext.fill(CGRect(x: 72, y: 112, width: 856, height: 2))
+            let rows = [
+                "Haemoglobin                         138      g/L",
+                "Ferritin                             28      µg/L",
+                "Vitamin D, 25-OH                     52      nmol/L",
+                "ApoB                               0.78      g/L",
+                "hs-CRP                              0.6      mg/L"
+            ]
+            for (index, row) in rows.enumerated() {
+                row.draw(
+                    at: CGPoint(x: 78, y: 165 + CGFloat(index) * 86),
+                    withAttributes: [.font: UIFont.monospacedSystemFont(ofSize: 27, weight: index == 1 ? .semibold : .regular), .foregroundColor: UIColor.black.withAlphaComponent(0.78)]
+                )
+            }
+        }
+        image = rendered
+        filename = "IMG_4471"
+        reportDay = "2026-08-14"
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--noop-labs-reading") {
+            state = .reading
+            candidates = []
+            return
+        }
+        if arguments.contains("--noop-labs-nothing-legible") {
+            state = .nothingLegible
+            candidates = []
+            return
+        }
+        state = .read
+        candidates = NoopOCRCandidate.samplesWithRects
+    }
+    #endif
+
+    fileprivate var captionDate: String? {
+        guard let reportDay, let date = Self.dayFormatter.date(from: reportDay) else { return nil }
+        return Self.captionFormatter.string(from: date)
+    }
+
+    private static func candidates(from lines: [LabReportImageTextExtractor.RecognizedLine]) -> [NoopOCRCandidate] {
+        struct Found {
+            let parsed: LabReportTextCandidate
+            let line: LabReportImageTextExtractor.RecognizedLine
+            let index: Int
+        }
+        var foundByMarker: [String: Found] = [:]
+        for (index, line) in lines.enumerated() {
+            let parsed = LabReportTextImport.parse(text: line.text)
+            for candidate in parsed.candidates {
+                let found = Found(parsed: candidate, line: line, index: index)
+                if let previous = foundByMarker[candidate.markerKey], previous.line.confidence >= line.confidence {
+                    continue
+                }
+                foundByMarker[candidate.markerKey] = found
+            }
+        }
+        return foundByMarker.values.sorted { $0.index < $1.index }.map { found in
+            let definition = MarkerCatalog.definition(for: found.parsed.markerKey)
+            let name = definition?.displayName ?? found.parsed.markerKey.replacingOccurrences(of: "_", with: " ").capitalized
+            let decimals = definition?.decimals ?? 2
+            let value = found.parsed.value.formatted(.number.precision(.fractionLength(0...decimals)))
+            let visionRect = found.line.boundingBox
+            let topLeftRect = CGRect(
+                x: visionRect.minX,
+                y: 1 - visionRect.maxY,
+                width: visionRect.width,
+                height: visionRect.height
+            )
+            return NoopOCRCandidate(
+                id: "\(found.index)-\(found.parsed.markerKey)",
+                markerKey: found.parsed.markerKey,
+                category: found.parsed.category,
+                name: name,
+                value: value,
+                unit: found.parsed.unit,
+                raw: found.line.text,
+                confidence: found.line.confidence < 0.75 ? "check this" : "clear read",
+                lowConfidence: found.line.confidence < 0.75,
+                sourceRect: topLeftRect
+            )
+        }
+    }
+
+    private static func reportDay(in lines: [String]) -> String? {
+        let text = lines.joined(separator: " ")
+        let patterns = [
+            "(?i)\\b[0-3]?[0-9]\\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+(?:19|20)[0-9]{2}\\b",
+            "\\b(?:19|20)[0-9]{2}-[01][0-9]-[0-3][0-9]\\b"
+        ]
+        for pattern in patterns {
+            guard let range = text.range(of: pattern, options: .regularExpression) else { continue }
+            let token = String(text[range])
+            for formatter in reportDateFormatters {
+                if let date = formatter.date(from: token) { return dayFormatter.string(from: date) }
+            }
+        }
+        return nil
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
+        return formatter
+    }()
+
+    private static let captionFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "d MMMM"
+        return formatter
+    }()
+
+    private static let reportDateFormatters: [DateFormatter] = ["d MMMM yyyy", "d MMM yyyy", "yyyy-MM-dd"].map { format in
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = format
+        formatter.isLenient = false
+        return formatter
+    }
+}
+
+fileprivate struct NoopPickedLabPhoto: Sendable {
+    let data: Data
+    let filename: String
+}
+
+private enum NoopLabPhotoSource: String, Identifiable {
+    case camera
+    case library
+    var id: String { rawValue }
+}
+
+private struct NoopLabPhotoDoor: ViewModifier {
+    @Binding var isChoosingSource: Bool
+    @Binding var source: NoopLabPhotoSource?
+    let title: String
+    let onPhoto: (NoopPickedLabPhoto) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog(
+                title,
+                isPresented: $isChoosingSource,
+                titleVisibility: .visible
+            ) {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("Take a photo") { source = .camera }
+                }
+                Button("Choose from Photos") { source = .library }
+                Button("Cancel", role: .cancel) {}
+            }
+            .sheet(item: $source) { selectedSource in
+                NoopLabPhotoPicker(source: selectedSource) { photo in
+                    source = nil
+                    if let photo { onPhoto(photo) }
+                }
+                .ignoresSafeArea()
+            }
+    }
+}
+
+private extension View {
+    func noopLabPhotoDoor(
+        isChoosingSource: Binding<Bool>,
+        source: Binding<NoopLabPhotoSource?>,
+        title: String = "Add lab results",
+        onPhoto: @escaping (NoopPickedLabPhoto) -> Void
+    ) -> some View {
+        modifier(NoopLabPhotoDoor(
+            isChoosingSource: isChoosingSource,
+            source: source,
+            title: title,
+            onPhoto: onPhoto
+        ))
+    }
+}
+
+private struct NoopLabPhotoPicker: UIViewControllerRepresentable {
+    let source: NoopLabPhotoSource
+    let completion: (NoopPickedLabPhoto?) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        switch source {
+        case .camera:
+            let picker = UIImagePickerController()
+            picker.sourceType = .camera
+            picker.cameraCaptureMode = .photo
+            picker.delegate = context.coordinator
+            return picker
+        case .library:
+            var configuration = PHPickerConfiguration(photoLibrary: .shared())
+            configuration.filter = .images
+            configuration.selectionLimit = 1
+            configuration.preferredAssetRepresentationMode = .current
+            let picker = PHPickerViewController(configuration: configuration)
+            picker.delegate = context.coordinator
+            return picker
+        }
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate, PHPickerViewControllerDelegate {
+        let completion: (NoopPickedLabPhoto?) -> Void
+
+        init(completion: @escaping (NoopPickedLabPhoto?) -> Void) {
+            self.completion = completion
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            completion(nil)
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            if let url = info[.imageURL] as? URL,
+               let data = try? Data(contentsOf: url) {
+                completion(NoopPickedLabPhoto(data: data, filename: url.lastPathComponent))
+                return
+            }
+            guard let image = info[.originalImage] as? UIImage,
+                  let data = image.jpegData(compressionQuality: 1) else {
+                completion(nil)
+                return
+            }
+            completion(NoopPickedLabPhoto(data: data, filename: "Camera photo"))
+        }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            guard let provider = results.first?.itemProvider else {
+                completion(nil)
+                return
+            }
+            let suggestedName = provider.suggestedName
+            provider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { url, _ in
+                guard let url, let data = try? Data(contentsOf: url) else {
+                    DispatchQueue.main.async { self.completion(nil) }
+                    return
+                }
+                let filename = suggestedName.flatMap { $0.isEmpty ? nil : $0 }
+                    ?? url.lastPathComponent
+                DispatchQueue.main.async {
+                    self.completion(NoopPickedLabPhoto(data: data, filename: filename))
+                }
+            }
+        }
+    }
+}
+
 struct NoopAct8Screens: View {
     @ObservedObject var navigation: NoopNavigation
+    @ObservedObject var labDraft: NoopLabReviewDraft
 
     var body: some View {
         switch navigation.route {
@@ -13,9 +344,9 @@ struct NoopAct8Screens: View {
         case .setGoal:
             NoopGoalSet(navigation: navigation)
         case .labs:
-            NoopLabsHome(navigation: navigation)
+            NoopLabsHome(navigation: navigation, draft: labDraft)
         case .review:
-            NoopLabReview(navigation: navigation)
+            NoopLabReview(navigation: navigation, draft: labDraft)
         case .marker:
             NoopMarkerDetail(navigation: navigation)
         default:
@@ -483,7 +814,7 @@ private struct NoopGoalSet: View {
         ZStack {
             NoopScreen(bottomInset: 118, topInset: 56) {
                 VStack(alignment: .leading, spacing: 12) {
-                    NoopBackHeader(label: "Journey") { navigation.reset(to: .goal) }
+                    NoopBackHeader(label: "Journey") { navigation.back(or: .goal) }
                         .padding(.horizontal, -2)
                         .padding(.bottom, -14)
                     Text("Set the goal").font(NoopHTMLFont.outfit(25, weight: .light)).tracking(-0.7)
@@ -763,6 +1094,9 @@ struct NoopGoalEditorSheet: View {
 
 private struct NoopLabsHome: View {
     @ObservedObject var navigation: NoopNavigation
+    @ObservedObject var draft: NoopLabReviewDraft
+    @State private var isChoosingSource = false
+    @State private var photoSource: NoopLabPhotoSource?
     private var markers: [NoopLabMarker] { NoopLabMarker.all }
     private var inBandCount: Int { markers.filter { !$0.isOutside }.count }
     private var outOfBandLine: String {
@@ -786,7 +1120,7 @@ private struct NoopLabsHome: View {
                     }.buttonStyle(.plain)
                     Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
-                    Button("Enter results") { navigation.push(.review) }.buttonStyle(NoopGoalWarmButtonStyle())
+                    Button("Add results") { isChoosingSource = true }.buttonStyle(NoopGoalWarmButtonStyle())
                 }
                 .padding(.horizontal, -2)
                 HStack { NoopSectionLabel("Biomarkers"); Spacer(); Text("drawn 14 August · Karolinska").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint) }.padding(.top, 8)
@@ -871,34 +1205,73 @@ private struct NoopLabsHome: View {
                     .padding(.top, 6)
             }
         }
+        .noopLabPhotoDoor(
+            isChoosingSource: $isChoosingSource,
+            source: $photoSource,
+            onPhoto: accept
+        )
+        .onAppear(perform: openRequestedDoor)
+        .onChange(of: navigation.labPhotoRequestID) { _, requestID in
+            guard requestID > 0 else { return }
+            openRequestedDoor()
+        }
+    }
+
+    private func openRequestedDoor() {
+        guard navigation.labPhotoRequestID > 0 else { return }
+        navigation.consumeLabPhotoRequest()
+        isChoosingSource = true
+    }
+
+    private func accept(_ photo: NoopPickedLabPhoto) {
+        guard draft.begin(photo) else { return }
+        navigation.push(.review)
+        Task { await draft.read(photo.data) }
     }
 }
 
 private struct NoopLabReview: View {
     @ObservedObject var navigation: NoopNavigation
+    @ObservedObject var draft: NoopLabReviewDraft
     @EnvironmentObject private var repo: Repository
-    @State private var candidates = NoopOCRCandidate.samples
     @State private var errorID: String?
     @State private var saving = false
     @State private var saveError: String?
+    @State private var isChoosingSource = false
+    @State private var photoSource: NoopLabPhotoSource?
+    @State private var viewerTarget: NoopLabViewerTarget?
 
     var body: some View {
         NoopScreen(bottomInset: 150, topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
-                NoopBackHeader(label: "Biomarkers") { navigation.reset(to: .labs) }
+                NoopBackHeader(label: "Biomarkers", action: leaveWithoutSaving)
                     .padding(.horizontal, -2)
-                    .padding(.bottom, -14)
+                    // The handoff's header ends 16 pt above the image card. The shared
+                    // header contributes 14 pt internally and this stack adds 12 pt, so
+                    // remove the extra 10 pt here without changing every back header.
+                    .padding(.bottom, -10)
+
+                if let image = draft.image {
+                    NoopLabImageCard(
+                        image: image,
+                        state: draft.state,
+                        filename: draft.filename,
+                        reportDate: draft.captionDate,
+                        retake: { isChoosingSource = true },
+                        open: { viewerTarget = NoopLabViewerTarget(rect: nil) }
+                    )
+                }
+
                 VStack(alignment: .leading, spacing: 9) {
                     HStack {
                         NoopSectionLabel("Nothing is stored yet", color: Color(hex: 0xF3C888)); Spacer()
-                        NoopPill(text: "read, not measured", color: Color(hex: 0xF3C888))
+                        NoopPill(text: reviewPill, color: Color(hex: 0xF3C888))
                     }
-                    Text("Four candidates were read off your photo. Confirm the ones that are right.")
+                    Text(reviewTitle)
                         .font(NoopHTMLFont.outfit(25, weight: .light)).tracking(-0.7).lineSpacing(2)
-                    Text("Read on this phone, nothing uploaded. Check each number against your report, fix anything misread, and discard what you would rather not keep.")
+                    Text(reviewInstructions)
                         .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
                 }
-                .padding(.top, -10)
                 if let saveError {
                     Text(saveError)
                         .font(NoopHTMLFont.sans(11.5))
@@ -907,11 +1280,24 @@ private struct NoopLabReview: View {
                 }
 
                 VStack(spacing: 11) {
-                    ForEach($candidates) { $candidate in
-                        NoopOCRCandidateCard(candidate: $candidate, error: errorID == candidate.id ? "Enter a known marker, numeric value and compatible unit." : nil) {
-                            if validate(candidate) { candidate.status = .corrected; candidate.editing = false; errorID = nil }
-                            else { errorID = candidate.id }
+                    ForEach(Array($draft.candidates.enumerated()), id: \.element.id) { index, $candidate in
+                        NoopOCRCandidateCard(
+                            candidate: $candidate,
+                            image: draft.image,
+                            reportDate: draft.captionDate,
+                            error: errorID == candidate.id ? "Enter a known marker, numeric value and compatible unit." : nil,
+                            openSource: { rect in viewerTarget = NoopLabViewerTarget(rect: rect) }
+                        ) {
+                            if validate(candidate) {
+                                candidate.status = .corrected
+                                candidate.editing = false
+                                errorID = nil
+                            } else {
+                                errorID = candidate.id
+                            }
                         }
+                        .transition(.opacity)
+                        .animation(.linear(duration: 0.16).delay(Double(index) * 0.024), value: draft.candidates.count)
                     }
                 }
 
@@ -950,42 +1336,139 @@ private struct NoopLabReview: View {
             .shadow(color: .black.opacity(0.45), radius: 13, y: 4)
             .padding(.horizontal, 14).padding(.bottom, 92)
         }
-        .onDisappear(perform: scrubDraft)
+        .noopLabPhotoDoor(
+            isChoosingSource: $isChoosingSource,
+            source: $photoSource,
+            title: retakeDoorTitle,
+            onPhoto: acceptRetake
+        )
+        .fullScreenCover(item: $viewerTarget) { target in
+            if let image = draft.image {
+                NoopLabImageViewer(image: image, focusRect: target.rect) {
+                    viewerTarget = nil
+                }
+            }
+        }
+        .onAppear(perform: ensureValidArrival)
     }
 
-    private var confirmedCount: Int { candidates.filter { $0.status == .confirmed || $0.status == .corrected }.count }
-    private var discardedCount: Int { candidates.filter { $0.status == .discarded }.count }
-    private var pendingCount: Int { candidates.filter { $0.status == .pending }.count }
+    private var confirmedCount: Int { draft.candidates.filter { $0.status == .confirmed || $0.status == .corrected }.count }
+    private var discardedCount: Int { draft.candidates.filter { $0.status == .discarded }.count }
+    private var pendingCount: Int { draft.candidates.filter { $0.status == .pending }.count }
+
+    private var retakeDoorTitle: String {
+        guard confirmedCount > 0 else { return "Replace report photo" }
+        let word = switch confirmedCount {
+        case 1: "one"
+        case 2: "two"
+        case 3: "three"
+        case 4: "four"
+        case 5: "five"
+        case 6: "six"
+        case 7: "seven"
+        case 8: "eight"
+        case 9: "nine"
+        default: "\(confirmedCount)"
+        }
+        return "This clears the \(word) you have checked."
+    }
+
+    private var reviewPill: String {
+        switch draft.state {
+        case .reading: "reading locally"
+        case .nothingLegible: "nothing read"
+        case .empty, .read: "read, not measured"
+        }
+    }
+
+    private var reviewTitle: String {
+        switch draft.state {
+        case .reading:
+            "Reading the page on this phone."
+        case .nothingLegible:
+            "No candidates were read from this photo."
+        case .empty:
+            "Choose a report photo to begin."
+        case .read:
+            "\(candidateCountWord) candidates were read off your photo. Confirm the ones that are right."
+        }
+    }
+
+    private var candidateCountWord: String {
+        let count = draft.candidates.count
+        return switch count {
+        case 0: "No"
+        case 1: "One"
+        case 2: "Two"
+        case 3: "Three"
+        case 4: "Four"
+        case 5: "Five"
+        case 6: "Six"
+        case 7: "Seven"
+        case 8: "Eight"
+        case 9: "Nine"
+        default: "\(count)"
+        }
+    }
+
+    private var reviewInstructions: String {
+        switch draft.state {
+        case .reading:
+            "Read on this phone, nothing uploaded. Candidates will appear here when the read is done."
+        case .nothingLegible:
+            "Read on this phone, nothing uploaded. Retake with another photo; nothing from this read will be kept."
+        case .empty:
+            "Nothing is uploaded or stored before you confirm it."
+        case .read:
+            "Read on this phone, nothing uploaded. Where a strip is shown, it is the part of the page the number was read from. Check each number against your report, fix anything misread, and discard what you would rather not keep."
+        }
+    }
+
     private func validate(_ candidate: NoopOCRCandidate) -> Bool {
-        let known = NoopLabMarker.definitions.first { $0.name.caseInsensitiveCompare(candidate.draftName.trimmingCharacters(in: .whitespaces)) == .orderedSame }
+        let known = markerDefinition(
+            named: candidate.draftName.trimmingCharacters(in: .whitespaces),
+            unit: candidate.draftUnit.trimmingCharacters(in: .whitespaces)
+        )
         let numeric = Double(candidate.draftValue.replacingOccurrences(of: ",", with: ".")) != nil
-        return known?.unit == candidate.draftUnit.trimmingCharacters(in: .whitespaces) && numeric
+        return known?.canonicalUnit.caseInsensitiveCompare(candidate.draftUnit.trimmingCharacters(in: .whitespaces)) == .orderedSame && numeric
     }
     @MainActor
     private func save() async {
         guard confirmedCount > 0, !saving else { return }
         saving = true
         saveError = nil
-        let confirmed = candidates.filter { $0.status == .confirmed || $0.status == .corrected }
+        let confirmed = draft.candidates.filter { $0.status == .confirmed || $0.status == .corrected }
+        guard let day = draft.reportDay else {
+            saving = false
+            saveError = "No report date was read, so these results cannot be dated or saved yet."
+            return
+        }
         guard let store = await repo.storeHandle() else {
             saving = false
             saveError = "Couldn’t open the local Lab Book. Nothing was saved."
             return
         }
 
-        let day = "2026-08-14"
         let epoch = LabBookFormat.noonEpoch(day)
         let rows = confirmed.compactMap { candidate -> LabMarkerRow? in
-            let enteredName = candidate.status == .corrected ? candidate.draftName.trimmingCharacters(in: .whitespaces) : candidate.name
-            let name = NoopLabMarker.definitions.first { $0.name.caseInsensitiveCompare(enteredName) == .orderedSame }?.name ?? enteredName
+            let definition: MarkerDefinition?
+            if candidate.status == .corrected {
+                definition = markerDefinition(
+                    named: candidate.draftName.trimmingCharacters(in: .whitespaces),
+                    unit: candidate.draftUnit.trimmingCharacters(in: .whitespaces)
+                )
+            } else {
+                definition = MarkerCatalog.definition(for: candidate.markerKey)
+                    ?? (candidate.markerKey == "custom_apob" ? MarkerCatalog.custom(key: "custom_apob", displayName: "ApoB", unit: "g/L", decimals: 2) : nil)
+            }
             let rawValue = candidate.status == .corrected ? candidate.draftValue : candidate.value
             guard let value = Double(rawValue.replacingOccurrences(of: ",", with: ".")),
-                  let storage = labStorage(for: name) else { return nil }
+                  let definition else { return nil }
             return LabMarkerRow(
-                id: "\(storage.key)-\(epoch)-\(UUID().uuidString.prefix(8))",
+                id: "\(definition.key)-\(epoch)-\(UUID().uuidString.prefix(8))",
                 deviceId: repo.deviceId,
-                markerKey: storage.key,
-                category: storage.category.rawValue,
+                markerKey: definition.key,
+                category: definition.category.rawValue,
                 day: day,
                 takenAt: epoch,
                 value: value,
@@ -1006,14 +1489,17 @@ private struct NoopLabReview: View {
             try await store.upsertLabMarkers(rows)
             let defaults = UserDefaults.standard
             for candidate in confirmed {
-                let enteredName = candidate.status == .corrected ? candidate.draftName.trimmingCharacters(in: .whitespaces) : candidate.name
-                let name = NoopLabMarker.definitions.first { $0.name.caseInsensitiveCompare(enteredName) == .orderedSame }?.name ?? enteredName
+                let name = candidate.status == .corrected
+                    ? candidate.draftName.trimmingCharacters(in: .whitespaces)
+                    : candidate.name
                 let value = candidate.status == .corrected ? candidate.draftValue : candidate.value
                 defaults.set(value.replacingOccurrences(of: ",", with: "."), forKey: "noop.html.marker.\(name).value")
             }
-            defaults.set("14 August", forKey: "noop.html.last-lab-draw")
+            if let captionDate = draft.captionDate {
+                defaults.set(captionDate, forKey: "noop.html.last-lab-draw")
+            }
             await repo.refresh()
-            scrubDraft()
+            draft.scrub()
             if navigation.route == .review { navigation.replace(with: .labs) }
         } catch {
             saveError = "Couldn’t save these readings to the local Lab Book. Nothing was changed."
@@ -1021,54 +1507,326 @@ private struct NoopLabReview: View {
         saving = false
     }
 
-    private func labStorage(for name: String) -> (key: String, category: LabMarkerCategory)? {
-        switch name.lowercased() {
-        case "ferritin": ("ferritin", .bloodPanel)
-        case "vitamin d": ("vitamin_d", .bloodPanel)
-        case "apob": ("custom_apob", .other)
-        case "hs-crp": ("crp", .bloodPanel)
-        case "hba1c": ("hba1c", .bloodPanel)
-        case "tsh": ("tsh", .bloodPanel)
-        case "alt": ("alt", .bloodPanel)
-        default: nil
+    private func markerDefinition(named name: String, unit: String) -> MarkerDefinition? {
+        if name.caseInsensitiveCompare("ApoB") == .orderedSame,
+           unit.caseInsensitiveCompare("g/L") == .orderedSame {
+            return MarkerCatalog.custom(key: "custom_apob", displayName: "ApoB", unit: "g/L", decimals: 2)
+        }
+        return MarkerCatalog.builtIn.first {
+            $0.displayName.caseInsensitiveCompare(name) == .orderedSame
         }
     }
 
-    private func scrubDraft() {
-        candidates = NoopOCRCandidate.samples
+    private func ensureValidArrival() {
+        #if DEBUG
+        draft.seedDemoReviewIfNeeded()
+        #endif
+        if draft.image == nil {
+            navigation.replace(with: .labs)
+        }
+    }
+
+    private func leaveWithoutSaving() {
+        draft.scrub()
         errorID = nil
         saveError = nil
+        navigation.replace(with: .labs)
+    }
+
+    private func acceptRetake(_ photo: NoopPickedLabPhoto) {
+        guard draft.begin(photo) else { return }
+        errorID = nil
+        saveError = nil
+        Task { await draft.read(photo.data) }
+    }
+}
+
+private struct NoopLabViewerTarget: Identifiable {
+    let id = UUID()
+    let rect: CGRect?
+}
+
+private struct NoopLabImageCard: View {
+    let image: UIImage
+    let state: NoopLabReviewDraft.ReadState
+    let filename: String
+    let reportDate: String?
+    let retake: () -> Void
+    let open: () -> Void
+
+    var body: some View {
+        ZStack {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 132)
+                .blur(radius: state == .nothingLegible ? 2.4 : 0)
+                .clipped()
+
+            if state == .nothingLegible {
+                Color(hex: 0x040605, alpha: 0.42)
+            }
+
+            if state == .reading {
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                    GeometryReader { proxy in
+                        let phase = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.03), Color.white.opacity(0.09), Color.white.opacity(0.03)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: proxy.size.width * 1.7)
+                        .offset(x: -proxy.size.width * 0.7 + proxy.size.width * CGFloat(phase) * 1.7)
+                    }
+                }
+                Text("READING THE PAGE")
+                    .font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                    .tracking(1.05)
+                    .foregroundStyle(Color(hex: 0x6C7570))
+            } else {
+                VStack {
+                    Spacer()
+                    LinearGradient(
+                        colors: [Color(hex: 0x040605, alpha: 0), Color(hex: 0x040605, alpha: 0.90)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 52)
+                }
+
+                HStack(spacing: 10) {
+                    Text(state == .nothingLegible ? "Nothing legible on this one" : caption)
+                        .font(NoopHTMLFont.sans(10.5))
+                        .foregroundStyle(state == .nothingLegible ? Color(hex: 0xF3C888) : NoopHTMLColor.inkSoft)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 0)
+                    Button("Retake", action: retake)
+                        .font(NoopHTMLFont.sans(11, weight: .semibold))
+                        .foregroundStyle(Color(hex: 0xF6DCB4))
+                        .buttonStyle(.plain)
+                }
+                .padding(.leading, 12)
+                .padding(.trailing, 10)
+                .padding(.bottom, 9)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+            }
+        }
+        .frame(height: 132)
+        .background(Color(hex: 0x101413))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(state == .nothingLegible ? NoopHTMLColor.warm.opacity(0.28) : Color.white.opacity(0.09), lineWidth: 0.5)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .onTapGesture {
+            guard state != .reading else { return }
+            open()
+        }
+    }
+
+    private var caption: String {
+        ([filename] + (reportDate.map { [$0] } ?? []) + ["read on this phone"])
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+    }
+}
+
+private struct NoopLabSourceStrip: View {
+    let image: UIImage
+    let rect: CGRect
+
+    var body: some View {
+        GeometryReader { proxy in
+            let crop = padded(rect)
+            let imageWidth = max(1, image.size.width)
+            let imageHeight = max(1, image.size.height)
+            let scale = proxy.size.height / max(1, crop.height * imageHeight)
+            let renderedWidth = imageWidth * scale
+            let renderedHeight = imageHeight * scale
+            let rawX = proxy.size.width - crop.maxX * renderedWidth
+            let rawY = -crop.minY * renderedHeight
+            let x = min(0, max(proxy.size.width - renderedWidth, rawX))
+            let y = min(0, max(proxy.size.height - renderedHeight, rawY))
+
+            Image(uiImage: image)
+                .resizable()
+                .frame(width: renderedWidth, height: renderedHeight)
+                .offset(x: x, y: y)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(width: 132, height: 26)
+        .background(Color(hex: 0x0C0E0D))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        }
+    }
+
+    private func padded(_ source: CGRect) -> CGRect {
+        let amount = source.height * 0.35
+        let expanded = source.insetBy(dx: -amount, dy: -amount)
+        return expanded.intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+    }
+}
+
+private struct NoopLabImageViewer: View {
+    let image: UIImage
+    let focusRect: CGRect?
+    let close: () -> Void
+    @State private var committedScale: CGFloat = 1
+    @State private var liveMagnification: CGFloat = 1
+    @State private var committedOffset: CGSize = .zero
+    @State private var liveDrag: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { proxy in
+            let safeWidth = max(1, proxy.size.width)
+            let safeHeight = max(1, proxy.size.height)
+            let imageAspect = max(0.001, image.size.width / max(1, image.size.height))
+            let viewportAspect = safeWidth / safeHeight
+            let fittedSize = imageAspect > viewportAspect
+                ? CGSize(width: safeWidth, height: safeWidth / imageAspect)
+                : CGSize(width: safeHeight * imageAspect, height: safeHeight)
+            let focus = paddedFocusRect
+            let focusScale = focus.map {
+                min(8, max(1, min(
+                    (safeWidth - 40) / max(1, $0.width * fittedSize.width),
+                    (safeHeight - 110) / max(1, $0.height * fittedSize.height)
+                )))
+            } ?? 1
+            let scale = min(10, max(1, focusScale * committedScale * liveMagnification))
+            let focusOffset = focus.map {
+                CGSize(
+                    width: (0.5 - $0.midX) * fittedSize.width * scale,
+                    height: (0.5 - $0.midY) * fittedSize.height * scale
+                )
+            } ?? .zero
+
+            ZStack(alignment: .topTrailing) {
+                Color(hex: 0x050706).ignoresSafeArea()
+                Image(uiImage: image)
+                    .resizable()
+                    .frame(width: fittedSize.width, height: fittedSize.height)
+                    .scaleEffect(scale)
+                    .offset(
+                        x: focusOffset.width + committedOffset.width + liveDrag.width,
+                        y: focusOffset.height + committedOffset.height + liveDrag.height
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        MagnifyGesture()
+                            .onChanged { liveMagnification = $0.magnification }
+                            .onEnded {
+                                committedScale = min(10 / focusScale, max(1 / focusScale, committedScale * $0.magnification))
+                                liveMagnification = 1
+                            }
+                    )
+                    .simultaneousGesture(
+                        DragGesture()
+                            .onChanged { liveDrag = $0.translation }
+                            .onEnded {
+                                committedOffset.width += $0.translation.width
+                                committedOffset.height += $0.translation.height
+                                liveDrag = .zero
+                            }
+                    )
+
+                Button(action: close) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                        .frame(width: 36, height: 36)
+                        .background(Color.white.opacity(0.14), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 54)
+                .padding(.trailing, 18)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var paddedFocusRect: CGRect? {
+        guard let focusRect else { return nil }
+        let amount = focusRect.height * 0.35
+        return focusRect.insetBy(dx: -amount, dy: -amount)
+            .intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
     }
 }
 
 private struct NoopOCRCandidateCard: View {
     @Binding var candidate: NoopOCRCandidate
+    let image: UIImage?
+    let reportDate: String?
     let error: String?
+    let openSource: (CGRect) -> Void
     let saveCorrection: () -> Void
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2.5) {
-                    Text(candidate.shownName).font(NoopHTMLFont.sans(13.5))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(candidate.shownName)
+                        .font(NoopHTMLFont.sans(13.5))
+                        .lineLimit(2)
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
-                        Text(candidate.shownValue).font(NoopHTMLFont.outfit(30, weight: .light))
-                        Text(candidate.shownUnit).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                        Text(candidate.shownValue)
+                            .font(NoopHTMLFont.sans(19, weight: .medium))
+                            .monospacedDigit()
+                        Text(candidate.shownUnit)
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
+                    }
+                    if candidate.lowConfidence {
+                        Text("Check this")
+                            .font(NoopHTMLFont.sans(11, weight: .semibold))
+                            .foregroundStyle(Color(hex: 0xF3C888))
+                            .padding(.horizontal, 7)
+                            .frame(height: 22)
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(hex: 0xF3C888).opacity(0.45), lineWidth: 0.5))
+                    } else {
+                        Text("clear read")
+                            .font(NoopHTMLFont.sans(11))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
                 VStack(alignment: .trailing, spacing: 5) {
-                    Text(candidate.raw)
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Color(hex: 0x17150F))
-                        .lineLimit(1)
-                        .frame(width: 156, height: 34)
-                        .background(Color.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 9))
-                    Text("AS READ")
-                        .font(NoopHTMLFont.sans(9.5, weight: .semibold))
-                        .tracking(0.95)
-                        .foregroundStyle(NoopHTMLColor.faint)
+                    if let image, let rect = candidate.sourceRect {
+                        Button { openSource(rect) } label: {
+                            NoopLabSourceStrip(image: image, rect: rect)
+                        }
+                        .buttonStyle(.plain)
+                        Text("FROM THE PAGE")
+                            .font(NoopHTMLFont.sans(9.5, weight: .semibold))
+                            .tracking(0.95)
+                            .foregroundStyle(NoopHTMLColor.faint)
+                    } else {
+                        Text(candidate.raw)
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(NoopHTMLColor.inkSoft)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .padding(.horizontal, 8)
+                            .frame(width: 132, height: 26)
+                            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
+                        Text("AS READ")
+                            .font(NoopHTMLFont.sans(9.5, weight: .semibold))
+                            .tracking(0.95)
+                            .foregroundStyle(NoopHTMLColor.faint)
+                    }
                 }
+                .frame(width: 132)
             }
+
             if candidate.editing {
                 VStack(alignment: .leading, spacing: 9) {
                     TextField("Marker", text: $candidate.draftName)
@@ -1084,8 +1842,6 @@ private struct NoopOCRCandidateCard: View {
                 }
                 .textFieldStyle(NoopOCRTextFieldStyle())
             } else if candidate.status == .pending {
-                // Approved native correction: the proof varies these controls between rows.
-                // Keep one 40pt height/radius system; only Confirm receives extra width/emphasis.
                 GeometryReader { proxy in
                     let unit = max(0, proxy.size.width - 14) / 3.3
                     HStack(spacing: 7) {
@@ -1108,7 +1864,9 @@ private struct NoopOCRCandidateCard: View {
                 .frame(height: 40)
             } else {
                 HStack {
-                    Text(candidate.status.message).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.inkSoft)
+                    Text(candidate.status.message(reportDate: reportDate))
+                        .font(NoopHTMLFont.sans(12))
+                        .foregroundStyle(NoopHTMLColor.inkSoft)
                     Spacer()
                     Button("Undo") { candidate.status = .pending }
                         .font(NoopHTMLFont.sans(11.5, weight: .semibold))
@@ -1120,12 +1878,9 @@ private struct NoopOCRCandidateCard: View {
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
             }
         }
-        .padding(EdgeInsets(top: 15, leading: 16, bottom: 16, trailing: 16))
+        .padding(13)
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(candidate.lowConfidence ? Color(hex: 0xF3C888).opacity(0.34) : Color.white.opacity(0.07), lineWidth: 0.5)
-        }
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
     }
 }
 
@@ -1135,7 +1890,7 @@ private struct NoopMarkerDetail: View {
     var body: some View {
         NoopScreen(bottomInset: 118, topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
-                NoopBackHeader(label: "Biomarkers") { navigation.reset(to: .labs) }
+                NoopBackHeader(label: "Biomarkers") { navigation.back(or: .labs) }
                     .padding(.horizontal, -2)
                     .padding(.bottom, -14)
                 VStack(alignment: .leading, spacing: 0) {
@@ -1314,23 +2069,50 @@ private struct NoopLabMarker: Identifiable {
     static var all: [NoopLabMarker] { definitions }
 }
 
-private enum NoopOCRStatus { case pending, confirmed, corrected, discarded
-    var message: String { switch self { case .confirmed: "Will be stored, dated 14 August"; case .corrected: "Corrected by hand — stored as you entered it"; case .discarded: "Discarded. Not stored, and the file is not kept either"; case .pending: "" } }
+private enum NoopOCRStatus {
+    case pending, confirmed, corrected, discarded
+
+    func message(reportDate: String?) -> String {
+        switch self {
+        case .confirmed:
+            reportDate.map { "Will be stored, dated \($0)" } ?? "Will be stored once the report date is known"
+        case .corrected:
+            "Corrected by hand — stored as you entered it"
+        case .discarded:
+            "Discarded. Not stored, and the file is not kept either"
+        case .pending:
+            ""
+        }
+    }
 }
 private struct NoopOCRCandidate: Identifiable {
-    // `confidence` and `lowConfidence` are not rendered on the interim path — nothing was read off a
-    // photo, so there is no confidence to report. They return with Change 7 piece 1, together with
-    // the source rect the per-row strip is cut from.
-    let id: String; let name: String; let value: String; let unit: String; let raw: String; let confidence: String; let lowConfidence: Bool
+    let id: String
+    let markerKey: String
+    let category: LabMarkerCategory
+    let name: String
+    let value: String
+    let unit: String
+    let raw: String
+    let confidence: String
+    let lowConfidence: Bool
+    /// Normalized, top-left image coordinates for the complete source line.
+    let sourceRect: CGRect?
     var status: NoopOCRStatus = .pending; var editing = false; var draftName = ""; var draftValue = ""; var draftUnit = ""
     var shownName: String { status == .corrected ? draftName : name }
     var shownValue: String { status == .corrected ? draftValue : value }
     var shownUnit: String { status == .corrected ? draftUnit : unit }
     static let samples = [
-        NoopOCRCandidate(id: "ferritin", name: "Ferritin", value: "28", unit: "µg/L", raw: "Ferritin  28 µg/L", confidence: "clear read", lowConfidence: false),
-        NoopOCRCandidate(id: "vitamin-d", name: "Vitamin D", value: "52", unit: "nmol/L", raw: "25-OH-D  52", confidence: "clear read", lowConfidence: false),
-        NoopOCRCandidate(id: "apob", name: "ApoB", value: "0.78", unit: "g/L", raw: "ApoB  O.78 g/L", confidence: "low confidence — the O may be a zero", lowConfidence: true),
-        NoopOCRCandidate(id: "hs-crp", name: "hs-CRP", value: "0.6", unit: "mg/L", raw: "hsCRP  <0,6", confidence: "low confidence — the page says “less than”", lowConfidence: true)
+        NoopOCRCandidate(id: "ferritin", markerKey: "ferritin", category: .bloodPanel, name: "Ferritin", value: "28", unit: "µg/L", raw: "Ferritin  28 µg/L", confidence: "clear read", lowConfidence: false, sourceRect: nil),
+        NoopOCRCandidate(id: "vitamin-d", markerKey: "vitamin_d", category: .bloodPanel, name: "Vitamin D", value: "52", unit: "nmol/L", raw: "Vitamin D, 25-OH  52 nmol/L", confidence: "clear read", lowConfidence: false, sourceRect: nil),
+        NoopOCRCandidate(id: "apob", markerKey: "custom_apob", category: .other, name: "ApoB", value: "0.78", unit: "g/L", raw: "ApoB  O.78 g/L", confidence: "check this", lowConfidence: true, sourceRect: nil),
+        NoopOCRCandidate(id: "hs-crp", markerKey: "crp", category: .bloodPanel, name: "hs-CRP", value: "0.6", unit: "mg/L", raw: "hsCRP  <0,6", confidence: "check this", lowConfidence: true, sourceRect: nil)
+    ]
+
+    static let samplesWithRects: [NoopOCRCandidate] = [
+        NoopOCRCandidate(id: "ferritin", markerKey: "ferritin", category: .bloodPanel, name: "Ferritin", value: "28", unit: "µg/L", raw: "Ferritin  28 µg/L", confidence: "clear read", lowConfidence: false, sourceRect: CGRect(x: 0.07, y: 0.32, width: 0.86, height: 0.075)),
+        NoopOCRCandidate(id: "vitamin-d", markerKey: "vitamin_d", category: .bloodPanel, name: "Vitamin D", value: "52", unit: "nmol/L", raw: "Vitamin D, 25-OH  52 nmol/L", confidence: "clear read", lowConfidence: false, sourceRect: CGRect(x: 0.07, y: 0.44, width: 0.86, height: 0.075)),
+        NoopOCRCandidate(id: "apob", markerKey: "custom_apob", category: .other, name: "ApoB", value: "0.78", unit: "g/L", raw: "ApoB  O.78 g/L", confidence: "check this", lowConfidence: true, sourceRect: CGRect(x: 0.07, y: 0.56, width: 0.86, height: 0.075)),
+        NoopOCRCandidate(id: "hs-crp", markerKey: "crp", category: .bloodPanel, name: "hs-CRP", value: "0.6", unit: "mg/L", raw: "hsCRP  <0,6", confidence: "check this", lowConfidence: true, sourceRect: CGRect(x: 0.07, y: 0.68, width: 0.86, height: 0.075))
     ]
 }
 

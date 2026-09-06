@@ -39,7 +39,7 @@ struct NoopDataScreen: View {
     private var doors: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 0) {
-                NoopBackHeader(label: "You") { navigation.reset(to: .you) }
+                NoopBackHeader(label: "You") { navigation.back(or: .you) }
 
                 VStack(alignment: .leading, spacing: 18) {
                     NoopScreenHeader("Bring your history in", eyebrow: "Your data")

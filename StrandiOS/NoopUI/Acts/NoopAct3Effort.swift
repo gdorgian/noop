@@ -6,7 +6,12 @@ struct NoopAct3Screens: View {
 
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     @SceneStorage("noop.act3.rest-day") private var restDay = false
-    @State private var detailWorkout: NoopWorkout?
+    @SceneStorage("noop.act3.across-range") private var acrossRangeRaw = Act3AcrossRange.quarter.rawValue
+
+    private var acrossRange: Act3AcrossRange {
+        get { Act3AcrossRange(rawValue: acrossRangeRaw) ?? .quarter }
+        nonmutating set { acrossRangeRaw = newValue.rawValue }
+    }
 
     var body: some View {
         switch navigation.route {
@@ -22,6 +27,8 @@ struct NoopAct3Screens: View {
             intervalsScreen
         case .detail:
             detailScreen
+        case .across:
+            acrossScreen
         default:
             sessionScreen
         }
@@ -45,15 +52,18 @@ struct NoopAct3Screens: View {
                     weeklyLoadCard
 
                     Button {
-                        detailWorkout = .steadyRide
+                        navigation.detailSession = navigation.finishedSessionToday == nil
+                            ? NoopSessionDetailSelection(workout: .steadyRide)
+                            : nil
+                        navigation.historyWorkout = nil
                         navigation.push(.detail)
                     } label: {
                         HStack(spacing: 13) {
                             NoopCanonicalGlyph(name: .bike, size: 21, color: NoopHTMLColor.blue)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("\(isNightWorker ? "Before last shift" : "Yesterday") · Steady ride")
+                                Text(lastSessionTitle)
                                     .font(NoopHTMLFont.sans(13.5, weight: .semibold))
-                                Text("42 min · in zone 82% of the time")
+                                Text(lastSessionLine)
                                     .font(NoopHTMLFont.sans(11.5))
                                     .foregroundStyle(Color(hex: 0x7F8A85))
                             }
@@ -66,6 +76,33 @@ struct NoopAct3Screens: View {
                         .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
+
+                    Button {
+                        navigation.push(.across)
+                    } label: {
+                        HStack(spacing: 13) {
+                            NoopCanonicalGlyph(name: .trends, size: 21, color: NoopHTMLColor.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Every session, in aggregate")
+                                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                Text(acrossSummaryLine)
+                                    .font(NoopHTMLFont.sans(11.5))
+                                    .foregroundStyle(Color(hex: 0x7F8A85))
+                                    .monospacedDigit()
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            NoopChevron()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 15)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5)
+                        )
+                    }
+                    .buttonStyle(.plain)
 
                     VStack(alignment: .leading, spacing: 9) {
                         Text("Rather not today?")
@@ -204,14 +241,16 @@ struct NoopAct3Screens: View {
                                 .font(NoopHTMLFont.sans(13))
                                 .fixedSize(horizontal: false, vertical: true)
                             Text(row.note)
-                                .font(NoopHTMLFont.sans(11.5))
+                                .font(.custom("Instrument Sans", fixedSize: 11.5))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
                                 .act3LineBox(fontSize: 11.5, ratio: 1.5)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .overlay(alignment: .topTrailing) {
-                            Act3VerdictChip(text: row.verdict, good: row.good)
-                        }
+                        .frame(
+                            width: row.verdict == "in zone" ? 246 : (row.verdict == "out of zone" ? 226 : 209),
+                            alignment: .leading
+                        )
+                        .fixedSize(horizontal: true, vertical: false)
+                        Act3VerdictChip(text: row.verdict, good: row.good)
                     }
                 }
             }
@@ -269,6 +308,331 @@ struct NoopAct3Screens: View {
                     .lineSpacing(3)
             }
         }
+    }
+
+    // MARK: - Every session, in aggregate
+
+    private var acrossInitialScrollID: String? {
+        #if DEBUG
+        if CommandLine.arguments.contains("--noop-scroll-across-sports") {
+            return "noop-across-sports"
+        }
+        if CommandLine.arguments.contains("--noop-scroll-across-sessions") {
+            return "noop-across-sessions"
+        }
+        #endif
+        return nil
+    }
+
+    private var acrossScreen: some View {
+        let snapshot = Act3AcrossFixture.snapshot(for: acrossRange)
+        return NoopScreen(topInset: 56, initialScrollID: acrossInitialScrollID) {
+            VStack(spacing: 0) {
+                Act3BackHeader(label: isNightWorker ? "This shift's session" : "Today's session") {
+                    back(to: .session)
+                }
+                .padding(.horizontal, -2)
+                .padding(.bottom, 2)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Every session")
+                        .font(NoopHTMLFont.outfit(25))
+                        .tracking(-0.625)
+                    Text("How much you actually did, over a window you choose — the same figures one session is priced in, added up.")
+                        .font(NoopHTMLFont.sans(13))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                        .act3LineBox(fontSize: 13, ratio: 1.55)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 8)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    acrossRangeControl
+                    HStack(alignment: .firstTextBaseline, spacing: 7) {
+                        Text("\(snapshot.days)")
+                            .font(NoopHTMLFont.outfit(17, weight: .light))
+                            .foregroundStyle(NoopHTMLColor.ink)
+                            .monospacedDigit()
+                        Text(snapshot.countNote)
+                            .font(NoopHTMLFont.sans(12))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
+                            .act3LineBox(fontSize: 12, ratio: 1.5)
+                    }
+                    .padding(.horizontal, 3)
+                }
+                .padding(.top, 14)
+
+                VStack(spacing: 9) {
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: 9), GridItem(.flexible())],
+                        spacing: 9
+                    ) {
+                        ForEach(snapshot.tiles) { tile in
+                            acrossTile(tile)
+                        }
+                    }
+
+                    acrossCostCard(snapshot)
+                    acrossSportsCard(snapshot)
+                        .id("noop-across-sports")
+                    acrossSessionsCard(snapshot)
+                        .id("noop-across-sessions")
+
+                    Text("Every comparison here is you against you. No age-group ranking, no weekly grade, and no calorie total — Noop does not keep one, and a training month is not a number out of ten.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .act3LineBox(fontSize: 11.5, ratio: 1.6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 2)
+                }
+                .padding(.top, 14)
+            }
+        }
+    }
+
+    private var acrossRangeControl: some View {
+        HStack(spacing: 0) {
+            ForEach(Act3AcrossRange.allCases) { range in
+                Button {
+                    guard range.isAvailable else { return }
+                    acrossRange = range
+                } label: {
+                    Text(range.label)
+                        .font(NoopHTMLFont.sans(12, weight: .semibold))
+                        .foregroundStyle(
+                            acrossRange == range
+                                ? NoopHTMLColor.blueLight
+                                : range.isAvailable ? NoopHTMLColor.copy : NoopHTMLColor.ink.opacity(0.34)
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            acrossRange == range ? NoopHTMLColor.blue.opacity(0.20) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!range.isAvailable)
+            }
+        }
+        .padding(3)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.07), lineWidth: 0.5)
+        )
+    }
+
+    private func acrossTile(_ tile: Act3AcrossTile) -> some View {
+        let label = tile.label == "the unit one session is priced in"
+            ? "the unit one session is priced\nin"
+            : tile.label
+
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(tile.value)
+                    .font(NoopHTMLFont.outfit(27, weight: .light))
+                    .tracking(-0.81)
+                    .foregroundStyle(NoopHTMLColor.ink)
+                    .monospacedDigit()
+                Text(tile.unit)
+                    .font(NoopHTMLFont.sans(10.5))
+                    .foregroundStyle(NoopHTMLColor.muted)
+            }
+            .frame(height: 27, alignment: .center)
+
+            Text(label)
+                .font(NoopHTMLFont.sans(11))
+                .foregroundStyle(Color(hex: 0x7F8A85))
+                .act3LineBox(fontSize: 11, ratio: 1.45)
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, minHeight: 94, maxHeight: 94, alignment: .topLeading)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5)
+        )
+    }
+
+    private func acrossCostCard(_ snapshot: Act3AcrossSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                NoopCanonicalGlyph(name: .moon, size: 18, color: NoopHTMLColor.night)
+                Text("What it cost you")
+                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+            }
+            VStack(spacing: 10) {
+                ForEach(snapshot.costs) { cost in
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(cost.label)
+                            .font(NoopHTMLFont.sans(12.5))
+                            .foregroundStyle(Color(hex: 0xB7C3C9))
+                            .act3LineBox(fontSize: 12.5, ratio: 1.5)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(cost.value)
+                            .font(NoopHTMLFont.sans(13, weight: .semibold))
+                            .foregroundStyle(NoopHTMLColor.ink)
+                            .monospacedDigit()
+                            .fixedSize()
+                    }
+                }
+            }
+            Text("Training is priced here the way it is priced on the day — in what you had and what was left. The rest days are counted on purpose: they are a training decision, not a gap.")
+                .font(NoopHTMLFont.sans(11.5))
+                .foregroundStyle(NoopHTMLColor.copy)
+                .act3LineBox(fontSize: 11.5, ratio: 1.6)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NoopHTMLColor.night.opacity(0.08), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(NoopHTMLColor.night.opacity(0.20), lineWidth: 0.5)
+        )
+    }
+
+    private func acrossSportsCard(_ snapshot: Act3AcrossSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                NoopSectionLabel("Where the time went")
+                Spacer(minLength: 0)
+                Text(snapshot.topSportNote)
+                    .font(NoopHTMLFont.sans(11))
+                    .foregroundStyle(NoopHTMLColor.faint)
+            }
+            VStack(spacing: 13) {
+                ForEach(snapshot.sports) { sport in
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(spacing: 11) {
+                            NoopCanonicalGlyph(name: sport.kind.glyph, size: 19, color: sport.kind.color)
+                            Text(sport.kind.name)
+                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.ink)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(sport.timeLabel)
+                                .font(NoopHTMLFont.sans(12.5))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                                .monospacedDigit()
+                        }
+                        GeometryReader { proxy in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.06))
+                                Capsule()
+                                    .fill(sport.kind.color)
+                                    .frame(width: max(2, proxy.size.width * sport.share))
+                            }
+                        }
+                        .frame(height: 5)
+                        Text(sport.meta)
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
+                            .monospacedDigit()
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5)
+        )
+    }
+
+    private func acrossSessionsCard(_ snapshot: Act3AcrossSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                NoopSectionLabel("Session by session")
+                Spacer(minLength: 0)
+                Text(snapshot.rowsNote)
+                    .font(NoopHTMLFont.sans(11))
+                    .foregroundStyle(NoopHTMLColor.faint)
+                    .monospacedDigit()
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(snapshot.rows.enumerated()), id: \.element.id) { index, row in
+                    Button {
+                        showDetail(for: row)
+                    } label: {
+                        HStack(spacing: 11) {
+                            Text(row.dayLabel)
+                                .font(NoopHTMLFont.sans(11))
+                                .foregroundStyle(Color(hex: 0x7F8A85))
+                                .monospacedDigit()
+                                .frame(width: 42, alignment: .leading)
+                            NoopCanonicalGlyph(name: row.sport.glyph, size: 17, color: row.sport.color)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(row.sport.name)
+                                    .font(NoopHTMLFont.sans(13))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Text(row.meta)
+                                    .font(NoopHTMLFont.sans(11))
+                                    .foregroundStyle(Color(hex: 0x7F8A85))
+                                    .monospacedDigit()
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.82)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(row.source.label)
+                                .font(NoopHTMLFont.sans(9.5, weight: .semibold))
+                                .foregroundStyle(row.source == .strap ? NoopHTMLColor.blueLight : Color(hex: 0x8A938F))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(
+                                    row.source == .strap ? NoopHTMLColor.blue.opacity(0.12) : Color.white.opacity(0.06),
+                                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                )
+                                .fixedSize()
+                        }
+                        .padding(.horizontal, 2)
+                        .padding(.vertical, 11)
+                        .frame(height: index == 0 ? 54 : 55)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .overlay(alignment: .top) {
+                            if index > 0 {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.055))
+                                    .frame(height: 0.5)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Button {
+                navigation.push(.history)
+            } label: {
+                HStack(spacing: 9) {
+                    Text("All \(Act3AcrossFixture.record.count) sessions in your history")
+                        .font(NoopHTMLFont.sans(12.5))
+                        .foregroundStyle(NoopHTMLColor.blueLight)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    NoopChevron()
+                }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 13)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(NoopHTMLColor.border)
+                        .frame(height: 0.5)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5)
+        )
     }
 
     // MARK: - Picker
@@ -550,16 +914,22 @@ struct NoopAct3Screens: View {
     // MARK: - Detail
 
     private var detailScreen: some View {
-        let detailModel = (detailWorkout ?? navigation.historyWorkout ?? navigation.finishedWorkout ?? navigation.selectedWorkout).act3
+        let selectedWorkout = navigation.detailSession?.workout
+            ?? navigation.historyWorkout
+            ?? navigation.finishedWorkout
+            ?? navigation.selectedWorkout
+        let detailModel = selectedWorkout.act3
         let detail = detailModel.detail
+        let detailLoad = navigation.detailSession?.load ?? detailModel.load
+        let costSubject = selectedWorkout == .steadyRide ? "this ride" : "this session"
         return NoopScreen(topInset: 56) {
             VStack(spacing: 0) {
                 // Change 3. From the finished-session arrival the user did not come from `session`,
                 // so sending them there is a lie; every other arrival keeps the Act 3 back map.
                 Act3BackHeader(label: detailBackLabel) {
                     // A push (from `session` or `history`) pops; the finished-session arrival is a
-                    // reset, so it falls back to `today` rather than lying about where it came from.
-                    navigation.canGoBack ? navigation.back() : navigation.reset(to: .today)
+                    // cover, so it dismisses down to `today` rather than lying about its origin.
+                    navigation.canGoBack ? navigation.back() : navigation.dismissFinishedSessionDetail()
                 }
                     .padding(.horizontal, -2)
 
@@ -568,7 +938,7 @@ struct NoopAct3Screens: View {
                         Text(detailModel.name)
                             .font(NoopHTMLFont.outfit(27, weight: .light))
                             .tracking(-0.756)
-                        Text("\(isNightWorker ? "Before last shift" : "Yesterday"), 17:04 · \(detail.durationLabel.split(separator: ":").first ?? "42") min · \(detail.distance) km")
+                        Text(detailHeaderLine(detail: detail))
                             .font(NoopHTMLFont.sans(13))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .monospacedDigit()
@@ -576,7 +946,7 @@ struct NoopAct3Screens: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 9), GridItem(.flexible())], spacing: 9) {
-                        detailTile(detail.durationLabel, unit: "min", label: "moving time")
+                        detailTile(navigation.detailSession?.durationLabel ?? detail.durationLabel, unit: "min", label: "moving time")
                         detailTile("\(detail.average)", unit: "bpm", label: "average pulse")
                         detailTile("\(detail.highest)", unit: "bpm", label: detail.highestCaption, warm: true)
                         detailTile("\(detail.inZone)", unit: "%", label: "of it inside the zone")
@@ -629,8 +999,8 @@ struct NoopAct3Screens: View {
                         }
                         detailCost("Added to tonight's sleep need", value: "+\(detail.sleepCost) min")
                         detailCost("Recovered by", value: detail.recoveredBy)
-                        detailCost("Load added to the week", value: "\(detailModel.load) → \(302 + detailModel.load)")
-                        Text("Effort is not free and Noop will not pretend otherwise. Tonight's sleep need went up because of this ride, and tomorrow's session already knows.")
+                        detailCost("Load added to the week", value: "\(detailLoad) → \(302 + detailLoad)")
+                        Text("Effort is not free and Noop will not pretend otherwise. Tonight's sleep need went up because of \(costSubject), and tomorrow's session already knows.")
                             .font(NoopHTMLFont.sans(11.5))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .act3LineBox(fontSize: 11.5, ratio: 1.6)
@@ -705,16 +1075,436 @@ struct NoopAct3Screens: View {
         if navigation.historyWorkout != nil { return "Everything you logged" }
         return navigation.canGoBack ? "Session" : "Today"
     }
+
+    private var lastSessionTitle: String {
+        if let record = navigation.finishedSessionToday {
+            return "\(record.whenLabel()) · \(record.workout.act3.name)"
+        }
+        return "\(isNightWorker ? "Before last shift" : "Yesterday") · Steady ride"
+    }
+
+    private var lastSessionLine: String {
+        if let record = navigation.finishedSessionToday {
+            return "\(record.minutes) min · in zone \(record.workout.act3.detail.inZone)% of the time"
+        }
+        return "42 min · in zone 82% of the time"
+    }
+
+    private var acrossSummaryLine: String {
+        let thirtyDayCount = Act3AcrossFixture.record.lazy.filter { $0.daysAgo <= 30 }.count
+        return "\(Act3AcrossFixture.record.count) on record · \(thirtyDayCount) in the last thirty days"
+    }
+
+    private func detailHeaderLine(detail: Act3WorkoutDetail) -> String {
+        if let headerLine = navigation.detailSession?.headerLine {
+            return headerLine
+        }
+        if navigation.detailSession == nil,
+           navigation.historyWorkout == nil,
+           let record = navigation.finishedSessionToday {
+            let distance = record.distanceLabel.map { " · \($0) km" } ?? ""
+            return "\(record.whenLabel()) · \(record.minutes) min\(distance)"
+        }
+        return "\(isNightWorker ? "Before last shift" : "Yesterday"), 17:04 · \(detail.durationLabel.split(separator: ":").first ?? "42") min · \(detail.distance) km"
+    }
     private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
 
-    private func showDetail(for workout: NoopWorkout) {
+    private func showDetail(for row: Act3AcrossSession) {
+        let day = row.daysAgo == 1 ? "Yesterday" : row.dayLabel
+        let distance = row.distance.map { " · \(Act3AcrossFixture.compactDecimal($0)) km" } ?? ""
         navigation.historyWorkout = nil
-        detailWorkout = workout
+        navigation.detailSession = NoopSessionDetailSelection(
+            workout: row.sport.workout,
+            headerLine: "\(day) · \(row.duration) min\(distance)",
+            durationLabel: "\(row.duration):00",
+            load: row.load
+        )
         navigation.push(.detail)
     }
 
     private func back(to fallback: NoopRoute) {
         navigation.canGoBack ? navigation.back() : navigation.reset(to: fallback)
+    }
+}
+
+private enum Act3AcrossRange: String, CaseIterable, Identifiable {
+    case week
+    case month
+    case quarter
+    case year
+    case all
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .week: "7D"
+        case .month: "30D"
+        case .quarter: "90D"
+        case .year: "1Y"
+        case .all: "All"
+        }
+    }
+
+    var windowDays: Int {
+        switch self {
+        case .week: 7
+        case .month: 30
+        case .quarter: 90
+        case .year: 365
+        case .all: Act3AcrossFixture.historyDays
+        }
+    }
+
+    var isAvailable: Bool { windowDays <= Act3AcrossFixture.historyDays }
+}
+
+private enum Act3AcrossSport: String, CaseIterable, Hashable {
+    case ride
+    case walk
+    case strength
+    case swim
+    case intervals
+
+    var name: String {
+        switch self {
+        case .ride: "Ride"
+        case .walk: "Long walk"
+        case .strength: "Strength"
+        case .swim: "Swim"
+        case .intervals: "Intervals"
+        }
+    }
+
+    var glyph: NoopCanonicalGlyphName {
+        switch self {
+        case .ride: .bike
+        case .walk: .walk
+        case .strength: .weight
+        case .swim: .wave
+        case .intervals: .bolt
+        }
+    }
+
+    var workout: NoopWorkout {
+        switch self {
+        case .ride: .steadyRide
+        case .walk: .longWalk
+        case .strength: .strength
+        case .swim: .easySwim
+        case .intervals: .intervals
+        }
+    }
+
+    var color: Color { self == .intervals ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue }
+
+    var weight: Double {
+        switch self {
+        case .ride: 0.30
+        case .walk: 0.24
+        case .strength: 0.20
+        case .swim: 0.14
+        case .intervals: 0.12
+        }
+    }
+
+    var durationBounds: ClosedRange<Int> {
+        switch self {
+        case .ride: 34...64
+        case .walk: 38...68
+        case .strength: 28...48
+        case .swim: 24...42
+        case .intervals: 18...30
+        }
+    }
+
+    var loadBounds: ClosedRange<Int> {
+        switch self {
+        case .ride: 36...74
+        case .walk: 12...26
+        case .strength: 42...72
+        case .swim: 30...54
+        case .intervals: 72...98
+        }
+    }
+
+    var distanceBounds: ClosedRange<Double>? {
+        switch self {
+        case .ride: 11...27
+        case .walk: 3.6...7.4
+        case .strength: nil
+        case .swim: 1.2...2.6
+        case .intervals: 4.2...8.6
+        }
+    }
+
+    var phrase: String {
+        switch self {
+        case .ride: "on the bike"
+        case .walk: "walking"
+        case .strength: "lifting"
+        case .swim: "in the water"
+        case .intervals: "in intervals"
+        }
+    }
+}
+
+private enum Act3AcrossSource: Equatable {
+    case strap
+    case imported
+    case health
+
+    var label: String {
+        switch self {
+        case .strap: "strap"
+        case .imported: "imported"
+        case .health: "Health"
+        }
+    }
+}
+
+private struct Act3AcrossSession: Identifiable {
+    let daysAgo: Int
+    let sport: Act3AcrossSport
+    let duration: Int
+    let load: Int
+    let distance: Double?
+    let source: Act3AcrossSource
+
+    var id: Int { daysAgo }
+
+    var dayLabel: String {
+        if daysAgo == 1 { return "Yest." }
+        if daysAgo < 7 {
+            let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+            return weekdays[(3 - daysAgo + 14) % 7]
+        }
+        return Act3AcrossFixture.dateLabel(daysAgo: daysAgo)
+    }
+
+    var meta: String {
+        var result = "\(duration) min · load \(load)"
+        if let distance {
+            result += " · \(Act3AcrossFixture.compactDecimal(distance)) km"
+        }
+        return result
+    }
+}
+
+private struct Act3AcrossTile: Identifiable {
+    let value: String
+    let unit: String
+    let label: String
+    var id: String { label }
+}
+
+private struct Act3AcrossCost: Identifiable {
+    let label: String
+    let value: String
+    var id: String { label }
+}
+
+private struct Act3AcrossSportSummary: Identifiable {
+    let kind: Act3AcrossSport
+    let timeLabel: String
+    let share: CGFloat
+    let meta: String
+    var id: Act3AcrossSport { kind }
+}
+
+private struct Act3AcrossSnapshot {
+    let days: Int
+    let countNote: String
+    let tiles: [Act3AcrossTile]
+    let costs: [Act3AcrossCost]
+    let sports: [Act3AcrossSportSummary]
+    let topSportNote: String
+    let rows: [Act3AcrossSession]
+    let rowsNote: String
+}
+
+private enum Act3AcrossFixture {
+    static let historyDays = 258
+
+    static let record: [Act3AcrossSession] = {
+        var result: [Act3AcrossSession] = []
+        for day in 1..<historyDays {
+            if hash(day * 7 + 3) > 0.58 { continue }
+
+            let probability = hash(day * 13 + 5)
+            var accumulated = 0.0
+            var sport = Act3AcrossSport.ride
+            for candidate in Act3AcrossSport.allCases {
+                accumulated += candidate.weight
+                if probability <= accumulated {
+                    sport = candidate
+                    break
+                }
+            }
+
+            let jitter = hash(day * 17 + 9)
+            let duration = interpolated(sport.durationBounds, amount: jitter)
+            let load = interpolated(sport.loadBounds, amount: hash(day * 19 + 11))
+            let distance = sport.distanceBounds.map { bounds in
+                let value = bounds.lowerBound + (bounds.upperBound - bounds.lowerBound) * jitter
+                return (value * 10).rounded() / 10
+            }
+            let source: Act3AcrossSource = if day > 126 {
+                .imported
+            } else if hash(day * 23 + 7) > 0.88 {
+                .health
+            } else {
+                .strap
+            }
+
+            result.append(
+                Act3AcrossSession(
+                    daysAgo: day,
+                    sport: sport,
+                    duration: duration,
+                    load: load,
+                    distance: distance,
+                    source: source
+                )
+            )
+        }
+        return result
+    }()
+
+    static func snapshot(for range: Act3AcrossRange) -> Act3AcrossSnapshot {
+        let days = min(range.windowDays, historyDays)
+        let sessions = record.filter { $0.daysAgo <= days }
+        let totalMinutes = sessions.reduce(0) { $0 + $1.duration }
+        let totalLoad = sessions.reduce(0) { $0 + $1.load }
+        let totalDistance = sessions.reduce(0.0) { $0 + ($1.distance ?? 0) }
+
+        let movingValue: Int
+        let movingUnit: String
+        if totalMinutes < 600 {
+            movingValue = totalMinutes
+            movingUnit = "min"
+        } else {
+            movingValue = Int((Double(totalMinutes) / 60).rounded())
+            movingUnit = "hours"
+        }
+
+        let tiles = [
+            Act3AcrossTile(
+                value: "\(sessions.count)",
+                unit: sessions.count == 1 ? "session" : "sessions",
+                label: "you actually did"
+            ),
+            Act3AcrossTile(
+                value: "\(movingValue)",
+                unit: movingUnit,
+                label: "moving, with stopped time taken off"
+            ),
+            Act3AcrossTile(
+                value: "\(totalLoad)",
+                unit: "load",
+                label: "the unit one session is priced in"
+            ),
+            Act3AcrossTile(
+                value: "\(Int(totalDistance.rounded()))",
+                unit: "km",
+                label: "ridden, walked and swum"
+            )
+        ]
+
+        let charge = Int((Double(totalLoad) * 0.375).rounded())
+        let sleep = Int((Double(totalLoad) * 0.25).rounded())
+        let sleepLabel = sleep >= 60
+            ? "+\(sleep / 60)h \(sleep % 60)m"
+            : "+\(sleep) min"
+        let costs = [
+            Act3AcrossCost(label: "Charge spent on training", value: "−\(charge)"),
+            Act3AcrossCost(label: "Added to the nights after", value: sleepLabel),
+            Act3AcrossCost(label: "Days you did not train", value: "\(max(0, days - sessions.count)) of \(days)")
+        ]
+
+        struct Totals {
+            var count = 0
+            var minutes = 0
+            var load = 0
+        }
+        var totals: [Act3AcrossSport: Totals] = [:]
+        for session in sessions {
+            var value = totals[session.sport] ?? Totals()
+            value.count += 1
+            value.minutes += session.duration
+            value.load += session.load
+            totals[session.sport] = value
+        }
+        let ordered = totals.sorted { lhs, rhs in
+            if lhs.value.minutes == rhs.value.minutes { return lhs.key.rawValue < rhs.key.rawValue }
+            return lhs.value.minutes > rhs.value.minutes
+        }
+        let maximumMinutes = max(1, ordered.first?.value.minutes ?? 1)
+        let sports = ordered.map { kind, total in
+            Act3AcrossSportSummary(
+                kind: kind,
+                timeLabel: timeLabel(total.minutes),
+                share: CGFloat(total.minutes) / CGFloat(maximumMinutes),
+                meta: "\(total.count) \(total.count == 1 ? "session" : "sessions") · \(Int((Double(total.minutes) / Double(total.count)).rounded())) min each · load \(Int((Double(total.load) / Double(total.count)).rounded())) a time"
+            )
+        }
+
+        let shownRows = Array(sessions.prefix(8))
+        let rowsNote = shownRows.count < sessions.count
+            ? "newest \(shownRows.count) of \(sessions.count)"
+            : "all \(sessions.count)"
+        let countNote: String
+        if sessions.count < 3 {
+            countNote = "days, with \(sessions.count) \(sessions.count == 1 ? "session" : "sessions") in them — too few to average anything on, and Noop will not try."
+        } else if range == .all {
+            countNote = "days on record. There is no more history than this."
+        } else {
+            countNote = "days of your record, and every session inside them"
+        }
+
+        return Act3AcrossSnapshot(
+            days: days,
+            countNote: countNote,
+            tiles: tiles,
+            costs: costs,
+            sports: sports,
+            topSportNote: ordered.first.map { "most of it \($0.key.phrase)" } ?? "",
+            rows: shownRows,
+            rowsNote: rowsNote
+        )
+    }
+
+    static func compactDecimal(_ value: Double) -> String {
+        if value.rounded() == value { return "\(Int(value))" }
+        return String(format: "%.1f", locale: Locale(identifier: "en_US_POSIX"), value)
+    }
+
+    static func dateLabel(daysAgo: Int) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let anchor = calendar.date(from: DateComponents(year: 2026, month: 8, day: 26))!
+        let date = calendar.date(byAdding: .day, value: -daysAgo, to: anchor)!
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: date)
+    }
+
+    private static func hash(_ number: Int) -> Double {
+        let value = sin(Double(number) * 12.9898 + 78.233) * 43_758.5453
+        return value - floor(value)
+    }
+
+    private static func interpolated(_ bounds: ClosedRange<Int>, amount: Double) -> Int {
+        Int((Double(bounds.lowerBound) + Double(bounds.upperBound - bounds.lowerBound) * amount).rounded())
+    }
+
+    private static func timeLabel(_ minutes: Int) -> String {
+        guard minutes >= 60 else { return "\(minutes)m" }
+        let remainder = minutes % 60
+        return remainder == 0 ? "\(minutes / 60)h" : "\(minutes / 60)h \(remainder)m"
     }
 }
 

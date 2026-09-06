@@ -34,7 +34,7 @@ struct NoopAct6Screens: View {
     private var ages: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
-                NoopAgeBackHeader(label: "Trends") { navigation.reset(to: .trends) }
+                NoopAgeBackHeader(label: "Trends") { navigation.back(or: .trends) }
 
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -248,7 +248,7 @@ struct NoopAct6Screens: View {
     private var building: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
-                NoopAgeBackHeader(label: "Trends") { navigation.reset(to: .trends) }
+                NoopAgeBackHeader(label: "Trends") { navigation.back(or: .trends) }
                 NoopAgeLead("Body Age needs three more nights before it will say anything.")
 
                 NoopHTMLCard(radius: 24, padding: 18) {
@@ -337,7 +337,7 @@ struct NoopAct6Screens: View {
         let item = NoopAgeDriver.all[min(max(selectedDriver, 0), NoopAgeDriver.all.count - 1)]
         return NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
-                NoopAgeBackHeader(label: "Your ages") { navigation.reset(to: .ages) }
+                NoopAgeBackHeader(label: "Your ages") { navigation.back(or: .ages) }
                 NoopAgeLead(item.lead)
 
                 NoopHTMLCard(radius: 24, padding: 18) {
@@ -396,7 +396,7 @@ struct NoopAct6Screens: View {
     private var method: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
-                NoopAgeBackHeader(label: "Your ages") { navigation.reset(to: .ages) }
+                NoopAgeBackHeader(label: "Your ages") { navigation.back(or: .ages) }
                 NoopAgeLead("It is a model, and you should know what it is made of.")
 
                 NoopHTMLCard(radius: 24, padding: 0) {
@@ -479,7 +479,7 @@ struct NoopAct6Screens: View {
     private var health: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
-                NoopAgeBackHeader(label: "Your ages") { navigation.reset(to: .ages) }
+                NoopAgeBackHeader(label: "Your ages") { navigation.back(or: .ages) }
                 NoopAgeLead(isNightWorker
                     ? "What was measured during your last sleep, and nothing estimated from it."
                     : "What was measured last night, and nothing estimated from it.")
