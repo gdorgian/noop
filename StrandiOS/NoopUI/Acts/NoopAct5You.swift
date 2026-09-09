@@ -321,7 +321,7 @@ private extension NoopAct5Screens {
                         VStack(spacing: 0) {
                             copyRow("Your journey", detail: "half marathon, 26 October · 46% recorded", symbol: "sparkles", tint: Self.blush) { navigation.push(.goal) }
                             Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Biomarkers", detail: "your own bloodwork, dated and kept here", symbol: "drop", tint: Self.blush, value: "7") { navigation.push(.labs) }
+                            copyRow("Biomarkers", detail: "your own bloodwork, dated and kept here", symbol: "drop", tint: Self.blush, value: "\(NoopLabCatalog.markerCount)") { navigation.push(.labs) }
                             Divider().overlay(NoopHTMLColor.border)
                             copyRow("Your strap", detail: "WHOOP 5.0 / MG · synced 2 min ago", symbol: "applewatch", value: "52%") { navigation.push(.strap) }
                             Divider().overlay(NoopHTMLColor.border)

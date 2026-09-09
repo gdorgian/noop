@@ -88,7 +88,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 7
     case coach, gate, setup, consent, memory
     // Act 8
-    case goal, setGoal = "set", labs, review, marker
+    case goal, setGoal = "set", labs, picker, review, marker
     // Act 9
     case instrumentIndex = "index", instrumentMetric = "metric", instrumentCompare = "compare", instrumentEffects = "effects"
 
@@ -104,7 +104,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .position: .plumbing
         case .ages, .building, .driver, .method, .health: .ages
         case .coach, .gate, .setup, .consent, .memory: .svea
-        case .goal, .setGoal, .labs, .review, .marker: .goals
+        case .goal, .setGoal, .labs, .picker, .review, .marker: .goals
         case .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects: .instrument
         }
     }
@@ -124,7 +124,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
             .trends
         case .you, .record, .zones, .history, .strap, .devices, .data, .settings,
              .widgets, .lab, .onboard, .pair, .position,
-             .goal, .setGoal, .labs, .review, .marker:
+             .goal, .setGoal, .labs, .picker, .review, .marker:
             .you
         }
     }
@@ -646,7 +646,10 @@ final class NoopNavigation: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { [weak self] in
             guard let self, self.pendingSheetTransition == transition else { return }
             self.pendingSheetTransition = nil
-            if pushed { self.push(route) }
+            // The picker has a canonical parent regardless of which sheet opened it, so it goes
+            // through its own door rather than being pushed onto the screen behind the sheet.
+            if route == .picker { self.enterLabPicker() }
+            else if pushed { self.push(route) }
             else { self.reset(to: route) }
         }
     }
@@ -702,6 +705,19 @@ final class NoopNavigation: ObservableObject {
         withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) { overlay = nil }
     }
 
+    /// The one door into `goal/picker`.
+    ///
+    /// 47-act8-goals.md §8.3 names three entrances — *Add results* on `labs`, the + on either of
+    /// Act 8's roots, and Act 5's *A lab result to import* row — and every one of them has to end
+    /// up in the same place, because 30-routes.md fixes the canonical parent at `picker → labs`.
+    /// Seating the stack on `labs` first is what makes the header chevron and the swipe agree: a
+    /// bare `push` from `you` or `goal` would leave the swipe popping back to whichever screen the
+    /// user happened to be standing on, which is the exact drift the route pass was cleaning up.
+    func enterLabPicker() {
+        if route != .labs { reset(to: .labs) }
+        push(.picker)
+    }
+
     func plus() {
         switch route.act {
         case .night:
@@ -716,14 +732,20 @@ final class NoopNavigation: ObservableObject {
         case .plumbing:
             show(.addRecord)
         case .ages:
-            show(.addRecord)
+            // 30-routes.md §The +: Act 6 has no add sheet of its own, so the + navigates to
+            // `plumbing/record` — "a measurement the estimate needs". It is one of the four rows
+            // that navigate, not one of the four that present in place.
+            push(.record)
         case .svea:
             guard coachVoice != .off else { return }
             reset(to: .coach)
             askFocusRequest += 1
         case .goals:
-            if route != .labs { reset(to: .labs) }
-            labPhotoRequestID += 1
+            // 30-routes.md §The +: from either of Act 8's two roots the + enters `goal/picker`.
+            // It must not raise a photo-source dialogue — the picker is the screen carrying the
+            // privacy sentence and the by-hand route.
+            //
+            enterLabPicker()
         case .instrument:
             reset(to: .history)
         }

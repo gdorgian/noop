@@ -62,14 +62,27 @@ public enum NoopSpecType {
 
     // MARK: PostScript names — verify, do not guess
 
+    // A variable file does not expose its named instances under the flat names the design calls
+    // them. CoreText registers ONE PostScript name for the file — the default instance — and
+    // addresses every other instance as `<defaultPostScriptName>_<InstanceName>`. For the two
+    // variable files in this pack the defaults are `Outfit-Thin` and `InstrumentSans-Regular`, so:
+    //
+    //     Outfit-ExtraLight       ->  Outfit-Thin_ExtraLight
+    //     InstrumentSans-SemiBold ->  InstrumentSans-Regular_SemiBold
+    //
+    // The flat names resolved to nil for six of the nine faces, which trapped `validateFaces()` in
+    // `StrandiOSApp.init()` and made the app unlaunchable in Debug. The names below are read off
+    // `UIFont.fontNames(forFamilyName:)` at runtime rather than inferred from the design's labels —
+    // this is what §63's "verify, do not guess" is asking for. The three static cuts are unchanged
+    // because a static file's PostScript name *is* the flat one.
     public enum Face {
-        public static let outfitExtraLight = "Outfit-ExtraLight"   // 200
-        public static let outfitLight      = "Outfit-Light"        // 300
-        public static let outfitRegular    = "Outfit-Regular"      // 400
-        public static let outfitMedium     = "Outfit-Medium"       // 500
-        public static let sansRegular      = "InstrumentSans-Regular"   // 400
-        public static let sansMedium       = "InstrumentSans-Medium"    // 500
-        public static let sansSemiBold     = "InstrumentSans-SemiBold"  // 600
+        public static let outfitExtraLight = "Outfit-Thin_ExtraLight"   // 200
+        public static let outfitLight      = "Outfit-Thin_Light"        // 300
+        public static let outfitRegular    = "Outfit-Thin_Regular"      // 400
+        public static let outfitMedium     = "Outfit-Thin_Medium"       // 500
+        public static let sansRegular      = "InstrumentSans-Regular"          // 400 — the default instance
+        public static let sansMedium       = "InstrumentSans-Regular_Medium"   // 500
+        public static let sansSemiBold     = "InstrumentSans-Regular_SemiBold" // 600
         public static let serifRegular     = "InstrumentSerif-Regular"
         public static let serifItalic      = "InstrumentSerif-Italic"
 

@@ -3,6 +3,7 @@ import UIKit
 import PhotosUI
 import UniformTypeIdentifiers
 import StrandImport
+import StrandDesign
 import WhoopStore
 
 @MainActor
@@ -345,6 +346,8 @@ struct NoopAct8Screens: View {
             NoopGoalSet(navigation: navigation)
         case .labs:
             NoopLabsHome(navigation: navigation, draft: labDraft)
+        case .picker:
+            NoopLabPicker(navigation: navigation, draft: labDraft)
         case .review:
             NoopLabReview(navigation: navigation, draft: labDraft)
         case .marker:
@@ -1098,19 +1101,30 @@ private struct NoopLabsHome: View {
     @State private var isChoosingSource = false
     @State private var photoSource: NoopLabPhotoSource?
     private var markers: [NoopLabMarker] { NoopLabMarker.all }
-    private var inBandCount: Int { markers.filter { !$0.isOutside }.count }
+    // A marker with nothing recorded is neither in nor out of its band, so it is counted in
+    // neither total. The denominator stays the full nine — the ring reads "of 9 in band"
+    // (48-designer-answers-9-september.md §2) because nine is what `labs` keeps, not how many
+    // happen to have a value today.
+    private var inBandCount: Int { markers.filter(\.isInBand).count }
+    private var outsideCount: Int { markers.filter(\.isOutside).count }
+    private var recordedCount: Int { markers.filter(\.isRecorded).count }
     private var outOfBandLine: String {
-        switch markers.count - inBandCount {
-        case 0: "every marker inside the lab\u{2019}s band"
-        case 1: "one marker outside the lab\u{2019}s band"
-        case let count: "\(count) markers outside the lab\u{2019}s band"
+        guard recordedCount > 0 else { return "nothing recorded yet" }
+        switch outsideCount {
+        case 0: return "every recorded marker inside the lab\u{2019}s band"
+        case 1: return "one marker outside the lab\u{2019}s band"
+        case let count: return "\(count) markers outside the lab\u{2019}s band"
         }
     }
     var body: some View {
         NoopScreen(bottomInset: 118, topInset: 56) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 12) {
-                    Button { navigation.reset(to: .goal) } label: {
+                    // 47-act8-goals.md §8.3: `labs` is a second root, not a child of `goal`. Its
+                    // chevron reads You and leaves the act. The destination said `goal` — a parent
+                    // the user never passed through, and the one case where the button and the
+                    // label disagreed.
+                    Button { navigation.reset(to: .you) } label: {
                         ZStack {
                             Circle().fill(Color.white.opacity(0.06))
                                 .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
@@ -1120,7 +1134,10 @@ private struct NoopLabsHome: View {
                     }.buttonStyle(.plain)
                     Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
-                    Button("Add results") { isChoosingSource = true }.buttonStyle(NoopGoalWarmButtonStyle())
+                    // Add results enters the picker. It must not raise a photo-source dialogue:
+                    // the picker is where the privacy sentence lives, and where the by-hand route
+                    // is offered alongside the camera.
+                    Button("Add results") { navigation.enterLabPicker() }.buttonStyle(NoopGoalWarmButtonStyle())
                 }
                 .padding(.horizontal, -2)
                 HStack { NoopSectionLabel("Biomarkers"); Spacer(); Text("drawn 14 August · Karolinska").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint) }.padding(.top, 8)
@@ -1205,28 +1222,257 @@ private struct NoopLabsHome: View {
                     .padding(.top, 6)
             }
         }
-        .noopLabPhotoDoor(
-            isChoosingSource: $isChoosingSource,
-            source: $photoSource,
-            onPhoto: accept
-        )
-        .onAppear(perform: openRequestedDoor)
-        .onChange(of: navigation.labPhotoRequestID) { _, requestID in
-            guard requestID > 0 else { return }
-            openRequestedDoor()
+    }
+}
+
+// MARK: - Picker
+
+/// `goal/picker` — photograph the report (`47-act8-goals.md` §8.6).
+///
+/// The step the build skipped. Every door into the lab-import family lands here: *Add results* on
+/// `labs`, the + on either Act 8 root, and Act 5's *A lab result to import* row. Before this screen
+/// existed those doors went straight to `review`, which meant handing someone a set of read values
+/// for a photograph they had never taken.
+///
+/// Two things on this screen are load-bearing rather than decorative. The **privacy sentence** sits
+/// here because this is where the camera opens — it is a photograph of a person's blood work, and
+/// the promise has to be readable at the moment they decide to take it, not in a settings page. And
+/// the **by-hand row** is the route that makes `labs` complete with no Vision work at all, which is
+/// why `50-wiring.md` can hold `review`'s OCR without holding the act.
+private struct NoopLabPicker: View {
+    @ObservedObject var navigation: NoopNavigation
+    @ObservedObject var draft: NoopLabReviewDraft
+    @State private var photoSource: NoopLabPhotoSource?
+
+    private var seeded: Bool { NoopContentPolicy.allowsPrototypeContent }
+
+    var body: some View {
+        NoopScreen(bottomInset: 116, topInset: 56) {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                // NoopScreen already frames content at `viewportWidth - 40` with 20 pt of its own
+                // horizontal padding, which is the HTML's `padding: 6px 20px 0`. Adding another 20
+                // here left 322 pt and the 110 pt tile row wrapped to two columns instead of three.
+                VStack(alignment: .leading, spacing: 13) {
+                    instruction
+                    takePhotoButton
+                    if seeded { recentTiles }
+                    byHandRow
+                    footnote
+                }
+                .padding(.top, 6)
+            }
+        }
+        // No confirmation dialogue here. This screen *is* the source chooser — camera, the tiles,
+        // or the by-hand row — so a second sheet asking the same question is the defect the picker
+        // was written to remove.
+        .sheet(item: $photoSource) { source in
+            NoopLabPhotoPicker(source: source) { photo in
+                photoSource = nil
+                if let photo { accept(photo) }
+            }
+            .ignoresSafeArea()
         }
     }
 
-    private func openRequestedDoor() {
-        guard navigation.labPhotoRequestID > 0 else { return }
-        navigation.consumeLabPhotoRequest()
-        isChoosingSource = true
+    private var header: some View {
+        HStack(spacing: 12) {
+            Button { navigation.back(or: .labs) } label: {
+                ZStack {
+                    Circle().fill(Color.white.opacity(0.06))
+                        .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+                    NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
+                }
+                .frame(width: 34, height: 34)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Biomarkers")
+            Text("Biomarkers").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+            Spacer()
+        }
+        .padding(.horizontal, -2)   // NoopScreen gives 20; the HTML header sits at 18
+        .padding(.bottom, 6)
+    }
+
+    private var instruction: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Photograph the report")
+                .font(NoopHTMLFont.outfit(25, weight: .light))
+                .tracking(-0.75)          // −.03em × 25 (00-RULES §1: tracking is points, not ems)
+                .foregroundStyle(NoopHTMLColor.ink)
+                .lineSpacing(NoopSpecType.lineSpacing(size: 25, cssLineHeight: 1.24, face: NoopSpecType.Face.outfitLight))
+                .fixedSize(horizontal: false, vertical: true)
+            Text("One page at a time, flat and filling the frame. Reading happens on this phone — the photo never leaves it, and it is dropped when you are done.")
+                .font(NoopHTMLFont.sans(12.5))
+                .foregroundStyle(NoopHTMLColor.muted)
+                .lineSpacing(NoopSpecType.lineSpacing(size: 12.5, cssLineHeight: 1.6, face: NoopSpecType.Face.sansRegular))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var takePhotoButton: some View {
+        Button {
+            photoSource = UIImagePickerController.isSourceTypeAvailable(.camera) ? .camera : .library
+        } label: {
+            HStack(spacing: 9) {
+                NoopCanonicalGlyph(name: .camera, size: 19, color: Color(hex: 0x1E1405))
+                Text("Take a photo")
+                    .font(NoopHTMLFont.sans(15, weight: .semibold))
+                    .foregroundStyle(Color(hex: 0x1E1405))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(NoopHTMLColor.warm)   // #F2B45C — Act 8 lab chrome, not the attention amber
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // `[bound]` in the spec: recent camera-roll candidates, so a report photographed earlier does
+    // not need re-taking. There is no PhotoKit fetch behind them yet, so the tiles render only
+    // under `--demo-seed` — a release build shows no tile row rather than six invented dates
+    // (00-RULES §0a). Tapping one opens the library, which is what the row promises either way.
+    private var recentTiles: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Or pick one you already have")
+                .font(NoopHTMLFont.sans(10, weight: .semibold))
+                .tracking(1.4)            // .14em × 10
+                .textCase(.uppercase)
+                .foregroundStyle(Color(hex: 0x6C7570))
+                .padding(.top, 6)
+                .padding(.horizontal, 2)
+                .padding(.bottom, 9)
+            NoopLabRecentTileRow { photoSource = .library }
+        }
+    }
+
+    // The by-hand route is specified (§8.6 §4, §8.4) but `review` has no by-hand mode yet: it
+    // renders the photo route unconditionally — image card, strips, "Four candidates were read off
+    // your photo" — so pushing into it from here would hand someone a read for a photograph they
+    // never took. That is the exact thing this screen exists to stop, so the row takes RULES §12's
+    // *Coming soon* state until the by-hand mode lands: present, named, 38 %, a Soon chip, no
+    // chevron, not tappable. Building that mode is the next piece of Act 8.
+    private var byHandRow: some View {
+        Button {} label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Enter results by hand")
+                        .font(NoopHTMLFont.sans(13.5))
+                        .foregroundStyle(Color(hex: 0xEDF1EF))
+                    Text("All nine markers, no photo. Every row is optional, and the confirm step drops its strips because there is no page to check against.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(Color(hex: 0x7F8A85))
+                        .lineSpacing(NoopSpecType.lineSpacing(size: 11.5, cssLineHeight: 1.45, face: NoopSpecType.Face.sansRegular))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+                // No chevron while the row is not a door (RULES §12).
+                Text("Soon")
+                    .font(NoopHTMLFont.sans(10, weight: .semibold))
+                    .tracking(1.2)
+                    .textCase(.uppercase)
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule(style: .continuous).fill(Color.white.opacity(0.06))
+                    )
+            }
+            .opacity(0.38)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 15)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(NoopHTMLColor.card)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(true)
+        .accessibilityLabel("Enter results by hand. Not available yet.")
+    }
+
+    private var footnote: some View {
+        Text("Cancelling here adds nothing, and a photo you back out of is not remembered.")
+            .font(NoopHTMLFont.sans(11.5))
+            .foregroundStyle(Color(hex: 0x57605C))
+            .lineSpacing(NoopSpecType.lineSpacing(size: 11.5, cssLineHeight: 1.6, face: NoopSpecType.Face.sansRegular))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 2)
+            .padding(.top, 2)
     }
 
     private func accept(_ photo: NoopPickedLabPhoto) {
         guard draft.begin(photo) else { return }
         navigation.push(.review)
         Task { await draft.read(photo.data) }
+    }
+}
+
+/// The page-shaped tiles under *Or pick one you already have*. 110 × 132 at radius 14, with the
+/// ruled-paper gradient rotated a degree or so each way so a row of them does not read as a grid of
+/// identical rectangles.
+private struct NoopLabRecentTileRow: View {
+    let onPick: () -> Void
+
+    private let stamps = ["Today", "Today", "14 Aug", "14 Aug", "2 Jul", "2 Jul"]
+
+    var body: some View {
+        let columns = [GridItem(.adaptive(minimum: 110, maximum: 110), spacing: 7, alignment: .leading)]
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 7) {
+            ForEach(Array(stamps.enumerated()), id: \.offset) { index, stamp in
+                Button(action: onPick) {
+                    ZStack(alignment: .bottomLeading) {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(hex: 0x101413))
+                        page(index: index)
+                        Text(stamp)
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .tracking(0.54)
+                            .foregroundStyle(Color(hex: 0xEDF1EF))
+                            .shadow(color: .black.opacity(0.8), radius: 6, y: 1)
+                            .padding(.leading, 8)
+                            .padding(.bottom, 7)
+                    }
+                    .frame(width: 110, height: 132)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("A photo from \(stamp)")
+            }
+        }
+    }
+
+    private func page(index: Int) -> some View {
+        LinearGradient(
+            colors: [Color(hex: 0xDFD9CB), Color(hex: 0xBEB6A3)],
+            startPoint: .init(x: 0.13, y: 0), endPoint: .init(x: 0.87, y: 1)   // 163°
+        )
+        .overlay(
+            GeometryReader { proxy in
+                Path { path in
+                    var y: CGFloat = 0
+                    while y < proxy.size.height {
+                        path.addRect(CGRect(x: 0, y: y, width: proxy.size.width, height: 1))
+                        y += 7
+                    }
+                }
+                .fill(Color(hex: 0x1E1A14).opacity(0.16))
+            }
+        )
+        .rotationEffect(.degrees(index % 3 == 1 ? 1.4 : -1.2))
+        .padding(index % 2 == 1 ? EdgeInsets(top: -8, leading: -12, bottom: -8, trailing: -12)
+                                : EdgeInsets(top: -10, leading: -8, bottom: -10, trailing: -8))
     }
 }
 
@@ -1966,19 +2212,52 @@ private struct NoopGoalFeasibility {
     static let unrealistic = NoopGoalFeasibility(kind: .unrealistic, kicker: "The data says not by then", body: "Your longest run and the selected date would require a weekly build above every block your sleep has absorbed this year.", fix: "Choose a later date or a shorter event. Both make a route Noop can actually build.", safety: "Noop will not build above its safety ceiling. It will save the goal only after confirmation and say when the date has to move.", commitLabel: "Commit anyway", color: Color(hex: 0xE9A288), light: Color(hex: 0xF0BBA6), factor: 0.62)
 }
 
+/// How many markers `labs` keeps, for the one caller outside Act 8 — Act 5's Biomarkers row on
+/// `you`. That row carried a literal `7`, so it went on saying seven after the list became nine.
+/// Reading the count is what stops it drifting again.
+enum NoopLabCatalog {
+    static var markerCount: Int { NoopLabMarker.all.count }
+}
+
 private struct NoopLabMarker: Identifiable {
     let id: String; let name: String; let unit: String; let low: Double; let high: Double; let defaultValue: Double; let trend: [Double]; let trendText: String; let contextCopy: String
-    var value: Double {
-        if NoopContentPolicy.allowsPrototypeContent { return defaultValue }
-        return Double(UserDefaults.standard.string(forKey: "noop.html.marker.\(name).value") ?? "") ?? defaultValue
+    /// The value this marker actually holds, or `nil` when nothing has been recorded for it.
+    ///
+    /// 00-RULES.md §0a: a prototype figure may exist only behind **both** `#if DEBUG` and
+    /// `--demo-seed`. This read used to end in `?? defaultValue`, so a release build with an empty
+    /// store rendered an invented blood result for a marker the user had never entered — a health
+    /// value is the first thing that rule names by name. A real saved value wins in every build; the
+    /// seeded figure is reachable only through `NoopContentPolicy`; otherwise the marker is absent
+    /// and the screen renders its absent state rather than a plausible number.
+    var value: Double? {
+        if let saved = Double(UserDefaults.standard.string(forKey: "noop.html.marker.\(name).value") ?? "") {
+            return saved
+        }
+        return NoopContentPolicy.allowsPrototypeContent ? defaultValue : nil
     }
-    var isOutside: Bool { value < low || value > high }
-    var color: Color { isOutside ? Color(hex: 0xF2B45C) : NoopHTMLColor.green }
-    var valueText: String { value.formatted(.number.precision(.fractionLength(0...2))) }
+    var isRecorded: Bool { value != nil }
+    /// Absent is not "outside": a marker with nothing recorded is neither in nor out of its band.
+    var isOutside: Bool { guard let value else { return false }; return value < low || value > high }
+    var isInBand: Bool { guard let value else { return false }; return value >= low && value <= high }
+    var color: Color {
+        guard isRecorded else { return NoopHTMLColor.faint }
+        return isOutside ? Color(hex: 0xF2B45C) : NoopHTMLColor.green
+    }
+    var valueText: String { value?.formatted(.number.precision(.fractionLength(0...2))) ?? "—" }
     var rangeText: String { "\(number(low))–\(number(high)) \(unit)" }
-    var bandTag: String { value < low ? "below band" : value > high ? "above band" : "in band" }
-    var detailBandTag: String { value < low ? "below the band" : value > high ? "above the band" : "in the band" }
+    var bandTag: String {
+        guard let value else { return "not recorded" }
+        return value < low ? "below band" : value > high ? "above band" : "in band"
+    }
+    var detailBandTag: String {
+        guard let value else { return "not recorded" }
+        return value < low ? "below the band" : value > high ? "above the band" : "in the band"
+    }
+    /// The dated series behind the trend chart. Empty when the marker holds nothing — there is no
+    /// history to draw for a value that was never recorded, and an invented one is the failure
+    /// 00-RULES §0a names.
     var series: [Double] {
+        guard let value else { return [] }
         let slope: Double
         switch id {
         case "ferritin": slope = 1.5
@@ -2042,6 +2321,9 @@ private struct NoopLabMarker: Identifiable {
         return "A single out-of-band result is not conclusive. Ask a clinician whether and when a repeat draw would be useful."
     }
     var dynamicContextCopy: String {
+        guard let value else {
+            return "Nothing has been recorded for \(name) yet. Add a result from a report or type one in, and Noop will show it against the laboratory’s band."
+        }
         let position = value < low ? "below" : value > high ? "above" : "inside"
         let markerFact: String
         switch id {
@@ -2057,14 +2339,22 @@ private struct NoopLabMarker: Identifiable {
     }
     private func number(_ value: Double) -> String { value.formatted(.number.precision(.fractionLength(0...2))) }
 
+    /// The nine markers `labs` keeps, in the order a printed panel runs them
+    /// (`48-designer-answers-9-september.md` §2 and `47-act8-goals.md` §8.4).
+    ///
+    /// Nine rather than seven, because the by-hand route and the Biomarkers list are one list: a
+    /// typed value has to have somewhere to live, so Haemoglobin and Creatine kinase are markers
+    /// here and not just fields on a form. The bands and the seeded values are the HTML's.
     static let definitions: [NoopLabMarker] = [
+        .init(id: "haemoglobin", name: "Haemoglobin", unit: "g/L", low: 130, high: 170, defaultValue: 141, trend: [140, 142, 141, 141], trendText: "steady across these four dated draws", contextCopy: "This result is inside the laboratory’s band and steady across these dated draws. Noop records the dated series and draws no conclusion from it."),
         .init(id: "ferritin", name: "Ferritin", unit: "µg/L", low: 30, high: 400, defaultValue: 28, trend: [42, 38, 33, 28], trendText: "lower across these four dated draws", contextCopy: "This result is below the laboratory’s band. One result is not a diagnosis; discuss the dated value and its downward trend with a clinician if you want it interpreted."),
         .init(id: "vitamin-d", name: "Vitamin D", unit: "nmol/L", low: 50, high: 125, defaultValue: 44, trend: [63, 58, 51, 44], trendText: "lower across these four dated draws", contextCopy: "This result is below the laboratory’s band. Seasonal timing can matter, but Noop does not infer a cause; a clinician can interpret the value in context."),
         .init(id: "apob", name: "ApoB", unit: "g/L", low: 0.5, high: 1.0, defaultValue: 0.78, trend: [0.88, 0.84, 0.8, 0.78], trendText: "slightly lower than the previous draw", contextCopy: "This result is inside the laboratory’s band and slightly lower than the prior draw. Noop records that fact and makes no treatment claim."),
-        .init(id: "hs-crp", name: "hs-CRP", unit: "mg/L", low: 0, high: 3, defaultValue: 0.6, trend: [1.1, 0.8, 0.7, 0.6], trendText: "lower across the four draws", contextCopy: "This result is inside the laboratory’s band. A single inflammatory marker is not a diagnosis, and Noop does not attach a cause to it."),
         .init(id: "hba1c", name: "HbA1c", unit: "mmol/mol", low: 20, high: 42, defaultValue: 33, trend: [34, 33, 33, 33], trendText: "stable across the four draws", contextCopy: "This result is inside the laboratory’s band and stable across these dated draws. Noop does not turn that into a clinical conclusion."),
+        .init(id: "hs-crp", name: "hs-CRP", unit: "mg/L", low: 0, high: 3, defaultValue: 0.6, trend: [1.1, 0.8, 0.7, 0.6], trendText: "lower across the four draws", contextCopy: "This result is inside the laboratory’s band. A single inflammatory marker is not a diagnosis, and Noop does not attach a cause to it."),
         .init(id: "tsh", name: "TSH", unit: "mIU/L", low: 0.4, high: 4, defaultValue: 2.1, trend: [2.4, 2.2, 2.2, 2.1], trendText: "close to the preceding values", contextCopy: "This result is inside the laboratory’s band and close to the preceding values. Interpretation belongs with the clinical context Noop does not have."),
-        .init(id: "alt", name: "ALT", unit: "U/L", low: 10, high: 50, defaultValue: 41, trend: [35, 38, 44, 41], trendText: "below the preceding draw", contextCopy: "This result is inside the laboratory’s band and below the preceding draw. Noop shows the dated series without attributing the change to training or anything else.")
+        .init(id: "alt", name: "ALT", unit: "U/L", low: 10, high: 50, defaultValue: 41, trend: [35, 38, 44, 41], trendText: "below the preceding draw", contextCopy: "This result is inside the laboratory’s band and below the preceding draw. Noop shows the dated series without attributing the change to training or anything else."),
+        .init(id: "creatine-kinase", name: "Creatine kinase", unit: "U/L", low: 30, high: 200, defaultValue: 186, trend: [96, 118, 152, 186], trendText: "higher across these four dated draws", contextCopy: "This result is inside the laboratory’s band and higher across these dated draws. The value moves with recent hard efforts; Noop reports it without attributing a cause.")
     ]
     static var all: [NoopLabMarker] { definitions }
 }

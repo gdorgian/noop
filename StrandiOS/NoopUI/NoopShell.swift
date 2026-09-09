@@ -554,6 +554,7 @@ private struct NoopVerifiedRouteScreen: View {
         case .goal: "Goals"
         case .setGoal: "Set a goal"
         case .labs: "Biomarkers"
+        case .picker: "Photograph the report"
         case .review: "Review lab results"
         case .marker: "Biomarker"
         case .instrumentIndex: "Ask it something"
@@ -1165,7 +1166,11 @@ private struct NoopAddRecordSheet: View {
                         choice("Body measurements", "height, weight, and the optional waist", .ruler, "RECORD", .record)
                         choice("Profile photo", "stays on this phone, never uploaded", .camera, "NOT SET", .record)
                         choice("Date of birth and sex", "the two facts the models need", .person, "RECORD", .record)
-                        choice("A lab result to import", "photograph the sheet — Noop reads it and asks you to confirm", .file, "LABS", .review)
+                        // 47-act8-goals.md §8.3: this row enters `goal/picker`, not `review`.
+                        // Entering `review` handed the user a set of read values for a photograph
+                        // they had never taken. The sub-line is the HTML's — it no longer promises
+                        // a read, because the by-hand route does not involve one.
+                        choice("A lab result to import", "photograph the sheet, or type the numbers in by hand", .file, "LABS", .picker)
                     }
 
                     Button(action: navigation.dismissOverlay) {
