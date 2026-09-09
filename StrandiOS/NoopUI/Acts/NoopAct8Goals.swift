@@ -8,6 +8,11 @@ import WhoopStore
 
 @MainActor
 final class NoopLabReviewDraft: ObservableObject {
+    fileprivate enum Origin: Equatable {
+        case photo
+        case manual
+    }
+
     fileprivate enum ReadState: Equatable {
         case empty
         case reading
@@ -20,20 +25,34 @@ final class NoopLabReviewDraft: ObservableObject {
     @Published fileprivate var reportDay: String?
     @Published fileprivate var state: ReadState = .empty
     @Published fileprivate var candidates: [NoopOCRCandidate] = []
+    @Published fileprivate var origin: Origin?
 
     private var generation = UUID()
 
-    var isEmpty: Bool { image == nil }
+    fileprivate var isManual: Bool { origin == .manual }
 
     fileprivate func begin(_ photo: NoopPickedLabPhoto) -> Bool {
         guard let image = UIImage(data: photo.data) else { return false }
         generation = UUID()
         self.image = image
+        origin = .photo
         filename = photo.filename.trimmingCharacters(in: .whitespacesAndNewlines)
         reportDay = nil
         candidates = []
         state = .reading
         return true
+    }
+
+    /// Starts the honest no-photo route. Every field is empty; the examples live only in each
+    /// text field's placeholder and can therefore never be mistaken for a result or saved.
+    fileprivate func beginManual(at date: Date = Date()) {
+        generation = UUID()
+        image = nil
+        origin = .manual
+        filename = ""
+        reportDay = Self.manualDayFormatter.string(from: date)
+        candidates = NoopOCRCandidate.manualFields
+        state = .read
     }
 
     func read(_ data: Data) async {
@@ -54,6 +73,7 @@ final class NoopLabReviewDraft: ObservableObject {
     func scrub() {
         generation = UUID()
         image = nil
+        origin = nil
         filename = ""
         reportDay = nil
         candidates = []
@@ -62,7 +82,7 @@ final class NoopLabReviewDraft: ObservableObject {
 
     #if DEBUG
     func seedDemoReviewIfNeeded() {
-        guard image == nil, NoopContentPolicy.allowsPrototypeContent else { return }
+        guard origin == nil, NoopContentPolicy.allowsPrototypeContent else { return }
         let size = CGSize(width: 1000, height: 720)
         let renderer = UIGraphicsImageRenderer(size: size)
         let rendered = renderer.image { context in
@@ -89,6 +109,7 @@ final class NoopLabReviewDraft: ObservableObject {
             }
         }
         image = rendered
+        origin = .photo
         filename = "IMG_4471"
         reportDay = "2026-08-14"
         let arguments = ProcessInfo.processInfo.arguments
@@ -179,6 +200,15 @@ final class NoopLabReviewDraft: ObservableObject {
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.isLenient = false
+        return formatter
+    }()
+
+    private static let manualDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
 
@@ -1098,8 +1128,6 @@ struct NoopGoalEditorSheet: View {
 private struct NoopLabsHome: View {
     @ObservedObject var navigation: NoopNavigation
     @ObservedObject var draft: NoopLabReviewDraft
-    @State private var isChoosingSource = false
-    @State private var photoSource: NoopLabPhotoSource?
     private var markers: [NoopLabMarker] { NoopLabMarker.all }
     // A marker with nothing recorded is neither in nor out of its band, so it is counted in
     // neither total. The denominator stays the full nine — the ring reads "of 9 in band"
@@ -1115,6 +1143,11 @@ private struct NoopLabsHome: View {
         case 1: return "one marker outside the lab\u{2019}s band"
         case let count: return "\(count) markers outside the lab\u{2019}s band"
         }
+    }
+    private var latestDrawLabel: String? {
+        if NoopContentPolicy.allowsPrototypeContent { return "drawn 14 August · Karolinska" }
+        return UserDefaults.standard.string(forKey: "noop.html.last-lab-draw")
+            .map { "drawn \($0)" }
     }
     var body: some View {
         NoopScreen(bottomInset: 118, topInset: 56) {
@@ -1140,7 +1173,16 @@ private struct NoopLabsHome: View {
                     Button("Add results") { navigation.enterLabPicker() }.buttonStyle(NoopGoalWarmButtonStyle())
                 }
                 .padding(.horizontal, -2)
-                HStack { NoopSectionLabel("Biomarkers"); Spacer(); Text("drawn 14 August · Karolinska").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint) }.padding(.top, 8)
+                HStack {
+                    NoopSectionLabel("Biomarkers")
+                    Spacer()
+                    if let latestDrawLabel {
+                        Text(latestDrawLabel)
+                            .font(NoopHTMLFont.sans(10.5))
+                            .foregroundStyle(NoopHTMLColor.faint)
+                    }
+                }
+                .padding(.top, 8)
                 NoopHelixHero(markers: markers.map { NoopHelixMarker(id: $0.id, outOfBand: $0.isOutside) })
                     .padding(.top, 6)
 
@@ -1181,7 +1223,9 @@ private struct NoopLabsHome: View {
                                 Circle().fill(marker.color).shadow(color: marker.color, radius: 5).frame(width: 8, height: 8)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(marker.name).font(NoopHTMLFont.sans(13.5))
-                                    Text("band \(marker.rangeText) · 14 Aug").font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+                                    Text(marker.listDetail)
+                                        .font(NoopHTMLFont.sans(11))
+                                        .foregroundStyle(Color(hex: 0x7F8A85))
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 VStack(alignment: .trailing, spacing: 2) {
@@ -1256,7 +1300,7 @@ private struct NoopLabPicker: View {
                 VStack(alignment: .leading, spacing: 13) {
                     instruction
                     takePhotoButton
-                    if seeded { recentTiles }
+                    if seeded { recentTiles } else { chooseFromPhotosRow }
                     byHandRow
                     footnote
                 }
@@ -1348,14 +1392,43 @@ private struct NoopLabPicker: View {
         }
     }
 
-    // The by-hand route is specified (§8.6 §4, §8.4) but `review` has no by-hand mode yet: it
-    // renders the photo route unconditionally — image card, strips, "Four candidates were read off
-    // your photo" — so pushing into it from here would hand someone a read for a photograph they
-    // never took. That is the exact thing this screen exists to stop, so the row takes RULES §12's
-    // *Coming soon* state until the by-hand mode lands: present, named, 38 %, a Soon chip, no
-    // chevron, not tappable. Building that mode is the next piece of Act 8.
+    /// Until real PhotoKit thumbnails are bound, production exposes the real library picker
+    /// directly instead of drawing the prototype's six invented report tiles and dates.
+    private var chooseFromPhotosRow: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Or pick one you already have")
+                .font(NoopHTMLFont.sans(10, weight: .semibold))
+                .tracking(1.4)
+                .textCase(.uppercase)
+                .foregroundStyle(Color(hex: 0x6C7570))
+                .padding(.horizontal, 2)
+            Button { photoSource = .library } label: {
+                HStack(spacing: 10) {
+                    NoopCanonicalGlyph(name: .file, size: 19, color: NoopHTMLColor.warm)
+                    Text("Choose from Photos")
+                        .font(NoopHTMLFont.sans(13.5, weight: .medium))
+                    Spacer()
+                    NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 48)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private var byHandRow: some View {
-        Button {} label: {
+        Button {
+            draft.beginManual()
+            // Replace Picker rather than stacking Review on top of it. Both the visible chevron
+            // and the leading-edge swipe on Review return directly to Biomarkers in the HTML.
+            navigation.replace(with: .review)
+        } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Enter results by hand")
@@ -1369,19 +1442,8 @@ private struct NoopLabPicker: View {
                         .multilineTextAlignment(.leading)
                 }
                 Spacer(minLength: 0)
-                // No chevron while the row is not a door (RULES §12).
-                Text("Soon")
-                    .font(NoopHTMLFont.sans(10, weight: .semibold))
-                    .tracking(1.2)
-                    .textCase(.uppercase)
-                    .foregroundStyle(NoopHTMLColor.copy)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(
-                        Capsule(style: .continuous).fill(Color.white.opacity(0.06))
-                    )
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
             }
-            .opacity(0.38)
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
             .background(
@@ -1394,8 +1456,7 @@ private struct NoopLabPicker: View {
             )
         }
         .buttonStyle(.plain)
-        .disabled(true)
-        .accessibilityLabel("Enter results by hand. Not available yet.")
+        .accessibilityLabel("Enter results by hand")
     }
 
     private var footnote: some View {
@@ -1410,7 +1471,9 @@ private struct NoopLabPicker: View {
 
     private func accept(_ photo: NoopPickedLabPhoto) {
         guard draft.begin(photo) else { return }
-        navigation.push(.review)
+        // Review's canonical parent is Labs, not Picker. Replacing leaves [.labs, .review], so
+        // the interactive back gesture and the chevron walk the same map.
+        navigation.replace(with: .review)
         Task { await draft.read(photo.data) }
     }
 }
@@ -1489,72 +1552,84 @@ private struct NoopLabReview: View {
 
     var body: some View {
         NoopScreen(bottomInset: 150, topInset: 56) {
-            VStack(alignment: .leading, spacing: 12) {
-                NoopBackHeader(label: "Biomarkers", action: leaveWithoutSaving)
-                    .padding(.horizontal, -2)
-                    // The handoff's header ends 16 pt above the image card. The shared
-                    // header contributes 14 pt internally and this stack adds 12 pt, so
-                    // remove the extra 10 pt here without changing every back header.
-                    .padding(.bottom, -10)
-
-                if let image = draft.image {
-                    NoopLabImageCard(
-                        image: image,
-                        state: draft.state,
-                        filename: draft.filename,
-                        reportDate: draft.captionDate,
-                        retake: { isChoosingSource = true },
-                        open: { viewerTarget = NoopLabViewerTarget(rect: nil) }
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: 9) {
-                    HStack {
-                        NoopSectionLabel("Nothing is stored yet", color: Color(hex: 0xF3C888)); Spacer()
-                        NoopPill(text: reviewPill, color: Color(hex: 0xF3C888))
-                    }
-                    Text(reviewTitle)
-                        .font(NoopHTMLFont.outfit(25, weight: .light)).tracking(-0.7).lineSpacing(2)
-                    Text(reviewInstructions)
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
-                }
-                if let saveError {
-                    Text(saveError)
-                        .font(NoopHTMLFont.sans(11.5))
-                        .foregroundStyle(NoopHTMLColor.red)
-                        .lineSpacing(3)
-                }
-
-                VStack(spacing: 11) {
-                    ForEach(Array($draft.candidates.enumerated()), id: \.element.id) { index, $candidate in
-                        NoopOCRCandidateCard(
-                            candidate: $candidate,
-                            image: draft.image,
+            VStack(alignment: .leading, spacing: 0) {
+                reviewHeader
+                VStack(alignment: .leading, spacing: 12) {
+                    if let image = draft.image {
+                        NoopLabImageCard(
+                            image: image,
+                            state: draft.state,
+                            filename: draft.filename,
                             reportDate: draft.captionDate,
-                            error: errorID == candidate.id ? "Enter a known marker, numeric value and compatible unit." : nil,
-                            openSource: { rect in viewerTarget = NoopLabViewerTarget(rect: rect) }
-                        ) {
-                            if validate(candidate) {
-                                candidate.status = .corrected
-                                candidate.editing = false
-                                errorID = nil
-                            } else {
-                                errorID = candidate.id
+                            retake: { isChoosingSource = true },
+                            open: { viewerTarget = NoopLabViewerTarget(rect: nil) }
+                        )
+                    }
+
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack {
+                            NoopSectionLabel("Nothing is stored yet", color: Color(hex: 0xF3C888)); Spacer()
+                            Text(reviewPill.uppercased())
+                                .font(NoopHTMLFont.sans(9, weight: .semibold))
+                                .tracking(1.08)
+                                .foregroundStyle(Color(hex: 0xF3C888))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color(hex: 0xF3C888).opacity(0.45), lineWidth: 0.5)
+                                )
+                        }
+                        Text(reviewTitle)
+                            .font(NoopHTMLFont.outfit(25, weight: .light))
+                            .tracking(-0.75)
+                            .lineSpacing(NoopSpecType.lineSpacing(size: 25, cssLineHeight: 1.24, face: NoopSpecType.Face.outfitLight))
+                        Text(reviewInstructions)
+                            .font(NoopHTMLFont.sans(12.5))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                            .lineSpacing(NoopSpecType.lineSpacing(size: 12.5, cssLineHeight: 1.6, face: NoopSpecType.Face.sansRegular))
+                    }
+                    if let saveError {
+                        Text(saveError)
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(NoopHTMLColor.red)
+                            .lineSpacing(3)
+                    }
+
+                    VStack(spacing: 9) {
+                        ForEach(Array($draft.candidates.enumerated()), id: \.element.id) { index, $candidate in
+                            NoopOCRCandidateCard(
+                                candidate: $candidate,
+                                image: draft.image,
+                                reportDate: draft.captionDate,
+                                isManual: draft.isManual,
+                                error: errorID == candidate.id ? "Enter a numeric value." : nil,
+                                openSource: { rect in viewerTarget = NoopLabViewerTarget(rect: rect) },
+                                beginEditing: { beginEditing(candidateID: candidate.id) }
+                            ) {
+                                if validate(candidate) {
+                                    candidate.status = .corrected
+                                    candidate.editing = false
+                                    errorID = nil
+                                } else {
+                                    errorID = candidate.id
+                                }
+                            }
+                            .transition(.opacity)
+                            .animation(.linear(duration: 0.16).delay(Double(index) * 0.024), value: draft.candidates.count)
+                        }
+                    }
+
+                    NoopHTMLCard(radius: 24, padding: 16) {
+                        VStack(alignment: .leading, spacing: 9) {
+                            NoopSectionLabel("What happens to the file")
+                            ForEach(fileFacts, id: \.self) { fact in
+                                NoopLabFileFact(fact)
                             }
                         }
-                        .transition(.opacity)
-                        .animation(.linear(duration: 0.16).delay(Double(index) * 0.024), value: draft.candidates.count)
                     }
                 }
-
-                NoopHTMLCard(radius: 24, padding: 16) {
-                    VStack(alignment: .leading, spacing: 9) {
-                        NoopSectionLabel("What happens to the file")
-                        NoopLabFileFact("The photo and the text read from it are deleted when you leave this screen, whatever you decide.")
-                        NoopLabFileFact("Discarded rows are not remembered — not as a value, and not as “you declined this”.")
-                        NoopLabFileFact("Nothing was uploaded. The read happened on this phone, and it is the one part of the app that would rather be slow than remote.")
-                    }
-                }
+                .padding(.top, 6)
             }
         }
         // Keep the fixed action bar out of the scroll view's layout calculation. As a ZStack
@@ -1565,7 +1640,7 @@ private struct NoopLabReview: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(confirmedCount == 0 ? "Nothing confirmed yet" : "\(confirmedCount) \(confirmedCount == 1 ? "result" : "results") will be stored")
                         .font(NoopHTMLFont.sans(12.5, weight: .semibold))
-                    Text("\(pendingCount) still to check · \(discardedCount) discarded").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(reviewNote).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 Spacer()
                 Button(saving ? "Saving…" : "Save") { Task { await save() } }
@@ -1598,6 +1673,27 @@ private struct NoopLabReview: View {
         .onAppear(perform: ensureValidArrival)
     }
 
+    private var reviewHeader: some View {
+        HStack(spacing: 12) {
+            Button(action: leaveWithoutSaving) {
+                ZStack {
+                    Circle().fill(Color.white.opacity(0.06))
+                        .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+                    NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
+                }
+                .frame(width: 34, height: 34)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Biomarkers")
+            Text("Biomarkers")
+                .font(NoopHTMLFont.sans(13.5))
+                .foregroundStyle(NoopHTMLColor.copy)
+            Spacer()
+        }
+        .padding(.horizontal, -2)
+        .padding(.bottom, 6)
+    }
+
     private var confirmedCount: Int { draft.candidates.filter { $0.status == .confirmed || $0.status == .corrected }.count }
     private var discardedCount: Int { draft.candidates.filter { $0.status == .discarded }.count }
     private var pendingCount: Int { draft.candidates.filter { $0.status == .pending }.count }
@@ -1620,7 +1716,8 @@ private struct NoopLabReview: View {
     }
 
     private var reviewPill: String {
-        switch draft.state {
+        if draft.isManual { return "entered, not measured" }
+        return switch draft.state {
         case .reading: "reading locally"
         case .nothingLegible: "nothing read"
         case .empty, .read: "read, not measured"
@@ -1628,7 +1725,10 @@ private struct NoopLabReview: View {
     }
 
     private var reviewTitle: String {
-        switch draft.state {
+        if draft.isManual {
+            return "Nine fields, and nothing filled in for you. Type the ones your sheet has."
+        }
+        return switch draft.state {
         case .reading:
             "Reading the page on this phone."
         case .nothingLegible:
@@ -1658,7 +1758,10 @@ private struct NoopLabReview: View {
     }
 
     private var reviewInstructions: String {
-        switch draft.state {
+        if draft.isManual {
+            return "The nine markers Noop keeps, in the order a printed panel runs them. No photo, so no strips and no confidence: there is no page to check a number against, and the app will not dress a typed value as a read one. Every row is optional — leave one out and it is not stored."
+        }
+        return switch draft.state {
         case .reading:
             "Read on this phone, nothing uploaded. Candidates will appear here when the read is done."
         case .nothingLegible:
@@ -1666,18 +1769,59 @@ private struct NoopLabReview: View {
         case .empty:
             "Nothing is uploaded or stored before you confirm it."
         case .read:
-            "Read on this phone, nothing uploaded. Where a strip is shown, it is the part of the page the number was read from. Check each number against your report, fix anything misread, and discard what you would rather not keep."
+            "Read on this phone, nothing uploaded. Each row shows the strip of the page it came from — check the number against it, fix it if the read is wrong, and discard anything you would rather not keep."
         }
     }
 
-    private func validate(_ candidate: NoopOCRCandidate) -> Bool {
-        let known = markerDefinition(
-            named: candidate.draftName.trimmingCharacters(in: .whitespaces),
-            unit: candidate.draftUnit.trimmingCharacters(in: .whitespaces)
-        )
-        let numeric = Double(candidate.draftValue.replacingOccurrences(of: ",", with: ".")) != nil
-        return known?.canonicalUnit.caseInsensitiveCompare(candidate.draftUnit.trimmingCharacters(in: .whitespaces)) == .orderedSame && numeric
+    private var fileFacts: [String] {
+        if draft.isManual {
+            return [
+                "What you type is stored when you save it, and discarded rows are not remembered — not as a value, and not as “you declined this”.",
+                "No photograph was taken and none is needed. There is no page to check these against, so no row claims one.",
+                "Nothing was uploaded. This is a local entry into your own lab book."
+            ]
+        }
+        return [
+            "The photo and the text read from it are deleted when you leave this screen, whatever you decide.",
+            "Discarded rows are not remembered — not as a value, and not as “you declined this”.",
+            "Nothing was uploaded. The read happened on this phone, and it is the one part of the app that would rather be slow than remote."
+        ]
     }
+
+    private var reviewNote: String {
+        if confirmedCount == 0 {
+            return draft.isManual
+                ? "Type a value and use it — Save does nothing until then"
+                : "Confirm or fix a row — Save does nothing until then"
+        }
+        if pendingCount > 0 {
+            return "\(pendingCount) still to check · \(discardedCount) discarded"
+        }
+        if let date = draft.captionDate {
+            return "\(discardedCount) discarded · the rest dated \(date)"
+        }
+        return "\(discardedCount) discarded"
+    }
+
+    private func validate(_ candidate: NoopOCRCandidate) -> Bool {
+        let text = candidate.draftValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        guard let value = Double(text) else {
+            return false
+        }
+        return value.isFinite
+    }
+
+    private func beginEditing(candidateID: String) {
+        for index in draft.candidates.indices {
+            draft.candidates[index].editing = false
+        }
+        guard let index = draft.candidates.firstIndex(where: { $0.id == candidateID }) else { return }
+        draft.candidates[index].draftValue = draft.isManual ? "" : draft.candidates[index].value
+        draft.candidates[index].editing = true
+        errorID = nil
+    }
+
     @MainActor
     private func save() async {
         guard confirmedCount > 0, !saving else { return }
@@ -1697,17 +1841,9 @@ private struct NoopLabReview: View {
 
         let epoch = LabBookFormat.noonEpoch(day)
         let rows = confirmed.compactMap { candidate -> LabMarkerRow? in
-            let definition: MarkerDefinition?
-            if candidate.status == .corrected {
-                definition = markerDefinition(
-                    named: candidate.draftName.trimmingCharacters(in: .whitespaces),
-                    unit: candidate.draftUnit.trimmingCharacters(in: .whitespaces)
-                )
-            } else {
-                definition = MarkerCatalog.definition(for: candidate.markerKey)
-                    ?? (candidate.markerKey == "custom_apob" ? MarkerCatalog.custom(key: "custom_apob", displayName: "ApoB", unit: "g/L", decimals: 2) : nil)
-            }
-            let rawValue = candidate.status == .corrected ? candidate.draftValue : candidate.value
+            let definition = markerDefinition(for: candidate)
+            let rawValue = (candidate.status == .corrected ? candidate.draftValue : candidate.value)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             guard let value = Double(rawValue.replacingOccurrences(of: ",", with: ".")),
                   let definition else { return nil }
             return LabMarkerRow(
@@ -1719,9 +1855,11 @@ private struct NoopLabReview: View {
                 takenAt: epoch,
                 value: value,
                 valueText: nil,
-                unit: candidate.status == .corrected ? candidate.draftUnit.trimmingCharacters(in: .whitespaces) : candidate.unit,
-                source: LabReportTextImport.sourceId,
-                note: nil,
+                unit: candidate.unit,
+                source: draft.isManual ? "manual" : LabReportTextImport.sourceId,
+                note: draft.isManual
+                    ? "Entered manually by the user."
+                    : (candidate.status == .corrected ? "Corrected by the user after an on-device document read." : nil),
                 referenceText: nil
             )
         }
@@ -1735,40 +1873,64 @@ private struct NoopLabReview: View {
             try await store.upsertLabMarkers(rows)
             let defaults = UserDefaults.standard
             for candidate in confirmed {
-                let name = candidate.status == .corrected
-                    ? candidate.draftName.trimmingCharacters(in: .whitespaces)
-                    : candidate.name
                 let value = candidate.status == .corrected ? candidate.draftValue : candidate.value
-                defaults.set(value.replacingOccurrences(of: ",", with: "."), forKey: "noop.html.marker.\(name).value")
+                defaults.set(
+                    value.trimmingCharacters(in: .whitespacesAndNewlines)
+                        .replacingOccurrences(of: ",", with: "."),
+                    forKey: "noop.html.marker.\(candidate.name).value"
+                )
             }
             if let captionDate = draft.captionDate {
                 defaults.set(captionDate, forKey: "noop.html.last-lab-draw")
+                for candidate in confirmed {
+                    defaults.set(captionDate, forKey: "noop.html.marker.\(candidate.name).date")
+                }
             }
             await repo.refresh()
             draft.scrub()
-            if navigation.route == .review { navigation.replace(with: .labs) }
+            if navigation.route == .review { navigation.reset(to: .labs) }
         } catch {
             saveError = "Couldn’t save these readings to the local Lab Book. Nothing was changed."
         }
         saving = false
     }
 
-    private func markerDefinition(named name: String, unit: String) -> MarkerDefinition? {
-        if name.caseInsensitiveCompare("ApoB") == .orderedSame,
-           unit.caseInsensitiveCompare("g/L") == .orderedSame {
-            return MarkerCatalog.custom(key: "custom_apob", displayName: "ApoB", unit: "g/L", decimals: 2)
+    private func markerDefinition(for candidate: NoopOCRCandidate) -> MarkerDefinition? {
+        if let definition = MarkerCatalog.definition(for: candidate.markerKey) {
+            return definition
         }
-        return MarkerCatalog.builtIn.first {
-            $0.displayName.caseInsensitiveCompare(name) == .orderedSame
+        switch candidate.markerKey {
+        case "custom_apob":
+            return MarkerCatalog.custom(
+                key: candidate.markerKey,
+                displayName: candidate.name,
+                unit: candidate.unit,
+                decimals: 2
+            )
+        case "custom_creatine_kinase":
+            return MarkerCatalog.custom(
+                key: candidate.markerKey,
+                displayName: candidate.name,
+                unit: candidate.unit,
+                decimals: 0
+            )
+        default:
+            return nil
         }
     }
 
     private func ensureValidArrival() {
         #if DEBUG
-        draft.seedDemoReviewIfNeeded()
+        if NoopContentPolicy.allowsPrototypeContent,
+           ProcessInfo.processInfo.arguments.contains("--noop-labs-manual"),
+           draft.origin == nil {
+            draft.beginManual()
+        } else {
+            draft.seedDemoReviewIfNeeded()
+        }
         #endif
-        if draft.image == nil {
-            navigation.replace(with: .labs)
+        if draft.origin == nil || (!draft.isManual && draft.image == nil) {
+            navigation.reset(to: .labs)
         }
     }
 
@@ -1776,7 +1938,7 @@ private struct NoopLabReview: View {
         draft.scrub()
         errorID = nil
         saveError = nil
-        navigation.replace(with: .labs)
+        navigation.reset(to: .labs)
     }
 
     private func acceptRetake(_ photo: NoopPickedLabPhoto) {
@@ -2010,8 +2172,10 @@ private struct NoopOCRCandidateCard: View {
     @Binding var candidate: NoopOCRCandidate
     let image: UIImage?
     let reportDate: String?
+    let isManual: Bool
     let error: String?
     let openSource: (CGRect) -> Void
+    let beginEditing: () -> Void
     let saveCorrection: () -> Void
 
     var body: some View {
@@ -2023,13 +2187,22 @@ private struct NoopOCRCandidateCard: View {
                         .lineLimit(2)
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
                         Text(candidate.shownValue)
-                            .font(NoopHTMLFont.sans(19, weight: .medium))
+                            .font(NoopHTMLFont.outfit(30, weight: .light))
+                            .tracking(-0.9)
                             .monospacedDigit()
+                            .foregroundStyle(candidate.shownValue == "—" ? Color(hex: 0x3F4744) : NoopHTMLColor.ink)
                         Text(candidate.shownUnit)
                             .font(NoopHTMLFont.sans(11.5))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                     }
-                    if candidate.lowConfidence {
+                    if isManual {
+                        Text(candidate.status == .corrected
+                            ? "typed in by you — there is no page to check it against"
+                            : "not filled in")
+                            .font(NoopHTMLFont.sans(11))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
+                            .lineSpacing(3)
+                    } else if candidate.lowConfidence {
                         Text("Check this")
                             .font(NoopHTMLFont.sans(11, weight: .semibold))
                             .foregroundStyle(Color(hex: 0xF3C888))
@@ -2044,73 +2217,110 @@ private struct NoopOCRCandidateCard: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                VStack(alignment: .trailing, spacing: 5) {
-                    if let image, let rect = candidate.sourceRect {
-                        Button { openSource(rect) } label: {
-                            NoopLabSourceStrip(image: image, rect: rect)
+                if !isManual {
+                    VStack(alignment: .trailing, spacing: 5) {
+                        if let image, let rect = candidate.sourceRect {
+                            Button { openSource(rect) } label: {
+                                NoopLabSourceStrip(image: image, rect: rect)
+                            }
+                            .buttonStyle(.plain)
+                            Text("FROM THE PAGE")
+                                .font(NoopHTMLFont.sans(9.5, weight: .semibold))
+                                .tracking(0.95)
+                                .foregroundStyle(NoopHTMLColor.faint)
+                        } else {
+                            Text(candidate.raw)
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(NoopHTMLColor.inkSoft)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .padding(.horizontal, 8)
+                                .frame(width: 132, height: 26)
+                                .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
+                            Text("AS READ")
+                                .font(NoopHTMLFont.sans(9.5, weight: .semibold))
+                                .tracking(0.95)
+                                .foregroundStyle(NoopHTMLColor.faint)
                         }
-                        .buttonStyle(.plain)
-                        Text("FROM THE PAGE")
-                            .font(NoopHTMLFont.sans(9.5, weight: .semibold))
-                            .tracking(0.95)
-                            .foregroundStyle(NoopHTMLColor.faint)
-                    } else {
-                        Text(candidate.raw)
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(NoopHTMLColor.inkSoft)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .padding(.horizontal, 8)
-                            .frame(width: 132, height: 26)
-                            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
-                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
-                        Text("AS READ")
-                            .font(NoopHTMLFont.sans(9.5, weight: .semibold))
-                            .tracking(0.95)
-                            .foregroundStyle(NoopHTMLColor.faint)
                     }
+                    .frame(width: 132)
                 }
-                .frame(width: 132)
             }
 
             if candidate.editing {
-                VStack(alignment: .leading, spacing: 9) {
-                    TextField("Marker", text: $candidate.draftName)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(isManual ? "Type the value from your sheet" : "Correct the value")
+                        .font(NoopHTMLFont.sans(10, weight: .semibold))
+                        .tracking(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Color(hex: 0xF3C888))
                     HStack(spacing: 8) {
-                        TextField("Value", text: $candidate.draftValue).keyboardType(.decimalPad)
-                        TextField("Unit", text: $candidate.draftUnit).frame(width: 105)
+                        TextField(
+                            isManual ? "e.g. \(candidate.example ?? "")" : candidate.value,
+                            text: $candidate.draftValue
+                        )
+                        .keyboardType(.decimalPad)
+                        Text(candidate.unit)
+                            .font(NoopHTMLFont.sans(12))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
                     }
+                    Text(editNote)
+                        .font(NoopHTMLFont.sans(11))
+                        .foregroundStyle(Color(hex: 0x7F8A85))
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let error { Text(error).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.red) }
                     HStack(spacing: 7) {
-                        Button("Save correction", action: saveCorrection).buttonStyle(NoopOCRActionStyle(primary: true))
+                        Button("Use this value", action: saveCorrection)
+                            .buttonStyle(NoopOCRActionStyle(primary: true, enabled: hasDraftValue))
+                            .disabled(!hasDraftValue)
                         Button("Cancel") { candidate.editing = false }.buttonStyle(NoopOCRActionStyle())
                     }
                 }
                 .textFieldStyle(NoopOCRTextFieldStyle())
+                .padding(.horizontal, 13)
+                .padding(.vertical, 12)
+                .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .stroke(Color(hex: 0xF2B45C).opacity(0.32), lineWidth: 0.5)
+                )
             } else if candidate.status == .pending {
-                GeometryReader { proxy in
-                    let unit = max(0, proxy.size.width - 14) / 3.3
+                if isManual {
                     HStack(spacing: 7) {
-                        Button("Confirm") { candidate.status = .confirmed }
+                        Button("Type it in", action: beginEditing)
                             .buttonStyle(NoopOCRActionStyle(primary: true))
-                            .frame(width: unit * 1.3)
-                        Button("Fix") {
-                            candidate.draftName = candidate.name
-                            candidate.draftValue = candidate.value
-                            candidate.draftUnit = candidate.unit
-                            candidate.editing = true
-                        }
-                        .buttonStyle(NoopOCRActionStyle())
-                        .frame(width: unit)
-                        Button("Discard") { candidate.status = .discarded }
+                            .frame(maxWidth: .infinity)
+                        Button("Leave it out") { candidate.status = .discarded }
                             .buttonStyle(NoopOCRActionStyle())
-                            .frame(width: unit)
+                            .frame(maxWidth: .infinity)
                     }
+                } else {
+                    GeometryReader { proxy in
+                        let unit = max(0, proxy.size.width - 14) / 3.3
+                        HStack(spacing: 7) {
+                            Button("Confirm") { candidate.status = .confirmed }
+                                .buttonStyle(NoopOCRActionStyle(primary: true))
+                                .frame(width: unit * 1.3)
+                            Button("Fix", action: beginEditing)
+                                .buttonStyle(NoopOCRActionStyle())
+                                .frame(width: unit)
+                            Button("Discard") { candidate.status = .discarded }
+                                .buttonStyle(NoopOCRActionStyle())
+                                .frame(width: unit)
+                        }
+                    }
+                    .frame(height: 40)
                 }
-                .frame(height: 40)
             } else {
                 HStack {
-                    Text(candidate.status.message(reportDate: reportDate))
+                    Text(candidate.status.message(
+                        reportDate: reportDate,
+                        isManual: isManual,
+                        value: candidate.shownValue,
+                        unit: candidate.unit
+                    ))
                         .font(NoopHTMLFont.sans(12))
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                     Spacer()
@@ -2124,9 +2334,26 @@ private struct NoopOCRCandidateCard: View {
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
             }
         }
-        .padding(13)
+        .padding(.horizontal, 16)
+        .padding(.top, 15)
+        .padding(.bottom, 16)
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(candidate.lowConfidence && !isManual ? Color(hex: 0xF3C888).opacity(0.34) : Color.white.opacity(0.07), lineWidth: 0.5)
+        )
+    }
+
+    private var hasDraftValue: Bool {
+        !candidate.draftValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var editNote: String {
+        if isManual {
+            return "Nothing is filled in for you and there is no page to check it against, so the row is stored as entered rather than read. Leave it out and nothing is stored."
+        }
+        let read = candidate.readToken ?? (candidate.raw.isEmpty ? candidate.value : candidate.raw)
+        return "Read as “\(read)”. What you type replaces it, and the row is stored as corrected — not as read."
     }
 }
 
@@ -2151,10 +2378,19 @@ private struct NoopMarkerDetail: View {
 
                 NoopHTMLCard(radius: 24, padding: 16) {
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack { NoopSectionLabel("Four draws"); Spacer(); Text("shaded — the lab's band").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint) }
+                        HStack {
+                            NoopSectionLabel(NoopContentPolicy.allowsPrototypeContent ? "Four draws" : "Recorded result")
+                            Spacer()
+                            Text("shaded — the lab's band").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                        }
                         NoopMarkerTrend(marker: marker)
-                        HStack { Text("Jun 25"); Spacer(); Text("Nov 25"); Spacer(); Text("Mar 26"); Spacer(); Text("14 Aug") }
-                            .font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                        if NoopContentPolicy.allowsPrototypeContent {
+                            HStack { Text("Jun 25"); Spacer(); Text("Nov 25"); Spacer(); Text("Mar 26"); Spacer(); Text("14 Aug") }
+                                .font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                        } else if let date = marker.recordedDateText {
+                            HStack { Spacer(); Text(date) }
+                                .font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                        }
                         Text(marker.bandNote)
                             .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
                     }
@@ -2162,14 +2398,16 @@ private struct NoopMarkerDetail: View {
                 }
                 .padding(.top, 6)
 
-                NoopHTMLCard(radius: 24, padding: 16) {
-                    VStack(alignment: .leading, spacing: 11) {
-                        NoopSectionLabel("What it sits next to")
-                        NoopMarkerBeside("Haemoglobin, same draw", "141 g/L")
-                        NoopMarkerBeside("Weekly distance that month", "34 km")
-                        NoopMarkerBeside("Nights over your need, that month", "17 of 31")
-                        Text("Shown together because they were drawn on the same day, not because Noop found a relationship. It has four points — that is not enough to claim one.")
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
+                if NoopContentPolicy.allowsPrototypeContent {
+                    NoopHTMLCard(radius: 24, padding: 16) {
+                        VStack(alignment: .leading, spacing: 11) {
+                            NoopSectionLabel("What it sits next to")
+                            NoopMarkerBeside("Haemoglobin, same draw", "141 g/L")
+                            NoopMarkerBeside("Weekly distance that month", "34 km")
+                            NoopMarkerBeside("Nights over your need, that month", "17 of 31")
+                            Text("Shown together because they were drawn on the same day, not because Noop found a relationship. It has four points — that is not enough to claim one.")
+                                .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
+                        }
                     }
                 }
 
@@ -2245,6 +2483,14 @@ private struct NoopLabMarker: Identifiable {
     }
     var valueText: String { value?.formatted(.number.precision(.fractionLength(0...2))) ?? "—" }
     var rangeText: String { "\(number(low))–\(number(high)) \(unit)" }
+    var recordedDateText: String? {
+        if NoopContentPolicy.allowsPrototypeContent { return "14 Aug" }
+        return UserDefaults.standard.string(forKey: "noop.html.marker.\(name).date")
+    }
+    var listDetail: String {
+        guard let recordedDateText else { return "band \(rangeText)" }
+        return "band \(rangeText) · \(recordedDateText)"
+    }
     var bandTag: String {
         guard let value else { return "not recorded" }
         return value < low ? "below band" : value > high ? "above band" : "in band"
@@ -2258,24 +2504,10 @@ private struct NoopLabMarker: Identifiable {
     /// 00-RULES §0a names.
     var series: [Double] {
         guard let value else { return [] }
-        let slope: Double
-        switch id {
-        case "ferritin": slope = 1.5
-        case "vitamin-d": slope = 1.42
-        case "apob": slope = 1.14
-        case "hs-crp": slope = 1.7
-        case "hba1c": slope = 1.06
-        case "tsh": slope = 1.12
-        case "alt": slope = 0.84
-        default: slope = 1.2
-        }
-        return [3, 2, 1, 0].map { back in
-            guard back > 0 else { return value }
-            let factor = 1 + (slope - 1) * (Double(back) / 3)
-            return (value * factor * 100).rounded() / 100
-        }
+        return NoopContentPolicy.allowsPrototypeContent ? trend : [value]
     }
     var trendDirection: String {
+        guard series.count > 1 else { return "one recorded result, not yet a trend" }
         guard let first = series.first, let last = series.last else { return "not yet a trend" }
         let threshold = max(0.01, abs(first) * 0.03)
         if last < first - threshold { return "lower across these four dated draws" }
@@ -2283,6 +2515,9 @@ private struct NoopLabMarker: Identifiable {
         return "broadly stable across these four dated draws"
     }
     var readCopy: String {
+        guard NoopContentPolicy.allowsPrototypeContent else {
+            return "One dated result. \(dynamicContextCopy)"
+        }
         let note = htmlNote
         return "Four draws in fourteen months. \(note.prefix(1).uppercased())\(note.dropFirst())."
     }
@@ -2312,6 +2547,11 @@ private struct NoopLabMarker: Identifiable {
         return "The shaded area is the laboratory’s band from \(number(low)) \(unit) upward. Its upper limit, \(number(high)) \(unit), is far off this scale and is not drawn."
     }
     var retestCopy: String {
+        guard NoopContentPolicy.allowsPrototypeContent else {
+            return isOutside
+                ? "A single out-of-band result is not conclusive. Ask a clinician whether and when a repeat draw would be useful."
+                : "Noop does not infer a retest schedule from one recorded result."
+        }
         if id == "ferritin" && isOutside {
             return "A single low ferritin inside a training block is common and not conclusive. The usual advice is a repeat draw in eight to twelve weeks — 9 November is the earliest that would tell you anything new."
         }
@@ -2327,7 +2567,7 @@ private struct NoopLabMarker: Identifiable {
         let position = value < low ? "below" : value > high ? "above" : "inside"
         let markerFact: String
         switch id {
-        case "vitamin-d": markerFact = "The draw is dated August; Noop does not assume a seasonal cause."
+        case "vitamin-d": markerFact = "Noop does not assume a seasonal cause."
         case "hs-crp": markerFact = "Noop does not attach an inflammatory cause to a single value."
         case "hba1c": markerFact = "Noop records the dated series without turning it into a metabolic conclusion."
         case "tsh": markerFact = "Interpretation depends on clinical context Noop does not have."
@@ -2362,14 +2602,18 @@ private struct NoopLabMarker: Identifiable {
 private enum NoopOCRStatus {
     case pending, confirmed, corrected, discarded
 
-    func message(reportDate: String?) -> String {
+    func message(reportDate: String?, isManual: Bool, value: String, unit: String) -> String {
         switch self {
         case .confirmed:
             reportDate.map { "Will be stored, dated \($0)" } ?? "Will be stored once the report date is known"
         case .corrected:
-            "Corrected by hand — stored as you entered it"
+            isManual
+                ? "Stored as \(value) \(unit), as you typed it"
+                : "Stored as \(value) \(unit), corrected by you"
         case .discarded:
-            "Discarded. Not stored, and the file is not kept either"
+            isManual
+                ? "Left out. Not stored, and not remembered as declined"
+                : "Discarded. Not stored, and the file is not kept either"
         case .pending:
             ""
         }
@@ -2385,24 +2629,74 @@ private struct NoopOCRCandidate: Identifiable {
     let raw: String
     let confidence: String
     let lowConfidence: Bool
+    /// The exact value-shaped token printed on the page when it can be preserved separately.
+    /// Real OCR may only provide the complete source line, which remains the honest fallback.
+    let readToken: String?
     /// Normalized, top-left image coordinates for the complete source line.
     let sourceRect: CGRect?
-    var status: NoopOCRStatus = .pending; var editing = false; var draftName = ""; var draftValue = ""; var draftUnit = ""
-    var shownName: String { status == .corrected ? draftName : name }
-    var shownValue: String { status == .corrected ? draftValue : value }
-    var shownUnit: String { status == .corrected ? draftUnit : unit }
+    let example: String?
+    var status: NoopOCRStatus = .pending
+    var editing = false
+    var draftValue = ""
+
+    init(
+        id: String,
+        markerKey: String,
+        category: LabMarkerCategory,
+        name: String,
+        value: String,
+        unit: String,
+        raw: String,
+        confidence: String,
+        lowConfidence: Bool,
+        sourceRect: CGRect?,
+        readToken: String? = nil,
+        example: String? = nil
+    ) {
+        self.id = id
+        self.markerKey = markerKey
+        self.category = category
+        self.name = name
+        self.value = value
+        self.unit = unit
+        self.raw = raw
+        self.confidence = confidence
+        self.lowConfidence = lowConfidence
+        self.sourceRect = sourceRect
+        self.readToken = readToken
+        self.example = example
+    }
+
+    var shownName: String { name }
+    var shownValue: String {
+        let text = status == .corrected ? draftValue : value
+        return text.isEmpty ? "—" : text
+    }
+    var shownUnit: String { unit }
+
+    static let manualFields: [NoopOCRCandidate] = [
+        .init(id: "manual-haemoglobin", markerKey: "haemoglobin", category: .bloodPanel, name: "Haemoglobin", value: "", unit: "g/L", raw: "", confidence: "", lowConfidence: false, sourceRect: nil, example: "141"),
+        .init(id: "manual-ferritin", markerKey: "ferritin", category: .bloodPanel, name: "Ferritin", value: "", unit: "µg/L", raw: "", confidence: "", lowConfidence: false, sourceRect: nil, example: "28"),
+        .init(id: "manual-vitamin-d", markerKey: "vitamin_d", category: .bloodPanel, name: "Vitamin D", value: "", unit: "nmol/L", raw: "", confidence: "", lowConfidence: false, sourceRect: nil, example: "52"),
+        .init(id: "manual-apob", markerKey: "custom_apob", category: .other, name: "ApoB", value: "", unit: "g/L", raw: "", confidence: "", lowConfidence: false, sourceRect: nil, example: "0.78"),
+        .init(id: "manual-hba1c", markerKey: "hba1c", category: .bloodPanel, name: "HbA1c", value: "", unit: "mmol/mol", raw: "", confidence: "", lowConfidence: false, sourceRect: nil, example: "33"),
+        .init(id: "manual-hs-crp", markerKey: "crp", category: .bloodPanel, name: "hs-CRP", value: "", unit: "mg/L", raw: "", confidence: "", lowConfidence: false, sourceRect: nil, example: "0.6"),
+        .init(id: "manual-tsh", markerKey: "tsh", category: .bloodPanel, name: "TSH", value: "", unit: "mIU/L", raw: "", confidence: "", lowConfidence: false, sourceRect: nil, example: "2.1"),
+        .init(id: "manual-alt", markerKey: "alt", category: .bloodPanel, name: "ALT", value: "", unit: "U/L", raw: "", confidence: "", lowConfidence: false, sourceRect: nil, example: "41"),
+        .init(id: "manual-creatine-kinase", markerKey: "custom_creatine_kinase", category: .other, name: "Creatine kinase", value: "", unit: "U/L", raw: "", confidence: "", lowConfidence: false, sourceRect: nil, example: "186")
+    ]
     static let samples = [
-        NoopOCRCandidate(id: "ferritin", markerKey: "ferritin", category: .bloodPanel, name: "Ferritin", value: "28", unit: "µg/L", raw: "Ferritin  28 µg/L", confidence: "clear read", lowConfidence: false, sourceRect: nil),
-        NoopOCRCandidate(id: "vitamin-d", markerKey: "vitamin_d", category: .bloodPanel, name: "Vitamin D", value: "52", unit: "nmol/L", raw: "Vitamin D, 25-OH  52 nmol/L", confidence: "clear read", lowConfidence: false, sourceRect: nil),
-        NoopOCRCandidate(id: "apob", markerKey: "custom_apob", category: .other, name: "ApoB", value: "0.78", unit: "g/L", raw: "ApoB  O.78 g/L", confidence: "check this", lowConfidence: true, sourceRect: nil),
-        NoopOCRCandidate(id: "hs-crp", markerKey: "crp", category: .bloodPanel, name: "hs-CRP", value: "0.6", unit: "mg/L", raw: "hsCRP  <0,6", confidence: "check this", lowConfidence: true, sourceRect: nil)
+        NoopOCRCandidate(id: "ferritin", markerKey: "ferritin", category: .bloodPanel, name: "Ferritin", value: "28", unit: "µg/L", raw: "Ferritin  28 µg/L", confidence: "clear read", lowConfidence: false, sourceRect: nil, readToken: "28"),
+        NoopOCRCandidate(id: "vitamin-d", markerKey: "vitamin_d", category: .bloodPanel, name: "Vitamin D", value: "52", unit: "nmol/L", raw: "Vitamin D, 25-OH  52 nmol/L", confidence: "clear read", lowConfidence: false, sourceRect: nil, readToken: "52"),
+        NoopOCRCandidate(id: "apob", markerKey: "custom_apob", category: .other, name: "ApoB", value: "0.78", unit: "g/L", raw: "ApoB  O.78 g/L", confidence: "check this", lowConfidence: true, sourceRect: nil, readToken: "O.78"),
+        NoopOCRCandidate(id: "hs-crp", markerKey: "crp", category: .bloodPanel, name: "hs-CRP", value: "0.6", unit: "mg/L", raw: "hsCRP  <0,6", confidence: "check this", lowConfidence: true, sourceRect: nil, readToken: "<0,6")
     ]
 
     static let samplesWithRects: [NoopOCRCandidate] = [
-        NoopOCRCandidate(id: "ferritin", markerKey: "ferritin", category: .bloodPanel, name: "Ferritin", value: "28", unit: "µg/L", raw: "Ferritin  28 µg/L", confidence: "clear read", lowConfidence: false, sourceRect: CGRect(x: 0.07, y: 0.32, width: 0.86, height: 0.075)),
-        NoopOCRCandidate(id: "vitamin-d", markerKey: "vitamin_d", category: .bloodPanel, name: "Vitamin D", value: "52", unit: "nmol/L", raw: "Vitamin D, 25-OH  52 nmol/L", confidence: "clear read", lowConfidence: false, sourceRect: CGRect(x: 0.07, y: 0.44, width: 0.86, height: 0.075)),
-        NoopOCRCandidate(id: "apob", markerKey: "custom_apob", category: .other, name: "ApoB", value: "0.78", unit: "g/L", raw: "ApoB  O.78 g/L", confidence: "check this", lowConfidence: true, sourceRect: CGRect(x: 0.07, y: 0.56, width: 0.86, height: 0.075)),
-        NoopOCRCandidate(id: "hs-crp", markerKey: "crp", category: .bloodPanel, name: "hs-CRP", value: "0.6", unit: "mg/L", raw: "hsCRP  <0,6", confidence: "check this", lowConfidence: true, sourceRect: CGRect(x: 0.07, y: 0.68, width: 0.86, height: 0.075))
+        NoopOCRCandidate(id: "ferritin", markerKey: "ferritin", category: .bloodPanel, name: "Ferritin", value: "28", unit: "µg/L", raw: "Ferritin  28 µg/L", confidence: "clear read", lowConfidence: false, sourceRect: CGRect(x: 0.07, y: 0.32, width: 0.86, height: 0.075), readToken: "28"),
+        NoopOCRCandidate(id: "vitamin-d", markerKey: "vitamin_d", category: .bloodPanel, name: "Vitamin D", value: "52", unit: "nmol/L", raw: "Vitamin D, 25-OH  52 nmol/L", confidence: "clear read", lowConfidence: false, sourceRect: CGRect(x: 0.07, y: 0.44, width: 0.86, height: 0.075), readToken: "52"),
+        NoopOCRCandidate(id: "apob", markerKey: "custom_apob", category: .other, name: "ApoB", value: "0.78", unit: "g/L", raw: "ApoB  O.78 g/L", confidence: "check this", lowConfidence: true, sourceRect: CGRect(x: 0.07, y: 0.56, width: 0.86, height: 0.075), readToken: "O.78"),
+        NoopOCRCandidate(id: "hs-crp", markerKey: "crp", category: .bloodPanel, name: "hs-CRP", value: "0.6", unit: "mg/L", raw: "hsCRP  <0,6", confidence: "check this", lowConfidence: true, sourceRect: CGRect(x: 0.07, y: 0.68, width: 0.86, height: 0.075), readToken: "<0,6")
     ]
 }
 
@@ -2438,7 +2732,11 @@ private struct NoopMarkerTrend: View {
             var line = Path()
             var points: [CGPoint] = []
             for (index, value) in marker.series.enumerated() {
-                let point = CGPoint(x: CGFloat(index) / CGFloat(marker.series.count - 1) * size.width, y: y(value))
+                let denominator = max(1, marker.series.count - 1)
+                let x = marker.series.count == 1
+                    ? size.width
+                    : CGFloat(index) / CGFloat(denominator) * size.width
+                let point = CGPoint(x: x, y: y(value))
                 index == 0 ? line.move(to: point) : line.addLine(to: point)
                 points.append(point)
             }
@@ -2464,17 +2762,29 @@ private struct NoopLabFileFact: View {
 }
 
 private struct NoopOCRTextFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View { configuration.font(NoopHTMLFont.sans(13)).padding(.horizontal, 12).frame(height: 44).background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.11), lineWidth: 0.5)) }
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .font(NoopHTMLFont.outfit(19, weight: .light))
+            .tracking(-0.38)
+            .padding(.horizontal, 12)
+            .frame(height: 40)
+            .background(Color(hex: 0x0A0C0B).opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.14), lineWidth: 0.5))
+    }
 }
 private struct NoopOCRActionStyle: ButtonStyle {
     var primary = false
+    var enabled = true
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
-            .foregroundStyle(primary ? NoopHTMLColor.warmInk : NoopHTMLColor.inkSoft)
+            .foregroundStyle(primary ? (enabled ? NoopHTMLColor.warmInk : NoopHTMLColor.faint) : NoopHTMLColor.inkSoft)
             .frame(maxWidth: .infinity)
             .frame(height: 40)
-            .background(primary ? NoopHTMLColor.warm : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 13))
+            .background(
+                primary ? (enabled ? NoopHTMLColor.warm : Color.white.opacity(0.07)) : Color.white.opacity(0.06),
+                in: RoundedRectangle(cornerRadius: 13)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 13)
                     .stroke(primary ? Color.clear : Color.white.opacity(0.10), lineWidth: 0.5)

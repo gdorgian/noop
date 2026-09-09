@@ -7,9 +7,7 @@ struct NoopAct7Screens: View {
     var body: some View {
         switch navigation.route {
         case .coach:
-            if navigation.coachVoice == .off {
-                NoopSveaOff(navigation: navigation)
-            } else if coach.isConfigured || NoopSveaFixture.forcesCoachRoute {
+            if coach.isConfigured || NoopSveaFixture.forcesCoachRoute {
                 NoopSveaCoach(navigation: navigation)
             } else {
                 NoopSveaGate(navigation: navigation)
@@ -177,7 +175,7 @@ private struct NoopSveaCoach: View {
         ) {
             VStack(alignment: .leading, spacing: 11) {
                 HStack(spacing: 8) {
-                    NoopSveaEyebrow("Today's brief · 07:12", size: 9.5, color: Color(hex: 0xC9D0EE))
+                    NoopSveaEyebrow(briefKicker, size: 9.5, color: Color(hex: 0xC9D0EE))
                         .fixedSize(horizontal: true, vertical: false)
                     Spacer(minLength: 0)
                     Text("WRITTEN")
@@ -340,8 +338,15 @@ private struct NoopSveaCoach: View {
                 "Sleep met your need. Variability up four nights — you are ready for a moderate session, not a hard one.",
                 "Bedtime slipped 40 minutes this week. Fix that before it costs you a night."
             ]
-        case .off: return []
+        case .off:
+            return [
+                "No brief this morning. You have Svea set to Off, so nothing was fetched and no request left the phone — ask below and she answers."
+            ]
         }
+    }
+
+    private var briefKicker: String {
+        navigation.coachVoice == .off ? "Not briefed · off" : "Today's brief · 07:12"
     }
 
     private struct Source {
@@ -683,47 +688,6 @@ private struct NoopSveaGate: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
-            }
-        }
-    }
-}
-
-private struct NoopSveaOff: View {
-    @ObservedObject var navigation: NoopNavigation
-
-    var body: some View {
-        NoopSveaScrollScreen(bottomInset: 130) {
-            VStack(spacing: 0) {
-                VStack(spacing: 20) {
-                    NoopSveaLargeOrb(dimmed: true)
-                    VStack(spacing: 11) {
-                        Text("Svea is off.")
-                            .font(NoopHTMLFont.outfit(27, weight: .light))
-                            .tracking(-0.81)
-                        Text("No briefs, proposals, questions or generated coaching will contact a provider. Sleep, effort, trends, ages and the rest of Noop remain available.")
-                            .font(NoopHTMLFont.sans(13.5))
-                            .foregroundStyle(NoopHTMLColor.copy)
-                            .multilineTextAlignment(.center)
-                            .noopSveaLineBox(fontSize: 13.5, ratio: 1.65)
-                    }
-                }
-                .padding(.horizontal, 22)
-                .padding(.top, 74)
-
-                VStack(spacing: 10) {
-                    Button("Turn Svea on") { navigation.coachVoice = .plain }
-                        .buttonStyle(NoopSveaPrimaryButtonStyle())
-                    Button("Provider and permissions") { navigation.push(.setup) }
-                        .buttonStyle(NoopSveaSecondaryButtonStyle(height: 52, radius: 18, fontSize: 14))
-                    Text("Your provider, key, grants and memories stay on this iPhone so turning Svea back on restores the choices you made.")
-                        .font(NoopHTMLFont.sans(11))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .multilineTextAlignment(.center)
-                        .noopSveaLineBox(fontSize: 11, ratio: 1.6)
-                        .padding(.top, 4)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 22)
             }
         }
     }

@@ -714,8 +714,19 @@ final class NoopNavigation: ObservableObject {
     /// bare `push` from `you` or `goal` would leave the swipe popping back to whichever screen the
     /// user happened to be standing on, which is the exact drift the route pass was cleaning up.
     func enterLabPicker() {
-        if route != .labs { reset(to: .labs) }
-        push(.picker)
+        pendingSheetTransition = nil
+        overlay = nil
+        guard route != .picker else { return }
+        arrival = .pushed
+        withAnimation(NoopMotion.enter) {
+            if route == .labs {
+                path.append(.picker)
+            } else {
+                // One state change, one arrival. Calling reset() and then push() here started two
+                // competing animations and briefly rendered Labs between the source and Picker.
+                path = [.labs, .picker]
+            }
+        }
     }
 
     func plus() {
@@ -735,9 +746,10 @@ final class NoopNavigation: ObservableObject {
             // 30-routes.md §The +: Act 6 has no add sheet of its own, so the + navigates to
             // `plumbing/record` — "a measurement the estimate needs". It is one of the four rows
             // that navigate, not one of the four that present in place.
-            push(.record)
+            // `record`'s visible chevron says You. Make that its actual stack parent too; pushing
+            // it on top of Ages made an edge swipe return to Ages while the chevron returned to You.
+            reset(to: .record)
         case .svea:
-            guard coachVoice != .off else { return }
             reset(to: .coach)
             askFocusRequest += 1
         case .goals:
