@@ -42,6 +42,10 @@ struct StrandiOSApp: App {
     @AppStorage(UnitPrefs.effortScaleKey) private var effortScaleRaw = EffortScale.hundred.rawValue
 
     init() {
+        // The redesign fonts are owned by StrandDesign's resource bundle. Register them before any
+        // SwiftUI text resolves a face; the widget repeats this in its own process.
+        NoopSpecType.registerFonts()
+
         // One-time migration off the retired card/button/both Coach-entry picker onto the three
         // independent entry toggles (banner/header-icon/floating-button). No-op after the first launch
         // that has them. Must run before any Today/RootTabView reads its @AppStorage default.

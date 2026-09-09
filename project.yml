@@ -280,13 +280,6 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NoopCommitSHA: "$(NOOP_COMMIT_SHA)"
-        # Canonical HTML typography. Bundled locally so the native iOS UI never depends on a font request.
-        UIAppFonts:
-          # Xcode's synchronized resources flatten these files into the app-bundle root.
-          - Outfit.ttf
-          - InstrumentSans.ttf
-          - InstrumentSerif-Regular.ttf
-          - InstrumentSerif-Italic.ttf
         # Surfaces APP_GROUP_ID to runtime (WidgetSnapshot.suiteName) so the App Group id isn't
         # hard-coded in Swift; stays in sync with the application-groups entitlement (both $(APP_GROUP_ID)).
         AppGroupIdentifier: "$(APP_GROUP_ID)"
