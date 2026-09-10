@@ -526,6 +526,7 @@ private struct NoopVerifiedRouteScreen: View {
         case .tonight: "Tonight"
         case .why: "Why"
         case .debt: "Sleep debt"
+        case .alarm: "Smart alarm"
         case .today: "Today"
         case .inbox: "Updates"
         case .charge: "Charge"

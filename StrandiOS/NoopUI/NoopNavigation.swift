@@ -74,7 +74,7 @@ enum NoopMotion {
 
 enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 1
-    case rest, tonight, why, debt
+    case rest, tonight, why, debt, alarm
     // Act 2
     case today, inbox, charge, day, vitals, stress, heart
     // Act 3
@@ -96,7 +96,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
 
     var act: NoopAct {
         switch self {
-        case .rest, .tonight, .why, .debt: .night
+        case .rest, .tonight, .why, .debt, .alarm: .night
         case .today, .inbox, .charge, .day, .vitals, .stress, .heart: .day
         case .session, .pick, .ready, .live, .intervals, .detail, .across: .effort
         case .trends, .capacity, .rhythm, .year: .picture
@@ -112,7 +112,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     /// The highlighted destination follows the cross-Act grammar of the HTML.
     var tab: NoopTab {
         switch self {
-        case .rest, .tonight, .why, .debt:
+        case .rest, .tonight, .why, .debt, .alarm:
             .rest
         case .today, .inbox, .charge, .day, .vitals, .stress, .heart,
              .session, .pick, .ready, .live, .intervals, .detail, .across,

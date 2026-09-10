@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import StrandDesign
 
 struct NoopAct1Screens: View {
     @ObservedObject var navigation: NoopNavigation
@@ -10,6 +11,13 @@ struct NoopAct1Screens: View {
     @State private var selectedStage: Int?
     @SceneStorage("noop.act1.selected-bedtime") private var selectedBedtime = 2
     @SceneStorage("noop.act1.smart-wake") private var smartWake = true
+    /// Minutes past midnight for the wake time, stepped in fives. Nil until the user moves it, so
+    /// the screen shows the schedule's own anchor rather than a number nobody chose.
+    @SceneStorage("noop.act1.alarm-minutes") private var alarmMinutes = -1
+    /// Index into the four windows: exact, 15, 30, 45 minutes before the set time.
+    @SceneStorage("noop.act1.alarm-window") private var alarmWindowIndex = 1
+    /// Which weekdays the window is armed for, Monday first, as a 7-character mask.
+    @SceneStorage("noop.act1.alarm-days") private var alarmDayMask = "1111100"
     @SceneStorage("noop.act1.wind-down") private var windDownBuzz = true
     @SceneStorage("noop.act1.bedtime-committed") private var bedtimeCommitted = false
     @State private var expandedCause = 1
@@ -26,6 +34,8 @@ struct NoopAct1Screens: View {
             whyScreen
         case .debt:
             debtScreen
+        case .alarm:
+            alarmScreen
         default:
             restScreen
         }
@@ -383,7 +393,7 @@ struct NoopAct1Screens: View {
                         .foregroundStyle(NoopHTMLColor.copy)
                         .monospacedDigit()
                 }
-                .padding(.top, 14)
+                .padding(.top, 6)
                 .padding(.bottom, 26)
 
                 VStack(spacing: 10) {
@@ -435,10 +445,34 @@ struct NoopAct1Screens: View {
                     .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
 
                     VStack(spacing: 0) {
+                        // The HTML makes this a navigation row into `alarm`, not a toggle: the
+                        // wake time is a decision with its own screen, and the toggle beneath it
+                        // is a different question — whether the window is armed on the strap.
+                        Button { navigation.push(.alarm) } label: {
+                            HStack(spacing: 13) {
+                                NoopCanonicalGlyph(name: .alarm, size: 21, color: NoopHTMLColor.night)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Wake me by \(alarmSetText)")
+                                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                        .foregroundStyle(smartWake ? Color(hex: 0xEDF1EF) : Color(hex: 0xEDF1EF).opacity(0.38))
+                                    Text(smartWake ? alarmFromText : "Not armed")
+                                        .font(NoopHTMLFont.sans(11.5))
+                                        .foregroundStyle(Color(hex: 0x6C7570))
+                                        .lineSpacing(NoopSpecType.lineSpacing(size: 11.5, cssLineHeight: 1.45, face: NoopSpecType.Face.sansRegular))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                NoopFixedChevron(direction: .right, color: Color(hex: 0x57605C))
+                            }
+                            .frame(minHeight: 74)
+                        }
+                        .buttonStyle(.plain)
+                        Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
                         tonightToggle(
-                            glyph: .alarm,
-                            title: isNightWorker ? "Wake me between 15:10 and 15:40" : "Wake me between 06:10 and 06:40",
-                            detail: "Whichever moment you're closest to light sleep",
+                            glyph: .watch,
+                            title: "Armed on the strap",
+                            detail: "Fires with your phone off, silent, or in another room",
                             isOn: smartWake
                         ) { smartWake.toggle() }
                         Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
@@ -876,6 +910,282 @@ struct NoopAct1Screens: View {
 
     private var activeBedtimes: [Act1Bedtime] { isNightWorker ? Self.nightShiftBedtimes : Self.bedtimes }
     private var alarmTime: String { isNightWorker ? "15:25" : "06:25" }
+
+    // MARK: - 1.5 `alarm` — the smart alarm
+
+    /// The schedule's own wake anchor, in minutes past midnight.
+    private var alarmAnchorMinutes: Int {
+        let parts = alarmTime.split(separator: ":").compactMap { Int($0) }
+        guard parts.count == 2 else { return 6 * 60 + 25 }
+        return parts[0] * 60 + parts[1]
+    }
+    /// The set time. Until the user steps it, this is the anchor — not a number nobody chose.
+    private var alarmSetMinutes: Int { alarmMinutes < 0 ? alarmAnchorMinutes : alarmMinutes }
+    private static let alarmWindows = [0, 15, 30, 45]
+    private var alarmWindowMinutes: Int { Self.alarmWindows[min(max(alarmWindowIndex, 0), 3)] }
+
+    private func alarmClock(_ minutes: Int) -> String {
+        let m = ((minutes % 1440) + 1440) % 1440
+        return String(format: "%02d:%02d", m / 60, m % 60)
+    }
+    private var alarmSetText: String { alarmClock(alarmSetMinutes) }
+    /// The one sentence every other surface reads, so the row on `tonight` and the screen itself
+    /// cannot drift apart.
+    private var alarmFromText: String {
+        alarmWindowMinutes == 0
+            ? "Exactly \(alarmSetText), whatever stage you are in"
+            : "From \(alarmClock(alarmSetMinutes - alarmWindowMinutes)), at whichever moment you are closest to light sleep"
+    }
+
+    private var alarmScreen: some View {
+        NoopScreen(bottomInset: 116, topInset: 56) {
+            VStack(alignment: .leading, spacing: 0) {
+                // 30-routes.md: the chevron goes to `tonight`, not `rest` — this is a decision
+                // about tonight, so it lives inside tonight's plan.
+                NoopBackHeader(label: "Tonight") { navigation.back(or: .tonight) }
+                    .padding(.horizontal, -2)
+
+                // One continuous column, as the HTML lays it out: the hero block carries 24 pt
+                // beneath it, the window group runs on an 11 pt gap and closes with 26, and the
+                // two cards and the primary follow on their own small margins.
+                VStack(alignment: .leading, spacing: 0) {
+                    alarmHero
+                        .padding(.bottom, 24)
+                    VStack(alignment: .leading, spacing: 11) {
+                        alarmWindowPicker
+                        Text("Fifteen minutes is enough to find light sleep on most nights. Exact means exact — it wakes you at \(alarmSetText) whatever stage you are in.")
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
+                            .lineSpacing(NoopSpecType.lineSpacing(size: 11.5, cssLineHeight: 1.55, face: NoopSpecType.Face.sansRegular))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 2)
+                        alarmDayPicker
+                    }
+                    .padding(.bottom, 26)
+                    alarmStrapCard
+                        .padding(.bottom, 10)
+                    alarmFailureCard
+                    alarmArmButton
+                        .padding(.top, 4)
+                }
+                .padding(.top, 10)
+            }
+        }
+    }
+
+    /// The largest numeral in the app, deliberately: it is the one figure a person reads in the dark.
+    private var alarmHero: some View {
+        VStack(spacing: 8) {
+            Text("Wake me by")
+                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                .tracking(1.25)           // .1em x 12.5
+                .textCase(.uppercase)
+                .foregroundStyle(Color(hex: 0x6C7570))
+            alarmHeroRow
+            // The block is centred; the sentence itself sets left, as in the HTML, so a wrap
+            // reads as a paragraph rather than a centred couplet.
+            Text(alarmFromText)
+                .font(NoopHTMLFont.sans(14))
+                .monospacedDigit()
+                .foregroundStyle(NoopHTMLColor.muted)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var alarmHeroRow: some View {
+        HStack(spacing: 16) {
+            alarmStep(later: false) { alarmMinutes = alarmSetMinutes - 5 }
+            Text(alarmSetText)
+                .font(NoopHTMLFont.outfit200(82))
+                .tracking(-3.69)              // −.045em × 82
+                .monospacedDigit()
+                .foregroundStyle(NoopHTMLColor.ink)
+                // CSS line-height .94 on 82 is a 77 pt box. SwiftUI's own line box for an 82 pt
+                // face is nearer 98, which pushed everything below the hero down by 20 pt.
+                .frame(height: 77)
+                .fixedSize()
+            alarmStep(later: true) { alarmMinutes = alarmSetMinutes + 5 }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func alarmStep(later: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                Circle().strokeBorder(NoopHTMLColor.night.opacity(0.34), lineWidth: 0.5)
+                Rectangle().fill(Color(hex: 0xC9CEE8)).frame(width: 13, height: 1.6)
+                if later { Rectangle().fill(Color(hex: 0xC9CEE8)).frame(width: 1.6, height: 13) }
+            }
+            .frame(width: 40, height: 40)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(later ? "Five minutes later" : "Five minutes earlier")
+    }
+
+    private var alarmDayPicker: some View {
+        let labels = ["M", "T", "W", "T", "F", "S", "S"]
+        let mask = Array(alarmDayMask.padding(toLength: 7, withPad: "0", startingAt: 0))
+        return VStack(alignment: .leading, spacing: 11) {
+            Text("Which days")
+                .font(NoopHTMLFont.sans(10, weight: .semibold))
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(Color(hex: 0x6C7570))
+                .padding(.horizontal, 2)
+                .padding(.top, 10)
+            HStack(spacing: 6) {
+                ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
+                    let on = mask[index] == "1"
+                    Button {
+                        var next = mask
+                        next[index] = on ? "0" : "1"
+                        alarmDayMask = String(next)
+                    } label: {
+                        Text(label)
+                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .foregroundStyle(on ? Color(hex: 0xC9CEE8) : NoopHTMLColor.muted)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 42)
+                            .background(
+                                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                    .fill(on ? NoopHTMLColor.night.opacity(0.18) : NoopHTMLColor.card)
+                                    .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                        .strokeBorder(on ? NoopHTMLColor.night.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 0.5))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(label)
+                    .accessibilityValue(on ? "armed" : "not armed")
+                }
+            }
+        }
+    }
+
+    private var alarmWindowPicker: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text("How early it may wake you")
+                .font(NoopHTMLFont.sans(10, weight: .semibold))
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(Color(hex: 0x6C7570))
+                .padding(.horizontal, 2)
+            HStack(spacing: 0) {
+                ForEach(Array(Self.alarmWindows.enumerated()), id: \.offset) { index, window in
+                    let on = index == alarmWindowIndex
+                    Button { alarmWindowIndex = index } label: {
+                        VStack(spacing: 2) {
+                            Text(window == 0 ? "Exact" : "\(window) min")
+                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .foregroundStyle(on ? Color(hex: 0xC9CEE8) : NoopHTMLColor.muted)
+                            Text(window == 0 ? alarmSetText : "from \(alarmClock(alarmSetMinutes - window))")
+                                .font(NoopHTMLFont.sans(10))
+                                .monospacedDigit()
+                                .foregroundStyle(NoopHTMLColor.faint)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                .fill(on ? NoopHTMLColor.night.opacity(0.2) : .clear)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(3)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(NoopHTMLColor.card)
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5))
+            )
+        }
+    }
+
+    /// The reason the screen exists: this is the one alarm on the phone that is not the phone's.
+    private var alarmStrapCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("It runs on the strap, not the phone")
+                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                .foregroundStyle(Color(hex: 0xEDF1EF))
+            Text("Noop hands the window to the band before you sleep. It buzzes your wrist even if your phone is off, flat, silenced or in another room. Costs about 2 % of the band’s battery a night.")
+                .font(NoopHTMLFont.sans(12.5))
+                .foregroundStyle(Color(hex: 0xC9CEE8))
+                .lineSpacing(NoopSpecType.lineSpacing(size: 12.5, cssLineHeight: 1.6, face: NoopSpecType.Face.sansRegular))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(NoopHTMLColor.night.opacity(0.08))
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(NoopHTMLColor.night.opacity(0.22), lineWidth: 0.5))
+        )
+    }
+
+    /// Every failure mode named before it happens. An alarm that silently does not fire is worse
+    /// than no alarm, and the honest place to say so is here rather than in tomorrow's read.
+    private var alarmFailureCard: some View {
+        let failures = [
+            "The band is not on your wrist when you fall asleep. It cannot buzz an empty strap, and it will not fall back to your phone.",
+            "The band is below 5 %. It keeps the window armed but drops the buzz — you get one line about it on tomorrow morning’s read.",
+            "You never opened Noop before bed. The window is handed over at your bedtime anchor, so an alarm set three days ago and never re-armed does not fire."
+        ]
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("When it will not fire")
+                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                .foregroundStyle(Color(hex: 0xEDF1EF))
+            ForEach(Array(failures.enumerated()), id: \.offset) { index, line in
+                HStack(alignment: .firstTextBaseline, spacing: 11) {
+                    Circle().fill(Color(hex: 0xC8934B)).frame(width: 5, height: 5)
+                    Text(line)
+                        .font(NoopHTMLFont.sans(12.5))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                        .lineSpacing(NoopSpecType.lineSpacing(size: 12.5, cssLineHeight: 1.55, face: NoopSpecType.Face.sansRegular))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.vertical, 8)
+                if index < failures.count - 1 {
+                    Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous).fill(NoopHTMLColor.card)
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5))
+        )
+    }
+
+    /// Arming is a separate, reversible act from setting the time — setting commits nothing to the
+    /// strap. The committed state lives on `tonight`, not in a toast.
+    private var alarmArmButton: some View {
+        Button {
+            smartWake = true
+            navigation.back(or: .tonight)
+        } label: {
+            Text(smartWake ? "Armed · back to tonight" : "Arm it for tonight")
+                .font(NoopHTMLFont.sans(15, weight: .semibold))
+                .foregroundStyle(smartWake ? Color(hex: 0xC9CEE8) : Color(hex: 0x12142B))
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(smartWake ? Color.clear : Color(hex: 0x8B99D6))
+                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(smartWake ? NoopHTMLColor.night.opacity(0.36) : .clear, lineWidth: 0.5))
+                )
+        }
+        .buttonStyle(.plain)
+    }
     private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
     private var rhythmLine: String {
         isNightWorker
