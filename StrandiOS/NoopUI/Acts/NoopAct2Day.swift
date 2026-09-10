@@ -1,4 +1,6 @@
+import Combine
 import Foundation
+import StrandAnalytics
 import SwiftUI
 
 struct NoopAct2Screens: View {
@@ -29,6 +31,8 @@ struct NoopAct2Screens: View {
             stressScreen
         case .heart:
             heartScreen
+        case .breathe, .bcatalog, .bplayer, .bsweep, .bfound:
+            NoopBreatheScreens(navigation: navigation)
         default:
             todayScreen
         }
@@ -118,6 +122,17 @@ struct NoopAct2Screens: View {
                     )
                 }
                 .buttonStyle(NoopHTMLPressStyle())
+                // The HTML lays a Ø176 hit target over the sphere itself: the gauge around it opens
+                // Charge, the orb is Breathe's door.
+                .overlay {
+                    Circle()
+                        .fill(Color.clear)
+                        .frame(width: 176, height: 176)
+                        .contentShape(Circle())
+                        .onTapGesture { navigation.push(.breathe) }
+                        .accessibilityLabel("Breathe")
+                        .accessibilityAddTraits(.isButton)
+                }
 
                 VStack(spacing: 10) {
                     Button { navigation.push(.charge) } label: {
@@ -1353,7 +1368,7 @@ struct NoopAct2Screens: View {
                     .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
                     .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
 
-                    Button { navigation.reset(to: .today) } label: {
+                    Button { navigation.push(.breathe) } label: {
                         VStack(alignment: .leading, spacing: 10) {
                             NoopSectionLabel("The one control you have", color: selectedStress >= 2 ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue)
                             Text("Breathe with the orb")
@@ -2582,4 +2597,1387 @@ private extension NoopAct2Screens {
         Act2DayContext(weekday: "Fri", number: 21, date: "Friday 21 August", shortLabel: "Fri 21", eyebrow: "Friday 21 August", header: "You went to bed on time", span: "06:40 → 22:05", axis: ["06:40", "11:00", "16:30", "22:05"], endTime: "22:05", dayRead: "The day held steady and the evening came down early enough to leave sleep alone.", recordedPulse: 63, wakeCharge: 88, charge: 57, chargeLabel: "Enough for the evening", chargeLine: "You woke with 88 and finished with 57. Nothing borrowed from the next morning.", spend: Array(commonSpend.prefix(3)), marks: marks(21)),
         Act2DayContext(weekday: "Sat", number: 22, date: "Saturday 22 August", shortLabel: "Sat 22", eyebrow: "Hi, Gabriel", header: "Take four breaths first", span: "06:41 → 14:20", axis: ["06:41", "09:00", "11:30", "14:20"], endTime: "14:20", dayRead: "Quiet since the walk. You are sitting eight beats above your resting line, which is normal for the early afternoon.", recordedPulse: 72, wakeCharge: 92, charge: 56, chargeLabel: "Enough for the evening", chargeLine: "You woke with 92 and you have 56 left. Normal for this hour. Enough for the evening you had planned.", spend: commonSpend, marks: marks(22))
     ]
+}
+
+// MARK: - Breathe (Act 2 §2.8–2.12)
+//
+// Source of truth: the Breathe screens in `Noop Act 2 - The Day.dc.html`. Release reads the real
+// `BreathProtocolCatalog`, drives the strap through `BiofeedbackController`, and scores the sweep with
+// `ResonanceEngine`; the HTML's eighteen-row catalog, its sine-wave heart and its 5.5 result exist only
+// under `--demo-seed`. Nothing on these five screens treats, diagnoses or claims a clinical effect.
+
+/// One row of the catalog — a real protocol, the locked resonance pace, or the sweep itself.
+struct NoopBreatheItem: Identifiable, Equatable {
+    enum Kind: Equatable { case paced, guided, sweep }
+    let id: String
+    let name: String
+    let detail: String
+    let pattern: String
+    /// Stage lengths in seconds, in order. Empty for guided protocols and the sweep.
+    let stages: [NoopBreatheStage]
+    let kind: Kind
+    var sessionSeconds: Int = 360
+    /// The catalog protocol the strap paces, when there is one.
+    var source: BreathProtocol? = nil
+
+    var cycleSeconds: Double { stages.reduce(0) { $0 + $1.seconds } }
+
+    static func == (lhs: NoopBreatheItem, rhs: NoopBreatheItem) -> Bool { lhs.id == rhs.id }
+}
+
+struct NoopBreatheStage: Equatable {
+    let phase: BreathPhase
+    let seconds: Double
+}
+
+struct NoopBreatheGroup: Identifiable {
+    let id: String
+    let items: [NoopBreatheItem]
+    let warning: String?
+}
+
+/// What a finished sweep found, persisted so `bfound` and `breathe` survive a relaunch.
+struct NoopBreatheSweep: Codable, Equatable {
+    struct Point: Codable, Equatable { let bpm: Double; let amplitude: Double? }
+    let points: [Point]
+    let lockedBpm: Double?
+    let date: Date
+
+    var peak: Point? {
+        guard let lockedBpm else { return nil }
+        return points.first { $0.bpm == lockedBpm }
+    }
+
+    /// How much harder the heart swung at the peak than at the best of the rest, in percent.
+    var margin: Int? {
+        guard let peak, let top = peak.amplitude else { return nil }
+        let rest = points.filter { $0.bpm != peak.bpm }.compactMap(\.amplitude)
+        guard let runnerUp = rest.max(), runnerUp > 0 else { return nil }
+        return Int(((top / runnerUp - 1) * 100).rounded())
+    }
+}
+
+@MainActor
+final class NoopBreatheSession: ObservableObject {
+    static let shared = NoopBreatheSession()
+
+    /// The HTML's five candidates and ninety seconds each (`BRATES`, the bargain line).
+    static let sweepPaces: [Double] = [6.5, 6.0, 5.5, 5.0, 4.5]
+    static let sweepSecondsPerPace = 90
+    private static let sweepKey = "noop.breathe.sweep"
+
+    @Published private(set) var controller: BiofeedbackController?
+    @Published private(set) var samples: [Double] = []
+    @Published private(set) var paceSamples: [Double] = []
+    @Published private(set) var sessionStart: Date?
+    @Published private(set) var sweepStart: Date?
+    @Published private(set) var sweepPaceStart: Date?
+    @Published private(set) var sweepSwings: [Int: [Double]] = [:]
+    @Published private(set) var sweep: NoopBreatheSweep?
+    /// Demo only: the HTML's `bfound` flag, set once its 30-second sweep settles.
+    @Published var demoFound = false
+
+    private var model: AppModel?
+    private var ticker: Timer?
+    private var sweepWatch: AnyCancellable?
+
+    private init() {
+        if let data = UserDefaults.standard.data(forKey: Self.sweepKey),
+           let stored = try? JSONDecoder().decode(NoopBreatheSweep.self, from: data) {
+            sweep = stored
+        }
+    }
+
+    var isDemo: Bool { NoopContentPolicy.allowsPrototypeContent }
+
+    func attach(model: AppModel, live: LiveState) {
+        guard controller == nil else { return }
+        self.model = model
+        let made = BiofeedbackController(model: model, live: live)
+        controller = made
+        sweepWatch = made.$lastSweep
+            .compactMap { $0 }
+            .sink { [weak self] result in self?.store(result) }
+    }
+
+    var strapCanBuzz: Bool { controller?.canBuzz ?? false }
+
+    /// The pace every resonance session uses: the locked one if a sweep found it.
+    var lockedPace: Double? {
+        if isDemo { return demoFound ? 5.5 : nil }
+        return BiofeedbackPrefs.lockedPace
+    }
+
+    // MARK: Player
+
+    func startSession(_ item: NoopBreatheItem) {
+        stopTicker()
+        samples = []
+        paceSamples = []
+        sessionStart = Date()
+        if !isDemo, let controller {
+            if let proto = item.source {
+                controller.startProtocolSession(proto, sessionMs: item.sessionSeconds * 1000)
+            } else if item.id == "noop.resonance", let bpm = lockedPace {
+                let cycles = max(1, Int((Double(item.sessionSeconds) * bpm / 60).rounded()))
+                controller.startResonanceSession(bpm: bpm, cycles: cycles)
+            }
+        }
+        // The trace is sampled every 140 ms, as the HTML does, so it is read rather than drawn after the fact.
+        ticker = Timer.scheduledTimer(withTimeInterval: 0.14, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.sampleHeart(for: item) }
+        }
+    }
+
+    func endSession() {
+        stopTicker()
+        controller?.stop()
+        sessionStart = nil
+    }
+
+    private func sampleHeart(for item: NoopBreatheItem) {
+        guard let start = sessionStart else { return }
+        let t = Date().timeIntervalSince(start)
+        let cycle = max(item.cycleSeconds, 1)
+        let heart: Double?
+        if isDemo {
+            // The prototype's synthetic heart: a 7.5 bpm swing that trails the breath by a sixth of a cycle.
+            let jitter = sin(t * 12.9898) * 0.45
+            heart = 64 + 7.5 * sin(2 * .pi * (t - cycle * 0.16) / cycle) + jitter
+        } else {
+            heart = model?.bpm.map(Double.init)
+        }
+        guard let heart else { return }
+        samples = Array((samples + [heart]).suffix(96))
+        paceSamples = Array((paceSamples + [NoopBreathePacer.breath(item: item, at: t)]).suffix(96))
+    }
+
+    private func stopTicker() {
+        ticker?.invalidate()
+        ticker = nil
+    }
+
+    // MARK: Sweep
+
+    func startSweep() {
+        stopTicker()
+        sweepStart = Date()
+        sweepPaceStart = Date()
+        sweepSwings = [:]
+        if !isDemo {
+            controller?.startSweep(quick: false, secondsPerPace: Self.sweepSecondsPerPace, paces: Self.sweepPaces)
+            ticker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.sampleSweep() }
+            }
+        }
+    }
+
+    /// The step the sweep is on, 0-based, and how far through it (0…1).
+    func sweepStep(at date: Date) -> (index: Int, progress: Double) {
+        if isDemo {
+            let t = date.timeIntervalSince(sweepStart ?? date)
+            return (min(4, Int(t / 6)), (t.truncatingRemainder(dividingBy: 6)) / 6)
+        }
+        guard case let .resonanceSweep(_, index, _) = controller?.session else { return (0, 0) }
+        let t = date.timeIntervalSince(sweepPaceStart ?? date)
+        return (index, min(1, t / Double(Self.sweepSecondsPerPace)))
+    }
+
+    private var lastSweepIndex = -1
+
+    private func sampleSweep() {
+        guard case let .resonanceSweep(_, index, _) = controller?.session else { return }
+        if index != lastSweepIndex {
+            lastSweepIndex = index
+            sweepPaceStart = Date()
+        }
+        if let bpm = model?.bpm { sweepSwings[index, default: []].append(Double(bpm)) }
+    }
+
+    /// The live swing (max − min heart rate) seen at pace `index`, or nil with nothing measured.
+    func measuredSwing(_ index: Int) -> Double? {
+        guard let beats = sweepSwings[index], beats.count > 4,
+              let hi = beats.max(), let lo = beats.min() else { return nil }
+        return hi - lo
+    }
+
+    var sweepRunning: Bool {
+        if case .resonanceSweep = controller?.session { return true }
+        return false
+    }
+
+    func keepSweep() {
+        stopTicker()
+        controller?.keepSweep()
+        sweepStart = nil
+    }
+
+    func cancelSweep() {
+        stopTicker()
+        controller?.stop()
+        sweepStart = nil
+    }
+
+    private func store(_ result: ResonanceEngine.SweepResult) {
+        stopTicker()
+        let stored = NoopBreatheSweep(
+            points: result.scores.map { .init(bpm: $0.bpm, amplitude: $0.rsaAmplitude) },
+            lockedBpm: result.didLock ? result.lockedBpm : nil,
+            date: Date()
+        )
+        sweep = stored
+        if let data = try? JSONEncoder().encode(stored) {
+            UserDefaults.standard.set(data, forKey: Self.sweepKey)
+        }
+    }
+}
+
+enum NoopBreathePacer {
+    /// Breath fullness 0…1 at `t` seconds: eased up through an inhale, held, eased down through an
+    /// exhale. Guided protocols have no tempo and sit at the midpoint.
+    static func breath(item: NoopBreatheItem, at t: Double) -> Double {
+        state(item: item, at: t).breath
+    }
+
+    struct State {
+        let breath: Double
+        let phase: BreathPhase
+        let secondsLeft: Int
+    }
+
+    static func state(item: NoopBreatheItem, at t: Double) -> State {
+        let stages = item.stages.filter { $0.seconds > 0 }
+        let cycle = stages.reduce(0) { $0 + $1.seconds }
+        guard cycle > 0 else { return State(breath: 0.5, phase: .textOnly, secondsLeft: 0) }
+        var u = t.truncatingRemainder(dividingBy: cycle)
+        var level = 0.0
+        for stage in stages {
+            if u < stage.seconds {
+                let p = u / stage.seconds
+                let eased = 0.5 - 0.5 * cos(.pi * p)
+                let breath: Double
+                switch stage.phase {
+                case .inhale: breath = eased
+                case .exhale: breath = 1 - eased
+                case .hold, .textOnly: breath = level
+                }
+                return State(breath: breath, phase: stage.phase, secondsLeft: max(1, Int(ceil(stage.seconds - u))))
+            }
+            u -= stage.seconds
+            switch stage.phase {
+            case .inhale: level = 1
+            case .exhale: level = 0
+            case .hold, .textOnly: break
+            }
+        }
+        return State(breath: level, phase: stages.last?.phase ?? .inhale, secondsLeft: 1)
+    }
+
+    /// The HTML's sweep pacer: a sine at the candidate's own rate.
+    static func sine(rate: Double, at t: Double) -> (breath: Double, inhaling: Bool) {
+        let cycle = 60 / rate
+        let u = t.truncatingRemainder(dividingBy: cycle) / cycle
+        return (0.5 - 0.5 * cos(2 * .pi * u), u < 0.5)
+    }
+}
+
+enum NoopBreatheCatalog {
+    static let defaultID = "coherent_6_6"
+
+    static func groups(lockedPace: Double?, demo: Bool) -> [NoopBreatheGroup] {
+        demo ? demoGroups : liveGroups(lockedPace: lockedPace)
+    }
+
+    static func item(id: String, lockedPace: Double?, demo: Bool) -> NoopBreatheItem {
+        let all = groups(lockedPace: lockedPace, demo: demo).flatMap(\.items)
+        return all.first { $0.id == id && $0.kind != .sweep }
+            ?? all.first { $0.id == (demo ? "demo.coherent" : defaultID) }
+            ?? all[0]
+    }
+
+    /// The count word for the title — the catalog decides how many there are, not the design.
+    static func countWord(_ groups: [NoopBreatheGroup]) -> String {
+        // The HTML counts every row, the sweep included: eighteen.
+        let n = groups.flatMap(\.items).count
+        let words = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+                     "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen",
+                     "Nineteen", "Twenty"]
+        if n < words.count { return words[n] }
+        let units = ["", "-one", "-two", "-three", "-four", "-five", "-six", "-seven", "-eight", "-nine"]
+        return n < 30 ? "Twenty" + units[n - 20] : "\(n)"
+    }
+
+    // MARK: Release — the real catalog, grouped by what each protocol is for
+
+    private static let settle = ["relax_4_6", "coherent_6_6", "box_4_4_4_4", "four_seven_eight",
+                                 "diaphragmatic_4_2_6", "deep_4_2_6", "qigong"]
+    private static let lift = ["bhastrika", "kapalabhati", "breath_of_fire", "wim_hof", "holotropic",
+                               "tummo", "shamanic", "presence_mid", "presence_punching"]
+
+    private static func liveGroups(lockedPace: Double?) -> [NoopBreatheGroup] {
+        let all = BreathProtocolCatalog.all.map(item(from:))
+        var steady = all.filter { !settle.contains($0.id) && !lift.contains($0.id) }
+        if let lockedPace {
+            let half = 30 / lockedPace
+            steady.insert(NoopBreatheItem(
+                id: "noop.resonance", name: "Resonance",
+                detail: "Whatever your sweep found. Locked to you.",
+                pattern: "\(clock(half)) · \(clock(half))",
+                stages: [.init(phase: .inhale, seconds: half), .init(phase: .exhale, seconds: half)],
+                kind: .paced, sessionSeconds: 600
+            ), at: 0)
+        }
+        return [
+            NoopBreatheGroup(id: "To settle", items: settle.compactMap { id in all.first { $0.id == id } }, warning: nil),
+            NoopBreatheGroup(id: "To steady", items: steady, warning: nil),
+            NoopBreatheGroup(
+                id: "To lift",
+                items: lift.compactMap { id in all.first { $0.id == id } },
+                warning: "These are forceful. Sitting or lying only, never while driving, and stop at the first sign of light-headedness."
+            ),
+            NoopBreatheGroup(id: "To measure", items: [sweepItem], warning: nil)
+        ].filter { !$0.items.isEmpty }
+    }
+
+    private static func item(from proto: BreathProtocol) -> NoopBreatheItem {
+        let stages = proto.stages.filter { $0.durationMs > 0 }
+            .map { NoopBreatheStage(phase: $0.type, seconds: Double($0.durationMs) / 1000) }
+        let guided = proto.mode == .guided || stages.isEmpty
+        return NoopBreatheItem(
+            id: proto.id,
+            name: proto.title,
+            detail: proto.subtitle,
+            pattern: guided ? "guided" : stages.map { clock($0.seconds) }.joined(separator: " · "),
+            stages: stages,
+            kind: guided ? .guided : .paced,
+            sessionSeconds: max(60, proto.recommendedDurationMs / 1000),
+            source: proto
+        )
+    }
+
+    static func clock(_ seconds: Double) -> String {
+        let rounded = (seconds * 10).rounded() / 10
+        return rounded == rounded.rounded() ? String(Int(rounded)) : String(format: "%.1f", rounded)
+    }
+
+    private static let sweepItem = NoopBreatheItem(
+        id: "noop.sweep", name: "Find your pace", detail: "The resonance sweep. Ten minutes, once.",
+        pattern: "sweep", stages: [], kind: .sweep
+    )
+
+    // MARK: Demo — the HTML's `PROTOS`, verbatim
+
+    private static func demo(_ id: String, _ name: String, _ detail: String, _ pattern: String, _ cycle: Double,
+                             kind: NoopBreatheItem.Kind = .paced) -> NoopBreatheItem {
+        // The prototype paces every row as half in, half out over its cycle.
+        NoopBreatheItem(id: "demo." + id, name: name, detail: detail, pattern: pattern,
+                        stages: [.init(phase: .inhale, seconds: cycle / 2), .init(phase: .exhale, seconds: cycle / 2)],
+                        kind: kind)
+    }
+
+    private static let demoGroups: [NoopBreatheGroup] = [
+        NoopBreatheGroup(id: "To settle", items: [
+            demo("coherent", "Coherent 6-6", "Six seconds in, six out. The default until a sweep says otherwise.", "6 · 6", 12),
+            demo("box", "Box", "Equal four counts. The one on today\u{2019}s orb.", "4 · 4 · 4 · 4", 16),
+            demo("478", "4-7-8", "Long hold, longer out. For getting to sleep.", "4 · 7 · 8", 19),
+            demo("diaphragmatic", "Diaphragmatic", "Slow and low, no counting to speak of.", "5 · 5", 10),
+            demo("extended", "Extended exhale", "Twice as long out as in.", "4 · 8", 12)
+        ], warning: nil),
+        NoopBreatheGroup(id: "To steady", items: [
+            demo("nostril", "Alternate Nostril", "Alternating sides, hands involved.", "4 · 4 · 4", 12),
+            demo("buteyko", "Buteyko", "Reduced volume, light air hunger.", "3 · 3 · 6", 12),
+            demo("resonance", "Resonance", "Whatever your sweep found. Locked to you.", "5.5 · 5.5", 11),
+            demo("ujjayi", "Ujjayi", "Narrowed throat, audible and even.", "5 · 5", 10)
+        ], warning: nil),
+        NoopBreatheGroup(id: "To lift", items: [
+            demo("bhastrika", "Bhastrika", "Forceful and fast, in and out.", "1 · 1", 2),
+            demo("kapalabhati", "Kapalabhati", "Sharp exhales, passive inhales.", "0.5 · 1", 1.5),
+            demo("fire", "Breath of fire", "Rapid and even through the nose.", "1 · 1", 2),
+            demo("wimhof", "Wim Hof rounds", "Thirty deep breaths, then a hold.", "30 + hold", 3),
+            demo("holotropic", "Holotropic", "Sustained fast breathing, long session.", "free", 3)
+        ], warning: "These four are forceful. Sitting or lying only, never while driving, and stop at the first sign of light-headedness."),
+        NoopBreatheGroup(id: "To measure", items: [
+            NoopBreatheItem(id: "noop.sweep", name: "Find your pace", detail: "The resonance sweep. Ten minutes, once.",
+                            pattern: "sweep", stages: [], kind: .sweep),
+            demo("co2", "CO\u{2082} tolerance", "One comfortable hold, timed.", "hold", 10),
+            demo("bolt", "BOLT score", "Breath-hold time after a normal exhale.", "hold", 10),
+            demo("resting", "Resting check", "Two minutes of nothing, for a baseline.", "\u{2014}", 10)
+        ], warning: nil)
+    ]
+}
+
+/// Rates as the HTML says them: "Five and a half a minute".
+enum NoopBreatheWords {
+    static func half(_ value: Double) -> String {
+        let halves = Int((value * 2).rounded())
+        let whole = halves / 2
+        let names = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+                     "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen"]
+        let base = whole < names.count ? names[whole] : "\(whole)"
+        return halves % 2 == 0 ? base : base + " and a half"
+    }
+
+    static func rate(_ bpm: Double) -> String { String(format: "%.1f", bpm) }
+}
+
+struct NoopBreatheScreens: View {
+    @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var live: LiveState
+    @ObservedObject private var session = NoopBreatheSession.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("noop.breathe.protocol") private var protocolID = NoopBreatheCatalog.defaultID
+    @State private var arrival = Date()
+
+    private static let aura = Color(hex: 0x7FC9EE)
+    private static let auraPale = Color(hex: 0x9FE2FB)
+    private static let body = Color(hex: 0xB7C3C9)
+    private static let sub = Color(hex: 0x7F8A85)
+
+    private var demo: Bool { session.isDemo }
+    private var groups: [NoopBreatheGroup] { NoopBreatheCatalog.groups(lockedPace: session.lockedPace, demo: demo) }
+    private var current: NoopBreatheItem {
+        NoopBreatheCatalog.item(id: demo && !protocolID.hasPrefix("demo.") ? "demo.coherent" : protocolID,
+                                lockedPace: session.lockedPace, demo: demo)
+    }
+
+    var body: some View {
+        Group {
+            switch navigation.route {
+            case .bcatalog: catalogScreen
+            case .bplayer: playerScreen
+            case .bsweep: sweepScreen
+            case .bfound: foundScreen
+            default: breatheScreen
+            }
+        }
+        .onAppear {
+            session.attach(model: model, live: live)
+            arrival = Date()
+        }
+    }
+
+    // MARK: Header — Breathe's own chevron: no fill, a 0.5 pt border
+
+    private func header(_ label: String) -> some View {
+        HStack(spacing: 12) {
+            Button { navigation.back(or: navigation.route == .breathe ? .today : .breathe) } label: {
+                ZStack {
+                    Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                    NoopBreatheCorner().offset(x: -1)
+                }
+                .frame(width: 35, height: 35)
+                .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
+            Text(label)
+                .font(NoopHTMLFont.sans(13.5))
+                .foregroundStyle(NoopHTMLColor.copy)
+            Spacer()
+        }
+        .padding(.horizontal, -2)
+        .padding(.top, -2)
+    }
+
+    private func closeButton(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                Text("\u{00D7}")
+                    .font(.system(size: 15))
+                    .foregroundStyle(NoopHTMLColor.inkSoft)
+                    .offset(y: -1)
+            }
+            .frame(width: 35, height: 35)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close")
+    }
+
+    private func lineSpacing(_ size: CGFloat, _ cssLineHeight: CGFloat) -> CGFloat {
+        // Instrument Sans' own line is 1.22 em; CSS adds the rest as leading.
+        max(0, size * cssLineHeight - size * 1.22)
+    }
+
+    private func copy(_ text: String, _ size: CGFloat, _ lh: CGFloat, _ color: Color) -> some View {
+        Text(text)
+            .font(NoopHTMLFont.sans(size))
+            .foregroundStyle(color)
+            .lineSpacing(lineSpacing(size, lh))
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func primary(_ title: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(NoopHTMLFont.sans(15, weight: .semibold))
+                .foregroundStyle(NoopHTMLColor.blueInk)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 18))
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+    }
+
+    private func secondary(_ title: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(NoopHTMLFont.sans(14.5, weight: .medium))
+                .foregroundStyle(NoopHTMLColor.inkSoft)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.14), lineWidth: 0.5))
+                .contentShape(RoundedRectangle(cornerRadius: 18))
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+    }
+
+    private func listCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(spacing: 0) { content() }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 4)
+            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+            .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+    }
+
+    // MARK: Orb layers
+
+    private func orbBody(_ size: CGFloat, shadowBlur: CGFloat, shadowY: CGFloat, opacity: Double) -> some View {
+        // radial-gradient(circle at 38% 32%, …) reaches its farthest corner.
+        let far = size * sqrt(0.62 * 0.62 + 0.68 * 0.68)
+        return Circle()
+            .fill(RadialGradient(
+                stops: [
+                    .init(color: Color(hex: 0x9FE2FB), location: 0),
+                    .init(color: Color(hex: 0x2FB2F0), location: 0.55),
+                    .init(color: Color(hex: 0x0A5F92), location: 1)
+                ],
+                center: UnitPoint(x: 0.38, y: 0.32), startRadius: 0, endRadius: far
+            ))
+            .frame(width: size, height: size)
+            .shadow(color: Color(hex: 0x0B6FA8).opacity(opacity), radius: shadowBlur / 2, y: shadowY)
+    }
+
+    private func glow(_ size: CGFloat, alpha: Double) -> some View {
+        // radial-gradient(circle, …) defaults to farthest-corner: √2 × half the box.
+        Circle()
+            .fill(RadialGradient(
+                stops: [
+                    .init(color: Color(hex: 0x2FB2F0).opacity(alpha), location: 0),
+                    .init(color: Color(hex: 0x2FB2F0).opacity(0), location: 0.66),
+                    .init(color: .clear, location: 1)
+                ],
+                center: .center, startRadius: 0, endRadius: size / 2 * sqrt(2)
+            ))
+            .frame(width: size, height: size)
+    }
+
+    // MARK: 2.8 breathe
+
+    private var foundPace: Double? { session.lockedPace }
+
+    private var breatheScreen: some View {
+        NoopScreen(topInset: 58) {
+            VStack(spacing: 0) {
+                header("Today")
+                    .padding(.bottom, 8)
+                breatheHero
+                    .frame(height: 292)
+                VStack(alignment: .leading, spacing: 11) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(foundPace.map { "\(NoopBreatheWords.half($0)) a minute" } ?? "A pace, until you find yours")
+                            .font(NoopHTMLFont.outfit(23))
+                            .tracking(-0.575)
+                        copy(homeLine, 13, 1.55, NoopHTMLColor.copy)
+                    }
+                    .padding(.horizontal, 2)
+
+                    primary("Start \u{00B7} \(current.name)") { navigation.push(.bplayer) }
+
+                    Button { navigation.push(.bcatalog) } label: {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(current.name)
+                                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Text(protocolMeta(current))
+                                    .font(NoopHTMLFont.sans(11.5))
+                                    .foregroundStyle(Self.sub)
+                            }
+                            Spacer(minLength: 0)
+                            Text("Change")
+                                .font(NoopHTMLFont.sans(12))
+                                .foregroundStyle(NoopHTMLColor.faint)
+                            Act2CSSChevron(size: 8, color: NoopHTMLColor.faint)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 15)
+                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                        .contentShape(RoundedRectangle(cornerRadius: 22))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+
+                    Button { navigation.push(.bsweep) } label: {
+                        VStack(alignment: .leading, spacing: 7) {
+                            HStack {
+                                NoopSectionLabel(sweepEyebrow, color: Self.aura)
+                                Spacer()
+                                Act2CSSChevron(size: 8, color: Self.aura)
+                            }
+                            Text(foundPace == nil ? "Find your pace" : "Test it again")
+                                .font(NoopHTMLFont.outfit(19))
+                                .tracking(-0.38)
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            copy(sweepLine, 12.5, 1.55, Self.body)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 15)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
+                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.blue.opacity(0.2), lineWidth: 0.5))
+                        .contentShape(RoundedRectangle(cornerRadius: 22))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+
+                    if foundPace != nil {
+                        afterRows(vertical: 13, pace: foundPace)
+                    }
+
+                    copy("A pace that suits your physiology. Nothing here treats anything, and the strap does the counting so you can shut your eyes.",
+                         11.5, 1.6, NoopHTMLColor.faint)
+                        .padding(.horizontal, 2)
+                        .padding(.top, 2)
+                }
+                .padding(.bottom, 26)
+            }
+        }
+    }
+
+    private var breatheHero: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { timeline in
+            // auraBreathe: 10 s ease-in-out, scale .92 ↔ 1.06, opacity .5 ↔ .85.
+            let t = timeline.date.timeIntervalSince(arrival).truncatingRemainder(dividingBy: 10) / 10
+            let k = reduceMotion ? 0.5 : 0.5 - 0.5 * cos(2 * .pi * t)
+            let scale = 0.92 + 0.14 * k
+            let alpha = 0.5 + 0.35 * k
+            ZStack {
+                glow(280, alpha: 0.20).scaleEffect(scale).opacity(alpha)
+                Circle().stroke(Self.auraPale.opacity(0.28), lineWidth: 1)
+                    .frame(width: 214, height: 214).scaleEffect(scale).opacity(alpha)
+                orbBody(150, shadowBlur: 52, shadowY: 18, opacity: 0.55)
+                VStack(spacing: 3) {
+                    Text(foundPace.map(NoopBreatheWords.rate) ?? "6.0")
+                        .font(NoopHTMLFont.outfit200(38))
+                        .tracking(-1.14)
+                        .monospacedDigit()
+                        .foregroundStyle(Color(hex: 0xF6FDFF))
+                        .shadow(color: Color(hex: 0x041E30).opacity(0.55), radius: 8, y: 2)
+                        .frame(height: 38)
+                    Text((foundPace == nil ? "generic pace" : "your pace").uppercased())
+                        .font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                        .tracking(1.05)
+                        .foregroundStyle(Color(hex: 0xF6FDFF).opacity(0.72))
+                }
+                .allowsHitTesting(false)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var sweepDate: String {
+        let date = demo ? nil : BiofeedbackPrefs.lockedPaceDate
+        guard let date else { return "12 August" }
+        return date.formatted(.dateTime.day().month(.wide))
+    }
+
+    private var homeLine: String {
+        guard foundPace != nil else {
+            return "Breathe works today at six a minute, which suits most people. Ten minutes of measuring finds the one that suits you."
+        }
+        return demo
+            ? "Locked from your sweep on 12 August. Every protocol that can run at your pace now does."
+            : "Locked from your sweep on \(sweepDate). Resonance sessions now run at it."
+    }
+
+    private var sweepEyebrow: String { foundPace == nil ? "Ten minutes, once" : "Swept \(sweepDate)" }
+
+    private var sweepLine: String {
+        guard foundPace != nil else {
+            return "There is one pace where your heart swings hardest with each breath. The strap can find it in about ten minutes."
+        }
+        return demo
+            ? "Your resting pulse has moved 3 bpm since. Worth re-testing, not urgent."
+            : "A pace can drift as your fitness changes. Worth re-testing every few months."
+    }
+
+    private func protocolMeta(_ item: NoopBreatheItem) -> String {
+        switch item.kind {
+        case .guided: return "Guided \u{00B7} your own tempo"
+        case .sweep: return item.detail
+        case .paced:
+            let cycle = item.cycleSeconds
+            return "\(item.pattern) \u{00B7} \(cycle == cycle.rounded() ? String(Int(cycle)) : String(format: "%.0f", cycle))s a breath"
+        }
+    }
+
+    private struct AfterRow: Identifiable {
+        var id: String { k }
+        let k: String
+        let sub: String
+        let v: String
+    }
+
+    private func afterRowsData(_ pace: Double?) -> [AfterRow] {
+        guard let pace else { return [] }
+        if demo {
+            return [
+                AfterRow(k: "Breathe", sub: "Every paced protocol runs at 5.5 unless you pick otherwise", v: "5.5"),
+                AfterRow(k: "The orb on today", sub: "Paces at your rate instead of a generic six", v: "follows"),
+                AfterRow(k: "Wind-down buzz", sub: "The bedtime nudge uses your pace for its two minutes", v: "follows")
+            ]
+        }
+        // Only what the build actually does with the pace.
+        return [AfterRow(k: "Resonance", sub: "A protocol in the catalog that paces at your rate", v: NoopBreatheWords.rate(pace))]
+    }
+
+    private func afterRows(vertical: CGFloat, pace: Double?) -> some View {
+        let rows = afterRowsData(pace)
+        return listCard {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.k)
+                            .font(NoopHTMLFont.sans(13))
+                            .foregroundStyle(NoopHTMLColor.ink)
+                        copy(row.sub, 11.5, 1.5, Self.sub)
+                    }
+                    Spacer(minLength: 0)
+                    Text(row.v)
+                        .font(NoopHTMLFont.sans(12))
+                        .foregroundStyle(Self.aura)
+                        .monospacedDigit()
+                }
+                .padding(.vertical, vertical)
+                .overlay(alignment: .bottom) {
+                    if index < rows.count - 1 {
+                        Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: 2.9 bcatalog
+
+    private var catalogScreen: some View {
+        let groups = self.groups
+        return NoopScreen(topInset: 58) {
+            VStack(alignment: .leading, spacing: 0) {
+                header("Breathe")
+                    .padding(.bottom, 16)
+                VStack(alignment: .leading, spacing: 13) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(NoopBreatheCatalog.countWord(groups)) ways to breathe")
+                            .font(NoopHTMLFont.outfit(25))
+                            .tracking(-0.625)
+                        copy("All of them already in the catalog. Grouped by what they are for, because \(NoopBreatheCatalog.countWord(groups).lowercased()) in one list is a menu nobody reads.",
+                             13, 1.6, NoopHTMLColor.copy)
+                    }
+                    ForEach(groups) { group in
+                        VStack(alignment: .leading, spacing: 8) {
+                            NoopSectionLabel(group.id)
+                                .padding(.horizontal, 2)
+                                .padding(.top, 6)
+                            listCard {
+                                ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
+                                    catalogRow(item, last: index == group.items.count - 1)
+                                }
+                            }
+                            if let warning = group.warning {
+                                copy(warning, 11.5, 1.6, Color(hex: 0xC8934B))
+                                    .padding(.horizontal, 2)
+                            }
+                        }
+                    }
+                }
+                .padding(.bottom, 26)
+            }
+        }
+    }
+
+    private func catalogRow(_ item: NoopBreatheItem, last: Bool) -> some View {
+        let on = item.id == current.id
+        return Button {
+            if item.kind == .sweep {
+                navigation.replace(with: .bsweep)
+            } else {
+                protocolID = item.id
+                navigation.unwind(to: .breathe)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.name)
+                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                        .foregroundStyle(on ? Self.aura : NoopHTMLColor.ink)
+                    Text(item.detail)
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(Self.sub)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(item.pattern)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(on ? Self.aura : NoopHTMLColor.faint)
+            }
+            .padding(.vertical, 13)
+            .contentShape(Rectangle())
+            .overlay(alignment: .bottom) {
+                if !last { Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5) }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: 2.10 bplayer
+
+    private var playerScreen: some View {
+        let item = current
+        return VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                closeButton { endPlayer() }
+                TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(item.name)
+                            .font(NoopHTMLFont.sans(13, weight: .semibold))
+                            .foregroundStyle(NoopHTMLColor.ink)
+                        Text("\(clock(elapsed(at: timeline.date))) of \(clock(item.sessionSeconds))")
+                            .font(NoopHTMLFont.sans(11))
+                            .foregroundStyle(NoopHTMLColor.muted)
+                            .monospacedDigit()
+                    }
+                }
+                Spacer(minLength: 0)
+                buzzChip(item)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 2)
+
+            Spacer(minLength: 0)
+            VStack(spacing: 26) {
+                TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+                    pacer(item, at: timeline.date)
+                }
+                heartTrace
+            }
+            .padding(.horizontal, 20)
+            Spacer(minLength: 0)
+
+            secondary("End the session") { endPlayer() }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 30)
+        }
+        .sessionFrame()
+        .onAppear { session.startSession(item) }
+    }
+
+    private func elapsed(at date: Date) -> Int {
+        guard let start = session.sessionStart else { return 0 }
+        return max(0, Int(date.timeIntervalSince(start)))
+    }
+
+    private func clock(_ seconds: Int) -> String {
+        String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private func endPlayer() {
+        session.endSession()
+        navigation.unwind(to: .breathe)
+    }
+
+    private func buzzChip(_ item: NoopBreatheItem) -> some View {
+        // A promise about hardware: say so when there is no strap to keep it.
+        let buzzing = demo || (session.strapCanBuzz && item.kind == .paced)
+        return TimelineView(.animation(minimumInterval: 1 / 20)) { timeline in
+            let t = session.sessionStart.map { timeline.date.timeIntervalSince($0) } ?? 0
+            let b = NoopBreathePacer.breath(item: item, at: t)
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(buzzing ? Self.aura : NoopHTMLColor.faint)
+                    .frame(width: 7, height: 7)
+                    .opacity(buzzing ? (b > 0.9 || b < 0.1 ? 1 : 0.35) : 1)
+                Text(buzzing ? "Buzzing the cue" : item.kind == .guided ? "Guided \u{00B7} no cue" : "No strap \u{00B7} on screen")
+                    .font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                    .foregroundStyle(buzzing ? Self.aura : NoopHTMLColor.muted)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background((buzzing ? NoopHTMLColor.blue.opacity(0.1) : Color.white.opacity(0.04)), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(buzzing ? NoopHTMLColor.blue.opacity(0.24) : NoopHTMLColor.borderStrong, lineWidth: 0.5))
+        }
+    }
+
+    private func pacer(_ item: NoopBreatheItem, at date: Date) -> some View {
+        let t = session.sessionStart.map { date.timeIntervalSince($0) } ?? 0
+        let done = t >= Double(item.sessionSeconds)
+        let state = NoopBreathePacer.state(item: item, at: t)
+        // Reduce Motion: the pacer holds still and the word keeps the cadence.
+        let b = reduceMotion ? 1.0 : state.breath
+        let word: String = {
+            if done { return "Done" }
+            switch state.phase {
+            case .inhale: return "Breathe in"
+            case .exhale: return "Breathe out"
+            case .hold: return "Hold"
+            case .textOnly: return "Your own pace"
+            }
+        }()
+        return ZStack {
+            Circle().stroke(Color.white.opacity(0.05), lineWidth: 1).frame(width: 296, height: 296)
+            glow(290, alpha: 0.10 + 0.16 * b)
+            Circle().stroke(Self.auraPale.opacity(0.16 + 0.3 * b), lineWidth: 1)
+                .frame(width: 230, height: 230).scaleEffect(0.72 + 0.28 * b)
+            orbBody(150, shadowBlur: 52, shadowY: 18, opacity: 0.55).scaleEffect(0.62 + 0.38 * b)
+            VStack(spacing: 5) {
+                Text(word)
+                    .font(NoopHTMLFont.outfit(27, weight: .light))
+                    .tracking(-0.54)
+                    .foregroundStyle(Color(hex: 0xF6FDFF))
+                    .shadow(color: Color(hex: 0x041E30).opacity(0.55), radius: 8, y: 2)
+                if !done && state.secondsLeft > 0 {
+                    Text("\(state.secondsLeft)")
+                        .font(NoopHTMLFont.outfit(15, weight: .light))
+                        .foregroundStyle(Color(hex: 0xF6FDFF).opacity(0.75))
+                        .monospacedDigit()
+                }
+            }
+        }
+        .frame(width: 300, height: 300)
+    }
+
+    private var heartTrace: some View {
+        let samples = session.samples
+        let swing: String = {
+            guard samples.count > 8 else { return demo ? "0.0" : "\u{2014}" }
+            let recent = samples.suffix(40)
+            return String(format: "%.1f", (recent.max() ?? 0) - (recent.min() ?? 0))
+        }()
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline) {
+                NoopSectionLabel("Your heart, against the pace")
+                Spacer()
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(swing)
+                        .font(NoopHTMLFont.outfit(20, weight: .light))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                        .monospacedDigit()
+                    Text("bpm swing")
+                        .font(NoopHTMLFont.sans(11))
+                        .foregroundStyle(Self.sub)
+                }
+            }
+            NoopBreatheTrace(heart: samples, pace: session.paceSamples)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(height: 96)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+            copy(samples.isEmpty && !demo
+                 ? "No heart rate is coming in, so there is nothing to draw against the pace. The pacer still runs."
+                 : "The dashed line is the pace you are following. The bright one is your heart answering it \u{2014} the bigger the swing, the better this pace fits you.",
+                 11.5, 1.55, Self.sub)
+        }
+    }
+
+    // MARK: 2.11 bsweep
+
+    private var sweepScreen: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                closeButton {
+                    session.cancelSweep()
+                    navigation.unwind(to: .breathe)
+                }
+                TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
+                    let step = session.sweepStep(at: timeline.date)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Finding your pace")
+                            .font(NoopHTMLFont.sans(13, weight: .semibold))
+                            .foregroundStyle(NoopHTMLColor.ink)
+                        Text(sweepStepLabel(step))
+                            .font(NoopHTMLFont.sans(11))
+                            .foregroundStyle(NoopHTMLColor.muted)
+                            .monospacedDigit()
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 2)
+
+            Spacer(minLength: 0)
+            TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+                sweepBody(at: timeline.date)
+            }
+            .padding(.horizontal, 20)
+            Spacer(minLength: 0)
+
+            VStack(spacing: 9) {
+                secondary("Stop \u{2014} keep what it has") {
+                    if demo { session.demoFound = true } else { session.keepSweep() }
+                    navigation.replace(with: .bfound)
+                }
+                Text("Ten minutes, five paces, ninety seconds each. Stopping early keeps every pace it finished.")
+                    .font(NoopHTMLFont.sans(11))
+                    .foregroundStyle(NoopHTMLColor.faint)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(lineSpacing(11, 1.55))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 30)
+        }
+        .sessionFrame()
+        .onAppear {
+            if session.sweepStart == nil || (!demo && !session.sweepRunning) { session.startSweep() }
+        }
+        .onChange(of: session.sweep) { _, _ in
+            if navigation.route == .bsweep { navigation.replace(with: .bfound) }
+        }
+    }
+
+    private func sweepStepLabel(_ step: (index: Int, progress: Double)) -> String {
+        if !demo && !session.strapCanBuzz && session.samples.isEmpty && model.bpm == nil {
+            return "Pace \(step.index + 1) of 5 \u{00B7} no strap, nothing to measure"
+        }
+        let left = max(1, Int(ceil((1 - step.progress) * Double(NoopBreatheSession.sweepSecondsPerPace))))
+        return "Pace \(step.index + 1) of 5 \u{00B7} \(left)s left"
+    }
+
+    private func sweepBody(at date: Date) -> some View {
+        let step = session.sweepStep(at: date)
+        if demo, date.timeIntervalSince(session.sweepStart ?? date) > 30, navigation.route == .bsweep {
+            DispatchQueue.main.async {
+                guard navigation.route == .bsweep else { return }
+                session.demoFound = true
+                session.cancelSweep()
+                navigation.replace(with: .bfound)
+            }
+        }
+        let rate = NoopBreatheSession.sweepPaces[step.index]
+        let t = date.timeIntervalSince(session.sweepStart ?? date)
+        let wave = NoopBreathePacer.sine(rate: rate, at: t)
+        let b = reduceMotion ? 1.0 : wave.breath
+        return VStack(spacing: 24) {
+            ZStack {
+                glow(240, alpha: 0.09 + 0.14 * b)
+                Circle().stroke(Self.auraPale.opacity(0.14 + 0.26 * b), lineWidth: 1)
+                    .frame(width: 196, height: 196).scaleEffect(0.74 + 0.26 * b)
+                orbBody(120, shadowBlur: 40, shadowY: 14, opacity: 0.5).scaleEffect(0.66 + 0.34 * b)
+                VStack(spacing: 2) {
+                    Text(NoopBreatheWords.rate(rate))
+                        .font(NoopHTMLFont.outfit200(34))
+                        .tracking(-1.02)
+                        .foregroundStyle(Color(hex: 0xF6FDFF))
+                        .monospacedDigit()
+                    Text("BREATHS / MIN")
+                        .font(NoopHTMLFont.sans(10, weight: .semibold))
+                        .tracking(1)
+                        .foregroundStyle(Color(hex: 0xF6FDFF).opacity(0.7))
+                }
+            }
+            .frame(width: 250, height: 250)
+
+            Text(wave.inhaling ? "In, slowly" : "And out")
+                .font(NoopHTMLFont.serif(17))
+                .foregroundStyle(NoopHTMLColor.inkSoft)
+                .multilineTextAlignment(.center)
+
+            VStack(alignment: .leading, spacing: 10) {
+                NoopSectionLabel("How hard your heart swung at each")
+                HStack(alignment: .bottom, spacing: 8) {
+                    ForEach(0..<5, id: \.self) { i in
+                        sweepBar(i, step: step)
+                    }
+                }
+                .frame(height: 132, alignment: .bottom)
+            }
+        }
+    }
+
+    private static let demoSwings: [Double] = [0.52, 0.74, 1.0, 0.68, 0.44]
+
+    private func sweepBar(_ i: Int, step: (index: Int, progress: Double)) -> some View {
+        let done = i < step.index
+        let isLive = i == step.index
+        let h: Double
+        let figure: String
+        let best: Bool
+        if demo {
+            let swing = Self.demoSwings[i]
+            h = done ? swing : isLive ? swing * min(1, step.progress * 1.15) : 0
+            figure = done || (isLive && step.progress > 0.25) ? String(format: "%.1f", h * 9.4) : ""
+            best = done && swing == 1
+        } else {
+            let swings = (0..<5).map { session.measuredSwing($0) }
+            let top = swings.compactMap { $0 }.max() ?? 0
+            let mine = swings[i]
+            h = top > 0 && (done || isLive) ? (mine ?? 0) / top : 0
+            figure = (done || isLive) ? mine.map { String(format: "%.1f", $0) } ?? "" : ""
+            let doneSwings = (0..<step.index).compactMap { swings[$0] }
+            best = done && doneSwings.count >= 2 && mine == doneSwings.max()
+        }
+        let fill: AnyShapeStyle = best
+            ? AnyShapeStyle(LinearGradient(colors: [Self.auraPale, Color(hex: 0x2FB2F0)], startPoint: .top, endPoint: .bottom))
+            : AnyShapeStyle(isLive ? Self.auraPale.opacity(0.55) : done ? Self.auraPale.opacity(0.28) : Color.white.opacity(0.07))
+        return VStack(spacing: 7) {
+            Text(figure)
+                .font(NoopHTMLFont.sans(10.5))
+                .foregroundStyle(best ? Self.auraPale : Self.sub)
+                .monospacedDigit()
+            UnevenRoundedRectangle(topLeadingRadius: 8, bottomLeadingRadius: 3, bottomTrailingRadius: 3, topTrailingRadius: 8)
+                .fill(fill)
+                .frame(height: max(3, h * 78))
+            Text(NoopBreatheWords.rate(NoopBreatheSession.sweepPaces[i]))
+                .font(NoopHTMLFont.sans(10.5, weight: isLive || best ? .semibold : .regular))
+                .foregroundStyle(best ? Self.auraPale : isLive ? NoopHTMLColor.ink : NoopHTMLColor.faint)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: 2.12 bfound
+
+    private var result: NoopBreatheSweep? {
+        if demo {
+            return NoopBreatheSweep(points: [
+                .init(bpm: 6.5, amplitude: 0.52), .init(bpm: 6.0, amplitude: 0.74), .init(bpm: 5.5, amplitude: 1.0),
+                .init(bpm: 5.0, amplitude: 0.68), .init(bpm: 4.5, amplitude: 0.44)
+            ], lockedBpm: 5.5, date: Date())
+        }
+        return session.sweep
+    }
+
+    private var foundScreen: some View {
+        let result = self.result
+        let peak = result?.peak
+        return NoopScreen(topInset: 58) {
+            VStack(spacing: 0) {
+                header("Breathe")
+                    .padding(.bottom, 24)
+                VStack(spacing: 8) {
+                    NoopSectionLabel("Your pace", color: Self.aura)
+                    if let peak {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(NoopBreatheWords.rate(peak.bpm))
+                                .font(NoopHTMLFont.outfit200(76))
+                                .tracking(-3.42)
+                                .monospacedDigit()
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            Text("breaths / min")
+                                .font(NoopHTMLFont.sans(14))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                        }
+                        .frame(height: 74)
+                    } else {
+                        Text("No clear pace")
+                            .font(NoopHTMLFont.outfit(34, weight: .light))
+                            .tracking(-1)
+                            .foregroundStyle(NoopHTMLColor.ink)
+                            .padding(.vertical, 10)
+                    }
+                    Text(foundSentence(result))
+                        .font(NoopHTMLFont.sans(13))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(lineSpacing(13, 1.55))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity)
+
+                VStack(spacing: 12) {
+                    if let result, !result.points.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            NoopSectionLabel("The curve it found")
+                            NoopBreatheCurve(sweep: result, htmlPoints: demo)
+                                .frame(height: 128)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                    }
+
+                    if let peak { afterRows(vertical: 15.5, pace: peak.bpm) }
+
+                    if let peak {
+                        primary("Breathe at \(NoopBreatheWords.rate(peak.bpm))") {
+                            protocolID = demo ? "demo.resonance" : "noop.resonance"
+                            navigation.replace(with: .bplayer)
+                        }
+                    } else {
+                        primary(result == nil ? "Find your pace" : "Try again") { navigation.replace(with: .bsweep) }
+                    }
+                    copy("Worth testing again after a few months, or if your resting pulse moves. It is a pace that suits your physiology, not a treatment for anything.",
+                         11.5, 1.6, NoopHTMLColor.faint)
+                        .padding(.horizontal, 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.top, 26)
+                .padding(.bottom, 26)
+            }
+        }
+    }
+
+    private func foundSentence(_ result: NoopBreatheSweep?) -> String {
+        guard let result else {
+            return "No sweep yet. Ten minutes with the strap on finds the pace your heart answers most."
+        }
+        guard let peak = result.peak else {
+            return "None of the paces it tried cleared the others, so it has not picked one. Nothing changes until a sweep finds one."
+        }
+        let half = NoopBreatheWords.half(30 / peak.bpm)
+        let lead = "\(half) seconds in, \(half.lowercased()) out."
+        // The prototype's sentence is verbatim; its bars are not its curve, so its margin is not derived.
+        guard let margin = demo ? 31 : result.margin else { return lead }
+        return lead + " Your heart swung \(margin) % harder here than at any other pace it tried."
+    }
+}
+
+private extension View {
+    /// A Breathe session fills the phone: the HTML's 56 pt header offset below the status bar, the
+    /// screen's own width (the shell can propose more during a transition), and the home indicator.
+    func sessionFrame() -> some View {
+        padding(.top, 58)
+            .frame(width: UIScreen.main.bounds.width)
+            .frame(maxHeight: .infinity)
+    }
+}
+
+/// Breathe's chevron: an 8 × 8 box with 1.6 pt top and left borders, rotated −45°.
+private struct NoopBreatheCorner: View {
+    var body: some View {
+        Canvas { context, _ in
+            var path = Path()
+            path.move(to: CGPoint(x: 0.8, y: 9.6))
+            path.addLine(to: CGPoint(x: 0.8, y: 0.8))
+            path.addLine(to: CGPoint(x: 9.6, y: 0.8))
+            context.stroke(path, with: .color(NoopHTMLColor.inkSoft), style: StrokeStyle(lineWidth: 1.6))
+        }
+        .frame(width: 9.6, height: 9.6)
+        .rotationEffect(.degrees(-45))
+    }
+}
+
+/// `viewBox 0 0 340 76`, `preserveAspectRatio: none`: the pace band, the dashed pace line, the heart.
+private struct NoopBreatheTrace: View {
+    let heart: [Double]
+    let pace: [Double]
+
+    var body: some View {
+        Canvas { context, size in
+            let sx = size.width / 340, sy = size.height / 76
+            func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x * sx, y: y * sy) }
+            let paceY = pace.map { 62 - $0 * 46 }
+            let xs = (0..<max(heart.count, pace.count)).map { Double($0) / 95 * 340 }
+
+            var band = Path()
+            band.move(to: pt(0, 72))
+            if paceY.count > 2 {
+                for (i, y) in paceY.enumerated() { band.addLine(to: pt(xs[i], y)) }
+            }
+            band.addLine(to: pt(340, 72))
+            band.closeSubpath()
+            context.fill(band, with: .color(NoopHTMLColor.blue.opacity(0.10)))
+
+            if paceY.count > 1 {
+                var line = Path()
+                for (i, y) in paceY.enumerated() {
+                    i == 0 ? line.move(to: pt(xs[i], y)) : line.addLine(to: pt(xs[i], y))
+                }
+                context.stroke(line, with: .color(Color(hex: 0x9FE2FB).opacity(0.34)),
+                               style: StrokeStyle(lineWidth: 1.2, dash: [3, 4]))
+            }
+            if heart.count > 1 {
+                var line = Path()
+                for (i, v) in heart.enumerated() {
+                    let y = max(6, min(70, 68 - (v - 54) / 24 * 60))
+                    i == 0 ? line.move(to: pt(xs[i], y)) : line.addLine(to: pt(xs[i], y))
+                }
+                context.stroke(line, with: .color(Color(hex: 0x9FE2FB)),
+                               style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            }
+        }
+    }
+}
+
+/// `viewBox 0 0 320 128`: the response curve, a dashed drop-line at the peak, a dot per candidate.
+private struct NoopBreatheCurve: View {
+    let sweep: NoopBreatheSweep
+    /// Demo only: the HTML's hand-placed candidate positions, not ones derived from amplitudes.
+    var htmlPoints = false
+    private static let html: [(Double, Double)] = [(14, 106), (112, 40), (168, 34), (258, 98), (306, 106)]
+
+    var body: some View {
+        Canvas { context, size in
+            // Default preserveAspectRatio (xMidYMid meet): uniform scale, centred.
+            let scale = min(size.width / 320, size.height / 128)
+            let ox = (size.width - 320 * scale) / 2, oy = (size.height - 128 * scale) / 2
+            func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: ox + x * scale, y: oy + y * scale) }
+
+            let ordered = sweep.points.sorted { $0.bpm > $1.bpm }
+            let scored = ordered.compactMap(\.amplitude)
+            let lo = scored.min() ?? 0, hi = scored.max() ?? 1
+            let n = max(ordered.count - 1, 1)
+            let placed: [(x: Double, y: Double, point: NoopBreatheSweep.Point)] = ordered.enumerated().compactMap { i, p in
+                guard let a = p.amplitude else { return nil }
+                if htmlPoints, i < Self.html.count { return (Self.html[i].0, Self.html[i].1, p) }
+                let x = 14 + Double(i) / Double(n) * 292
+                let y = hi > lo ? 106 - (a - lo) / (hi - lo) * 72 : 70
+                return (x, y, p)
+            }
+            if placed.count > 1 {
+                // Catmull-Rom through the scored candidates, as a smooth response curve.
+                var curve = Path()
+                curve.move(to: pt(placed[0].x, placed[0].y))
+                for i in 0..<(placed.count - 1) {
+                    let p0 = placed[max(0, i - 1)], p1 = placed[i], p2 = placed[i + 1], p3 = placed[min(placed.count - 1, i + 2)]
+                    let c1 = pt(p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6)
+                    let c2 = pt(p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6)
+                    curve.addCurve(to: pt(p2.x, p2.y), control1: c1, control2: c2)
+                }
+                context.stroke(curve, with: .color(Color(hex: 0x9FE2FB).opacity(0.3)), lineWidth: 1.6 * scale)
+            }
+            let peak = sweep.peak
+            if let peak, let top = placed.first(where: { $0.point == peak }) {
+                var drop = Path()
+                drop.move(to: pt(top.x, top.y))
+                drop.addLine(to: pt(top.x, 112))
+                context.stroke(drop, with: .color(Color(hex: 0x9FE2FB).opacity(0.35)),
+                               style: StrokeStyle(lineWidth: 1 * scale, dash: [3 * scale, 4 * scale]))
+            }
+            for p in placed {
+                let isPeak = p.point == peak
+                let r = (isPeak ? 6.5 : 4) * scale
+                let c = pt(p.x, p.y)
+                context.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
+                             with: .color(isPeak ? Color(hex: 0x9FE2FB) : Color(hex: 0x3E6B80)))
+            }
+            // Rates at the peak and at both ends.
+            func label(_ text: String, x: Double, color: Color) {
+                context.draw(Text(text).font(NoopHTMLFont.sans(10 * scale)).foregroundStyle(color),
+                             at: pt(x, 126), anchor: UnitPoint(x: 0.5, y: 0.78))
+            }
+            if let first = ordered.first { label(NoopBreatheWords.rate(first.bpm), x: 14, color: NoopHTMLColor.faint) }
+            if let last = ordered.last, ordered.count > 1 { label(NoopBreatheWords.rate(last.bpm), x: 306, color: NoopHTMLColor.faint) }
+            if let peak, let top = placed.first(where: { $0.point == peak }) {
+                label(NoopBreatheWords.rate(peak.bpm), x: top.x, color: Color(hex: 0x9FE2FB))
+            }
+        }
+    }
 }

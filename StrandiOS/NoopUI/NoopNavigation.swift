@@ -77,6 +77,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case rest, tonight, why, debt, alarm
     // Act 2
     case today, inbox, charge, day, vitals, stress, heart
+    case breathe, bcatalog, bplayer, bsweep, bfound
     // Act 3
     case session, pick, ready, live, intervals, detail, across
     // Act 4
@@ -97,7 +98,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     var act: NoopAct {
         switch self {
         case .rest, .tonight, .why, .debt, .alarm: .night
-        case .today, .inbox, .charge, .day, .vitals, .stress, .heart: .day
+        case .today, .inbox, .charge, .day, .vitals, .stress, .heart,
+             .breathe, .bcatalog, .bplayer, .bsweep, .bfound: .day
         case .session, .pick, .ready, .live, .intervals, .detail, .across: .effort
         case .trends, .capacity, .rhythm, .year: .picture
         case .you, .record, .zones, .history, .strap, .devices, .data, .settings, .widgets, .lab, .onboard, .pair,
@@ -115,6 +117,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .rest, .tonight, .why, .debt, .alarm:
             .rest
         case .today, .inbox, .charge, .day, .vitals, .stress, .heart,
+             .breathe, .bcatalog, .bplayer, .bsweep, .bfound,
              .session, .pick, .ready, .live, .intervals, .detail, .across,
              .coach, .gate, .setup, .consent, .memory:
             .today
@@ -131,7 +134,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
 
     var hidesBottomBar: Bool {
         switch self {
-        case .ready, .live, .intervals, .onboard, .pair: true
+        case .ready, .live, .intervals, .onboard, .pair, .bplayer, .bsweep: true
         default: false
         }
     }
@@ -686,6 +689,19 @@ final class NoopNavigation: ObservableObject {
         guard path.count > 1 else { return }
         withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) {
             path.removeLast()
+        }
+    }
+
+    /// Return to `route` if it is already on the path, dropping everything above it; otherwise put
+    /// it in place of the current screen. Breathe's sessions land on its root, not on whatever
+    /// screen happened to open them.
+    func unwind(to route: NoopRoute) {
+        pendingSheetTransition = nil
+        overlay = nil
+        guard let index = path.lastIndex(of: route) else { replace(with: route); return }
+        guard index < path.count - 1 else { return }
+        withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) {
+            path.removeSubrange((index + 1)..<path.count)
         }
     }
 

@@ -33,6 +33,8 @@ final class BiofeedbackController: ObservableObject {
         case resonanceSession(bpm: Double)
         /// L2 "Calm me" below-HR metronome.
         case calmMe
+        /// A catalog protocol paced on the strap (Breathe's player).
+        case protocolSession(id: String)
     }
 
     // MARK: - Published session state (the views read these)
@@ -177,6 +179,19 @@ final class BiofeedbackController: ObservableObject {
         }
     }
 
+    /// Pace one catalog protocol for `sessionMs`, buzzing its stages on the strap (one pulse in, two out,
+    /// holds silent). Guided protocols have no cue list; they run the timer only and never auto-pace.
+    func startProtocolSession(_ proto: BreathProtocol, sessionMs: Int) {
+        stop()
+        session = .protocolSession(id: proto.id)
+        running = true
+        ScreenIdle.keepAwake(true)
+        startSecondTimer()
+        walkCues(BreathProtocolPlayer.schedule(proto, sessionMs: sessionMs)) { [weak self] in
+            self?.stop()
+        }
+    }
+
     /// Walk a `[BreathCue]` list: drive `phase` and fire the per-cue buzz at each offset, then call
     /// `onComplete` after the last cue's cycle finishes. Pure cue list in, scheduled side-effects out —
     /// the spec's "the existing asyncAfter walk drives it".
@@ -207,22 +222,21 @@ final class BiofeedbackController: ObservableObject {
     /// R-R is pulled off `LiveState.rr` (the reliable standard-profile feed) into a per-pace bucket while
     /// that pace is being paced; the engine cleans + scores. Honest by construction: a thin pace is left
     /// unscored, and < minScoredPaces → the engine returns the 5.5 fallback with `didLock == false`.
-    func startSweep(quick: Bool, secondsPerPace: Int = 120) {
+    func startSweep(quick: Bool, secondsPerPace: Int = 120, paces custom: [Double]? = nil) {
         stop()
-        let paces = quick ? ResonanceEngine.quickSweepPaces : ResonanceEngine.fullSweepPaces
+        let paces = custom ?? (quick ? ResonanceEngine.quickSweepPaces : ResonanceEngine.fullSweepPaces)
         running = true
         ScreenIdle.keepAwake(true)
         startSecondTimer()
         sweepProgress = 0
         lastSweep = nil
-
-        var samples: [ResonanceEngine.PaceSample] = []
+        sweepSamples = []
 
         func runPace(_ index: Int) {
             guard index < paces.count, running else {
                 sweepRRSub?.cancel()
                 sweepRRSub = nil
-                finishSweep(samples)
+                finishSweep(sweepSamples)
                 return
             }
             let bpm = paces[index]
@@ -245,26 +259,38 @@ final class BiofeedbackController: ObservableObject {
             walkCues(BreathPacer.schedule(bpm: bpm, cycles: cycles)) { [weak self] in
                 guard let self else { return }
                 let endTs = Int(Date().timeIntervalSince1970)
-                samples.append(ResonanceEngine.PaceSample(bpm: bpm, rr: bucket,
-                                                          startTs: startTs, endTs: endTs))
+                self.sweepSamples.append(ResonanceEngine.PaceSample(bpm: bpm, rr: bucket,
+                                                                    startTs: startTs, endTs: endTs))
                 self.sweepProgress = Double(index + 1) / Double(paces.count)
                 runPace(index + 1)
             }
         }
 
-        func finishSweep(_ samples: [ResonanceEngine.PaceSample]) {
-            let result = ResonanceEngine.sweep(samples)
-            lastSweep = result
-            // Persist the locked pace + date as plain prefs (no store table) so the Breathe screen + the
-            // resonance pill can read it across relaunch. Honest: only persist a real lock; a fallback
-            // leaves the user on the preset paces.
-            if result.didLock {
-                BiofeedbackPrefs.saveLockedPace(result.lockedBpm, date: Date())
-            }
-            stop()
-        }
-
         runPace(0)
+    }
+
+    /// Paces the sweep has fully finished, kept so an early stop can still be scored.
+    private var sweepSamples: [ResonanceEngine.PaceSample] = []
+
+    /// Stop the sweep now and score every pace it finished. The pace in progress is dropped — it was
+    /// never paced for its full window — and fewer than `minScoredPaces` scores still returns the
+    /// engine's honest "no lock", never a least-bad pick.
+    func keepSweep() {
+        guard running, case .resonanceSweep = session else { return }
+        finishSweep(sweepSamples)
+    }
+
+    private func finishSweep(_ samples: [ResonanceEngine.PaceSample]) {
+        let result = ResonanceEngine.sweep(samples)
+        lastSweep = result
+        sweepSamples = []
+        // Persist the locked pace + date as plain prefs (no store table) so the Breathe screen + the
+        // resonance pill can read it across relaunch. Honest: only persist a real lock; a fallback
+        // leaves the user on the preset paces.
+        if result.didLock {
+            BiofeedbackPrefs.saveLockedPace(result.lockedBpm, date: Date())
+        }
+        stop()
     }
 
     // MARK: - L2: "Calm me" below-HR metronome

@@ -329,6 +329,11 @@ struct NoopVerifiedAppShell: View {
     /// actually specifies.
     private static let canonicalLabRoutes: Set<NoopRoute> = [.labs, .picker, .review, .marker]
 
+    /// Breathe runs on the real protocol catalog, the strap's buzz and `ResonanceEngine`. With no
+    /// strap it paces on screen and says so; with no sweep it says there is no pace yet. Nothing on
+    /// it is a fixture outside `--demo-seed`, so it is safe here too.
+    private static let canonicalBreatheRoutes: Set<NoopRoute> = [.breathe, .bcatalog, .bplayer, .bsweep, .bfound]
+
     var body: some View {
         ZStack {
             NoopHTMLColor.canvas.ignoresSafeArea()
@@ -336,6 +341,8 @@ struct NoopVerifiedAppShell: View {
             Group {
                 if Self.canonicalLabRoutes.contains(navigation.route) {
                     NoopAct8Screens(navigation: navigation, labDraft: labDraft)
+                } else if Self.canonicalBreatheRoutes.contains(navigation.route) {
+                    NoopBreatheScreens(navigation: navigation)
                 } else {
                     NoopVerifiedRouteScreen(
                         route: navigation.route,
@@ -534,6 +541,11 @@ private struct NoopVerifiedRouteScreen: View {
         case .vitals: "Vitals"
         case .stress: "Stress"
         case .heart: "Heart"
+        case .breathe: "Breathe"
+        case .bcatalog: "Eighteen ways to breathe"
+        case .bplayer: "Breathing"
+        case .bsweep: "Finding your pace"
+        case .bfound: "Your pace"
         case .session: "Session"
         case .pick: "Choose a session"
         case .ready: "Ready"
