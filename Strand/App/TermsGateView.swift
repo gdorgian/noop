@@ -13,6 +13,18 @@ struct TermsGateView: View {
     private var allChecked: Bool { checks.allSatisfy { $0 } }
 
     var body: some View {
+        // The 560 × 720 card is a desktop size. A vertical ScrollView reports its content's ideal
+        // width upward, so on a phone the VStack grew toward 560, overflowed the 402 pt screen and
+        // was centred by the ZStack — clipping the copy at BOTH edges and putting half of each
+        // toggle off-screen, which made the gate impossible to accept by tapping. Clamping to the
+        // container keeps the desktop card and makes the phone use the width it actually has.
+        GeometryReader { proxy in
+            content(maxWidth: min(560, proxy.size.width), maxHeight: min(720, proxy.size.height))
+                .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+    }
+
+    private func content(maxWidth: CGFloat, maxHeight: CGFloat) -> some View {
         ZStack {
             StrandPalette.surfaceBase.ignoresSafeArea()
 
@@ -70,6 +82,7 @@ struct TermsGateView: View {
                             .foregroundStyle(StrandPalette.textTertiary)
                             .padding(.top, 2)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 30)
                     .padding(.bottom, 18)
                 }
@@ -90,7 +103,7 @@ struct TermsGateView: View {
                 .keyboardShortcut(.defaultAction)
                 .padding(26)
             }
-            .frame(maxWidth: 560, maxHeight: 720)
+            .frame(maxWidth: maxWidth, maxHeight: maxHeight)
         }
     }
 }
