@@ -1128,16 +1128,37 @@ struct NoopGoalEditorSheet: View {
 private struct NoopLabsHome: View {
     @ObservedObject var navigation: NoopNavigation
     @ObservedObject var draft: NoopLabReviewDraft
-    private var markers: [NoopLabMarker] { NoopLabMarker.all }
+    @EnvironmentObject private var repo: Repository
+    @StateObject private var book = NoopLabBook()
+    private var markers: [NoopLabMarker] { NoopLabMarker.all(attaching: book) }
     // A marker with nothing recorded is neither in nor out of its band, so it is counted in
     // neither total. The denominator stays the full nine — the ring reads "of 9 in band"
     // (48-designer-answers-9-september.md §2) because nine is what `labs` keeps, not how many
     // happen to have a value today.
     private var inBandCount: Int { markers.filter(\.isInBand).count }
+    /// Seeded, the hero counts band membership, because the fixture carries the design's bands.
+    /// In Release there are no bands to count, so it reports what is actually recorded rather than
+    /// asserting nine markers sit inside ranges nobody supplied.
+    private var heroCount: Int { NoopContentPolicy.allowsPrototypeContent ? inBandCount : recordedCount }
+    private var heroCaption: String {
+        NoopContentPolicy.allowsPrototypeContent
+            ? "of \(markers.count) in band"
+            : "of \(markers.count) recorded"
+    }
     private var outsideCount: Int { markers.filter(\.isOutside).count }
     private var recordedCount: Int { markers.filter(\.isRecorded).count }
     private var outOfBandLine: String {
-        guard recordedCount > 0 else { return "nothing recorded yet" }
+        guard recordedCount > 0 else {
+            return book.unavailable ? "the Lab Book could not be opened" : "nothing recorded yet"
+        }
+        guard NoopContentPolicy.allowsPrototypeContent else {
+            // No shipped reference ranges, so nothing here may be described as inside or outside
+            // one. The line names the sources instead, which is a recorded fact.
+            let sources = book.sources
+            if sources == ["manual"] { return "entered by hand" }
+            if sources.isEmpty { return "recorded on this phone" }
+            return "from \(sources.count) source\(sources.count == 1 ? "" : "s"), kept on this phone"
+        }
         switch outsideCount {
         case 0: return "every recorded marker inside the lab\u{2019}s band"
         case 1: return "one marker outside the lab\u{2019}s band"
@@ -1146,8 +1167,9 @@ private struct NoopLabsHome: View {
     }
     private var latestDrawLabel: String? {
         if NoopContentPolicy.allowsPrototypeContent { return "drawn 14 August · Karolinska" }
-        return UserDefaults.standard.string(forKey: "noop.html.last-lab-draw")
-            .map { "drawn \($0)" }
+        // The most recent day a reading is dated to. No clinic: the store records a source, not a
+        // laboratory, and naming one would be inventing provenance.
+        return book.latestDayLabel.map { "drawn \($0)" }
     }
     var body: some View {
         NoopScreen(bottomInset: 118, topInset: 56) {
@@ -1191,11 +1213,11 @@ private struct NoopLabsHome: View {
                 HStack(alignment: .bottom, spacing: 14) {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text("\(inBandCount)")
+                            Text("\(heroCount)")
                                 .font(NoopHTMLFont.outfit200(38))
                                 .tracking(-1.71)
                                 .monospacedDigit()
-                            Text("of \(markers.count) in band")
+                            Text(heroCaption)
                                 .font(NoopHTMLFont.sans(12))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
                                 .fixedSize()
@@ -1231,7 +1253,7 @@ private struct NoopLabsHome: View {
                                 VStack(alignment: .trailing, spacing: 2) {
                                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                                         Text(marker.valueText).font(NoopHTMLFont.outfit(20, weight: .light))
-                                        Text(marker.unit).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+                                        Text(marker.shownUnit).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
                                     }
                                     Text(marker.bandTag)
                                         .font(NoopHTMLFont.sans(10.5, weight: .semibold))
@@ -1265,6 +1287,12 @@ private struct NoopLabsHome: View {
                     .padding(.horizontal, 2)
                     .padding(.top, 6)
             }
+        }
+        .task(id: repo.deviceId) {
+            // Read once on arrival, and again if the active strap changes. Save calls
+            // `repo.refresh()` and resets to `labs`, so returning from `review` re-runs this and
+            // the list shows what was actually written rather than what was typed.
+            await book.load(store: await repo.storeHandle(), deviceId: repo.deviceId)
         }
     }
 }
@@ -2459,6 +2487,18 @@ enum NoopLabCatalog {
 
 private struct NoopLabMarker: Identifiable {
     let id: String; let name: String; let unit: String; let low: Double; let high: Double; let defaultValue: Double; let trend: [Double]; let trendText: String; let contextCopy: String
+    /// The store's `markerKey`. The display `id` is the design's slug; this is the identity the
+    /// Lab Book writes and reads, and the two are deliberately not the same string.
+    let storeKey: String
+    /// The latest reading the Lab Book actually holds, attached by the screen. When present it is
+    /// the source of truth for the value, its date, its unit and whether a range exists at all.
+    var live: NoopLabReading? = nil
+
+    /// The design's `low`/`high` are demo fixtures. `MarkerDefinition.referenceTextHint` is
+    /// documented as "NOT a shipped reference range" and `higherIsBetter` as "ALWAYS nil (NOOP
+    /// makes no value judgement)", so outside the seeded fixture there is no band to be in or out
+    /// of — only the range the user typed on their own reading, shown back verbatim.
+    var demoBandApplies: Bool { NoopContentPolicy.allowsPrototypeContent }
     /// The value this marker actually holds, or `nil` when nothing has been recorded for it.
     ///
     /// 00-RULES.md §0a: a prototype figure may exist only behind **both** `#if DEBUG` and
@@ -2468,35 +2508,52 @@ private struct NoopLabMarker: Identifiable {
     /// seeded figure is reachable only through `NoopContentPolicy`; otherwise the marker is absent
     /// and the screen renders its absent state rather than a plausible number.
     var value: Double? {
-        if let saved = Double(UserDefaults.standard.string(forKey: "noop.html.marker.\(name).value") ?? "") {
-            return saved
-        }
+        if let live { return live.value }
         return NoopContentPolicy.allowsPrototypeContent ? defaultValue : nil
     }
     var isRecorded: Bool { value != nil }
     /// Absent is not "outside": a marker with nothing recorded is neither in nor out of its band.
-    var isOutside: Bool { guard let value else { return false }; return value < low || value > high }
-    var isInBand: Bool { guard let value else { return false }; return value >= low && value <= high }
+    var isOutside: Bool {
+        guard demoBandApplies, let value else { return false }
+        return value < low || value > high
+    }
+    var isInBand: Bool {
+        guard demoBandApplies, let value else { return false }
+        return value >= low && value <= high
+    }
     var color: Color {
         guard isRecorded else { return NoopHTMLColor.faint }
         return isOutside ? Color(hex: 0xF2B45C) : NoopHTMLColor.green
     }
     var valueText: String { value?.formatted(.number.precision(.fractionLength(0...2))) ?? "—" }
+    /// The stored reading's unit, falling back to the design's only for an empty row.
+    var shownUnit: String { live?.unit ?? unit }
     var rangeText: String { "\(number(low))–\(number(high)) \(unit)" }
     var recordedDateText: String? {
-        if NoopContentPolicy.allowsPrototypeContent { return "14 Aug" }
-        return UserDefaults.standard.string(forKey: "noop.html.marker.\(name).date")
+        if let live { return live.dayLabel }
+        return NoopContentPolicy.allowsPrototypeContent ? "14 Aug" : nil
     }
     var listDetail: String {
-        guard let recordedDateText else { return "band \(rangeText)" }
-        return "band \(rangeText) · \(recordedDateText)"
+        if demoBandApplies {
+            guard let recordedDateText else { return "band \(rangeText)" }
+            return "band \(rangeText) · \(recordedDateText)"
+        }
+        // Release: only what was recorded. A range appears solely because the user typed one on
+        // their own reading; the design's band is a fixture and saying it here would be inventing
+        // a clinical reference for this person's blood work.
+        var parts: [String] = []
+        if let reference = live?.referenceText { parts.append("band \(reference)") }
+        if let recordedDateText { parts.append(recordedDateText) }
+        return parts.isEmpty ? "not recorded" : parts.joined(separator: " · ")
     }
     var bandTag: String {
-        guard let value else { return "not recorded" }
+        guard value != nil else { return "not recorded" }
+        guard demoBandApplies, let value else { return "recorded" }
         return value < low ? "below band" : value > high ? "above band" : "in band"
     }
     var detailBandTag: String {
-        guard let value else { return "not recorded" }
+        guard value != nil else { return "not recorded" }
+        guard demoBandApplies, let value else { return "recorded" }
         return value < low ? "below the band" : value > high ? "above the band" : "in the band"
     }
     /// The dated series behind the trend chart. Empty when the marker holds nothing — there is no
@@ -2586,17 +2643,31 @@ private struct NoopLabMarker: Identifiable {
     /// typed value has to have somewhere to live, so Haemoglobin and Creatine kinase are markers
     /// here and not just fields on a form. The bands and the seeded values are the HTML's.
     static let definitions: [NoopLabMarker] = [
-        .init(id: "haemoglobin", name: "Haemoglobin", unit: "g/L", low: 130, high: 170, defaultValue: 141, trend: [140, 142, 141, 141], trendText: "steady across these four dated draws", contextCopy: "This result is inside the laboratory’s band and steady across these dated draws. Noop records the dated series and draws no conclusion from it."),
-        .init(id: "ferritin", name: "Ferritin", unit: "µg/L", low: 30, high: 400, defaultValue: 28, trend: [42, 38, 33, 28], trendText: "lower across these four dated draws", contextCopy: "This result is below the laboratory’s band. One result is not a diagnosis; discuss the dated value and its downward trend with a clinician if you want it interpreted."),
-        .init(id: "vitamin-d", name: "Vitamin D", unit: "nmol/L", low: 50, high: 125, defaultValue: 44, trend: [63, 58, 51, 44], trendText: "lower across these four dated draws", contextCopy: "This result is below the laboratory’s band. Seasonal timing can matter, but Noop does not infer a cause; a clinician can interpret the value in context."),
-        .init(id: "apob", name: "ApoB", unit: "g/L", low: 0.5, high: 1.0, defaultValue: 0.78, trend: [0.88, 0.84, 0.8, 0.78], trendText: "slightly lower than the previous draw", contextCopy: "This result is inside the laboratory’s band and slightly lower than the prior draw. Noop records that fact and makes no treatment claim."),
-        .init(id: "hba1c", name: "HbA1c", unit: "mmol/mol", low: 20, high: 42, defaultValue: 33, trend: [34, 33, 33, 33], trendText: "stable across the four draws", contextCopy: "This result is inside the laboratory’s band and stable across these dated draws. Noop does not turn that into a clinical conclusion."),
-        .init(id: "hs-crp", name: "hs-CRP", unit: "mg/L", low: 0, high: 3, defaultValue: 0.6, trend: [1.1, 0.8, 0.7, 0.6], trendText: "lower across the four draws", contextCopy: "This result is inside the laboratory’s band. A single inflammatory marker is not a diagnosis, and Noop does not attach a cause to it."),
-        .init(id: "tsh", name: "TSH", unit: "mIU/L", low: 0.4, high: 4, defaultValue: 2.1, trend: [2.4, 2.2, 2.2, 2.1], trendText: "close to the preceding values", contextCopy: "This result is inside the laboratory’s band and close to the preceding values. Interpretation belongs with the clinical context Noop does not have."),
-        .init(id: "alt", name: "ALT", unit: "U/L", low: 10, high: 50, defaultValue: 41, trend: [35, 38, 44, 41], trendText: "below the preceding draw", contextCopy: "This result is inside the laboratory’s band and below the preceding draw. Noop shows the dated series without attributing the change to training or anything else."),
-        .init(id: "creatine-kinase", name: "Creatine kinase", unit: "U/L", low: 30, high: 200, defaultValue: 186, trend: [96, 118, 152, 186], trendText: "higher across these four dated draws", contextCopy: "This result is inside the laboratory’s band and higher across these dated draws. The value moves with recent hard efforts; Noop reports it without attributing a cause.")
+        .init(id: "haemoglobin", name: "Haemoglobin", unit: "g/L", low: 130, high: 170, defaultValue: 141, trend: [140, 142, 141, 141], trendText: "steady across these four dated draws", contextCopy: "This result is inside the laboratory’s band and steady across these dated draws. Noop records the dated series and draws no conclusion from it.", storeKey: "haemoglobin"),
+        .init(id: "ferritin", name: "Ferritin", unit: "µg/L", low: 30, high: 400, defaultValue: 28, trend: [42, 38, 33, 28], trendText: "lower across these four dated draws", contextCopy: "This result is below the laboratory’s band. One result is not a diagnosis; discuss the dated value and its downward trend with a clinician if you want it interpreted.", storeKey: "ferritin"),
+        .init(id: "vitamin-d", name: "Vitamin D", unit: "nmol/L", low: 50, high: 125, defaultValue: 44, trend: [63, 58, 51, 44], trendText: "lower across these four dated draws", contextCopy: "This result is below the laboratory’s band. Seasonal timing can matter, but Noop does not infer a cause; a clinician can interpret the value in context.", storeKey: "vitamin_d"),
+        .init(id: "apob", name: "ApoB", unit: "g/L", low: 0.5, high: 1.0, defaultValue: 0.78, trend: [0.88, 0.84, 0.8, 0.78], trendText: "slightly lower than the previous draw", contextCopy: "This result is inside the laboratory’s band and slightly lower than the prior draw. Noop records that fact and makes no treatment claim.", storeKey: "custom_apob"),
+        .init(id: "hba1c", name: "HbA1c", unit: "mmol/mol", low: 20, high: 42, defaultValue: 33, trend: [34, 33, 33, 33], trendText: "stable across the four draws", contextCopy: "This result is inside the laboratory’s band and stable across these dated draws. Noop does not turn that into a clinical conclusion.", storeKey: "hba1c"),
+        .init(id: "hs-crp", name: "hs-CRP", unit: "mg/L", low: 0, high: 3, defaultValue: 0.6, trend: [1.1, 0.8, 0.7, 0.6], trendText: "lower across the four draws", contextCopy: "This result is inside the laboratory’s band. A single inflammatory marker is not a diagnosis, and Noop does not attach a cause to it.", storeKey: "crp"),
+        .init(id: "tsh", name: "TSH", unit: "mIU/L", low: 0.4, high: 4, defaultValue: 2.1, trend: [2.4, 2.2, 2.2, 2.1], trendText: "close to the preceding values", contextCopy: "This result is inside the laboratory’s band and close to the preceding values. Interpretation belongs with the clinical context Noop does not have.", storeKey: "tsh"),
+        .init(id: "alt", name: "ALT", unit: "U/L", low: 10, high: 50, defaultValue: 41, trend: [35, 38, 44, 41], trendText: "below the preceding draw", contextCopy: "This result is inside the laboratory’s band and below the preceding draw. Noop shows the dated series without attributing the change to training or anything else.", storeKey: "alt"),
+        .init(id: "creatine-kinase", name: "Creatine kinase", unit: "U/L", low: 30, high: 200, defaultValue: 186, trend: [96, 118, 152, 186], trendText: "higher across these four dated draws", contextCopy: "This result is inside the laboratory’s band and higher across these dated draws. The value moves with recent hard efforts; Noop reports it without attributing a cause.", storeKey: "custom_creatine_kinase")
     ]
     static var all: [NoopLabMarker] { definitions }
+
+    /// The nine definitions with the Lab Book's latest reading attached to each.
+    ///
+    /// The list is always all nine, recorded or not: a marker with nothing stored is still a row
+    /// showing its absent state, which is RULES §12 rather than a screen that shrinks as the store
+    /// empties.
+    @MainActor
+    static func all(attaching book: NoopLabBook) -> [NoopLabMarker] {
+        definitions.map { definition in
+            var marker = definition
+            marker.live = book.markers.first { $0.key == definition.storeKey }?.latest
+            return marker
+        }
+    }
 }
 
 private enum NoopOCRStatus {
@@ -2818,4 +2889,207 @@ private struct NoopGoalCommitStyle: ButtonStyle {
 }
 private struct NoopGoalWarmButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View { configuration.label.font(NoopHTMLFont.sans(11.5, weight: .semibold)).foregroundStyle(Color(hex: 0xF6DCB4)).padding(.horizontal, 12).frame(height: 30).background(Color(hex: 0xF2B45C).opacity(0.14), in: RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: 0xF2B45C).opacity(0.32), lineWidth: 0.5)).opacity(configuration.isPressed ? 0.82 : 1) }
+}
+
+// MARK: - Lab Book adapter
+
+// The Act 8 lab family, backed by what the Lab Book actually holds.
+//
+// The canonical screens (`labs`, `picker`, `review`, `marker`) were reading a `UserDefaults`
+// display mirror written by Save. That mirror is a convenience, not a record: it holds one value
+// per marker NAME, keeps no history, no source and no date beyond a caption string, and it is
+// written from the same screen that renders it. This adapter replaces it for Release with reads of
+// the real `labMarker` table, so the screens show what was stored rather than what was last typed.
+//
+// **What this type will not do.** Everything here is a recorded fact or absent. Where the Lab Book
+// has nothing, the value stays `nil` and the screen renders its absent state — no zero, no demo
+// band, no clinic, no invented date, no neighbouring marker standing in, no trend drawn from a
+// single point, and no interpretation of what a number means. That is `00-RULES.md` §0a applied to
+// the one screen in the app whose subject is somebody's blood work.
+//
+// **Reference ranges.** NOOP ships none, and this is settled in two places already:
+// `LabMarkerRow.referenceText` is documented as "User-entered reference range, shown back verbatim.
+// NOOP ships none", and `MarkerDefinition.referenceTextHint` says it is "NOT a shipped reference
+// range" while `higherIsBetter` is "ALWAYS nil (NOOP makes no value judgement)". So a band exists
+// only when the user recorded one, and a marker without one is shown without a band rather than
+// against the design's demo range. The 130–170 in the handoff is a fixture, and using it in Release
+// would be inventing a clinical reference for somebody's haemoglobin.
+//
+// The demo fixtures are untouched: under `#if DEBUG` **and** `--demo-seed` the screens keep reading
+// `NoopLabMarker`, so the canonical 402×874 appearance still matches the prototype exactly.
+
+/// One reading, exactly as the Lab Book stored it.
+struct NoopLabReading: Equatable, Identifiable {
+    let id: String
+    let value: Double
+    /// The stored `yyyy-MM-dd` day key — the day the reading is dated to, not the day it was typed.
+    let day: String
+    let takenAt: Int
+    let unit: String
+    let source: String
+    /// Present only when the user recorded a range on this reading.
+    let referenceText: String?
+
+    init(row: LabMarkerRow, value: Double) {
+        self.id = row.id
+        self.value = value
+        self.day = row.day
+        self.takenAt = row.takenAt
+        self.unit = row.unit
+        self.source = row.source
+        self.referenceText = row.referenceText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? row.referenceText
+            : nil
+    }
+
+    /// "14 August" — from the stored day key, never from `Date()`. A reading with an unparseable
+    /// day keeps its raw key rather than being given today's date.
+    var dayLabel: String {
+        guard let date = Self.dayParser.date(from: day) else { return day }
+        return Self.dayLabeller.string(from: date)
+    }
+
+    private static let dayParser: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private static let dayLabeller: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_GB")
+        f.setLocalizedDateFormatFromTemplate("d MMMM")
+        return f
+    }()
+}
+
+/// A marker as the Lab Book holds it: its identity, and whatever readings exist for it.
+struct NoopLabMarkerState: Equatable, Identifiable {
+    /// The store's `markerKey`, which is the identity that survives a rename of the display label.
+    let key: String
+    let displayName: String
+    /// The unit to show on an empty row. Taken from the catalogue, so it describes the marker
+    /// rather than asserting a reading.
+    let canonicalUnit: String
+    let decimals: Int
+    /// Ascending by `takenAt`, exactly as the store returns them.
+    let history: [NoopLabReading]
+
+    var id: String { key }
+    var latest: NoopLabReading? { history.last }
+    var isRecorded: Bool { latest != nil }
+
+    /// The unit to display: the reading's own, falling back to the catalogue's for an empty row.
+    var unit: String { latest?.unit ?? canonicalUnit }
+
+    /// A range only exists when the user recorded one on the latest reading.
+    var referenceText: String? { latest?.referenceText }
+    var hasRange: Bool { referenceText != nil }
+
+    var valueText: String {
+        guard let latest else { return "—" }
+        return latest.value.formatted(.number.precision(.fractionLength(0...max(0, decimals))))
+    }
+
+    /// Only a series of two or more dated points is a history worth drawing. One point is a point.
+    var drawableHistory: [NoopLabReading] { history.count >= 2 ? history : [] }
+}
+
+/// Loads the Act 8 lab family from the real Lab Book.
+///
+/// One read per marker key, in the fixed catalogue order the design uses, so the list is stable
+/// whether or not anything has been recorded — a marker with no readings is still a row, showing
+/// its absent state. That is `00-RULES.md` §12: the card renders and says what is missing rather
+/// than disappearing.
+@MainActor
+final class NoopLabBook: ObservableObject {
+    /// The nine markers `labs` keeps, in the order a printed panel runs them
+    /// (`48-designer-answers-9-september.md` §2). Keys match what Save writes.
+    static let markerKeys: [(key: String, name: String, unit: String, decimals: Int)] = [
+        ("haemoglobin", "Haemoglobin", "g/L", 0),
+        ("ferritin", "Ferritin", "µg/L", 0),
+        ("vitamin_d", "Vitamin D", "nmol/L", 0),
+        ("custom_apob", "ApoB", "g/L", 2),
+        ("hba1c", "HbA1c", "mmol/mol", 0),
+        ("crp", "hs-CRP", "mg/L", 1),
+        ("tsh", "TSH", "mIU/L", 1),
+        ("alt", "ALT", "U/L", 0),
+        ("custom_creatine_kinase", "Creatine kinase", "U/L", 0),
+    ]
+
+    @Published private(set) var markers: [NoopLabMarkerState] = []
+    /// Distinguishes "nothing recorded" from "not read yet", so the screen can hold its shape
+    /// during the load instead of flashing an empty state it will immediately contradict.
+    @Published private(set) var hasLoaded = false
+    /// Set when the store could not be opened or a read threw. The screen says so rather than
+    /// rendering an empty Lab Book, which would be a different and untrue statement.
+    @Published private(set) var unavailable = false
+
+    var recordedCount: Int { markers.filter(\.isRecorded).count }
+    /// Only markers whose latest reading carries a user-recorded range can be judged against one.
+    var rangedMarkers: [NoopLabMarkerState] { markers.filter(\.hasRange) }
+
+    /// The most recent day any marker was dated to, for the header's draw line. Absent when
+    /// nothing is recorded — the header then says nothing rather than naming a date.
+    var latestDayLabel: String? {
+        markers.compactMap(\.latest).max { $0.takenAt < $1.takenAt }?.dayLabel
+    }
+
+    /// The sources actually present, so the header can name where readings came from without
+    /// asserting a clinic the app was never told about.
+    var sources: [String] {
+        Array(Set(markers.compactMap(\.latest?.source))).sorted()
+    }
+
+    func load(store: WhoopStore?, deviceId: String) async {
+        guard let store else {
+            markers = Self.emptyStates()
+            unavailable = true
+            hasLoaded = true
+            return
+        }
+        var built: [NoopLabMarkerState] = []
+        var failed = false
+        for entry in Self.markerKeys {
+            let rows: [LabMarkerRow]
+            do {
+                rows = try await store.labMarkers(deviceId: deviceId, markerKey: entry.key)
+            } catch {
+                failed = true
+                rows = []
+            }
+            // A qualitative row (`value == nil`, meaning in `valueText`) is not plottable and is
+            // not a number this screen can place against a range, so it is skipped rather than
+            // coerced to zero.
+            let readings = rows.compactMap { row -> NoopLabReading? in
+                guard let value = row.value else { return nil }
+                return NoopLabReading(row: row, value: value)
+            }
+            built.append(
+                NoopLabMarkerState(
+                    key: entry.key,
+                    displayName: entry.name,
+                    canonicalUnit: MarkerCatalog.definition(for: entry.key)?.canonicalUnit ?? entry.unit,
+                    decimals: MarkerCatalog.definition(for: entry.key)?.decimals ?? entry.decimals,
+                    history: readings
+                )
+            )
+        }
+        markers = built
+        unavailable = failed
+        hasLoaded = true
+    }
+
+    private static func emptyStates() -> [NoopLabMarkerState] {
+        markerKeys.map {
+            NoopLabMarkerState(
+                key: $0.key,
+                displayName: $0.name,
+                canonicalUnit: MarkerCatalog.definition(for: $0.key)?.canonicalUnit ?? $0.unit,
+                decimals: MarkerCatalog.definition(for: $0.key)?.decimals ?? $0.decimals,
+                history: []
+            )
+        }
+    }
 }

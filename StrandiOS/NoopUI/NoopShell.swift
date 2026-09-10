@@ -318,16 +318,32 @@ struct NoopVerifiedAppShell: View {
     @ObservedObject var navigation: NoopNavigation
     @EnvironmentObject private var repo: Repository
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @StateObject private var labDraft = NoopLabReviewDraft()
+
+    /// The four Act 8 screens that are safe to show outside the fixture shell.
+    ///
+    /// They read the Lab Book directly and render an absent state wherever it holds nothing — no
+    /// demo band, no clinic, no invented date, no trend from a single point. The rest of the
+    /// canonical shell is still fixture-backed, so it stays behind `--demo-seed`; routing these
+    /// four here is what replaces the generic Local-record list with the screens the design
+    /// actually specifies.
+    private static let canonicalLabRoutes: Set<NoopRoute> = [.labs, .picker, .review, .marker]
 
     var body: some View {
         ZStack {
             NoopHTMLColor.canvas.ignoresSafeArea()
 
-            NoopVerifiedRouteScreen(
-                route: navigation.route,
-                repo: repo,
-                backAction: verifiedBack
-            )
+            Group {
+                if Self.canonicalLabRoutes.contains(navigation.route) {
+                    NoopAct8Screens(navigation: navigation, labDraft: labDraft)
+                } else {
+                    NoopVerifiedRouteScreen(
+                        route: navigation.route,
+                        repo: repo,
+                        backAction: verifiedBack
+                    )
+                }
+            }
                 .id(navigation.route.rawValue)
                 .transition(
                     .asymmetric(
