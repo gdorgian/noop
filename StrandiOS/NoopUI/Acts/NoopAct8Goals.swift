@@ -1169,7 +1169,7 @@ private struct NoopLabsHome: View {
         if NoopContentPolicy.allowsPrototypeContent { return "drawn 14 August · Karolinska" }
         // The most recent day a reading is dated to. No clinic: the store records a source, not a
         // laboratory, and naming one would be inventing provenance.
-        return book.latestDayLabel.map { "drawn \($0)" }
+        return book.latestDateLabel
     }
     var body: some View {
         NoopScreen(bottomInset: 118, topInset: 56) {
@@ -2387,7 +2387,12 @@ private struct NoopOCRCandidateCard: View {
 
 private struct NoopMarkerDetail: View {
     @ObservedObject var navigation: NoopNavigation
-    private var marker: NoopLabMarker { NoopLabMarker.all.first { $0.name == navigation.selectedMarker } ?? NoopLabMarker.all[0] }
+    @EnvironmentObject private var repo: Repository
+    @StateObject private var book = NoopLabBook()
+    private var marker: NoopLabMarker {
+        let all = NoopLabMarker.all(attaching: book)
+        return all.first { $0.name == navigation.selectedMarker } ?? all[0]
+    }
     var body: some View {
         NoopScreen(bottomInset: 118, topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
@@ -2409,7 +2414,9 @@ private struct NoopMarkerDetail: View {
                         HStack {
                             NoopSectionLabel(NoopContentPolicy.allowsPrototypeContent ? "Four draws" : "Recorded result")
                             Spacer()
-                            Text("shaded — the lab's band").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                            // The eyebrow may only promise shading where a band is actually drawn.
+                            Text(marker.chartBand == nil ? "dated results" : "shaded — the lab's band")
+                                .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
                         }
                         NoopMarkerTrend(marker: marker)
                         if NoopContentPolicy.allowsPrototypeContent {
@@ -2450,11 +2457,16 @@ private struct NoopMarkerDetail: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(NoopHTMLColor.warm.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(NoopHTMLColor.warm.opacity(0.26), lineWidth: 0.5))
-                Text("Entered by you, from a laboratory report. Noop stores and dates it, draws it against the band the lab gave, and stops there — it is not a diagnosis and not advice.")
+                Text(marker.chartBand == nil
+                     ? "Entered by you, from a laboratory report. Noop stores and dates it, shows any range you recorded with it, and stops there — it is not a diagnosis and not advice."
+                     : "Entered by you, from a laboratory report. Noop stores and dates it, draws it against the band the lab gave, and stops there — it is not a diagnosis and not advice.")
                     .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                     .padding(.horizontal, 2)
                     .padding(.top, -10)
             }
+        }
+        .task(id: repo.deviceId) {
+            await book.load(store: await repo.storeHandle(), deviceId: repo.deviceId)
         }
     }
 }
@@ -2493,6 +2505,8 @@ private struct NoopLabMarker: Identifiable {
     /// The latest reading the Lab Book actually holds, attached by the screen. When present it is
     /// the source of truth for the value, its date, its unit and whether a range exists at all.
     var live: NoopLabReading? = nil
+    /// Every dated reading the Lab Book holds for this marker, ascending. Real points only.
+    var liveSeries: [Double] = []
 
     /// The design's `low`/`high` are demo fixtures. `MarkerDefinition.referenceTextHint` is
     /// documented as "NOT a shipped reference range" and `higherIsBetter` as "ALWAYS nil (NOOP
@@ -2529,6 +2543,9 @@ private struct NoopLabMarker: Identifiable {
     /// The stored reading's unit, falling back to the design's only for an empty row.
     var shownUnit: String { live?.unit ?? unit }
     var rangeText: String { "\(number(low))–\(number(high)) \(unit)" }
+    /// The band the chart may shade, or `nil` when there is none to shade. Outside the seeded
+    /// fixture NOOP ships no reference range, so nothing is drawn and nothing is described.
+    var chartBand: (low: Double, high: Double)? { demoBandApplies ? (low, high) : nil }
     var recordedDateText: String? {
         if let live { return live.dayLabel }
         return NoopContentPolicy.allowsPrototypeContent ? "14 Aug" : nil
@@ -2560,6 +2577,10 @@ private struct NoopLabMarker: Identifiable {
     /// history to draw for a value that was never recorded, and an invented one is the failure
     /// 00-RULES §0a names.
     var series: [Double] {
+        // Real dated readings win wherever they exist: the chart draws what was recorded, in the
+        // order it was recorded. The seeded four-point `trend` is a fixture and stays behind the
+        // demo gate; outside it a single reading is a single point, never a manufactured curve.
+        if !liveSeries.isEmpty { return liveSeries }
         guard let value else { return [] }
         return NoopContentPolicy.allowsPrototypeContent ? trend : [value]
     }
@@ -2579,6 +2600,7 @@ private struct NoopLabMarker: Identifiable {
         return "Four draws in fourteen months. \(note.prefix(1).uppercased())\(note.dropFirst())."
     }
     var htmlNote: String {
+        guard demoBandApplies else { return bandTag }
         switch id {
         case "ferritin": return isOutside ? "under the band, and the one worth asking about" : "inside, at the low end of a very wide band"
         case "vitamin-d": return isOutside ? "under the band, which for August is early" : "inside, in August — it falls by February"
@@ -2590,9 +2612,16 @@ private struct NoopLabMarker: Identifiable {
         default: return bandTag
         }
     }
-    var chartMinimum: Double { (series + [low]).min()! * 0.86 }
-    var chartMaximum: Double { (series + [low]).max()! * 1.14 }
+    var chartMinimum: Double { (series + (chartBand.map { [$0.low] } ?? [])).min().map { $0 * 0.86 } ?? 0 }
+    var chartMaximum: Double { (series + (chartBand.map { [$0.low] } ?? [])).max().map { $0 * 1.14 } ?? 1 }
     var bandNote: String {
+        guard demoBandApplies else {
+            // Shown back verbatim because it is the user's own text, not a range NOOP supplies.
+            guard let reference = live?.referenceText else {
+                return "No reference range was recorded with this result, so none is drawn."
+            }
+            return "The range recorded with this result: \(reference)."
+        }
         let topVisible = high <= chartMaximum
         let bottomVisible = low >= chartMinimum
         if topVisible && bottomVisible {
@@ -2620,6 +2649,10 @@ private struct NoopLabMarker: Identifiable {
     var dynamicContextCopy: String {
         guard let value else {
             return "Nothing has been recorded for \(name) yet. Add a result from a report or type one in, and Noop will show it against the laboratory’s band."
+        }
+        guard demoBandApplies else {
+            let dated = live.map { " dated \($0.dayLabel)" } ?? ""
+            return "\(name) is \(valueText) \(shownUnit)\(dated), \(trendDirection). Noop records the dated value and does not compare it to a range it was not given. One result is not a diagnosis; discuss it with a clinician if you want it interpreted."
         }
         let position = value < low ? "below" : value > high ? "above" : "inside"
         let markerFact: String
@@ -2664,7 +2697,9 @@ private struct NoopLabMarker: Identifiable {
     static func all(attaching book: NoopLabBook) -> [NoopLabMarker] {
         definitions.map { definition in
             var marker = definition
-            marker.live = book.markers.first { $0.key == definition.storeKey }?.latest
+            let state = book.markers.first { $0.key == definition.storeKey }
+            marker.live = state?.latest
+            marker.liveSeries = (state?.history ?? []).map(\.value)
             return marker
         }
     }
@@ -2779,14 +2814,22 @@ private struct NoopMarkerTrend: View {
             let maxValue = marker.chartMaximum
             let span = max(0.001, maxValue - minValue)
             func y(_ value: Double) -> CGFloat { CGFloat((maxValue - value) / span) * size.height }
-            let topVisible = marker.high <= maxValue
-            let bottomVisible = marker.low >= minValue
-            let bandTop = topVisible ? y(marker.high) : 0
-            let bandBottom = bottomVisible ? y(marker.low) : size.height
-            context.fill(
-                Path(CGRect(x: 0, y: bandTop, width: size.width, height: max(2, bandBottom - bandTop))),
-                with: .color(NoopHTMLColor.green.opacity(0.10))
-            )
+            // Only a band NOOP actually has may be drawn. Outside the seeded fixture there is no
+            // reference range, so the chart plots the dated points on their own rather than
+            // shading a range the user was never given.
+            let band = marker.chartBand
+            let topVisible = band.map { $0.high <= maxValue } ?? false
+            let bottomVisible = band.map { $0.low >= minValue } ?? false
+            if let band {
+                let bandTop = topVisible ? y(band.high) : 0
+                let bandBottom = bottomVisible ? y(band.low) : size.height
+                context.fill(
+                    Path(CGRect(x: 0, y: bandTop, width: size.width, height: max(2, bandBottom - bandTop))),
+                    with: .color(NoopHTMLColor.green.opacity(0.10))
+                )
+            }
+            let bandTop = topVisible ? y(band?.high ?? 0) : 0
+            let bandBottom = bottomVisible ? y(band?.low ?? 0) : size.height
             if topVisible {
                 var boundary = Path()
                 boundary.move(to: CGPoint(x: 0, y: bandTop))
@@ -3030,10 +3073,20 @@ final class NoopLabBook: ObservableObject {
     /// Only markers whose latest reading carries a user-recorded range can be judged against one.
     var rangedMarkers: [NoopLabMarkerState] { markers.filter(\.hasRange) }
 
-    /// The most recent day any marker was dated to, for the header's draw line. Absent when
-    /// nothing is recorded — the header then says nothing rather than naming a date.
-    var latestDayLabel: String? {
-        markers.compactMap(\.latest).max { $0.takenAt < $1.takenAt }?.dayLabel
+    /// The most recently dated reading across all markers. Absent when nothing is recorded — the
+    /// header then says nothing rather than naming a date.
+    var latestReading: NoopLabReading? {
+        markers.compactMap(\.latest).max { $0.takenAt < $1.takenAt }
+    }
+    var latestDayLabel: String? { latestReading?.dayLabel }
+
+    /// "drawn" is a claim about when blood was taken. A manual row is dated to the day it was
+    /// typed, which is a truthful source for *entry* and not for the draw — someone entering a
+    /// result off a March report today would otherwise read "drawn 10 September". The header says
+    /// which it is rather than assuming the two are the same.
+    var latestDateLabel: String? {
+        guard let latest = latestReading else { return nil }
+        return latest.source == "manual" ? "entered \(latest.dayLabel)" : "drawn \(latest.dayLabel)"
     }
 
     /// The sources actually present, so the header can name where readings came from without
