@@ -1140,6 +1140,10 @@ private struct NoopLabsHome: View {
     /// In Release there are no bands to count, so it reports what is actually recorded rather than
     /// asserting nine markers sit inside ranges nobody supplied.
     private var heroCount: Int { NoopContentPolicy.allowsPrototypeContent ? inBandCount : recordedCount }
+    private var heroValueText: String {
+        if NoopContentPolicy.allowsPrototypeContent { return "\(heroCount)" }
+        return book.hasLoaded && !book.unavailable ? "\(heroCount)" : "—"
+    }
     private var heroCaption: String {
         NoopContentPolicy.allowsPrototypeContent
             ? "of \(markers.count) in band"
@@ -1148,8 +1152,14 @@ private struct NoopLabsHome: View {
     private var outsideCount: Int { markers.filter(\.isOutside).count }
     private var recordedCount: Int { markers.filter(\.isRecorded).count }
     private var outOfBandLine: String {
+        guard NoopContentPolicy.allowsPrototypeContent || book.hasLoaded else {
+            return "opening the Lab Book"
+        }
+        if book.unavailable {
+            return recordedCount > 0 ? "the Lab Book could not be refreshed" : "the Lab Book could not be opened"
+        }
         guard recordedCount > 0 else {
-            return book.unavailable ? "the Lab Book could not be opened" : "nothing recorded yet"
+            return "nothing recorded yet"
         }
         guard NoopContentPolicy.allowsPrototypeContent else {
             // No shipped reference ranges, so nothing here may be described as inside or outside
@@ -1213,7 +1223,7 @@ private struct NoopLabsHome: View {
                 HStack(alignment: .bottom, spacing: 14) {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text("\(heroCount)")
+                            Text(heroValueText)
                                 .font(NoopHTMLFont.outfit200(38))
                                 .tracking(-1.71)
                                 .monospacedDigit()
@@ -1899,21 +1909,6 @@ private struct NoopLabReview: View {
 
         do {
             try await store.upsertLabMarkers(rows)
-            let defaults = UserDefaults.standard
-            for candidate in confirmed {
-                let value = candidate.status == .corrected ? candidate.draftValue : candidate.value
-                defaults.set(
-                    value.trimmingCharacters(in: .whitespacesAndNewlines)
-                        .replacingOccurrences(of: ",", with: "."),
-                    forKey: "noop.html.marker.\(candidate.name).value"
-                )
-            }
-            if let captionDate = draft.captionDate {
-                defaults.set(captionDate, forKey: "noop.html.last-lab-draw")
-                for candidate in confirmed {
-                    defaults.set(captionDate, forKey: "noop.html.marker.\(candidate.name).date")
-                }
-            }
             await repo.refresh()
             draft.scrub()
             if navigation.route == .review { navigation.reset(to: .labs) }
@@ -2457,9 +2452,7 @@ private struct NoopMarkerDetail: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(NoopHTMLColor.warm.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(NoopHTMLColor.warm.opacity(0.26), lineWidth: 0.5))
-                Text(marker.chartBand == nil
-                     ? "Entered by you, from a laboratory report. Noop stores and dates it, shows any range you recorded with it, and stops there — it is not a diagnosis and not advice."
-                     : "Entered by you, from a laboratory report. Noop stores and dates it, draws it against the band the lab gave, and stops there — it is not a diagnosis and not advice.")
+                Text(marker.provenanceCopy)
                     .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                     .padding(.horizontal, 2)
                     .padding(.top, -10)
@@ -2587,14 +2580,14 @@ private struct NoopLabMarker: Identifiable {
     var trendDirection: String {
         guard series.count > 1 else { return "one recorded result, not yet a trend" }
         guard let first = series.first, let last = series.last else { return "not yet a trend" }
-        let threshold = max(0.01, abs(first) * 0.03)
-        if last < first - threshold { return "lower across these four dated draws" }
-        if last > first + threshold { return "higher across these four dated draws" }
-        return "broadly stable across these four dated draws"
+        let count = series.count
+        if last < first { return "the latest is lower than the first of \(count) dated results" }
+        if last > first { return "the latest is higher than the first of \(count) dated results" }
+        return "the latest equals the first of \(count) dated results"
     }
     var readCopy: String {
         guard NoopContentPolicy.allowsPrototypeContent else {
-            return "One dated result. \(dynamicContextCopy)"
+            return dynamicContextCopy
         }
         let note = htmlNote
         return "Four draws in fourteen months. \(note.prefix(1).uppercased())\(note.dropFirst())."
@@ -2612,8 +2605,24 @@ private struct NoopLabMarker: Identifiable {
         default: return bandTag
         }
     }
-    var chartMinimum: Double { (series + (chartBand.map { [$0.low] } ?? [])).min().map { $0 * 0.86 } ?? 0 }
-    var chartMaximum: Double { (series + (chartBand.map { [$0.low] } ?? [])).max().map { $0 * 1.14 } ?? 1 }
+    var chartMinimum: Double {
+        let values = series + (chartBand.map { [$0.low] } ?? [])
+        guard let minimum = values.min(), let maximum = values.max() else { return 0 }
+        if demoBandApplies { return minimum * 0.86 }
+        let padding = minimum == maximum
+            ? max(abs(minimum) * 0.14, 1)
+            : max((maximum - minimum) * 0.14, 0.001)
+        return minimum - padding
+    }
+    var chartMaximum: Double {
+        let values = series + (chartBand.map { [$0.low] } ?? [])
+        guard let minimum = values.min(), let maximum = values.max() else { return 1 }
+        if demoBandApplies { return maximum * 1.14 }
+        let padding = minimum == maximum
+            ? max(abs(maximum) * 0.14, 1)
+            : max((maximum - minimum) * 0.14, 0.001)
+        return maximum + padding
+    }
     var bandNote: String {
         guard demoBandApplies else {
             // Shown back verbatim because it is the user's own text, not a range NOOP supplies.
@@ -2646,13 +2655,48 @@ private struct NoopLabMarker: Identifiable {
         }
         return "A single out-of-band result is not conclusive. Ask a clinician whether and when a repeat draw would be useful."
     }
+    var provenanceCopy: String {
+        if NoopContentPolicy.allowsPrototypeContent {
+            return chartBand == nil
+                ? "Entered by you, from a laboratory report. Noop stores and dates it, shows any range you recorded with it, and stops there — it is not a diagnosis and not advice."
+                : "Entered by you, from a laboratory report. Noop stores and dates it, draws it against the band the lab gave, and stops there — it is not a diagnosis and not advice."
+        }
+        guard let live else {
+            return "No result is stored for this marker. Noop does not supply a value or a reference range."
+        }
+        let origin: String
+        switch live.source {
+        case "manual":
+            origin = "Entered by you."
+        case LabReportTextImport.sourceId:
+            origin = "Confirmed by you after an on-device read of a laboratory document."
+        case LabMarkerCsvImport.sourceId:
+            origin = "Imported from a laboratory CSV."
+        case WhoopBiomarkerExportParser.sourceId:
+            origin = "Imported from a WHOOP biomarkers export."
+        case "coach-chat":
+            origin = "Entered through Svea."
+        default:
+            origin = "Saved in your local Lab Book."
+        }
+        let range = live.referenceText == nil
+            ? "No reference range was recorded with it."
+            : "The reference range shown is the text recorded with it."
+        return "\(origin) Noop stores the dated value locally. \(range) It is not a diagnosis and not advice."
+    }
     var dynamicContextCopy: String {
         guard let value else {
-            return "Nothing has been recorded for \(name) yet. Add a result from a report or type one in, and Noop will show it against the laboratory’s band."
+            return "Nothing has been recorded for \(name) yet. Add a result from a report or type one in, and Noop will store and date what you confirm."
         }
         guard demoBandApplies else {
-            let dated = live.map { " dated \($0.dayLabel)" } ?? ""
-            return "\(name) is \(valueText) \(shownUnit)\(dated), \(trendDirection). Noop records the dated value and does not compare it to a range it was not given. One result is not a diagnosis; discuss it with a clinician if you want it interpreted."
+            let dated = live.map { ", dated \($0.dayLabel)" } ?? ""
+            let history = series.count == 1
+                ? "This is one recorded result, not yet a trend."
+                : "Across the recorded history, \(trendDirection)."
+            let comparison = live?.referenceText == nil
+                ? "Noop does not compare it to a reference range it was not given."
+                : "Noop shows the recorded reference text verbatim and does not interpret or compare the value to it."
+            return "\(name) is \(valueText) \(shownUnit)\(dated). \(history) \(comparison) A recorded result is not a diagnosis; discuss it with a clinician if you want it interpreted."
         }
         let position = value < low ? "below" : value > high ? "above" : "inside"
         let markerFact: String
@@ -2809,10 +2853,10 @@ private struct NoopOCRCandidate: Identifiable {
 private struct NoopMarkerTrend: View {
     let marker: NoopLabMarker
     var body: some View {
+        let minValue = marker.chartMinimum
+        let maxValue = marker.chartMaximum
+        let span = max(0.001, maxValue - minValue)
         Canvas { context, size in
-            let minValue = marker.chartMinimum
-            let maxValue = marker.chartMaximum
-            let span = max(0.001, maxValue - minValue)
             func y(_ value: Double) -> CGFloat { CGFloat((maxValue - value) / span) * size.height }
             // Only a band NOOP actually has may be drawn. Outside the seeded fixture there is no
             // reference range, so the chart plots the dated points on their own rather than
@@ -2844,7 +2888,6 @@ private struct NoopMarkerTrend: View {
             }
 
             var line = Path()
-            var points: [CGPoint] = []
             for (index, value) in marker.series.enumerated() {
                 let denominator = max(1, marker.series.count - 1)
                 let x = marker.series.count == 1
@@ -2852,16 +2895,30 @@ private struct NoopMarkerTrend: View {
                     : CGFloat(index) / CGFloat(denominator) * size.width
                 let point = CGPoint(x: x, y: y(value))
                 index == 0 ? line.move(to: point) : line.addLine(to: point)
-                points.append(point)
             }
             context.stroke(line, with: .color(Color(hex: 0xF2B45C)), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-
-            for point in points {
-                let dot = Path(ellipseIn: CGRect(x: point.x - 3.6, y: point.y - 3.6, width: 7.2, height: 7.2))
-                context.fill(dot, with: .color(NoopHTMLColor.canvas))
-                context.stroke(dot, with: .color(Color(hex: 0xF2B45C)), lineWidth: 2)
+        }
+        // HTML's SVG explicitly uses overflow:visible, so its endpoint circles remain whole even
+        // though their centres sit at x=0 and x=300. Canvas clips its own drawing; render the dots
+        // as overlay views to preserve that exact behaviour instead of leaving an orange crescent.
+        .overlay {
+            GeometryReader { proxy in
+                ForEach(Array(marker.series.enumerated()), id: \.offset) { index, value in
+                    let denominator = max(1, marker.series.count - 1)
+                    let x = marker.series.count == 1
+                        ? proxy.size.width
+                        : CGFloat(index) / CGFloat(denominator) * proxy.size.width
+                    let y = CGFloat((maxValue - value) / span) * proxy.size.height
+                    Circle()
+                        .fill(NoopHTMLColor.canvas)
+                        .overlay(Circle().stroke(Color(hex: 0xF2B45C), lineWidth: 2))
+                        .frame(width: 7.2, height: 7.2)
+                        .position(x: x, y: y)
+                }
             }
-        }.frame(height: 118)
+            .allowsHitTesting(false)
+        }
+        .frame(height: 118)
     }
 }
 
@@ -3086,16 +3143,17 @@ final class NoopLabBook: ObservableObject {
     /// which it is rather than assuming the two are the same.
     var latestDateLabel: String? {
         guard let latest = latestReading else { return nil }
-        return latest.source == "manual" ? "entered \(latest.dayLabel)" : "drawn \(latest.dayLabel)"
+        return "latest \(latest.dayLabel)"
     }
 
     /// The sources actually present, so the header can name where readings came from without
     /// asserting a clinic the app was never told about.
     var sources: [String] {
-        Array(Set(markers.compactMap(\.latest?.source))).sorted()
+        Array(Set(markers.flatMap(\.history).map(\.source))).sorted()
     }
 
     func load(store: WhoopStore?, deviceId: String) async {
+        Self.purgeLegacyDisplayMirror()
         guard let store else {
             markers = Self.emptyStates()
             unavailable = true
@@ -3103,14 +3161,20 @@ final class NoopLabBook: ObservableObject {
             return
         }
         var built: [NoopLabMarkerState] = []
-        var failed = false
         for entry in Self.markerKeys {
             let rows: [LabMarkerRow]
             do {
                 rows = try await store.labMarkers(deviceId: deviceId, markerKey: entry.key)
+            } catch is CancellationError {
+                return
             } catch {
-                failed = true
-                rows = []
+                // A partial nine-marker read is indistinguishable from missing health data. Keep
+                // the last complete snapshot if one exists; on first load, expose only the fixed
+                // empty catalogue and the unavailable state.
+                if markers.isEmpty { markers = Self.emptyStates() }
+                unavailable = true
+                hasLoaded = true
+                return
             }
             // A qualitative row (`value == nil`, meaning in `valueText`) is not plottable and is
             // not a number this screen can place against a range, so it is skipped rather than
@@ -3130,7 +3194,7 @@ final class NoopLabBook: ObservableObject {
             )
         }
         markers = built
-        unavailable = failed
+        unavailable = false
         hasLoaded = true
     }
 
@@ -3143,6 +3207,17 @@ final class NoopLabBook: ObservableObject {
                 decimals: MarkerCatalog.definition(for: $0.key)?.decimals ?? $0.decimals,
                 history: []
             )
+        }
+    }
+
+    /// Older UI code duplicated lab values and dates into UserDefaults after the canonical database
+    /// write. Nothing reads that mirror now; remove it so health values have one source of truth.
+    private static func purgeLegacyDisplayMirror() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: "noop.html.last-lab-draw")
+        for marker in markerKeys {
+            defaults.removeObject(forKey: "noop.html.marker.\(marker.name).value")
+            defaults.removeObject(forKey: "noop.html.marker.\(marker.name).date")
         }
     }
 }

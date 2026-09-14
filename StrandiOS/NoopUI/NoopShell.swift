@@ -334,6 +334,11 @@ struct NoopVerifiedAppShell: View {
     /// it is a fixture outside `--demo-seed`, so it is safe here too.
     private static let canonicalBreatheRoutes: Set<NoopRoute> = [.breathe, .bcatalog, .bplayer, .bsweep, .bfound]
 
+    private var usesCanonicalCanvas: Bool {
+        Self.canonicalLabRoutes.contains(navigation.route)
+            || Self.canonicalBreatheRoutes.contains(navigation.route)
+    }
+
     var body: some View {
         ZStack {
             NoopHTMLColor.canvas.ignoresSafeArea()
@@ -386,6 +391,10 @@ struct NoopVerifiedAppShell: View {
         .preferredColorScheme(.dark)
         .contentShape(Rectangle())
         .simultaneousGesture(verifiedBackGesture)
+        // Canonical pages measure their 56 pt header inset from the full 402 x 874 canvas, exactly
+        // like the fixture shell. Without this, SwiftUI first removes the status-bar safe area and
+        // NoopScreen adds 56 pt again, putting every verified Lab/Breathe page about 60 pt too low.
+        .ignoresSafeArea(.container, edges: usesCanonicalCanvas ? .top : [])
     }
 
     private func verifiedBack() {

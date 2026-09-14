@@ -112,7 +112,9 @@ final class BiofeedbackController: ObservableObject {
     var canBuzz: Bool { live.bonded && live.encryptedBond }
 
     private func fireBuzz(loops: Int) {
-        guard canBuzz else { return }
+        // Holds and text-only protocol stages deliberately carry zero loops. They still move the
+        // on-screen phase, but must never be serialized as a zero-length RUN_HAPTICS command.
+        guard loops > 0, canBuzz else { return }
         // #haptics: biofeedback/resonance cues ride the Breathing toggle (parity with Android's Breathe path).
         model.buzz(loops: UInt8(clamping: loops), gate: HapticPrefs.breathing)
     }
@@ -174,7 +176,10 @@ final class BiofeedbackController: ObservableObject {
         running = true
         ScreenIdle.keepAwake(true)
         startSecondTimer()
-        walkCues(BreathPacer.schedule(bpm: bpm, cycles: cycles)) { [weak self] in
+        walkCues(
+            BreathPacer.schedule(bpm: bpm, cycles: cycles),
+            completionAfterMs: BreathPacer.sessionDurationMs(bpm: bpm, cycles: cycles)
+        ) { [weak self] in
             self?.stop()
         }
     }
@@ -187,17 +192,25 @@ final class BiofeedbackController: ObservableObject {
         running = true
         ScreenIdle.keepAwake(true)
         startSecondTimer()
-        walkCues(BreathProtocolPlayer.schedule(proto, sessionMs: sessionMs)) { [weak self] in
+        walkCues(
+            BreathProtocolPlayer.schedule(proto, sessionMs: sessionMs),
+            completionAfterMs: sessionMs
+        ) { [weak self] in
             self?.stop()
         }
     }
 
     /// Walk a `[BreathCue]` list: drive `phase` and fire the per-cue buzz at each offset, then call
-    /// `onComplete` after the last cue's cycle finishes. Pure cue list in, scheduled side-effects out —
-    /// the spec's "the existing asyncAfter walk drives it".
-    private func walkCues(_ cues: [BreathCue], onComplete: @escaping () -> Void) {
-        guard !cues.isEmpty else { onComplete(); return }
-        for cue in cues {
+    /// `onComplete` after the caller's exact session window. Guided protocols intentionally have no
+    /// cues, so an empty cue list still keeps its timer alive until that window ends.
+    private func walkCues(
+        _ cues: [BreathCue],
+        completionAfterMs: Int,
+        onComplete: @escaping () -> Void
+    ) {
+        let duration = max(0, completionAfterMs)
+        guard duration > 0 else { onComplete(); return }
+        for cue in cues where cue.offsetMs < duration {
             let item = DispatchWorkItem { [weak self] in
                 guard let self else { return }
                 self.phase = cue.phase
@@ -206,11 +219,9 @@ final class BiofeedbackController: ObservableObject {
             pending.append(item)
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(cue.offsetMs), execute: item)
         }
-        // Schedule completion one cycle past the last cue's offset (the exhale fills the rest of the cycle).
-        let lastOffset = cues.map(\.offsetMs).max() ?? 0
         let endItem = DispatchWorkItem { onComplete() }
         pending.append(endItem)
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(lastOffset + 4_000), execute: endItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(duration), execute: endItem)
     }
 
     // MARK: - L1: the "find my pace" sweep
@@ -256,7 +267,10 @@ final class BiofeedbackController: ObservableObject {
 
             // Pace it via the cue list for this pace's window.
             let cycles = max(1, Int((Double(secondsPerPace) * bpm / 60.0).rounded()))
-            walkCues(BreathPacer.schedule(bpm: bpm, cycles: cycles)) { [weak self] in
+            walkCues(
+                BreathPacer.schedule(bpm: bpm, cycles: cycles),
+                completionAfterMs: secondsPerPace * 1_000
+            ) { [weak self] in
                 guard let self else { return }
                 let endTs = Int(Date().timeIntervalSince1970)
                 self.sweepSamples.append(ResonanceEngine.PaceSample(bpm: bpm, rr: bucket,

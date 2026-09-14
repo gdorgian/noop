@@ -2661,9 +2661,10 @@ struct NoopBreatheSweep: Codable, Equatable {
 final class NoopBreatheSession: ObservableObject {
     static let shared = NoopBreatheSession()
 
-    /// The HTML's five candidates and ninety seconds each (`BRATES`, the bargain line).
+    /// Five candidates at the engine design's two-minute scoring window. The HTML fixture keeps
+    /// its accelerated ninety-second wording, but Release runs the ten minutes it promises.
     static let sweepPaces: [Double] = [6.5, 6.0, 5.5, 5.0, 4.5]
-    static let sweepSecondsPerPace = 90
+    static let sweepSecondsPerPace = 120
     private static let sweepKey = "noop.breathe.sweep"
 
     @Published private(set) var controller: BiofeedbackController?
@@ -2761,9 +2762,12 @@ final class NoopBreatheSession: ObservableObject {
 
     func startSweep() {
         stopTicker()
+        samples = []
+        paceSamples = []
         sweepStart = Date()
         sweepPaceStart = Date()
         sweepSwings = [:]
+        lastSweepIndex = -1
         if !isDemo {
             controller?.startSweep(quick: false, secondsPerPace: Self.sweepSecondsPerPace, paces: Self.sweepPaces)
             ticker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -3246,7 +3250,7 @@ struct NoopBreatheScreens: View {
                         afterRows(vertical: 13, pace: foundPace)
                     }
 
-                    copy("A pace that suits your physiology. Nothing here treats anything, and the strap does the counting so you can shut your eyes.",
+                    copy(homeFootnote,
                          11.5, 1.6, NoopHTMLColor.faint)
                         .padding(.horizontal, 2)
                         .padding(.top, 2)
@@ -3287,30 +3291,46 @@ struct NoopBreatheScreens: View {
         }
     }
 
-    private var sweepDate: String {
-        let date = demo ? nil : BiofeedbackPrefs.lockedPaceDate
-        guard let date else { return "12 August" }
-        return date.formatted(.dateTime.day().month(.wide))
+    private var sweepDate: String? {
+        if demo { return "12 August" }
+        return BiofeedbackPrefs.lockedPaceDate?.formatted(.dateTime.day().month(.wide))
     }
 
     private var homeLine: String {
         guard foundPace != nil else {
-            return "Breathe works today at six a minute, which suits most people. Ten minutes of measuring finds the one that suits you."
+            return demo
+                ? "Breathe works today at six a minute, which suits most people. Ten minutes of measuring finds the one that suits you."
+                : "Breathe starts at six a minute, inside the commonly tested 4.5–7 range. A ten-minute sweep compares five paces against your recorded heart response."
         }
-        return demo
-            ? "Locked from your sweep on 12 August. Every protocol that can run at your pace now does."
-            : "Locked from your sweep on \(sweepDate). Resonance sessions now run at it."
+        if demo { return "Locked from your sweep on 12 August. Every protocol that can run at your pace now does." }
+        if let sweepDate { return "Locked from your sweep on \(sweepDate). Resonance sessions now run at it." }
+        return "Locked from your latest saved sweep. Resonance sessions now run at it."
     }
 
-    private var sweepEyebrow: String { foundPace == nil ? "Ten minutes, once" : "Swept \(sweepDate)" }
+    private var sweepEyebrow: String {
+        guard foundPace != nil else { return "Ten minutes, once" }
+        return sweepDate.map { "Swept \($0)" } ?? "Saved sweep"
+    }
 
     private var sweepLine: String {
         guard foundPace != nil else {
-            return "There is one pace where your heart swings hardest with each breath. The strap can find it in about ten minutes."
+            return demo
+                ? "There is one pace where your heart swings hardest with each breath. The strap can find it in about ten minutes."
+                : "The sweep compares how strongly your recorded heart rate changes at five paced breathing rates."
         }
         return demo
             ? "Your resting pulse has moved 3 bpm since. Worth re-testing, not urgent."
-            : "A pace can drift as your fitness changes. Worth re-testing every few months."
+            : "The saved pace is dated. Re-test whenever you want a newer measurement."
+    }
+
+    private var homeFootnote: String {
+        if demo {
+            return "A pace that suits your physiology. Nothing here treats anything, and the strap does the counting so you can shut your eyes."
+        }
+        if foundPace != nil {
+            return "A pace selected from your recorded sweep. Nothing here treats anything, and a connected strap can carry the cue while your eyes are shut."
+        }
+        return "No personal pace has been measured yet. Nothing here treats anything; without a connected strap, the cue stays on screen."
     }
 
     private func protocolMeta(_ item: NoopBreatheItem) -> String {
@@ -3630,7 +3650,9 @@ struct NoopBreatheScreens: View {
                     if demo { session.demoFound = true } else { session.keepSweep() }
                     navigation.replace(with: .bfound)
                 }
-                Text("Ten minutes, five paces, ninety seconds each. Stopping early keeps every pace it finished.")
+                Text(demo
+                     ? "Ten minutes, five paces, ninety seconds each. Stopping early keeps every pace it finished."
+                     : "Ten minutes, five paces, two minutes each. Stopping early keeps every pace it finished.")
                     .font(NoopHTMLFont.sans(11))
                     .foregroundStyle(NoopHTMLColor.faint)
                     .multilineTextAlignment(.center)
@@ -3650,10 +3672,11 @@ struct NoopBreatheScreens: View {
     }
 
     private func sweepStepLabel(_ step: (index: Int, progress: Double)) -> String {
-        if !demo && !session.strapCanBuzz && session.samples.isEmpty && model.bpm == nil {
-            return "Pace \(step.index + 1) of 5 \u{00B7} no strap, nothing to measure"
+        if !demo && model.bpm == nil {
+            return "Pace \(step.index + 1) of 5 \u{00B7} no heart rate to measure"
         }
-        let left = max(1, Int(ceil((1 - step.progress) * Double(NoopBreatheSession.sweepSecondsPerPace))))
+        let secondsPerPace = demo ? 90 : NoopBreatheSession.sweepSecondsPerPace
+        let left = max(1, Int(ceil((1 - step.progress) * Double(secondsPerPace))))
         return "Pace \(step.index + 1) of 5 \u{00B7} \(left)s left"
     }
 
@@ -3823,7 +3846,7 @@ struct NoopBreatheScreens: View {
                     } else {
                         primary(result == nil ? "Find your pace" : "Try again") { navigation.replace(with: .bsweep) }
                     }
-                    copy("Worth testing again after a few months, or if your resting pulse moves. It is a pace that suits your physiology, not a treatment for anything.",
+                    copy(resultFootnote(result),
                          11.5, 1.6, NoopHTMLColor.faint)
                         .padding(.horizontal, 2)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -3836,7 +3859,9 @@ struct NoopBreatheScreens: View {
 
     private func foundSentence(_ result: NoopBreatheSweep?) -> String {
         guard let result else {
-            return "No sweep yet. Ten minutes with the strap on finds the pace your heart answers most."
+            return demo
+                ? "No sweep yet. Ten minutes with the strap on finds the pace your heart answers most."
+                : "No sweep has been saved yet. With heart-rate data, the ten-minute sweep compares five paced rates."
         }
         guard let peak = result.peak else {
             return "None of the paces it tried cleared the others, so it has not picked one. Nothing changes until a sweep finds one."
@@ -3846,6 +3871,16 @@ struct NoopBreatheScreens: View {
         // The prototype's sentence is verbatim; its bars are not its curve, so its margin is not derived.
         guard let margin = demo ? 31 : result.margin else { return lead }
         return lead + " Your heart swung \(margin) % harder here than at any other pace it tried."
+    }
+
+    private func resultFootnote(_ result: NoopBreatheSweep?) -> String {
+        if demo {
+            return "Worth testing again after a few months, or if your resting pulse moves. It is a pace that suits your physiology, not a treatment for anything."
+        }
+        guard result?.peak != nil else {
+            return "No pace was selected from this sweep. It is an estimate from wrist heart-rate timing, not a treatment or clinical measurement."
+        }
+        return "This pace was selected from the recorded sweep and may be tested again. It is an estimate from wrist heart-rate timing, not a treatment or clinical measurement."
     }
 }
 
