@@ -1249,6 +1249,10 @@ private struct NoopOverlayHost: View {
             NoopDeepInsightsConfirmation(navigation: navigation)
         case .destructiveConfirmation(let item):
             NoopDestructiveConfirmation(item: item, navigation: navigation)
+        case .instrumentSignalPickerA:
+            NoopInstrumentSignalPickerSheet(navigation: navigation, slot: .first)
+        case .instrumentSignalPickerB:
+            NoopInstrumentSignalPickerSheet(navigation: navigation, slot: .second)
         }
     }
 }

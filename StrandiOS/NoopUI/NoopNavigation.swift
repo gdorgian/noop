@@ -267,6 +267,8 @@ enum NoopOverlay: Identifiable, Equatable {
     case deepInsightsConfirmation
     case destructiveConfirmation(String)
     case importCatalog
+    case instrumentSignalPickerA
+    case instrumentSignalPickerB
 
     var id: String {
         switch self {
@@ -278,6 +280,8 @@ enum NoopOverlay: Identifiable, Equatable {
         case .goalEditor: "goal-editor"
         case .deepInsightsConfirmation: "deep-insights"
         case .destructiveConfirmation(let value): "destructive-\(value)"
+        case .instrumentSignalPickerA: "instrument-signal-a"
+        case .instrumentSignalPickerB: "instrument-signal-b"
         }
     }
 }
@@ -563,6 +567,8 @@ final class NoopNavigation: ObservableObject {
             case "goal-editor": overlay = .goalEditor
             case "deep-insights": overlay = .deepInsightsConfirmation
             case "destructive": overlay = .destructiveConfirmation("your account and data")
+            case "instrument-signal-a": overlay = .instrumentSignalPickerA
+            case "instrument-signal-b": overlay = .instrumentSignalPickerB
             default: break
             }
         }
