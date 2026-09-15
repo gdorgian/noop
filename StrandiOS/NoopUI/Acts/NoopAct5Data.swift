@@ -1,5 +1,8 @@
 #if os(iOS)
+import StrandImport
 import SwiftUI
+import UniformTypeIdentifiers
+import WhoopStore
 
 // MARK: - plumbing/data · the two doors
 //
@@ -16,9 +19,330 @@ import SwiftUI
 // sit ABOVE their card, trailing notes sit BELOW it, list cards are padded 4/16 with a hairline
 // between rows, and the two figure heroes are Outfit 200.
 
+
+// MARK: - Production adapter
+//
+// The screens below draw the handoff. In a Debug `--demo-seed` build they draw its fixture; everywhere
+// else they read this adapter, which binds them to the importers, `DataBackup`, `CsvExport`,
+// `FolderBackup` and the store. It never supplies a number the store, the file or the importer did not
+// hand it: what is unknown renders as unknown.
+
+@MainActor
+final class NoopDataFlow: ObservableObject {
+    static let shared = NoopDataFlow()
+
+    struct Stored: Equatable {
+        let days: Int
+        let sleeps: Int
+        let first: String?
+        let last: String?
+    }
+
+    struct Reading: Equatable {
+        let fileName: String
+        let fileSize: Int?
+        let startedAt: Date
+    }
+
+    struct Written: Equatable {
+        let source: String
+        let summary: ImportSummary
+    }
+
+    struct Refused: Equatable {
+        let fileName: String
+        let reason: String
+    }
+
+    enum Phase: Equatable {
+        case idle
+        case reading(Reading)
+        case imported(Written)
+        case rejected(Refused)
+    }
+
+    @Published private(set) var stored: Stored?
+    @Published private(set) var storedUnavailable = false
+    @Published private(set) var phase: Phase = .idle
+    @Published private(set) var backupBusy = false
+    @Published var notice: (title: String, message: String)?
+    /// Bumped when a backup is written, so the snapshot card re-reads `FolderBackup`.
+    @Published private(set) var backupSeq = 0
+
+    var isReading: Bool { if case .reading = phase { return true }; return false }
+
+    // MARK: Stored on this phone
+
+    func loadStored(repo: Repository) async {
+        guard let store = await repo.storeHandle() else {
+            storedUnavailable = true
+            return
+        }
+        storedUnavailable = false
+        var days = Set<String>()
+        var ids = repo.importedReadIds + repo.computedReadIds + [Repository.appleHealthSource]
+        ids = ids.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        for id in ids {
+            for metric in (try? await store.dailyMetrics(deviceId: id, from: "0000-01-01", to: "9999-12-31")) ?? [] {
+                days.insert(metric.day)
+            }
+        }
+        var sleeps = Set<String>()
+        for id in repo.importedReadIds + repo.computedReadIds {
+            for block in (try? await store.sleepSessions(deviceId: id, from: 0, to: 4_102_444_800, limit: 1_000_000)) ?? [] {
+                sleeps.insert("\(block.startTs)-\(block.endTs)")
+            }
+        }
+        let sorted = days.sorted()
+        stored = Stored(days: days.count, sleeps: sleeps.count, first: sorted.first, last: sorted.last)
+    }
+
+    // MARK: The door in
+
+    /// Pick one file and hand it to the importer that recognises it by content. The flow moves forward
+    /// only: `reading`, then `imported` or `rejected`.
+    func chooseAndImport(model: AppModel, navigation: NoopNavigation) {
+        guard !isReading else { navigation.replace(with: .reading); return }
+        Task {
+            let types: [UTType] = [.zip, .xml, .json, .commaSeparatedText, .plainText, .data, .item]
+            guard let picked = await DocumentPicker.importFile(types) else { return }
+            await importFile(picked, model: model, navigation: navigation)
+        }
+    }
+
+    func importFile(_ picked: URL, model: AppModel, navigation: NoopNavigation) async {
+        guard !isReading else { return }
+        let size = (try? picked.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+        phase = .reading(Reading(fileName: picked.lastPathComponent, fileSize: size, startedAt: Date()))
+        navigation.replace(with: .reading)
+        let outcome = await Self.run(picked, model: model)
+        phase = outcome
+        await loadStored(repo: model.repo)
+        // A reader who left the flow is not dragged back into it; the result waits for them.
+        if navigation.route == .reading {
+            switch outcome {
+            case .imported: navigation.replace(with: .imported)
+            case .rejected: navigation.replace(with: .rejected)
+            case .idle, .reading: break
+            }
+        }
+    }
+
+    #if DEBUG
+    private var debugImportConsumed = false
+
+    /// Debug-only capture seam: `--act5-import <path>` runs the real importer on a file already in the
+    /// app's sandbox, so the production flow can be exercised without driving the system picker.
+    func runDebugImportIfRequested(model: AppModel, navigation: NoopNavigation) async {
+        guard !debugImportConsumed,
+              let flag = CommandLine.arguments.firstIndex(of: "--act5-import"),
+              CommandLine.arguments.indices.contains(flag + 1) else { return }
+        debugImportConsumed = true
+        await importFile(URL(fileURLWithPath: CommandLine.arguments[flag + 1]), model: model, navigation: navigation)
+    }
+    #endif
+
+    func finishFlow() {
+        if !isReading { phase = .idle }
+    }
+
+    private static func run(_ picked: URL, model: AppModel) async -> Phase {
+        let name = picked.lastPathComponent
+        let scoped = picked.startAccessingSecurityScopedResource()
+        defer { if scoped { picked.stopAccessingSecurityScopedResource() } }
+        guard let store = await model.repo.storeHandle() else {
+            return .rejected(Refused(fileName: name, reason: "The record on this phone could not be opened, so nothing was read. Try again after reopening Noop."))
+        }
+        do {
+            let local = try await AppModel.materializeForImport(picked)
+            defer { local.cleanup() }
+            let kind: DataSourceKind?
+            do {
+                kind = try ImportCoordinator().detectKind(of: local.url)
+            } catch ImportError.notAZipOrFolder {
+                kind = nil   // no first-party marker: the wearable importer sniffs Oura, Fitbit or Garmin
+            }
+            let written: Written
+            switch kind {
+            case .whoopExport:
+                let summary = try await WhoopImporter.importExport(url: local.url, into: store, deviceId: model.deviceId)
+                written = Written(source: "WHOOP export", summary: summary)
+            case .appleHealth:
+                let summary = try await AppleHealthImport.importExport(url: local.url, into: store, deviceId: model.appleDeviceId)
+                model.repo.appleHealthCache = nil
+                model.repo.appleHealthLoadedSeq = -1
+                written = Written(source: "Apple Health", summary: summary)
+            case .xiaomiBand:
+                let summary = try await XiaomiImporter.importExport(url: local.url, into: store)
+                written = Written(source: "Mi Band", summary: summary)
+            case .ouraImport, .fitbitImport, .garminImport, nil:
+                let result = try await WearableImporter.importExport(url: local.url, into: store)
+                written = Written(source: result.brand.displayName, summary: result.summary)
+            }
+            try? await store.checkpointWAL()
+            await model.repo.refresh()
+            return .imported(written)
+        } catch let error as ImportError {
+            return .rejected(Refused(fileName: name, reason: Self.reason(for: error)))
+        } catch {
+            return .rejected(Refused(fileName: name, reason: error.localizedDescription))
+        }
+    }
+
+    private static func reason(for error: ImportError) -> String {
+        switch error {
+        case .fileNotFound:
+            return "The file was gone by the time Noop went to read it. Nothing was written."
+        // The importer's own text carries a sandbox path; the reader gets the finding without it.
+        case .notAZipOrFolder:
+            return "Noop could not recognise this as an export it reads. It is not one of the files in the list below, so nothing in it could be attached to a date."
+        case .missingEntry(let entry):
+            return "This looks like an export, but it is missing \((entry as NSString).lastPathComponent), which Noop needs to read the rest."
+        case .xmlParseFailed:
+            return "The file looks like an Apple Health export, but it could not be parsed. It may have been cut short while it was copied."
+        case .emptyExport:
+            return "Noop recognised the file, but it carried nothing that could be written."
+        }
+    }
+
+    // MARK: The door out
+
+    func exportBackup(repo: Repository) {
+        guard !backupBusy else { return }
+        backupBusy = true
+        Task {
+            let result = await DataBackup.runExport(checkpoint: { await repo.checkpointForBackup() })
+            backupBusy = false
+            switch result {
+            case .cancelled: return
+            case .exported(let url):
+                notice = ("Backup saved", "\(url.lastPathComponent) is ready to copy to your other phone.")
+            case .imported:
+                return
+            case .failure(let message):
+                notice = ("The backup was not written", message)
+            }
+        }
+    }
+
+    func exportCSV(repo: Repository) {
+        guard !backupBusy else { return }
+        backupBusy = true
+        Task {
+            let result = await CsvExport.run(repo: repo)
+            backupBusy = false
+            switch result {
+            case .cancelled: return
+            case .exported(let url):
+                notice = ("CSV saved", "\(url.lastPathComponent) reads back into Noop.")
+            case .failure(let message):
+                notice = ("The CSV was not written", message)
+            }
+        }
+    }
+
+    func restoreBackup() {
+        guard !backupBusy, !isReading else { return }
+        backupBusy = true
+        Task {
+            let result = await DataBackup.runImport()
+            backupBusy = false
+            switch result {
+            case .cancelled, .exported: return
+            case .imported:
+                notice = ("Restored", "The backup replaced the record on this phone. Quit and reopen Noop for it to take effect.")
+            case .failure(let message):
+                notice = ("Nothing was restored", message)
+            }
+        }
+    }
+}
+
+/// Formatting that only ever restates what it is given.
+enum NoopDataFormat {
+    static func count(_ value: Int) -> String {
+        value.formatted(.number.grouping(.automatic))
+    }
+
+    static func day(_ key: String) -> String? {
+        let parser = DateFormatter()
+        parser.calendar = Calendar(identifier: .gregorian)
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        return parser.date(from: key).map(date)
+    }
+
+    static func date(_ value: Date) -> String {
+        let out = DateFormatter()
+        out.dateFormat = "d MMM yyyy"
+        return out.string(from: value)
+    }
+
+    static func bytes(_ value: Int) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .file)
+    }
+
+    static func age(sinceMs ms: Int, now: Date = Date()) -> String {
+        let seconds = now.timeIntervalSince(Date(timeIntervalSince1970: Double(ms) / 1000))
+        let days = Int(seconds / 86_400)
+        if days >= 2 { return "\(days) days ago" }
+        if days == 1 { return "Yesterday" }
+        let hours = Int(seconds / 3_600)
+        if hours >= 1 { return hours == 1 ? "An hour ago" : "\(hours) hours ago" }
+        return "Just now"
+    }
+
+    /// "Seven years, in" from the span the importer reported. No span, no claim about time.
+    static func headline(_ summary: ImportSummary) -> String {
+        guard let first = summary.earliest, let last = summary.latest, last >= first else {
+            return "Written, undated"
+        }
+        let parts = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: first, to: last)
+        let (n, unit): (Int, String) = {
+            if let y = parts.year, y >= 1 { return (y, "year") }
+            if let m = parts.month, m >= 1 { return (m, "month") }
+            return (max(1, (parts.day ?? 0) + 1), "day")
+        }()
+        let words = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+                     "Eleven", "Twelve"]
+        let lead = n < words.count ? words[n] : "\(n)"
+        return "\(lead) \(unit)\(n == 1 ? "" : "s"), in"
+    }
+
+    /// The importers' own category keys, said in words.
+    static func category(_ key: String) -> String {
+        let known: [String: String] = [
+            "days": "Days", "cycles": "Cycles", "sleeps": "Sleeps", "sleepSessions": "Sleeps",
+            "workouts": "Workouts", "journal": "Journal entries", "journalEntries": "Journal entries",
+            "HeartRate": "Heart rate", "SleepAnalysis": "Sleep analysis", "RestingHeartRate": "Resting heart rate",
+            "HeartRateVariabilitySDNN": "Variability", "StepCount": "Steps"
+        ]
+        if let word = known[key] { return word }
+        var spaced = ""
+        for (index, char) in key.enumerated() {
+            if index > 0, char.isUppercase { spaced += " " }
+            spaced.append(index == 0 ? Character(char.uppercased()) : Character(char.lowercased()))
+        }
+        return spaced
+    }
+}
+
 struct NoopDataScreen: View {
     @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var repo: Repository
+    @ObservedObject private var flow = NoopDataFlow.shared
     @State private var connectedServices: Set<String> = ["Apple Health"]
+
+    /// The handoff's fixture is drawn only in a Debug `--demo-seed` build. `--act5-live` keeps a seeded
+    /// capture on the production binding, so the live states can be flipped at the same position.
+    private var demo: Bool {
+        #if DEBUG
+        NoopContentPolicy.allowsPrototypeContent && !CommandLine.arguments.contains("--act5-live")
+        #else
+        false
+        #endif
+    }
 
     private static let blush = Color(hex: 0xE08A9B)
     private static let blushLight = Color(hex: 0xF6D3DA)
@@ -27,13 +351,31 @@ struct NoopDataScreen: View {
     private static let dim = Color(hex: 0x8B958F)
 
     var body: some View {
-        switch navigation.route {
-        case .importHistory: importScreen
-        case .reading: reading
-        case .imported: imported
-        case .rejected: rejected
-        case .backup: backupScreen
-        default: dataHome
+        Group {
+            switch navigation.route {
+            case .importHistory: importScreen
+            case .reading: reading
+            case .imported: imported
+            case .rejected: rejected
+            case .backup: backupScreen
+            default: dataHome
+            }
+        }
+        .task(id: repo.refreshSeq) {
+            if !demo { await flow.loadStored(repo: repo) }
+        }
+        #if DEBUG
+        .task {
+            if !demo { await flow.runDebugImportIfRequested(model: model, navigation: navigation) }
+        }
+        #endif
+        .alert(flow.notice?.title ?? "", isPresented: Binding(
+            get: { flow.notice != nil },
+            set: { if !$0 { flow.notice = nil } }
+        )) {
+            Button("OK") { flow.notice = nil }
+        } message: {
+            Text(flow.notice?.message ?? "")
         }
     }
 
@@ -43,6 +385,7 @@ struct NoopDataScreen: View {
         NoopScreen(topInset: 56, horizontalInset: 18) {
             VStack(alignment: .leading, spacing: 0) {
                 NoopBackHeader(label: "Your data") { navigation.back(or: .data) }
+                    .padding(.bottom, -8)
 
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Bring your history in")
@@ -57,12 +400,13 @@ struct NoopDataScreen: View {
                     section("Stored on this phone") {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(alignment: .firstTextBaseline, spacing: 7) {
-                                figure("1,284", "days")
-                                figure("1,190", "sleeps")
+                                figure(storedDays, "days")
+                                figure(storedSleeps, "sleeps")
                                 Spacer(minLength: 0)
                             }
-                            Text("14 Feb 2023 — today")
+                            Text(storedSpan)
                                 .font(NoopHTMLFont.sans(11.5))
+                                .monospacedDigit()
                                 .foregroundStyle(NoopHTMLColor.faint)
                         }
                         .padding(.vertical, 15)
@@ -125,12 +469,17 @@ struct NoopDataScreen: View {
                 .foregroundStyle(NoopHTMLColor.copy)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
+                .frame(maxWidth: 12.5 * 19)   // max-width: 19em
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 5)
 
             Button {
-                navigation.importStartedAt = Date()
-                navigation.replace(with: .reading)
+                if demo {
+                    navigation.importStartedAt = Date()
+                    navigation.replace(with: .reading)
+                } else {
+                    flow.chooseAndImport(model: model, navigation: navigation)
+                }
             } label: {
                 Text("Choose a file or folder")
                     .font(NoopHTMLFont.sans(13.5, weight: .semibold))
@@ -152,7 +501,27 @@ struct NoopDataScreen: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 20)
         .background(RoundedRectangle(cornerRadius: 28).fill(Self.blush.opacity(0.05)))
-        .overlay(RoundedRectangle(cornerRadius: 28).strokeBorder(Self.blush.opacity(0.34), lineWidth: 1))
+        // The app's only dashed edge: the one place a dashed border means "put something here".
+        .overlay(RoundedRectangle(cornerRadius: 28).strokeBorder(Self.blush.opacity(0.34), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+    }
+
+    private var storedDays: String {
+        if demo { return "1,284" }
+        return flow.stored.map { NoopDataFormat.count($0.days) } ?? "\u{2014}"
+    }
+
+    private var storedSleeps: String {
+        if demo { return "1,190" }
+        return flow.stored.map { NoopDataFormat.count($0.sleeps) } ?? "\u{2014}"
+    }
+
+    private var storedSpan: String {
+        if demo { return "14 Feb 2023 \u{2014} today" }
+        if flow.storedUnavailable { return "The record on this phone could not be opened" }
+        guard let stored = flow.stored else { return "Counting what is stored\u{2026}" }
+        guard let first = stored.first.flatMap(NoopDataFormat.day),
+              let last = stored.last.flatMap(NoopDataFormat.day) else { return "Nothing stored yet" }
+        return "\(first) \u{2014} \(last)"
     }
 
     private func figure(_ value: String, _ unit: String) -> some View {
@@ -176,12 +545,12 @@ struct NoopDataScreen: View {
                 HStack(alignment: .top, spacing: 10) {
                     VStack(alignment: .leading, spacing: 0) {
                         NoopSectionLabel("Last snapshot", color: Self.dim)
-                        Text("2 days ago")
+                        Text(snapshotAge)
                             .font(NoopHTMLFont.outfit(21, weight: .light))
                             .tracking(-0.42)
                             .foregroundStyle(NoopHTMLColor.ink)
                             .padding(.top, 4)
-                        Text("iCloud Drive · 214 MB")
+                        Text(snapshotPlace)
                             .font(NoopHTMLFont.sans(11.5))
                             .foregroundStyle(NoopHTMLColor.faint)
                             .padding(.top, 5)
@@ -196,7 +565,7 @@ struct NoopDataScreen: View {
 
                 HStack(spacing: 8) {
                     NoopCanonicalGlyph(name: .clock, size: 13, color: NoopHTMLColor.faint)
-                    Text("Next on Sunday, keeping the last 8")
+                    Text(snapshotNext)
                         .font(NoopHTMLFont.sans(11.5))
                         .foregroundStyle(Self.dim)
                 }
@@ -210,15 +579,17 @@ struct NoopDataScreen: View {
 
             section("Take one now", noteView: AnyView(approximateNote)) {
                 rowsCard([
-                    RowModel(title: "Everything, exactly · .noopbak",
+                    RowModel(id: "noopbak", title: "Everything, exactly · .noopbak",
                              note: "The whole database, your settings, and which build wrote it. The phone-to-phone path.",
                              noteColor: Self.dim, noteSize: 11.5,
                              trailing: .glyph(.download, Self.blush.opacity(0.8), 17), padding: 14),
-                    RowModel(title: "A readable copy · WHOOP CSV",
+                    RowModel(id: "csv", title: "A readable copy · WHOOP CSV",
                              note: "Four CSVs in a zip. Reads back into Noop, and into the Android build.",
                              noteColor: Self.dim, noteSize: 11.5,
                              trailing: .glyph(.download, Self.blush.opacity(0.8), 17), padding: 14)
-                ])
+                ], onTap: demo ? nil : { id in
+                    if id == "noopbak" { flow.exportBackup(repo: repo) } else { flow.exportCSV(repo: repo) }
+                })
             }
 
             section(
@@ -226,7 +597,11 @@ struct NoopDataScreen: View {
                 note: "There is no account and no server, so this file is the only way your history reaches another phone. That is the whole reason this screen ships with Act 5.",
                 noteColor: Self.dim
             ) {
-                Button { navigation.enter(.importHistory, from: .data) } label: {
+                Button {
+                    // The HTML's row opens the drop target. The content detector does not read a
+                    // `.noopbak`, so the production row runs the one restore path that does.
+                    if demo { navigation.enter(.importHistory, from: .data) } else { flow.restoreBackup() }
+                } label: {
                     rowsCard([
                         RowModel(title: "Restore from a .noopbak",
                                  note: "Replaces everything on this phone. It will tell you which build wrote the file first.",
@@ -244,6 +619,7 @@ struct NoopDataScreen: View {
         NoopScreen(topInset: 56, horizontalInset: 18) {
             VStack(alignment: .leading, spacing: 0) {
                 NoopBackHeader(label: "Your data") { navigation.back(or: .data) }
+                    .padding(.bottom, -8)
                 Text("Backup and sync")
                     .font(NoopHTMLFont.outfit(23))
                     .tracking(-0.46)
@@ -255,10 +631,35 @@ struct NoopDataScreen: View {
         }
     }
 
+    private var snapshotAge: String {
+        if demo { return "2 days ago" }
+        _ = flow.backupSeq
+        let last = FolderBackup.lastBackupMs
+        return last > 0 ? NoopDataFormat.age(sinceMs: last) : "None yet"
+    }
+
+    private var snapshotPlace: String {
+        if demo { return "iCloud Drive \u{00B7} 214 MB" }
+        return FolderBackup.folderLabel() ?? "No backup folder chosen"
+    }
+
+    private var snapshotNext: String {
+        if demo { return "Next on Sunday, keeping the last 8" }
+        guard FolderBackup.autoEnabled, FolderBackup.hasFolder else {
+            return "Automatic snapshots are off"
+        }
+        return "Next a day after the last, keeping the last \(FolderBackup.keepCount)"
+    }
+
+    private var scheduleWord: String {
+        if demo { return "Weekly" }
+        return FolderBackup.autoEnabled && FolderBackup.hasFolder ? "Daily" : "Manual"
+    }
+
     private var schedulePill: some View {
         HStack(spacing: 6) {
             Circle().fill(Self.blush.opacity(0.75)).frame(width: 5, height: 5)
-            Text("Weekly")
+            Text(scheduleWord)
                 .font(NoopHTMLFont.sans(10.5, weight: .semibold))
                 .tracking(0.63)
                 .foregroundStyle(Self.blushLight)
@@ -273,7 +674,7 @@ struct NoopDataScreen: View {
     private var approximateNote: some View {
         (
             Text("In the CSV, anything Noop worked out itself is tagged ")
-            + Text("noop (APPROXIMATE)").font(NoopHTMLFont.sans(11)).foregroundColor(Self.dim)
+            + Text("noop (APPROXIMATE)").font(.system(size: 11, design: .monospaced)).foregroundColor(Self.dim)
             + Text(" and skipped on the way back in, and Apple Health rows are left out entirely so they cannot be mis-attributed to a strap.")
         )
         .font(NoopHTMLFont.sans(11.5))
@@ -321,18 +722,28 @@ struct NoopDataScreen: View {
                     VStack(alignment: .leading, spacing: 12) {
                         NoopSectionLabel("Where it lives")
                         VStack(alignment: .leading, spacing: 11) {
-                            dataPlace("On your phone", "Everything raw: every beat, every night, the whole 221. It never has to leave to be useful.", glyph: .watch)
+                            dataPlace("On your phone", demo
+                                ? "Everything raw: every beat, every night, the whole 221. It never has to leave to be useful."
+                                : "Everything raw: every beat, every night. It never has to leave to be useful.", glyph: .watch)
                             dataPlace("On Noop’s servers", "Nothing. There is no account and no server — a restore comes from your own backup file.", glyph: .cloud)
                         }
                     }
                 }
 
                 VStack(spacing: 0) {
-                    dataConnection("Apple Health", "writes sleep, workouts and vitals")
-                    Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
-                    dataConnection("Strava", "would write sessions only")
-                    Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
-                    dataConnection("Google Fit", "not connected")
+                    if demo {
+                        dataConnection("Apple Health", "writes sleep, workouts and vitals")
+                        Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                        dataConnection("Strava", "would write sessions only")
+                        Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                        dataConnection("Google Fit", "not connected")
+                    } else {
+                        // Strava and Google Fit do not exist in this build, and the Apple Health
+                        // switches live on their own screen; a toggle here would change nothing.
+                        dataRoute("Apple Health", "What Noop writes and reads is set here", glyph: .heart) {
+                            navigation.enter(.apple, from: .data)
+                        }
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
@@ -345,7 +756,7 @@ struct NoopDataScreen: View {
                             navigation.enter(.importHistory, from: .data)
                         }
                         Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
-                        dataRoute("Backup and sync", "Last snapshot 2 days ago · iCloud Drive", glyph: .upload) {
+                        dataRoute("Backup and sync", backupRouteDetail, glyph: .upload) {
                             navigation.enter(.backup, from: .data)
                         }
                     }
@@ -377,6 +788,15 @@ struct NoopDataScreen: View {
                     .padding(.horizontal, 2)
             }
         }
+    }
+
+    private var backupRouteDetail: String {
+        if demo { return "Last snapshot 2 days ago \u{00B7} iCloud Drive" }
+        let last = FolderBackup.lastBackupMs
+        guard last > 0 else { return "No snapshot yet" }
+        let age = NoopDataFormat.age(sinceMs: last)
+        let place = FolderBackup.folderLabel().map { " \u{00B7} \($0)" } ?? ""
+        return "Last snapshot \(age.prefix(1).lowercased() + age.dropFirst())\(place)"
     }
 
     private func dataFact(_ title: String, _ detail: String) -> some View {
@@ -433,6 +853,11 @@ struct NoopDataScreen: View {
     // MARK: 2 · Reading
 
     private var reading: some View {
+        if demo { return AnyView(demoReading) }
+        return AnyView(liveReading)
+    }
+
+    private var demoReading: some View {
         NoopScreen(topInset: 56, horizontalInset: 18) {
             VStack(alignment: .leading, spacing: 18) {
                 NoopScreenHeader("Apple Health", eyebrow: "Reading")
@@ -517,9 +942,103 @@ struct NoopDataScreen: View {
         return min(0.92, 0.41 + now.timeIntervalSince(started) / 60)
     }
 
+    // The importers report nothing until they finish: no fraction, no running counts, no cancel. The
+    // live read therefore draws the same frame with what is known — the file, its size, and an honest
+    // "not yet" — rather than a percentage or counts it would have to make up.
+    private var liveReading: some View {
+        let current: NoopDataFlow.Reading? = { if case .reading(let r) = flow.phase { return r }; return nil }()
+        return NoopScreen(topInset: 56, horizontalInset: 18) {
+            VStack(alignment: .leading, spacing: 18) {
+                NoopScreenHeader(current.map { ($0.fileName as NSString).deletingPathExtension } ?? "No file", eyebrow: "Reading")
+                    .lineLimit(1)
+                    .padding(.bottom, -18)
+
+                VStack(alignment: .leading, spacing: 13) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("\u{2014}")
+                            .font(NoopHTMLFont.outfit200(44))
+                            .tracking(-1.76)
+                            .foregroundStyle(NoopHTMLColor.ink)
+                        Spacer(minLength: 8)
+                        if let current {
+                            Text(current.fileSize.map { "\(current.fileName) \u{00B7} \(NoopDataFormat.bytes($0))" } ?? current.fileName)
+                                .font(.system(size: 11.5, design: .monospaced))
+                                .foregroundStyle(NoopHTMLColor.faint)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    .frame(height: 44)
+
+                    liveReadingBar(running: current != nil)
+
+                    Text(current == nil
+                         ? "No read is running. Choose a file from the drop target to start one."
+                         : "Streaming it a piece at a time and aggregating as it goes, so a file this size never has to fit in memory.")
+                        .font(NoopHTMLFont.sans(12.5))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                        .lineSpacing(3.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                section("Found so far") {
+                    rowsCard([
+                        RowModel(title: "Counts arrive when the read finishes", trailing: .value("\u{2014}", NoopHTMLColor.faint), padding: 12)
+                    ])
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    if current == nil {
+                        Button { navigation.replace(with: .importHistory) } label: {
+                            Text("Choose a file")
+                                .font(NoopHTMLFont.sans(13.5, weight: .medium))
+                                .foregroundStyle(NoopHTMLColor.inkSoft)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 47)
+                                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5))
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                    }
+                    Text("A read cannot be stopped once it has started. Nothing here leaves the phone \u{2014} there is no server to send it to.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .lineSpacing(3.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    /// No fraction exists, so the fill does not claim one: a short segment travels the track while
+    /// the importer is working, and the track sits empty when nothing is.
+    private func liveReadingBar(running: Bool) -> some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !running)) { timeline in
+            GeometryReader { proxy in
+                let t = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.8) / 1.8
+                let segment = proxy.size.width * 0.28
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06))
+                    if running {
+                        RoundedRectangle(cornerRadius: 6).fill(Self.blush)
+                            .frame(width: segment)
+                            .offset(x: (proxy.size.width + segment) * t - segment)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .frame(height: 12)
+        }
+    }
+
     // MARK: 3 · What was written
 
     private var imported: some View {
+        if demo { return AnyView(demoImported) }
+        if case .imported(let written) = flow.phase { return AnyView(liveImported(written)) }
+        return AnyView(noResult(eyebrow: "Imported", title: "Nothing has been imported"))
+    }
+
+    private var demoImported: some View {
         NoopScreen(topInset: 56, horizontalInset: 18) {
             VStack(alignment: .leading, spacing: 18) {
                 NoopScreenHeader("Seven years, in", eyebrow: "Imported · WHOOP 5.0 export")
@@ -612,6 +1131,12 @@ struct NoopDataScreen: View {
     // MARK: 4 · The wrong file — the one screen that earns amber
 
     private var rejected: some View {
+        if demo { return AnyView(demoRejected) }
+        if case .rejected(let refused) = flow.phase { return AnyView(liveRejected(refused)) }
+        return AnyView(noResult(eyebrow: "Nothing was written", title: "No file has been refused"))
+    }
+
+    private var demoRejected: some View {
         NoopScreen(topInset: 56, horizontalInset: 18) {
             VStack(alignment: .leading, spacing: 18) {
                 NoopScreenHeader("This one is the raw log", eyebrow: "Nothing was written")
@@ -677,6 +1202,197 @@ struct NoopDataScreen: View {
         }
     }
 
+    // MARK: 3 and 4, bound to the importer's result
+
+    private func liveImported(_ written: NoopDataFlow.Written) -> some View {
+        let summary = written.summary
+        let dayCount = summary.countsByCategory["days"] ?? summary.countsByCategory["cycles"]
+        let span: String? = {
+            guard let first = summary.earliest, let last = summary.latest else { return nil }
+            return "\(NoopDataFormat.date(first)) \u{2014} \(NoopDataFormat.date(last))"
+        }()
+        var rows = summary.countsByCategory
+            .sorted { $0.key < $1.key }
+            .map { RowModel(title: NoopDataFormat.category($0.key), trailing: .value(NoopDataFormat.count($0.value), NoopHTMLColor.ink), padding: 12) }
+        if summary.skippedSpans > 0 {
+            rows.append(RowModel(title: "Unreadable stretches", titleColor: Self.dim, note: "skipped, not guessed",
+                                 trailing: .value(NoopDataFormat.count(summary.skippedSpans), NoopHTMLColor.faint), padding: 12))
+        }
+        if rows.isEmpty {
+            rows = [RowModel(title: "Records", trailing: .value(NoopDataFormat.count(summary.recordCount), NoopHTMLColor.ink), padding: 12)]
+        }
+        return NoopScreen(topInset: 56, horizontalInset: 18) {
+            VStack(alignment: .leading, spacing: 18) {
+                NoopScreenHeader(NoopDataFormat.headline(summary), eyebrow: "Imported \u{00B7} \(written.source)")
+                    .padding(.bottom, -18)
+
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(NoopDataFormat.count(dayCount ?? summary.recordCount))
+                                .font(NoopHTMLFont.outfit200(44))
+                                .tracking(-1.76)
+                                .monospacedDigit()
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            Text(dayCount == nil ? "records" : "days")
+                                .font(NoopHTMLFont.sans(14))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                        }
+                        Text(span ?? "The file carried no dates")
+                            .font(NoopHTMLFont.sans(12))
+                            .monospacedDigit()
+                            .foregroundStyle(Self.dim)
+                    }
+                    Spacer(minLength: 8)
+                    ZStack {
+                        Circle().fill(Self.blush.opacity(0.13))
+                            .overlay(Circle().strokeBorder(Self.blush.opacity(0.3), lineWidth: 0.5))
+                        NoopCanonicalGlyph(name: .check, size: 16, color: Self.blush)
+                    }
+                    .frame(width: 35, height: 35)
+                    .padding(.top, 10)
+                }
+
+                section(
+                    "By category",
+                    note: "Only what the export carried was written. What it did not carry stays blank rather than becoming a zero — a missing night and a bad night should never look alike."
+                ) {
+                    rowsCard(rows)
+                }
+
+                resultActions
+            }
+        }
+    }
+
+    private var resultActions: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                flow.finishFlow()
+                navigation.reset(to: .data)
+            } label: {
+                Text("Done")
+                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                    .foregroundStyle(Self.blushInk)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(Self.blush.opacity(0.92), in: RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+
+            Button {
+                flow.finishFlow()
+                navigation.replace(with: .importHistory)
+            } label: {
+                Text("Import something else")
+                    .font(NoopHTMLFont.sans(13.5, weight: .medium))
+                    .foregroundStyle(NoopHTMLColor.inkSoft)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 47)
+                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5))
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+
+            (
+                Text("Rest and Charge are being recomputed from what came in. Your first fourteen days will carry a ")
+                + Text("building").font(NoopHTMLFont.serif(14, italic: true))
+                + Text(" chip while the baselines catch up.")
+            )
+            .font(NoopHTMLFont.sans(11.5))
+            .foregroundStyle(Self.dim)
+            .lineSpacing(3.5)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func liveRejected(_ refused: NoopDataFlow.Refused) -> some View {
+        NoopScreen(topInset: 56, horizontalInset: 18) {
+            VStack(alignment: .leading, spacing: 18) {
+                NoopScreenHeader("This file could not be used", eyebrow: "Nothing was written")
+                    .padding(.bottom, -18)
+
+                VStack(alignment: .leading, spacing: 11) {
+                    HStack(spacing: 10) {
+                        ZStack {
+                            Circle().fill(NoopHTMLColor.warm.opacity(0.14))
+                            NoopCanonicalGlyph(name: .file, size: 16, color: NoopHTMLColor.warm)
+                        }
+                        .frame(width: 30, height: 30)
+                        Text(refused.fileName)
+                            .font(.system(size: 12.5, design: .monospaced))
+                            .foregroundStyle(NoopHTMLColor.warm)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text(refused.reason)
+                        .font(NoopHTMLFont.sans(13))
+                        .foregroundStyle(NoopHTMLColor.inkSoft)
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 16)
+                .padding(.horizontal, 17)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 24).fill(NoopHTMLColor.warm.opacity(0.08)))
+                .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(NoopHTMLColor.warm.opacity(0.26), lineWidth: 0.5))
+
+                // The importers report why a file failed, not which file of a set to send instead, so
+                // the specific fixes are not guessed. The reference list is what can honestly be offered.
+                section("The way out") {
+                    Button { navigation.show(.importCatalog) } label: {
+                        rowsCard([
+                            RowModel(title: "See what it can read",
+                                     note: "Each app, and the export to ask it for.",
+                                     noteColor: Self.dim, noteSize: 11.5, trailing: .chevron, padding: 14)
+                        ])
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Button {
+                        flow.finishFlow()
+                        navigation.replace(with: .importHistory)
+                    } label: {
+                        Text("Choose another file")
+                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            .foregroundStyle(Self.blushInk)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
+                            .background(Self.blush.opacity(0.92), in: RoundedRectangle(cornerRadius: 16))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+
+                    Text(untouchedLine)
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(Self.dim)
+                        .lineSpacing(3.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private var untouchedLine: String {
+        let lead = flow.stored.map { "Your \(NoopDataFormat.count($0.days)) stored days are untouched." } ?? "What is stored is untouched."
+        return lead + " A rejected file changes nothing — it is read, judged and dropped."
+    }
+
+    /// A result route reached with no result behind it (a relaunch, or a direct route) says so.
+    private func noResult(eyebrow: String, title: String) -> some View {
+        NoopScreen(topInset: 56, horizontalInset: 18) {
+            VStack(alignment: .leading, spacing: 18) {
+                NoopScreenHeader(title, eyebrow: eyebrow)
+                    .padding(.bottom, -18)
+                Text("There is no finished read on this launch to show. Results are not kept once you leave them.")
+                    .font(NoopHTMLFont.sans(13))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                resultActions
+            }
+        }
+    }
+
     // MARK: The surface's vocabulary
     //
     // A section is a 10/600 label ABOVE its card and an optional note BELOW it — never inside.
@@ -712,6 +1428,7 @@ struct NoopDataScreen: View {
     }
 
     private struct RowModel {
+        var id: String = ""
         var title: String
         var titleColor: Color = NoopHTMLColor.inkSoft
         var note: String = ""
@@ -723,10 +1440,16 @@ struct NoopDataScreen: View {
     }
 
     /// The handoff's list card: padded 4/16, one hairline between rows and none after the last.
-    private func rowsCard(_ rows: [RowModel]) -> some View {
+    private func rowsCard(_ rows: [RowModel], onTap: ((String) -> Void)? = nil) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                listRow(row)
+                if let onTap {
+                    Button { onTap(row.id) } label: { listRow(row).contentShape(Rectangle()) }
+                        .buttonStyle(NoopHTMLPressStyle())
+                        .disabled(flow.backupBusy)
+                } else {
+                    listRow(row)
+                }
                 if index < rows.count - 1 {
                     Rectangle()
                         .fill(NoopHTMLColor.border)
