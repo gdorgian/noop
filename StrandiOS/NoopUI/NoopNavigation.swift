@@ -557,6 +557,27 @@ final class NoopNavigation: ObservableObject {
             selectedGoal = requestedGoal
         }
         if NoopContentPolicy.allowsPrototypeContent,
+           let flag = arguments.firstIndex(of: "--noop-instrument-metric"),
+           arguments.indices.contains(flag + 1) {
+            instrumentMetricKey = arguments[flag + 1]
+        }
+        if NoopContentPolicy.allowsPrototypeContent,
+           let flag = arguments.firstIndex(of: "--noop-instrument-a"),
+           arguments.indices.contains(flag + 1) {
+            instrumentCompareAKey = arguments[flag + 1]
+        }
+        if NoopContentPolicy.allowsPrototypeContent,
+           let flag = arguments.firstIndex(of: "--noop-instrument-b"),
+           arguments.indices.contains(flag + 1) {
+            instrumentCompareBKey = arguments[flag + 1]
+        }
+        if NoopContentPolicy.allowsPrototypeContent,
+           let flag = arguments.firstIndex(of: "--noop-instrument-shift"),
+           arguments.indices.contains(flag + 1),
+           let requestedShift = Int(arguments[flag + 1]) {
+            instrumentCompareShift = min(2, max(0, requestedShift))
+        }
+        if NoopContentPolicy.allowsPrototypeContent,
            let flag = arguments.firstIndex(of: "--noop-overlay"),
            arguments.indices.contains(flag + 1) {
             switch arguments[flag + 1] {
@@ -849,6 +870,10 @@ final class NoopNavigation: ObservableObject {
             back(or: .settings)
         case .importHistory, .backup:
             back(or: .data)
+        case .instrumentIndex:
+            back(or: .trends)
+        case .instrumentMetric, .instrumentCompare, .instrumentEffects:
+            back(or: .instrumentIndex)
         default:
             back()
         }

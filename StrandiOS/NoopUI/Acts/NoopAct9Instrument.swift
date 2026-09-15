@@ -2143,18 +2143,32 @@ private extension NoopInstrumentDemoData {
             )
         }
 
-        let learningSource: [NoopInstrumentRankedBehavior] = short.isEmpty
-            ? ranked.sorted {
-                min($0.stats?.withCount ?? 0, $0.stats?.withoutCount ?? 0)
-                    < min($1.stats?.withCount ?? 0, $1.stats?.withoutCount ?? 0)
-            }.prefix(2).map { $0 }
-            : short
+        let learningSource: [(behavior: NoopInstrumentBehavior, stats: NoopInstrumentGroupStats)] = {
+            if !short.isEmpty {
+                var thinRows: [(behavior: NoopInstrumentBehavior, stats: NoopInstrumentGroupStats)] = []
+                for item in short {
+                    let behaviorValues = tail(values[item.behavior.key] ?? [], count: range.dayCount)
+                    let stats = groupStats(behavior: behaviorValues, target: target, lag: 1)
+                    thinRows.append((behavior: item.behavior, stats: stats))
+                }
+                return thinRows
+            }
+
+            var candidates: [(behavior: NoopInstrumentBehavior, stats: NoopInstrumentGroupStats)] = []
+            for behavior in Self.behaviors {
+                let behaviorValues = tail(values[behavior.key] ?? [], count: range.dayCount)
+                let stats = groupStats(behavior: behaviorValues, target: target, lag: 1)
+                candidates.append((behavior: behavior, stats: stats))
+            }
+            candidates.sort {
+                let leftCount = min($0.stats.withCount, $0.stats.withoutCount)
+                let rightCount = min($1.stats.withCount, $1.stats.withoutCount)
+                return leftCount < rightCount
+            }
+            return Array(candidates.prefix(2))
+        }()
         let learningLines = learningSource.map { item -> String in
-            let stats = item.stats ?? groupStats(
-                behavior: tail(values[item.behavior.key] ?? [], count: range.dayCount),
-                target: target,
-                lag: 1
-            )
+            let stats = item.stats
             let thinWith = stats.withCount <= stats.withoutCount
             let missing = max(1, 5 - (thinWith ? stats.withCount : stats.withoutCount))
             let action = thinWith
