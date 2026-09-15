@@ -125,6 +125,7 @@ extension EnvironmentValues {
 struct NoopScreen<Content: View>: View {
     var bottomInset: CGFloat = 116
     var topInset: CGFloat = 10
+    var horizontalInset: CGFloat = 20
     /// Optional deterministic launch anchor used by Debug visual-parity fixtures. Production
     /// screens leave this nil and always arrive at the top.
     var initialScrollID: String? = nil
@@ -138,8 +139,8 @@ struct NoopScreen<Content: View>: View {
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     content
-                        .frame(width: max(0, viewportWidth - 40), alignment: .topLeading)
-                        .padding(.horizontal, 20)
+                        .frame(width: max(0, viewportWidth - horizontalInset * 2), alignment: .topLeading)
+                        .padding(.horizontal, horizontalInset)
                         .padding(.top, topInset)
                         .padding(.bottom, bottomInset + liveBarInset)
                         .id("noop-screen-top")

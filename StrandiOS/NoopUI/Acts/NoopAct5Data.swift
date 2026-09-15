@@ -3,14 +3,14 @@ import SwiftUI
 
 // MARK: - plumbing/data · the two doors
 //
-// Import and backup are the same two formats read in opposite directions, so they share one screen.
-// The way in is ONE drop target, not twelve rows: `detectAndImport` works out what it was handed by
-// filename and JSON key shape, so the catalog of twelve is documentation and lives one tap down.
+// Import and backup are the same two formats read in opposite directions. The way in is ONE drop
+// target, not twelve rows: the importer works out what it was handed from content and key shape, so
+// the catalog of twelve is documentation and lives one tap down.
 //
-// Reading, what-was-written and the-wrong-file are states this screen becomes during an import, not
-// destinations — they add no routes, and none of them carries a back button: Stop, Done and Choose
-// another file are the way out. Blush throughout, the hue the screen already carries; amber is spent
-// only on the one case that wants something from the reader, which is the reserved meaning.
+// Reading, what-was-written and the-wrong-file are explicit navigation states because Debug capture
+// and restoration must be deterministic. They deliberately carry no back button: Stop, Done and
+// Choose another file are the exits drawn by the HTML. Blush is the family hue; amber is spent only
+// on the rejected file that needs something from the reader.
 //
 // Metrics below are the handoff's, read off the drawn frames rather than paraphrased: section labels
 // sit ABOVE their card, trailing notes sit BELOW it, list cards are padded 4/16 with a hairline
@@ -18,6 +18,7 @@ import SwiftUI
 
 struct NoopDataScreen: View {
     @ObservedObject var navigation: NoopNavigation
+    @State private var connectedServices: Set<String> = ["Apple Health"]
 
     private static let blush = Color(hex: 0xE08A9B)
     private static let blushLight = Color(hex: 0xF6D3DA)
@@ -26,26 +27,32 @@ struct NoopDataScreen: View {
     private static let dim = Color(hex: 0x8B958F)
 
     var body: some View {
-        switch navigation.dataState {
-        case .idle: doors
+        switch navigation.route {
+        case .importHistory: importScreen
         case .reading: reading
-        case .written: written
+        case .imported: imported
         case .rejected: rejected
+        case .backup: backupScreen
+        default: dataHome
         }
     }
 
     // MARK: 1 · The door in, and 5 · the door out
 
-    private var doors: some View {
-        NoopScreen(topInset: 56) {
+    private var importScreen: some View {
+        NoopScreen(topInset: 56, horizontalInset: 18) {
             VStack(alignment: .leading, spacing: 0) {
-                NoopBackHeader(label: "You") { navigation.back(or: .you) }
+                NoopBackHeader(label: "Your data") { navigation.back(or: .data) }
 
-                VStack(alignment: .leading, spacing: 18) {
-                    NoopScreenHeader("Bring your history in", eyebrow: "Your data")
-                        .padding(.bottom, -18)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Bring your history in")
+                        .font(NoopHTMLFont.outfit(23))
+                        .tracking(-0.46)
+                        .foregroundStyle(NoopHTMLColor.ink)
+                        .padding(.horizontal, 2)
 
                     dropTarget
+                        .padding(.top, 16)
 
                     section("Stored on this phone") {
                         VStack(alignment: .leading, spacing: 4) {
@@ -64,6 +71,7 @@ struct NoopDataScreen: View {
                         .background(RoundedRectangle(cornerRadius: 22).fill(NoopHTMLColor.card))
                         .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
                     }
+                    .padding(.top, 18)
 
                     section(
                         "What it can read",
@@ -81,15 +89,14 @@ struct NoopDataScreen: View {
                         }
                         .buttonStyle(NoopHTMLPressStyle())
                     }
+                    .padding(.top, 18)
 
                     Text("Your scores stay yours. Noop recomputes Rest, Charge and Effort from the raw heart rate, variability and sleep it finds. A brand’s own score is kept for reference and never shown as one of yours — so your numbers here will not match your old app’s.")
                         .font(NoopHTMLFont.sans(11.5))
                         .foregroundStyle(Self.dim)
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 2)
-
-                    doorOut
+                        .padding(.top, 16)
                 }
             }
         }
@@ -121,7 +128,10 @@ struct NoopDataScreen: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 5)
 
-            Button { navigation.beginImport(at: Date()) } label: {
+            Button {
+                navigation.importStartedAt = Date()
+                navigation.replace(with: .reading)
+            } label: {
                 Text("Choose a file or folder")
                     .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                     .foregroundStyle(Self.blushInk)
@@ -160,11 +170,8 @@ struct NoopDataScreen: View {
 
     // MARK: 5 · The door out
 
-    private var doorOut: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            NoopSectionLabel("Backup and sync", color: Self.blush)
-                .padding(.top, 6)
-
+    private var backupContents: some View {
+        VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: 10) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -219,15 +226,32 @@ struct NoopDataScreen: View {
                 note: "There is no account and no server, so this file is the only way your history reaches another phone. That is the whole reason this screen ships with Act 5.",
                 noteColor: Self.dim
             ) {
-                rowsCard([
-                    RowModel(title: "Restore from a .noopbak",
-                             note: "Replaces everything on this phone. It will tell you which build wrote the file first.",
-                             noteColor: Self.dim, noteSize: 11.5,
-                             trailing: .chevron, padding: 14)
-                ])
+                Button { navigation.enter(.importHistory, from: .data) } label: {
+                    rowsCard([
+                        RowModel(title: "Restore from a .noopbak",
+                                 note: "Replaces everything on this phone. It will tell you which build wrote the file first.",
+                                 noteColor: Self.dim, noteSize: 11.5,
+                                 trailing: .chevron, padding: 14)
+                    ])
+                }
+                .buttonStyle(NoopHTMLPressStyle())
             }
 
-            permissions
+        }
+    }
+
+    private var backupScreen: some View {
+        NoopScreen(topInset: 56, horizontalInset: 18) {
+            VStack(alignment: .leading, spacing: 0) {
+                NoopBackHeader(label: "Your data") { navigation.back(or: .data) }
+                Text("Backup and sync")
+                    .font(NoopHTMLFont.outfit(23))
+                    .tracking(-0.46)
+                    .foregroundStyle(NoopHTMLColor.ink)
+                    .padding(.horizontal, 2)
+                backupContents
+                    .padding(.top, 18)
+            }
         }
     }
 
@@ -256,7 +280,6 @@ struct NoopDataScreen: View {
         .foregroundStyle(NoopHTMLColor.faint)
         .lineSpacing(3.5)
         .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, 2)
     }
 
     // MARK: The other half of the screen's name
@@ -264,63 +287,153 @@ struct NoopDataScreen: View {
     // The doors are new; these are not. They sit below the way out because a person comes here to
     // move their history far more often than to read what the strap records.
 
-    private var permissions: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            NoopSectionLabel("What is collected", color: Self.blush)
-                .padding(.top, 6)
+    private var dataHome: some View {
+        NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 13) {
+                NoopBackHeader(label: "You") { navigation.back(or: .you) }
+                    .padding(.horizontal, -2)
+                    .padding(.bottom, -10)
 
-            section("What the strap records") {
-                rowsCard([
-                    RowModel(title: "Pulse, and the gap between beats",
-                             note: "Continuously while worn. This is where sleep stages, stress and recovery all come from.",
-                             noteColor: Self.dim, noteSize: 11.5, padding: 13),
-                    RowModel(title: "Movement",
-                             note: "To tell sleep from lying still, and to auto-pause a session.",
-                             noteColor: Self.dim, noteSize: 11.5, padding: 13),
-                    RowModel(title: "Skin temperature and blood oxygen",
-                             note: "Overnight, as deviations from your own normal rather than absolute figures.",
-                             noteColor: Self.dim, noteSize: 11.5, padding: 13),
-                    RowModel(title: "What you log",
-                             note: "Coffee, drinks, meals, naps, intimacy. Only what you tap.",
-                             noteColor: Self.dim, noteSize: 11.5, padding: 13)
-                ])
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Data and permissions")
+                        .font(NoopHTMLFont.outfit(25))
+                        .tracking(-0.625)
+                        .foregroundStyle(NoopHTMLColor.ink)
+                    Text("What is collected, where it sits, and how to take it with you.")
+                        .font(NoopHTMLFont.sans(13.5))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                        .lineSpacing(4)
+                }
+
+                NoopHTMLCard(radius: 22, padding: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        NoopSectionLabel("What the strap records")
+                        VStack(alignment: .leading, spacing: 10) {
+                            dataFact("Pulse, and the gap between beats", "Continuously while worn. This is where sleep stages, stress and recovery all come from.")
+                            dataFact("Movement", "To tell sleep from lying still, and to auto-pause a session.")
+                            dataFact("Skin temperature and blood oxygen", "Overnight, as deviations from your own normal rather than absolute figures.")
+                            dataFact("What you log", "Coffee, drinks, meals, naps, intimacy. Only what you tap.")
+                        }
+                    }
+                }
+
+                NoopHTMLCard(radius: 22, padding: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        NoopSectionLabel("Where it lives")
+                        VStack(alignment: .leading, spacing: 11) {
+                            dataPlace("On your phone", "Everything raw: every beat, every night, the whole 221. It never has to leave to be useful.", glyph: .watch)
+                            dataPlace("On Noop’s servers", "Nothing. There is no account and no server — a restore comes from your own backup file.", glyph: .cloud)
+                        }
+                    }
+                }
+
+                VStack(spacing: 0) {
+                    dataConnection("Apple Health", "writes sleep, workouts and vitals")
+                    Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                    dataConnection("Strava", "would write sessions only")
+                    Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                    dataConnection("Google Fit", "not connected")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+
+                VStack(spacing: 8) {
+                    VStack(spacing: 0) {
+                        dataRoute("Bring your history in", "One file, any brand — Noop works out what it is", glyph: .download) {
+                            navigation.enter(.importHistory, from: .data)
+                        }
+                        Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                        dataRoute("Backup and sync", "Last snapshot 2 days ago · iCloud Drive", glyph: .upload) {
+                            navigation.enter(.backup, from: .data)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+
+                    Button { navigation.show(.destructiveConfirmation("your account and data")) } label: {
+                        HStack(spacing: 9) {
+                            NoopCanonicalGlyph(name: .trash, size: 19, color: Color(hex: 0xF3A472))
+                            Text("Delete my account and data")
+                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                        }
+                        .foregroundStyle(Color(hex: 0xF3A472))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(NoopHTMLColor.amber.opacity(0.1), in: RoundedRectangle(cornerRadius: 17))
+                        .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(NoopHTMLColor.amber.opacity(0.3), lineWidth: 0.5))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                }
+
+                Text("Nothing here is sold, and there is no advertising identifier in the app. Deleting takes effect immediately and the export is a plain file you can read yourself.")
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(NoopHTMLColor.faint)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 2)
             }
-
-            section("Where it lives") {
-                rowsCard([
-                    RowModel(title: "On your phone",
-                             note: "Everything raw: every beat, every night, the whole 221. It never has to leave to be useful.",
-                             noteColor: Self.dim, noteSize: 11.5, leading: .watch, padding: 13),
-                    RowModel(title: "On Noop’s servers",
-                             note: "Nothing. There is no account and no server — a restore comes from your own backup file.",
-                             noteColor: Self.dim, noteSize: 11.5, leading: .cloud, padding: 13)
-                ])
-            }
-
-            Button { navigation.show(.destructiveConfirmation("your account and data")) } label: {
-                Label("Delete my account and data", systemImage: "trash")
-                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0xF3A472))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(NoopHTMLColor.amber.opacity(0.1), in: RoundedRectangle(cornerRadius: 17))
-                    .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(NoopHTMLColor.amber.opacity(0.3), lineWidth: 0.5))
-            }
-            .buttonStyle(NoopHTMLPressStyle())
-
-            Text("Nothing here is sold, and there is no advertising identifier in the app. Deleting takes effect immediately.")
-                .font(NoopHTMLFont.sans(11.5))
-                .foregroundStyle(NoopHTMLColor.faint)
-                .lineSpacing(3.5)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 2)
         }
+    }
+
+    private func dataFact(_ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Circle().fill(NoopHTMLColor.blue).frame(width: 7, height: 7).padding(.top, 6)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink)
+                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+            }
+        }
+    }
+
+    private func dataPlace(_ title: String, _ detail: String, glyph: NoopCanonicalGlyphName) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            NoopCanonicalGlyph(name: glyph, size: 19, color: Self.blush).frame(width: 20)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink)
+                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+            }
+        }
+    }
+
+    private func dataConnection(_ title: String, _ detail: String) -> some View {
+        HStack(spacing: 13) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+            }
+            Spacer(minLength: 8)
+            NoopA5TintToggle(isOn: connectedServices.contains(title), tint: Self.blush) {
+                if connectedServices.contains(title) { connectedServices.remove(title) }
+                else { connectedServices.insert(title) }
+            }
+        }
+        .frame(minHeight: 62)
+    }
+
+    private func dataRoute(_ title: String, _ detail: String, glyph: NoopCanonicalGlyphName, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                NoopCanonicalGlyph(name: glyph, size: 19, color: Self.blush).frame(width: 20)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                }
+                Spacer(minLength: 8)
+                NoopChevron()
+            }
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(NoopHTMLPressStyle())
     }
 
     // MARK: 2 · Reading
 
     private var reading: some View {
-        NoopScreen(topInset: 56) {
+        NoopScreen(topInset: 56, horizontalInset: 18) {
             VStack(alignment: .leading, spacing: 18) {
                 NoopScreenHeader("Apple Health", eyebrow: "Reading")
                     .padding(.bottom, -18)
@@ -354,7 +467,6 @@ struct NoopDataScreen: View {
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.horizontal, 2)
 
                 section("Found so far") {
                     rowsCard([
@@ -366,7 +478,7 @@ struct NoopDataScreen: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Button { navigation.dataState = .written } label: {
+                    Button { navigation.replace(with: .importHistory) } label: {
                         Text("Stop")
                             .font(NoopHTMLFont.sans(13.5, weight: .medium))
                             .foregroundStyle(NoopHTMLColor.inkSoft)
@@ -381,7 +493,6 @@ struct NoopDataScreen: View {
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 2)
                 }
             }
         }
@@ -408,8 +519,8 @@ struct NoopDataScreen: View {
 
     // MARK: 3 · What was written
 
-    private var written: some View {
-        NoopScreen(topInset: 56) {
+    private var imported: some View {
+        NoopScreen(topInset: 56, horizontalInset: 18) {
             VStack(alignment: .leading, spacing: 18) {
                 NoopScreenHeader("Seven years, in", eyebrow: "Imported · WHOOP 5.0 export")
                     .padding(.bottom, -18)
@@ -439,7 +550,6 @@ struct NoopDataScreen: View {
                     .frame(width: 35, height: 35)
                     .padding(.top, 10)
                 }
-                .padding(.horizontal, 2)
 
                 section(
                     "By category",
@@ -465,7 +575,7 @@ struct NoopDataScreen: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Button { navigation.dataState = .idle } label: {
+                    Button { navigation.reset(to: .data) } label: {
                         Text("Done")
                             .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                             .foregroundStyle(Self.blushInk)
@@ -475,7 +585,7 @@ struct NoopDataScreen: View {
                     }
                     .buttonStyle(NoopHTMLPressStyle())
 
-                    Button { navigation.dataState = .idle } label: {
+                    Button { navigation.replace(with: .importHistory) } label: {
                         Text("Import something else")
                             .font(NoopHTMLFont.sans(13.5, weight: .medium))
                             .foregroundStyle(NoopHTMLColor.inkSoft)
@@ -487,14 +597,13 @@ struct NoopDataScreen: View {
 
                     (
                         Text("Rest and Charge are being recomputed from what came in. Your first fourteen days will carry a ")
-                        + Text("building").font(NoopHTMLFont.sans(14))
+                        + Text("building").font(NoopHTMLFont.serif(14, italic: true))
                         + Text(" chip while the baselines catch up.")
                     )
                     .font(NoopHTMLFont.sans(11.5))
                     .foregroundStyle(Self.dim)
                     .lineSpacing(3.5)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 2)
                 }
             }
         }
@@ -503,7 +612,7 @@ struct NoopDataScreen: View {
     // MARK: 4 · The wrong file — the one screen that earns amber
 
     private var rejected: some View {
-        NoopScreen(topInset: 56) {
+        NoopScreen(topInset: 56, horizontalInset: 18) {
             VStack(alignment: .leading, spacing: 18) {
                 NoopScreenHeader("This one is the raw log", eyebrow: "Nothing was written")
                     .padding(.bottom, -18)
@@ -548,7 +657,7 @@ struct NoopDataScreen: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Button { navigation.dataState = .idle } label: {
+                    Button { navigation.replace(with: .importHistory) } label: {
                         Text("Choose another file")
                             .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                             .foregroundStyle(Self.blushInk)
@@ -563,7 +672,6 @@ struct NoopDataScreen: View {
                         .foregroundStyle(Self.dim)
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 2)
                 }
             }
         }
@@ -582,7 +690,6 @@ struct NoopDataScreen: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             NoopSectionLabel(title, color: Self.dim)
-                .padding(.horizontal, 2)
             content()
             if let noteView {
                 noteView
@@ -592,7 +699,6 @@ struct NoopDataScreen: View {
                     .foregroundStyle(noteColor)
                     .lineSpacing(3.5)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 2)
                     .padding(.top, -1)
             }
         }

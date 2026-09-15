@@ -35,10 +35,18 @@ struct NoopAct5Screens: View {
         "Continuous pulse", "Temperature", "Blood oxygen", "Stay connected in the background",
         "Apple Health", "Bedtime nudge", "Session offer", "Battery alerts", "Journal reminder",
         "Day-cycle sky", "Sky behind cards", "Pause the HRV stream when low", "Sleep staging V2",
-        "Overnight only"
+        "Overnight only", "Messages", "Phone calls", "Calendar", "WhatsApp", "Reminders",
+        "Only when the phone is locked", "Follow iPhone Focus", "Hold them during quiet hours",
+        "Quiet hours", "Live heart rate in the Dynamic Island", "Illness early warning",
+        "Buzz if I go over"
     ]
     @State private var lastLogAction: String?
     @State private var pinged = false
+    @State private var notificationBuzz = "Two short"
+    @State private var healthAccessFixed = false
+    @State private var ceilingMode = "Profile zone"
+    @State private var ceilingZone = "Zone 4"
+    @State private var ceilingBPM = 162
 
     @State private var sparePresent = true
     @State private var activeDevice = "mg"
@@ -50,7 +58,7 @@ struct NoopAct5Screens: View {
         "Units": "Metric", "Temperature": "°C", "Effort": "0–100", "Appearance": "Dark",
         "Chart colours": "Titanium", "Sleep chart": "Hypnogram", "Card surface": "Frosted",
         "App icon": "Titanium", "Power saving at": "20%", "Double tap": "Sleep mark",
-        "Svea’s voice": "Plain"
+        "Language": "English", "Svea’s voice": "Plain"
     ]
     @State private var baselinesRestarting = false
     @State private var settingsSearch = ""
@@ -67,11 +75,15 @@ struct NoopAct5Screens: View {
             case .zones: zonesScreen
             case .history: historyScreen
             case .strap: strapScreen
+            case .notifs: notificationsScreen
             case .devices: devicesScreen
-            case .data: NoopDataScreen(navigation: navigation)
+            case .apple: appleHealthScreen
+            case .data, .importHistory, .reading, .imported, .rejected, .backup:
+                NoopDataScreen(navigation: navigation)
             case .settings: settingsScreen
             case .widgets: widgetsScreen
             case .lab: labScreen
+            case .automations: automationsScreen
             case .onboard: onboardingScreen
             case .pair: pairingScreen
             case .position: positionScreen
@@ -222,7 +234,13 @@ private extension NoopAct5Screens {
         }
     }
 
-    func segmentRow(_ title: String, detail: String, choices: [String], tint: Color = Self.blush) -> some View {
+    func segmentRow(
+        _ title: String,
+        detail: String,
+        choices: [String],
+        tint: Color = Self.blush,
+        disabledChoices: Set<String> = []
+    ) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(title).font(NoopHTMLFont.sans(13.5))
@@ -231,10 +249,12 @@ private extension NoopAct5Screens {
             }
             HStack(spacing: 4) {
                 ForEach(choices, id: \.self) { choice in
-                    let selected = title == "Svea’s voice"
+                    let disabled = disabledChoices.contains(choice)
+                    let selected = !disabled && (title == "Svea’s voice"
                         ? navigation.coachVoice.rawValue == choice
-                        : preferences[title] == choice
+                        : preferences[title] == choice)
                     Button {
+                        guard !disabled else { return }
                         if title == "Svea’s voice", let voice = NoopCoachVoice(rawValue: choice) {
                             navigation.coachVoice = voice
                             preferences[title] = choice
@@ -257,6 +277,8 @@ private extension NoopAct5Screens {
                             .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? tint.opacity(0.42) : .clear, lineWidth: 0.5))
                     }
                     .buttonStyle(.plain)
+                    .disabled(disabled)
+                    .opacity(disabled ? 0.34 : 1)
                 }
             }
             .padding(4)
@@ -1126,6 +1148,29 @@ private extension NoopAct5Screens {
                         .disabled(!isEnabled("Apple Health"))
                         Text("Noop writes to Health and never reads your Health history back in — the only exception is your phone's step count, which fills days the strap could not estimate.")
                             .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                        Button { navigation.push(.apple) } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("What crossed, and what did not")
+                                        .font(NoopHTMLFont.sans(13))
+                                        .foregroundStyle(NoopHTMLColor.ink)
+                                    Text(healthAccessFixed
+                                         ? "Six kinds out, steps in. Everything is crossing."
+                                         : "One kind is being refused — variability has never reached Health")
+                                        .font(NoopHTMLFont.sans(11.5))
+                                        .foregroundStyle(healthAccessFixed ? Color(hex: 0x7F8A85) : Color(hex: 0xC8934B))
+                                        .lineSpacing(3)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 8)
+                                NoopChevron()
+                            }
+                            .padding(.top, 13)
+                            .overlay(alignment: .top) {
+                                Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                            }
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
                     }
                 }
 
@@ -1163,6 +1208,28 @@ private extension NoopAct5Screens {
                         .buttonStyle(NoopHTMLPressStyle())
                     }
                 }
+
+                Button { navigation.push(.notifs) } label: {
+                    HStack(spacing: 13) {
+                        NoopCanonicalGlyph(name: .bell, size: 19, color: Self.blush)
+                            .frame(width: 20)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Buzz for phone notifications")
+                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            Text("designed · not built yet")
+                                .font(NoopHTMLFont.sans(11.5))
+                                .foregroundStyle(Color(hex: 0x7F8A85))
+                        }
+                        Spacer(minLength: 8)
+                        NoopChevron()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 15)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
 
                 NoopHTMLCard(radius: 22, padding: 16) {
                     VStack(alignment: .leading, spacing: 12) {
@@ -1228,6 +1295,569 @@ private extension NoopAct5Screens {
                 .frame(maxWidth: .infinity).frame(height: 46)
                 .background(done ? Self.green.opacity(0.12) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(done ? Self.green.opacity(0.34) : Color.white.opacity(0.11), lineWidth: 0.5))
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+    }
+}
+
+// MARK: Buzz for notifications
+
+private extension NoopAct5Screens {
+    var notificationsScreen: some View {
+        NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 12) {
+                act5BackHeader("Your strap") { navigation.back(or: .strap) }
+                pageTitle(
+                    "Buzz for notifications",
+                    copy: "Your phone decides what arrives. You decide what is worth your wrist."
+                )
+
+                VStack(alignment: .leading, spacing: 13) {
+                    HStack(spacing: 13) {
+                        NoopCanonicalGlyph(name: .bell, size: 22, color: NoopHTMLColor.muted)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Mirroring is not built yet")
+                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            Text("iOS only hands notifications to a paired accessory over ANCS, and the strap does not consume it today. Everything below is the decided design, held here so you can see what it will ask for — no permission is requested and nothing is saved.")
+                                .font(NoopHTMLFont.sans(11.5))
+                                .foregroundStyle(Color(hex: 0x7F8A85))
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Text("Later")
+                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .tracking(0.5)
+                        .foregroundStyle(NoopHTMLColor.muted)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 15))
+                        .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
+                }
+                .padding(16)
+                .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Color.white.opacity(0.09), lineWidth: 0.5))
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 13) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Mirror phone notifications")
+                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            Text("Not available. Noop still buzzes for its own things — bedtime, sessions, battery.")
+                                .font(NoopHTMLFont.sans(11.5))
+                                .foregroundStyle(Color(hex: 0x7F8A85))
+                                .lineSpacing(3)
+                        }
+                        Spacer(minLength: 8)
+                        laterChip
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 15)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        NoopSectionLabel("Which ones reach your wrist")
+                            .padding(.horizontal, 4)
+                        dividedCard {
+                            ForEach(Array(notificationApps.enumerated()), id: \.offset) { index, item in
+                                notificationToggleRow(item.0, detail: item.1)
+                                if index < notificationApps.count - 1 {
+                                    Divider().overlay(NoopHTMLColor.border)
+                                }
+                            }
+                        }
+                        Text("Nothing in this list reaches your wrist while mirroring is unbuilt. The defaults are the intent: chat and calls through, feeds and newsletters not.")
+                            .font(NoopHTMLFont.sans(11))
+                            .foregroundStyle(NoopHTMLColor.faint)
+                            .lineSpacing(3)
+                            .padding(.horizontal, 4)
+                    }
+
+                    NoopHTMLCard(radius: 22, padding: 16) {
+                        VStack(alignment: .leading, spacing: 11) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("How it buzzes").font(NoopHTMLFont.sans(13.5))
+                                Spacer()
+                                Text(notificationBuzz == "One buzz" ? "easy to miss, easy to live with" : notificationBuzz == "Long" ? "hard to miss, harder to ignore" : "the one people keep")
+                                    .font(NoopHTMLFont.sans(11.5))
+                                    .foregroundStyle(Color(hex: 0x7F8A85))
+                            }
+                            NoopSegmentedControl(items: ["One buzz", "Two short", "Long"], selection: notificationBuzz) {
+                                notificationBuzz = $0
+                            }
+                            Text("Feel it on the strap")
+                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.inkSoft)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 15))
+                                .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.white.opacity(0.10), lineWidth: 0.5))
+                        }
+                    }
+
+                    dividedCard {
+                        ForEach(Array(notificationConditions.enumerated()), id: \.offset) { index, item in
+                            notificationToggleRow(item.0, detail: item.1)
+                            if index < notificationConditions.count - 1 {
+                                Divider().overlay(NoopHTMLColor.border)
+                            }
+                        }
+                    }
+
+                    Text("When this is built, Noop will never read what a notification says — only which app sent it, so it knows whether to buzz. Nothing on this page is stored or synced today.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 2)
+                }
+                .opacity(0.38)
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    var laterChip: some View {
+        Text("LATER")
+            .font(NoopHTMLFont.sans(10, weight: .semibold))
+            .tracking(0.6)
+            .foregroundStyle(NoopHTMLColor.muted)
+            .padding(.horizontal, 10)
+            .frame(height: 24)
+            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.10), lineWidth: 0.5))
+    }
+
+    var notificationApps: [(String, String)] {
+        [
+            ("Messages", "Anyone who can already reach you. A group thread counts once."),
+            ("Phone calls", "Incoming only, and only while it is still ringing."),
+            ("Calendar", "The ten-minute warning, not the invitation."),
+            ("WhatsApp", "Direct messages and mentions. Not every group line."),
+            ("Mail", "Noisy by nature. Off is the honest default."),
+            ("Slack", "Held outside your active hours whatever you pick here."),
+            ("Reminders", "The ones with a time on them."),
+            ("Everything else", "One buzz for any other app your phone already allows.")
+        ]
+    }
+
+    var notificationConditions: [(String, String)] {
+        [
+            ("Only when the phone is locked", "If you are already looking at the screen, your wrist adds nothing."),
+            ("Follow iPhone Focus", "Sleep, Work and Do Not Disturb all apply here first."),
+            ("Hold them during quiet hours", "Nothing between your bedtime anchor and your usual wake."),
+            ("Repeat once after two minutes", "One more buzz if you have not picked the phone up.")
+        ]
+    }
+
+    func notificationToggleRow(_ title: String, detail: String) -> some View {
+        HStack(spacing: 13) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(NoopHTMLFont.sans(13.5))
+                    .foregroundStyle(NoopHTMLColor.ink)
+                Text(detail)
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(Color(hex: 0x7F8A85))
+                    .lineSpacing(3)
+            }
+            Spacer(minLength: 8)
+            NoopA5TintToggle(isOn: isEnabled(title), tint: Self.blush) { }
+        }
+        .padding(.vertical, 13)
+    }
+}
+
+// MARK: Apple Health
+
+private extension NoopAct5Screens {
+    var appleHealthScreen: some View {
+        NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 14) {
+                act5BackHeader("Your strap") { navigation.back(or: .strap) }
+                pageTitle(
+                    "Apple Health",
+                    copy: "A two-way bridge — six kinds out, one in — and the only place to look when a kind stops crossing."
+                )
+
+                HStack(spacing: 10) {
+                    appleSummaryTile(
+                        eyebrow: "Noop writes",
+                        value: healthAccessFixed ? "Six kinds" : "Five of six",
+                        copy: healthAccessFixed
+                            ? "sleep, workouts, pulse, resting pulse, variability and respiration"
+                            : "one is being refused, and it is the one the night is built on"
+                    )
+                    appleSummaryTile(
+                        eyebrow: "Noop takes",
+                        value: "One",
+                        copy: "steps, and only on days the strap could not estimate them"
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("An imported score never becomes your score")
+                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.blueLight)
+                    Text("Another app’s readiness or sleep score is kept under its own name and is never shown as Charge, Effort or Rest. Noop recomputes its own from the raw pulse, variability and sleep it can see.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(Color(hex: 0xB7C3C9))
+                        .lineSpacing(3)
+                }
+                .padding(.horizontal, 15)
+                .padding(.vertical, 14)
+                .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.blue.opacity(0.20), lineWidth: 0.5))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        NoopSectionLabel("Every kind, and what happened to it")
+                        Spacer()
+                        Text(healthAccessFixed ? "all crossing" : "1 needs you")
+                            .font(NoopHTMLFont.sans(11))
+                            .foregroundStyle(NoopHTMLColor.faint)
+                    }
+                    .padding(.horizontal, 2)
+
+                    dividedCard {
+                        ForEach(Array(appleKinds.enumerated()), id: \.offset) { index, item in
+                            appleKindRow(item)
+                            if index < appleKinds.count - 1 {
+                                Divider().overlay(NoopHTMLColor.border)
+                            }
+                        }
+                    }
+
+                    Text("iOS never tells an app that a read was refused — a denied kind and a kind with no data look identical from in here. That is why this page counts what was written rather than claiming everything worked.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 2)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    NoopSectionLabel("Where your steps came from")
+                        .padding(.horizontal, 2)
+                    NoopHTMLCard(radius: 22, padding: 16) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(alignment: .bottom, spacing: 3) {
+                                ForEach(Array(appleStepBars.enumerated()), id: \.offset) { index, value in
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill([2, 7, 11].contains(index) ? Color(hex: 0x5B7C8D) : NoopHTMLColor.blue)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: value / 13.1 * 60)
+                                }
+                            }
+                            .frame(height: 60, alignment: .bottom)
+                            HStack(spacing: 14) {
+                                appleLegend("the strap", color: NoopHTMLColor.blue)
+                                appleLegend("your phone, through Health", color: Color(hex: 0x5B7C8D))
+                            }
+                            Text("Three of the last fourteen days came from the phone — days the strap was off your wrist or charging. Nothing else on this page fills a gap that way.")
+                                .font(NoopHTMLFont.sans(11.5))
+                                .foregroundStyle(Color(hex: 0x8B958F))
+                                .lineSpacing(3)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    NoopSectionLabel("Health holds these, Noop does not use them")
+                        .padding(.horizontal, 2)
+                    dividedCard {
+                        ForEach(Array(appleUnused.enumerated()), id: \.offset) { index, item in
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.0).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                                    Text(item.2).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                                }
+                                Spacer(minLength: 8)
+                                Text(item.1).font(NoopHTMLFont.sans(12.5)).foregroundStyle(Color(hex: 0x8B958F)).monospacedDigit()
+                            }
+                            .padding(.vertical, 13)
+                            if index < appleUnused.count - 1 { Divider().overlay(NoopHTMLColor.border) }
+                        }
+                    }
+                    Text("To bring any of this in as history rather than as a live feed, hand the Health export to Bring history in — it reads the same file and tells you what it wrote.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 2)
+                }
+
+                Button { navigation.enter(.importHistory, from: .data) } label: {
+                    HStack(spacing: 13) {
+                        NoopCanonicalGlyph(name: .upload, size: 19, color: NoopHTMLColor.blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Bring history in").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("the one-time import — a Health export, or any of the other eleven formats")
+                                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                        }
+                        Spacer(minLength: 8)
+                        NoopChevron()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 15)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                .padding(.bottom, 22)
+            }
+        }
+    }
+
+    struct AppleKind {
+        let title: String
+        let value: String
+        let copy: String
+        let state: Int
+    }
+
+    var appleKinds: [AppleKind] {
+        [
+            AppleKind(title: "Sleep", value: "221 nights", copy: "Written after each night is sorted. Last at 07:14 today.", state: 1),
+            AppleKind(title: "Workouts", value: "148 sessions", copy: "Written when a session ends. Last yesterday, 18:22.", state: 1),
+            AppleKind(title: "Heart rate", value: "62,410 samples", copy: "Every sample the strap took, at the strap’s own rate.", state: 1),
+            AppleKind(title: "Resting heart rate", value: "221 days", copy: "One figure a day, from the night rather than from the morning.", state: 1),
+            healthAccessFixed
+                ? AppleKind(title: "Heart rate variability", value: "221 nights", copy: "Allowed. Written with the night it belongs to.", state: 1)
+                : AppleKind(title: "Heart rate variability", value: "refused", copy: "iOS is refusing this one, so 221 nights of variability have never reached Health. Nothing is lost in Noop — it is only missing on the other side.", state: -1),
+            AppleKind(title: "Respiratory rate", value: "219 nights", copy: "Two nights had too little clean signal to write anything.", state: 1),
+            AppleKind(title: "Body temperature", value: "not asked", copy: "Noop asks for a kind the first time it has something to write. It has not needed this one yet.", state: 0)
+        ]
+    }
+
+    var appleStepBars: [CGFloat] { [8.4, 11.2, 6.1, 9.8, 12.4, 7.2, 10.1, 5.4, 11.9, 9.2, 13.1, 8.8, 10.6, 11.4] }
+
+    var appleUnused: [(String, String, String)] {
+        [
+            ("VO₂ max", "48.2", "from your watch — Noop works its own out from your sessions and shows that one instead"),
+            ("Weight", "74.2 kg", "from a scale app. Your record holds 74.0, and Your record is what Noop uses."),
+            ("Body fat", "17.4%", "nothing in Noop reads this yet"),
+            ("Lean mass", "61.3 kg", "nothing in Noop reads this yet")
+        ]
+    }
+
+    func appleSummaryTile(eyebrow: String, value: String, copy: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            NoopSectionLabel(eyebrow)
+            Text(value)
+                .font(NoopHTMLFont.outfit(26, weight: .light))
+                .tracking(-0.78)
+                .foregroundStyle(NoopHTMLColor.ink)
+            Text(copy)
+                .font(NoopHTMLFont.sans(11.5))
+                .foregroundStyle(Color(hex: 0x7F8A85))
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 15)
+        .padding(.horizontal, 15)
+        .padding(.bottom, 13)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+    }
+
+    func appleKindRow(_ item: AppleKind) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Circle()
+                .fill(item.state < 0 ? NoopHTMLColor.warm : item.state == 0 ? Color.white.opacity(0.16) : Self.green)
+                .frame(width: 6, height: 6)
+                .padding(.top, 6)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(item.title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                    Spacer(minLength: 8)
+                    Text(item.value)
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(item.state < 0 ? NoopHTMLColor.warm : Color(hex: 0x8B958F))
+                        .monospacedDigit()
+                }
+                Text(item.copy)
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(item.state < 0 ? Color(hex: 0xC8934B) : Color(hex: 0x7F8A85))
+                    .lineSpacing(3)
+                if item.state < 0 {
+                    Button { healthAccessFixed = true } label: {
+                        Text("Open Health → Noop")
+                            .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                            .foregroundStyle(NoopHTMLColor.warm)
+                            .padding(.horizontal, 12)
+                            .frame(height: 29)
+                            .background(NoopHTMLColor.warm.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(NoopHTMLColor.warm.opacity(0.34), lineWidth: 0.5))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    .padding(.top, 4)
+                }
+            }
+        }
+        .padding(.vertical, 13)
+    }
+
+    func appleLegend(_ title: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 8, height: 8)
+            Text(title).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+        }
+    }
+}
+
+// MARK: Automations
+
+private extension NoopAct5Screens {
+    var automationsScreen: some View {
+        NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 12) {
+                act5BackHeader("Settings") { navigation.back(or: .settings) }
+                pageTitle(
+                    "Automations",
+                    copy: "What the strap reports and what Noop does about it. Each row says what it costs you — a buzz or an interruption — and the footnote says where each one runs."
+                )
+
+                automationGroup("The strap as a button", note: "the phone may stay locked") {
+                    segmentRow("Double tap", detail: "two firm taps on the face, any time", choices: ["Sleep mark", "Log water", "Nothing"])
+                    Divider().overlay(NoopHTMLColor.border)
+                    automationSegment("When it comes off", detail: "the moment the skin contact breaks", choices: ["Nothing", "Lock the phone", "Run a Shortcut"])
+                    Divider().overlay(NoopHTMLColor.border)
+                    automationSegment("When it goes back on", detail: "and it knows loose from off", choices: ["Nothing", "Run a Shortcut"])
+                }
+
+                automationGroup("Quietly, in the background", note: "each one costs a buzz you did not ask for") {
+                    toggleRow("Move reminder", detail: "Buzzes the strap after 45 minutes still, inside your active hours only. Never during a session, never after your anchor.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Stress check-ins", detail: "A passive haptic when stress holds high for twenty minutes. Off by default, because most people find it lands at the worst moment.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Illness early warning", detail: "Watches four signals against your own 28-day normal and says what it ruled out first. It appears in the charge ledger, priced like any other drain — it never takes over the screen.", tint: Self.blush)
+                }
+
+                automationGroup("A ceiling, and a nudge", note: "") {
+                    VStack(alignment: .leading, spacing: 0) {
+                        toggleRow("Buzz if I go over", detail: "One buzz when you cross it, then nothing until you have been under for a full minute.", tint: Self.blush)
+                        if isEnabled("Buzz if I go over") {
+                            Divider().overlay(NoopHTMLColor.border)
+                            VStack(alignment: .leading, spacing: 11) {
+                                automationBareSegment(["Profile zone", "Fixed bpm"], selection: ceilingMode) { ceilingMode = $0 }
+                                if ceilingMode == "Profile zone" {
+                                    automationBareSegment(["Zone 3", "Zone 4", "Zone 5"], selection: ceilingZone) { ceilingZone = $0 }
+                                } else {
+                                    HStack(spacing: 18) {
+                                        Spacer()
+                                        automationStepButton(plus: false) { ceilingBPM = max(120, ceilingBPM - 2) }
+                                        Text("\(ceilingBPM) bpm")
+                                            .font(NoopHTMLFont.outfit(30, weight: .light))
+                                            .tracking(-0.9)
+                                            .monospacedDigit()
+                                            .frame(minWidth: 104)
+                                        automationStepButton(plus: true) { ceilingBPM = min(200, ceilingBPM + 2) }
+                                        Spacer()
+                                    }
+                                }
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("ARMS AT \(resolvedCeilingBPM) BPM")
+                                        .font(NoopHTMLFont.sans(10, weight: .semibold))
+                                        .tracking(1)
+                                        .foregroundStyle(Self.blushLight)
+                                    Text(ceilingMode == "Profile zone"
+                                         ? "\(ceilingZone) starts at \(resolvedCeilingBPM) bpm on your record. It arms with that number, and it moves if your maximum does."
+                                         : "It arms with exactly this number, whatever your zones do later.")
+                                        .font(NoopHTMLFont.sans(11.5))
+                                        .foregroundStyle(Color(hex: 0xC9BEC0))
+                                        .lineSpacing(3)
+                                }
+                                .padding(.horizontal, 13)
+                                .padding(.vertical, 11)
+                                .background(Self.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Self.blush.opacity(0.20), lineWidth: 0.5))
+                            }
+                            .padding(.vertical, 13)
+                        }
+                        Divider().overlay(NoopHTMLColor.border)
+                        toggleRow("Target-zone coach", detail: "While a session runs: one tap means you are in the zone, two means push, three means ease off. It is the only thing in Noop that buzzes more than once.", tint: Self.blush)
+                    }
+                }
+
+                Text("Everything here runs through Noop rather than on the strap: the strap reports, the app decides, and the app buzzes it back. Each one needs Noop running; background delivery is best effort because iOS may suspend it. Nothing on this page claims strap-firmware support.")
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(NoopHTMLColor.faint)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 2)
+                    .padding(.bottom, 20)
+            }
+        }
+    }
+
+    var resolvedCeilingBPM: Int {
+        guard ceilingMode == "Profile zone" else { return ceilingBPM }
+        switch ceilingZone {
+        case "Zone 3": return 148
+        case "Zone 5": return 176
+        default: return 162
+        }
+    }
+
+    func automationGroup<Content: View>(_ title: String, note: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                NoopSectionLabel(title)
+                Spacer(minLength: 8)
+                if !note.isEmpty {
+                    Text(note)
+                        .font(NoopHTMLFont.sans(11))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+            .padding(.horizontal, 2)
+            dividedCard { content() }
+        }
+    }
+
+    func automationSegment(_ title: String, detail: String, choices: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(title).font(NoopHTMLFont.sans(13.5))
+                Spacer()
+                Text(detail).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+            }
+            automationBareSegment(choices, selection: preferences[title] ?? choices[0]) { preferences[title] = $0 }
+        }
+        .padding(.vertical, 13)
+    }
+
+    func automationBareSegment(_ choices: [String], selection: String, action: @escaping (String) -> Void) -> some View {
+        HStack(spacing: 4) {
+            ForEach(choices, id: \.self) { choice in
+                Button { action(choice) } label: {
+                    Text(choice)
+                        .font(NoopHTMLFont.sans(11.5, weight: choice == selection ? .semibold : .regular))
+                        .foregroundStyle(choice == selection ? Self.blushLight : NoopHTMLColor.copy)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 32)
+                        .background(choice == selection ? Self.blush.opacity(0.20) : .clear, in: RoundedRectangle(cornerRadius: 11))
+                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(choice == selection ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    func automationStepButton(plus: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                Capsule().fill(NoopHTMLColor.inkSoft).frame(width: 11, height: 1.6)
+                if plus { Capsule().fill(NoopHTMLColor.inkSoft).frame(width: 1.6, height: 11) }
+            }
+            .frame(width: 34, height: 34)
+            .background(Color.white.opacity(0.06), in: Circle())
+            .overlay(Circle().stroke(Color.white.opacity(0.10), lineWidth: 0.5))
         }
         .buttonStyle(NoopHTMLPressStyle())
     }
@@ -1484,23 +2114,31 @@ private extension NoopAct5Screens {
                 settingsGroup("Appearance") {
                     copyRow("Widgets", detail: "three, and what each one answers", symbol: "square.grid.2x2", tint: Self.blush, value: "3") { navigation.push(.widgets) }
                     Divider().overlay(NoopHTMLColor.border)
-                    segmentRow("Appearance", detail: "dark suits a bedside app", choices: ["Dark", "Light", "System"])
+                    segmentRow(
+                        "Appearance",
+                        detail: "dark only in this build — light is drawn but not coloured yet",
+                        choices: ["Dark", "Light", "System"],
+                        disabledChoices: ["Light", "System"]
+                    )
                     Divider().overlay(NoopHTMLColor.border)
-                    segmentRow("Chart colours", detail: "Classic recolours the data, not the chrome", choices: ["Titanium", "Classic"])
-                    Divider().overlay(NoopHTMLColor.border)
-                    segmentRow("Sleep chart", detail: "how the stages are drawn", choices: ["Hypnogram", "Rows", "Ribbon"])
-                    Divider().overlay(NoopHTMLColor.border)
-                    segmentRow("Card surface", detail: "lets the sky show through", choices: ["Solid", "Frosted", "Clear"])
-                    Divider().overlay(NoopHTMLColor.border)
-                    segmentRow("App icon", detail: "on your home screen", choices: ["Titanium", "Blued"])
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Day-cycle sky", detail: "The backdrop moves with the hour. Off gives you a plain dark canvas.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Sky behind cards", detail: "Extends that sky under the whole scroll, so transparent cards reveal it.", tint: Self.blush)
+                    segmentRow(
+                        "Language",
+                        detail: "English only in this build; the strings are written but not translated",
+                        choices: ["System", "English", "Deutsch"],
+                        disabledChoices: ["System", "Deutsch"]
+                    )
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Reduce motion in Noop", detail: "Poses every looping graphic still without needing the system switch.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
-                    valueRow("Language", detail: "this build is English only", value: "English")
+                    soonRow("Chart colours", detail: "a second palette for the data, leaving the chrome alone", glyph: .chart)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Sleep chart", detail: "the hypnogram drawn as rows or as a ribbon instead", glyph: .moon)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Card surface", detail: "frosted and clear cards, so the sky shows through", glyph: .grid)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Day-cycle sky", detail: "a backdrop that moves with the hour", glyph: .today)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("App icon", detail: "a second icon for your home screen", glyph: .grid)
                 }
 
                 settingsGroup("Your strap") {
@@ -1522,7 +2160,7 @@ private extension NoopAct5Screens {
                 }
 
                 settingsGroup("Features") {
-                    toggleRow("Hydration", detail: "A local water log with a daily goal that follows your sex and the day’s effort.", tint: Self.blush)
+                    soonRow("Hydration", detail: "a local water log with a goal that follows your sex and the day’s effort", glyph: .drop)
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Offer a workout it spotted", detail: "Sees a probable session in your heart rate and offers to save it. It never creates one for you.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
@@ -1532,6 +2170,8 @@ private extension NoopAct5Screens {
                 }
 
                 settingsGroup("What may interrupt you") {
+                    copyRow("Buzz for phone notifications", detail: "which apps reach your wrist, and how", symbol: "bell", tint: Self.blush, value: "5") { navigation.enter(.notifs, from: .strap) }
+                    Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Bedtime nudge", detail: "One buzz thirty minutes before your anchor, and nothing after it.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Session offer", detail: "One notification a day, in the morning, with today’s recommendation.", tint: Self.blush)
@@ -1542,15 +2182,9 @@ private extension NoopAct5Screens {
                 }
 
                 settingsGroup("Automations") {
-                    toggleRow("Move reminder", detail: "Buzzes the strap after 45 minutes still, inside your active hours only.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Stress check-ins", detail: "A passive haptic when stress holds high. Off by default.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Illness notice", detail: "An on-device estimate from temperature and respiration. Not a diagnosis, and it says so.", tint: Self.blush)
+                    copyRow("Automations", detail: "what the strap does on its own, and what a tap on it does", symbol: "sparkles", tint: Self.blush, value: "3 on") { navigation.push(.automations) }
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Rhythm", detail: "Needs reading and ticking a page first. No alarms, no red, no condition names.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    segmentRow("Double tap", detail: "what a double tap on the strap does", choices: ["Sleep mark", "Log water", "Nothing"])
                 }
 
                 settingsGroup("Svea") {
@@ -1565,32 +2199,47 @@ private extension NoopAct5Screens {
 
                 settingsGroup("Backup and data") {
                     actionRow("Back up to a file", detail: "one .noopbak with every night, session and log — yours to keep", symbol: "arrow.down.to.line", tint: NoopHTMLColor.blue) {
-                        actionNotice = "Backup prepared. The .noopbak file contains every night, session and log."
+                        navigation.enter(.backup, from: .data)
                     }
                     Divider().overlay(NoopHTMLColor.border)
                     actionRow("Restore from a file", detail: "imports straight back in; nothing is merged silently", symbol: "arrow.up.to.line", tint: NoopHTMLColor.blue) {
-                        actionNotice = "Choose a .noopbak file. No existing entry will be merged silently."
+                        navigation.enter(.importHistory, from: .data)
                     }
                     Divider().overlay(NoopHTMLColor.border)
-                    copyRow("Data and permissions", detail: "what is recorded, what leaves, and how to delete it", symbol: "shield", tint: Self.blush) { navigation.push(.data) }
+                    copyRow("Data and permissions", detail: "what is recorded, what leaves, and how to delete it", symbol: "shield", tint: Self.blush) { navigation.enter(.data, from: .you) }
                 }
 
                 settingsGroup("About") {
-                    actionRow("How Noop works", detail: "how sleep is sorted, how the scores build, where the numbers come from", symbol: "globe", tint: NoopHTMLColor.blue) {
-                        actionNotice = "Noop sorts sleep and builds every estimate locally from your own baselines."
-                    }
-                    Divider().overlay(NoopHTMLColor.border)
-                    actionRow("What’s new", detail: "the changelog, in plain words", symbol: "doc.text", tint: NoopHTMLColor.blue) {
-                        actionNotice = "You are using Noop 5.2.0."
-                    }
-                    Divider().overlay(NoopHTMLColor.border)
                     actionRow("Check for updates", detail: "one request to the release page, when you ask for it", symbol: "arrow.triangle.2.circlepath", tint: NoopHTMLColor.blue) {
                         actionNotice = "No update check has left this phone in the prototype."
                     }
                     Divider().overlay(NoopHTMLColor.border)
-                    actionRow("Set up Apple Watch", detail: "what it is good at, and where it is lighter than the strap", symbol: "applewatch", tint: NoopHTMLColor.blue) {
-                        actionNotice = "Apple Watch setup is ready to continue."
-                    }
+                    soonRow("How Noop works", detail: "how sleep is sorted, how the scores build, where the numbers come from", glyph: .globe)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("What’s new", detail: "the changelog, in plain words", glyph: .file)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Set up Apple Watch", detail: "what it is good at, and where it is lighter than the strap", glyph: .watch)
+                }
+
+                settingsGroup(
+                    "Later",
+                    note: "Nine utilities that are decided but not built. They are listed here rather than left out, so you can see the shape of what is coming — and so nothing in this app pretends to do something it cannot."
+                ) {
+                    soonRow("Your data, fused", detail: "every source merged onto one timeline, with the winner named per day", glyph: .copy)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Storage", detail: "what the database is spending, by category", glyph: .grid)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Nutrition", detail: "calories and macros on the same timeline as charge and rest, via CSV", glyph: .plate)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Weekly digest", detail: "the written summary, Sunday evening", glyph: .file)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Trends report", detail: "a longer read across a quarter, exportable", glyph: .chart)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Siri and Shortcuts", detail: "App Intents and voice — “ask Noop what I have got today”", glyph: .spark)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Shortcuts export", detail: "the HealthKit-free path, for a sideloaded build with no account", glyph: .upload)
+                    Divider().overlay(NoopHTMLColor.border)
+                    soonRow("Strap limitations", detail: "4.0 against 5.0 against MG — what each band can actually read", glyph: .watch)
                 }
 
                 Button { navigation.push(.lab) } label: {
@@ -1616,11 +2265,52 @@ private extension NoopAct5Screens {
         }
     }
 
-    func settingsGroup<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    func settingsGroup<Content: View>(
+        _ title: String,
+        note: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             NoopSectionLabel(title).padding(.horizontal, 2).padding(.top, 8)
+            if let note {
+                Text(note)
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(Color(hex: 0x7F8A85))
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 2)
+                    .padding(.bottom, 2)
+            }
             dividedCard { content() }
         }
+    }
+
+    func soonRow(_ title: String, detail: String, glyph: NoopCanonicalGlyphName) -> some View {
+        HStack(spacing: 13) {
+            NoopCanonicalGlyph(name: glyph, size: 19, color: Color(hex: 0x4E5854))
+                .frame(width: 21)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(NoopHTMLFont.sans(13.5))
+                    .foregroundStyle(Color(hex: 0x8B958F))
+                Text(detail)
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(Color(hex: 0x7F8A85))
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Text("Later")
+                .font(NoopHTMLFont.sans(9.5, weight: .semibold))
+                .tracking(0.95)
+                .textCase(.uppercase)
+                .foregroundStyle(Color(hex: 0x7F8A85))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.white.opacity(0.09), lineWidth: 0.5))
+        }
+        .padding(.vertical, 14)
     }
 
     func actionRow(_ title: String, detail: String, symbol: String, tint: Color, action: @escaping () -> Void) -> some View {
@@ -1638,17 +2328,6 @@ private extension NoopAct5Screens {
         .buttonStyle(NoopHTMLPressStyle())
     }
 
-    func valueRow(_ title: String, detail: String, value: String) -> some View {
-        HStack(spacing: 13) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(NoopHTMLFont.sans(13.5))
-                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
-            }
-            Spacer()
-            Text(value).font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(Self.blushLight)
-        }
-        .padding(.vertical, 14)
-    }
 }
 
 // MARK: Widgets
@@ -2044,7 +2723,7 @@ private extension NoopAct5Screens {
     }
 }
 
-private struct NoopA5TintToggle: View {
+struct NoopA5TintToggle: View {
     let isOn: Bool
     let tint: Color
     let action: () -> Void
@@ -2054,9 +2733,21 @@ private struct NoopA5TintToggle: View {
             Capsule()
                 .fill(isOn ? tint : Color.white.opacity(0.09))
                 .frame(width: 46, height: 28)
+                .overlay(
+                    Capsule().strokeBorder(
+                        Color.white.opacity(isOn ? 0.14 : 0.16),
+                        lineWidth: 0.5
+                    )
+                )
                 .overlay(alignment: isOn ? .trailing : .leading) {
-                    Circle().fill(NoopHTMLColor.ink).frame(width: 24, height: 24).padding(2)
+                    Circle()
+                        .fill(NoopHTMLColor.ink)
+                        .frame(width: 24, height: 24)
+                        .shadow(color: .black.opacity(0.45), radius: 1.5, y: 1)
+                        .overlay(Circle().strokeBorder(.black.opacity(0.10), lineWidth: 0.5))
+                        .padding(2)
                 }
+                .animation(.timingCurve(0.34, 1.25, 0.64, 1, duration: 0.24), value: isOn)
         }
         .buttonStyle(.plain)
     }

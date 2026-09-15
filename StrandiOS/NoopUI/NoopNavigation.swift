@@ -40,8 +40,8 @@ enum NoopTab: String, CaseIterable, Identifiable {
     }
 }
 
-/// Canonical HTML routes. Notification mirroring is intentionally absent: the user removed that
-/// feature because the strap firmware has no support for it.
+/// Canonical HTML routes. The notification design remains reachable as an explicitly inert
+/// “Later” screen; no mirroring permission or firmware capability is implied by the route.
 
 /// §10's six curves, named so a transition can be referred to rather than re-typed. Nothing here
 /// is new: four of them simply had no name, which is why they were being missed.
@@ -83,7 +83,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 4
     case trends, capacity, rhythm, year
     // Act 5
-    case you, record, zones, history, strap, devices, data, settings, widgets, lab, onboard, pair, position
+    case you, record, zones, history, strap, notifs, devices, apple, data, settings, widgets, lab, automations, onboard, pair, position
+    case importHistory = "import", reading, imported, rejected, backup
     // Act 6
     case ages, building, driver, method, health
     // Act 7
@@ -102,8 +103,9 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound: .day
         case .session, .pick, .ready, .live, .intervals, .detail, .across: .effort
         case .trends, .capacity, .rhythm, .year: .picture
-        case .you, .record, .zones, .history, .strap, .devices, .data, .settings, .widgets, .lab, .onboard, .pair,
-             .position: .plumbing
+        case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
+             .widgets, .lab, .automations, .onboard, .pair, .position, .importHistory, .reading,
+             .imported, .rejected, .backup: .plumbing
         case .ages, .building, .driver, .method, .health: .ages
         case .coach, .gate, .setup, .consent, .memory: .svea
         case .goal, .setGoal, .labs, .picker, .review, .marker: .goals
@@ -125,8 +127,9 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .ages, .building, .driver, .method, .health,
              .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects:
             .trends
-        case .you, .record, .zones, .history, .strap, .devices, .data, .settings,
-             .widgets, .lab, .onboard, .pair, .position,
+        case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
+             .widgets, .lab, .automations, .onboard, .pair, .position, .importHistory, .reading,
+             .imported, .rejected, .backup,
              .goal, .setGoal, .labs, .picker, .review, .marker:
             .you
         }
@@ -671,6 +674,23 @@ final class NoopNavigation: ObservableObject {
         }
     }
 
+    /// Enter a route through the parent drawn by the canonical HTML. Cross-section links can open
+    /// a child from somewhere else, but its visible chevron and the edge swipe must still reveal
+    /// the same parent.
+    func enter(_ route: NoopRoute, from parent: NoopRoute) {
+        pendingSheetTransition = nil
+        overlay = nil
+        guard self.route != route else { return }
+        arrival = .pushed
+        withAnimation(NoopMotion.enter) {
+            if self.route == parent {
+                path.append(route)
+            } else {
+                path = [parent, route]
+            }
+        }
+    }
+
     func replace(with route: NoopRoute) {
         pendingSheetTransition = nil
         overlay = nil
@@ -688,7 +708,7 @@ final class NoopNavigation: ObservableObject {
         }
         guard path.count > 1 else { return }
         withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) {
-            path.removeLast()
+            _ = path.removeLast()
         }
     }
 
