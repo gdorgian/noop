@@ -102,7 +102,7 @@ struct RootTabView: View {
         case .liveSession:
             navigation.push(.session)
         case .breathe:
-            navigation.push(.stress)
+            navigation.push(.breathe)
         case .journal:
             navigation.show(.dayLog)
         case .dataSources:
@@ -124,7 +124,7 @@ struct RootTabView: View {
         case .logJournal:
             navigation.show(.dayLog)
         case .breathe:
-            navigation.push(.stress)
+            navigation.push(.breathe)
         }
     }
 }
