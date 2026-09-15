@@ -334,20 +334,30 @@ struct NoopVerifiedAppShell: View {
     /// it is a fixture outside `--demo-seed`, so it is safe here too.
     private static let canonicalBreatheRoutes: Set<NoopRoute> = [.breathe, .bcatalog, .bplayer, .bsweep, .bfound]
 
+    /// Act 5's data door is backed by the real importers, local store and backup engines. Its Debug
+    /// fixture lives inside `NoopDataScreen`; the same view fails closed onto measured values here.
+    private static let canonicalDataRoutes: Set<NoopRoute> = [
+        .data, .importHistory, .reading, .imported, .rejected, .backup
+    ]
+
     private var usesCanonicalCanvas: Bool {
         Self.canonicalLabRoutes.contains(navigation.route)
             || Self.canonicalBreatheRoutes.contains(navigation.route)
+            || Self.canonicalDataRoutes.contains(navigation.route)
     }
 
     var body: some View {
         ZStack {
             NoopHTMLColor.canvas.ignoresSafeArea()
+            verifiedAmbientGlow
 
             Group {
                 if Self.canonicalLabRoutes.contains(navigation.route) {
                     NoopAct8Screens(navigation: navigation, labDraft: labDraft)
                 } else if Self.canonicalBreatheRoutes.contains(navigation.route) {
                     NoopBreatheScreens(navigation: navigation)
+                } else if Self.canonicalDataRoutes.contains(navigation.route) {
+                    NoopDataScreen(navigation: navigation)
                 } else {
                     NoopVerifiedRouteScreen(
                         route: navigation.route,
@@ -375,13 +385,21 @@ struct NoopVerifiedAppShell: View {
                 .zIndex(5)
             }
 
-            if navigation.overlay != nil {
-                NoopBottomSheet(title: "Recorded data", dismiss: navigation.dismissOverlay, showsDone: true) {
-                    Text("Only information already present in your local record is shown in this build.")
-                        .font(NoopHTMLFont.sans(13))
-                        .foregroundStyle(NoopHTMLColor.copy)
-                        .lineSpacing(3)
-                        .padding(.bottom, 8)
+            if let overlay = navigation.overlay {
+                Group {
+                    if Self.canonicalDataRoutes.contains(navigation.route) {
+                        // Data uses only the static format catalog and the real destructive confirmation;
+                        // neither contains prototype measurements.
+                        NoopOverlayHost(overlay: overlay, navigation: navigation)
+                    } else {
+                        NoopBottomSheet(title: "Recorded data", dismiss: navigation.dismissOverlay, showsDone: true) {
+                            Text("Only information already present in your local record is shown in this build.")
+                                .font(NoopHTMLFont.sans(13))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                                .lineSpacing(3)
+                                .padding(.bottom, 8)
+                        }
+                    }
                 }
                 .zIndex(20)
             }
@@ -395,6 +413,35 @@ struct NoopVerifiedAppShell: View {
         // like the fixture shell. Without this, SwiftUI first removes the status-bar safe area and
         // NoopScreen adds 56 pt again, putting every verified Lab/Breathe page about 60 pt too low.
         .ignoresSafeArea(.container, edges: usesCanonicalCanvas ? .top : [])
+    }
+
+    @ViewBuilder
+    private var verifiedAmbientGlow: some View {
+        if usesCanonicalCanvas {
+            let isLab = Self.canonicalLabRoutes.contains(navigation.route)
+            let color: Color = isLab
+                ? NoopHTMLColor.warm
+                : (Self.canonicalDataRoutes.contains(navigation.route) ? NoopHTMLColor.blush : NoopHTMLColor.blue)
+            let opacity = isLab ? 0.15 : (Self.canonicalDataRoutes.contains(navigation.route) ? 0.13 : 0.17)
+            VStack {
+                Ellipse()
+                    .fill(RadialGradient(
+                        stops: [
+                            .init(color: color.opacity(opacity), location: 0),
+                            .init(color: color.opacity(0), location: 0.7)
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: isLab ? 319 : 312
+                    ))
+                    .frame(width: isLab ? 480 : 470, height: isLab ? 420 : 410)
+                    .blur(radius: 18)
+                    .offset(y: isLab ? -170 : -150)
+                Spacer()
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+        }
     }
 
     private func verifiedBack() {
@@ -416,11 +463,41 @@ struct NoopVerifiedAppShell: View {
     private var verifiedBackGesture: some Gesture {
         DragGesture(minimumDistance: 22, coordinateSpace: .local)
             .onEnded { value in
-                guard navigation.route.hidesBottomBar,
-                      value.startLocation.x <= 32,
+                guard value.startLocation.x <= 32,
                       value.translation.width > 78,
                       abs(value.translation.height) < 58 else { return }
-                verifiedBack()
+
+                // Sheets always close before the route is considered, even on the three forward-only
+                // import states. This is the same precedence as the primary shell.
+                if navigation.overlay != nil {
+                    navigation.back()
+                    return
+                }
+
+                switch navigation.route {
+                case .labs:
+                    // Labs is an Act 8 root whose drawn chevron leaves the act rather than walking
+                    // an arbitrary history stack.
+                    navigation.reset(to: .you)
+                case .picker, .review, .marker:
+                    navigation.back(or: .labs)
+                case .breathe:
+                    navigation.back(or: .today)
+                case .bcatalog, .bplayer, .bsweep, .bfound:
+                    navigation.back(or: .breathe)
+                case .data:
+                    navigation.back(or: .you)
+                case .importHistory, .backup:
+                    navigation.back(or: .data)
+                case .reading, .imported, .rejected:
+                    // These are forward-only states and draw no back control.
+                    return
+                default:
+                    // Keep the fail-closed placeholder's existing behaviour until that route gets
+                    // its own verified production screen.
+                    guard navigation.route.hidesBottomBar else { return }
+                    verifiedBack()
+                }
             }
     }
 }

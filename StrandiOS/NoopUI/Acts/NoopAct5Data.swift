@@ -66,8 +66,6 @@ final class NoopDataFlow: ObservableObject {
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var backupBusy = false
     @Published var notice: (title: String, message: String)?
-    /// Bumped when a backup is written, so the snapshot card re-reads `FolderBackup`.
-    @Published private(set) var backupSeq = 0
 
     var isReading: Bool { if case .reading = phase { return true }; return false }
 
@@ -75,26 +73,68 @@ final class NoopDataFlow: ObservableObject {
 
     func loadStored(repo: Repository) async {
         guard let store = await repo.storeHandle() else {
+            stored = nil
             storedUnavailable = true
             return
         }
-        storedUnavailable = false
-        var days = Set<String>()
-        var ids = repo.importedReadIds + repo.computedReadIds + [Repository.appleHealthSource]
-        ids = ids.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
-        for id in ids {
-            for metric in (try? await store.dailyMetrics(deviceId: id, from: "0000-01-01", to: "9999-12-31")) ?? [] {
-                days.insert(metric.day)
-            }
+        // Every namespace that the iOS import door can actually write. Counting only the active and
+        // canonical WHOOP ids made Apple Health, Mi Band, Oura, Fitbit and Garmin disappear from this
+        // card even though their rows were safely in the database.
+        let ids = (
+            repo.importedReadIds
+                + repo.computedReadIds
+                + [Repository.appleHealthSource, Repository.xiaomiBandSource]
+                + Repository.wearableImportSources
+        ).reduce(into: [String]()) { result, id in
+            if !result.contains(id) { result.append(id) }
         }
-        var sleeps = Set<String>()
-        for id in repo.importedReadIds + repo.computedReadIds {
-            for block in (try? await store.sleepSessions(deviceId: id, from: 0, to: 4_102_444_800, limit: 1_000_000)) ?? [] {
-                sleeps.insert("\(block.startTs)-\(block.endTs)")
+
+        do {
+            var days = Set<String>()
+            // A "sleep" here is one stored sleep day. That lets Apple Health's daily sleep aggregate
+            // and a wearable's matching session describe the same night without double-counting it.
+            var sleeps = Set<String>()
+            let sleepRowLimit = 100_001
+
+            for id in ids {
+                for metric in try await store.dailyMetrics(
+                    deviceId: id,
+                    from: "0000-01-01",
+                    to: "9999-12-31"
+                ) {
+                    days.insert(metric.day)
+                    if metric.totalSleepMin != nil { sleeps.insert(metric.day) }
+                }
+
+                let sessions = try await store.sleepSessions(
+                    deviceId: id,
+                    from: 0,
+                    to: 4_102_444_800,
+                    limit: sleepRowLimit
+                )
+                // Never present a truncated count as complete. Reaching this deliberately generous
+                // bound is treated as unavailable until the store exposes an aggregate count query.
+                guard sessions.count < sleepRowLimit else {
+                    stored = nil
+                    storedUnavailable = true
+                    return
+                }
+                for session in sessions {
+                    sleeps.insert(Repository.localDayKey(
+                        Date(timeIntervalSince1970: TimeInterval(session.endTs))
+                    ))
+                }
             }
+
+            let sorted = days.sorted()
+            stored = Stored(days: days.count, sleeps: sleeps.count, first: sorted.first, last: sorted.last)
+            storedUnavailable = false
+        } catch {
+            // A partial count is worse than an explicit unknown: it looks authoritative and can only
+            // understate what the person has entrusted to the app.
+            stored = nil
+            storedUnavailable = true
         }
-        let sorted = days.sorted()
-        stored = Stored(days: days.count, sleeps: sleeps.count, first: sorted.first, last: sorted.last)
     }
 
     // MARK: The door in
@@ -185,7 +225,12 @@ final class NoopDataFlow: ObservableObject {
         } catch let error as ImportError {
             return .rejected(Refused(fileName: name, reason: Self.reason(for: error)))
         } catch {
-            return .rejected(Refused(fileName: name, reason: error.localizedDescription))
+            // Third-party parser errors can include the app's sandbox path. The screen already names
+            // the selected file; do not expose an internal path or an unreviewed system sentence.
+            return .rejected(Refused(
+                fileName: name,
+                reason: "Noop could not finish reading this file, so nothing from it was written. Check that the export finished downloading, then choose it again."
+            ))
         }
     }
 
@@ -261,7 +306,11 @@ final class NoopDataFlow: ObservableObject {
 /// Formatting that only ever restates what it is given.
 enum NoopDataFormat {
     static func count(_ value: Int) -> String {
-        value.formatted(.number.grouping(.automatic))
+        value.formatted(
+            .number
+                .grouping(.automatic)
+                .locale(Locale(identifier: "en_US_POSIX"))
+        )
     }
 
     static func day(_ key: String) -> String? {
@@ -274,6 +323,8 @@ enum NoopDataFormat {
 
     static func date(_ value: Date) -> String {
         let out = DateFormatter()
+        out.calendar = Calendar(identifier: .gregorian)
+        out.locale = Locale(identifier: "en_US_POSIX")
         out.dateFormat = "d MMM yyyy"
         return out.string(from: value)
     }
@@ -582,11 +633,11 @@ struct NoopDataScreen: View {
                     RowModel(id: "noopbak", title: "Everything, exactly · .noopbak",
                              note: "The whole database, your settings, and which build wrote it. The phone-to-phone path.",
                              noteColor: Self.dim, noteSize: 11.5,
-                             trailing: .glyph(.download, Self.blush.opacity(0.8), 17), padding: 14),
+                             trailing: .glyph(.upload, Self.blush.opacity(0.8), 17), padding: 14),
                     RowModel(id: "csv", title: "A readable copy · WHOOP CSV",
                              note: "Four CSVs in a zip. Reads back into Noop, and into the Android build.",
                              noteColor: Self.dim, noteSize: 11.5,
-                             trailing: .glyph(.download, Self.blush.opacity(0.8), 17), padding: 14)
+                             trailing: .glyph(.upload, Self.blush.opacity(0.8), 17), padding: 14)
                 ], onTap: demo ? nil : { id in
                     if id == "noopbak" { flow.exportBackup(repo: repo) } else { flow.exportCSV(repo: repo) }
                 })
@@ -633,7 +684,6 @@ struct NoopDataScreen: View {
 
     private var snapshotAge: String {
         if demo { return "2 days ago" }
-        _ = flow.backupSeq
         let last = FolderBackup.lastBackupMs
         return last > 0 ? NoopDataFormat.age(sinceMs: last) : "None yet"
     }
@@ -974,7 +1024,7 @@ struct NoopDataScreen: View {
 
                     Text(current == nil
                          ? "No read is running. Choose a file from the drop target to start one."
-                         : "Streaming it a piece at a time and aggregating as it goes, so a file this size never has to fit in memory.")
+                         : "Reading it locally and writing only records the importer can identify. Nothing leaves this phone.")
                         .font(NoopHTMLFont.sans(12.5))
                         .foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(3.5)
@@ -1293,11 +1343,7 @@ struct NoopDataScreen: View {
             }
             .buttonStyle(NoopHTMLPressStyle())
 
-            (
-                Text("Rest and Charge are being recomputed from what came in. Your first fourteen days will carry a ")
-                + Text("building").font(NoopHTMLFont.serif(14, italic: true))
-                + Text(" chip while the baselines catch up.")
-            )
+            Text("Only measures supported by what the file actually carried can be calculated. Missing inputs stay blank.")
             .font(NoopHTMLFont.sans(11.5))
             .foregroundStyle(Self.dim)
             .lineSpacing(3.5)

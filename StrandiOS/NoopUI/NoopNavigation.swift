@@ -817,7 +817,35 @@ final class NoopNavigation: ObservableObject {
         guard startX <= 32,
               translation.width > 78,
               abs(translation.height) < 58 else { return }
-        back()
+
+        // A sheet always closes first, including on a screen whose route itself has no back action.
+        if overlay != nil {
+            back()
+            return
+        }
+
+        // Act 5's visible chevrons are canonical destinations, not merely whatever happens to sit
+        // underneath the current route in an in-memory path. Supplying the same fallback here makes
+        // a direct launch, a cross-act entrance and a tapped chevron agree. The three import-result
+        // states deliberately have no chevron and therefore no swipe exit.
+        switch route {
+        case .you, .reading, .imported, .rejected, .onboard:
+            return
+        case .record, .history, .strap, .settings, .data, .position:
+            back(or: .you)
+        case .zones:
+            back(or: .record)
+        case .notifs, .devices, .apple:
+            back(or: .strap)
+        case .pair:
+            back(or: .devices)
+        case .widgets, .lab, .automations:
+            back(or: .settings)
+        case .importHistory, .backup:
+            back(or: .data)
+        default:
+            back()
+        }
     }
 
     private func refreshDayLogIfNeeded() {
