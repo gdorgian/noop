@@ -36,10 +36,14 @@ struct WorkoutsView: View {
     @State private var showLiveWorkout = false
     @State private var showStartSport = false
 
-    // Imperial/Metric display preference (D#103). Workout distances are stored in metres; the toggle
-    // re-labels them to miles/yards. Display-only — nothing on disk changes.
+    // Exercise-distance preference (#1913). Unset follows the original combined preference.
     @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
-    private var unitSystem: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
+    @AppStorage(UnitPrefs.distanceSystemKey) private var distanceSystemRaw = ""
+    private var distanceUnitSystem: UnitSystem {
+        UnitPrefs.resolveDistance(
+            system: UnitSystem(rawValue: unitSystemRaw) ?? .metric,
+            override: distanceSystemRaw)
+    }
 
     // Effort display scale (#268) — drives the effort hero's read-out. Display-only.
     @AppStorage(UnitPrefs.effortScaleKey) private var effortScaleRaw = EffortScale.hundred.rawValue
@@ -1000,7 +1004,7 @@ struct WorkoutsView: View {
                      caption: "kcal",
                      accent: StrandPalette.metricAmber)
             StatTile(label: "Total Distance",
-                     value: distancesM.isEmpty ? "–" : UnitFormatter.distanceFromKilometers(totalKmRaw, system: unitSystem),
+                     value: distancesM.isEmpty ? "–" : UnitFormatter.distanceFromKilometers(totalKmRaw, system: distanceUnitSystem),
                      caption: String(localized: "covered"),
                      accent: StrandPalette.metricCyan)
             StatTile(label: "Most Active",
@@ -1590,9 +1594,9 @@ struct WorkoutsView: View {
         .fixedSize()
     }
 
-    /// Right-click actions per row. A DETECTED bout can be re-labelled (becomes a real manual session
-    /// that survives re-detection) or dismissed (durably hidden). A MANUAL session can be edited or
-    /// deleted. Imported WHOOP / Apple rows are read-only (we never rewrite imported history).
+    /// Right-click actions per row. A grandfathered DETECTED bout can be re-labelled as a real manual
+    /// session or dismissed with its legacy marker retained. A MANUAL session can be edited or deleted.
+    /// Imported WHOOP / Apple rows are read-only (we never rewrite imported history).
     @ViewBuilder
     private func rowMenu(_ row: WorkoutRow) -> some View {
         switch WorkoutSource.classify(row.source) {
@@ -1763,12 +1767,9 @@ struct WorkoutsView: View {
 
     // The "jmm" skeleton respects the device's 12-/24-hour setting (#337): "4:34 PM" where 12-hour is
     // preferred, "16:34" where 24-hour is — instead of forcing 24-hour on everyone (matches TodayView).
-    private static let timeFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = AppLanguage.activeLocale
-        f.setLocalizedDateFormatFromTemplate("jmm")
-        return f
-    }()
+    /// #1821: routed through AppClock so the Clock format setting reaches this label. Was a `static
+    /// let`, which would have frozen the reader's choice at first use until the app relaunched.
+    private static var timeFmt: DateFormatter { AppClock.hourMinuteFormatter() }
 
     private func dateLabel(_ ts: Int) -> String {
         Self.dateFmt.string(from: Date(timeIntervalSince1970: TimeInterval(ts)))
@@ -1800,7 +1801,7 @@ struct WorkoutsView: View {
 
     private func distanceLabel(_ m: Double?) -> String {
         guard let m, m > 0 else { return "–" }
-        return UnitFormatter.distanceFromMeters(m, system: unitSystem)
+        return UnitFormatter.distanceFromMeters(m, system: distanceUnitSystem)
     }
 
     private func oneDecimal(_ v: Double) -> String { String(format: "%.1f", v) }

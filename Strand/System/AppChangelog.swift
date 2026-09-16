@@ -7,7 +7,7 @@ enum AppChangelog {
 
     /// Bump this when you add a release below. The "What's New" sheet shows automatically when the
     /// stored last-seen version is behind this. (Decoupled from the bundle version on purpose.)
-    static let currentVersion = "10.5.0"
+    static let currentVersion = "11.7.0"
 
     struct Release: Identifiable {
         let version: String
@@ -19,6 +19,99 @@ enum AppChangelog {
 
     /// Newest first.
     static let releases: [Release] = [
+        Release(
+            version: "11.7.0",
+            title: "A stress screen that keeps up, WHOOP 5 readings in the units the strap sends, and a ring that stops repeating itself",
+            date: "September 2026",
+            items: [
+                "**A stress screen that keeps up (#2191, #2194, #2202, #2116).** Scoring a day of samples no longer happens on the thread that is drawing the screen, so Today and Stress stay responsive while they load. The baseline is reduced a day at a time instead of holding a month of readings at once, and the unprompted rescore now yields to whatever you are doing rather than competing with it.",
+                "**A stress widget that fills on its own (#2186, #2121, #2177).** The home-screen curve refreshes without waiting for the app to be opened, retries a rescore that produced nothing instead of spending the whole interval on it, and the Today curve stays as fresh as the screen it links to.",
+                "**Stress readings that agree with each other (#2165, #2168, #2182, #2190, #2124).** The 0 to 3 level has one spelling across the widget and the card, and is no longer rounded a second time on the way to the widget. The screen draws its line from the same sliding read the number comes from, movement is drawn as the stretches it covers rather than dots on the axis, and an early morning no longer reports Calibrating when the day has simply not started yet.",
+                "**WHOOP 5 readings in the units the strap actually sends (#2195, #2192, #2196, #2197, thanks @Trillient).** R-R intervals from the standard heart-rate profile were being converted as though they were in the spec's units, leaving them 2.3% low and feeding that error into HRV. The console log's sequence byte was also being read as half of a counter it is not. Both are decoded correctly now, on both platforms.",
+                "**An Oura ring that stops repeating itself (#2100, #2146, #2147, #2153, #2155, #2170, thanks @pipiche38).** A replayed burst the ring's own clock disproves no longer resets the history cursor or announces a reboot that did not happen. A freshly offloaded night is scored immediately rather than at the next periodic tick, history is fetched every five minutes instead of fifteen, and the anchor check judges a ten second gap rather than only a thirty second one.",
+                "**Scores that survive a re-score (#2115, #2141, thanks @bhelm).** WHOOP 5 HRV and Recovery, and the vitals derived from R-R, are preserved across a re-score instead of being dropped by a pass that could not recompute them.",
+                "**Scan and connect where you can reach them (#2178, #2180).** Both sit on the Today header, and the scan control appears only while the strap is actually away rather than occupying the header permanently.",
+                "**Readings that say when they are at a limit (#2176, #2189, #2122, #2201).** A Fitness Age sitting at the end of its scale says so rather than looking like a measurement, and points at the number that still moves. On Sleep, a night already in hand silences the calculating banner, and browsing to a night with no stages no longer shows the most recent night's date beneath it.",
+                "**Diagnostics that name the cause (#2118, #2129, #2136, #2160, #2138).** A device with no R-R now says whether the beats were never banked or were refused by the unit policy, and the nightly HRV summary says why it reported nothing. A retired probe tells its reader which switch to turn on, a re-arm clears the refusal latch it could never reach before, and the sync chip surfaces the strap's backlog.",
+                "**Smaller corrections.** A tile value now shrinks to fit instead of truncating, which it was meant to do all along (#2203, #2204, thanks @kavemang). Illness baselines are trusted per signal on Android (#2157, thanks @kavemang), stress scoring is skipped without a widget to draw it (#2111), sleep session cache upserts are guarded (#2112), and the strain banner is gated on the baseline the score already uses (#2132).",
+            ]
+        ),
+        Release(
+            version: "11.6.0",
+            title: "A Today screen you arrange yourself, stress on the home screen, and backups that check themselves",
+            date: "September 2026",
+            items: [
+                "**Stress on your home screen (#2044, #2045).** A widget showing today's stress curve, on both platforms. It fills without needing the app opened, and when it has nothing to draw it says why instead of sitting blank (#2074).",
+                "**A Today screen you arrange yourself (#2047, #2051, #2053, #2054).** Today's stress curve and the Trends charts can now be placed on Today as cards, on both platforms. Tapping a hosted card opens the tab it came from rather than stranding you (#2052), and a hero ring on the classic Today opens its own detail (#2060).",
+                "**Charts that break where the strap did (#2064, #2083).** A heart-rate line no longer draws straight through hours the strap never recorded, on every surface that draws one. A gap now looks like a gap.",
+                "**WHOOP 5 readings corrected (#2046, #2042, #2056, thanks @Trillient).** R-R intervals are read in the units the strap actually sends, which feeds HRV. Skin temperature now reaches recovery scoring before the score is computed rather than after. Both platforms carry tests covering the gaps these came from.",
+                "**Backups that check themselves (#2086).** Every export path now verifies the file it actually wrote, so a truncated backup is caught when it is made instead of when you need it. When SQLite does complain, the message is shown in full and can be copied (#2084).",
+                "**A coach that holds on to your conversation (#2058, #2061).** A rejected API key can be corrected without losing the thread you were in. The coach is told what the workout was rather than only that one happened, the consent screen says what it actually sends (#2063), and the morning brief reaches the screen it was generated for (#2088).",
+                "**Diagnostics that say why, not just how many (#2080, #2094).** A night that missed the re-score cache now names the setting that dropped it. A dropped link is always recorded (#2065), the Live Console reads the device you actually selected (#2076), and the Rest card says why it is waiting on a sync (#2077).",
+                "**Your Oura serial stays out of the logs (#2095, #2090, thanks @pipiche38).** Serial numbers are masked in the Oura redactors on both platforms, and product-info replies no longer land in the raw diagnostics sidecar.",
+                "**Sharing a Test Centre report (#2096).** The Test Centre now hands you the bundle through the same share sheet the strap log uses, and stops there, instead of steering you into opening an issue.",
+                "**Smaller corrections.** Live heart rate stays armed while the Breathe screen is open (#2036, thanks @kiesstein). Workout actions stay readable over the daytime scene (#2050, thanks @kavemang). A silently dead duplicate string key is gone and the drifted Info.plist is regenerated (#2029, thanks @UtkuDenizAltiok). A manual workout can be entered by its start and end rather than only a duration (#2070), the strap picker seeds from the family actually recorded (#2067), and Today's heart-rate high and low read the samples rather than the mean curve (#2038).",
+            ]
+        ),
+        Release(
+            version: "11.5.0",
+            title: "A coach that keeps the thread, your heart rate on the home screen, and charts that claim less",
+            date: "September 2026",
+            items: [
+                "**A coach you can hold a conversation with (#1862, thanks @kggreco11).** Replies stream in as they are written rather than arriving in one lump, the conversation is kept between sessions, and it can speak and be spoken to. A morning brief sums up the night behind you. There are widgets and Siri shortcuts, and an optional Today launcher card that stays off until you turn it on.",
+                "**Your heart rate on the home screen (#1957).** A widget showing live bpm with the recent trace behind it, on both platforms, laid out by your launcher rather than fighting it.",
+                "**Charts that claim less (#2007, #2011, #2027, #2028).** Points are spaced by date, so a week you did not wear the strap takes the width it actually spans instead of closing up. Daily scores draw as bars, because a line between two days asserts the value travelled through everything in between and it did not. The Line and Bars setting now applies to the detail charts as well as Trends, and HRV and Resting HR carry a dashed rule at your own baseline, so a number means something without you having to remember what is normal for you.",
+                "**Skin temperature reads as a temperature (#1845, #622 thanks @bartmuskala, #111 thanks @whisp0).** The Health screen and the explorer now lead with the measured value, with a Settings choice if you prefer the difference from your baseline, and it applies across the whole window rather than only the newest night. A Fahrenheit import is converted on the way in instead of being filed as Celsius.",
+                "**Sleep that survives a broken night (#1937 thanks @bartmuskala, #1855 thanks @AussieFries).** A night chopped into fragments too short to count on their own is bridged into the night it was, instead of scoring as nothing. Drag across the filled hypnogram to read the clock time under your finger. A night measured from heart rate alone now reports the HRV it actually measured, and the night label counts from today rather than from the newest record you happen to hold.",
+                "**Steps that know when you were asleep (#1572).** The step count and the day boundary now follow your own sleep rather than midnight, so a late night stops splitting one day's activity across two.",
+                "**A wake time for each day of the week (#1859).** Set Saturday later than Tuesday. The per-day override drives the strap alarm and the backup notification, not just the phone.",
+                "**Re-scores that take a fraction of the time (#1538 thanks @justinjor-bit).** The steps calibration no longer re-reads sixty days of movement on every pass, and what it learns now survives a restart. On a worn library that phase went from roughly thirty-three seconds to under three.",
+                "**A strap log that reports instead of assuming (#1997 thanks @semoi, #1881 thanks @pipiche38).** A connection your phone is already holding is no longer read as the strap refusing to pair, the strap you selected is the one that gets connected and credited, and a bond that ends now says why in language that reads the same in every locale. Serial numbers are masked wherever a log can be shared.",
+                "**Russian, German that speaks to you as du, and smaller corrections.** Routes now import from Apple Health and Health Connect (#1205). The battery pack reports its own charge without overriding the strap gauge (#1935, thanks @Zebsi235). Body measurements and exercise distance carry separate unit preferences (#1913, thanks @kavemang), and the readings table prints each unit once (#1942, thanks @Geg0r).",
+            ]
+        ),
+        Release(
+            version: "11.1.0",
+            title: "Choose a 12-hour clock, sleep from straps that bank no motion, and a strap log that stops guessing",
+            date: "September 2026",
+            items: [
+                "**Pick the clock you read times in (#1821).** Settings → Appearance now offers System, 12-hour or 24-hour. It defaults to System, so nothing changes unless you ask — and System now means your phone's own 24-hour switch, which NOOP was previously ignoring in favour of your region's default. A reader in a 24-hour country who prefers 12-hour had no way to say so.",
+                "**Sleep from a strap that records no motion (#1801).** A WHOOP 5/MG that never pairs banks no movement data, and sleep detection is built on stillness — so those nights scored as nothing at all. NOOP can now find a night from heart rate alone and stage it. It is display-only by design: an HR-only night never feeds your resting heart rate or HRV baselines, because it has not earned that.",
+                "**A charged strap is no longer told to charge (#1818).** The 1970/71 clock warning offered one remedy regardless of battery, so people at 100% were sent round a loop they had already run. It now says something true for a strap that is already charged, and asks for the log that can actually explain it.",
+                "**The coach can see your sleep stages (#1816).** It was answering that it had no access to them, because deep, REM and light minutes were never in what it was given. They are now, along with sleep efficiency.",
+                "**Back up a database larger than NOOP would restore (#1807).** Export warns when an archive is past the 2 GiB restore ceiling instead of writing it silently, and a restore can be allowed through rather than refused outright.",
+                "**Home-screen widget corrections (#1795, thanks @Sneheth; #1799).** The heart-rate and HRV values sat under each other's icons on Apple. Both platforms' widgets now also read properly aloud, with the value spoken rather than the raw number.",
+                "**Live workout no longer stacks two timers (#1814), and the steps card stops asking for the half you already gave it (#1815).**",
+                "**A strap log that reports rather than assumes (#1809, thanks @supremesynergy; #1823).** Every disconnect now records how long the link held and whether the strap sent anything at all, and the clock exchange quotes what the strap actually answered. NOOP used to write \"clock synced\" the moment it queued the write, before any reply existed — so a log could insist the clock was set while the screen said 1970/71.",
+                "**Oura rings with no name, and Android's heart-rate logging (#1797, thanks @pipiche38; #1796, thanks @kvnloo).**",
+            ]
+        ),
+        Release(
+            version: "11.0.0",
+            title: "A WHOOP 5 that stays connected, your body clock on the Sleep screen, and a Journal that knows No from nothing",
+            date: "September 2026",
+            items: [
+                "**The WHOOP 5.0 and MG stop dropping every few seconds (#1635, thanks @Zebsi235).** A handshake the strap never answers was knocking a perfectly good link down about every five seconds, all day. NOOP now recognises a strap that will not complete that handshake, stops attempting it, and holds the link instead — live heart rate keeps streaming rather than restarting forever. Tapping Connect costs one reconnect now, not five.",
+                "**Your body clock, on the Sleep screen (#1722, #1723, #1729, #1733).** A 24-hour dial showing when your body actually wants to sleep, and a chronotype read from your own nights rather than a questionnaire. It says what it used and refuses to guess when it cannot see enough.",
+                "**Nights read straighter (#1717, #1734, #1741, #1755, #1782).** A night that only partly downloaded is no longer scored as if it were whole. Sleep that arrives in fragments is stitched back together when your heart rate says you stayed asleep through the gap. And sleep debt is now a number you can act on tonight.",
+                "**A day you never logged is not a day you answered No (#322).** Journal insights compared days you ticked against every other day — including the ones you simply did not open the app. They now compare Yes days against No days only, so an untracked week stops quietly counting against you.",
+                "**NOOP tells you when there is a new version (#1674, #1675).** Both platforms now notice a release and say so, on by default, checked directly against the release feed with nothing else sent.",
+                "**Health Connect asks for one category at a time (#1509, thanks @kavemang).** Recovery, Activity and Body composition are chosen before Android's prompt appears, so you grant what you meant to. Existing installs keep exactly what they already had.",
+            ]
+        ),
+        Release(
+            version: "10.6.0",
+            title: "An Effort scale you choose, a ring that gets to sleep, and far fewer wasted re-scores",
+            date: "August 2026",
+            items: [
+                "**Pick how Effort is scored (#1562, #1563).** Banister TRIMP is now wired end to end and selectable, so Effort can follow the method you trust rather than the one that happened to ship. A workout is also scored against the same HRmax as the day containing it (#1565).",
+                "**The phone stops re-scoring all night (#1557, #1559).** A background re-score that could not finish used to restart from the beginning, forever. It now runs where it can complete, and the diagnostics say which pass ran and why — so days that quietly refused to compute now compute.",
+                "**The Oura ring is allowed to sleep (#1526, #1550, thanks @pipiche38).** Live-HR daytime mode was being held open whenever nobody was looking at the app, blocking the ring's own overnight sleep suite. NOOP now hands the ring back out of daytime mode, on suspend and on teardown.",
+                "**Sleep reads straighter (#1551, #1552, thanks @bartmuskala).** The Classic view draws the night's heart-rate line, and the stage breakdown is ramp-aware with the redundant legend gone.",
+                "**Pause or discard a live workout, and SDNN on Android (#1533, #1535, thanks @bhelm).** Live workouts gain pause and discard controls, and the SDNN index that was iOS-only is now on both platforms.",
+                "**Your strap's device key stays out of the strap log (#1610).** A WHOOP 4.0 identity response carries the strap serial and its device key side by side; the log now reports the structure and withholds the key, so a log attached to an issue no longer publishes it.",
+            ]
+        ),
         Release(
             version: "10.5.0",
             title: "Training load, a VO₂max without a tape measure, and Apple Health write-back",

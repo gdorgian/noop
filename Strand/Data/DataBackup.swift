@@ -27,7 +27,12 @@ import ZIPFoundation
 /// security-scoped access on the panel-returned URLs. Every path is best-effort — failures surface
 /// as a `.failure` result and never crash.
 enum DataBackup {
-    private static let maxBackupSQLiteBytes: Int64 = 2_147_483_648
+    /// Uncompressed ceiling for the SQLite entry, enforced while EXTRACTING (see `extractBackupZip`).
+    /// Deliberately measured on the decompressed stream: this is a zip-bomb guard, and a zip bomb is by
+    /// definition small compressed and enormous expanded, so a cap on the archive's own size would be
+    /// trivially defeated. Compressing harder cannot help a user past it — the backup is already
+    /// `.deflate`d and the count is of bytes landing on disk. (#1807)
+    static let maxBackupSQLiteBytes: Int64 = 2_147_483_648
     private static let maxBackupSettingsBytes: Int64 = 1_048_576
 
     // MARK: - Result
@@ -35,11 +40,21 @@ enum DataBackup {
     enum BackupResult {
         /// Export wrote the backup to `url`.
         case exported(URL)
+        /// Export wrote the backup, but the database is larger than [maxBackupSQLiteBytes], the ceiling
+        /// the restore path enforces. The file is valid and worth keeping — restoring it just needs the
+        /// user to confirm once. Reported at EXPORT time because the alternative is finding out during a
+        /// restore, which is exactly when the original is gone. (#1807)
+        case exportedOversize(URL, bytes: Int64, limit: Int64)
         /// Import succeeded; a relaunch is required for it to take effect. `sidecar` is where the
         /// previous database was preserved, in case the user wants to roll back.
         case imported(sidecar: URL)
         /// The user dismissed the save/open panel — nothing happened, show nothing loud.
         case cancelled
+        /// The restore stopped ONLY because an entry exceeds the size ceiling. Distinct from `failure`
+        /// so the caller can offer to go ahead anyway: the cap is a decompression guard against a hostile
+        /// archive, and a backup the user just picked out of their own files is a different threat model
+        /// than the one it defends against. (#1807)
+        case restoreTooLarge(name: String, limit: Int64)
         /// Something went wrong; `message` is user-facing.
         case failure(String)
     }
@@ -94,7 +109,7 @@ enum DataBackup {
             try await Task.detached(priority: .utility) {
                 try writeVerifiedBackupZip(dbURL: dbURL, to: dest, settingsJSON: currentSettingsJSON())
             }.value
-            return .exported(dest)
+            return exportOutcome(dest, dbURL: dbURL)
         } catch {
             return .failure(String(localized: "Export failed: \(error.localizedDescription)"))
         }
@@ -113,7 +128,7 @@ enum DataBackup {
             return .failure(String(localized: "Export failed: \(error.localizedDescription)"))
         }
         guard let dest = await DocumentPicker.export(staged) else { return .cancelled }
-        return .exported(dest)
+        return exportOutcome(dest, dbURL: dbURL)
         #endif
     }
 
@@ -123,7 +138,7 @@ enum DataBackup {
     private struct ExportIntegrityFailure: LocalizedError {
         let complaint: String
         var errorDescription: String? {
-            String(localized: "the NOOP database failed its integrity check (SQLite reports: \(complaint)). A backup of it would not restore. Export the WHOOP-format CSV (Settings → Export data) to save what's still readable.")
+            String(localized: "the NOOP database failed its integrity check (SQLite reports: \(DatabaseIntegrity.readableComplaint(complaint))). A backup of it would not restore. Export the WHOOP-format CSV (Settings → Export data) to save what's still readable.")
         }
     }
 
@@ -137,6 +152,14 @@ enum DataBackup {
         }
     }
 
+    /// Thrown when the written backup could not be READ BACK to check it, which is not the same thing as
+    /// finding it damaged and must not be reported as though it were. The file is left where it is.
+    private struct BackupWriteUnverified: LocalizedError {
+        var errorDescription: String? {
+            String(localized: "the backup file was written, but couldn't be read back to check it, so it has been left in place rather than deleted. Open it before you rely on it, or export again somewhere else.")
+        }
+    }
+
     /// The production export path: verify, then archive. GRDB checkpoints the WAL first (the
     /// callers' `checkpoint()` guard), so at this point the single file IS the whole store — run a
     /// read-only `PRAGMA quick_check` over it BEFORE zipping (#1014). Archiving an already-corrupt
@@ -144,23 +167,77 @@ enum DataBackup {
     /// when the original data may be long gone; failing loudly NOW is the honest move. The read-only
     /// probe sits safely beside the app's open GRDB pool (WAL allows concurrent readers).
     /// `writeBackupForTesting` deliberately bypasses this so tests can build damaged containers.
+    /// `.exported`, or `.exportedOversize` when the database is past the ceiling the restore path
+    /// enforces. Measured on the DATABASE, not the finished archive: the archive is `.deflate`d and the
+    /// cap the restore checks counts the DECOMPRESSED stream, so the zip's own size says nothing about
+    /// whether it can be read back. (#1807)
+    private static func exportOutcome(_ dest: URL, dbURL: URL) -> BackupResult {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: dbURL.path)
+        guard let bytes = (attrs?[.size] as? NSNumber)?.int64Value,
+              bytes > maxBackupSQLiteBytes else { return .exported(dest) }
+        return .exportedOversize(dest, bytes: bytes, limit: maxBackupSQLiteBytes)
+    }
+
+    /// The smallest a real database entry can be: SQLite's own file header is exactly this long, so
+    /// anything shorter cannot be a database whatever else it looks like.
+    static let minimumBackupEntryBytes: UInt32 = 100
+
+    /// Whether the `.noopbak` at `url` is a COMPLETE archive carrying a plausible database entry.
+    ///
+    /// #1014 (write-side): the SOURCE is verified before archiving, but the PRODUCED file can still be
+    /// torn by a full disk, a dying filesystem, or a cloud client that drops the tail mid-write, and such
+    /// a truncated `.noopbak` otherwise "restores" into an empty store, caught only by the import-side
+    /// quick_check much later, when the original may be long gone.
+    ///
+    /// Opening an `Archive` for reading parses the CENTRAL DIRECTORY, which lives at the end of a ZIP, so
+    /// a file cut short does not open at all. That is cheap (an index read, no extraction) and is what
+    /// makes this catch truncation rather than merely mis-content.
+    ///
+    /// Extracted from `writeVerifiedBackupZip` so it can be driven against hand-built archives: this
+    /// guard has protected every export since #1014 and, until now, had no test of its own. The Android
+    /// twin is `DataBackup.hasEndOfCentralDirectory` plus `backupStreamIsIntact`, which has to find the
+    /// end record itself because `ZipInputStream` never looks for one.
+    /// What a post-write check concluded about the file just produced.
+    ///
+    /// `unverifiable` exists so that failing to READ a backup is never mistaken for evidence against it.
+    /// The caller DELETES a `torn` file, and deleting on "we could not look" would let a transient read
+    /// failure destroy a backup that was perfectly good. Twin of the Android `BackupWriteVerdict`.
+    enum BackupWriteVerdict: Equatable { case intact, torn, unverifiable }
+
+    /// Re-read the `.noopbak` just written to `url` and say what it looks like.
+    ///
+    /// Unreadable is its own answer rather than a bad one: it says nothing about the CONTENT, and the
+    /// caller's response to `torn` is destructive. Past that gate a file that will not open as an
+    /// archive really is torn, because opening one only reads the central directory a complete ZIP has.
+    static func verifyWrittenBackup(at url: URL) -> BackupWriteVerdict {
+        guard FileManager.default.isReadableFile(atPath: url.path) else { return .unverifiable }
+        guard let written = try? Archive(url: url, accessMode: .read),
+              let dbEntry = written.first(where: { ($0.path as NSString).lastPathComponent == backupEntryName }),
+              dbEntry.uncompressedSize >= minimumBackupEntryBytes else { return .torn }
+        return .intact
+    }
+
+    /// Convenience over `verifyWrittenBackup(at:)` for callers that only care whether it passed.
+    static func writtenBackupIsIntact(at url: URL) -> Bool {
+        verifyWrittenBackup(at: url) == .intact
+    }
+
     private static func writeVerifiedBackupZip(dbURL: URL, to dest: URL, settingsJSON: Data?) throws {
         if let complaint = DatabaseIntegrity.quickCheckFailure(atPath: dbURL.path) {
             throw ExportIntegrityFailure(complaint: complaint)
         }
         try writeBackupZip(dbURL: dbURL, to: dest, settingsJSON: settingsJSON, manifestJSON: currentManifestJSON())
-        // #1014 (write-side): the SOURCE is verified above, but the PRODUCED file can still be torn by a
-        // full disk / dying filesystem / flaky cloud-sync mid-write, and such a truncated `.noopbak`
-        // otherwise "restores" into an empty store — caught only by the import-side quick_check much later.
-        // Re-open the file we just wrote (a cheap central-directory read, no extraction — and a torn file
-        // has no valid trailing central directory, so it won't even open) and confirm its DB entry is
-        // present and non-empty (a SQLite header alone is 100 bytes). Fail HERE if not, and don't leave a
-        // corrupt file behind masquerading as a good snapshot. Twin of the Android post-write check.
-        guard let written = try? Archive(url: dest, accessMode: .read),
-              let dbEntry = written.first(where: { ($0.path as NSString).lastPathComponent == backupEntryName }),
-              dbEntry.uncompressedSize >= 100 else {
+        switch verifyWrittenBackup(at: dest) {
+        case .intact:
+            break
+        case .torn:
+            // Never leave a corrupt file behind masquerading as a good snapshot.
             try? FileManager.default.removeItem(at: dest)
             throw BackupWriteIncomplete()
+        case .unverifiable:
+            // Failing to READ it back is not evidence against it, so it is LEFT IN PLACE. Deleting here
+            // would let a transient read failure destroy a backup that was perfectly good.
+            throw BackupWriteUnverified()
         }
     }
 
@@ -246,7 +323,7 @@ enum DataBackup {
             let fm = FileManager.default
             if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
             try writeVerifiedBackupZip(dbURL: dbURL, to: dest, settingsJSON: currentSettingsJSON())
-            return .exported(dest)
+            return exportOutcome(dest, dbURL: dbURL)
         } catch {
             return .failure(String(localized: "Backup failed: \(error.localizedDescription)"))
         }
@@ -273,7 +350,7 @@ enum DataBackup {
     /// siblings). The store stays open, so the swapped-in file only takes effect after a relaunch —
     /// the caller informs the user.
     @MainActor
-    static func runImport() async -> BackupResult {
+    static func runImport(allowOversize: Bool = false) async -> BackupResult {
         let dbPath: String
         do { dbPath = try StorePaths.defaultDatabasePath() }
         catch { return .failure(String(localized: "Couldn't locate the NOOP database. \(error.localizedDescription)")) }
@@ -305,7 +382,7 @@ enum DataBackup {
         // stays valid because the surrounding function is still awaiting here. Only Sendable value
         // types (URL, String) cross the hop; the result hops back to main for handleBackup.
         return await Task.detached(priority: .utility) {
-            restore(from: pickedSource, toDatabaseAt: dbPath)
+            restore(from: pickedSource, toDatabaseAt: dbPath, allowOversize: allowOversize)
         }.value
     }
 
@@ -330,7 +407,8 @@ enum DataBackup {
     /// `settingsDefaults` is where a `settings.json` entry (#1000) is re-applied — injected for the
     /// same reason as `dbPath` (tests use a suite-scoped UserDefaults, never the runner's real domain).
     static func restore(from pickedSource: URL, toDatabaseAt dbPath: String,
-                        settingsDefaults: UserDefaults = .standard) -> BackupResult {
+                        settingsDefaults: UserDefaults = .standard,
+                        allowOversize: Bool = false) -> BackupResult {
         // If the picked file is a .noopbak ZIP, extract the SQLite entry to a temp dir first.
         // Legacy plain-SQLite files fall straight through. The extracted dir is cleaned up below.
         let fm = FileManager.default
@@ -343,7 +421,15 @@ enum DataBackup {
             do {
                 if fm.fileExists(atPath: tmpExtract.path) { try fm.removeItem(at: tmpExtract) }
                 try fm.createDirectory(at: tmpExtract, withIntermediateDirectories: true)
-                try extractBackupZip(at: pickedSource, into: tmpExtract)
+                try extractBackupZip(at: pickedSource, into: tmpExtract, allowOversize: allowOversize)
+            } catch let err as BackupArchiveError {
+                try? fm.removeItem(at: tmpExtract)
+                // Reported as its own case, not a generic failure: this one is RECOVERABLE, and the caller
+                // is the only layer that can ask the user whether to go ahead. (#1807)
+                switch err {
+                case .entryTooLarge(let name):
+                    return .restoreTooLarge(name: name, limit: maxBackupSQLiteBytes)
+                }
             } catch {
                 try? fm.removeItem(at: tmpExtract)
                 return .failure(String(localized: "Couldn't open the backup archive: \(error.localizedDescription)"))
@@ -394,7 +480,7 @@ enum DataBackup {
             && (fm.fileExists(atPath: source.path + "-wal") || fm.fileExists(atPath: source.path + "-shm"))
         if !legacySidecarsPresent,
            let complaint = DatabaseIntegrity.quickCheckFailure(atPath: source.path) {
-            return .failure(String(localized: "This backup file is damaged and can't be restored (SQLite reports: \(complaint)). Your current data was left untouched. Try an earlier backup file."))
+            return .failure(String(localized: "This backup file is damaged and can't be restored (SQLite reports: \(DatabaseIntegrity.readableComplaint(complaint))). Your current data was left untouched. Try an earlier backup file."))
         }
 
         let dbURL = URL(fileURLWithPath: dbPath)
@@ -444,11 +530,11 @@ enum DataBackup {
                 removeIfPresent(dbURL)
                 if sidecar != dbURL, fm.fileExists(atPath: sidecar.path) {
                     try? fm.copyItem(at: sidecar, to: dbURL)
-                    return .failure(String(localized: "Import failed its post-restore integrity check (SQLite reports: \(complaint)). Your previous data was rolled back automatically and is unchanged."))
+                    return .failure(String(localized: "Import failed its post-restore integrity check (SQLite reports: \(DatabaseIntegrity.readableComplaint(complaint))). Your previous data was rolled back automatically and is unchanged."))
                 }
                 // Fresh install: there was no previous store to preserve, so removing the damaged
                 // file (done above) restores the exact pre-import state — an empty slate.
-                return .failure(String(localized: "Import failed its post-restore integrity check (SQLite reports: \(complaint)). The damaged file was removed; there was no previous data to roll back."))
+                return .failure(String(localized: "Import failed its post-restore integrity check (SQLite reports: \(DatabaseIntegrity.readableComplaint(complaint))). The damaged file was removed; there was no previous data to roll back."))
             }
 
             // Restore sidecars only for legacy plain-SQLite backups whose WAL wasn't
@@ -591,14 +677,15 @@ enum DataBackup {
     /// Extract only the canonical entries from a `.noopbak` ZIP at `zipURL` into `destDir`.
     /// Unknown files are ignored, and each accepted entry is streamed through an uncompressed-size cap
     /// before it lands on disk.
-    private static func extractBackupZip(at zipURL: URL, into destDir: URL) throws {
+    private static func extractBackupZip(at zipURL: URL, into destDir: URL,
+                                         allowOversize: Bool = false) throws {
         let archive = try Archive(url: zipURL, accessMode: .read)
         for entry in archive where entry.type == .file {
             let name = (entry.path as NSString).lastPathComponent
             let limit: Int64
             switch name {
             case backupEntryName:
-                limit = maxBackupSQLiteBytes
+                limit = allowOversize ? Int64.max : maxBackupSQLiteBytes
             case BackupSettings.entryName:
                 limit = maxBackupSettingsBytes
             default:

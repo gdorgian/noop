@@ -78,15 +78,31 @@ public func isPlausibleHistoricalUnix(_ ts: Int, wallNow: Int,
 /// archive they are lost forever while the UI reports a clean sync (#77 / #91).
 ///
 /// Console (type-50, `frame[typeIndex] == 0x32`) frames are strap-side debug-log text that decode to
-/// zero rows BY DESIGN and are never returned. 5/MG v26 (raw PPG block, hist_version 26) is also
-/// skipped unconditionally (even on a CRC failure): a v26 record's payload is the optical waveform,
-/// which `extractHistoricalStreams` now persists durably in its OWN stream (`Streams.ppgWaveform` /
-/// WhoopStore's `ppgWaveformSample` table, issue #156 follow-up) whenever it decodes — this reject
-/// archive exists for genuinely-undecodable records, and a decoded v26 record was never one of those.
+/// zero rows BY DESIGN and are never returned. 5/MG v26 (raw PPG block, hist_version 26) is skipped
+/// only while it is INTACT: a v26 record's payload is the optical waveform, which
+/// `extractHistoricalStreams` persists durably in its OWN stream (`Streams.ppgWaveform` / WhoopStore's
+/// `ppgWaveformSample` table, issue #156 follow-up) — but only for a record it accepts. Since the
+/// integrity gate, a v26 record with a broken envelope is dropped by that extraction too, so skipping
+/// it here on the version byte alone would leave it stored nowhere while its section is acked anyway.
 /// Only genuine type-47 record frames whose payload would otherwise be silently dropped are returned.
 ///
 /// Used by the Backfiller/BLEManager to archive undecodable history BEFORE acking the trim. Mirrors
 /// the Android rejectedHistoricalRecords so one mapping toolchain re-ingests both archives.
+///
+/// EVIDENCE-PRESERVING READER (D8) — its verdict runs the OTHER WAY ROUND, and the difference is
+/// load-bearing. Everywhere else a negative integrity verdict means "do not act on this frame". Here it
+/// means "this frame must be archived", because the strap is about to free it and this archive is the
+/// only durable copy that will exist. Turning this into "act only on a positive verdict", the way the
+/// state-driving gates were turned, would delete exactly the frames it exists to keep.
+///
+/// So the stricter verdict makes the archived set LARGER, never smaller: every frame archived before is
+/// archived still, plus the classes the envelope check now rejects (a wrong header checksum, a declared
+/// length below the family minimum, a truncated frame, trailing bytes). The one way a frame can be lost
+/// relative to before is upstream of here: the reassembler drops a byte run whose declared total is
+/// below the family minimum, so it never reaches any parser. That drop is counted
+/// (`Reassembler.belowMinimumLengthDrops`, folded into `FrameRejectTally`) precisely so it stays visible.
+///
+/// Accepted side effect: on a noisy link the raw archives grow. The existing eviction rule bounds that.
 public func rejectedHistoricalRecords(_ rawFrames: [[UInt8]], family: DeviceFamily) -> [[UInt8]] {
     // The type byte sits at the inner-record start: frame[4] on WHOOP 4.0, frame[8] on WHOOP 5/MG
     // (the puffin envelope is 4 bytes longer). hist_version sits one byte past the type+seq+cmd
@@ -97,7 +113,14 @@ public func rejectedHistoricalRecords(_ rawFrames: [[UInt8]], family: DeviceFami
         // Only genuine HISTORICAL_DATA records (47). Console (50) and METADATA frames have a
         // different type byte, so they never pass this gate — they are excluded by construction.
         guard f.count > typeIndex, Int(f[typeIndex]) == 47 else { return false }
-        if family == .whoop5, f.count > versionIndex, Int(f[versionIndex]) == 26 { return false }  // v26 PPG: has its own durable stream (ppgWaveform), not this reject archive
+        // v26 PPG: skipped BECAUSE `extractHistoricalStreams` stores it durably in its own waveform
+        // stream (ppgWaveform) — so the skip holds only while that premise does. A REJECTED v26 record
+        // is dropped by the extraction like any other, which leaves it stored nowhere while the section
+        // is acked anyway. Bind the skip to the verdict, not to the version byte alone.
+        if family == .whoop5, f.count > versionIndex, Int(f[versionIndex]) == 26 {
+            let p = parseFrame(f, family: family)
+            return !(p.ok && p.crcOK != false)
+        }
         // UNMAPPED LAYOUT (5/MG) — archive UNCONDITIONALLY, whatever it decoded.
         //
         // The decode-outcome test below is the wrong question for a layout NOOP has no field map for.
@@ -113,7 +136,11 @@ public func rejectedHistoricalRecords(_ rawFrames: [[UInt8]], family: DeviceFami
         // banks empty placeholder records at 1 Hz cannot push out the one informative frame either.
         if family == .whoop5, isUnmappedWhoop5HistoricalRecord(f) { return true }
         let p = parseFrame(f, family: family)
-        // Envelope/CRC reject: parse failed outright or the CRC32 trailer mismatched.
+        // NOT INTACT → ARCHIVE. Reading the verdict this way round is the whole point of this reader
+        // (D8): the frame cannot be turned into rows, so its bytes are the only thing left to keep.
+        // With the verdict widened to cover the header checksum and the structural length, this branch
+        // catches strictly MORE frames than it did before — which is the intended direction. The
+        // `crcOK` half stays for exactly that reason: every condition here can only add to the archive.
         if !p.ok || p.crcOK == false { return true }
         // Unmapped layout: the envelope parsed but no usable biometrics decoded. A record is genuinely
         // undecodable only if it has no timestamp, or NEITHER heart rate NOR motion. v25 (issue #30)
@@ -242,6 +269,11 @@ public func extractHistoricalStreams(_ parsed: [ParsedFrame],
     // #891: packet types that reach `default:` and are dropped. See `Streams.unhandledPacketTypes`.
     var unhandledTypes: [String: Int] = [:]
     for r in parsed {
+        // `ok` is now the FULL verdict — header checksum, payload CRC32 and structural length — so it
+        // alone rejects everything the two-part check used to. The `crcOK` half is kept because this
+        // function takes parse results from its CALLER, and a `ParsedFrame` decoded from a capture file
+        // written before the verdict widened carries the old constant `ok: true` beside a false `crcOK`.
+        // Dropping it would start deriving rows from those.
         if !r.ok || r.crcOK == false { continue }
         let p = r.parsed
         switch r.typeName {
@@ -257,15 +289,16 @@ public func extractHistoricalStreams(_ parsed: [ParsedFrame],
             // heart_rate/spo2/gravity, so it adds nothing to the branches below — handled here only.
             if let samples = p["ppg_waveform"]?.intArrayValue, !samples.isEmpty {
                 ppgRecords.append((ts: ts, samples: samples))
-                out.ppgWaveform.append(PpgWaveformSample(ts: ts, samples: samples))
+                out.ppgWaveform.append(PpgWaveformSample(ts: ts, samples: samples,
+                                                         burstIndex: p["burst_index"]?.intValue,
+                                                         baseCode: p["ppg_base_code"]?.intValue))
             }
             if let bpm = p["heart_rate"]?.intValue, bpm != 0 {  // skip startup hr=0
                 out.hr.append(HRSample(ts: ts, bpm: bpm))
             }
             if let rrs = p["rr_intervals"]?.intArrayValue {
-                for rr in rrs {
-                    out.rr.append(RRInterval(ts: ts, rrMs: rr, srcChannel: .whoopHistorical))
-                }
+                let source = p["rr_source_channel"]?.intValue.flatMap(RRSourceChannel.init(rawValue:))
+                for rr in rrs { out.rr.append(RRInterval(ts: ts, rrMs: rr, srcChannel: source)) }
             }
             if let red = p["spo2_red"]?.intValue {
                 out.spo2.append(SpO2Sample(ts: ts, red: red, ir: p["spo2_ir"]?.intValue ?? 0))
@@ -389,9 +422,7 @@ public func extractHistoricalStreams(_ parsed: [ParsedFrame],
                 out.hr.append(HRSample(ts: ts, bpm: bpm))
             }
             if let ts = rtTs, let rrs = p["rr_intervals"]?.intArrayValue {
-                for rr in rrs {
-                    out.rr.append(RRInterval(ts: ts, rrMs: rr, srcChannel: .whoopHistorical))
-                }
+                for rr in rrs { out.rr.append(RRInterval(ts: ts, rrMs: rr)) }
             }
         case "EVENT":
             // EVENT carries the strap RTC's real-unix seconds. Correct for a grossly-stale RTC
@@ -435,4 +466,67 @@ public func extractHistoricalStreams(_ parsed: [ParsedFrame],
     out.droppedImplausibleOldestTs = droppedOldest   // #324 poisoned-range epoch span (diag only)
     out.droppedImplausibleNewestTs = droppedNewest
     return out
+}
+
+/// Reconstruct a WHOOP 5/MG v26 optical window from its stored parts. #2019.
+///
+/// The strap sends a 25-sample window as one absolute ADC code plus 24 deltas, so this is the only way to
+/// get back the signal the strap measured: `sample[0] = baseCode`, `sample[i+1] = sample[i] + delta[i]`.
+/// NOOP stores the two as they arrive rather than folding them together, because the delta blob is
+/// little-endian i16 and a real code (about 378,000 on the captured fixture) does not fit in one.
+///
+/// nil when `baseCode` is nil, which is the honest answer for a row written before the base was read: a
+/// delta series cannot be inverted without its starting point, and returning the deltas, or a window
+/// built from a fabricated zero, would present a signal nobody measured.
+///
+/// CAVEAT: the deltas are SATURATED, clamped at the i16 bounds by the encoder, so a window containing a
+/// clamped delta reconstructs only approximately. Nothing here can detect that after the fact; a delta at
+/// exactly ±32,768 is the signal to distrust, and the captured fixture's largest magnitude is 1,833.
+///
+/// Mirror EXACTLY in Kotlin (`ppgWaveformAbsolute`).
+public func ppgWaveformAbsolute(baseCode: Int?, deltas: [Int]) -> [Int]? {
+    guard let baseCode else { return nil }
+    var out: [Int] = [baseCode]
+    out.reserveCapacity(deltas.count + 1)
+    var acc = baseCode
+    for d in deltas {
+        acc += d
+        out.append(acc)
+    }
+    return out
+}
+
+/// A delta at either i16 rail: the encoder clamped it, so the window reconstructs only approximately.
+public func isSaturatedPpgDelta(_ delta: Int) -> Bool {
+    delta == Int(Int16.min) || delta == Int(Int16.max)
+}
+
+/// The per-session v26 optical census, or nil when the session carried no v26 windows (a 4.0, or a 5/MG
+/// that banked none) so a log with nothing to say stays quiet. #2019.
+///
+/// Three things a strap log could not previously answer, all of which decide whether the banked windows
+/// are usable for the channel-mapping work this stream exists for:
+///
+/// - how many windows arrived at all;
+/// - how many carried the absolute base. A window without one cannot be reconstructed, ever. On a
+///   well-formed record the base is always readable, so `withBase` below the window count means
+///   TRUNCATED records or a firmware that does not carry it at frame-abs 23, and either is worth knowing
+///   rather than silently banking un-reconstructable windows;
+/// - how many windows hold a SATURATED delta. Those reconstruct only approximately, and the caveat is
+///   worthless without a way to see whether it ever fires.
+///
+/// The base range is carried because it is the DC level over the session, which is the quantity the whole
+/// stream is banked for and the one that used to be discarded entirely.
+///
+/// Mirror EXACTLY in Kotlin (`ppgWaveformCensusLine`).
+public func ppgWaveformCensusLine(windows: Int, withBase: Int, saturatedWindows: Int,
+                                  baseMin: Int?, baseMax: Int?) -> String? {
+    guard windows > 0 else { return nil }
+    let range: String = {
+        guard let baseMin, let baseMax else { return " base n/a" }
+        return " base \(baseMin)..\(baseMax)"
+    }()
+    let note = saturatedWindows > 0 ? " (a saturated window reconstructs only approximately)" : ""
+    return "Backfill: v26 optical census: \(windows) window(s), \(withBase) with a base, "
+        + "\(saturatedWindows) saturated,\(range)\(note)"
 }

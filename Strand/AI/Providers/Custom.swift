@@ -1,4 +1,5 @@
 import Foundation
+import StrandAnalytics
 
 /// A generic OpenAI-compatible provider pointed at a user-set base URL — e.g. a local LLM server such
 /// as Ollama, LM Studio or llama.cpp (`http://localhost:11434/v1`), or any self-hosted gateway. Speaks
@@ -31,23 +32,53 @@ struct CustomClient: AIProviderClient {
         }
     }
 
-    /// Appended to a reply the server stopped early, so a cutoff is never silent.
+    /// K1: Stream via `stream: true` (most local OpenAI-compatible servers support it). Same body
+    /// as `send`'s standard-params path, with `stream: true`. SSE parsing via `SseDeltas.openAiDelta`.
+    /// The modern-params retry on 400 is NOT streamed (rare path; falls back to `send`'s retry).
+    func stream(
+        key: String,
+        model: String,
+        systemPrompt: String,
+        messages: [(role: ChatMessage.Role, content: String)],
+        session: URLSession,
+        onDelta: (String) -> Void
+    ) async throws {
+        try AIProvider.guardCustomBaseURL()   // #321: reject a public cleartext Custom URL before egress
+        var wire: [[String: Any]] = [["role": "system", "content": systemPrompt]]
+        for m in messages { wire.append(["role": m.role.rawValue, "content": m.content]) }
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": wire,
+            "temperature": 0.6,
+            "max_tokens": 4096,
+            "stream": true
+        ]
+
+        var req = URLRequest(url: AIProvider.custom.endpoint)
+        req.httpMethod = "POST"
+        AIProvider.applyCustomAuthHeader(key, to: &req)
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        try await performStreamingRequest(req, session: session) { payload in
+            if let delta = SseDeltas.openAiDelta(payload) {
+                onDelta(delta)
+            }
+        }
+    }
+
+    /// Appended to a reply when the server stopped early because it ran out of context window.
+    /// Local OpenAI-compatible servers (notably Ollama, which defaults to a 2048-token window and
+    /// IGNORES `num_ctx` on the `/v1` endpoint) truncate silently — no error, the text just stops
+    /// mid-sentence. We can't raise the window over the OpenAI wire format, so we make the cutoff
+    /// visible and tell the user exactly how to fix it.
+    /// The cut-off note, keyed on whether the server is actually local.
     ///
-    /// `finish_reason: "length"` says only that *a* length limit was reached — never which one — so this
-    /// must not claim to know. In practice there are two very different causes, and the useful advice
-    /// depends entirely on where the server is:
-    ///
-    /// - **Local** (Ollama and friends): the context window, which defaults to a mere 2048 tokens and is
-    ///   IGNORED when set via `num_ctx` on the `/v1` endpoint, so the text just stops mid-sentence. We
-    ///   can't raise it over the OpenAI wire format; the user has to.
-    /// - **Hosted gateway** (OpenRouter et al): almost always the *output* cap — our own `max_tokens`, or
-    ///   the model's own `max_completion_tokens` — since hosted context windows are typically huge.
-    ///
-    /// Hence the split: Ollama instructions are noise to someone pointed at a gateway, and worse, they
-    /// name a cause that isn't theirs. (#1074 upstream collapsed this to one provider-agnostic message
-    /// for the same reason — a DeepSeek-via-gateway user was shown Ollama advice — but this fork already
-    /// keyed the message on `isLocalServer` instead, so a genuinely local server still gets the actionable
-    /// `num_ctx` fix rather than losing it.)
+    /// Upstream #1074 collapsed this to one provider-agnostic message because a DeepSeek-via-gateway user
+    /// was shown Ollama advice that named a cause that was not theirs. This fork fixes the same bug the
+    /// other way: it keys the message on `isLocalServer`, so a genuinely local server still gets the
+    /// actionable `num_ctx` instruction instead of losing it, and a hosted one never sees it.
     static func truncationNote(isLocalServer: Bool) -> String {
         let head = "\n\n---\n*Reply cut off: the model stopped at a length limit. "
         if isLocalServer {
@@ -60,17 +91,17 @@ struct CustomClient: AIProviderClient {
     }
 
     /// Whether the Custom base URL points at this machine or its own LAN — the only case where the
-    /// Ollama advice above applies. Reuses the same classifier as the #321 cleartext guard, so "local"
-    /// means exactly one thing across this file.
+    /// Ollama advice above applies. Reuses the same classifier as the cleartext guard, so "local" means
+    /// exactly one thing across this file.
     static var isLocalCustomServer: Bool {
         guard let host = URLComponents(string: AIProvider.customBaseURL)?.host else { return false }
         return AIProvider.isPrivateLANOrLoopback(host)
     }
 
-    /// Pure: unwrap an OpenAI-compatible chat-completions body into the assistant text, appending the
-    /// truncation note when the server stopped early (`finish_reason == "length"`). `isLocalServer` is
-    /// passed in rather than read from UserDefaults so this stays pure. No network — unit-tested.
-    func parseChatContent(_ json: [String: Any], isLocalServer: Bool) throws -> String {
+    /// Pure: unwrap an OpenAI-compatible chat-completions body into the assistant text. Appends
+    /// `truncationNote` when the server stopped early (`finish_reason == "length"`) so a context-
+    /// window cutoff is never silent. No network — unit-tested.
+    func parseChatContent(_ json: [String: Any]) throws -> String {
         guard let choices = json["choices"] as? [[String: Any]],
               let first = choices.first,
               let message = first["message"] as? [String: Any],
@@ -79,7 +110,7 @@ struct CustomClient: AIProviderClient {
             throw emptyReplyError(json)   // #1074: surface the provider's real error if the 200 body has one
         }
         if (first["finish_reason"] as? String)?.lowercased() == "length" {
-            return content + Self.truncationNote(isLocalServer: isLocalServer)
+            return content + Self.truncationNote(isLocalServer: Self.isLocalCustomServer)
         }
         return content
     }
@@ -130,10 +161,10 @@ struct CustomClient: AIProviderClient {
         // #1074: 900 truncated detailed coaching replies mid-sentence on cloud providers; 4096 lets a
         // full multi-section reply complete (a cap, not a target). Matches the Gemini leg + Android.
         if modernParams {
-            body["max_completion_tokens"] = CoachOutputBudget.maxTokens
+            body["max_completion_tokens"] = 4096
         } else {
             body["temperature"] = 0.6
-            body["max_tokens"] = CoachOutputBudget.maxTokens
+            body["max_tokens"] = 4096
         }
 
         var req = URLRequest(url: AIProvider.custom.endpoint)
@@ -143,6 +174,6 @@ struct CustomClient: AIProviderClient {
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let json = try await performRequest(req, session: session)
-        return try parseChatContent(json, isLocalServer: Self.isLocalCustomServer)
+        return try parseChatContent(json)
     }
 }

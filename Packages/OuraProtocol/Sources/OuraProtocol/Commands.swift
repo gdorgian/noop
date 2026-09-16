@@ -20,9 +20,21 @@ public enum OuraCommands {
     public static let featureDaytimeHR: UInt8 = 0x02
     // The SpO2 feature id. Per OURA_PROTOCOL.md s7.1.
     public static let featureSpO2: UInt8 = 0x04
-    // The real-steps feature id. Server-flag-gated (activity/real_steps, default off), so it is never
-    // emitted for an offline NOOP-only ring. Per OURA_PROTOCOL.md s7.1 / s7.3 [open_oura-feat].
+    // The real-steps feature id (`activity/real_steps`). Nominally server-flag-gated per
+    // OURA_PROTOCOL.md s7.1/s7.3 [open_oura-feat], but on-device 2026-08-25 real-steps status reads
+    // came back enabled (status=1) from BOTH an authenticated Oura-app session and NOOP's own fully
+    // offline, unauthenticated read of the same ring — the gate is ring-side state, not tied to which
+    // client asks or whether that client is cloud-authenticated. Do not assume "off for NOOP" without
+    // checking a live read.
     public static let featureRealSteps: UInt8 = 0x0B
+    // The exercise-HR (AWHR) feature id — data arrives as `0x73`/`0x74`. Server-flag-gated per
+    // OURA_PROTOCOL.md s7.1 [ring4-ble]. Per s7.5, open_oura reports this one respects a local
+    // `setFeatureMode` write on a consumer ring.
+    public static let featureExerciseHR: UInt8 = 0x03
+    // The CVA PPG sampler feature id — feeds `0x81` raw PPG. Server-flag-gated per OURA_PROTOCOL.md
+    // s7.1 [ring4-ble]. Per s7.5, open_oura reports this one respects a local `setFeatureMode` write
+    // on a consumer ring.
+    public static let featureCvaPpg: UInt8 = 0x0D
 
     // MARK: - Pre-auth / identity (unauthenticated OK)
 
@@ -115,10 +127,27 @@ public enum OuraCommands {
         OuraCommand(label: "dhr_subscribe", bytes: [0x2F, 0x03, 0x26, featureDaytimeHR, 0x02])
     }
 
-    /// Disable live HR: `2f 03 22 02 01`. ACK: `2f 03 23 02 00`; stream stops on ACK.
-    /// Per OURA_PROTOCOL.md s5.6.
+    /// Disable live HR: `2f 03 22 02 00`. ACK: `2f 03 23 02 00`.
+    /// Mode byte is **0x00** ("off" per OURA_PROTOCOL.md s7.2's APK-sourced table), not 0x01
+    /// ("automatic") — an earlier build wrote 0x01 here on the mistaken belief it meant "off"; s7.4's
+    /// own worked example shows mode=1 read back while daytime-HR is actively streaming, and two
+    /// consecutive real-hardware nights (08-17/18, 08-18/19) falsified "stream stops on ACK" for that
+    /// byte — green 0x80 kept arriving all night at reduced but non-zero volume, matching "automatic"
+    /// mode's own adaptive/motion-triggered sampling rather than a true off. Per OURA_PROTOCOL.md s5.6.
     public static func liveHRDisable() -> OuraCommand {
-        OuraCommand(label: "dhr_disable", bytes: [0x2F, 0x03, 0x22, featureDaytimeHR, 0x01])
+        OuraCommand(label: "dhr_disable", bytes: [0x2F, 0x03, 0x22, featureDaytimeHR, 0x00])
+    }
+
+    /// Unsubscribe from live-HR pushes: `2f 03 26 02 00`. ACK: `2f 03 27 02 00`.
+    /// The enable triplet's step 3 (`liveHRSubscribe`) leaves the ring subscribed at "latest" (byte2 =
+    /// 2); nothing ever wrote it back to "off" before this — `liveHRDisable` alone only touches the
+    /// feature MODE byte, not the subscription. Send both together when suspending live HR so no
+    /// notification channel is left standing open for the ring's own adaptive sampling to push through.
+    /// Safe to send any time the driver has reached `.streaming`: its ACK shares subop 0x27 with the
+    /// subscribe step's ACK, which `OuraDriver.nextStep(after: .enableAckReceived)` no-ops outside
+    /// `.enablingLiveHR` (same reasoning as `liveHRDisable`'s ACK routing). Per OURA_PROTOCOL.md s5.6/7.2.
+    public static func liveHRUnsubscribe() -> OuraCommand {
+        OuraCommand(label: "dhr_unsubscribe", bytes: [0x2F, 0x03, 0x26, featureDaytimeHR, 0x00])
     }
 
     // MARK: - Feature-status diagnostics (READ-ONLY; s5.6 / s7.1)
@@ -131,11 +160,31 @@ public enum OuraCommands {
         OuraCommand(label: "spo2_status", bytes: [0x2F, 0x02, 0x20, featureSpO2])
     }
 
-    /// Read the real-steps feature status, `2f 02 20 0b` (READ verb, not enable). The `0x21` reply confirms
-    /// the server-flag gate (`activity/real_steps`, default off) from the ring itself. Read-only diagnostic.
-    /// [open_oura-feat]
+    /// Read the real-steps feature status, `2f 02 20 0b` (READ verb, not enable). The `0x21` reply reports
+    /// the ring's own real_steps gate state — NOT reliably "off" for an offline ring: on-device
+    /// 2026-08-25 this read back status=1 (enabled) from NOOP's own unauthenticated connection, matching
+    /// the real Oura app's read of the same ring byte-for-byte. Read-only diagnostic either way — never
+    /// enables anything, never writes a mode. [open_oura-feat]
     public static func realStepsReadStatus() -> OuraCommand {
         OuraCommand(label: "realsteps_status", bytes: [0x2F, 0x02, 0x20, featureRealSteps])
+    }
+
+    // MARK: - Feature-mode write (s7.5; UNVALIDATED, opt-in only)
+
+    /// Read any feature's status: `2f 02 20 <id>` — same read verb as `spo2ReadStatus`/
+    /// `realStepsReadStatus`, generalized so the feature-mode write below can re-probe after writing.
+    public static func featureReadStatus(_ feature: UInt8) -> OuraCommand {
+        OuraCommand(label: "feature_status_\(String(feature, radix: 16))", bytes: [0x2F, 0x02, 0x20, feature])
+    }
+
+    /// Write a feature's MODE: `2f 03 22 <id> <mode>`. UNVALIDATED on NOOP's own hardware — see
+    /// OURA_PROTOCOL.md s7.5: [open_oura-feat] reports this write bypassing the account gate for
+    /// several features on a consumer ring, tested there only with mode=0x01 (automatic); mode=0x00
+    /// ("off") always reverts. Gated to Test Centre / explicit user action only — nothing in
+    /// `OuraDriver`'s own flow produces this call.
+    public static func setFeatureMode(_ feature: UInt8, mode: UInt8) -> OuraCommand {
+        OuraCommand(label: "EXPERIMENT_set_feature_\(String(feature, radix: 16))_mode\(mode)",
+                    bytes: [0x2F, 0x03, 0x22, feature, mode])
     }
 
     /// The ordered live-HR enable triplet (read, enable, subscribe). The driver gates each on its ACK.

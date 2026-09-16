@@ -27,6 +27,14 @@ struct BodyVitalReading: Identifiable {
     /// strap's own capture is known-unreliable for it (e.g. a WHOOP 4.0 R-R over-count contaminating HRV).
     /// nil = no caveat. Defaulted so existing call sites keep compiling unchanged.
     var caveat: String? = nil
+    /// A second reading shown with the caption, under the headline value (#1636).
+    ///
+    /// Distinct from `caveat`, which says the value is unreliable; this one says what the value means.
+    /// Skin temperature is the case: the absolute leads, and the deviation it was derived from is what
+    /// makes it legible — "+0.2" says nothing without an anchor, and 34.6 °C says little without
+    /// knowing it runs high for you. Pure formatted data (a number and a unit), never a sentence.
+    /// Defaulted so existing call sites keep compiling unchanged.
+    var secondary: String? = nil
 
     var id: String { key }
 
@@ -48,7 +56,9 @@ struct BodyVitalReading: Identifiable {
     /// line when nothing resolved, so an empty tile still says why instead of a bare dash.
     var stateCaption: String {
         guard let day else { return missingCaption }
-        var parts = [Self.dayLabel(day)]
+        // #1636: the secondary reading leads, so it sits directly under the headline value.
+        var parts = secondary.map { [$0] } ?? []
+        parts.append(Self.dayLabel(day))
         if let sourceText = Self.sourceLabel(source, key: key) {
             parts.append(sourceText)
         }
@@ -123,7 +133,10 @@ enum BodyVitalSigns {
                          temperatureUnit: TemperatureUnit,
                          now: Date = Date(),
                          spo2CandidateByDay: [String: Double] = [:],
-                         hrvOverCountByDay: [String: Double] = [:]) -> [BodyVitalReading] {
+                         hrvOverCountByDay: [String: Double] = [:],
+                         // #1846: the Settings lead-with choice, so this tile agrees with Today and the
+                         // detail screen. A setting that reaches two of three surfaces is worse than none.
+                         skinTempPreferred: SkinTempDisplay.Kind = .absolute) -> [BodyVitalReading] {
         let logicalDay = logicalDayKey(now)
 
         // Resolve one metric to a per-day series, taking the FIRST source (by precedence) that carries
@@ -161,10 +174,13 @@ enum BodyVitalSigns {
 
         let respPoints = points(key: "resp", \.respRateBpm)
         let spo2Points = points(key: "spo2", \.spo2Pct)
-        // #103: SpO₂ candidate @82 (WHOOP 5/MG only). When no calibrated spo2Pct exists AND the toggle is
-        // ON, the candidate mean is passed in from metricSeries as a fallback. It has split cross-device
-        // evidence and ships behind a default-off toggle, never as `spo2Pct` (CLAUDE.md derived-biosignal
-        // rule). Built into VitalPoints so the tile + sparkline + `latest()` resolve it the same way.
+        // #103/queue-11a: SpO₂ candidate — WHOOP `spo2_candidate_82`, or an Oura owner's ceiling@100
+        // `0x6F` mean (device-conditional, computed in IntelligenceEngine; this view just reads whatever
+        // landed in metricSeries). When no calibrated spo2Pct exists AND the toggle is ON, the candidate
+        // mean is passed in from metricSeries as a fallback. Neither candidate is a validated calibration
+        // and both ship behind this one default-off toggle, never as `spo2Pct` (CLAUDE.md derived-
+        // biosignal rule). Built into VitalPoints so the tile + sparkline + `latest()` resolve it the
+        // same way.
         let spo2CandidateOn = PuffinExperiment.spo2CandidateDisplayEnabled && !spo2CandidateByDay.isEmpty
         let spo2CandidatePoints: [VitalPoint] = spo2CandidateOn
             ? spo2CandidateByDay.map { (day, value) in
@@ -180,17 +196,21 @@ enum BodyVitalSigns {
         let rhrPoints = points(key: "rhr") { $0.restingHr.map(Double.init) }
         let hrvPoints = points(key: "hrv", \.avgHrv)
         let skinPoints = points(key: "skin", \.skinTempDevC)
+        // #1636: the night's ABSOLUTE, when the strap measured one. Nights scored before that column
+        // shipped carry only the deviation and refill on the next scoring pass, so this is empty until
+        // then and everything below falls through to the deviation-led behaviour unchanged.
+        let skinAbsPoints = points(key: "skin", \.skinTempC)
 
         let respRow = latest(respPoints)
-        // #103: fall back to the spo2_candidate @82 mean when no calibrated spo2Pct exists. The candidate
-        // is labelled "strap estimate (unverified)" in the tile caption so it is never read as a calibrated
-        // blood-oxygen percentage.
+        // #103/queue-11a: fall back to the spo2_candidate mean when no calibrated spo2Pct exists. The
+        // candidate is labelled "strap estimate (unverified)" in the tile caption so it is never read as
+        // a calibrated blood-oxygen percentage.
         let spo2Row = latest(spo2Points) ?? latest(spo2CandidatePoints)
         let spo2IsCandidate = spo2Row != nil && latest(spo2Points) == nil
         let spo2rawRow = latest(spo2rawPoints)
         let rhrRow = latest(rhrPoints)
         let hrvRow = latest(hrvPoints)
-        let skinRow = latest(skinPoints)
+        let skinRowDeviation = latest(skinPoints)
         // #1118: mark HRV "unverified" when this night's in-sleep R-R was over-counted — the WHOOP 4.0
         // two-optical-channel artifact that inflates R-R and contaminates RMSSD, so NOOP's HRV won't match
         // WHOOP until the de-dup fix lands. The flag is written only for NOOP's OWN measured capture (an
@@ -211,13 +231,34 @@ enum BodyVitalSigns {
         // Skin temp is bimodal: CSV imports store ABSOLUTE °C, the on-device pipeline a ±°C DEVIATION —
         // partition the history to the displayed value's kind and pick the matching config + population
         // fallback (±0.6 °C mirrors the illness watch's flag threshold).
+        //
+        // #1636: resolve the DISPLAYED night first — the freshest that carries either reading — then
+        // lead with its absolute if it has one. Asking "does the row I am already showing have an
+        // absolute?" is what keeps the tile from silently stepping back to an older night: an
+        // import-only night has a deviation and no absolute, and a CALIBRATING night has the reverse
+        // (`recomputeSkinTempDev` returns nil until the baseline is usable, while the absolute is
+        // already measured — those wearers read "needs ~4 worn nights" today with a real temperature
+        // sitting unshown behind it).
+        let skinAbsCandidate = latest(skinAbsPoints)
+        let skinRowDay: String? = [skinRowDeviation?.day, skinAbsCandidate?.day].compactMap { $0 }.max()
+        let skinAbsCandidateOnDay = skinAbsCandidate.flatMap { $0.day == skinRowDay ? $0 : nil }
+        // #1846: the same `leadReading` rule the other surfaces use — the preference picks which number is
+        // tried first, the other stays the fallback, so choosing one never empties the tile.
+        let skinLeadsAbsolute = SkinTempDisplay.leadReading(absC: skinAbsCandidateOnDay?.value,
+                                                            devC: skinRowDeviation?.value,
+                                                            prefer: skinTempPreferred)?.kind == .absolute
+        let skinAbsRow = skinLeadsAbsolute ? skinAbsCandidateOnDay : nil
+        let skinRow = skinAbsRow ?? skinRowDeviation ?? skinAbsCandidateOnDay
         let skin = skinRow?.value
-        let skinIsAbsolute = skin.map(VitalBands.isAbsoluteSkinTemp) ?? true
+        let skinIsAbsolute = skinAbsRow != nil || (skin.map(VitalBands.isAbsoluteSkinTemp) ?? true)
+        // The series the tile is actually showing — banding and the sparkline must both read from it, or
+        // an absolute would be scored against a history of deviations (#1636).
+        let skinSeries = skinAbsRow != nil ? skinAbsPoints : skinPoints
         let skinResult: VitalBands.Result
         if let skin {
             skinResult = VitalBands.band(
                 value: skin,
-                history: VitalBands.skinTempHistory(matching: skin, in: history(before: skinRow?.day, skinPoints)),
+                history: VitalBands.skinTempHistory(matching: skin, in: history(before: skinRow?.day, skinSeries)),
                 populationRange: skinIsAbsolute ? 33...36 : (-0.6)...0.6,
                 cfg: skinIsAbsolute ? Baselines.metricCfg["skin_temp"]! : VitalBands.skinTempDeviationCfg
             )
@@ -236,6 +277,15 @@ enum BodyVitalSigns {
         let skinFormat: (Double) -> String = { c in
             SkinTempDisplay.numberString(c, kind: skinKind, fahrenheit: fahrenheit, decimals: 1)
         }
+        // #1636: the deviation for THE DISPLAYED NIGHT — not the freshest one anywhere. A calibrating
+        // night carries an absolute and no deviation, and reaching for the latest deviation there would
+        // print a previous night's number under tonight's temperature.
+        let skinSecondary: String? = skinAbsRow == nil ? nil
+            : skinPoints.last(where: { $0.day == skinRow?.day }).map { dev in
+                let n = SkinTempDisplay.numberString(dev.value, kind: .deviation,
+                                                     fahrenheit: fahrenheit, decimals: 1)
+                return "\(n) \(SkinTempDisplay.unitSymbol(kind: .deviation, fahrenheit: fahrenheit))"
+            }
 
         return [
             BodyVitalReading(
@@ -288,7 +338,7 @@ enum BodyVitalSigns {
                 missingCaption: spo2IsCandidate
                     ? String(localized: "strap estimate (unverified)")
                     : (PuffinExperiment.spo2CandidateDisplayEnabled && spo2Row == nil
-                       ? String(localized: "toggle ON · no @82 data")
+                       ? String(localized: "toggle ON · no estimate yet")
                        : (spo2rawRow != nil
                           ? String(localized: "Raw counts only — needs an import")
                           : String(localized: "No SpO₂ import or Health value"))),
@@ -368,7 +418,10 @@ enum BodyVitalSigns {
                 missingCaption: String(localized: "No nightly skin-temp yet — needs ~4 worn nights (or import a WHOOP CSV)"),
                 // Keep the trail on the displayed value's kind — absolute °C and ±deviation must not
                 // mix on one sparkline (matches the banding partition above).
-                sparkline: trail(skinPoints.filter { VitalBands.isAbsoluteSkinTemp($0.value) == skinIsAbsolute })
+                sparkline: trail(skinSeries.filter { VitalBands.isAbsoluteSkinTemp($0.value) == skinIsAbsolute }),
+                // #1636: the deviation this absolute was derived from, shown beneath it. Only when the
+                // headline IS the absolute — on a deviation-led tile it would just repeat the value.
+                secondary: skinSecondary
             ),
         ]
     }

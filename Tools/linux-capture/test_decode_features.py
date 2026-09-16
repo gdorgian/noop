@@ -9,27 +9,29 @@ import unittest
 import decode_features as df
 
 
-def _conn():
+def _conn(owner=None):
     c = sqlite3.connect(":memory:")
     df.apply_schema(c)
+    if owner is not None:
+        owner.addCleanup(c.close)
     return c
 
 
 class SchemaTests(unittest.TestCase):
     def test_creates_four_feature_tables(self):
-        c = _conn()
+        c = _conn(self)
         names = {r[0] for r in c.execute(
             "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         self.assertTrue({"feat_second", "feat_rr", "feat_ppg", "feat_event"} <= names)
 
     def test_schema_is_idempotent(self):
-        c = _conn()
+        c = _conn(self)
         df.apply_schema(c)  # second apply must not raise
         self.assertTrue(True)
 
     def test_feat_ppg_has_burst_index_column(self):
         # PR#553: the raw per-burst counter column ships on a fresh feat_ppg.
-        c = _conn()
+        c = _conn(self)
         cols = {r[1] for r in c.execute("PRAGMA table_info(feat_ppg)")}
         self.assertIn("burst_index", cols)
 
@@ -37,6 +39,7 @@ class SchemaTests(unittest.TestCase):
         # A pre-PR#553 DB has feat_ppg WITHOUT burst_index; apply_schema must ALTER it in once, and a
         # second apply must be a no-op (never raise "duplicate column").
         c = sqlite3.connect(":memory:")
+        self.addCleanup(c.close)
         c.executescript(
             "CREATE TABLE feat_ppg (device_id INTEGER NOT NULL, unix INTEGER NOT NULL, "
             "sample_idx INTEGER NOT NULL, channel INTEGER NOT NULL, value INTEGER NOT NULL, "
@@ -67,9 +70,9 @@ class RrStatsTests(unittest.TestCase):
         self.assertEqual(df.rr_stats([0, -5, 600]), (1, 600.0, None))
 
 
-def _rec(inner_type, parsed, unix=1000, version=24, crc_ok=True, device_id=1):
+def _rec(inner_type, parsed, unix=1000, version=24, ok=True, device_id=1):
     return {"device_id": device_id, "unix": unix, "inner_type": inner_type,
-            "version": version, "crc_ok": crc_ok, "parsed": parsed}
+            "version": version, "ok": ok, "parsed": parsed}
 
 
 class FeatureToRowsTests(unittest.TestCase):
@@ -134,9 +137,22 @@ class FeatureToRowsTests(unittest.TestCase):
         self.assertEqual(out["event"]["kind"], "123")
         self.assertEqual(out["event"]["event_num"], 123)
 
-    def test_crc_invalid_skipped(self):
-        out = df.feature_to_rows(_rec(47, {"heart_rate": 95}, crc_ok=False))
+    def test_rejected_frame_skipped(self):
+        out = df.feature_to_rows(_rec(47, {"heart_rate": 95}, ok=False))
         self.assertEqual(out, {"second": None, "rr": [], "ppg": [], "event": None})
+
+    def test_missing_verdict_is_rejected_not_passed(self):
+        # A record that carries no verdict at all yields no rows: absence is a rejection, never a pass.
+        rec = _rec(47, {"heart_rate": 95})
+        del rec["ok"]
+        self.assertEqual(df.feature_to_rows(rec),
+                         {"second": None, "rr": [], "ppg": [], "event": None})
+
+    def test_rejected_event_frame_skipped(self):
+        # The verdict gates events too, not only the per-second data types.
+        out = df.feature_to_rows(_rec(48, {"event": "WRIST_ON", "event_timestamp": 1000},
+                                      unix=None, ok=False))
+        self.assertIsNone(out["event"])
 
     def test_no_unix_non_event_skipped(self):
         out = df.feature_to_rows(_rec(47, {"heart_rate": 95}, unix=None))
@@ -149,7 +165,7 @@ class FeatureToRowsTests(unittest.TestCase):
 
 class ApplyRowsTests(unittest.TestCase):
     def test_inserts_all_tables(self):
-        c = _conn()
+        c = _conn(self)
         mapped = [
             df.feature_to_rows(_rec(47, {"heart_rate": 95, "rr_intervals": [600, 610]})),
             df.feature_to_rows(_rec(47, {"ppg_waveform": [1, 2], "burst_index": 3}, unix=1001, version=26)),
@@ -165,7 +181,7 @@ class ApplyRowsTests(unittest.TestCase):
         self.assertEqual((ch, bi), (0, 3))
 
     def test_idempotent(self):
-        c = _conn()
+        c = _conn(self)
         mapped = [df.feature_to_rows(_rec(47, {"heart_rate": 95, "rr_intervals": [600]}))]
         df.apply_rows(c, 1, mapped)
         df.apply_rows(c, 1, mapped)  # second time changes nothing
@@ -173,7 +189,7 @@ class ApplyRowsTests(unittest.TestCase):
         self.assertEqual(c.execute("SELECT COUNT(*) FROM feat_rr").fetchone()[0], 1)
 
     def test_coalesce_merges_partial_seconds(self):
-        c = _conn()
+        c = _conn(self)
         # scalar-only second, then ppg-only at SAME unix must not clobber hr.
         df.apply_rows(c, 1, [df.feature_to_rows(_rec(47, {"heart_rate": 88}, unix=1000))])
         df.apply_rows(c, 1, [df.feature_to_rows(_rec(47, {"gravity_x": 0.5}, unix=1000, version=18))])
@@ -182,9 +198,9 @@ class ApplyRowsTests(unittest.TestCase):
         self.assertEqual(row[1], 0.5)    # merged in
 
 
-def _decoded(fields, crcOK=True, family="whoop5"):
+def _decoded(fields, crcOK=True, family="whoop5", ok=True):
     return {"family": family, "char": "x", "ts_ms": 0, "hr": None,
-            "frame": {"crcOK": crcOK, "seq": 1, "fields": fields}}
+            "frame": {"ok": ok, "crcOK": crcOK, "seq": 1, "fields": fields}}
 
 
 def _fld(name, value, cat):
@@ -208,12 +224,13 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual(rec["unix"], 1700000000)
         self.assertEqual(rec["inner_type"], 47)
         self.assertEqual(rec["version"], 18)
-        self.assertTrue(rec["crc_ok"])
+        self.assertTrue(rec["ok"])
 
     def test_carries_rr_intervals_from_parsed(self):
         # The R-R array is parsed-only (per-interval values are rr[i] FIELDS, the array is not a field),
         # so normalize must carry frame.parsed["rr_intervals"] through or feat_rr/rmssd stay empty.
-        raw = {"family": "whoop5", "frame": {"crcOK": True, "fields": [_fld("rr_count", 2, "rr")],
+        raw = {"family": "whoop5", "frame": {"ok": True, "crcOK": True,
+                                             "fields": [_fld("rr_count", 2, "rr")],
                                              "parsed": {"rr_intervals": [602, 613]}}}
         src = (1, "aa", "fd4b0005", 0, 1700000000, None, 47)
         rec = df.normalize_decode_record(raw, src, 1)
@@ -222,7 +239,7 @@ class NormalizeTests(unittest.TestCase):
     def test_realtime_type40_timestamp_supplies_unix_and_rr(self):
         # Realtime (type-40) frames have no frames.unix; the decoded `timestamp` field supplies it, and
         # the carried rr_intervals must flow into feat_rr (the realtime-capture path).
-        raw = {"family": "whoop5", "frame": {"crcOK": True,
+        raw = {"family": "whoop5", "frame": {"ok": True, "crcOK": True,
                "fields": [_fld("timestamp", 1781084150, "time"), _fld("rr_count", 1, "rr")],
                "parsed": {"timestamp": 1781084150, "rr_intervals": [963]}}}
         src = (1, "aa", "fd4b0005", 1781084150307, None, None, 40)   # frames.unix = None
@@ -230,10 +247,21 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual(m["second"]["unix"], 1781084150)
         self.assertEqual(m["rr"], [{"unix": 1781084150, "idx": 0, "rr_ms": 963}])
 
-    def test_crcOK_false(self):
-        raw = _decoded([_fld("heart_rate", 90, "hr")], crcOK=False)
+    def test_verdict_false(self):
+        raw = _decoded([_fld("heart_rate", 90, "hr")], crcOK=False, ok=False)
         src = (1, "aa", "c", 0, 100, None, 47)
-        self.assertFalse(df.normalize_decode_record(raw, src, 1)["crc_ok"])
+        self.assertFalse(df.normalize_decode_record(raw, src, 1)["ok"])
+
+    def test_payload_crc_ok_but_envelope_rejected(self):
+        # The class this gate is for: the payload CRC32 verifies, but the decoder's full verdict is
+        # negative (broken header checksum or a length that does not add up). `crcOK` alone would
+        # have let the frame through.
+        raw = _decoded([_fld("heart_rate", 90, "hr")], crcOK=True, ok=False)
+        src = (1, "aa", "c", 0, 100, None, 47)
+        rec = df.normalize_decode_record(raw, src, 1)
+        self.assertFalse(rec["ok"])
+        self.assertEqual(df.feature_to_rows(rec),
+                         {"second": None, "rr": [], "ppg": [], "event": None})
 
     def test_whoop4_version_defaults_to_24(self):
         raw = _decoded([_fld("heart_rate", 110, "hr")], family="whoop4")  # no hist_version field
@@ -254,18 +282,24 @@ class NormalizeTests(unittest.TestCase):
         src = (1, "aa", "c", 0, 555, None, 48)
         self.assertEqual(df.normalize_decode_record(raw, src, 1)["unix"], 555)
 
-    def test_missing_frame_is_empty_parsed_crc_true(self):
+    def test_missing_frame_is_empty_parsed_and_rejected(self):
         src = (1, "aa", "c", 0, 100, None, 47)
         rec = df.normalize_decode_record({}, src, 1)
         self.assertEqual(rec["parsed"], {})
-        self.assertTrue(rec["crc_ok"])
+        self.assertFalse(rec["ok"])
         self.assertIsNone(rec["version"])
 
+    def test_missing_verdict_field_is_rejected(self):
+        # An object whose frame carries no `ok` key at all: fail closed, do not assume a pass.
+        raw = {"family": "whoop5", "frame": {"crcOK": True, "fields": [_fld("heart_rate", 90, "hr")]}}
+        src = (1, "aa", "c", 0, 100, None, 47)
+        self.assertFalse(df.normalize_decode_record(raw, src, 1)["ok"])
 
-def _dec_obj(fields, family="whoop4", crcOK=True):
+
+def _dec_obj(fields, family="whoop4", crcOK=True, ok=True):
     """A whoop-decode --json object stub (real shape: values live in frame.fields)."""
     return {"family": family, "char": "x", "ts_ms": 0, "hr": None,
-            "frame": {"crcOK": crcOK, "seq": 1, "fields": fields}}
+            "frame": {"ok": ok, "crcOK": crcOK, "seq": 1, "fields": fields}}
 
 
 class _FakeDB:
@@ -286,6 +320,11 @@ class _FakeDB:
 
 
 class DecodeNewTests(unittest.TestCase):
+    def _db(self):
+        db = _FakeDB(self._frames())
+        self.addCleanup(db.db.close)
+        return db
+
     def _frames(self):
         return [
             (1, "aa", "6108", 10, 1000, 95, 47),
@@ -302,7 +341,7 @@ class DecodeNewTests(unittest.TestCase):
         ]
 
     def test_decodes_and_advances_cursor(self):
-        fdb = _FakeDB(self._frames())
+        fdb = self._db()
         res = df.decode_new(fdb, 1, decode_fn=self._decoder)
         self.assertEqual(res["frames"], 3)
         self.assertEqual(res["skipped"], 1)              # the inner_type-49 frame
@@ -310,19 +349,33 @@ class DecodeNewTests(unittest.TestCase):
         self.assertEqual(fdb.state(1)["last_decoded_frame_id"], "3")
 
     def test_incremental_second_run_is_noop(self):
-        fdb = _FakeDB(self._frames())
+        fdb = self._db()
         df.decode_new(fdb, 1, decode_fn=self._decoder)
         res2 = df.decode_new(fdb, 1, decode_fn=self._decoder)
         self.assertEqual(res2["frames"], 0)              # cursor past all frames
 
     def test_full_redecodes_from_zero(self):
-        fdb = _FakeDB(self._frames())
+        fdb = self._db()
         df.decode_new(fdb, 1, decode_fn=self._decoder)
         res = df.decode_new(fdb, 1, full=True, decode_fn=self._decoder)
         self.assertEqual(res["frames"], 3)               # full ignores the cursor
 
+    def test_rejected_frame_contributes_no_rows(self):
+        # End to end over the whole stage: a frame the decoder rejected (payload CRC fine, envelope
+        # not) writes nothing and counts as skipped, while its intact neighbour still lands.
+        fdb = self._db()
+        decoder = lambda records: [
+            _dec_obj([_fld("heart_rate", 95, "hr")], crcOK=True, ok=False),
+            _dec_obj([_fld("heart_rate", 96, "hr")]),
+            _dec_obj([_fld("meta_type", 3, "meta")]),
+        ]
+        res = df.decode_new(fdb, 1, decode_fn=decoder)
+        self.assertEqual(res["skipped"], 2)               # the rejected frame + the inner_type-49 one
+        rows = fdb.db.execute("SELECT unix, hr FROM feat_second").fetchall()
+        self.assertEqual(rows, [(1001, 96)])
+
     def test_decoder_count_mismatch_raises(self):
-        fdb = _FakeDB(self._frames())   # 3 frames
+        fdb = self._db()   # 3 frames
         short = lambda records: [_dec_obj([_fld("heart_rate", 95, "hr")])]  # returns only 1
         with self.assertRaises(RuntimeError):
             df.decode_new(fdb, 1, decode_fn=short)

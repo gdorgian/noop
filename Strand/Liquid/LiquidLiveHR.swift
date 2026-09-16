@@ -14,6 +14,10 @@ struct LiquidLiveHR: View {
     var tint: Color
     var fallback: [Double]        // today's banked 5-minute buckets — shown when there's no live stream
     var fallbackTimes: [Date]     // parallel to `fallback` — lets a scrub name the time it landed on
+    /// Line identity for `fallback` only (#2082). The live series is 1 Hz and contiguous by construction,
+    /// so it passes nil and draws exactly as before; the banked buckets skip the hours nothing was
+    /// recorded, and without this the sparkline joined across them as though the day were continuous.
+    var fallbackSegments: [String] = []
     var animated: Bool
     /// False on a navigated PAST day: the strap may well be streaming right now, but that number says
     /// nothing about the day on screen, so the card reads out the banked trace only and labels it as the
@@ -99,7 +103,12 @@ struct LiquidLiveHR: View {
                 readout(showsChevron: false)
             }
             if series.count >= 2 {
-                LiquidThread(bpm: series, tint: tint, height: 92, animated: animated,
+                // Segments only when the BANKED series is on screen: the live 1 Hz stream has no gaps to
+                // draw, and handing it ids would split a continuous trace for nothing.
+                LiquidThread(bpm: series,
+                             segments: isLive || fallbackSegments.count != fallback.count
+                                 ? nil : fallbackSegments,
+                             tint: tint, height: 92, animated: animated,
                              scrubIndex: scrubIndex)
                     .background(GeometryReader { geo in
                         Color.clear

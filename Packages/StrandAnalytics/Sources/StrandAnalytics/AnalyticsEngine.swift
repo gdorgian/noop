@@ -66,6 +66,10 @@ public enum AnalyticsEngine {
         public let cachedSleep: [CachedSleepSession]
         /// Detected workout/exercise sessions.
         public let workouts: [ExerciseSession]
+        /// #1545: where the detector lost every candidate workout on this day. nil only when detection did
+        /// not run. Always populated otherwise — including (especially) when `workouts` is empty, which is
+        /// the case the counts exist to explain.
+        public let detectionFunnel: WorkoutDetector.DetectionFunnel?
         /// Recovery / "Charge" score [0,100] or nil (cold-start / no HRV baseline).
         public let recovery: Double?
         /// Ordered Charge driver breakdown (one row per real term that fed the score, biggest
@@ -117,9 +121,11 @@ public enum AnalyticsEngine {
                     sessionMotionByStart: [Int: [Double]] = [:],
                     sessionSleepStateByStart: [Int: [Int]] = [:],
                     chargeDrivers: [ChargeDriver] = [],
-                    skinTempRelative: SkinTempRelative? = nil) {
+                    skinTempRelative: SkinTempRelative? = nil,
+                    detectionFunnel: WorkoutDetector.DetectionFunnel? = nil) {
             self.daily = daily; self.sleepSessions = sleepSessions
             self.cachedSleep = cachedSleep; self.workouts = workouts
+            self.detectionFunnel = detectionFunnel
             self.recovery = recovery; self.strain = strain
             self.chargeDrivers = chargeDrivers
             self.skinTempRelative = skinTempRelative
@@ -169,6 +175,13 @@ public enum AnalyticsEngine {
     /// from `dayString`), and the Kotlin mirror degrades the SAME way (`runCatching { … }.getOrDefault(0)`)
     /// instead of throwing, so a single bad day key can never take down a whole scoring pass on either
     /// platform (nil-tolerant over fail-fast, per the #996 review).
+    ///
+    /// This is a UTC midnight that callers pair with one captured offset and fixed 86,400-second blocks,
+    /// so every boundary beyond a clock change sits an hour from the local midnight it names.
+    /// `LocalDayWindows` is the zone-rule-correct primitive built to replace that, and is deliberately
+    /// called by nothing yet. This function remains the shipped answer until a switch-over lands; the two
+    /// disagree by an hour on the far side of a transition, and `LocalDayWindowsTests` pins both answers
+    /// so the difference is visible rather than discovered.
     static func dayStartUtcSeconds(_ day: String) -> Int {
         Int(isoDay.date(from: day)?.timeIntervalSince1970 ?? 0)
     }
@@ -287,6 +300,10 @@ public enum AnalyticsEngine {
     public static let vendorRespMinSpanS = 3_600
 
     public static func analyzeDay(day: String,
+                                  // Optional sink for the Effort funnel line. Nil (the default) builds
+                                  // nothing at all — see StrainScorer.strain. A parameter rather than a
+                                  // field so this engine stays pure.
+                                  strainDiag: ((String) -> Void)? = nil,
                                   hr: [HRSample] = [],
                                   rr: [RRInterval] = [],
                                   resp: [RespSample] = [],
@@ -451,7 +468,15 @@ public enum AnalyticsEngine {
                                   // #141: when true, the nightly HRV is RMSSD over DEEP-sleep windows only
                                   // (WHOOP-style), instead of the whole-night mean. Threaded from the caller
                                   // (UnitPrefs.hrvWindowKey). Default false = byte-identical whole-night value.
-                                  deepHrvWindow: Bool = false) -> DayResult {
+                                  deepHrvWindow: Bool = false,
+                                  // #1545: which TRIMP recipe scores Effort. Edwards (the default) is
+                                  // time-in-zone and pays NOTHING below 50% HRR, so intermittent work —
+                                  // a lifting session, once the sets are averaged against the rests —
+                                  // can score near zero however long it lasts. Banister is exponential in
+                                  // %HRR with no floor. Threaded rather than read from a global so this
+                                  // stays a pure function, and defaulted so every existing caller and
+                                  // test is byte-identical.
+                                  effortMethod: StrainScorer.Method = .edwards) -> DayResult {
 
         // Precompute the day's UTC bounds ONCE (#996). `dayString(ts, offsetSec:)` formats the UTC
         // calendar day of (ts + offset) with a FIXED offset, so "== day" is exactly membership in
@@ -488,11 +513,20 @@ public enum AnalyticsEngine {
         } else {
             let rrSorted = rr.sortedByTsStable()
             let enrichedProvided: [SleepSession] = providedSleep.map { s in
+                // #1884: no HR-only special case any more. This used to short-circuit on `s.hrOnly` to
+                // preserve #1801's display-only guarantee, which withheld both values. Now that an HR-only
+                // session reports what it measured, that clause is not merely redundant — an HR-only night
+                // that measured a resting HR but no HRV (no R-R banked) would take the short-circuit and
+                // skip the fill every other session gets. The rule is uniform: fill what is missing.
                 guard s.restingHR == nil || s.avgHRV == nil else { return s }
                 let rhr = s.restingHR ?? SleepStager.sessionRestingHR(start: s.start, end: s.end, hr: hr)
                 let hrv = s.avgHRV ?? SleepStager.sessionAvgHRV(start: s.start, end: s.end, rr: rrSorted)
+                // `hrOnly` carried explicitly: unlike Kotlin's `copy`, this rebuilds the struct field by
+                // field, so a new flag is dropped by DEFAULT unless named here. #1884 removed the guard
+                // that used to keep HR-only nights away from this line, so this is now the only thing
+                // standing between the flag and silent loss rather than a belt.
                 return SleepSession(start: s.start, end: s.end, efficiency: s.efficiency,
-                                    stages: s.stages, restingHR: rhr, avgHRV: hrv)
+                                    stages: s.stages, restingHR: rhr, avgHRV: hrv, hrOnly: s.hrOnly)
             }
             let keptDetected = refinedSessions.filter { d in
                 !enrichedProvided.contains { $0.start < d.end && d.start < $0.end }
@@ -532,17 +566,36 @@ public enum AnalyticsEngine {
         var deepS = 0.0, remS = 0.0, lightS = 0.0, tstS = 0.0
         var inBedS = 0.0, effWeighted = 0.0
         var disturbances = 0
+        // Hypnogram COVERAGE across the group: how much of the fragments' own spans the stage segments
+        // actually account for. Accumulated separately from `inBedS` because that one later absorbs the
+        // inter-fragment gap (#777/#705), which is a different quantity — a bridged out-of-bed gap is
+        // known-awake time between two fragments, whereas a hole INSIDE a fragment is time we never
+        // observed at all. Summed straight off `s.stages` (no JSON re-parse: the segments are already
+        // decoded here), then handed to `HypnogramCoverage` so the ratio/clamp/nil rules have ONE
+        // definition shared with the merge-side guard.
+        // NOTE on scope at THIS call site: coverage here is summed off the DECODED segments, not off
+        // `stagesJSON`, so the timestamp-free shapes are not screened out by the payload-shape rule the
+        // merge side uses. A minute-dict session decodes to zero segments and contributes span with no
+        // cover, and what keeps it from reading as a holed night is `fraction`'s `coveredSeconds > 0`
+        // returning nil for a group with no timestamped stages at all. Same outcome, different
+        // mechanism — and it holds only while a group is single-sourced, which the day merge ensures by
+        // choosing one side. A group mixing a timestamped fragment with a minute-dict one would read as
+        // holed; `HypnogramCoverageTests.testMixedSourceGroupReadsAsHoled` pins both halves.
+        var coveredS = 0.0, spanS = 0.0
         for s in mainGroup {
             let m = SleepStager.hypnogramMetrics(s)
             let inBed = Double(s.end - s.start)
             inBedS += inBed                       // each fragment's own in-bed span (the gap is added below)
             effWeighted += s.efficiency * inBed   // in-bed-weighted efficiency across the group
+            spanS += inBed
+            for seg in s.stages where seg.end > seg.start { coveredS += Double(seg.end - seg.start) }
             deepS += m.deepMin * 60.0
             remS += m.remMin * 60.0
             lightS += m.lightMin * 60.0
             tstS += m.tstS
             disturbances += m.disturbances
         }
+        let stageCoverage = HypnogramCoverage.fraction(coveredSeconds: coveredS, spanSeconds: spanS)
         // OUT-OF-BED time BETWEEN bridged fragments is AWAKE (#777/#705): a main night bridged from two
         // fragments split by a 20-min wake gap was reporting that gap as nowhere (it is in no fragment's
         // [start,end) span), so 20+ min of real awake read as ~4 min - a v7.1 regression, multi-reporter.
@@ -628,7 +681,25 @@ public enum AnalyticsEngine {
         // negligible shift. The Rest/sleep-quality term is main-night; the recovery physiology is
         // day-best-resting, night-dominated. Keep these two definitions distinct on purpose.
         // Daily resting HR = lowest per-session resting HR across matched sessions.
-        let restingHRDaily = matched.compactMap { $0.restingHR }.min()
+        // #1801/#1884: the sessions whose PHYSIOLOGY is folded into the day's aggregates. Motion-backed
+        // sessions are PREFERRED; an HR-only night is used only when the day has no other kind.
+        //
+        // #1801 excluded HR-only nights outright, reasoning that a baseline is the one thing a false positive
+        // cannot be unwound from. #1884 narrowed that rather than reversing it: only the session BOUNDS are
+        // inferred from heart rate — each RMSSD is measured over its own 5-minute window — so excluding the
+        // night discarded a real 22-25ms HRV and left Charge with NO input instead of a slightly fuzzy one, on
+        // every scoring pass in the field log. Preferring keeps the original protection exactly where it earned its keep (a mixed
+        // day still ignores the HR-only night outright) and gives it up only where the alternative was
+        // nothing at all. The night still travels marked `hrOnly` for any consumer that wants to weigh it
+        // down; what it no longer gets is a silent delete.
+        //
+        // Named once rather than filtered at each use: the deep-window HRV pool and the SDNN index below
+        // re-derive from `rr` over each session's own stages instead of reading restingHR/avgHRV, so the
+        // only way to scope them is through the session set itself — which is precisely the "one forgotten
+        // call site" a scattered filter invites.
+        let physiologyOnly = matched.filter { !$0.hrOnly }
+        let physiologySessions = physiologyOnly.isEmpty ? matched : physiologyOnly
+        let restingHRDaily = physiologySessions.compactMap { $0.restingHR }.min()
         // Daily avg HRV = in-bed-weighted mean of per-session avg HRV.
         let avgHRVDaily: Double? = {
             if deepHrvWindow {
@@ -638,13 +709,13 @@ public enum AnalyticsEngine {
                 // = successive diffs). nil when no deep sleep is detected (WHOOP-4.0 staging can be sparse) —
                 // the caller shows calibrating, never a fabricated number.
                 let rrSorted = rr.sortedByTsStable()
-                let deep = matched.flatMap { s in
+                let deep = physiologySessions.flatMap { s in
                     SleepStager.sessionHrvWindows(start: s.start, end: s.end, rr: rrSorted, stages: s.stages)
                         .filter { $0.stage == "deep" }.compactMap { $0.rmssd }
                 }
                 return deep.isEmpty ? nil : deep.reduce(0, +) / Double(deep.count)
             }
-            let pairs = matched.compactMap { s -> (Double, Double)? in
+            let pairs = physiologySessions.compactMap { s -> (Double, Double)? in
                 s.avgHRV.map { ($0, Double(s.end - s.start)) }
             }
             guard !pairs.isEmpty else { return nil }
@@ -661,7 +732,7 @@ public enum AnalyticsEngine {
         // against a watch meaningless. The 5-min index is window-comparable to those. nil when no segment has
         // enough clean beats (HRVAnalyzer's own gate). Keeps the R-R timestamps (segmentation needs them).
         let avgSDNNDaily: Double? = {
-            let inBed = rr.filter { r in matched.contains { r.ts >= $0.start && r.ts < $0.end } }
+            let inBed = rr.filter { r in physiologySessions.contains { r.ts >= $0.start && r.ts < $0.end } }
             return inBed.isEmpty ? nil : HRVAnalyzer.sdnnIndex(inBed, segmentSec: 300)
         }()
 
@@ -698,7 +769,33 @@ public enum AnalyticsEngine {
             // `wholeNight` is the pooled-window mean it equals on single-session nights and the apples-to-
             // apples baseline for the deepOnly/lastSWS comparison (all three are pooled window means).
             let reported = avgHRVDaily.map { "\(r2($0))ms" } ?? "nil"
-            hrvTraceSink("hrv nightSummary reported=\(reported) wholeNight=\(meanMs(withR)) deepOnly=\(meanMs(deepW)) lastSWS=\(meanMs(lastSws)) nWin=\(withR.count) nDeep=\(deepW.count)")
+            // #2128: say WHY `reported` is nil, but ONLY when the night printed real window means beside
+            // it. That is the confusing case: a nil next to `wholeNight=31.55ms` reads as a value that went
+            // missing, when the usual cause is the #1118 gate refusing an over-counted night on purpose. A
+            // night with no windows at all explains itself and pays nothing here.
+            //
+            // The `hrv diag` row above carries `rrIntegrity`, but that verdict is scored over the whole DAY
+            // while the gate runs per SESSION, so the two disagree exactly when it matters: a day reading
+            // `underCovered` can still hold a session the gate refused. Reading the adjacent line is what
+            // led #2128 to be filed against intended behaviour.
+            //
+            // Derived from the two existing calls rather than by re-classifying the beats. Inside
+            // `sessionAvgHRV` the ONLY paths to nil are "no window yielded an RMSSD" and the gate, so
+            // windows-with-RMSSD plus a nil value IS the gate, with nothing restated that could later
+            // disagree with it. It says `overCount` rather than naming a verdict because that function pins
+            // every over-count to crossSecondOverCount internally to avoid a sort, so the specific label
+            // would be a distinction it does not actually make.
+            //
+            // NOT in deep-window mode. That branch re-derives from `sessionHrvWindows` and never reads
+            // `s.avgHRV`, so the gate plays no part in its nil and naming it would be a diagnostic
+            // asserting a cause it did not verify. `nDeep` on this same line already explains that case.
+            let refused = !deepHrvWindow && avgHRVDaily == nil && !withR.isEmpty
+                && physiologySessions.contains { s in
+                    SleepStager.sessionHrvWindows(start: s.start, end: s.end, rr: rrSorted, stages: [])
+                        .contains { $0.rmssd != nil }
+                        && SleepStager.sessionAvgHRV(start: s.start, end: s.end, rr: rrSorted) == nil
+                }
+            hrvTraceSink("hrv nightSummary reported=\(reported) \(refused ? "refused=overCount " : "")wholeNight=\(meanMs(withR)) deepOnly=\(meanMs(deepW)) lastSWS=\(meanMs(lastSws)) nWin=\(withR.count) nDeep=\(deepW.count)")
         }
 
         // Nightly APPROXIMATE respiratory rate (breaths/min) from the R-R stream via
@@ -787,8 +884,12 @@ public enum AnalyticsEngine {
         // night `hr` for pure-function callers/tests.
         let effMaxHR: Double? = maxHROverride ?? (profile.age > 0 ? StrainScorer.tanakaHRmax(age: profile.age) : nil)
         let restForStrain = restingHRDaily.map(Double.init) ?? StrainScorer.defaultRestingHR
+        // The Effort ring's own funnel. A nil sink builds nothing at all, so a caller that does not want
+        // diagnostics pays nothing; IntelligenceEngine passes its per-day recorder, the same one the
+        // `workout detect` and `sleep-detect` lines beside it already use.
         let strain = StrainScorer.strain(dayHr ?? hr, maxHR: effMaxHR, restingHR: restForStrain,
-                                         sex: profile.sex)
+                                         method: effortMethod, sex: profile.sex,
+                                         diag: strainDiag, day: day)
 
         // ── Workouts ──────────────────────────────────────────────────────────
         // Detect over the full CALENDAR day (dayHr/dayGravity) when the caller supplies it, so a
@@ -796,12 +897,31 @@ public enum AnalyticsEngine {
         // a later pass re-reads it through the next night window (which ends at ≈ noon). Falls back
         // to the night window for pure-function callers/tests. restingHR still comes from the night's
         // sleep sessions; nil → WorkoutDetector derives it from the day's own HR floor.
+        var detectionFunnel: WorkoutDetector.DetectionFunnel? = nil
         let workouts = WorkoutDetector.detect(
             hr: dayHr ?? hr, gravity: dayGravity ?? gravity,
             restingHR: restingHRDaily.map(Double.init),
-            maxHR: maxHROverride,
+            // #1545: the DAY's effective HRmax, not just the override. Passing `maxHROverride` meant an
+            // install with no override left the detector to fall back to `StrainScorer.estimateHRmax`,
+            // which returns max(observed p99.5, Tanaka) -- so every bout was measured against a HRmax at
+            // least as high as, and usually higher than, the one its own day used. A higher HRmax is a
+            // bigger reserve and therefore a SMALLER %HRR, so bouts were held to a stricter yardstick
+            // than the day containing them: for age 30 / RHR 60 with an observed 195, a 125 bpm minute is
+            // zone 1 for the day and zone 0 for the bout. That is the same
+            // day-disagrees-with-its-own-workouts failure #1562 fixed for the TRIMP method.
+            //
+            // This also feeds the z2+ qualification gate below, so it changes which bouts are DETECTED,
+            // not only how they score -- in the direction of no longer dropping a workout by a standard
+            // its own day never applied. Still nil for an age-less profile, where the detector's own
+            // estimate remains the only available fallback.
+            maxHR: effMaxHR,
             age: profile.age > 0 ? profile.age : nil,
-            profile: profile)
+            profile: profile,
+            // #1545: the bouts inside a day MUST be scored by the same recipe as the day itself.
+            // A day on Banister whose workouts were still on Edwards would show a session scoring
+            // less than the day it sits inside, which is a worse inconsistency than either method.
+            effortMethod: effortMethod,
+            funnel: { detectionFunnel = $0 })
 
         // ── Steps (APPROXIMATE) ───────────────────────────────────────────────
         // step_motion_counter@57 is a CUMULATIVE u16 running counter (it climbs while you move, holds
@@ -867,7 +987,21 @@ public enum AnalyticsEngine {
             activeKcalEst: activeKcalEst,
             spo2Red: nightlySpo2Raw?.red,
             spo2Ir: nightlySpo2Raw?.ir,
-            avgSdnn: avgSDNNDaily)
+            avgSdnn: avgSDNNDaily,
+            // The ABSOLUTE this pass's deviation was derived from (#1636). Set HERE, beside
+            // `skinTempDevC`, so the engine's own row is symmetric: any path that persists this
+            // struct directly keeps both thermal values, not just the one.
+            skinTempC: nightlySkinTempC,
+            // "Every session this day was staged from heart rate alone."
+            //
+            // #1884: read from the SESSIONS' own marker, NOT from `physiologySessions.isEmpty`. Those two
+            // were equivalent while the set was `matched` minus the HR-only ones, so an all-HR-only night
+            // emptied it. They are NOT equivalent now that the set FALLS BACK to `matched`: it can never
+            // be empty when `matched` is not, which would have pinned this flag to false forever and
+            // silently retired the #1879 note. Deriving it from `hrOnly` states what the flag has always
+            // meant and is independent of how the physiology set is chosen. Byte-identical twin of Kotlin
+            // `AnalyticsEngine`'s `sleepHrOnly = if (matched.isEmpty()) null else matched.all { it.hrOnly }`.
+            sleepHrOnly: matched.isEmpty ? nil : matched.allSatisfy { $0.hrOnly })
         _ = sleepStart; _ = sleepEnd  // available for callers wiring sleep_start/end columns
 
         // ── Cache rows ────────────────────────────────────────────────────────
@@ -915,11 +1049,14 @@ public enum AnalyticsEngine {
         let effortConfidence = ScoreConfidence.effort(strain: strain, hrSampleCount: hr.count)
         // Rest confidence with H9: downgrade a high-efficiency night whose deep+REM share is implausibly low
         // to low-confidence (likely staging miss) — honest, no faked stages. tstS/efficiency are the
-        // main-group totals computed above; restorative = deepS + remS.
+        // main-group totals computed above; restorative = deepS + remS. `stageCoverage` adds the third
+        // guard: a night whose stage timeline covers only part of its own span (an incompletely-received
+        // device hypnogram) cannot earn a SOLID Rest either, and neither of the other two can see it.
         let restConfidence = ScoreConfidence.rest(hasSession: !matched.isEmpty,
                                                   hasStagedSleep: hasStagedSleep,
                                                   asleepSeconds: tstS, restorativeSeconds: deepS + remS,
-                                                  efficiency: efficiency, gravitySparse: gravitySparse)
+                                                  efficiency: efficiency, gravitySparse: gravitySparse,
+                                                  stageCoverage: stageCoverage)
 
         return DayResult(daily: daily, sleepSessions: matched, cachedSleep: cachedSleep,
                          workouts: workouts, recovery: recovery, strain: strain,
@@ -931,7 +1068,8 @@ public enum AnalyticsEngine {
                          sessionMotionByStart: sessionMotionByStart,
                          sessionSleepStateByStart: sessionSleepStateByStart,
                          chargeDrivers: chargeDrivers,
-                         skinTempRelative: skinTempRelative)
+                         skinTempRelative: skinTempRelative,
+                         detectionFunnel: detectionFunnel)
     }
 
     // MARK: - Rest composite (Charge/Effort/Rest)
@@ -1151,7 +1289,13 @@ public enum AnalyticsEngine {
     ///
     /// DIAGNOSTIC ONLY. Nothing scores this, it never writes `spo2Pct`, and it is not a blood-oxygen
     /// reading — it is the raw candidate averaged, surfaced so it can be checked against a real one.
-    /// Byte-parity twin of the Kotlin `nightlySpo2CandidateMean`.
+    ///
+    /// The mean is ROUNDED (`.rounded()`), not floored — `sum / kept` on two `Int`s truncates toward
+    /// zero, silently biasing every candidate down by up to 0.99 (e.g. a true 97.97 shipped as 97,
+    /// missing an app-displayed 98 the transform's own precise value would have round-matched). Every
+    /// value in range is positive (70...100), so round-half-up and round-half-away-from-zero agree —
+    /// no platform-divergence risk from the rounding rule itself. Byte-parity twin of the Kotlin
+    /// `nightlySpo2CandidateMean`.
     public static func nightlySpo2CandidateMean(_ sessions: [SleepSession],
                                          aux: [V18AuxSample]) -> (mean: Int, samples: Int)? {
         guard !sessions.isEmpty, !aux.isEmpty else { return nil }
@@ -1162,7 +1306,54 @@ public enum AnalyticsEngine {
             sum += v; kept += 1
         }
         guard kept > 0 else { return nil }
-        return (mean: sum / kept, samples: kept)
+        return (mean: Int((Double(sum) / Double(kept)).rounded()), samples: kept)
+    }
+
+    /// The plausible range for a raw Oura `0x6F` SpO2 sample before the ceiling transform below.
+    /// Excludes the mis-scaled `dc_raw`/perfusion-channel contamination (-1016 … 11,709,098,
+    /// OURA_PROTOCOL.md §6.5.0.1) by three orders of magnitude, same bounds as
+    /// `Repository.spo2SingleChannelPlausible` (kept in sync manually — the app layer cannot be
+    /// imported here, so that display gate should read from this one instead of redefining it).
+    public static let spo2SingleChannelPlausible = 50...110
+
+    /// Nightly **ceiling@100** mean of the Oura ring's own decoded SpO2 (`spo2Sample.red`, `0x6F`)
+    /// over the detected in-bed `sessions`, with the sample count it rests on — or nil when no
+    /// plausible sample fell inside any span. Oura twin of `nightlySpo2CandidateMean` above; queue
+    /// 11a's starting transform.
+    ///
+    /// WHY CEILING@100, NOT RAW OR THE OFFSET+CLAMP FIT. `0x6F`'s raw wire mean carries a
+    /// consistent positive bias — 20-48% of samples on a contamination-clean night read above the
+    /// physical 100% ceiling (OURA_PROTOCOL.md §6.5.0.1) — so the raw mean is the ONE transform
+    /// that has missed the Oura app's own displayed value on every full-tier paired night measured
+    /// so far (1/3 as of 2026-08-22, see §6.5.0). `min(sample, 100)` applied PER-SAMPLE before
+    /// averaging (a clamp on the aggregate mean is a different, wrong number) has round-matched
+    /// the app's displayed value on all 3 of those nights — the best track record of the
+    /// candidates tried, edging out the offset−0.32+clamp[85,100] fit (2/3) on this same bar. Not a
+    /// validated calibration (n=3, only the rounded integer, not the app's internal precision) —
+    /// per the derived-biosignal rule (CLAUDE.md), it ships the same way `spo2_candidate_82` ships:
+    /// diagnostic-only, gated behind the display toggle, never written to `spo2Pct`, never scored.
+    ///
+    /// Gated to `spo2SingleChannelPlausible` (50...110) BEFORE the ceiling is applied, so a
+    /// contaminated row (down to -1016) cannot drag the mean down — the ceiling alone only guards
+    /// the top of the range.
+    ///
+    /// The mean is ROUNDED (`.rounded()`), not floored — same fix, same reasoning, as
+    /// `nightlySpo2CandidateMean` just above (found 2026-08-24 comparing a live-persisted 08-23/24
+    /// row against the Oura app: the transform's precise mean, 97.97, round-matched the app's 98%,
+    /// but the shipped `sum / kept` Int division floored it to 97, a spurious miss). All values here
+    /// are positive too, so the rounding-rule choice is again inert. Byte-parity twin of the Kotlin
+    /// `nightlySpo2CeilingMean`.
+    public static func nightlySpo2CeilingMean(_ sessions: [SleepSession],
+                                        spo2: [SpO2Sample]) -> (mean: Int, samples: Int)? {
+        guard !sessions.isEmpty, !spo2.isEmpty else { return nil }
+        var sum = 0, kept = 0
+        for s in spo2 {
+            guard spo2SingleChannelPlausible.contains(s.red) else { continue }
+            guard sessions.contains(where: { $0.start <= s.ts && s.ts <= $0.end }) else { continue }
+            sum += min(s.red, 100); kept += 1
+        }
+        guard kept > 0 else { return nil }
+        return (mean: Int((Double(sum) / Double(kept)).rounded()), samples: kept)
     }
 
     /// #1169 SHADOW METRIC: the primary-session MEAN resting HR — window each detected sleep session's HR

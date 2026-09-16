@@ -19,9 +19,13 @@ private struct ChartWidthKey: PreferenceKey {
 
 struct XiaomiBandView: View {
     @EnvironmentObject var repo: Repository
-    /// The empty state's "Open Data Sources" button routes through the shell (`NavRouter`), because
-    /// neither shell exposes a selection this screen could set directly.
-    @EnvironmentObject var router: NavRouter
+    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
+    @AppStorage(UnitPrefs.distanceSystemKey) private var distanceSystemRaw = ""
+    private var distanceUnitSystem: UnitSystem {
+        UnitPrefs.resolveDistance(
+            system: UnitSystem(rawValue: unitSystemRaw) ?? .metric,
+            override: distanceSystemRaw)
+    }
 
     /// Per-source partition key — matches `XiaomiImporter.deviceId`.
     private static let source = "xiaomi-band"
@@ -110,8 +114,7 @@ struct XiaomiBandView: View {
         ScreenScaffold(title: "Mi Band", subtitle: spanSubtitle.map { "\($0)" },
                        onRefresh: { await repo.refresh() }, lazy: loaded && hasAnyData) {
             if loaded && !hasAnyData {
-                ComingSoon(what: "Nothing imported yet. In Data Sources, choose your Mi Fitness export (a .zip of the Mi Fitness app folder from the Files app) to bring in your steps, heart rate, sleep stages, SpO₂ and stress.",
-                           action: ("Open Data Sources", { router.openDataSources() }))
+                ComingSoon(what: "Nothing imported yet. In Data Sources, choose your Mi Fitness export (a .zip of the Mi Fitness app folder from the Files app) to bring in your steps, heart rate, sleep stages, SpO₂ and stress.")
             } else if !loaded {
                 loadingState
             } else {
@@ -143,11 +146,7 @@ struct XiaomiBandView: View {
     /// data so the scaffold's `LazyVStack` + `ForEach` only build the cards actually on screen.
     private enum PageItem: Identifiable {
         case header(LocalizedStringKey, String)
-        /// `LocalizedStringResource`, not `LocalizedStringKey`, so the title can do both jobs: the
-        /// compiler still extracts the literal into the string catalog, and `String(localized:)` can
-        /// resolve it for the chart's accessibility label — a `LocalizedStringKey` is opaque and left
-        /// every one of these charts announcing itself to VoiceOver as the generic "Trend".
-        case chart(LocalizedStringResource, String, Gradient, ClosedRange<Double>, (Double) -> String)
+        case chart(LocalizedStringKey, String, Gradient, ClosedRange<Double>, (Double) -> String)
         case hypnogram
         var id: String {
             switch self {
@@ -173,7 +172,9 @@ struct XiaomiBandView: View {
             .chart("Sleep score", "sleep_score", accentGradient, 0...100, { "\(Int($0.rounded()))" }),
             .header("Activity & Energy", "Movement"),
             .chart("Steps", "steps", cyanGradient, 0...12000, { intString($0) }),
-            .chart("Distance", "distance_m", cyanGradient, 0...10000, { String(format: "%.2f km", $0 / 1000) }),
+            .chart("Distance", "distance_m", cyanGradient, 0...10000, {
+                UnitFormatter.distanceFromMeters($0, system: distanceUnitSystem)
+            }),
             .chart("Active energy", "energy_kcal", amberGradient, 0...1000, { "\(intString($0)) kcal" }),
             .chart("Intensity minutes", "intensity_min", amberGradient, 0...120, { "\(Int($0.rounded())) min" }),
             .header("Wellbeing", "Body energy"),
@@ -392,7 +393,7 @@ struct XiaomiBandView: View {
     // MARK: - Chart card
 
     @ViewBuilder
-    private func chartCard(title: LocalizedStringResource, key: String, gradient: Gradient,
+    private func chartCard(title: LocalizedStringKey, key: String, gradient: Gradient,
                            fallback: ClosedRange<Double>,
                            fmt: @escaping (Double) -> String) -> some View {
         let rows = resolvedWindow(key)
@@ -408,17 +409,14 @@ struct XiaomiBandView: View {
             return [("Avg", fmt(avg)), ("Min", fmt(lo)), ("Max", fmt(hi)), ("Points", "\(vals.count)")]
         }()
         ChartCard(
-            // Already-resolved text wrapped in an interpolation (renders verbatim), since ChartCard
-            // takes a LocalizedStringKey and the title is now a resource.
-            title: "\(String(localized: title))",
+            title: title,
             subtitle: rangeNote(forKey: key),
             trailing: trailing,
             chart: {
                 if pts.count >= 2 {
                     TrendChart(points: pts, gradient: gradient,
                                valueRange: valueRange(pts, fallback: fallback),
-                               showsArea: true, height: NoopMetrics.chartHeight, valueFormat: fmt,
-                               accessibilityLabel: String(localized: "\(String(localized: title)) trend"))
+                               showsArea: true, height: NoopMetrics.chartHeight, valueFormat: fmt)
                 } else if let only = vals.last {
                     singlePoint(only, fmt: fmt, accent: StrandPalette.sample(stops: gradient.stops, at: 0.85))
                 } else {

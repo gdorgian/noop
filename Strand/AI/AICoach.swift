@@ -330,6 +330,35 @@ final class AICoachEngine: ObservableObject {
     /// would break in every language but English.
     @Published private(set) var lastError: AICoachError?
 
+    // MARK: Ported from ryanbr/noop v11.7 — stored state
+    //
+    // These four live in the class body because Swift forbids stored properties in an extension; the
+    // behaviour built on them sits in `AICoachUpstreamPorts.swift`, which explains each one.
+
+    /// Qualifies `errorText` rather than standing on its own: the view reads it only inside the branch
+    /// that renders an error, so it cannot leave a key editor open under no error. Assigned on every
+    /// failure, so a rejection followed by a rate limit stops claiming to be a rejection.
+    @Published var keyRejected = false
+
+    /// A question handed over by the Today coach launcher sheet, for the coach screen to send on appear
+    /// (#1862). The launcher owns no send, stream, error or consent surface of its own — duplicating
+    /// those is how a second chat UI drifts from the first. Nil is the normal state, and setting it
+    /// performs NO network work by itself.
+    @Published var pendingPrompt: String?
+
+    /// An optional chart image (base64-encoded PNG) to send with the next user message. Set by the
+    /// composer's "Attach chart" control when multimodal is enabled. Consumed (cleared) on the next
+    /// send; nil when no image is attached.
+    @Published var pendingChartImage: String?
+
+    /// Whether a rendered chart may be sent alongside the question to a provider that accepts images.
+    /// Off by default: it puts a picture of the wearer's own data on the wire, so it is opt-in.
+    @Published var multimodalChartEnabled: Bool = UserDefaults.standard.bool(forKey: AICoachEngine.multimodalChartKey) {
+        didSet { UserDefaults.standard.set(multimodalChartEnabled, forKey: AICoachEngine.multimodalChartKey) }
+    }
+
+    static let multimodalChartKey = "ai.multimodalChartEnabled"
+
     /// Record a failure for the UI. Classifies anything that isn't already an `AICoachError` through
     /// `coachTransportError`, so an offline device reads as offline wherever it surfaced — the
     /// providers' own streaming paths throw raw `URLError`s that used to arrive here as CFNetwork prose.
@@ -337,6 +366,10 @@ final class AICoachEngine: ObservableObject {
         let coachError = (error as? AICoachError) ?? coachTransportError(error)
         lastError = coachError
         errorText = coachError.errorDescription
+        // Assigned on EVERY failure, not just a rejection: a bad key followed by a rate limit must stop
+        // claiming to be a rejection, or the error row keeps offering a key editor for a problem a new
+        // key cannot fix. Ported from ryanbr/noop v11.7.
+        if case .badKey = coachError { keyRejected = true } else { keyRejected = false }
     }
 
     /// Clear both halves together: a lingering `lastError` would leave a stale "Retry" under a chat
@@ -344,6 +377,9 @@ final class AICoachEngine: ObservableObject {
     func clearError() {
         errorText = nil
         lastError = nil
+        // `keyRejected` only ever QUALIFIES a live error, so it cannot outlive one — leaving it set here
+        // would render a key editor under no error at all.
+        keyRejected = false
     }
 
     /// Recompute the wake-time-tracking check-in from recent sleep and reschedule. A thin passthrough so
@@ -2489,6 +2525,34 @@ final class AICoachEngine: ObservableObject {
         (3) offer AT MOST ONE small adjustment, and only if it clearly helps. No full plan, no lecture — \
         a conversation, not a briefing.
         """
+    }
+
+    /// The instruction appended to the data context when producing a standalone brief.
+    private static let briefInstruction = """
+    Based on the data above, give me TODAY'S coaching brief in three short parts: \
+    (1) my readiness in one line, citing charge, HRV and rest; \
+    (2) exactly what training to do today and what to avoid; \
+    (3) one specific thing to improve my charge. Be punchy and motivating.
+    """
+
+    /// Produce today's brief as TEXT, without touching the visible transcript.
+    ///
+    /// Ported from ryanbr/noop v11.7 and deliberately distinct from `generateBrief()` below, which
+    /// SPEAKS a brief into the conversation and reports whether it did. The scheduled morning brief
+    /// (`CoachBriefScheduler`) can run with no coach screen open and has to decide for itself where the
+    /// text goes — a notification, a widget, or the chat — so it needs the words, not a side effect.
+    ///
+    /// Non-streaming: a background task has no UI to stream into. Tools are off for the same reason —
+    /// a brief is a summary of data already gathered, not an investigation. Returns nil when not
+    /// configured or consented, on any network failure, or when the reply is empty; never throws.
+    func generateBriefText() async -> String? {
+        guard isConfigured, dataConsent, let key = resolvedKey else { return nil }
+        let context = await buildFullContext()
+        let wire: [(role: ChatMessage.Role, content: String)] =
+            [(.user, context + "\n\n---\n\n" + Self.briefInstruction)]
+        guard let reply = try? await callProvider(key: key, messages: wire, tools: []) else { return nil }
+        let clean = reply.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? nil : clean
     }
 
     /// Shared brief generation: build today's context and ask the provider for the three-part brief.

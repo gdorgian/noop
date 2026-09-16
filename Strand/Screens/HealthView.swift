@@ -139,7 +139,10 @@ private struct SyncStatusSection: View {
     @EnvironmentObject var model: AppModel
 
     /// The strap link is usable for a manual offload kick (matches BLEManager.syncNow's own gate).
-    private var canSync: Bool { live.connected && live.bonded && !live.backfilling }
+    ///
+    /// `historyReady`, not `bonded` alone: the live-HR path sets `bonded` for a 5/MG that has never
+    /// completed a handshake, so this enabled itself and beginBackfill then declined it silently.
+    private var canSync: Bool { live.connected && live.bonded && live.historyReady && !live.backfilling }
 
     var body: some View {
         VStack(alignment: .leading, spacing: NoopMetrics.gap) {
@@ -191,8 +194,10 @@ private struct SyncStatusSection: View {
                     .foregroundStyle(StrandPalette.textSecondary)
             }
         } else {
-            StatePill(live.bonded ? "Ready to sync" : "Pairing…",
-                      tone: .accent, showsDot: true, pulsing: !live.bonded)
+            // Same condition as the button below it. Keyed on `bonded` this said "Ready to sync" directly
+            // above a DISABLED Sync now, on exactly the strap that cannot sync.
+            StatePill(live.historyReady ? "Ready to sync" : "Pairing…",
+                      tone: .accent, showsDot: true, pulsing: !live.historyReady)
         }
     }
 
@@ -203,7 +208,11 @@ private struct SyncStatusSection: View {
         if !live.connected {
             return String(localized: "Connect your strap to sync its stored history. Until then, only imported data shows here.")
         }
-        if !live.bonded {
+        // historyReady, not `bonded`. This branch already said the right thing and simply never fired on
+        // the strap that needed it: `bonded` is set by the live-HR path, so a 5/MG that never completed a
+        // handshake fell through to the "syncs right away" line, under a Sync-now button that had just
+        // been disabled. Same condition as the button and the pill, so all three agree.
+        if !live.historyReady {
             return String(localized: "Finishing the pairing handshake. Sync now becomes available once the strap is paired.")
         }
         return String(localized: "Syncs your strap's stored history right away, instead of waiting for the next automatic sync.")
@@ -667,6 +676,9 @@ private struct FitnessAgeSection: View {
     /// Latest estimated VO₂max (ml/kg/min) from "vo2max_est" — present even without a waist (the Uth
     /// HR-ratio fallback, #1391); a waist upgrades it to the more accurate Nes waist-based estimate.
     @State private var vo2max: Double?
+    /// Estimator captured beside the latest value. nil is an honest legacy-unknown state, never inferred
+    /// from today's waist because the profile may have changed since the point was scored.
+    @State private var vo2maxEstimator: Vo2MaxEstimator?
     @State private var loaded = false
     /// True while a manual "refresh Fitness Age" recompute is running (spinner in the readiness card).
     @State private var refreshing = false
@@ -779,7 +791,21 @@ private struct FitnessAgeSection: View {
 
     /// The younger/older-than-your-age subtitle as whole-phrase variants per count and direction, so
     /// translators see complete sentences (never a stitched plural or direction fragment).
-    private func ageDeltaLine(years: Int, younger: Bool) -> String {
+    private func ageDeltaLine(years: Int, younger: Bool, bound: String = "") -> String {
+        // A bounded reading can only be stated as a direction, never as a distance: the true age is at
+        // or beyond the bound, so a plain "N years younger" would present a floor as a measurement.
+        // "At least N" is the same number said truthfully, and where there is no safe distance to give
+        // (a chronological age at or inside the bound) the line states the bound on its own.
+        if bound == "≤" {
+            if younger && years == 1 { return String(localized: "At least 1 year younger than your age") }
+            if younger && years > 1 { return String(localized: "At least \(years) years younger than your age") }
+            return String(localized: "\(Int(FitnessAgeEngine.minAge)) or younger")
+        }
+        if bound == "≥" {
+            if !younger && years == 1 { return String(localized: "At least 1 year older than your age") }
+            if !younger && years > 1 { return String(localized: "At least \(years) years older than your age") }
+            return String(localized: "\(Int(FitnessAgeEngine.maxAge)) or older")
+        }
         if years == 0 { return String(localized: "About the same as your age") }
         switch (younger, years == 1) {
         case (true, true):   return String(localized: "1 year younger than your age")
@@ -817,6 +843,7 @@ private struct FitnessAgeSection: View {
 
     private func heroCard(age: Double) -> some View {
         let shown = Int(age.rounded())
+        let bound = fitnessAgeBoundSymbol(age)
         let delta = Double(profile.age) - age        // +ve = fitness age younger than chronological
         let years = Int(abs(delta).rounded())
         let younger = delta >= 0
@@ -826,18 +853,20 @@ private struct FitnessAgeSection: View {
                 HStack(alignment: .center, spacing: NoopMetrics.space5) {
                     // The signature liquid gauge anchors the hero: a vessel tinted to the Charge world,
                     // filled by how young the fitness age reads (younger = fuller), with the age counting
-                    // up over it. Same HeroScoreCell idiom as Today; taps fall through to the trend button.
+                    // up over it. Same HeroScoreCell idiom as Today. tapPassesThrough is what actually makes
+                    // taps reach the trend Button: a plain splash gesture on the vessel swallows them.
                     ZStack {
-                        LiquidVessel(value: fitnessAgeFraction(age), tint: StrandPalette.chargeColor, animated: true)
+                        LiquidVessel(value: fitnessAgeFraction(age), tint: StrandPalette.chargeColor,
+                                     animated: true, tapPassesThrough: true)
                             .frame(width: 96, height: 96)
-                        CountUpNumber(value: Double(shown), font: StrandFont.rounded(30))
+                        CountUpNumber(value: Double(shown), font: StrandFont.rounded(30), prefix: bound)
                             .foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.5), radius: 6, y: 1)
                             .allowsHitTesting(false)
                     }
                     VStack(alignment: .leading, spacing: NoopMetrics.space1) {
                         Text("Fitness Age").strandOverline()
-                        Text(ageDeltaLine(years: years, younger: younger))
+                        Text(ageDeltaLine(years: years, younger: younger, bound: bound))
                             .font(StrandFont.subhead)
                             .foregroundStyle(younger ? StrandPalette.statusPositive : StrandPalette.statusWarning)
                     }
@@ -851,6 +880,9 @@ private struct FitnessAgeSection: View {
                             Text("ml/kg/min")
                                 .font(StrandFont.footnote)
                                 .foregroundStyle(StrandPalette.textTertiary)
+                            Text("\(String(localized: "On-device")) · \(vo2MaxEstimatorDisplayName(vo2maxEstimator))")
+                                .font(StrandFont.footnote)
+                                .foregroundStyle(StrandPalette.textTertiary)
                         }
                     }
                     Image(systemName: "chevron.right")
@@ -862,7 +894,24 @@ private struct FitnessAgeSection: View {
             }
             .buttonStyle(LiquidPressStyle())
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Fitness Age \(shown), \(ageDeltaLine(years: years, younger: younger)). Tap to see the trend.")
+            // The spoken label carries the bound too, so a screen reader is not told a floored reading is exact.
+            .accessibilityLabel("Fitness Age \(bound)\(shown), \(ageDeltaLine(years: years, younger: younger, bound: bound)). Tap to see the trend.")
+
+            // At a bound the age has stopped carrying information: every model output past the end of
+            // the scale banks as the same number, so someone still improving sees nothing move (#2184).
+            // The VO₂max in the row above is NOT clamped and is the same estimate this age derives from,
+            // so it keeps resolving where the age cannot. Pointing at it asserts nothing the model cannot
+            // support, which an extended reporting floor could not manage: two more years of range would
+            // still sit inside the ±5 band the line below states.
+            //
+            // FULL WIDTH, beside that band line, rather than inside the VStack holding the vessel and the
+            // delta: that column shares an HStack with the VO₂max readout, so a 44-character sentence
+            // would wrap in half a card and crowd the number it explains.
+            if !bound.isEmpty, vo2max != nil {
+                Text("Fitness Age stops here. VO₂max keeps moving.")
+                    .font(StrandFont.footnote)
+                    .foregroundStyle(StrandPalette.textTertiary)
+            }
 
             Text("± \(Int(FitnessAgeEngine.displayBandYears)) yr · a fitness comparison, not a biological age")
                 .font(StrandFont.footnote)
@@ -911,9 +960,17 @@ private struct FitnessAgeSection: View {
     /// freshest point — the weekly value is keyed to the week's Saturday and refines through the week.
     private func load() async {
         let faPts = await repo.exploreSeries(key: "fitness_age", source: "my-whoop")
-        let vo2Pts = await repo.exploreSeries(key: "vo2max_est", source: "my-whoop")
+        let vo2Resolution = await repo.resolvedSeries(key: "vo2max_est", source: "my-whoop")
         fitnessAge = faPts.last?.value
-        vo2max = vo2Pts.last?.value
+        if let latest = vo2Resolution.points.last {
+            vo2max = latest.value
+            let tag = await repo.scoreProvenanceTag(
+                resolvedSource: latest.source, day: latest.day, metricKey: "vo2max_est")
+            vo2maxEstimator = tag.flatMap { Vo2MaxEstimator(rawValue: $0) }
+        } else {
+            vo2max = nil
+            vo2maxEstimator = nil
+        }
         loaded = true
     }
 }
@@ -1219,14 +1276,16 @@ private struct VitalsSection: View {
     // Temperature display preference (D#103). Skin temp is stored in °C (absolute or a ±deviation); the
     // toggle re-labels it to °F. Display-only — banding still runs on the stored °C value.
     @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
+    @AppStorage(UnitPrefs.skinTempDisplayKey) private var skinTempDisplayRaw = ""   // #1846
     @AppStorage(UnitPrefs.temperatureKey) private var temperatureRaw = ""
     private var temperatureUnit: TemperatureUnit {
         let system = UnitSystem(rawValue: unitSystemRaw) ?? .metric
         return UnitPrefs.resolveTemperature(system: system, override: temperatureRaw)
     }
 
-    // #103: SpO₂ candidate @82 nightly means from metricSeries, loaded when the experimental toggle is ON.
-    // Empty when the toggle is OFF or no candidate data exists (WHOOP 4.0 has no v18 aux stream).
+    // #103/queue-11a: SpO₂ candidate nightly means from metricSeries — WHOOP `spo2_candidate_82`, or an
+    // Oura owner's ceiling@100 `0x6F` mean (device-conditional, see IntelligenceEngine) — loaded when
+    // the experimental toggle is ON. Empty when the toggle is OFF or no candidate data exists.
     @State private var spo2CandidateByDay: [String: Double] = [:]
     @State private var hrvOverCountByDay: [String: Double] = [:]   // #1118
 
@@ -1235,7 +1294,8 @@ private struct VitalsSection: View {
             sourceRows: repo.vitalMetricRows,
             temperatureUnit: temperatureUnit,
             spo2CandidateByDay: spo2CandidateByDay,
-            hrvOverCountByDay: hrvOverCountByDay
+            hrvOverCountByDay: hrvOverCountByDay,
+            skinTempPreferred: SkinTempDisplay.Kind(rawValue: skinTempDisplayRaw) ?? .absolute   // #1846
         )
         VStack(alignment: .leading, spacing: NoopMetrics.gap) {
             SectionHeader("Vital Signs", overline: "Latest", trailing: BodyVitalSigns.latestDayLabel(readings))
@@ -1266,10 +1326,12 @@ private struct VitalsSection: View {
             // from the computed metricSeries. Absent/0 on a clean or imported night → no caveat.
             let ocPts = await repo.exploreSeries(key: "hrv_rr_overcount", source: "my-whoop", days: 14)
             hrvOverCountByDay = Dictionary(ocPts.map { ($0.day, $0.value) }, uniquingKeysWith: { a, _ in a })
-            // #103: load the SpO₂ candidate @82 nightly means from metricSeries when the toggle is ON.
-            // The engine writes "spo2_candidate" under the "-noop" computed device ID; `exploreSeries`
-            // with source "my-whoop" reads it from Layer 2 (computed metricSeries). Empty when the toggle
-            // is OFF (the engine writes nothing) or on a WHOOP 4.0 (no v18 aux stream).
+            // #103/queue-11a: load the SpO₂ candidate nightly means from metricSeries when the toggle is
+            // ON. The engine writes "spo2_candidate" under the "-noop" computed device ID; `exploreSeries`
+            // with source "my-whoop" reads it from Layer 2 (computed metricSeries) — "my-whoop" is the
+            // generic active-strap sentinel, resolved through `computedReadIds`, so this already covers
+            // an Oura ring's own computed id. Empty when the toggle is OFF (the engine writes nothing) or
+            // the owner has no in-band reading for its device.
             guard PuffinExperiment.spo2CandidateDisplayEnabled else {
                 spo2CandidateByDay = [:]
                 return
@@ -1545,3 +1607,21 @@ struct VitalityDemoScreen: View {
     }
 }
 #endif
+
+/// The symbol a stored Fitness Age needs when it is sitting on a reporting bound (#2173).
+///
+/// `FitnessAgeEngine` clamps to [minAge, maxAge], so every model output below 20 is stored as
+/// exactly 20.0 and every output above 80 as exactly 80.0. A reader cannot tell either from a
+/// genuine 20 or 80, and the number looks as exact as every other number on the screen, which is
+/// what makes a floored reading read like a sync or scoring fault rather than the end of the scale.
+///
+/// Decided from the value rather than carried out of the engine, matching the Kotlin twin. The
+/// clamp returns the bound constant itself, so equality is exact and needs no tolerance, and
+/// deciding here covers the weekly rows already banked, which no flag added today could reach.
+/// A reading that is genuinely 20.0 is therefore also called "20 or younger", which is true of it.
+/// Saying "<20" would need the unclamped value, and that is gone before anything is stored.
+func fitnessAgeBoundSymbol(_ value: Double) -> String {
+    if value <= FitnessAgeEngine.minAge { return "≤" }
+    if value >= FitnessAgeEngine.maxAge { return "≥" }
+    return ""
+}

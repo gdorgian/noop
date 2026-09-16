@@ -92,6 +92,7 @@ final class DeviceRegistry: ObservableObject {
     /// Best-effort: a store failure leaves the recordings and published state untouched. Awaits the delete
     /// BEFORE `reload()` so the refreshed device list reflects the emptied recordings.
     func deleteDeviceData(_ id: String, store: WhoopStore) async {
+        guard ImuSessionFileStore.shared.deleteDevice(id) else { return }
         do {
             try await store.deleteAllData(deviceId: id)
         } catch {
@@ -108,6 +109,7 @@ final class DeviceRegistry: ObservableObject {
     /// and refreshes the published list. Best-effort: if the data wipe fails the registry row is left in
     /// place (we never leave orphaned recordings behind a removed row).
     func forget(_ id: String, store: WhoopStore) async {
+        guard ImuSessionFileStore.shared.deleteDevice(id) else { return }
         do {
             try await store.deleteAllData(deviceId: id)
         } catch {
@@ -122,6 +124,13 @@ final class DeviceRegistry: ObservableObject {
     /// connected peripheral back to its registry row. Refreshes the published list. Best-effort.
     func setPeripheralId(_ id: String, peripheralId: String?) {
         try? store.setPeripheralId(id, peripheralId: peripheralId)
+        reload()
+    }
+
+    /// Stamp a device as seen right now — a real connect or disconnect, not every inbound packet, which
+    /// would be a write per second for no more truth. Refreshes the published list. Best-effort. (#1527)
+    func touchLastSeen(_ id: String, at ts: Int = Int(Date().timeIntervalSince1970)) {
+        try? store.touchLastSeen(id, at: ts)
         reload()
     }
 

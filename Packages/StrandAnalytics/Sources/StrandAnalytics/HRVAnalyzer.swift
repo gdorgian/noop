@@ -488,11 +488,57 @@ public enum HRVAnalyzer {
     /// arriving in real time, carrying no timestamps to measure coverage with — and suppressing those
     /// would refuse honest readings, the opposite of the point.
     ///
-    /// Successive-difference statistics (RMSSD, pNN50) are deliberately NOT gated here. Their dominant
-    /// error on a banked stream was the lost within-second emission order (#823, root-caused in #1072),
-    /// which is fixed at the write path; whether they need a gate of their own is a question for a
-    /// post-fix capture to answer, not an assumption to bake in now.
+    /// Successive-difference statistics (RMSSD, pNN50) are not gated HERE, but they are no longer ungated
+    /// by COVERAGE: see `successiveDiffIsTrustworthy` below. The question this comment left open was one for
+    /// a post-fix capture to answer; that capture arrived and answered it yes. Note it answered THIS
+    /// question only. The sibling deferral on `beatValuesAreTrustworthy`, about beat-to-beat accuracy, is
+    /// still open and still waiting on a capture of its own.
     public static func beatSpreadIsTrustworthy(_ verdict: RrCoverageVerdict) -> Bool {
+        switch verdict {
+        case .sameSecondOverCount, .crossSecondOverCount:
+            return false
+        case .plausible, .underCovered, .unmeasurable:
+            return true
+        }
+    }
+
+    /// Whether RMSSD / pNN50 can be trusted from a window with this coverage verdict (#1118).
+    ///
+    /// The sibling of `beatSpreadIsTrustworthy`, and the same two verdicts refuse, but for its own reason
+    /// rather than by borrowing that one's. SDNN is a spread over every interval, so a duplicated beat
+    /// widens it. Successive-difference statistics fail the other way: a beat the heart never produced
+    /// sits next to its neighbour with a near-zero difference, and RMSSD is the root mean square of
+    /// exactly those differences, so an over-counted night reads LOW. Measured on a WHOOP 4.0 night whose
+    /// banked R-R covers 2.13× the wall clock it spans, RMSSD reads 36 ms where the same night's beats
+    /// collapsed read 41 ms; the direction of the error is not obvious from the number, which is precisely
+    /// why it cannot be shown.
+    ///
+    /// The comment on `beatSpreadIsTrustworthy` used to say these were deliberately ungated because their
+    /// dominant error was the lost within-second emission order fixed at the write path (#823 / #1072),
+    /// and that whether they needed a gate of their own was for a post-fix capture to answer. The capture
+    /// arrived: a build carrying that fix, on a WHOOP 4.0, still reports `crossSecondOverCount` on every
+    /// measured night, with 91% of the inflating beat-time on seconds written by more than one delivery.
+    /// The write-path fix did not make the stream clean, so the assumption it licensed no longer holds.
+    ///
+    /// WITHHOLD, DO NOT FABRICATE. This trades a wrong number for a blank on every affected night, which
+    /// is a real cost: HRV is the dominant Charge driver, so a gated night drops that term and renormalises
+    /// the rest. That cost is accepted deliberately. A contaminated RMSSD does not merely display wrong, it
+    /// enters the personal baseline the following nights are scored against, so showing it spreads the
+    /// error into days whose own capture was clean.
+    ///
+    /// THE COST REACHES FURTHER THAN THE CARD, and a reader should know it before widening this rule.
+    /// `Baselines.update` holds on a nil night without advancing `nValid`, so on an install whose EVERY
+    /// night gates, the HRV baseline never reaches `Baselines.minNightsSeed` and stays calibrating
+    /// indefinitely. That is the WHOOP 4.0-only case exactly. It is still the right answer, because the
+    /// alternative is seeding a personal baseline from beats the heart did not produce and scoring every
+    /// later night against it, but it means this gate can leave a strap with no HRV baseline at all rather
+    /// than merely a gap in one. A mixed install is unaffected: its clean nights seed the baseline and the
+    /// gated ones skip-and-hold.
+    ///
+    /// `underCovered` and `unmeasurable` stay trusted for the same reason they do above: neither duplicates
+    /// a beat, and `unmeasurable` is what an honest live spot reading looks like. Pure. Byte-parity twin of
+    /// Kotlin `successiveDiffIsTrustworthy`.
+    public static func successiveDiffIsTrustworthy(_ verdict: RrCoverageVerdict) -> Bool {
         switch verdict {
         case .sameSecondOverCount, .crossSecondOverCount:
             return false
@@ -563,8 +609,12 @@ public enum HRVAnalyzer {
     /// median, so no per-beat artifact rule can see the fault — it is in the decomposition, not in
     /// outliers.
     ///
-    /// Successive-difference statistics (RMSSD, pNN50) are deliberately NOT gated here, for the same
-    /// reason they are not gated by the coverage verdict: that is a question for a capture to answer.
+    /// Successive-difference statistics (RMSSD, pNN50) are deliberately NOT gated here. They ARE now gated
+    /// on the coverage verdict (`successiveDiffIsTrustworthy`), but that is a different fault and a
+    /// different population, and the capture that justified it says nothing about this one. Gating here
+    /// would sweep in the very night described above: coverage 1.03, verdict plausible, and untrustworthy
+    /// only in its decomposition. Refusing those needs its own capture, and inventing one from a WHOOP 4.0
+    /// over-count would be exactly the assumption the paragraph above refused to bake in.
     public static func beatValuesAreTrustworthy(beatAccurateFraction: Double) -> Bool {
         // Negated `<` so a NaN input lands on `true` — NaN means "not measured", and an unmeasured
         // window must not be silently refused. Matches the NaN convention in `classifyCoverage`.
@@ -801,11 +851,93 @@ public enum HRVAnalyzer {
     /// shape as the `%.1f` divergence in #1473, where one platform's formatter rounded a tie the other way.
     /// `x + 0.5` truncated is half-up on both, with no stdlib rounding involved, so the agreement is by
     /// construction rather than by luck. Byte-parity twin of Kotlin `HrvAnalyzer.msToInt`.
+    /// One second's worth of duplicate-pair bookkeeping: how many rows landed on it, the first two
+    /// intervals, and whether every row claimed `ord == 0`. Only a second with EXACTLY two rows, both
+    /// `ord 0`, is an unambiguous two-delivery pair — see `duplicatePairRatios`.
+    final class PairTally {
+        var count = 0
+        var first = 0
+        var second = 0
+        var allOrdZero = true
+        var qualifies: Bool { count == 2 && allOrdZero }
+        func add(ms: Int, ord: Int) {
+            count += 1
+            if count == 1 { first = ms } else if count == 2 { second = ms }
+            if ord != 0 { allOrdZero = false }
+        }
+    }
+
+    /// #1505: when two deliveries wrote the same second, how do their two intervals COMPARE?
+    ///
+    /// `deliveryHistogram` counts how many deliveries wrote each second; it never looks at what they wrote.
+    /// That is the measurement the R-R unit question turns on. A WHOOP 5 emits the beat train live over
+    /// `0x2A37` (spec-fixed 1/1024-second units, converted on the way in) and again inside its v18
+    /// historical record (stored as read). If those are the same beat in two units, a duplicated second
+    /// holds two values 1024/1000 apart. If they are genuinely different beats, the ratios scatter.
+    ///
+    /// Restricted to the unambiguous case: seconds carrying EXACTLY two rows, both `ord == 0`. `ord`
+    /// restarts per delivery, so that is two deliveries each contributing their first beat — not two
+    /// consecutive beats from one record's array, which would read `0` then `1`.
+    ///
+    /// A single such pair proves nothing: 872 vs 893 ms is both the 1024/1000 ratio and an utterly ordinary
+    /// beat-to-beat difference. A POPULATION of them separates the two — a tight cluster at 1.024 is a unit
+    /// mismatch, a broad spread is normal variability. This reports the distribution and takes no view.
+    ///
+    /// Parts-per-thousand in integer arithmetic so Swift and Kotlin cannot round a tie differently.
+    public static func duplicatePairRatios(tsSec: [Int], rrMs: [Double], ords: [Int?]) -> String {
+        let n = min(tsSec.count, rrMs.count, ords.count)
+        guard n > 0 else { return "" }
+        // A tally per second rather than an array per second, matching `SecondTally` above: this runs over
+        // a whole night's beats on the same path, and the histogram beside it was deliberately reduced to
+        // one dictionary and no per-second allocation for exactly that reason.
+        var bySec: [Int: PairTally] = [:]
+        for i in 0 ..< n {
+            guard let o = ords[i] else { continue }
+            let ms = msToInt(rrMs[i])
+            guard ms > 0 else { continue }
+            let tally: PairTally
+            if let t = bySec[tsSec[i]] { tally = t } else { tally = PairTally(); bySec[tsSec[i]] = tally }
+            tally.add(ms: ms, ord: o)
+        }
+        var ppts: [Int] = []
+        for (_, t) in bySec where t.qualifies {
+            let lo = min(t.first, t.second), hi = max(t.first, t.second)
+            guard lo > 0 else { continue }
+            // Int64 so the multiply cannot overflow on a corrupt row — Kotlin's Int is 32-bit and would
+            // wrap where Swift's would not, and a diagnostic that disagrees across platforms is worthless.
+            ppts.append(Int((Int64(hi) * 1_000 + Int64(lo) / 2) / Int64(lo)))   // half-up, parts per thousand
+        }
+        guard !ppts.isEmpty else { return "rr dupPairs n=0" }
+        ppts.sort()
+        // Identical (both deliveries stored the same number), the 1024/1000 signature, or neither.
+        let same = ppts.filter { $0 <= 1_005 }.count
+        let tick = ppts.filter { $0 >= 1_019 && $0 <= 1_029 }.count
+        let med = ppts.count % 2 == 1
+            ? ppts[ppts.count / 2]
+            : (ppts[ppts.count / 2 - 1] + ppts[ppts.count / 2]) / 2
+        return "rr dupPairs n=\(ppts.count) same=\(same) tick=\(tick)"
+            + " other=\(ppts.count - same - tick) medPPT=\(med) spread=\(ppts[0])-\(ppts[ppts.count - 1])"
+    }
+
     static func msToInt(_ ms: Double) -> Int { ms > 0 ? Int(ms + 0.5) : 0 }
 
     /// Whole-percent, integer half-up, so both platforms round a tie the same way. 0 when `total` is 0.
+    ///
+    /// The arithmetic is widened to `Int64` because `deliveryHistogram` passes BEAT-TIME IN
+    /// MILLISECONDS summed over a whole night, not a row count. The numerator is `part * 200 + total`,
+    /// so with `part <= total` it needs more than 32 bits from `total >= 10,683,999` ms (2.97 h of
+    /// beat-time on multi-delivery seconds) and a real over-count night carries 3-4x that. The multiply
+    /// ALONE would survive to `part >= 10,737,419`; the `+ total` term is what brings the bound down, so
+    /// quoting the multiply's limit understates the exposure. `Int` is 64-bit on iOS/macOS so this
+    /// platform read correctly while the Kotlin twin wrapped; it is 32-bit on `arm64_32`, and
+    /// StrandAnalytics already builds for watchOS, so the width is stated rather than inherited.
+    ///
+    /// The wrap did not always land negative, which is the dangerous half: a 100% multi-share 8 h night
+    /// (`pct(28_800_000, 28_800_000)`) returned 25 in 32 bits - positive, plausible, and wrong by 75
+    /// points. A negative percentage was a symptom of this, never the test for it. Twin of Kotlin
+    /// `HrvAnalyzer.pct`.
     static func pct(_ part: Int, _ total: Int) -> Int {
-        total > 0 ? (part * 200 + total) / (total * 2) : 0
+        total > 0 ? Int((Int64(part) * 200 + Int64(total)) / (Int64(total) * 2)) : 0
     }
 
     /// #1008: a compact, deterministic RAW-ROW sample of the beats around the DENSEST second, for the

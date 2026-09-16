@@ -158,6 +158,11 @@ final class SourceCoordinator: ObservableObject {
     ///   • WHOOP active after a strap → stop the strap source + resume WHOOP.
     ///   • A generic strap → pause WHOOP + (re)start `StandardHRSource` for that strap's id.
     func activeDeviceChanged(to id: String) {
+        // #2208: publish whose device this is BEFORE any branch returns. Readouts that show the strap's
+        // charge need it to know the number is not the active device's, and the Apple Watch path below
+        // short-circuits, so setting it inside the WHOOP/strap split would leave a watch reading `true`.
+        live.activeIsWhoop = isWhoop(id)
+
         // The Apple Watch is a HealthKit source with `peripheralId: nil` (see `AppleWatchDevice`): there is
         // no BLE peripheral to connect, and the M1 live read happens entirely in `HealthKitBridge`'s
         // observers + sync, off this BLE coordinator. Short-circuit BEFORE the WHOOP branch so we never
@@ -489,6 +494,16 @@ final class SourceCoordinator: ObservableObject {
 
     // MARK: - Identity adoption
 
+    /// Stamp the row belonging to the strap that just DISCONNECTED, resolved by the identity it adopted
+    /// rather than by whatever is active now. On a multi-WHOOP install those are not the same row: make
+    /// another strap active while this one is live, and stamping "the active row" would record a sighting
+    /// of a strap that was never connected — the same mis-mapping the peripheralId guard above exists to
+    /// prevent. A uuid no row has adopted stamps nothing. (#1527)
+    private func touchLastSeen(forStrap uuid: String) {
+        guard let device = registry.device(forPeripheralId: uuid) else { return }
+        registry.touchLastSeen(device.id)
+    }
+
     /// The BLE engine connected to a WHOOP peripheral (`uuid`). Persist that stable identity onto the
     /// CURRENTLY ACTIVE device when it's a WHOOP and hasn't adopted one yet — so the legacy "my-whoop"
     /// learns its strap's id on first connect, and a freshly-paired WHOOP confirms its identity.
@@ -508,8 +523,16 @@ final class SourceCoordinator: ObservableObject {
         // Track the live strap's uuid for the WHOOP->WHOOP adopt-in-place skip (#74). nil is a
         // disconnect/never-connected republish: clear it so a later make-active can't wrongly match a stale
         // link, then fall through to the existing ignore.
+        let previouslyConnectedTo = connectedWhoopUuid
         connectedWhoopUuid = uuid
-        guard let uuid else { return }
+        guard let uuid else {
+            // Disconnect edge. The strap was in hand right up to this instant, so stamp it NOW rather than
+            // leaving the connect-time value: after a ten-hour overnight session that would have the card
+            // reading "Last seen 10 h ago" the moment the link dropped. Only when we were actually
+            // connected — a nil republish with no prior link is not a sighting. (#1527)
+            if let previouslyConnectedTo { touchLastSeen(forStrap: previouslyConnectedTo) }
+            return
+        }
 
         let activeId = registry.activeDeviceId
         guard isWhoop(activeId),
@@ -519,8 +542,9 @@ final class SourceCoordinator: ObservableObject {
         case .none:
             // First connect for this WHOOP row → adopt the strap's stable identity.
             registry.setPeripheralId(activeId, peripheralId: uuid)
+            registry.touchLastSeen(activeId)
         case .some(uuid):
-            break                               // already adopted this exact strap → nothing to do
+            registry.touchLastSeen(activeId)    // already adopted this exact strap → only the sighting is new
         case .some(let existing):
             // A DIFFERENT strap connected under this WHOOP row. Re-adopt ONLY when this is the #52 stale-pin
             // handoff — i.e. the engine is genuinely encrypted-bonded to the strap whose id just arrived.
@@ -531,6 +555,7 @@ final class SourceCoordinator: ObservableObject {
             if live.encryptedBond {
                 live.append(log: "Multi-WHOOP (#52): active device \(activeId) was pinned to strap \(existing) which refused to bond — re-adopting the working strap \(uuid).")
                 registry.setPeripheralId(activeId, peripheralId: uuid)
+                registry.touchLastSeen(activeId)
             } else {
                 live.append(log: "Multi-WHOOP: active device \(activeId) is registered to strap \(existing) but \(uuid) connected — not overwriting.")
             }
@@ -568,7 +593,9 @@ final class SourceCoordinator: ObservableObject {
     }
 
     /// A device is WHOOP when its brand is "WHOOP" (the seeded `my-whoop` row's brand).
-    static func isWhoop(_ device: PairedDevice) -> Bool {
-        device.id == "my-whoop" || device.brand.caseInsensitiveCompare("WHOOP") == .orderedSame
-    }
+    ///
+    /// #1881 gave the BLE engine the same question to answer, so the rule now lives in ONE place
+    /// (`SourceIdentity`, beside `PairedDevice`) and this delegates. Two spellings of "is this a WHOOP"
+    /// that could disagree is precisely how a strap's samples end up filed under a ring.
+    static func isWhoop(_ device: PairedDevice) -> Bool { SourceIdentity.isWhoop(device) }
 }

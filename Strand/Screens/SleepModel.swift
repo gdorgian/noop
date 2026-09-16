@@ -105,7 +105,18 @@ struct Night {
         let onsetDay = Date(timeIntervalSince1970: TimeInterval(session.effectiveStartTs))
         let wakeDay  = Date(timeIntervalSince1970: TimeInterval(session.endTs))
         let cal = Calendar.current
-        if cal.isDate(onsetDay, inSameDayAs: wakeDay) { return Night.dateFmt.string(from: onsetDay) }
+        // A night that BEGINS after midnight has onset and wake on one calendar date, and naming it
+        // by that date makes it repeat the date the row above already leads with: the carousel is
+        // keyed by wake day, so the night before it woke on this same date. Name it by the evening it
+        // belongs to instead, its wake day minus one, which is what the cross-midnight branch below
+        // already leads with and what Android prints (#2199).
+        //
+        // `byAdding:` rather than subtracting 86_400 seconds: a DST day is 23 or 25 hours long and
+        // the arithmetic form lands on the wrong calendar date.
+        if cal.isDate(onsetDay, inSameDayAs: wakeDay) {
+            let nightDay = cal.date(byAdding: .day, value: -1, to: wakeDay) ?? wakeDay
+            return Night.dateFmt.string(from: nightDay)
+        }
         return "\(Night.spanFmt.string(from: onsetDay)) → \(Night.dateFmt.string(from: wakeDay))"
     }
 
@@ -118,12 +129,12 @@ struct Night {
     // Clock for the Asleep/Woke row — the times people read at a glance. The "jmm" skeleton
     // follows the device's 12-/24-hour setting ("11:42 PM" or "23:42") instead of forcing one
     // on everyone, matching the HR-tooltip / workout times (#337).
-    private static let timeFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = AppLanguage.activeLocale
-        f.setLocalizedDateFormatFromTemplate("jmm")
-        return f
-    }()
+    /// #1821: routed through `AppClock` so the Clock format setting reaches every night time on screen -
+    /// this is the formatter behind the sleep card's ASLEEP/WOKE values in the report. It used the `jmm`
+    /// template, whose `j` resolves the hour from the locale, which is how a reader's explicit 12-hour
+    /// choice was being discarded. `AppClock` caches per resolved template, so this is no more expensive
+    /// than the `static let` it replaces and it responds when the setting changes.
+    private static var timeFmt: DateFormatter { AppClock.hourMinuteFormatter() }
     private static let dateFmt: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "EEE d MMM"; return f
     }()
@@ -137,8 +148,42 @@ struct Night {
 /// `SleepModel.build(_:)` and read by the subviews, so full passes over the day rows / sleep sessions
 /// and the Night.intervals reconstruction no longer run on every render.
 struct SleepModel {
-    /// (latest, typical mean, full history) per metric — mirrors SleepView's per-tile series.
-    typealias Metric = (latest: Double?, typical: Double?, series: [Double])
+    /// (latest, latestDay, typical mean, full history) per metric — mirrors SleepView's per-tile series.
+    /// `latestDay` is the yyyy-MM-dd the `latest` value was carried from (nil when there is no latest
+    /// value, or when the latest value IS today's). #1946: a carried prior-day value is stamped with its
+    /// day so it is not passed off as tonight's read.
+    typealias Metric = (latest: Double?, latestDay: String?, typical: Double?, series: [Double])
+
+    /// #1946: the caption for a metric tile whose `latest` value was carried from a prior day.
+    /// Returns nil when the value is NOT carried (today's own, or no value) so the caller falls through
+    /// to the normal "vs typical" caption. When carried, returns "Carried · <date>" so a prior night's
+    /// number is never passed off as tonight's read. Pure + unit-testable. Mirror EXACTLY in Kotlin.
+    static func carriedMetricCaption(latestDay: String?, latest: Double?) -> String? {
+        guard let latestDay, latest != nil else { return nil }
+        return String(localized: "Carried · \(Self.shortDayLabel(latestDay))")
+    }
+
+    /// "12 Jul" for a "yyyy-MM-dd" key — the SAME format `TodayView.carriedCaption` uses for the
+    /// recovery carry stamp, so a carried Rest on Today and a carried metric on Sleep read identically.
+    static func shortDayLabel(_ key: String) -> String {
+        guard let date = dayKeyParser.date(from: key) else { return key }
+        return Self.shortDayFormatter.string(from: date)
+    }
+
+    private static let dayKeyParser: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
+    private static let shortDayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = AppLanguage.activeLocale
+        f.setLocalizedDateFormatFromTemplate("dMMM")
+        return f
+    }()
 
     let night: Night
     /// Stage intervals for the hypnogram — computed once (Night.intervals is a computed
@@ -169,8 +214,8 @@ struct SleepModel {
 
     let trendPoints: [TrendPoint]
 
-    /// Rolling 14-night sleep-debt ledger: Σ(slept − personal need) across the recent
-    /// fortnight, with the per-night deltas behind it. Computed once per data change.
+    /// Recency-weighted sleep-debt estimate across the latest 14 usable nights, with
+    /// raw per-night deltas for context. Computed once per data change.
     let sleepDebtLedger: SleepDebtLedger
 }
 
@@ -365,7 +410,11 @@ extension SleepModel {
         // `BodyVitalSigns.logicalDayKey` rather than `Repository.logicalDayKey`: same 04:00 boundary,
         // but self-contained, so this stays pure and independent of the @MainActor Repository.
         let fresh = Baselines.freshestCarried(points, todayKey: BodyVitalSigns.logicalDayKey(now))
-        return (fresh?.value, mean(series), series)
+        // #1946: track the day the carried value came from so the tile can stamp it. nil when there is
+        // no carried value, or when the carried value IS today's own (no stamp needed for today's read).
+        let todayKey = BodyVitalSigns.logicalDayKey(now)
+        let latestDay = (fresh != nil && fresh!.day != todayKey) ? fresh!.day : nil
+        return (fresh?.value, latestDay, mean(series), series)
     }
 
     /// Sleep performance %: the imported WHOOP figure when the export carried one for that day;
@@ -392,7 +441,7 @@ extension SleepModel {
         let imported = importedSleep
         if let lastDay = days.last?.day, imported[lastDay]?.consistencyPct != nil {
             let series = days.compactMap { imported[$0.day]?.consistencyPct }
-            return (series.last, mean(series), series)
+            return (series.last, nil, mean(series), series)
         }
         let cal = Calendar.current
         func bedMinutes(_ s: CachedSleepSession) -> Double {
@@ -403,7 +452,7 @@ extension SleepModel {
             return m
         }
         let mins = sleeps.map(bedMinutes)
-        guard mins.count >= 3 else { return (nil, nil, []) }
+        guard mins.count >= 3 else { return (nil, nil, nil, []) }
         var scores: [Double] = []
         for i in mins.indices {
             let lo = Swift.max(0, i - 13)
@@ -414,7 +463,7 @@ extension SleepModel {
             let sd = variance.squareRoot()
             scores.append(Swift.max(0, Swift.min(100, 100 * (1 - sd / 120))))
         }
-        return (scores.last, mean(scores), scores)
+        return (scores.last, nil, mean(scores), scores)
     }
 
     /// Hours vs needed % = asleep / need. The imported sleep_need_min wins per day; else the
@@ -443,20 +492,23 @@ extension SleepModel {
         metric(days: days) { $0.respRateBpm }
     }
 
-    /// Sleep debt (minutes): the imported sleep_debt_min when the export carried it; else the
-    /// APPROXIMATE per-night need − (main sleep + nap sleep), floored at 0.
+    /// Sleep debt (minutes): imported `sleep_debt_min` remains export-verbatim. Otherwise use
+    /// the same recency-weighted ledger as the card, including nap credit and its 14-night window.
     static func sleepDebtSeries(days: [DailyMetric], importedSleep: [String: ImportedSleepFigures],
                                 napSleepMinByDay: [String: Double]) -> Metric {
-        let imported = importedSleep
         let need = debtNeedMin(days: days)   // #242: normative need, not the self-referential mean
-        let series = days.compactMap { d -> Double? in
-            if let debt = imported[d.day]?.debtMin { return debt }   // minutes, export-verbatim
-            guard let asleep = SleepDebt.creditedSleepMin(
+        let credited = days.map { d in
+            (day: d.day, totalSleepMin: SleepDebt.creditedSleepMin(
                 mainSleepMin: d.totalSleepMin,
-                napSleepMin: napSleepMinByDay[d.day] ?? 0), need > 0 else { return nil }
-            return Swift.max(0, need - asleep)   // APPROXIMATE fallback
+                napSleepMin: napSleepMinByDay[d.day] ?? 0))
         }
-        return (series.last, mean(series), series)
+        let importedDebt = importedSleep.compactMapValues(\.debtMin)
+        let series = SleepDebt.debtSeries(
+            series: credited,
+            needHours: need / 60.0,
+            importedDebtMin: importedDebt
+        ).map(\.value)
+        return (series.last, nil, mean(series), series)
     }
 
     // MARK: Trend points
@@ -469,10 +521,9 @@ extension SleepModel {
 
     // MARK: Sleep-debt ledger
 
-    /// The rolling 14-night sleep-debt ledger from the cached daily metrics. Measures against the
-    /// normative `debtNeedMin` (the engine's `personalizedNeedHours`) — the SAME need the per-night
-    /// "Sleep Debt" tile uses, so the running-balance card and the tile agree — over each main night's
-    /// `totalSleepMin` plus actual asleep minutes from separately-recorded naps. (#242)
+    /// The 14-night recency-weighted estimate from cached daily metrics. It measures against the
+    /// normative `debtNeedMin` (the engine's `personalizedNeedHours`) — the SAME need and recurrence
+    /// the local "Sleep Debt" tile uses — and credits actual asleep minutes from separate naps. (#242)
     static func debtLedger(days: [DailyMetric], napSleepMinByDay: [String: Double]) -> SleepDebtLedger {
         SleepDebt.ledger(
             series: days.map { day in

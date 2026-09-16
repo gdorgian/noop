@@ -5,13 +5,6 @@ import UserNotifications
 @main
 struct StrandApp: App {
     init() {
-        // Install the wearer's awake window before ANYTHING stages a night — see the iOS twin.
-        SleepSchedulePrefs.apply()
-        // One-time migration off the retired card/button/both Coach-entry picker onto the three
-        // independent entry toggles (banner/header-icon/floating-button). No-op after the first launch
-        // that has them. Must run before any Today/RootTabView reads its @AppStorage default.
-        CoachEntryPrefs.migrateIfNeeded()
-
         // #1008: pin the pre-change Overnight-only default for existing installs before
         // anything reads it. Idempotent; a no-op on fresh installs and after the first launch.
         PuffinExperiment.migrateContinuousHrvOvernightDefault()
@@ -29,22 +22,23 @@ struct StrandApp: App {
         // Foreground presentation: without a delegate, macOS suppresses a notification's banner while the
         // app is frontmost, so a reminder tested with NOOP open would show nothing. Mirrors iOS.
         UNUserNotificationCenter.current().delegate = NotificationPresenter.shared
-        // Register the check-in's action buttons before any notification can arrive — a category a
-        // notification names but nobody registered simply shows no buttons, silently.
-        CoachCheckIn.registerCategory()
+        // K5: tapping a scheduled morning-brief notification routes to Coach via the shared NavRouter.
+        let router = NavRouter()
+        _router = StateObject(wrappedValue: router)
+        NotificationPresenter.shared.onCoachBriefTapped = { [weak router] in router?.openCoach() }
     }
 
     @StateObject private var model = AppModel()
     /// Shared cross-screen navigation hook (e.g. Live → Devices). The macOS shell (`RootView`)
     /// observes it and drives the sidebar selection.
-    @StateObject private var router = NavRouter()
+    @StateObject private var router: NavRouter
     /// #267: drives a foreground sync kick when the window becomes active (no scenePhase hook
     /// existed on macOS before this).
     @Environment(\.scenePhase) private var scenePhase
     /// Appearance preference (System/Light/Dark). Default follows the OS; the Settings picker writes it.
     @AppStorage(AppearanceMode.storageKey) private var appearanceRaw = AppearanceMode.system.rawValue
     /// Chart data-colour style (Titanium / Classic throwback). Re-colours gauges + charts.
-    @AppStorage(ChartStyle.storageKey) private var chartStyleRaw = ChartStyle.fallback.rawValue
+    @AppStorage(ChartStyle.storageKey) private var chartStyleRaw = ChartStyle.titanium.rawValue
     /// Chrome accent colour (mint / WHOOP blue / custom). Chrome only — never the data colour worlds.
     @AppStorage(AccentColor.storageKey) private var accentRaw = AccentColor.mint.rawValue
     @AppStorage(AccentColor.customHexKey) private var accentCustomHex = AccentColor.defaultCustomHex
@@ -83,17 +77,7 @@ struct StrandApp: App {
                 // Single-param form (not the two-param `{ _, phase in }`) — that overload needs macOS 14,
                 // this target is macOS 13.
                 .onChange(of: scenePhase) { phase in
-                    if phase == .active {
-                        model.ble.requestSync(.foreground)
-                        // Re-learn the wake-time-tracking check-in from fresh sleep. No-op unless the
-                        // check-in is on and set to .afterWake; keeps the repeating trigger in step with
-                        // the user's actual wake time rather than a clock time that drifts.
-                        Task { await CoachCheckIn.refreshDynamicScheduleIfNeeded(repo: model.repo) }
-                        Task {
-                            await PlanReconciliationCoordinator.reconcile(repo: model.repo)
-                            await GoalTrackingStore.shared.refresh(repo: model.repo)
-                        }
-                    }
+                    if phase == .active { model.ble.requestSync(.foreground) }
                 }
         }
         .windowStyle(.hiddenTitleBar)

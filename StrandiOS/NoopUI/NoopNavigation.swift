@@ -63,6 +63,17 @@ enum NoopMotion {
     // `tick` is linear and continuous — the elapsed numeral, the import fill, the charge drain.
     // It is deliberately not an Animation: easing a clock makes it run fast in the middle.
 
+    /// Returns `animation` normally, or nil (instant, no animation) when Reduce Motion is on, so a
+    /// `withAnimation` / `.animation(_:value:)` call site snaps straight to the final frame.
+    ///
+    /// Mirrors `StrandDesign.NoopMotion.gated`. This shell-level `NoopMotion` shadows that one inside the
+    /// app module, so a shared screen calling `NoopMotion.gated(...)` would otherwise resolve here and
+    /// fail to compile on iOS while compiling fine on macOS.
+    @inline(__always)
+    static func gated(_ animation: Animation, reduced: Bool) -> Animation? {
+        reduced ? nil : animation
+    }
+
     /// How the last route change arrived, which is what decides whether the screen rises.
     enum Arrival {
         case pushed

@@ -204,9 +204,11 @@ final class ConnectionReadoutTests: XCTestCase {
         XCTAssertEqual(
             ConnectionReadout.clockLatchedLabel(deviceClockUnix: nil, strapNewestUnix: 1_782_475_600),
             "yes")
+        // #1823: no clock was READ on this path - it is the 5/MG fallback, where the only evidence is
+        // how the strap dated its records. The wording must not claim a clock reading.
         XCTAssertEqual(
             ConnectionReadout.clockLatchedLabel(deviceClockUnix: nil, strapNewestUnix: 40_000_000),
-            "no (RTC reads 1970/71)")
+            "no (records dated 1970/71)")
         XCTAssertEqual(
             ConnectionReadout.clockLatchedLabel(deviceClockUnix: nil, strapNewestUnix: nil),
             "no (waiting for the strap clock)")
@@ -224,8 +226,140 @@ final class ConnectionReadoutTests: XCTestCase {
                      "no signal seen yet must not fabricate a fault")
     }
 
+    /// #1818: the remedy must track the battery. A charged strap told to "charge to 100%" is the bug
+    /// the field report hit - the user had already done it, twice.
+    func testRtcWarningRemedyTracksBattery() {
+        let flat = ConnectionReadout.rtcWarning(deviceClockUnix: 40_000_000, strapNewestUnix: nil,
+                                                batteryPct: 40)
+        XCTAssertEqual(flat?.contains("Charge the strap to 100%"), true,
+                       "a low strap keeps the charge advice - a flat battery really does reset the RTC")
+
+        let charged = ConnectionReadout.rtcWarning(deviceClockUnix: 40_000_000, strapNewestUnix: nil,
+                                                   batteryPct: 100)
+        XCTAssertEqual(charged?.contains("Charge the strap to 100%"), false,
+                       "an already-charged strap must not be sent round the loop it just ran")
+        XCTAssertEqual(charged?.contains("already charged"), true)
+        XCTAssertEqual(charged?.contains("strap log"), true, "it must name the next actionable step")
+        // The charged copy must stay true for EVERY strap. "NOOP re-sends the clock on every connect"
+        // holds on WHOOP4 but not on a 5/MG, where the write is gated behind didBond and an unbondable
+        // strap (#1635) is never clocked at all - the strap most likely to be showing this warning.
+        XCTAssertEqual(charged?.contains("every connect"), false,
+                       "no model-specific mechanism claim in copy shown to every model")
+
+        // Pin the VALUE, not just the symbol: feeding the constant back into the function under test
+        // can never catch a wrong threshold, and nothing else would catch it drifting away from the
+        // Kotlin twin - the two platforms would each keep passing while giving different advice.
+        XCTAssertEqual(ConnectionReadout.rtcAlreadyChargedPct, 95)
+
+        // Boundary, from both sides, with literals: inclusive at 95, charge advice at 94.
+        let atThreshold = ConnectionReadout.rtcWarning(deviceClockUnix: 40_000_000,
+                                                       strapNewestUnix: nil, batteryPct: 95)
+        XCTAssertEqual(atThreshold?.contains("already charged"), true)
+        let justBelow = ConnectionReadout.rtcWarning(deviceClockUnix: 40_000_000,
+                                                     strapNewestUnix: nil, batteryPct: 94)
+        XCTAssertEqual(justBelow?.contains("Charge the strap to 100%"), true)
+
+        // Battery not read yet: we only withdraw advice on evidence, so the default stands.
+        let unknown = ConnectionReadout.rtcWarning(deviceClockUnix: 40_000_000, strapNewestUnix: nil)
+        XCTAssertEqual(unknown?.contains("Charge the strap to 100%"), true)
+
+        // A sane clock stays silent no matter how full the battery is.
+        XCTAssertNil(ConnectionReadout.rtcWarning(deviceClockUnix: 1_782_475_600,
+                                                  strapNewestUnix: 1_782_475_000, batteryPct: 100))
+    }
+
+    /// #1809: the epitaph exists so a strap log can STATE that nothing arrived, rather than a reporter
+    /// inferring it from the fact that every logged line happened to be outgoing.
+    func testLinkEpitaph() {
+        let silent = ConnectionReadout.linkEpitaph(upMillis: 4_123, inboundFrames: 0, inboundBytes: 0,
+                                                   cmdChannelFrames: 0, realtimeArmed: false,
+                                                   ended: "CBError.connectionTimeout(6)")
+        XCTAssertEqual(silent,
+                       "Link epitaph: up 4123ms, inbound 0 frames / 0 bytes (cmd-channel 0), "
+                       + "realtime armed=no, ended=CBError.connectionTimeout(6)"
+                       + " - the strap sent NOTHING on this link")
+
+        // A link that carried traffic must NOT claim silence.
+        let alive = ConnectionReadout.linkEpitaph(upMillis: 61_000, inboundFrames: 812,
+                                                  inboundBytes: 40_990, cmdChannelFrames: 9,
+                                                  realtimeArmed: true, ended: "intentional")
+        XCTAssertEqual(alive,
+                       "Link epitaph: up 61000ms, inbound 812 frames / 40990 bytes (cmd-channel 9), "
+                       + "realtime armed=yes, ended=intentional")
+        XCTAssertFalse(alive.contains("NOTHING"))
+
+        // Negatives are clamped rather than printed: a monotonic-clock hiccup must not emit "up -3ms".
+        XCTAssertTrue(ConnectionReadout.linkEpitaph(upMillis: -3, inboundFrames: -1, inboundBytes: -9,
+                                                    cmdChannelFrames: -2, realtimeArmed: false,
+                                                    ended: "x")
+                        .hasPrefix("Link epitaph: up 0ms, inbound 0 frames / 0 bytes (cmd-channel 0)"))
+    }
+
     func testLastFrameLabel() {
         XCTAssertEqual(ConnectionReadout.lastFrameLabel(lastFrameUnix: 990, nowUnix: 1_002), "12s ago")
         XCTAssertEqual(ConnectionReadout.lastFrameLabel(lastFrameUnix: nil, nowUnix: 1_002), "no frames yet")
+    }
+}
+
+/// #2117: the R-R transport line, which separates "banked nothing" from "banked beats the policy refused".
+final class UniversalTraceRRTransportTests: XCTestCase {
+
+    /// A device the WHOOP 5 unit policy does not govern says nothing at all, so a WHOOP 4 export is
+    /// byte-unchanged by this line existing.
+    func testANonStrictDeviceEmitsNothing() {
+        XCTAssertNil(UniversalTrace.rrTransportLine(strictWhoop5: false, firstRecordedUnix: 1_750_000_000,
+                                                    firstScorableUnix: nil))
+    }
+
+    /// The state that blanks every night at once: beats on disk, none the policy will score. This is the
+    /// one worth recognising at a glance, because it looks identical to "no data" from the analyzer's side.
+    func testBeatsOnDiskButNoneScorableIsNamed() {
+        let line = UniversalTrace.rrTransportLine(strictWhoop5: true, firstRecordedUnix: 1_750_000_000,
+                                                  firstScorableUnix: nil)
+        XCTAssertNotNil(line)
+        XCTAssertTrue(line!.contains("scorable=none"))
+        XCTAssertTrue(line!.contains("unscorableHistory=yes"))
+    }
+
+    /// A strap that has never banked a beat is a DIFFERENT report from one whose beats were refused, and
+    /// the line must not blur them: no "unscorableHistory" claim when there is no history to be unscorable.
+    func testNoHistoryAtAllIsNotReportedAsUnscorable() {
+        let line = UniversalTrace.rrTransportLine(strictWhoop5: true, firstRecordedUnix: nil,
+                                                  firstScorableUnix: nil)
+        XCTAssertEqual(line, "rrTransport recorded=none scorable=none")
+        XCTAssertFalse(line!.contains("unscorableHistory"))
+    }
+
+    /// Partly scorable: the gap is what says how much history was refused, and it is the number that
+    /// distinguishes "upgraded last week" from "lost a year".
+    func testAPartlyScorableHistoryReportsTheGapInDays() {
+        let line = UniversalTrace.rrTransportLine(strictWhoop5: true, firstRecordedUnix: 1_750_000_000,
+                                                  firstScorableUnix: 1_750_000_000 + 30 * 86_400)
+        XCTAssertNotNil(line)
+        XCTAssertTrue(line!.contains("unscorableHistory=yes"))
+        XCTAssertTrue(line!.contains("gapDays=30"))
+    }
+
+    /// The WHOLE line, byte for byte, with the identical literal pinned on the Kotlin side.
+    ///
+    /// The other cases here assert fragments, which would let the two platforms drift on anything a
+    /// `contains` does not look at: field order, spacing, or the shared date format. A report is diffed
+    /// across platforms, so the line has to be the same line, not merely the same facts.
+    func testTheWholeLineIsPinnedByteForByte() {
+        XCTAssertEqual(
+            UniversalTrace.rrTransportLine(strictWhoop5: true, firstRecordedUnix: 1_750_000_000,
+                                           firstScorableUnix: 1_752_592_000),
+            "rrTransport recorded=2025-06-15 15:06:40 scorable=2025-07-15 15:06:40 unscorableHistory=yes gapDays=30"
+        )
+    }
+
+    /// Fully scorable from the first beat: nothing was refused, and the line must say so plainly rather
+    /// than leaving a reader to infer it from a missing field.
+    func testAFullyScorableHistorySaysSo() {
+        let line = UniversalTrace.rrTransportLine(strictWhoop5: true, firstRecordedUnix: 1_750_000_000,
+                                                  firstScorableUnix: 1_750_000_000)
+        XCTAssertNotNil(line)
+        XCTAssertTrue(line!.contains("unscorableHistory=no"))
+        XCTAssertTrue(line!.contains("gapDays=0"))
     }
 }

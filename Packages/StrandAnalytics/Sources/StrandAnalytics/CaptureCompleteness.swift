@@ -15,7 +15,9 @@ import Foundation
 // Everything here is PURE and side-effect-free: it takes the active-domain set and the already-redacted
 // report text and returns values. No I/O, no clock, no PII (it only counts token occurrences). The token map
 // is the single declarative source of truth shared by the report renderer and the meta field. No em-dashes.
-// The Kotlin twin is CaptureCompleteness.kt, kept aligned by a parity test (same tokens, same status words).
+// Android's `ReportCompleteness` in
+// `android/app/src/main/java/com/noop/testcentre/ReportCompleteness.kt` is the architectural counterpart;
+// it has its own status vocabulary, token maps, and domain-selection rules.
 
 /// Whether a domain that was active during the capture produced its killer trace.
 public enum CaptureStatus: String, Sendable, Codable, Equatable {
@@ -70,7 +72,10 @@ public enum CaptureCompleteness {
         .dataImport: ["import stage=", "rowsIn="],
         .steps:      ["stepsRaw", "stepsCal"],
         .battery:    ["bank soc=", "socSeries"],
-        .recovery:   ["charge term", "charge score=", "charge nilScore"],
+        // "charge day=" for the same reason as the Kotlin twin: IntelligenceEngine re-emits every
+        // recovery trace line as `charge day=<day> ` + the body, so none of the three variants this
+        // used to name could ever match and the domain reported MISSING on every capture.
+        .recovery:   ["charge day="],
         .hrv:        ["hrv rmssd=", "hrv result=", "hrv nightSummary"],
         .universal:  ["dayOwner ", "strapClock "],
     ]

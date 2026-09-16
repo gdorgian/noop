@@ -64,6 +64,16 @@ final class ProfileStore: ObservableObject {
     @Published var stepsCalibrationManual: Bool { didSet { d.set(stepsCalibrationManual, forKey: K.stepsManualFlag) } }
     /// User-set manual coefficient. 0 = auto-fit (nil to the engine); > 0 = manual override.
     @Published var stepsManualCoefficient: Double { didSet { d.set(max(0, stepsManualCoefficient), forKey: K.stepsManualCoeff) } }
+    /// #1816: true when the strap has banked ANY motion (gravity samples → `dayMotionIntensity > 0`)
+    /// in the calibration scan window. Written by `IntelligenceEngine` on every analytics pass so it
+    /// tracks a fresh strap's first sync without a separate query. The Today tile reads this to decide
+    /// whether "Need N more days where your phone also counted steps" is the honest caption or a lie:
+    /// a step estimate is `motion * coefficient`, so with the motion half missing neither the estimate
+    /// nor the fit moves however many phone-counted days the user collects. The caption that names only
+    /// the phone half is actively misleading — it sent a field reporter to enter Apple Health steps by
+    /// hand expecting calibration to start, which it cannot without strap motion. Twin of Android's
+    /// `ProfileStore.stepsHasBankedMotion`.
+    @Published var stepsHasBankedMotion: Bool { didSet { d.set(stepsHasBankedMotion, forKey: K.stepsHasMotion) } }
 
     // ── Profile picture (optional, on-device only) ──────────────────────────────────────────────
     /// The user's chosen profile photo as JPEG bytes, or nil for the default SF-Symbol fallback.
@@ -111,6 +121,7 @@ final class ProfileStore: ObservableObject {
         static let stepsConfidence = "profile.stepsCalibrationConfidence"
         static let stepsManualFlag = "profile.stepsCalibrationManual"
         static let stepsManualCoeff = "profile.stepsManualCoefficient"
+        static let stepsHasMotion = "profile.stepsHasBankedMotion"
         static let avatar = "profile.avatarImageData"
     }
 
@@ -165,6 +176,7 @@ final class ProfileStore: ObservableObject {
         stepsCalibrationConfidence = d.object(forKey: K.stepsConfidence) as? Double ?? 0
         stepsCalibrationManual = d.object(forKey: K.stepsManualFlag) as? Bool ?? false
         stepsManualCoefficient = max(0, d.object(forKey: K.stepsManualCoeff) as? Double ?? 0)
+        stepsHasBankedMotion = d.object(forKey: K.stepsHasMotion) as? Bool ?? false
         avatarImageData = d.data(forKey: K.avatar)
         name = d.string(forKey: K.name) ?? ""
     }
@@ -278,6 +290,62 @@ final class ProfileStore: ObservableObject {
     var hrZoneSet: HRZoneSet {
         HRZones.zones(config: hrZoneConfig, maxHR: Double(hrMax),
                       autoSource: hrMaxOverride > 0 ? "manual" : "tanaka")
+    }
+
+    // MARK: Upstream compatibility — flat bpm thresholds
+    //
+    // Upstream models custom zones as one flat `[Int]` of bpm lower bounds; this fork models them as an
+    // `HRZoneConfig` with an explicit mode, because it also supports PERCENT bounds and has to remember
+    // both sets while the user switches between them. Upstream's settings screen is carried in this
+    // tree, so these two map its flat view onto the config without narrowing the model: reading returns
+    // the bpm bounds only when that is the live mode, and writing sets `.bpm` (or clears to `.auto`),
+    // leaving any stored percent bounds untouched.
+
+    /// Five personalized inclusive zone starts in bpm; empty = not on custom bpm zones.
+    var hrZoneThresholds: [Int] {
+        get {
+            let config = hrZoneConfig
+            guard config.mode == .bpm,
+                  HRZones.validatedBpmEdges(lowerBpm: config.bpmLowerBounds,
+                                            maxHR: Double(hrMax)) != nil else { return [] }
+            return config.bpmLowerBounds.map { Int($0.rounded()) }
+        }
+        set {
+            if newValue.isEmpty {
+                setHRZoneConfig(.auto)
+            } else {
+                setHRZoneConfig(HRZoneConfig(mode: .bpm,
+                                             percentLowerBounds: hrZoneConfig.percentLowerBounds,
+                                             bpmLowerBounds: newValue.map(Double.init)))
+            }
+        }
+    }
+
+    /// Move one boundary while preserving strict ordering. Neighbour-aware clamps make it impossible for
+    /// the stepper to create a gap, an overlap, or a set the validator would reject — the floor and
+    /// ceiling here are the same `minBpmEdge` / `minBpmGap` rules `HRZones.validatedBpmEdges` enforces,
+    /// so a step can never produce a config that silently degrades back to `.auto`.
+    func stepHRZoneThreshold(at index: Int, up: Bool) {
+        var next = hrZoneThresholds
+        guard next.indices.contains(index) else { return }
+        let gap = Int(HRZones.minBpmGap.rounded(.up))
+        let low = index == 0
+            ? Int(HRZones.minBpmEdge.rounded(.up))
+            : next[index - 1] + gap
+        let high = index == next.count - 1
+            ? hrMax - gap
+            : next[index + 1] - gap
+        guard low <= high else { return }   // no room between neighbours -> no-op
+        next[index] = min(max(next[index] + (up ? 1 : -1), low), high)
+        hrZoneThresholds = next
+    }
+
+    /// Enable by seeding the editor with boundaries that classify integer bpm exactly like the
+    /// conventional percentages; disabling removes the override and immediately restores defaults.
+    func setCustomHRZonesEnabled(_ enabled: Bool) {
+        hrZoneThresholds = enabled
+            ? HRZones.defaultBpmLowerBounds(maxHR: Double(hrMax)).map { Int($0.rounded()) }
+            : []
     }
 
     /// Store a validated configuration. Returns false (and changes nothing) when the mode's bounds

@@ -10,6 +10,7 @@
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).semanticmemory</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).sveaproactive</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).healthwriteback</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).rescore</string>
 	</array>
 	<key>CADisableMinimumFrameDuration</key>
 	<true/>
@@ -72,8 +73,12 @@
 	<string>Noop writes the metrics it computes from your strap back into Apple Health, on-device and only when you allow it.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Noop records your route during an outdoor workout to show distance, pace and a map, including while the screen is off. The route is stored locally unless you export or back up the activity.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Noop uses the microphone only when you ask Svea a question by voice. Audio is transcribed on your iPhone; only the resulting text can be sent to the provider you configured.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Noop reads your iPhone's step count for a walking or running workout and shows it in the activity summary. It stays local unless you export or back up the activity.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Noop transcribes your spoken question on your iPhone so you can ask Svea without typing. Audio is not sent to the configured AI provider.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NoopCommitSHA</key>
@@ -89,6 +94,7 @@
 		<string>bluetooth-central</string>
 		<string>location</string>
 		<string>fetch</string>
+		<string>processing</string>
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>

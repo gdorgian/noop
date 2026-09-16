@@ -667,6 +667,15 @@ public enum StrandPalette {
         case .titanium: return Color(light: "#3A80D6", dark: "#4A90E2")
         }
     }
+    /// The bright blue line colour for a rest/sleep card, resolved per palette.
+    ///
+    /// Introduces no new value: it selects the existing token that reads as the bright blue in each
+    /// palette. The families are not parallel — classic's `restBright` is a PURPLE accent while the
+    /// other palettes' is the blue, and classic's `restColor` is the blue where theirs is a muted
+    /// steel — so a card naming either token directly gets the right colour in one palette and the
+    /// wrong one in the others. Ported from ryanbr/noop v11.7.
+    public static var restLine: Color { isClassic ? restColor : restBright }
+
     public static var restGradient: Gradient { Gradient(colors: [restDeep, restBright]) }
 
     /// Stress — blue→gold→orange world / Classic green→amber→red / Apple Health

@@ -242,8 +242,12 @@ enum LiquidRender {
     ///
     /// `scrubIndex` (nil = not scrubbing) pins a crosshair + dot on that sample, so a finger dragged
     /// across the thread has something to point at while the caller's readout follows it.
+    /// - Parameter segments: per-value line identity from `hrGapSegments`, or nil for a series known to
+    ///   be contiguous. Values whose ids differ are stroked as SEPARATE subpaths, so a stretch the strap
+    ///   never recorded reads as a break instead of a straight climb across it (#2082). Nil produces
+    ///   byte-for-byte the path this drew before, which is what keeps the live 1 Hz stream untouched.
     static func thread(_ base: GraphicsContext, _ size: CGSize, values: [Double], now: Double,
-                       tint: Color, scrubIndex: Int? = nil) {
+                       tint: Color, scrubIndex: Int? = nil, segments: [String]? = nil) {
         guard values.count >= 2 else { return }
         let w = size.width, h = size.height, pad = LiquidThreadGeometry.pad
         // Plot geometry lives in ONE place (LiquidThreadGeometry) so the drawn curve and a scrub
@@ -253,21 +257,47 @@ enum LiquidRender {
         let n = values.count
         func px(_ i: Int) -> Double { LiquidThreadGeometry.x(index: i, count: n, width: w) }
         func py(_ v: Double) -> Double { LiquidThreadGeometry.y(value: v, bounds: bounds, height: h) }
-        func curve() -> Path {
-            var p = Path()
-            p.move(to: CGPoint(x: px(0), y: py(values[0])))
-            for i in 1..<(n - 1) {
+        func appendRun(_ p: inout Path, _ lo: Int, _ hi: Int) {
+            // A lone bucket between two gaps is real data, and it has to draw as something. A bare `move`
+            // strokes nothing at all, and a ZERO-length line is at the mercy of whether the renderer keeps
+            // a degenerate subpath alive for its round cap. Give it a hair of width instead, so the cap has
+            // something to round and the reading is a dot rather than a coin flip. Losing it would be the
+            // same class of lie as the joined line this change removes: data on screen that is not there.
+            guard hi > lo else {
+                let x = px(lo), y = py(values[lo])
+                p.move(to: CGPoint(x: x - 0.6, y: y))
+                p.addLine(to: CGPoint(x: x + 0.6, y: y))
+                return
+            }
+            p.move(to: CGPoint(x: px(lo), y: py(values[lo])))
+            for i in (lo + 1)..<hi {
                 let xc = (px(i) + px(i + 1)) / 2, yc = (py(values[i]) + py(values[i + 1])) / 2
                 p.addQuadCurve(to: CGPoint(x: xc, y: yc), control: CGPoint(x: px(i), y: py(values[i])))
             }
-            p.addLine(to: CGPoint(x: px(n - 1), y: py(values[n - 1])))
+            p.addLine(to: CGPoint(x: px(hi), y: py(values[hi])))
+        }
+        // Resolved ONCE, outside `curve()`. That closure is called twice per frame and this runs inside a
+        // 60fps TimelineView, so leaving the walk in there re-split the whole series 120 times a second for
+        // an answer that cannot change between strokes.
+        // One run when nothing says otherwise, and that run is the exact path this drew before.
+        var runs: [ClosedRange<Int>] = [0...(n - 1)]
+        if let segs = segments, segs.count == n { runs = hrGapRuns(segments: segs) }
+        func curve() -> Path {
+            var p = Path()
+            for r in runs { appendRun(&p, r.lowerBound, r.upperBound) }
             return p
         }
         var ctx = base
-        ctx.stroke(curve(), with: .color(tint.opacity(0.9)), style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
-        // travelling glint
+        // Built ONCE. The glint strokes the same geometry as the line under it, and this runs inside a
+        // 60fps TimelineView, so building it per stroke walked the whole series twice a frame for two
+        // identical paths.
+        let line = curve()
+        ctx.stroke(line, with: .color(tint.opacity(0.9)), style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
+        // Travelling glint. The dash pattern restarts at each subpath, so a day broken into several runs
+        // shows a tick per run rather than one glint travelling the whole line. Cosmetic, and the honest
+        // alternative (one glint walking across gaps) would re-assert the continuity this change removes.
         let phase = -(now * 55).truncatingRemainder(dividingBy: 414)
-        ctx.stroke(curve(), with: .color(.white.opacity(0.55)),
+        ctx.stroke(line, with: .color(.white.opacity(0.55)),
                    style: StrokeStyle(lineWidth: 1.1, lineCap: .round, dash: [14, 400], dashPhase: phase))
         // endpoint pulse
         let ex = px(n - 1), ey = py(values[n - 1])
@@ -332,10 +362,34 @@ enum LiquidThreadGeometry {
 /// `animated: false` renders a single static frame (no TimelineView, no CoreMotion) — the small
 /// gauges in card rows / vitals slosh imperceptibly at 26–30pt but each cost a live 30fps Canvas,
 /// so they pose still and CoreAnimation caches them. The big hero gauges stay animated.
+/// Applies the splash tap either as a normal tap (consuming it) or as a simultaneous gesture (sharing
+/// it with whatever wraps the view).
+///
+/// A plain `onTapGesture` inside a `NavigationLink` swallows the tap, so the link never pushes. That is
+/// why the hero rings could splash but not navigate. `simultaneousGesture` lets both run, which is the
+/// behaviour a tappable gauge wants; standalone vessels keep the consuming tap so nothing else changes.
+private struct LiquidSplashTap: ViewModifier {
+    let passesThrough: Bool
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        if passesThrough {
+            content.simultaneousGesture(TapGesture().onEnded { action() })
+        } else {
+            content.onTapGesture { action() }
+        }
+    }
+}
+
 struct LiquidVessel: View {
     let value: Double?
     let tint: Color
     var animated: Bool = true
+    /// When the vessel sits inside a NavigationLink or Button, the splash tap must not CONSUME the
+    /// tap or the wrapping control never fires. Opt in and the splash runs as a simultaneous gesture
+    /// instead, so both happen: the liquid still splashes and the link still pushes. Default false
+    /// keeps every standalone vessel byte-identical (#1995).
+    var tapPassesThrough: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var motion = NoopMotionState.shared
@@ -346,10 +400,13 @@ struct LiquidVessel: View {
     /// True once the liquid has stopped moving and the clock has stood down. See `gauge`.
     @State private var atRest = false
 
-    init(value: Double?, tint: Color, animated: Bool = true) {
+    // The custom init exists to seed `_sim` from `value`, which also means the memberwise init is NOT
+    // synthesised: any new stored property has to be threaded through here or callers cannot pass it.
+    init(value: Double?, tint: Color, animated: Bool = true, tapPassesThrough: Bool = false) {
         self.value = value
         self.tint = tint
         self.animated = animated
+        self.tapPassesThrough = tapPassesThrough
         _sim = State(initialValue: LiquidSim(target: value ?? 0))
     }
 
@@ -383,7 +440,7 @@ struct LiquidVessel: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .contentShape(Circle())
-        .onTapGesture { sim.splash(12); splashes &+= 1; atRest = false }
+        .modifier(LiquidSplashTap(passesThrough: tapPassesThrough) { sim.splash(12); splashes &+= 1; atRest = false })
         .liquidTapHaptic(trigger: splashes)   // light tap feedback (guarded so the primitives compile on macOS 13)
         .onChangeCompat(of: value) { _ in atRest = false }
         .onChangeCompat(of: wake.tiltEpoch) { _ in atRest = false }
@@ -474,6 +531,10 @@ struct LiquidTube: View {
 /// call sites that don't scrub are unchanged.
 struct LiquidThread: View {
     let bpm: [Double]
+    /// Per-value line identity from `hrGapSegments`, or nil for a series known to be contiguous (#2082).
+    /// The live 1 Hz stream passes nil and is drawn exactly as before; the banked 5-minute fallback passes
+    /// ids so the hours a strap recorded nothing read as breaks rather than a climb across them.
+    var segments: [String]? = nil
     var tint: Color = Color(.sRGB, red: 1, green: 107/255, blue: 129/255, opacity: 1)
     var height: CGFloat = 96
     var animated: Bool = true
@@ -490,7 +551,8 @@ struct LiquidThread: View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { tl in   // 60fps to flow smoothly on ProMotion
             let now = liquidSeconds(tl.date)
             Canvas { context, size in
-                LiquidRender.thread(context, size, values: bpm, now: now, tint: tint, scrubIndex: scrubIndex)
+                LiquidRender.thread(context, size, values: bpm, now: now, tint: tint,
+                                    scrubIndex: scrubIndex, segments: segments)
             }
         }
         .frame(height: height)
@@ -499,7 +561,8 @@ struct LiquidThread: View {
     /// One-shot render (no travelling glint / pulse) — used until first data load settles.
     private var staticThread: some View {
         Canvas { context, size in
-            LiquidRender.thread(context, size, values: bpm, now: 0, tint: tint, scrubIndex: scrubIndex)
+            LiquidRender.thread(context, size, values: bpm, now: 0, tint: tint,
+                                scrubIndex: scrubIndex, segments: segments)
         }
         .frame(height: height)
     }
@@ -584,12 +647,16 @@ struct CountUpNumber: View, Animatable {
     /// byte-identical; the WHOOP 0–21 Effort scale passes 1 so the hero matches the app-wide one-decimal
     /// `effortDisplay` convention instead of rounding 12.6 → "13" (#45).
     var decimals: Int = 0
+    /// Rendered ahead of the number and never animated, for a value that is bounded rather than
+    /// measured: Fitness Age arrives clamped, so a reading at the edge of the scale shows "≤20" while
+    /// the count-up still runs (#2173). Empty by default, which leaves every existing caller identical.
+    var prefix: String = ""
     var animatableData: Double {
         get { value }
         set { value = newValue }
     }
     var body: some View {
-        Text(decimals > 0 ? String(format: "%.\(decimals)f", value) : "\(Int(value.rounded()))")
+        Text(prefix + (decimals > 0 ? String(format: "%.\(decimals)f", value) : "\(Int(value.rounded()))"))
             .font(font).monospacedDigit()
     }
 }
@@ -769,6 +836,8 @@ struct LiquidScoreGauge: View {
     var captionText: String? = nil
     var numberColor: Color = StrandPalette.textPrimary
     var captionColor: Color = StrandPalette.textTertiary
+    /// Forwarded to `LiquidVessel` so a gauge inside a link still splashes AND still navigates (#1995).
+    var tapPassesThrough: Bool = false
 
     @State private var shown: Double = 0
 
@@ -778,7 +847,8 @@ struct LiquidScoreGauge: View {
 
     var body: some View {
         ZStack {
-            LiquidVessel(value: frac, tint: tint, animated: animated)
+            LiquidVessel(value: frac, tint: tint, animated: animated,
+                         tapPassesThrough: tapPassesThrough)
                 .frame(width: diameter, height: diameter)
             VStack(spacing: captionText == nil ? 0 : 1) {
                 Group {

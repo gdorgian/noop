@@ -246,21 +246,72 @@ public final class OuraDriver {
         return Int(seconds)
     }
 
+    /// How far the ring's clock may run AHEAD of `lowerBoundTicks` and still be recognised. The bound is a
+    /// stale resume cursor or the oldest ring-time a drain has seen, either of which can trail the ring's
+    /// clock by the ring's whole banked depth (~14 days) plus however long the cursor has been stuck — the
+    /// original 7-day window silently excluded exactly that case: in the 2026-09-02/03 iOS captures an
+    /// 8.2-day-stale cursor could never be re-anchored, so it could never advance, so the staleness only
+    /// grew — one full re-serve of the same window per launch, forever. Both readings fit the window only
+    /// when `window >= 9 × lowerBound`, i.e. a ring under ~5 days of clock; that case is settled by
+    /// `syncTimeAnchorAdjacencyTicks` below, never by preference.
+    public static let syncTimeAnchorWindowTicks: Int64 = 38_880_000   // 45 days of 100 ms ticks
+
+    /// How close to `lowerBoundTicks` a reading must sit to be IDENTIFIED rather than merely plausible, and
+    /// how far a ticks reading may trail the bound. One hour of 100 ms ticks. Two facts set it:
+    /// (1) the bound can post-date the reply — `OuraHistoryDrain.maxSeenRingTime` is fed by records that
+    /// land AFTER the 0x13 was answered, and the ring keeps ticking, so the reply's own clock legitimately
+    /// sits a few ticks (or a whole drain's worth) BELOW the newest record; (2) the two readings differ by
+    /// `9 × value`, so once the drain's ring-times are within an hour of one of them, the other is days away
+    /// and the unit is settled by the ring's own records, not by a guess. Found on a Ring 5 with under five
+    /// days of clock (2026-09-15, a user bundle): a reply 22 ticks below the drain's newest record was
+    /// excluded as "before the floor", the ×10 reading was the only one left inside the 45-day window, and
+    /// the whole session was filed 41 days in the past.
+    public static let syncTimeAnchorAdjacencyTicks: Int64 = 36_000   // 1 hour of 100 ms ticks
+
     /// Resolve the 0x13 SyncTime-response device timestamp into ring TICKS, or nil when no unambiguous
     /// reading exists. ringverse BLE.md labels the field "seconds" but the ring's record clock runs in
     /// 100 ms ticks, so both readings are tried: the raw value (already ticks) and value×10 (seconds→
-    /// ticks). The ring's clock at connect must sit shortly AFTER where the last drain ended, so a
-    /// candidate is plausible iff it falls in `[historyCursor, historyCursor + 7 days]`; exactly one
-    /// must fit (ambiguity or a fresh/reset cursor → nil → the caller logs raw instead of guessing).
+    /// ticks). A candidate is plausible iff it falls in `[lowerBoundTicks − adjacency, lowerBoundTicks +
+    /// syncTimeAnchorWindowTicks]` — the ring's clock at the reply sits after any ring-time known BEFORE
+    /// the reply, and at most `syncTimeAnchorAdjacencyTicks` before one learned after it. Then:
+    ///
+    /// - only the ticks reading fits → ticks (the ordinary case on a ring with days of clock: ×10 lands
+    ///   beyond the window);
+    /// - both fit (a ring under ~5 days of clock) → the reading within `syncTimeAnchorAdjacencyTicks` of
+    ///   the bound, if exactly one is — the drain's own ring-times identify the unit; otherwise nil, and
+    ///   the caller parks the reply until the drain has caught up to the present;
+    /// - only the ×10 reading fits → it, but ONLY when adjacent. No capture on either ring generation has
+    ///   ever produced a seconds-unit reply (every anchor on file resolved as ticks), so the label alone
+    ///   does not earn adoption; the drain's ring-times must corroborate it. A ticks reply that has fallen
+    ///   more than an hour behind the bound is therefore nil, never silently ×10.
+    ///
+    /// `lowerBoundTicks` is any ring-time known to precede the ring's clock NOW: the persisted resume
+    /// cursor at connect, or — when that is 0 (fresh pair / post-reboot reset) or too stale — the largest
+    /// envelope ring-time the drain has actually seen (`OuraHistoryDrain.maxSeenRingTime`), which needs no
+    /// anchor to read and so breaks the cursor↔anchor deadlock (2026-09-02/03 captures).
+    ///
     /// Pure and testable; the honest-data invariant is "no anchor beats a wrong anchor".
-    public static func syncTimeAnchorCandidate(responseValue: UInt32, historyCursor: UInt32) -> UInt32? {
-        guard historyCursor > 0 else { return nil }
-        let lower = Int64(historyCursor)
-        let upper = lower + 6_048_000   // 7 days of 100 ms ticks
-        let readings = [Int64(responseValue), Int64(responseValue) * 10]
-        let fits = readings.filter { $0 >= lower && $0 <= upper && $0 <= Int64(UInt32.max) }
-        guard fits.count == 1 else { return nil }
-        return UInt32(fits[0])
+    public static func syncTimeAnchorCandidate(responseValue: UInt32, lowerBoundTicks: UInt32) -> UInt32? {
+        guard lowerBoundTicks > 0 else { return nil }
+        let lower = Int64(lowerBoundTicks)
+        let floor = lower - syncTimeAnchorAdjacencyTicks
+        let upper = lower + syncTimeAnchorWindowTicks
+        let ticks = Int64(responseValue)
+        let secondsX10 = Int64(responseValue) * 10
+        func plausible(_ v: Int64) -> Bool { v >= floor && v <= upper && v <= Int64(UInt32.max) }
+        func adjacent(_ v: Int64) -> Bool { abs(v - lower) <= syncTimeAnchorAdjacencyTicks }
+        switch (plausible(ticks), plausible(secondsX10)) {
+        case (true, false):
+            return UInt32(ticks)
+        case (false, true):
+            return adjacent(secondsX10) ? UInt32(secondsX10) : nil
+        case (true, true):
+            if adjacent(ticks), !adjacent(secondsX10) { return UInt32(ticks) }
+            if adjacent(secondsX10), !adjacent(ticks) { return UInt32(secondsX10) }
+            return nil
+        case (false, false):
+            return nil
+        }
     }
 
     /// Adopt a ring-time→UTC anchor from the 0x13 SyncTime response pair (`rt` = the ring's clock counter

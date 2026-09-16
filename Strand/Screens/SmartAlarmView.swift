@@ -242,6 +242,27 @@ struct SmartAlarmView: View {
                             .font(StrandFont.footnote)
                             .foregroundStyle(StrandPalette.textSecondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        // #1706: ask the strap what it actually has stored. The readback was otherwise
+                        // only reachable by ARMING, so anyone whose alarm is off could not produce the
+                        // frame that explains a wrong reported time.
+                        //
+                        // Shown unconditionally, where the Android twin hides it until bonded. That is a
+                        // deliberate platform difference, not drift: the Android card already observes
+                        // LiveState, so gating there is free, while this view does not — and pulling
+                        // `live` in would re-render the whole alarm screen on every 1 Hz HR tick, which
+                        // this codebase keeps parent views clear of on purpose. `getStrapAlarm` no-ops
+                        // and logs when nothing is connected, so the worst case is one ignored write.
+                        Divider().overlay(StrandPalette.hairline)
+                        Button {
+                            model.ble.getStrapAlarm()
+                        } label: {
+                            Text("Check what the strap has stored")
+                        }
+                        .buttonStyle(NoopButtonStyle(.secondary, fullWidth: true))
+                        Text("The answer from the strap appears in your strap log and debug export, with the raw bytes it replied with.")
+                            .font(StrandFont.footnote)
+                            .foregroundStyle(StrandPalette.textTertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -345,6 +366,9 @@ struct SmartAlarmView: View {
                     if !on {
                         for weekday in 1...7 { WindDownNudge.setWakeOverride(weekday: weekday, minutes: nil) }
                         overrides = [:]
+                        // #1864: re-arm the strap alarm + backup notification so they drop the per-day
+                        // times and revert to the single default, matching the wind-down nudge's revert.
+                        model.applySmartAlarm()
                     }
                 }
         }
@@ -375,6 +399,9 @@ struct SmartAlarmView: View {
                 Button {
                     WindDownNudge.setWakeOverride(weekday: weekday, minutes: nil)
                     overrides[weekday] = nil
+                    // #1864: re-arm so clearing an override reverts that day's wake to the default time
+                    // on the strap alarm + backup notification too, not just the wind-down nudge.
+                    model.applySmartAlarm()
                 } label: {
                     Image(systemName: "arrow.uturn.backward")
                         .font(.system(size: 12, weight: .semibold))
@@ -407,6 +434,10 @@ struct SmartAlarmView: View {
                 let m = (c.hour ?? 7) * 60 + (c.minute ?? 0)
                 WindDownNudge.setWakeOverride(weekday: weekday, minutes: m)
                 overrides[weekday] = m
+                // #1864: re-arm the strap alarm + backup notification so the new per-day time takes
+                // effect immediately, not just the wind-down reminder. Without this the override moved
+                // only the evening nudge and left the wake on the default time.
+                model.applySmartAlarm()
             }
         )
     }

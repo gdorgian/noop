@@ -126,9 +126,9 @@ public final class StandardHRSource: NSObject, ObservableObject {
 
     // MARK: - Sample buffer
 
-    /// Buffered (hr, rr, ts) readings, flushed to `persist` in batches to keep the write path off
+    /// Buffered (hr, rr, contact, ts) readings, flushed to `persist` in batches to keep the write path off
     /// the per-notification hot loop.
-    private var buffer: [(hr: Int, rr: [Int], ts: Int)] = []
+    private var buffer: [(hr: Int, rr: [Int], contact: StandardHRContact, ts: Int)] = []
     private var lastFlush: Date = .init()
     /// Flush thresholds — whichever trips first.
     private let flushCount = 30
@@ -230,8 +230,8 @@ public final class StandardHRSource: NSObject, ObservableObject {
 
     // MARK: - Buffer / persistence
 
-    private func enqueue(hr: Int, rr: [Int]) {
-        buffer.append((hr: hr, rr: rr, ts: Int(Date().timeIntervalSince1970)))
+    private func enqueue(hr: Int, rr: [Int], contact: StandardHRContact) {
+        buffer.append((hr: hr, rr: rr, contact: contact, ts: Int(Date().timeIntervalSince1970)))
         if buffer.count >= flushCount || Date().timeIntervalSince(lastFlush) >= flushInterval {
             flush()
         }
@@ -240,7 +240,8 @@ public final class StandardHRSource: NSObject, ObservableObject {
     private func flush() {
         guard !buffer.isEmpty else { lastFlush = Date(); return }
         for sample in buffer {
-            persist(StandardHRMapping.samples(fromHR: sample.hr, rr: sample.rr, at: sample.ts))
+            persist(StandardHRMapping.samples(fromHR: sample.hr, rr: sample.rr,
+                                               contact: sample.contact, at: sample.ts))
         }
         buffer.removeAll()
         lastFlush = Date()
@@ -304,7 +305,7 @@ extension StandardHRSource: @preconcurrency CBCentralManagerDelegate {
         seenPeripherals[id] = peripheral
         let advName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
         let name = advName ?? peripheral.name ?? "Heart Rate Strap"
-        if firstSight { log("HR-strap: found \(name) (\(id)) rssi \(RSSI.intValue)") }
+        if firstSight { log("HR-strap: found \(LiveState.logSafeDeviceName(name)) (\(id)) rssi \(RSSI.intValue)") }
         let strap = DiscoveredStrap(id: id, name: name, rssi: RSSI.intValue)
         discovered = Self.upsertByProximity(discovered, strap)
         // If we were scanning specifically to reach this strap (a not-yet-cached active strap), connect now
@@ -478,6 +479,6 @@ extension StandardHRSource: @preconcurrency CBPeripheralDelegate {
         live.heartRate = parsed.hr
         live.setRRIntervals(parsed.rr)
         live.connected = true
-        enqueue(hr: parsed.hr, rr: parsed.rr)
+        enqueue(hr: parsed.hr, rr: parsed.rr, contact: parsed.contact)
     }
 }

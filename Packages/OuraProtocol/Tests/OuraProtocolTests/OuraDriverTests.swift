@@ -659,13 +659,25 @@ final class OuraDriverTests: XCTestCase {
         ])
     }
 
-    func testIngestNotificationDecodesOnlyFirstPacketWhenBytesLookPacked() {
-        // Defensive: if a notification ever carries bytes that LOOK like two packed records, only the
-        // first is decoded (one lenient packet per notification) — the trailing bytes are ignored, never
-        // walked into phantom records. Documents the open_oura contract.
+    func testIngestNotificationDecodesEveryPacketWhenTheValueTilesExactly() {
+        // A notification that tiles exactly into two complete packets decodes BOTH (the ring packs like
+        // this when serving the official app, 2026-09-15 — see `OuraReassembler.feed`). The 0x46 temp
+        // record carries two 0.05 °C samples, so three events come out of the one value.
         let d = OuraDriver(ringGen: .gen3, authKey: key)
         let reassembler = OuraReassembler()
         let value = bytes("7b060200010003ca" + "460802000100420e470e")
+        let events = d.ingest(notification: value, reassembler: reassembler)
+        XCTAssertEqual(events, [.spo2(OuraSpO2(ringTimestamp: rt, value: 970)),
+                                .temp(OuraTemp(ringTimestamp: rt, celsius: 36.5)),
+                                .temp(OuraTemp(ringTimestamp: rt, celsius: 36.55))])
+    }
+
+    func testIngestNotificationDecodesOnlyFirstPacketWhenTheTailDoesNotTile() {
+        // Defensive, the phantom-storm guarantee: bytes after the first packet that do NOT form whole
+        // packets ending on the value's last byte are ignored, never walked into phantom records.
+        let d = OuraDriver(ringGen: .gen3, authKey: key)
+        let reassembler = OuraReassembler()
+        let value = bytes("7b060200010003ca" + "460802000100420e47")   // 0x46's declared len overshoots
         let events = d.ingest(notification: value, reassembler: reassembler)
         XCTAssertEqual(events, [.spo2(OuraSpO2(ringTimestamp: rt, value: 970))])
     }
@@ -694,6 +706,17 @@ final class OuraDriverTests: XCTestCase {
         // tz is a signed half-hour offset in the trailing byte: +4 (=UTC+2) -> 0x04; -4 -> 0xFC.
         XCTAssertEqual(OuraCommands.syncTime(unixSeconds: 0, tzHalfHours: 4).bytes.last, 0x04)
         XCTAssertEqual(OuraCommands.syncTime(unixSeconds: 0, tzHalfHours: -4).bytes.last, 0xFC)
+    }
+
+    func testLiveHRDisableWritesModeOffNotAutomatic() {
+        // 0x00 = "off" per OURA_PROTOCOL.md s7.2's APK-sourced feature-mode table; 0x01 is "automatic"
+        // and was falsified on two hardware nights (green 0x28 kept arriving after the old 0x01 write).
+        XCTAssertEqual(OuraCommands.liveHRDisable().bytes, [0x2F, 0x03, 0x22, 0x02, 0x00])
+    }
+
+    func testLiveHRUnsubscribeWritesSubscriptionOff() {
+        // Matching teardown for the enable triplet's step 3 (subscribe "latest" = 0x02).
+        XCTAssertEqual(OuraCommands.liveHRUnsubscribe().bytes, [0x2F, 0x03, 0x26, 0x02, 0x00])
     }
 
     // MARK: - Dangerous commands are isolated and labelled

@@ -22,6 +22,7 @@ enum DashboardCard: String, CaseIterable, Identifiable {
     case restingHr
     case respiratory
     case steps
+    case stepsAverage30
     case stress
     case fitnessAge
     case vo2max
@@ -37,6 +38,13 @@ enum DashboardCard: String, CaseIterable, Identifiable {
     /// adds it via CUSTOMISE, matching the manual-first / default-OFF posture.
     case coupled
 
+    /// Optional, default-OFF (#1862): a tap-through that opens the Coach launcher SHEET rather than pushing
+    /// a screen — the one card that does. Coach is otherwise buried in More, and entering it means leaving
+    /// Today. Like `coupled` it carries no metric value of its own and is absent from `defaultSelection`, so
+    /// a fresh install never shows it: someone who does not use a provider should not gain a fixed dashboard
+    /// row for one. Opening the sheet makes NO provider request — see `CoachLauncherSheet`.
+    case coach
+
     var id: String { rawValue }
 
     /// The card's display label (the UPPERCASE WHOOP metric-row label is derived from this). Localized via
@@ -48,6 +56,7 @@ enum DashboardCard: String, CaseIterable, Identifiable {
         case .restingHr:   return String(localized: "Resting HR")
         case .respiratory: return String(localized: "Respiratory")
         case .steps:       return String(localized: "Steps")
+        case .stepsAverage30: return String(localized: "30-day step average")
         case .stress:      return String(localized: "Stress")
         case .fitnessAge:  return String(localized: "Fitness Age")
         case .vo2max:      return String(localized: "VO₂ Max")
@@ -58,6 +67,7 @@ enum DashboardCard: String, CaseIterable, Identifiable {
         case .calories:    return String(localized: "Calories")
         case .hydration:   return String(localized: "Hydration")
         case .coupled:     return String(localized: "Coupled view")
+        case .coach:       return String(localized: "Coach")
         }
     }
 
@@ -69,6 +79,7 @@ enum DashboardCard: String, CaseIterable, Identifiable {
         case .restingHr:   return String(localized: "Resting heart rate")
         case .respiratory: return String(localized: "Breaths per minute")
         case .steps:       return String(localized: "Today")
+        case .stepsAverage30: return String(localized: "Rolling average over the last 30 days")
         case .stress:      return String(localized: "Autonomic load")
         case .fitnessAge:  return String(localized: "Updated weekly")
         case .vo2max:      return String(localized: "Estimated, updated weekly")
@@ -79,6 +90,9 @@ enum DashboardCard: String, CaseIterable, Identifiable {
         case .calories:    return String(localized: "Active energy")
         case .hydration:   return String(localized: "Today's fluid")
         case .coupled:     return String(localized: "Recovery, strain and sleep in one glance")
+        // Reuses the Coach screen's own subtitle, so the card and the screen describe the feature
+        // identically and no new copy needs translating into ten locales.
+        case .coach:       return String(localized: "Ask about your charge, effort, rest and workouts, grounded in your own numbers.")
         }
     }
 
@@ -88,7 +102,7 @@ enum DashboardCard: String, CaseIterable, Identifiable {
         case .hrv:         return "waveform.path.ecg"
         case .restingHr:   return "heart.fill"
         case .respiratory: return "lungs.fill"
-        case .steps:       return "figure.walk"
+        case .steps, .stepsAverage30: return "figure.walk"
         case .stress:      return "bolt.heart"
         case .fitnessAge:  return "figure.run"
         case .vo2max:      return "lungs"
@@ -99,6 +113,7 @@ enum DashboardCard: String, CaseIterable, Identifiable {
         case .calories:    return "flame.fill"
         case .hydration:   return "waterbottle.fill"
         case .coupled:     return "circle.hexagongrid.fill"
+        case .coach:       return "bubble.left.and.text.bubble.right.fill"
         }
     }
 
@@ -108,7 +123,7 @@ enum DashboardCard: String, CaseIterable, Identifiable {
         case .hrv:         return "ms"
         case .restingHr:   return "bpm"
         case .respiratory: return "rpm"
-        case .steps:       return ""
+        case .steps, .stepsAverage30: return ""
         case .stress:      return ""
         case .fitnessAge:  return "yrs"
         case .vo2max:      return ""    // the estimated VO₂max number alone; ml/kg/min is too long for a tile
@@ -119,6 +134,7 @@ enum DashboardCard: String, CaseIterable, Identifiable {
         case .calories:    return "kcal"
         case .hydration:   return ""    // value bakes in "<total> / <goal> L" itself
         case .coupled:     return ""    // a tap-through row, no value, so no unit
+        case .coach:       return ""    // likewise: a launcher row, no metric of its own
         }
     }
 
@@ -143,6 +159,17 @@ enum DashboardCard: String, CaseIterable, Identifiable {
 enum DashboardCardPrefs {
     /// UserDefaults key, a JSON array of `DashboardCard` ids in display order.
     static let selectionKey = "today.dashboardCards"
+
+    /// Preserve a prior explicit opt-in once, then let Your Cards own the preference.
+    static func migrateLegacyStepsAverage(defaults: UserDefaults = .standard) {
+        let legacy = (defaults.string(forKey: "today.keyMetrics") ?? "")
+            .split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard legacy.contains("stepsAverage30") else { return }
+        var enabled = decodeEnabled(defaults.string(forKey: selectionKey) ?? "")
+        if !enabled.contains(.stepsAverage30) { enabled.append(.stepsAverage30) }
+        defaults.set(encode(enabled), forKey: selectionKey)
+        defaults.set(legacy.filter { $0 != "stepsAverage30" }.joined(separator: ","), forKey: "today.keyMetrics")
+    }
 
     /// Encode an ordered list of enabled cards into the stored JSON string. Falls back to a comma-joined
     /// string if JSON encoding ever fails (it won't for [String]), so the value is always decodable.

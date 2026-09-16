@@ -13,7 +13,8 @@ import OuraProtocol
 ///
 /// The fix is deliberately NOT a de-duplication: both rows are real measurements, so the channel is
 /// LABELLED at decode, both rows are STORED, and the scoring read takes one. These tests pin all three
-/// halves of that sentence, plus the thing a channel filter can most easily break — a legacy NULL row.
+/// halves of that sentence, plus the two things a channel filter can most easily break — a WHOOP row
+/// (NULL forever, one beat source) and a pre-v32 row (NULL, never labelled).
 final class RrSourceChannelTests: XCTestCase {
     private let ts = 1_750_000_000
 
@@ -50,18 +51,16 @@ final class RrSourceChannelTests: XCTestCase {
         XCTAssertEqual(s.rr.map(\.srcChannel), [nil])
     }
 
-    /// Oura's cases are pinned to the same raw values on purpose. RRSourceChannel also appends WHOOP
-    /// transport cases, so equality is asserted for Oura's domain rather than by total case count.
+    /// The two enums are pinned to the same raw values on purpose: they are one durable storage code
+    /// split across two packages only because `OuraProtocol` does not depend on `WhoopProtocol`.
     func testTheTwoChannelEnumsAgreeCaseForCaseAndCodeForCode() {
+        XCTAssertEqual(OuraIBIChannel.allCases.count, RRSourceChannel.allCases.filter { !$0.isWhoop5Transport }.count)
         for c in OuraIBIChannel.allCases {
             let mapped = OuraStreamMapping.rrChannel(c)
             XCTAssertEqual(mapped?.rawValue, c.rawValue,
                            "\(c) must map to the SAME durable storage code on both sides")
         }
         XCTAssertNil(OuraStreamMapping.rrChannel(nil))
-        XCTAssertEqual(RRSourceChannel.whoopStandardBLE.rawValue, 5)
-        XCTAssertEqual(RRSourceChannel.whoopHistorical.rawValue, 6)
-        XCTAssertEqual(RRSourceChannel.whoopRealtime.rawValue, 7)
     }
 
     // MARK: - The migration
@@ -139,9 +138,9 @@ final class RrSourceChannelTests: XCTestCase {
         XCTAssertEqual(RRSourceChannel.ibiBare.rawValue, 4)
     }
 
-    /// Legacy WHOOP rows predate transport provenance and remain readable. A whitelist filter would
-    /// have deleted every such night from scoring.
-    func testLegacyWhoopRowsCarryNoChannelAndAreNeverFiltered() async throws {
+    /// The regression the filter could most easily cause. A WHOOP strap has ONE beat source, so its
+    /// rows carry no channel — a whitelist filter would have deleted every WHOOP night from scoring.
+    func testWhoopRowsCarryNoChannelAndAreNeverFiltered() async throws {
         let store = try await WhoopStore.inMemory()
         try await store.upsertDevice(id: "strap", mac: nil, name: nil)
         let beats = [812, 795, 840, 801, 833]
@@ -150,7 +149,7 @@ final class RrSourceChannelTests: XCTestCase {
 
         let stored = try await store.rrRowsWithChannelForTest(deviceId: "strap")
         XCTAssertEqual(stored.map(\.srcChannel), Array(repeating: nil, count: 5),
-                       "NULL is the preserved value for rows written before transport provenance")
+                       "NULL is the honest value for a single-source strap, not a placeholder")
         let read = try await store.rrIntervals(deviceId: "strap", from: 0, to: ts + 10, limit: 100)
         XCTAssertEqual(read.map(\.rrMs), beats, "emission order (#823) is unchanged by the filter")
         XCTAssertEqual(read.map(\.srcChannel), Array(repeating: nil, count: 5))

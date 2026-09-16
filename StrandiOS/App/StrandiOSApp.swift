@@ -25,12 +25,20 @@ struct StrandiOSApp: App {
     @StateObject private var watch = WatchSessionBridge()
     /// Shared cross-screen navigation hook (e.g. Live → Devices). The iOS shell (`RootTabView`)
     /// observes it and presents the Devices manager.
-    @StateObject private var router = NavRouter()
+    @StateObject private var router: NavRouter
     @State private var liveActivity = LiveActivityController()
     /// Refreshes an unchanged measured BPM before ActivityKit's 120-second stale date. BLE suppresses
     /// duplicate integer values, so an event-only pipeline could otherwise mark a genuinely steady live
     /// heart rate stale even while the strap remained connected.
     private let liveActivityKeepAlive = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    /// The Lift Log session's own Live Activity. Separate from the live-HR one above: while a gym
+    /// session is open this is the banner that matters (it carries the heart rate too), so the HR
+    /// activity is suppressed rather than stacked beside it.
+    @State private var liftActivity = LiftLiveActivityController()
+    /// The live gym session. Owned HERE, at the app root, rather than by the screen that shows it:
+    /// swiping the workout sheet away must not stop the clock, silence the strap or drop the
+    /// double-tap handler. See `LiftSessionController`.
+    @StateObject private var liftSession: LiftSessionController
     @Environment(\.scenePhase) private var scenePhase
     /// Chart data-colour style (Titanium / Classic throwback). Re-colours gauges + charts.
     @AppStorage(ChartStyle.storageKey) private var chartStyleRaw = ChartStyle.fallback.rawValue
@@ -40,6 +48,9 @@ struct StrandiOSApp: App {
     /// Effort's display scale is also embedded in the shared widget snapshot. Observe it here so a
     /// Settings change gets one accurate full rebuild instead of waiting for an unrelated repo refresh.
     @AppStorage(UnitPrefs.effortScaleKey) private var effortScaleRaw = EffortScale.hundred.rawValue
+    /// kg vs lb for the Lift Log Live Activity's "8 x 30 kg" line — the app formats it, because the
+    /// unit preference lives here and not in the widget extension.
+    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
 
     init() {
         // The redesign fonts are owned by StrandDesign's resource bundle. Register them before any
@@ -88,10 +99,33 @@ struct StrandiOSApp: App {
         // Register the check-in's action buttons before any notification can arrive — a category a
         // notification names but nobody registered simply shows no buttons, silently.
         CoachCheckIn.registerCategory()
+        // K5: tapping a scheduled morning-brief notification routes to Coach via the shared NavRouter.
+        let router = NavRouter()
+        _router = StateObject(wrappedValue: router)
+        NotificationPresenter.shared.onCoachBriefTapped = { [weak router] in router?.openCoach() }
         let model = AppModel()
         SemanticMemoryBackgroundTask.attach(coach: model.coach)
         SveaProactiveBackgroundTask.attach(coach: model.coach)
         _model = StateObject(wrappedValue: model)
+        // The buzz and the strap-gesture claim are injected, so the controller itself knows nothing
+        // about BLE and stays testable.
+        _liftSession = StateObject(wrappedValue: LiftSessionController(
+            buzz: { [weak model] loops in
+                model?.buzz(loops: loops, gate: HapticPrefs.liftRest)
+            },
+            setStrapHandler: { [weak model] handler in
+                model?.strapDoubleTapOverride = handler
+            }))
+        // #1538: a strap offload completes while the app is BACKGROUNDED — it stays alive as a
+        // bluetooth-central to receive it — and the re-score it triggers took nearly eight minutes on the
+        // reporter's install, far longer than that wake survives. The pass is all-or-nothing, so being
+        // suspended lost every scored night AND left the watermark unadvanced, which made the next offload
+        // start the same doomed pass again. This processing task is where that work is escalated to; it is
+        // the long, deferrable kind rather than the metered refresh kind the two schedulers above use.
+        // Registered before launch finishes and permitted in project.yml, or iOS never delivers it.
+        RescoreBackgroundScheduler.register { [weak model] in
+            await model?.runDeferredRescoreIfOwed()
+        }
         let bridge = HealthKitBridge(
             repo: model.repo,
             appleDeviceId: model.appleDeviceId,
@@ -128,6 +162,45 @@ struct StrandiOSApp: App {
         }
     }
 
+    /// The Shortcut-import alert's presentation binding, hoisted OUT of the `.alert` chain.
+    ///
+    /// An inline `Binding(get:set:)` is two untyped closures the solver must infer in place, on a
+    /// modifier chain that had already blown the type-check budget. Declaring it as a `Binding<Bool>`
+    /// property replaces all of that with one known type. Hoisting the message alone was not enough —
+    /// the build failed again at the same modifier, which is why this one is here too.
+    private var healthImportAlertPresented: Binding<Bool> {
+        Binding(
+            get: { model.pendingShortcutHealthImport != nil },
+            set: { showing in
+                if !showing { model.cancelPendingHealthImport() }
+            }
+        )
+    }
+
+    /// The Shortcut-import alert's buttons, hoisted for the same reason as the binding above.
+    @ViewBuilder
+    private var healthImportAlertButtons: some View {
+        Button("Import") { model.confirmPendingHealthImport() }
+        Button("Cancel", role: .cancel) { model.cancelPendingHealthImport() }
+    }
+
+    /// The Shortcut-import alert's message, hoisted OUT of the `.alert` chain.
+    ///
+    /// Not a style preference. This closure — an `if let` around two interpolated `Text`s — sits on a
+    /// modifier chain that grew past the Swift type-checker's budget, and the build failed with
+    /// "unable to type-check this expression in reasonable time" pointing at `} message: {`. The
+    /// expression did not change; the chain around it did. Hoisting a sub-expression into its own
+    /// declaration gives the solver a fixed type to work from instead of one more unknown in a chain
+    /// it is already struggling with.
+    @ViewBuilder
+    private var healthImportAlertMessage: some View {
+        if let pending = model.pendingShortcutHealthImport {
+            Text("A Shortcut wants to add \(pending.daysCount) days and \(pending.workoutsCount) workouts to the Apple Health import source.")
+        } else {
+            Text("A Shortcut wants to add data to the Apple Health import source.")
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             iOSRootView()
@@ -142,6 +215,7 @@ struct StrandiOSApp: App {
                 .environmentObject(health)
                 .environmentObject(router)
                 .environmentObject(UpdateStore.shared)
+                .environmentObject(liftSession)
                 // v5 L3: the shared stress check-in nudge surface, so the Breathe screen's passive
                 // card observes the SAME instance the central detector (AppModel.evaluateStress) posts to.
                 .environment(\.stressNudgeCenter, model.stressNudgeCenter)
@@ -179,9 +253,10 @@ struct StrandiOSApp: App {
                     liveActivity.update(
                         bpm: model.live.connected ? (model.bpm ?? model.live.heartRate) : nil,
                         recovery: day?.recovery.map { Int($0.rounded()) },
-                        connected: model.live.connected,
+                        connected: model.live.connected && !liftSession.isActive,
                         effort: day?.strain.map { Int($0.rounded()) }
                     )
+                    pushLiftActivity()
                 }
                 // End the Live Activity the moment the link drops, even if no further HR tick arrives.
                 .onReceive(model.live.$connected) { isConnected in
@@ -192,7 +267,7 @@ struct StrandiOSApp: App {
                     liveActivity.update(
                         bpm: isConnected ? (model.bpm ?? model.live.heartRate) : nil,
                         recovery: day?.recovery.map { Int($0.rounded()) },
-                        connected: isConnected,
+                        connected: isConnected && !liftSession.isActive,
                         effort: day?.strain.map { Int($0.rounded()) }
                     )
                 }
@@ -207,6 +282,11 @@ struct StrandiOSApp: App {
                         effort: day?.strain.map { Int($0.rounded()) }
                     )
                 }
+                // The gym session's own banner. Driven off the session's 1 Hz tick so a stage change
+                // reaches the Lock Screen promptly; the controller decides what is actually worth
+                // pushing, since the widget's clocks tick on their own.
+                .onReceive(liftSession.$now) { _ in pushLiftActivity() }
+                .onReceive(liftSession.$engine) { _ in pushLiftActivity() }
                 // #911/#759: republish the Home/Lock-Screen widget whenever the dashboard caches actually
                 // change mid-session. The only other publish site is the scenePhase .active handler, so
                 // during a long foreground session the widget froze at the last-foreground snapshot while
@@ -285,20 +365,10 @@ struct StrandiOSApp: App {
                         model.handleHealthImportURL(url)
                     }
                 }
-                .alert("Import Apple Health data?", isPresented: Binding(
-                    get: { model.pendingShortcutHealthImport != nil },
-                    set: { showing in
-                        if !showing { model.cancelPendingHealthImport() }
-                    }
-                )) {
-                    Button("Import") { model.confirmPendingHealthImport() }
-                    Button("Cancel", role: .cancel) { model.cancelPendingHealthImport() }
+                .alert("Import Apple Health data?", isPresented: healthImportAlertPresented) {
+                    healthImportAlertButtons
                 } message: {
-                    if let pending = model.pendingShortcutHealthImport {
-                        Text("A Shortcut wants to add \(pending.daysCount) days and \(pending.workoutsCount) workouts to the Apple Health import source.")
-                    } else {
-                        Text("A Shortcut wants to add data to the Apple Health import source.")
-                    }
+                    healthImportAlertMessage
                 }
                 // Bring the watch link up once at launch (WCSession ignores a redundant activate), then
                 // push the first snapshot so a watch that's already on-wrist gets current scores without
@@ -319,7 +389,7 @@ struct StrandiOSApp: App {
         // safe no-op until the user opts in.
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
-                model.drainPendingIntents()
+                model.drainPendingIntents(router: router)
                 // Re-arm the strap's smart alarm on foreground: the firmware alarm is a single instant
                 // and iOS can't re-arm it while suspended, so it would otherwise fire once and stop.
                 model.applySmartAlarm()
@@ -335,6 +405,17 @@ struct StrandiOSApp: App {
                     CoachSemanticMemory.shared.markForegroundCatchUp()
                     Task { await model.coach.performSemanticMemoryMaintenance(limit: 64) }
                 }
+                // #1538: settle a re-score an earlier background attempt could not finish, rather than
+                // waiting on the 15-minute idle tick now that there is a foreground with no suspension
+                // deadline. A no-op unless one is genuinely outstanding.
+                //
+                // Its OWN task, deliberately. This pass is minutes long on the installs that need it —
+                // that is the whole reason it was deferred — and the sequential block below owns Health
+                // sync, the widget snapshot and the watch push. Awaiting it there would leave the widget
+                // and the watch showing stale numbers for the entire re-score every time the app is
+                // opened, which is a worse regression than the bug being fixed. `analyzeRecent`
+                // serialises itself, so overlapping with the sync this foreground also kicks off is safe.
+                Task { await model.runDeferredRescoreIfOwed() }
                 Task {
                     health.refreshAuthIfPreviouslyGranted()
                     HealthWritebackBackgroundScheduler.updateSchedule(
@@ -360,6 +441,13 @@ struct StrandiOSApp: App {
                 // Re-submit on every transition because iOS may discard an old best-effort request.
                 HealthWritebackBackgroundScheduler.updateSchedule(
                     isAuthorized: health.auth == .authorized)
+                // #1538: same reasoning for the re-score continuation, plus one case of its own. A pass
+                // can be left owed with NOTHING scheduled — a foreground pass killed by a force-quit
+                // never runs the deferral path that submits the request, and iOS can discard a request
+                // that was submitted. Without this the work would wait for the next offload to defer it
+                // or the next launch to drain it. Re-submitting on the way out costs nothing when
+                // nothing is owed, because it is skipped entirely.
+                if RescoreBackgroundScheduler.isRescoreOwed { RescoreBackgroundScheduler.schedule() }
                 // #114: capture the LAST in-app live state on the way out so the Home widget matches what
                 // the user just saw — its battery/HR/score otherwise lag to the last FOREGROUND refreshSeq
                 // bump. One reload per app-exit is low-frequency and well within WidgetKit's daily budget.
@@ -375,6 +463,32 @@ struct StrandiOSApp: App {
                 Task { await ShortcutSessionExport.writeIfEnabled(repo: model.repo) }
             }
         }
+    }
+
+    /// Map the running session onto the Lock Screen banner.
+    ///
+    /// The wording and the numbers come from `LiftSessionController.presentation`, the same
+    /// resolution the in-app minimised bar renders, so the two surfaces cannot disagree. The heart
+    /// rate is the app's smoothed value, and only while the strap is actually connected — a frozen
+    /// last-known bpm on a Lock Screen reads as live and is not.
+    @MainActor
+    private func pushLiftActivity() {
+        let system = UnitSystem(rawValue: unitSystemRaw) ?? .metric
+        guard let p = liftSession.presentation(system: system) else {
+            liftActivity.update(programName: "", state: nil)
+            return
+        }
+        liftActivity.update(
+            programName: liftSession.programName ?? String(localized: "Session"),
+            state: LiftActivityAttributes.ContentState(
+                isResting: p.isResting,
+                exercise: p.exercise,
+                status: p.status,
+                detail: p.detail,
+                bpm: model.live.connected ? (model.bpm ?? model.live.heartRate) : nil,
+                progress: String(localized: "\(p.setsDone) of \(p.setsPlanned) sets done"),
+                stageStartedAt: p.stageStartedAt,
+                restEndsAt: p.restEndsAt))
     }
 }
 
@@ -458,6 +572,16 @@ private struct iOSRootView: View {
             // Seed the current What's New into the Updates inbox (idempotent per version) so the bell
             // collects it even if the user dismisses the auto sheet.
             UpdateStore.shared.seedWhatsNewIfNeeded()
+            // #1659: iOS cannot auto-update a sideloaded build - no API lets an app install or re-sign an
+            // .ipa - so the most NOOP can do is NOTICE a release and say so.
+            //
+            // Gated on the SAME condition as showWhatsNewIfDue above, and the Android hook. This matters
+            // now that the check is on by default: without it a brand-new install would reach the network
+            // during first run, before the Terms gate the user has not accepted yet. While the default was
+            // off, nothing made that visible.
+            if onboarded && acceptedTerms == Terms.currentVersion {
+                UpdateWatch.runIfDue(currentVersion: UpdateWatch.installedVersion, sideloadHint: true)
+            }
         }
         .onChange(of: acceptedTerms) { _, _ in showWhatsNewIfDue() }
     }
@@ -555,5 +679,6 @@ private struct OuraOnboardingDemoHost: View {
     var body: some View {
         AddDeviceWizard(live: live, onClose: {}, startAt: (.oura, .prep))
     }
+
 }
 #endif

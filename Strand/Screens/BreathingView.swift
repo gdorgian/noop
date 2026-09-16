@@ -230,10 +230,11 @@ private struct BreathingContent: View {
             on ? tonePlayer.activate() : tonePlayer.deactivate()
         }
         .onAppear {
+            model.startRealtimeHR()
             controllerBox.prepare(model: model, live: live)
             if audioCues { tonePlayer.activate() }
         }
-        .onDisappear { stop(); controller.stop(); tonePlayer.deactivate() }
+        .onDisappear { model.stopRealtimeHR(); stop(); controller.stop(); tonePlayer.deactivate() }
     }
 
     // MARK: - Mode switch
@@ -449,6 +450,14 @@ private struct BreathingContent: View {
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            // #697 parity: this screen builds its OWN ScrollView rather than going through
+            // ScreenScaffold, so it never inherited the scaffold's horizontal-bounce suppression and
+            // could still rubber-band left-right on a purely vertical scroll. Same modifier, same
+            // guard. `.basedOnSize` permits horizontal bounce only when content genuinely overflows
+            // the width, so nothing that is meant to scroll sideways is affected. (#1532 follow-up)
+            #if os(iOS)
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            #endif
             .navigationTitle(String(localized: "About this pace"))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

@@ -109,6 +109,10 @@ struct RootTabView: View {
             navigation.push(.data)
         case .sleep:
             navigation.reset(to: .rest)
+        // Upstream's coach route, raised by the Today launcher sheet and the scheduled-brief
+        // notification. The Aura shell answers it the same way its own coach notifications do.
+        case .coach:
+            navigation.reset(to: .coach)
         }
     }
 

@@ -26,6 +26,11 @@ enum KeyMetric: String, CaseIterable, Identifiable {
     case steps
     case weight
     case calories
+    /// Added 2026-08-24 (queue 11c follow-up): Skin Temp was already a "Your Cards" (`DashboardCard`)
+    /// option, but was never offered as a Key Metrics tile — not a bug, just never added. New case, NOT
+    /// added to `defaultOrder` below, so an existing user's saved layout (and a fresh install's default)
+    /// is byte-identical to before; only opts in via the layout editor.
+    case skinTemp
 
     var id: String { rawValue }
 
@@ -42,6 +47,9 @@ enum KeyMetric: String, CaseIterable, Identifiable {
         case .steps:       return String(localized: "Steps")
         case .weight:      return String(localized: "Weight")
         case .calories:    return String(localized: "Calories")
+        // Same short label the sibling "Your Cards" tile (`DashboardCard.skinTemp`) already uses —
+        // reuses its translation key rather than adding a new "Skin Temperature" one for this tile.
+        case .skinTemp:    return String(localized: "Skin Temp")
         }
     }
 
@@ -105,7 +113,17 @@ enum KeyMetricPrefs {
         var seen = Set<KeyMetric>()
         var result: [KeyMetric] = []
         for token in trimmed.split(separator: ",") {
-            if let m = KeyMetric(rawValue: String(token)), seen.insert(m).inserted {
+            // #1518: trim EACH token, not just the whole string. `KeyMetric(rawValue:)` matches exactly, so
+            // "charge, effort" dropped `effort` on the space alone. Kotlin's twin already does this
+            // (`KeyMetric.fromRaw(token.trim())`), as does `DashboardCards.decodeEnabled`, so Swift was the
+            // only decoder that could lose a tile the user had enabled.
+            //
+            // Latent rather than live: `encode` joins rawValues with no spaces, and this key is not in the
+            // `.noopbak` whitelist, so nothing in the app writes a spaced value today. It is fixed because
+            // a decoder that silently drops what it cannot parse should not also be picky about a space —
+            // the capabilities decoder in this same change was exactly that, and there it WAS reachable.
+            let raw = token.trimmingCharacters(in: .whitespaces)
+            if let m = KeyMetric(rawValue: raw), seen.insert(m).inserted {
                 result.append(m)
             }
         }

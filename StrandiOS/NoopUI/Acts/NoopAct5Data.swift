@@ -264,6 +264,15 @@ final class NoopDataFlow: ObservableObject {
                 notice = ("Backup saved", "\(url.lastPathComponent) is ready to copy to your other phone.")
             case .imported:
                 return
+            // The file is valid and worth keeping — a restore just needs one confirmation. Said at
+            // EXPORT time on purpose: the alternative is finding out during a restore, which is exactly
+            // when the original is gone.
+            case .exportedOversize(let url, _, _):
+                notice = ("Backup saved, and it is a large one",
+                          "\(url.lastPathComponent) is ready. Your record is big enough that restoring it will ask you to confirm once.")
+            // Not an export outcome; answered so the reading stays exhaustive if the shared type grows.
+            case .restoreTooLarge:
+                return
             case .failure(let message):
                 notice = ("The backup was not written", message)
             }
@@ -293,9 +302,16 @@ final class NoopDataFlow: ObservableObject {
             let result = await DataBackup.runImport()
             backupBusy = false
             switch result {
-            case .cancelled, .exported: return
+            case .cancelled, .exported, .exportedOversize: return
             case .imported:
                 notice = ("Restored", "The backup replaced the record on this phone. Quit and reopen Noop for it to take effect.")
+            // The size ceiling is a decompression guard against a hostile archive, and a backup the
+            // wearer just picked out of their own files is a different threat model. Upstream offers to
+            // go ahead anyway; Noop Aura has no designed confirmation for that yet, so this says plainly
+            // what stopped rather than pretending the file was broken.
+            case .restoreTooLarge(let name, _):
+                notice = ("That backup is too large to restore",
+                          "\(name) is bigger than the size Noop will unpack on its own. Nothing on this phone was changed.")
             case .failure(let message):
                 notice = ("Nothing was restored", message)
             }

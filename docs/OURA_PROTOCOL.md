@@ -97,6 +97,16 @@ Returned during history fetch (`0x10`/`0x11`) and live streaming. Each record: [
 
 - **Total record length = `len + 2`.** [ringverse]
 - Several records may pack into one notification; consume `2 + len` per record and loop. [open_ring]
+  **Measured 2026-09-15 (Gen 3, iOS, raw sidecar):** the ring does both, per session. Every NOOP history
+  drain captured to date arrives one packet per ≤ 20-byte notification (40,696 notifications across two
+  bundles, each one exactly `2 + len` long); the same ring serving the official app on the same link
+  (same negotiated MTU 203, same `10 09 <cursor> ff ffffffff` get_events bytes) packs ~10 packets into
+  each 196–200-byte notification (3,613 notifications, 38,136 packets, every value tiling exactly on
+  `2 + len` boundaries) — ≈ 19 KB/s against NOOP's ≈ 2.1 KB/s at the same notification rate. What flips
+  the ring between the modes is not yet identified; the candidates are the SetNotification mask
+  (`1c 01 ff` in the app's session vs NOOP's `3f`, `0x1C` in §4) and the app's unexplained `16 01 02` write.
+  NOOP's reassembler walks a value only when it tiles exactly into two or more well-formed packets and
+  otherwise reads the single lenient packet (the phantom-storm rule) — see `OuraReassembler.feed`.
 
 ### 2.4 Multi-packet payloads
 There is no application-level fragmentation header beyond the TLV `len`. A record never spans two notifications in the verified corpus; each notification contains whole frames/records. NOOP's parser must still be defensive: buffer partial trailing bytes across notifications and only emit complete `2+len` records.
@@ -174,28 +184,32 @@ Before app-auth, the ring answers a small set unauthenticated: firmware (`0x08`)
 
 Treat this key like a password: it authenticates as the real Oura app against your account's ring. NOOP stores it locally the same way it stores its own provisioned key (Keychain on iOS / EncryptedSharedPreferences-Keystore on Android, §3.2) — nothing is transmitted anywhere. This recipe extracts a fact from **your own** device backup and a public schema doc; it does not touch, decompile, or redistribute any Oura app code.
 
-### 3.8 macOS pairing limitation (observed, 2026-07-29)
+### 3.8 macOS pairing needs a factory-reset ring (observed 2026-07-29, corrected 2026-09-12)
 
-Pairing an Oura ring that has never been Bluetooth-bonded to the Mac (i.e. any ring whose only prior
-bond is with the official Oura app on a phone) reproducibly fails on macOS. `CBCentralManager.connect()`
-is issued cleanly (scanning stopped first, `central.state == .poweredOn`, a valid, in-range peripheral -
-observed RSSI as good as -55), but **no CoreBluetooth delegate callback ever arrives** - not
-`didConnect`, not `didFailToConnect`. The ring never appears in System Settings ▸ Bluetooth either
-(no partial bond record is created). Ruled out: a second central holding the ring - the same failure
-reproduces with the paired phone's Bluetooth fully off. This matches CoreBluetooth's documented
-behavior that `connect()` has no built-in timeout (an unanswered connect just stays pending forever),
-so the practical symptom is a silent, permanent hang rather than an error.
+Pairing an Oura ring that is still Bluetooth-bonded to a phone (i.e. its only prior bond is with the
+official Oura app) reproducibly fails on macOS. `CBCentralManager.connect()` is issued cleanly
+(scanning stopped first, `central.state == .poweredOn`, a valid, in-range peripheral - observed RSSI
+as good as -55), but **no CoreBluetooth delegate callback ever arrives** - not `didConnect`, not
+`didFailToConnect`. The ring never appears in System Settings ▸ Bluetooth either (no partial bond
+record is created). Ruled out: a second central holding the ring - the same failure reproduces with
+the paired phone's Bluetooth fully off. This matches CoreBluetooth's documented behavior that
+`connect()` has no built-in timeout (an unanswered connect just stays pending forever), so the
+practical symptom is a silent, permanent hang rather than an error.
 
 This is a different (and apparently more total) failure surface than the already-known WHOOP 5.0/MG
 macOS limitation (see `docs/WHOOP5_DEEP_DATA.md`, "iOS / Android only on real hardware") - WHOOP 5/MG
 at least connects and discovers services, failing only at an authenticated characteristic write
 (`CBATTError` "Encryption is insufficient"). Oura's connect doesn't get that far at all. The exact
 CoreBluetooth/bluetoothd mechanism isn't diagnosed further than this (would need a low-level HCI/SMP
-trace), but the practical conclusion is the same as WHOOP 5/MG's: **treat Oura ring pairing as
-iOS/Android-only** until proven otherwise on macOS. This applies to the §3.7 Advanced-key flow as
-much as to the §3.2 factory-reset one - the limitation is at connect time, before any key is used.
-Not yet tested: whether a genuinely never-bonded-anywhere (factory-reset) ring behaves differently
-from the already-Oura-app-owned case tested here.
+trace).
+
+**Corrected 2026-09-12: a genuinely factory-reset ring pairs on macOS without issue.** The 2026-07-29
+finding above tested only an already-Oura-app-owned ring; resetting the ring from the official Oura
+app first - clearing whatever bond/pairing state the earlier phone bond left behind - then pairing
+with NOOP on macOS works. So the limitation is specifically **an existing non-Mac bond**, not macOS
+pairing in general: this applies to the §3.7 Advanced-key flow as much as to the §3.2 factory-reset
+one, since the hang is at connect time, before any key is used, but a §3.2 factory-reset performed via
+the Oura app clears it first.
 
 ---
 
@@ -382,7 +396,24 @@ Three writes to `…0002`, each gated on its ACK; daytime-HR feature id = `0x02`
 - **`bpm = round(60000 / ibi_ms)`** [relue]
 - Example `[08,09] = 01 04` → `ibi = 1025 ms` → ≈ 59 BPM. [relue]
 
-**Disable:** `2f 03 22 02 01` → ACK `2f 03 23 02 00`. Stream stops on ACK. [relue][open_oura-r3]
+**Disable:** `2f 03 22 02 00` → ACK `2f 03 23 02 00`.
+
+> **Correction (2026-08-19):** an earlier draft of this line, and NOOP's own `liveHRDisable()`, wrote
+> mode byte **0x01** here on the strength of [relue][open_oura-r3]'s "stream stops on ACK" report. But
+> §7.2's APK-sourced feature-mode table (the citation this doc itself treats as authoritative over
+> earlier drafts) defines `0x01` as **"automatic"**, not "off" — `0x00` is off. §7.4's own worked
+> example shows mode=1 read back *while daytime-HR is actively streaming*, which is hard to square with
+> "disable." Two consecutive real-hardware NOOP nights (08-17/18, 08-18/19) directly falsified "stream
+> stops on ACK" for the 0x01 write: green `0x28` pushes continued all night at reduced-but-non-zero
+> volume, including resumptions with no reconnect in between — the signature of the ring's own
+> adaptive/motion-triggered "automatic" sampling, not a keep-alive wearing off. Byte corrected to
+> `0x00` here and in `Commands.swift`/`Commands.kt`; unvalidated on hardware as of this edit — see the
+> worklog for the next capture's result. [relue][open_oura-r3]'s original report may reflect a
+> transient quiet window inside the ~20 s auto-revert (§5.7) rather than a genuine off state.
+
+Also send the matching unsubscribe when tearing down a live session: `2f 03 26 02 00` → ACK
+`2f 03 27 02 00`. Step 3 of the enable triplet above leaves the ring subscribed at "latest"
+(byte2 = 2); the mode-disable write alone never turns that subscription back off.
 
 > Behaviour caveat: [open_oura-r3] reports that on its Ring-3 unit, realtime `0x06`-based enabling ACK'd but emitted no stream within 60–90 s, whereas the `0x2F`/feature-`0x02` path above produced ~1 Hz IBI. **NOOP must use the feature-`0x02` (`0x2F`) path, not `0x06`,** and treat absence of `0x28` pushes within ~10 s as "not streaming → retry/reseat."
 
@@ -543,10 +574,34 @@ like its sibling banked streams (`.hrv`/`.temp`/`.spo2`/`.sleepPhase`) — the f
     **zero overlapping days**. The comparison above is therefore distribution-level across
     *non-overlapping* periods (per-sample values vs nightly averages, different nights), which is why it
     can bound the discrepancy but not decompose it.
-  - **Re-pairing to the Oura app afterwards does NOT work — already refuted in practice.** Whichever
+  - **⚠️ CORRECTION 2026-08-19 — "does NOT work" is refuted, not confirmed.** A user re-paired the ring
+    to the Oura app via an OS-level Bluetooth unpair/re-pair (not a ring-side reset — see §5.3's
+    correction for the exact procedure and its caveats) and the app successfully backfilled full sleep
+    summary data, including `0x6F`-relevant SpO2, for two nights NOOP had already drained
+    (2026-08-13/14, 08-18/19). The original claim below is kept for its citation history, but is now
+    known to be wrong for at least this reproduction path — **the same-night comparison this section
+    says is "structurally blocked" is not, for sleep-summary-level data.** A first paired comparison
+    ran on these two nights: Oura app displayed SpO2 98% both nights, which round-matches the
+    offset−0.32/clamp[85,100] correction from §6.5.0.1 (98.11%, 97.39%) and does **not** match the raw
+    wire mean (99.11%, which would round to 99%). n=2 rounded integers, so this corroborates rather than
+    replaces the n=3 WHOOP-referenced MAE analysis in §6.5.0.2 — it does not by itself resolve path (a)
+    below, but it is no longer true that no paired data exists at all.
+    Full writeup: `worklog/analysis/2026-08-19-1730-oura-app-groundtruth-first-paired-comparison.txt`.
+  - **⚠️ UPDATE 2026-08-22 — 3rd full-tier paired night, same read.** Oura app displayed SpO2 **98%**
+    for 08-21/22 (screenshot, not a live-glance). Raw wire mean **99.66%** (rounds to 100% — miss);
+    ceiling@100 **98.48%** (rounds to 98% — hit); offset−0.32+clamp[85,100] **98.31%** (rounds to
+    98% — hit). Running full-tier tally across 3 screenshot-backed nights: raw 1/3, ceiling@100
+    **3/3**, offset+clamp 2/3 — raw is now the transform with the weakest track record of the
+    three; ceiling@100 slightly edges out the offset+clamp fit on this specific (weak,
+    rounded-integer) bar, though §6.5.0.1's own MAE-based fit still argues the opposite ordering.
+    n=3 (4 counting a weaker 08-20/21 live-glance point that missed on all three transforms) does
+    not change the ship decision. Full writeup:
+    `worklog/analysis/2026-08-22-1046-spo2-oura-app-groundtruth-night3.txt`.
+  - ~~**Re-pairing to the Oura app afterwards does NOT work — already refuted in practice.** Whichever
     client drains a window CONSUMES it, so the app finds nothing left for the nights NOOP captured (and
     vice versa). See the warning in §5.3, which records that observation and flags NOOP's unconditional
-    `28 01 00` flush as a candidate cause.
+    `28 01 00` flush as a candidate cause.~~ *(superseded by the correction above, kept struck-through
+    for citation history rather than deleted.)*
   - **Paths that could still settle it**, in increasing cost: (a) **resolve the §5.3 flush question** — if
     suppressing `28 01 00` leaves the history readable by BOTH clients, this comparison becomes possible
     for free. (b) A **reference pulse oximeter worn during sleep** alongside the ring — definitive, but
@@ -696,6 +751,20 @@ like its sibling banked streams (`.hrv`/`.temp`/`.spo2`/`.sleepPhase`) — the f
   | 6 | `motion_count` | u8 | — | source's parser THROWS if ≥ 121 |
   | 7 | `sleep_state` | u8 | — | source's parser THROWS if ∉ {0,1,2} |
   | 8–9 | `cv` | u16 LE | / 65536 | ⇒ [0,1) |
+
+  ⚠️ **The `motion_count` guard differs by ONE between the two independent re-derivations of the same
+  native function, and our corpus cannot settle it.** NOOP (the table above and both platform decoders)
+  rejects a body with `motion_count ≥ 121`; [open_oura]'s `decode_sleep_period_info` (PR #15, merged
+  2026-08-31) rejects `≥ 120`. Both cite the same `RepNumericRangeError` throw in
+  `parse_api_sleep_period_info`, so one of the two readings is off by one — settling it needs the binary,
+  not more nights. **Measured impact: none.** Across **8 075** distinct `0x6A` records in NOOP's capture
+  corpus (every `oura-resp.jsonl` held under `worklog/artifacts/Sleep Nights/`, de-duplicated by `ringTs`)
+  `motion_count` maxes at **55** — modal value 0, *nothing* ≥ 100, and **no record at 120** — while
+  `sleep_state` is only ever 0 or 1. Neither guard has ever fired on real data and no record has ever
+  landed in the disputed slot. ⇒ **Leave NOOP's `< 121` as it stands: this is a documented open
+  discrepancy, not a bug to "fix" into agreement with upstream.** (Weak physical argument for `< 121`, not
+  evidence: at a ~296 s cadence a bounded per-window tally with an *inclusive* upper bound throws at
+  ≥ 121, not ≥ 120.)
 
   **CORRECTION to this line's previous revision**, which read *"bytes6–9 four int8 metrics; bytes10–11
   `uint8/8.0`; byte12 motion-seconds; byte13 sleep-state int8; bytes14–15 uint16 LE/65536"* [ringverse]:
@@ -945,7 +1014,13 @@ edit of the ring's tag.
     window is the single regime a walking-equivalent model should do best in, and it does not overturn the
     857-day picture (median ≈ 0, p90 +186 %) that gates it. It is recorded because it bounds the error on
     the one regime where the estimate is meant to apply.
-  - **Real Steps (feature `0x0B`) server gating [open_oura-feat]:** real_steps is behind the server flag `activity/real_steps` (default **false**; `FeatureDefinitions.ActivityRealSteps`, Gen 3+), the same server-flag-off pattern as SpO2 (§7.1). This explains `0x7E`/`0x7F` never once appearing across the PR #960 live sessions - the ring isn't sending them, it is not a NOOP decode gap. `0x50` itself is an always-on base stream (not feature-gated), matching it appearing in every session.
+  - **Real Steps (feature `0x0B`) server gating [open_oura-feat]:** real_steps is documented as sitting behind the server flag `activity/real_steps` (default **false**; `FeatureDefinitions.ActivityRealSteps`, Gen 3+), the same server-flag-off pattern as SpO2 (§7.1).
+
+    **CORRECTED 2026-08-27 (#1629).** This section previously concluded: *"This explains `0x7E`/`0x7F` never once appearing across the PR #960 live sessions - the ring isn't sending them, it is not a NOOP decode gap."* **That explanation no longer holds.** On-device captures read the ring's own real_steps status (`2f 02 20 0b`) back as **`status=1` (enabled)** — identically from an authenticated Oura-app session and from NOOP's own fully offline, unauthenticated connection to the same ring. The gate is ring-side state, not something tied to which client asks.
+
+    So the *observation* stands — `0x7E`/`0x7F` still never appeared in those sessions — but the *cause* attributed to it does not. Be careful about what the new reading does and does not show: **`status=1` is not evidence the ring emits those tags.** It only removes gating as the explanation. Why they are absent is currently **unknown**, and a decode gap is back on the table as a possibility rather than ruled out. `0x50` is unaffected: an always-on base stream, not feature-gated, and it appears in every session.
+
+    Anything that cited this paragraph to close a line of investigation should be re-read on that basis.
 - **`0x7E`/`0x7F` real_steps_features 1/2** (18 B each): bit-packed step features merged across the paired events. **(UNVERIFIED - partial)** [ringverse]
   - **Unpack formula ([oura-rs] - Th0rgal/open_oura `crates/oura-protocol/src/events.rs#L566`, clean-room
     fact citation): 14 fields from the 14-byte body.** Fields 0 and 8 are genuine 9-bit values built as
@@ -1165,7 +1240,17 @@ NOOP ships a **read-only** probe that asks the ring to report a feature's own st
 
 - **Shipped probes:** `spo2_status` (`2f 02 20 04`) and `realsteps_status` (`2f 02 20 0b`), sent once after `get_battery` on each connect; logged once per feature, never stored or scored.
 - **All-zero = server-gated OFF.** A gated/unavailable feature reads back `mode=0 status=0 state=0 subscription=0`. Contrast the *streaming* daytime-HR (`0x02`), which reads `mode=1 status=0x11 state=2` — so **all-zero mode/status/state is the gated signature**, not `subscription==0` alone (daytime-HR is `subscription=0` yet active).
-- **2026-07-20 Gen 3 capture:** both SpO2 (`0x04`) and real_steps (`0x0b`) returned all-zero — confirming §7.1 on live hardware. No local `setFeatureMode` can flip these; the gate is the Oura cloud `ClientConfiguration`, not the ring or NOOP.
+- **2026-07-20 Gen 3 capture:** both SpO2 (`0x04`) and real_steps (`0x0b`) returned all-zero — confirming §7.1 on live hardware. **Correction (2026-09-11): the claim that formerly stood here — "no local `setFeatureMode` can flip these" — was never actually tested.** NOOP has only ever sent the read probe (`2f 02 20 <id>`); it has never sent the enable write (`2f 03 22 <id> <mode>`), so the ring's response to that write on a gate-OFF NOOP ring is genuinely unknown, not confirmed-impossible. See §7.5 for the contradicting evidence.
+
+### 7.5 Local `setFeatureMode` enable — bypasses the account gate for some features; NOOP sends it from Test Centre, the bypass itself is UNVALIDATED on NOOP's own hardware [open_oura-feat]
+
+`docs/ring-features.md` [open_oura-feat] reports that, on a **consumer Ring 5** with `real_steps`/`exercise_hr`/`cva_ppg`/`experimental` all reading server-gated OFF, sending the write `2f 03 22 <id> 01` (mode → automatic) directly over BLE — **with no paid membership and no server-side entitlement change** — returned success and the features stayed AUTOMATIC (verified there with a follow-up `feature-status` read). Only `research_data` (`0x01`) was rejected outright, and `raw_data` (`0x12`) accepted the mode write but its RData sampler still refused to configure (`INVALID_SUBTAG`) — so the local write does not universally defeat every entitlement, but it worked for 4 of the 5 features NOOP's §3.7 Advanced-key/paid-membership path was written to unlock.
+
+**What this does and doesn't tell us:**
+- It contradicts the §7.4 claim above at least for `real_steps`/`exercise_hr`/`cva_ppg`/`experimental` — the gate for those is not purely an Oura-cloud `ClientConfiguration` check; the ring itself will honor a local mode write regardless.
+- **SpO2 (`0x04`) is not covered by this evidence.** On the source ring, SpO2 already read AUTOMATIC by default before any write was sent — the experiment never demonstrated forcing SpO2 from a gate-OFF state, which is the case NOOP's own 2026-07-20 capture is actually in. Whether `2f 03 22 04 01` flips a gate-OFF SpO2 ring is untested by both projects.
+- The wire bytes (`2f 03 22 <id> <mode>` → `2f 03 23 <id> <status>`) are independently verifiable over BLE and are already cited into §7.1 from [ring4-ble]/[open_oura-feat]; only the *outcome of actually sending it on a gated ring* is new here. The *rationale* `ring-features.md` gives for why this works (`FeatureDefinitions.*` server-flag names, the `b0.smali` enable sequence) is attributed there to decompiled-app analysis and is cited here as background only — NOOP implements neither that code nor those literals.
+- **The account-gate bypass remains UNVALIDATED on NOOP's own hardware.** The write itself is now reachable, from Test Centre only (#2105), behind an explicit confirmation; no automatic path in `OuraDriver` sends it, and §7.4's status probe stays read-only. The write MECHANISM is confirmed here: disabling then re-enabling SpO2 flipped `mode` 1→0→1, reproduced in both directions on a real Gen 3. That ring was already cloud-entitled, so it does not test the bypass. Whether `2f 03 22 04 01` moves a gate-OFF SpO2 ring is still open work.
 
 ---
 

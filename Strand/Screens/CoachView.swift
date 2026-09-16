@@ -1,561 +1,524 @@
 import SwiftUI
 import MarkdownUI
 import StrandDesign
-#if canImport(UIKit)
-import UIKit
-#elseif canImport(AppKit)
-import AppKit
-#endif
 
 /// Coach, the one feature in NOOP that talks to the network.
 ///
-/// Strictly opt-in, bring-your-own-key: the user pastes their own provider API key (stored in the
-/// Keychain by `AICoachEngine`), and only a compact text summary of their metrics plus their question
-/// ever leaves the device. Nothing is sent until a key is saved and a question asked.
+/// It is strictly opt-in and bring-your-own-key: the user pastes their own OpenAI
+/// or Anthropic API key (stored in the macOS Keychain by `AICoachEngine`), and only
+/// a compact text summary of their metrics plus their question ever leaves the Mac.
+/// Nothing is sent until a key is saved and a question asked.
 ///
-/// This is the redesigned full-screen messenger chat: a slim header, a transcript that fills the
-/// screen, and a docked composer. All the provider/consent/persona/memory settings live in
-/// `CoachSettingsView` (behind the gear); past conversations live in `CoachHistoryView` (the history
-/// button). See `docs/CONTRIBUTING.md` for the design-system rules this screen follows.
+/// This screen compiles against `AICoachEngine`'s public API (the macos-core agent's
+/// contract): `hasKey`, `provider` / `provider.modelOptions`, `model`, `messages`,
+/// `sending`, `errorText`, `setKey(_:)`, `clearKey()`, and `send(_:)`.
 struct CoachView: View {
     @EnvironmentObject var coach: AICoachEngine
-    /// Injected at the app root (`StrandApp`/`StrandiOSApp`) — resolves from the environment wherever
-    /// this view is actually presented, since Coach is always reached from within that root's hierarchy.
-    @EnvironmentObject var navRouter: NavRouter
+    /// K8: used by "Save to Journal" — saves the coach advice as a journal entry with the text
+    /// in the notes field, so it appears alongside other journal entries in Insights.
+    @EnvironmentObject var repo: Repository
 
     /// Draft text in the composer (the question being typed).
-    @State private var draft: String = ""
+    /// K15: the composer draft is persisted to UserDefaults so it survives an app relaunch.
+    /// Restored on first appear, saved on every change. Keyed identically to the Android twin.
+    private static let draftKey = "coach.composerDraft"
+    @State private var draft: String = UserDefaults.standard.string(forKey: "coach.composerDraft") ?? ""
+    /// Pending key text in the setup card (never persisted here, handed to `setKey`).
+    @State private var keyDraft: String = ""
+    /// The corrected key, typed into the editor a rejection opens. Separate from `keyDraft` so the
+    /// setup card's own field is untouched, and cleared on save so a secret does not sit in view state
+    /// after it has been stored. Twin of the Kotlin `keyFix`.
+    @State private var keyFix: String = ""
+    /// Whether the model selector is in free-text "Custom…" mode.
+    @State private var customModel: Bool = false
+    /// The id typed in the "Custom…" field.
+    @State private var customModelDraft: String = ""
     @FocusState private var composerFocused: Bool
-    /// Presented sheet: settings, history, the plan book, goal & journey, the first-use note, and goal
-    /// onboarding — ONE enum-driven sheet. `firstUse` and `goalOnboarding` used to be their own stacked
-    /// `.sheet(isPresented:)` modifiers alongside this one; three sheet hosts on one view is the classic
-    /// SwiftUI glitch where dismissing one can intermittently re-present or bounce back to whatever's
-    /// underneath — reported as "Something else" (a custom goal) looping back to the goal picker.
-    private enum ActiveSheet: Int, Identifiable {
-        case settings, history, plan, goal, goalSetup, firstUse, goalOnboarding
-        var id: Int { rawValue }
-    }
-    @State private var activeSheet: ActiveSheet?
-    /// Seconds left before Retry re-enables, from the provider's `Retry-After` on a 429. 0 = ready.
-    @State private var retryCountdown = 0
-    /// Honour the system's Reduce Motion setting. The chat animates on every reply — the transcript
-    /// scrolls itself and the evidence chain expands — which is exactly the repeated, self-starting
-    /// movement that setting exists to stop. Nothing here is load-bearing: without the animation the
-    /// same state change simply happens at once.
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ObservedObject private var motion = NoopMotionState.shared
-    /// At the accessibility text sizes, five lines of composer is a couple of words — long enough to
-    /// type into, far too short to read back what you wrote before sending it.
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    /// The coach's avatar diameter beside its bubbles and in the typing indicator (#R-bigger-avatar) — one
-    /// named constant instead of a magic number repeated at every call site, since the gutter spacer
-    /// (`assistantGutter`) and the evidence/actionRow indent below a reply both have to match it exactly.
-    private static let assistantAvatarSize: CGFloat = 36
-    /// The coach's avatar diameter in the chat header. Conversation-scale, beside the title: the previous
-    /// 64pt centred portrait cost roughly 90pt of transcript before the first message could show.
-    private static let headerAvatarSize: CGFloat = 34
-    /// Drives the header avatar's breathing while a reply streams (see `header`).
-    @State private var breathing = false
-    /// Vertical gap before a NEW turn (a role switch, or the first message) — bigger, so a fresh reply or
-    /// question reads as its own moment (#R-chat-tidy). Also used before the typing indicator/error banner,
-    /// which are themselves always the start of a new turn.
-    private static let groupGap: CGFloat = 16
-    /// Vertical gap before a CONTINUATION bubble — the same sender following themselves, tight so a run of
-    /// coach turns still reads as one thought rather than several unrelated ones.
-    private static let continuationGap: CGFloat = 4
-    /// The ONE extra indent step for content nested a level deeper than a reply's side content (evidence
-    /// header, Regenerate, actionRow all sit flush with each other; the expanded evidence detail sits one
-    /// `sideContentIndent` in from that) — previously three uneven levels (#R-chat-tidy).
-    private static let sideContentIndent: CGFloat = 14
-    /// Which messages' evidence chains (P6) are expanded — per-message, so opening one doesn't open
-    /// every reply that has one.
-    @State private var expandedEvidenceIds: Set<UUID> = []
-    /// First-use trust/expectations note (#P6 6.3): shown once before the first conversation, via
-    /// `activeSheet == .firstUse`.
-    @AppStorage(CoachFirstUse.acknowledgedKey) private var coachFirstUseAcknowledged = false
-    /// Drives the header's pending-proposal dot.
-    @ObservedObject private var planStore = CoachPlanStore.shared
-    /// Goal/routine drafts use the same visible pending affordance as plan proposals, while remaining a
-    /// separate review flow because their safety, limits and multi-goal links need explicit editing.
-    @ObservedObject private var goalSetupStore = CoachGoalSetupProposalStore.shared
-    /// The coach's identity (#R9) — avatar + name shown in the header, updated live from settings.
-    @ObservedObject private var identityStore = CoachIdentityStore.shared
-    /// Drives the per-reply memory receipt: what a turn saved, and the controls to confirm, correct or
-    /// undo it. Observed so confirming a fact here updates the row without leaving the chat.
-    @ObservedObject private var memory = CoachMemory.shared
-    /// The fact being corrected from a receipt, and its draft text (same alert shape as the settings
-    /// list, so a correction reads the same wherever it's made).
-    @State private var editingFactID: UUID?
-    @State private var editingFactText: String = ""
-    /// Live Sessions (silent guardian) beta gate — the SAME key `LiquidTodayView`/Settings read. Hides
-    /// the action row's "Live Session" chip when the user has turned the feature off, so the chip never
-    /// looks tappable for something it can't actually open (#P3).
-    @AppStorage(LiveSessionPrefs.betaKey) private var liveSessionsBeta = true
-    /// Apple-inspired leading-icon coloring (SettingsView's "Apple-inspired colors") — same switch that
-    /// recolors the More tab and Coach's submenus. See `CoachIconColors`.
-    @AppStorage(AppleInspiredColorsPrefs.enabledKey) private var appleHealthColors = AppleInspiredColorsPrefs.defaultEnabled
 
-    private let suggestions = [
-        String(localized: "How's my charge trending?"),
-        String(localized: "What should today's training look like?"),
-        String(localized: "Analyse my sleep"),
-        String(localized: "Why am I run down?"),
-    ]
+    /// K2: confirmation gate for the destructive "Clear conversation" toolbar action.
+    @State private var showClearConfirm = false
+    /// #2243: the coach settings, presented as a sheet. See `CoachSettingsView` for why a sheet
+    /// rather than a push.
+    @State private var showSettings = false
+
+    // K4: on-device voice input for the composer (iOS only). macOS gets a no-op stub via
+    // `#if os(iOS)` guards — the shared file keeps compiling for both targets.
+    #if os(iOS)
+    @StateObject private var voiceInput = CoachVoiceInput()
+    #endif
+
+    /// Sentinel tag for the "Custom…" entry in the model Picker.
+    private let customModelTag = "__custom__"
+
+    /// Contextual suggestion chips, derived from today's bands by `AICoachEngine.suggestions`
+    /// (→ `CoachSuggestions`). Falls back to a stable generic set when there is no data. Recomputed
+    /// on each body evaluation so a fresh sync immediately updates the chips.
+    private var suggestions: [String] { coach.suggestions }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // No divider under the header any more: it floats as a glass bar, and its own material is the
-            // separation (plus the soft scroll edge on iOS 26).
-            header
+        ScreenScaffold(title: "Coach",
+                       subtitle: "Ask about your charge, effort, rest and workouts, grounded in your own numbers.",
+                       // Liquid finish: the same full-bleed day-of-sky backdrop Today + the other liquid
+                       // tabs carry, so Coach sits in one atmosphere. Static + non-interactive; the frosted
+                       // message/setup cards below sit on the opaque canvas and stay legible.
+                       topBackground: liquidScaffoldSky()) {
             if coach.isConfigured {
-                chatBody
-            } else {
-                notConnected
-            }
-        }
-        .background(chatBackground)
-        // Docked composer: pinned to the bottom, rising above the keyboard on iOS. Only once connected.
-        .safeAreaInset(edge: .bottom) {
-            if coach.isConfigured { composer }
-        }
-        .sheet(item: $activeSheet) { which in
-            switch which {
-            case .settings:
-                // Plain sheet, no zoom transition: CoachSettingsView owns its own NavigationStack and
-                // pushes further into 5 subpages — the zoom-transition system doesn't compose safely
-                // with content that starts an independent NavigationStack and pushes inside it (it
-                // crashed reproducibly on Settings -> Goal & Journey). Matches .history/.plan below,
-                // which never had a zoom transition either.
-                CoachSettingsView()
-                    .environmentObject(coach)
-            case .history:  CoachHistoryView(onPick: { activeSheet = nil }).environmentObject(coach)
-            case .plan:     CoachPlanView().environmentObject(coach)
-            case .goal:
-                // The chat's goal shortcut (#R6): the same Goal & Journey surface reachable from the
-                // top-level menu, presented over the chat with its own Done control.
-                NavigationStack {
-                    CoachGoalJourneyScreen()
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) { Button("Done") { activeSheet = nil } }
-                        }
+                connectedHeader
+                transcript
+                if let error = coach.errorText, !error.isEmpty {
+                    errorBanner(error)
+                    // A rejected key is the one failure the wearer can act on from here, and the
+                    // message already tells them to: "Check the key and the provider you selected".
+                    // Until this, the screen offered nowhere to check it. Rendered INSIDE the error
+                    // branch, never on its own flag, so it cannot outlive the message justifying it.
+                    if coach.keyRejected { keyRepairPanel }
                 }
-                .environmentObject(coach)
-            case .goalSetup:
-                if let proposal = goalSetupStore.pending.first {
-                    CoachGoalSetupReviewView(proposalId: proposal.id)
+                // K7: show follow-up chips after each assistant reply (when the transcript is
+                // non-empty and the last message is from the assistant and not mid-send);
+                // otherwise show the initial contextual chips.
+                if showFollowUpChips {
+                    followUpChips
                 } else {
-                    NavigationStack {
-                        VStack(spacing: 12) {
-                            Image(systemName: "checkmark.circle")
-                                .font(.system(size: 36)).foregroundStyle(StrandPalette.accent)
-                            Text("No draft waiting").font(StrandFont.headline)
-                            Text("This goal and routine draft has already been decided.")
-                                .font(StrandFont.footnote).foregroundStyle(StrandPalette.textSecondary)
-                        }
-                        .padding()
-                            .toolbar {
-                                ToolbarItem(placement: .confirmationAction) {
-                                    Button("Done") { activeSheet = nil }
-                                }
-                            }
-                    }
+                    suggestionChips
                 }
-            case .firstUse:
-                CoachFirstUseSheet(onAcknowledge: {
-                    coachFirstUseAcknowledged = true
-                    activeSheet = nil
-                })
+                composer
+                // K12: show a rough token estimate when the draft is non-empty.
+                if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   let tokens = coach.estimatedTokens(forDraft: draft) {
+                    tokenEstimateBar(tokens)
+                }
+                privacyFootnote
+            } else {
+                setupCard
+            }
+        }
+        // macOS only. On iOS these two live in `connectionMenu` instead, because this bar is hidden for
+        // a primary tab root and VISIBLE in the pillar sheet, so leaving them here would render nothing
+        // on the Coach tab and a duplicate of the menu in the sheet. One control per platform, reachable
+        // in both of iOS's presentations. The `#if` sits on the CHAIN rather than inside the builder:
+        // `ToolbarContentBuilder` is not relied on to accept an empty body, and the one other
+        // conditional toolbar here (CoupledView) always yields an item on both platforms. (#2206)
+        #if os(macOS)
+        .toolbar {
+            if coach.isConfigured {
+                // K2: wipe the persisted + in-memory conversation. Confirmed, since it's destructive.
+                ToolbarItem {
+                    Button(role: .destructive) {
+                        showClearConfirm = true
+                    } label: {
+                        Label("Clear conversation", systemImage: "trash")
+                    }
+                    .help("Clear the saved conversation")
+                    .accessibilityLabel("Clear conversation")
+                    .disabled(coach.messages.isEmpty)
+                }
+                ToolbarItem {
+                    Button(role: .destructive) {
+                        coach.disconnect()
+                        keyDraft = ""
+                    } label: {
+                        Label("Disconnect", systemImage: "gearshape")
+                    }
+                    .help("Forget the saved key and disconnect")
+                    .accessibilityLabel("Disconnect provider")
+                }
+            }
+        }
+        #endif
+        // #2243: coach settings. `repo` rides along because the scaffold's environment is not
+        // inherited by a sheet's own view tree.
+        .sheet(isPresented: $showSettings) {
+            CoachSettingsView()
                 .environmentObject(coach)
-            case .goalOnboarding:
-                // First-run onboarding uses the GUIDED flow (#R12) — one question at a time — instead of
-                // the one-page editor. Skipping or finishing both mark it asked, so it never nags twice.
-                CoachGoalOnboardingFlow {
-                    UserDefaults.standard.set(true, forKey: Self.goalOnboardingAskedKey)
-                }
-            }
+                .environmentObject(repo)
         }
-        .task(id: coach.dataConsent) {
-            await coach.prepareSemanticMemory()
-            // On open: the morning brief (forward), then — in order, each with its own once-per-day or
-            // once-per-week lock and a real-signal gate — a proactive nudge, a goal look-back and the
-            // weekly review (#P10). The goal review comes before the weekly one because a finished goal
-            // is the more specific thing to talk about on the day it comes up.
-            //
-            // AT MOST ONE speaks per open. All four could come due on the same morning, and four
-            // unprompted full-context requests before the user has typed anything is neither what they
-            // asked for nor what they want to pay for. Each `…IfNeeded` reports whether it actually
-            // said something; the rest keep their locks and get their turn on the next open.
-            if await coach.startBriefIfNeeded() { return }
-            if await coach.runProactiveNudgeIfNeeded() { return }
-            if await coach.runGoalReviewIfNeeded() { return }
-            await coach.runWeeklyReviewIfNeeded()
+        .confirmationDialog(
+            "Clear conversation?",
+            isPresented: $showClearConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Clear", role: .destructive) { coach.clearConversation() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes the saved conversation from this device. Coach history is your own notes, not medical advice.")
         }
-        // Tapping the daily check-in notification (routed here by RootTabView) runs a real check-in —
-        // a look BACK at what happened, not a re-run of the morning brief. Its own once-a-day lock.
-        .onReceive(NotificationCenter.default.publisher(for: .noopOpenCoachCheckIn)) { _ in
-            Task { await coach.checkInIfNeeded() }
-        }
-        // Opened from a metric card (#P11): read the pending card context and give a short, cheap read of
-        // that one metric, then offer its follow-up questions. No-op if the coach was opened another way.
-        // Fires two ways so both cases are covered, and is idempotent (it clears the pending context and
-        // no-ops when nil): the notification catches an ALREADY-mounted CoachView (the iOS tab that's up),
-        // and the .task catches a JUST-mounted one (a fresh Coach pane on macOS, opened by the same tap).
-        .onReceive(NotificationCenter.default.publisher(for: .noopOpenCoachCard)) { _ in
-            Task { await coach.runCardAnalysisIfNeeded() }
-        }
+        // K2 + K5 ordering matters and every step gates on an EMPTY transcript, so this is ONE `.task`
+        // running sequentially (separate `.task`s can interleave at their await points on the same
+        // actor): restore whatever the prior launch persisted, THEN surface a brief the scheduled
+        // notification already generated (if any), THEN the interactive first-open brief — so
+        // `startBriefIfNeeded` only ever runs over the network when BOTH of the above left the
+        // transcript genuinely empty.
         .task {
-            if coach.pendingCardContext != nil { await coach.runCardAnalysisIfNeeded() }
+            await coach.loadPersistedMessagesIfNeeded()
+            // Gated on the transcript BEFORE consuming. `consumeStoredBrief()` clears the unconsumed
+            // flag, and `surfaceScheduledBrief` then drops the text if a transcript exists, so a brief
+            // that arrived on a day with a conversation already open was consumed and thrown away, gone
+            // for good. Android checked first and so only ever failed to SHOW it (#2087).
+            if coach.messages.isEmpty, let stored = CoachBriefScheduler.consumeStoredBrief() {
+                coach.surfaceScheduledBrief(stored)
+            }
+            CoachBriefScheduler.activateIfEnabled { await coach.generateBriefText() }
+            await coach.startBriefIfNeeded()
         }
-        // First-use note (#P6 6.3): once the coach is connected, show the trust/expectations dialog
-        // before the first conversation. Keyed on `isConfigured` so it also arms right after the user
-        // connects from the setup screen (not just on a fresh, already-connected open). Guarded on
-        // `activeSheet == nil` so it never steals a sheet the user (or another trigger) already opened.
-        .task(id: coach.isConfigured) {
-            if coach.isConfigured && !coachFirstUseAcknowledged && activeSheet == nil {
-                activeSheet = .firstUse
+        // #1862: a question handed over by the Today launcher sheet. Cleared BEFORE sending so a view
+        // rebuild mid-flight cannot send it twice, and gated on `isConfigured` so an unconfigured handoff
+        // (which the launcher does not produce, but a future caller might) degrades to showing setup
+        // rather than a failed request.
+        .task(id: coach.pendingPrompt) {
+            guard let prompt = coach.pendingPrompt, !prompt.isEmpty else { return }
+            coach.pendingPrompt = nil
+            guard coach.isConfigured else { return }
+            await coach.send(prompt)
+        }
+        // K15: persist the composer draft so it survives an app relaunch.
+        .onChangeCompat(of: draft) { newValue in
+            UserDefaults.standard.set(newValue, forKey: Self.draftKey)
+        }
+        // K14: haptic feedback when a reply arrives (sending goes true → false).
+        .onChangeCompat(of: coach.sending) { isSending in
+            if !isSending && !coach.messages.isEmpty {
+                triggerReplyHaptic()
             }
         }
-        // Goal onboarding: offered ONCE, only to a configured coach with no goal yet, and skippable.
-        // Gated behind the first-use ack too, so the two one-time sheets never stack — goal onboarding
-        // simply waits for the next open after the note is acknowledged. The flag is set whichever way
-        // the sheet closes, so declining is respected permanently — you can always set a goal later.
-        .task {
-            guard coach.isConfigured,
-                  coachFirstUseAcknowledged,
-                  activeSheet == nil,
-                  CoachGoalStore.shared.activeGoals.isEmpty,
-                  // A setup already in progress (started from Goal & Journey) has no goal saved yet, so
-                  // every other condition here is true while the user is mid-wizard — offering a second
-                  // copy of the same flow on top is exactly how it looked like the wizard "restarted".
-                  !GoalOnboardingDraft.shared.isActive,
-                  !UserDefaults.standard.bool(forKey: Self.goalOnboardingAskedKey) else { return }
-            activeSheet = .goalOnboarding
+        // A consent toggle AFTER the initial load re-checks the brief (the original `.task(id:)`
+        // behaviour); the guard inside `startBriefIfNeeded` (messages.isEmpty) keeps this a no-op once
+        // a conversation exists.
+        .onChangeCompat(of: coach.dataConsent) { _ in
+            Task { await coach.startBriefIfNeeded() }
         }
-        // Correcting a fact straight from its receipt. Same alert shape as the settings list, and an edit
-        // made here counts as the user's own wording, so it confirms the fact as well.
-        .alert("Edit fact", isPresented: editingFactBinding) {
-            TextField("Fact", text: $editingFactText)
-            Button("Cancel", role: .cancel) { editingFactID = nil }
-            Button("Save") {
-                if let id = editingFactID {
-                    memory.update(id, text: editingFactText, confirmedByUser: true)
+    }
+
+    // MARK: - Setup (no key yet)
+
+    private var setupCard: some View {
+        StrandCard(padding: 20) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(StrandPalette.accent)
+                        .accessibilityHidden(true)
+                    Text("Connect a provider")
+                        .font(StrandFont.headline)
+                        .foregroundStyle(StrandPalette.textPrimary)
                 }
-                editingFactID = nil
-            }
-        }
-    }
 
-    /// Drives the edit-fact alert from `editingFactID` without a separate bool.
-    private var editingFactBinding: Binding<Bool> {
-        Binding(get: { editingFactID != nil }, set: { if !$0 { editingFactID = nil } })
-    }
+                Text("Coach uses your own API key. Pick a provider, paste a key, and choose a model. Your key is stored securely in the Keychain and never leaves \(Platform.deviceNounPhrase) except as the request you make.")
+                    .font(StrandFont.subhead)
+                    .foregroundStyle(StrandPalette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-    /// Set once the goal onboarding has been offered — saved or skipped — so it never nags twice.
-    static let goalOnboardingAskedKey = "coach.goalOnboardingAsked"
-
-    /// The full-bleed day-of-sky backdrop the liquid tabs carry, so Coach sits in one atmosphere.
-    private var chatBackground: some View {
-        liquidScaffoldSky(height: 240)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .ignoresSafeArea()
-    }
-
-    // MARK: - Header
-
-    /// The chat's title: a named conversation wins, else the coach's own name.
-    private var headerTitle: String {
-        coach.activeConversation?.title.isEmpty == false
-            ? coach.activeConversation!.title
-            : identityStore.identity.name
-    }
-
-    /// One compact glass row instead of a button bar stacked over a 64pt centred avatar. The old header
-    /// spent ~90pt of a phone screen before the first message; the coach still has a face here, just at
-    /// conversation scale. Five icons plus a title don't fit a 375pt row, so only the two LIVE controls
-    /// (the plan book with its pending dot, and New chat) stay inline — history, goal and settings move
-    /// into the overflow menu, which is where iOS users look for them anyway.
-    private var header: some View {
-        HStack(spacing: 10) {
-            Button { activeSheet = .settings } label: {
-                CoachAvatarView(size: Self.headerAvatarSize)
-                    // Presence while a reply is being written: the avatar breathes instead of the header
-                    // growing a "Thinking…" line that shifts the whole transcript down. Reduce Motion holds
-                    // it still — this is self-starting, repeating movement.
-                    .scaleEffect(breathing && !motion.poseStill(reduceMotion) ? 1.06 : 1)
-                    .animation(motion.poseStill(reduceMotion) ? nil
-                               : .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
-                               value: breathing)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Coach settings")
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(headerTitle)
-                    .font(StrandFont.headline)
-                    .foregroundStyle(StrandPalette.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                // Fixed-height subtitle slot: "Thinking…" swaps in for the persona line rather than
-                // appearing, so the header never changes height mid-reply.
-                Text(coach.sending ? String(localized: "Thinking…") : identityStore.identity.name)
-                    .font(StrandFont.footnote)
-                    .foregroundStyle(coach.sending ? StrandPalette.accent : StrandPalette.textTertiary)
-                    .lineLimit(1)
-                    .contentTransition(.opacity)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(coach.activeConversation?.title.isEmpty == false
-                                 ? coach.activeConversation!.title
-                                 : String(localized: "\(identityStore.identity.name), your coach"))
-
-            // The plan book. The dot means something is waiting for YOUR answer — the coach can propose,
-            // but only you can turn a suggestion into a plan.
-            Button { activeSheet = .plan } label: {
-                Image(systemName: "calendar")
-                    .font(StrandFont.headline)
-                    .foregroundStyle(planStore.pending.isEmpty
-                                     ? StrandPalette.textSecondary : StrandPalette.accent)
-                    .overlay(alignment: .topTrailing) {
-                        if !planStore.pending.isEmpty {
-                            Circle().fill(StrandPalette.accent)
-                                .frame(width: 6, height: 6)
-                                .offset(x: 3, y: -2)
+                // Provider
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Provider").strandOverline()
+                    Picker("Provider", selection: $coach.provider) {
+                        ForEach(AIProvider.allCases) { p in
+                            Text(p.displayName).tag(p)
                         }
                     }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(planStore.pending.isEmpty
-                                ? "Your plan"
-                                : "Your plan, \(planStore.pending.count) waiting for your decision")
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .accessibilityLabel("Provider")
+                }
 
-            Button { coach.newConversation() } label: {
-                Image(systemName: "square.and.pencil")
-                    .font(StrandFont.headline)
-                    .foregroundStyle(appleHealthColors
-                                     ? CoachIconColors.color(for: "chat.header.newChat")
-                                     : StrandPalette.textSecondary)
-            }
-            .buttonStyle(.plain)
-            .disabled(coach.sending || coach.messages.isEmpty)
-            .accessibilityLabel("New chat")
-
-            Menu {
-                if !goalSetupStore.pending.isEmpty {
-                    Button { activeSheet = .goalSetup } label: {
-                        Label("Review goal & routines", systemImage: "target")
+                // Server URL (Custom / local LLM only)
+                if coach.provider == .custom {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Server URL").strandOverline()
+                        TextField("http://localhost:11434/v1", text: $coach.customBaseURL)
+                            .textFieldStyle(.plain)
+                            .font(StrandFont.body)
+                            .foregroundStyle(StrandPalette.textPrimary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .background(StrandPalette.surfaceInset, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(StrandPalette.hairline, lineWidth: 1))
+                            .disableAutocorrection(true)
+                            .accessibilityLabel("Server URL")
+                        Text("Any OpenAI-compatible server: Ollama, LM Studio, llama.cpp, or your own gateway. Stays on your network; nothing leaves \(Platform.deviceNounPhrase).")
+                            .font(StrandFont.footnote)
+                            .foregroundStyle(StrandPalette.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                }
-                Button { activeSheet = .history } label: {
-                    Label("Conversation history", systemImage: "clock.arrow.circlepath")
-                }
-                Button { activeSheet = .goal } label: {
-                    Label("Goal and journey", systemImage: "target")
-                }
-                Button { activeSheet = .settings } label: {
-                    Label("Coach settings", systemImage: "gearshape")
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(StrandFont.headline)
-                    .foregroundStyle(!goalSetupStore.pending.isEmpty
-                                     ? StrandPalette.accent
-                                     : (appleHealthColors
-                                        ? CoachIconColors.color(for: "chat.header.menu")
-                                        : StrandPalette.textSecondary))
-                    .overlay(alignment: .topTrailing) {
-                        if !goalSetupStore.pending.isEmpty {
-                            Circle().fill(StrandPalette.accent)
-                                .frame(width: 6, height: 6)
-                                .offset(x: 3, y: -2)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Key header").strandOverline()
+                        Picker("Key header", selection: $coach.customAuthHeader) {
+                            ForEach(CustomAIAuthHeader.allCases) { header in
+                                Text(header.displayName).tag(header)
+                            }
                         }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .accessibilityLabel("Key header")
+                        Text("Use Bearer for most local servers; use x-api-key for gateways that require the key in that header.")
+                            .font(StrandFont.footnote)
+                            .foregroundStyle(StrandPalette.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                }
+
+                // Model
+                modelSelector
+
+                // Key
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(coach.provider == .custom ? "API key (optional)" : "API key").strandOverline()
+                    SecureField(coach.provider == .custom
+                                ? "Only if your server requires one"
+                                : "Paste your \(coach.provider.displayName) API key", text: $keyDraft)
+                        .textFieldStyle(.plain)
+                        .font(StrandFont.body)
+                        .foregroundStyle(StrandPalette.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(StrandPalette.surfaceInset, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(StrandPalette.hairline, lineWidth: 1))
+                        .onSubmit { coach.provider == .custom ? connectCustom() : saveKey() }
+                        .accessibilityLabel("API key")
+                }
+
+                HStack {
+                    if coach.provider == .custom {
+                        NoopButton("Connect", systemImage: "link", kind: .primary, action: connectCustom)
+                            .disabled(coach.customBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    } else {
+                        NoopButton("Save key", systemImage: "key.fill", kind: .primary, action: saveKey)
+                            .disabled(keyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    Spacer()
+                }
+
+                // Whatever the last attempt from THIS card ran into. The setup card had no error line
+                // at all, so every way it can fail before a key is committed failed silently: a Refresh
+                // the provider turned away, a Connect to a server that wants auth. The wearer saw a
+                // button do nothing. No repair affordance beside it, unlike the chat: the key field is
+                // already on screen, which is the whole point of the card.
+                if let error = coach.errorText, !error.isEmpty {
+                    errorBanner(error)
+                }
+
+                Divider().overlay(StrandPalette.hairline)
+                privacyFootnote
             }
-            .menuStyle(.borderlessButton)
+        }
+    }
+
+    /// Model selector: a Picker over `coach.availableModels` with a free-text "Custom…" path and a
+    /// "Refresh models" button that fetches the provider's live list.
+    private var modelSelector: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Model").strandOverline()
+                Spacer()
+                Button {
+                    Task { await coach.refreshModels() }
+                } label: {
+                    Label("Refresh models", systemImage: "arrow.clockwise")
+                        .font(StrandFont.footnote)
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(StrandPalette.accent)
+                .disabled(!coach.hasKey)
+                .help("Fetch the available models from \(coach.provider.displayName) using your saved key")
+                .accessibilityLabel("Refresh models from provider")
+            }
+
+            Picker("Model", selection: modelPickerSelection) {
+                ForEach(coach.availableModels, id: \.self) { m in
+                    Text(m).tag(m)
+                }
+                Divider()
+                Text("Custom…").tag(customModelTag)
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
             .fixedSize()
-            .accessibilityLabel(goalSetupStore.pending.isEmpty
-                                ? "More"
-                                : "More, \(goalSetupStore.pending.count) goal draft waiting for review")
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .liquidGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .strokeBorder(StrandPalette.hairline, lineWidth: 1))
-        .padding(.horizontal, 12)
-        .padding(.top, 6)
-        .padding(.bottom, 6)
-        // Drive the breathing avatar off the send state, once per state change (not per token).
-        .onChangeCompat(of: coach.sending) { sending in breathing = sending }
-    }
+            .accessibilityLabel("Model")
 
-    // MARK: - Chat body (connected)
+            if customModel {
+                HStack(spacing: 8) {
+                    TextField("Enter a model id", text: $customModelDraft)
+                        .textFieldStyle(.plain)
+                        .font(StrandFont.body)
+                        .foregroundStyle(StrandPalette.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(StrandPalette.surfaceInset, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(StrandPalette.hairline, lineWidth: 1))
+                        .onSubmit(applyCustomModel)
+                        .accessibilityLabel("Custom model id")
 
-    private var chatBody: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    if coach.messages.isEmpty {
-                        emptyState
-                    }
-                    ForEach(Array(coach.messages.enumerated()), id: \.element.id) { index, message in
-                        if shouldShowTimestamp(at: index) {
-                            timeSeparator(message.date)
-                        }
-                        bubble(message, groupStart: isAssistantGroupStart(at: index))
-                            .id(message.id)
-                            .padding(.top, topGap(at: index))
-                            // New turns still arrive from below, but existing transcript rows stay
-                            // fully opaque while scrolling. A row-level scrollTransition fades the
-                            // ENTIRE row; for a reply taller than the viewport that made most of the
-                            // visible answer dim merely because one edge crossed the screen boundary.
-                            .transition(reduceMotion
-                                        ? .opacity
-                                        : .move(edge: .bottom).combined(with: .opacity))
-                    }
-                    if coach.sending {
-                        typingIndicator.id("typing").padding(.top, Self.groupGap)
-                            .transition(.opacity)
-                    }
-                    if let error = coach.errorText, !error.isEmpty {
-                        errorBanner(error).id("error").padding(.top, Self.groupGap)
-                    }
-                    // Persistent reminder that answers are generic right now — not just at the empty
-                    // state, so it stays visible through an active conversation too (on-device feedback:
-                    // consent being off with no in-chat hint reads as "the coach is bad", not "it can't
-                    // see my data"). Bottom-anchored scroll keeps this near the latest content.
-                    if !coach.dataConsent {
-                        consentOffBanner.id("consentOff").padding(.top, Self.groupGap)
-                    }
-                    // Suggestion chips live at the bottom of an empty transcript, just above the composer.
-                    if coach.messages.isEmpty {
-                        suggestionChips.padding(.top, 4)
-                    } else if !coach.cardSuggestions.isEmpty {
-                        // After a card read (#P11): metric-specific follow-ups, offered until the next turn.
-                        cardSuggestionChips.padding(.top, 4)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                // The insert/remove transitions above only play if the COUNT change itself is animated —
-                // the engine publishes `messages` outside any `withAnimation`, so the animation has to be
-                // declared here rather than wrapped around the scroll call.
-                .animation(reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.84),
-                           value: coach.messages.count)
-            }
-            // A transcript belongs at its bottom edge, and a downward drag should put the keyboard away —
-            // both are what every messenger does, and both were missing.
-            .liquidBottomAnchored()
-            .liquidInteractiveKeyboardDismiss()
-            .liquidCrispChatEdges()
-            .onChangeCompat(of: coach.messages.count) { _ in scrollToEnd(proxy) }
-            .onChangeCompat(of: coach.sending) { sending in
-                scrollToEnd(proxy)
-                // Announce completion (not every token) so a VoiceOver user knows a reply landed —
-                // a streamed reply otherwise gives no signal beyond the initial "Coach is thinking".
-                if !sending, coach.errorText == nil {
-                    announceReplyComplete()
-                    // The reply is the moment worth feeling: one tap when the coach finishes writing.
-                    StrandHaptic.commit.play()
+                    Button("Use", action: applyCustomModel)
+                        .buttonStyle(NoopButtonStyle(.secondary))
+                        .disabled(customModelDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityLabel("Use custom model")
                 }
             }
-            // Keep pinned to the bottom as a streamed reply grows token-by-token.
-            .onChangeCompat(of: coach.messages.last?.text.count ?? 0) { _ in scrollToEnd(proxy) }
-            // A failed send must scroll into view even if the transcript's message COUNT didn't change
-            // (the failed turn's placeholder is removed, not appended) — otherwise the error can sit
-            // scrolled off-screen after a long prior reply.
-            .onChangeCompat(of: coach.errorText) { text in
-                scrollToEnd(proxy)
-                if let text, !text.isEmpty { StrandHaptic.warning.play() }
+        }
+    }
+
+    /// Bridges the model Picker to `coach.model`, with a "Custom…" sentinel that opens the free-text
+    /// field instead of selecting a real id.
+    private var modelPickerSelection: Binding<String> {
+        Binding(
+            get: { customModel ? customModelTag : coach.model },
+            set: { newValue in
+                if newValue == customModelTag {
+                    customModel = true
+                    if customModelDraft.isEmpty { customModelDraft = coach.model }
+                } else {
+                    customModel = false
+                    coach.model = newValue
+                }
             }
-        }
+        )
     }
 
-    /// A new chat introduces the coach instead of opening on a bare heading — the big avatar is the one
-    /// place the identity still gets a proper portrait now that the header runs compact.
-    private var emptyState: some View {
-        VStack(spacing: 10) {
-            CoachAvatarView(size: 76)
-                .padding(.bottom, 2)
-            Text("Hi, I'm \(identityStore.identity.name)")
-                .font(StrandFont.title2)
-                .foregroundStyle(StrandPalette.textPrimary)
-            Text(coach.dataConsent
-                 ? "Coach reads a summary of your last two weeks plus 30-day averages and recent workouts, then answers in plain language. Try a suggestion below."
-                 : "Data access is off, so answers stay generic. Turn it on in Settings → Privacy & data to get answers based on your real numbers.")
-                .font(StrandFont.subhead)
-                .foregroundStyle(StrandPalette.textSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 8)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 24)
-        .padding(.bottom, 10)
-        .accessibilityElement(children: .combine)
+    private func applyCustomModel() {
+        let trimmed = customModelDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        coach.setCustomModel(trimmed)
+        customModel = false
     }
 
-    // MARK: - Not connected (no key yet)
+    // MARK: - Connected state
 
-    private var notConnected: some View {
-        VStack(spacing: 16) {
+    private var connectedHeader: some View {
+        HStack(spacing: 10) {
+            StatePill("\(coach.provider.displayName) · \(coach.model)", tone: .accent, showsDot: true)
             Spacer()
-            Image(systemName: "sparkles")
-                .font(.system(size: 40))
-                .foregroundStyle(appleHealthColors
-                                 ? CoachIconColors.color(for: "chat.notConnected")
-                                 : StrandPalette.accent)
-            Text("Connect a provider to start")
+            if coach.sending {
+                StatePill("Thinking", tone: .accent, pulsing: true)
+            }
+            // #2243: the way through to what used to be stacked under this header.
+            Button {
+                showSettings = true
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(StrandPalette.textSecondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(String(localized: "Coach settings"))
+            #if os(iOS)
+            connectionMenu
+            #endif
+        }
+    }
+
+    #if os(iOS)
+    /// #2206: the same two actions the toolbar above carries, drawn where iPhone can reach them.
+    ///
+    /// `RootTabView.tab(...)` wraps every primary tab root in a NavigationStack and applies
+    /// `.toolbar(.hidden, for: .navigationBar)`, because each screen draws its own in-content header.
+    /// So Clear conversation and Disconnect were being placed into a bar this platform never shows, and
+    /// rendered nowhere. Disconnect is the ONLY route back to the setup card, which is the only place
+    /// an API key can be typed: `isConfigured` gates that card away the moment a key is saved. The
+    /// result was a key that could be set once and then never changed, with reinstalling the app the
+    /// only way out, which on an offline-first app costs the wearer their entire history.
+    ///
+    /// macOS keeps the toolbar and does not get this, so its behaviour is untouched. On iOS the toolbar
+    /// route is withdrawn rather than kept alongside: CoachView is presented twice on this platform, as
+    /// a primary tab whose bar is hidden and as a pillar sheet whose bar is NOT (it draws a Done button
+    /// and only hides the bar's background). Keeping both would render nothing on the tab and two of
+    /// everything in the sheet. One control, reachable in both presentations.
+    ///
+    /// A menu rather than a bare button because it needs two taps to reach a destructive action,
+    /// matching the protection the toolbar's separation gives, and because both actions belong to the
+    /// same connection.
+    ///
+    /// Worth knowing before changing `disconnect()`: neither `hasKey` nor `isConfigured` is published,
+    /// since `hasKey` reads the Keychain on each evaluation. The setup card reappears because
+    /// `disconnect()` ALSO assigns the published `messages`, which is what re-evaluates the body. A
+    /// future disconnect that stopped clearing the transcript would clear the key and leave this screen
+    /// showing a chat for a connection that no longer exists. macOS has depended on the same coupling
+    /// since its toolbar button existed, so this is a latent edge being written down, not a new one.
+    private var connectionMenu: some View {
+        Menu {
+            Button {
+                showClearConfirm = true
+            } label: {
+                Label("Clear conversation", systemImage: "trash")
+            }
+            .disabled(coach.messages.isEmpty)
+            Button(role: .destructive) {
+                coach.disconnect()
+                keyDraft = ""
+            } label: {
+                Label("Disconnect", systemImage: "gearshape")
+            }
+        } label: {
+            // Same affordance DevicesView uses for its per-device menu, headline size included. The
+            // size is not decoration here: the report this came from was that the option could not be
+            // FOUND, so a control that matches the one the wearer has already learned, at a size worth
+            // aiming at, is doing part of the work.
+            Image(systemName: "ellipsis.circle")
+                .font(StrandFont.headline)
+                .foregroundStyle(StrandPalette.textSecondary)
+        }
+        .accessibilityLabel("Connection")
+    }
+    #endif
+
+    private var transcript: some View {
+        StrandCard(padding: 16) {
+            if coach.messages.isEmpty {
+                emptyTranscript
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        // Lazy so off-screen bubbles aren't all resident/laid-out at once; with the
+                        // `maxStoredMessages` cap the transcript is already bounded, this keeps render cost flat.
+                        LazyVStack(alignment: .leading, spacing: 12) {
+                            ForEach(coach.messages) { message in
+                                bubble(message).id(message.id)
+                            }
+                            if coach.sending {
+                                typingIndicator.id("typing")
+                            }
+                        }
+                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    // #697 parity: this screen builds its OWN ScrollView rather than going through
+                    // ScreenScaffold, so it never inherited the scaffold's horizontal-bounce suppression and
+                    // could still rubber-band left-right on a purely vertical scroll. Same modifier, same
+                    // guard. `.basedOnSize` permits horizontal bounce only when content genuinely overflows
+                    // the width, so nothing that is meant to scroll sideways is affected. (#1532 follow-up)
+                    #if os(iOS)
+                    .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                    #endif
+                    .frame(minHeight: 220, maxHeight: 460)
+                    .onChangeCompat(of: coach.messages.count) { _ in
+                        scrollToEnd(proxy)
+                    }
+                    .onChangeCompat(of: coach.sending) { _ in
+                        scrollToEnd(proxy)
+                    }
+                }
+            }
+        }
+    }
+
+    private var emptyTranscript: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Ask your first question")
                 .font(StrandFont.headline)
                 .foregroundStyle(StrandPalette.textPrimary)
-            Text("Coach uses your own API key. Nothing is sent to a provider until you connect one. After that, Coach sends only the data categories you consent to when it answers or runs an optional proactive feature you enable.")
+            Text("Coach reads a summary of your last two weeks plus 30-day averages and recent workouts, then answers in plain language. Try a suggestion below.")
                 .font(StrandFont.subhead)
                 .foregroundStyle(StrandPalette.textSecondary)
-                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 24)
-            NoopButton("Connect a provider", systemImage: "link", kind: .primary) { activeSheet = .settings }
-            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(24)
-    }
-
-    // MARK: - Bubbles
-
-    /// True when this assistant message opens a run of consecutive coach turns — messenger-style, the
-    /// avatar shows once at the top of a group and continuation bubbles reserve the gutter to stay aligned.
-    private func isAssistantGroupStart(at index: Int) -> Bool {
-        let msgs = coach.messages
-        guard index >= 0, index < msgs.count, msgs[index].role == .assistant else { return false }
-        return index == 0 || msgs[index - 1].role != .assistant
-    }
-
-    /// The vertical gap ABOVE the message at `index` (#R-chat-tidy): a bigger `groupGap` for a new turn
-    /// (the first message, a role switch, or two consecutive user sends — there's no "continuation" concept
-    /// for the user side), a tight `continuationGap` only when both this message and the one before it are
-    /// coach replies in the same run (mirrors `isAssistantGroupStart`'s own same-role check).
-    private func topGap(at index: Int) -> CGFloat {
-        guard index > 0, index < coach.messages.count else { return 0 }
-        let cur = coach.messages[index].role
-        let prev = coach.messages[index - 1].role
-        return (cur == .assistant && prev == .assistant) ? Self.continuationGap : Self.groupGap
-    }
-
-    /// The leading avatar (or an equal-width empty gutter for continuation turns), so coach bubbles line up
-    /// under one avatar the way a messenger thread does (#R10). Sized to sit beside the bubble's first line.
-    @ViewBuilder
-    private func assistantGutter(groupStart: Bool) -> some View {
-        if groupStart {
-            CoachAvatarView(size: Self.assistantAvatarSize)
-        } else {
-            Color.clear.frame(width: Self.assistantAvatarSize, height: 1)
-        }
+        .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
     }
 
     @ViewBuilder
-    private func bubble(_ message: ChatMessage, groupStart: Bool = false) -> some View {
+    private func bubble(_ message: ChatMessage) -> some View {
         switch message.role {
         case .user:
             HStack {
@@ -567,556 +530,70 @@ struct CoachView: View {
                     .multilineTextAlignment(.leading)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    // A tail-side corner pulled tight (and a soft gradient instead of a flat fill) is what
-                    // makes a rectangle read as a spoken turn rather than as a table cell.
-                    .background(
-                        LinearGradient(colors: [StrandPalette.accent,
-                                                StrandPalette.accent.opacity(0.86)],
-                                       startPoint: .top, endPoint: .bottom),
-                        in: CoachBubbleShape(side: .user)
-                    )
+                    .background(StrandPalette.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .frame(maxWidth: 520, alignment: .trailing)
-                    .contextMenu {
-                        copyButton(message.text)
-                        shareButton(message.text)
-                        // Only the LAST question can be reclaimed: editing one from the middle would
-                        // silently discard every exchange after it, which is a bigger thing than the
-                        // menu item implies.
-                        if isLastUserTurn(message) {
-                            Button {
-                                if let question = coach.reclaimLastQuestion() { draft = question }
-                            } label: {
-                                Label("Edit and ask again", systemImage: "pencil")
-                            }
-                            .disabled(coach.sending)
-                        }
-                    }
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("You said: \(message.text)")
         case .assistant:
-            // A message the coach backed with a chart (plot_metric) renders as a native chart card; every
-            // other assistant message renders its Markdown reply. An empty assistant message with no chart
-            // is a stale chart host from before persistence — skip it rather than show a blank bubble.
-            if let chart = coach.chartsByMessage[message.id] {
-                HStack(alignment: .top, spacing: 8) {
-                    assistantGutter(groupStart: groupStart)
-                    CoachChartBubble(artifact: chart)
-                    Spacer(minLength: 0)
-                }
-            } else if !message.text.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top, spacing: 8) {
-                        assistantGutter(groupStart: groupStart)
-                        Group {
-                            // While the reply is still arriving it renders as plain `Text` so the
-                            // word-by-word settle can run (a TextRenderer can't attach to MarkdownUI).
-                            // The finished reply swaps to real Markdown — same font, same insets, so the
-                            // swap isn't visible. See CoachStreamingText.swift.
-                            if isStreaming(message) {
-                                HStack(alignment: .bottom, spacing: 3) {
-                                    CoachStreamingText(text: message.text, animated: !reduceMotion)
-                                    CoachStreamCaret(animated: !reduceMotion)
-                                }
-                            } else {
-                                Markdown(message.text)
-                                    .markdownTheme(.strand)
-                                    .textSelection(.enabled)
-                            }
+            // LLM replies arrive as Markdown (bold, lists, headings, tables),             // rendered with the chat-bubble-sized Strand theme. User bubbles stay
+            // verbatim `Text` so typed `*`/`#` never turn into surprise formatting.
+            // The reply sits on a frosted Charge-tinted surface, a card, not a flat box.
+            // K8: context menu (long-press / right-click) with Copy, Share, and Save actions.
+            HStack {
+                Markdown(message.text)
+                    .markdownTheme(.strand)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .frostedCardSurface(tint: StrandPalette.chargeColor, cornerRadius: 16)
+                    .frame(maxWidth: 560, alignment: .leading)
+                    // K8: Copy / Share / Save context menu on assistant replies.
+                    .contextMenu {
+                        Button {
+                            #if os(macOS)
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(message.text, forType: .string)
+                            #else
+                            UIPasteboard.general.string = message.text
+                            #endif
+                        } label: {
+                            Label("Copy", systemImage: "doc.on.doc")
                         }
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 11)
-                            .frostedCardSurface(tint: StrandPalette.chargeColor, cornerRadius: CoachRadius.card)
-                            .clipShape(CoachBubbleShape(side: .coach))
-                            .frame(maxWidth: 560, alignment: .leading)
-                            .contextMenu {
-                                copyButton(message.text)
-                                shareButton(message.text)
-                                if isLastAssistant(message) {
-                                    Button { coach.regenerate() } label: {
-                                        Label("Regenerate", systemImage: "arrow.clockwise")
-                                    }
-                                    .disabled(coach.sending)
-                                    if coach.hasDeepAnalysisModel {
-                                        Button { coach.regenerateDeeply() } label: {
-                                            Label("Look at this more closely",
-                                                  systemImage: "text.magnifyingglass")
-                                        }
-                                        .disabled(coach.sending)
-                                    }
-                                }
-                            }
-                        Spacer(minLength: 48)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Coach said: \(message.text)")
-
-                    // "The coach got in touch" — a brief, a nudge or the weekly review looks exactly like
-                    // an answer otherwise, so an unprompted message reads as a reply to a question the
-                    // user can't remember asking. Above the bubble, because it frames what follows.
-                    if message.origin.isCoachInitiated {
-                        coachInitiatedLabel(message.origin)
-                            .padding(.leading, Self.assistantAvatarSize + 8)
-                    }
-
-                    // The evidence chain and action controls sit UNDER the bubble, so they carry the same
-                    // leading gutter (avatar width + spacing) the bubble does — they line up with the coach's
-                    // text, not with the avatar (#R10).
-                    VStack(alignment: .leading, spacing: 4) {
-                        evidenceChain(for: message)
-                        memoryReceipt(for: message)
-
-                        // Visible, not just a long-press away — the context menu above still works too.
-                        if isLastAssistant(message) {
-                            Button { coach.regenerate() } label: {
-                                Label("Regenerate", systemImage: "arrow.clockwise")
-                                    .font(StrandFont.caption)
-                                    .foregroundStyle(StrandPalette.textTertiary)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(coach.sending)
-                            .accessibilityLabel("Regenerate this reply")
-
-                            // Offered only once a heavier model is configured, and only on an answer the
-                            // user has already read: the extra cost is spent when the quick answer turned
-                            // out too thin, never by default and never invisibly. Named for what it does,
-                            // not for the machinery — "reasoning" and "thinking" mean nothing to someone
-                            // who just wants a better answer about their sleep.
-                            if coach.hasDeepAnalysisModel {
-                                Button { coach.regenerateDeeply() } label: {
-                                    Label("Look at this more closely", systemImage: "text.magnifyingglass")
-                                        .font(StrandFont.caption)
-                                        .foregroundStyle(StrandPalette.textTertiary)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(coach.sending)
-                                .accessibilityLabel("Answer again using the deeper analysis model")
-                            }
-
-                            actionRow
+                        ShareLink(item: message.text) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                        Button {
+                            saveAdvice(message.text)
+                        } label: {
+                            Label("Save to Journal", systemImage: "square.and.pencil")
                         }
                     }
-                    .padding(.leading, Self.assistantAvatarSize + 8)
-                }
+                Spacer(minLength: 48)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Coach said: \(message.text)")
         }
     }
 
-    // MARK: - Memory receipt: what this reply saved, and how to take it back
-
-    /// What a reply wrote to memory, shown under it with the controls to act on it.
-    ///
-    /// Remembering used to happen in silence. The only trace was a "Memory" entry inside the collapsed
-    /// evidence chain, which named the tool but never the fact — and the sole way to confirm, correct or
-    /// undo it was a collapsed card three levels deep in settings. That mattered most for exactly the
-    /// facts a coach must not get wrong: an injury, goal or physiology fact is saved unconfirmed, and an
-    /// unconfirmed fact is barred from the block that frames every reply, so it sat there doing nothing
-    /// while the user had no idea it existed.
-    ///
-    /// Facts are looked up by id, so a row disappears when the fact is forgotten and re-reads its text
-    /// after an edit — the transcript never holds a stale copy. A row is shown for a message that saved
-    /// something whether or not it was the last one, because scrolling back to check what the coach took
-    /// away from a conversation is the whole point.
-    @ViewBuilder
-    private func memoryReceipt(for message: ChatMessage) -> some View {
-        let saved = message.memoryWrites.compactMap { id in memory.facts.first(where: { $0.id == id }) }
-        if !saved.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(saved) { fact in
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Image(systemName: "brain")
-                            .font(StrandFont.caption)
-                            .foregroundStyle(StrandPalette.textTertiary)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            // Says which of the two states it landed in, because they mean different
-                            // things to the user: one is done, the other is waiting on them.
-                            Text(fact.verification == .pendingConfirmation
-                                 ? String(localized: "Saved, pending your confirmation: \(fact.text)")
-                                 : String(localized: "Saved to memory: \(fact.text)"))
-                                .font(StrandFont.caption)
-                                .foregroundStyle(StrandPalette.textTertiary)
-                                .fixedSize(horizontal: false, vertical: true)
-
-                            HStack(spacing: 12) {
-                                if fact.verification != .confirmed {
-                                    Button {
-                                        memory.confirm(fact.id)
-                                    } label: {
-                                        Label("That's right", systemImage: "checkmark.seal")
-                                            .font(StrandFont.caption)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .foregroundStyle(StrandPalette.accent)
-                                    .accessibilityLabel("Confirm: \(fact.text)")
-                                }
-                                Button {
-                                    editingFactText = fact.text
-                                    editingFactID = fact.id
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                        .font(StrandFont.caption)
-                                }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(StrandPalette.textTertiary)
-                                .accessibilityLabel("Edit: \(fact.text)")
-                                Button {
-                                    memory.remove(fact.id)
-                                } label: {
-                                    Label("Forget", systemImage: "xmark.circle")
-                                        .font(StrandFont.caption)
-                                }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(StrandPalette.textTertiary)
-                                .accessibilityLabel("Forget: \(fact.text)")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// The "this arrived on its own" marker. Names WHICH kind, because a daily brief, a one-off nudge
-    /// and the weekly review are different promises about how often this happens — and the second
-    /// question after "why is the coach talking to me" is always "how often will it".
-    @ViewBuilder
-    private func coachInitiatedLabel(_ origin: ChatMessage.Origin) -> some View {
-        let (text, symbol): (LocalizedStringKey, String) = {
-            switch origin {
-            case .brief:        return ("Your daily brief — the coach got in touch", "sun.horizon")
-            case .checkIn:      return ("Check-in — the coach got in touch", "hand.wave")
-            case .nudge:        return ("The coach got in touch", "bell")
-            case .weeklyReview: return ("Your weekly review — the coach got in touch", "calendar")
-            case .reply:        return ("", "")
-            }
-        }()
-        HStack(spacing: 5) {
-            Image(systemName: symbol)
-                .font(StrandFont.caption)
-                .accessibilityHidden(true)
-            Text(text).font(StrandFont.caption)
-        }
-        .foregroundStyle(StrandPalette.textTertiary)
-        .padding(.bottom, 2)
-    }
-
-    private func copyButton(_ text: String) -> some View {
-        Button { CoachClipboard.copy(text) } label: { Label("Copy", systemImage: "doc.on.doc") }
-    }
-
-    /// Share a single turn out of the chat — the system share sheet, so it reaches Notes, Messages or a
-    /// file without a copy-paste detour. The text is the user's own; nothing else travels with it.
-    private func shareButton(_ text: String) -> some View {
-        ShareLink(item: text) { Label("Share", systemImage: "square.and.arrow.up") }
-    }
-
-    /// True while THIS message is the reply currently being written. Drives the plain-text + caret
-    /// rendering; everything else in the transcript is finished text and renders as Markdown.
-    ///
-    /// Deliberately keyed on the LAST message in the transcript, not on the last ASSISTANT message: the
-    /// engine appends the streaming placeholder only after its async setup, and providers without a
-    /// streaming client append nothing until the whole reply lands (`AICoach.send`). Keying on the last
-    /// assistant would therefore re-render the PREVIOUS, finished reply as plain text with a caret for the
-    /// duration of the request — losing its Markdown formatting and claiming it was being rewritten.
-    /// Once the user's question is appended, a finished older reply can never be the last message.
-    private func isStreaming(_ message: ChatMessage) -> Bool {
-        coach.sending && message.role == .assistant && coach.messages.last?.id == message.id
-    }
-
-    // MARK: - Evidence chain (P6): what actually grounded this reply
-
-    /// A short, human label per tool for the evidence list. Written as a switch of literal `Text(...)`
-    /// calls (not a computed `String` on `CoachTool`) for the same scanner-visibility reason as the
-    /// settings hub's row titles — piping this through a property would make it invisible to
-    /// `Tools/i18n_audit.py`. Several cases intentionally share one literal ("Memory" for all three
-    /// memory-editing tools) — one catalog entry, not three near-duplicates.
-    @ViewBuilder
-    private func evidenceLabel(_ tool: CoachTool) -> some View {
-        switch tool {
-        case .dataCatalog:             Text("Data catalog")
-        case .biometricSummary:        Text("Your metrics")
-        case .recentWorkouts:          Text("Recent workouts")
-        case .stressIndex:             Text("Stress index")
-        case .personalPatterns:        Text("Your patterns")
-        case .plotMetric:              Text("Chart")
-        case .rememberFact, .updateFact, .forgetFact: Text("Memory")
-        case .searchPastConversations: Text("Past conversations")
-        case .logCaffeine:             Text("Caffeine log")
-        case .logJournal:              Text("Journal")
-        case .logLabMarker:            Text("Lab Book")
-        case .sleepDetail:             Text("Sleep detail")
-        case .rangeReport:             Text("Range report")
-        case .trainingPreferences:     Text("Training preferences")
-        case .metricHistory:           Text("Long-term trend")
-        case .readiness:               Text("Readiness")
-        case .chargeDrivers:           Text("Charge breakdown")
-        case .proposePlan:             Text("Plan proposal")
-        case .proposeGoalSetup:        Text("Goal and routine draft")
-        case .sessionOutlook:          Text("Session outlook")
-        case .simulateDay:             Text("Simulation")
-        case .planAdherence:           Text("Plan adherence")
-        case .myLogs:                  Text("Your logs")
-        case .sensitiveLogs:           Text("Sensitive journal")
-        case .zoneMinutes:             Text("Zone minutes")
-        case .estimateSessionEffort:   Text("Session Effort estimate")
-        }
-    }
-
-    /// A one-line "what this source contributed" note per tool (#P12 12.2) — the data BEHIND the label, so
-    /// the evidence chain reads as reasoning ("grounded in your recovery + HRV"), not a bare tool name or a
-    /// raw-data dump. Same literal-`Text` switch as `evidenceLabel` for i18n-scanner visibility.
-    @ViewBuilder
-    private func evidenceDetail(_ tool: CoachTool) -> some View {
-        switch tool {
-        case .dataCatalog:             Text("Which locally stored metrics and sources are available")
-        case .biometricSummary:        Text("Recovery, HRV, resting HR and sleep")
-        case .recentWorkouts:          Text("Your last few sessions and their strain")
-        case .stressIndex:             Text("Autonomic load from today's heart-rate variability")
-        case .personalPatterns:        Text("Your own strongest n-of-1 correlations")
-        case .plotMetric:              Text("A metric plotted over time")
-        case .rememberFact, .updateFact, .forgetFact: Text("Facts you've asked the coach to keep")
-        case .searchPastConversations: Text("Earlier things you discussed")
-        case .logCaffeine:             Text("Caffeine you logged")
-        case .logJournal:              Text("A journal note you logged")
-        case .logLabMarker:            Text("A lab marker you logged")
-        case .sleepDetail:             Text("Last night's stages, timing and debt")
-        case .rangeReport:             Text("Trends across a range of weeks or months")
-        case .trainingPreferences:     Text("Repeated accepts, declines and skips around suggested sessions")
-        case .metricHistory:           Text("A compact local trend across months or years")
-        case .readiness:               Text("Today's push / maintain / rest call")
-        case .chargeDrivers:           Text("What moved your Charge up or down")
-        case .proposePlan:             Text("A session proposed for you to accept or change")
-        case .proposeGoalSetup:        Text("A goal and routines prepared for your review")
-        case .sessionOutlook:          Text("What a session would cost, from your history")
-        case .simulateDay:             Text("Tomorrow's Charge under a plan")
-        case .planAdherence:           Text("How closely you've kept to your plan")
-        case .myLogs:                  Text("What you logged — caffeine, journal, lab, mood")
-        case .sensitiveLogs:           Text("Only separately approved sensitive journal entries")
-        case .zoneMinutes:             Text("Time spent in each heart-rate zone")
-        case .estimateSessionEffort:   Text("What a planned session is worth, from your zones")
-        }
-    }
-
-    /// Human-readable receipt labels for the app's own local fallback routing. These are categories only;
-    /// no values, filenames, device identifiers or unseen prompt text are rendered here.
-    @ViewBuilder
-    private func localContextLabel(_ category: ChatMessage.LocalContextCategory) -> some View {
-        switch category {
-        case .biometricSnapshot:   Text("Your metrics")
-        case .readiness:           Text("Readiness")
-        case .recentWorkouts:      Text("Recent workouts")
-        case .planning:            Text("Your plan")
-        case .trainingPreferences: Text("Training preferences")
-        case .stress:              Text("Stress index")
-        case .personalPatterns:    Text("Your patterns")
-        case .conversationMemory:  Text("Past conversations")
-        case .semanticMemory:      Text("Semantic memory (on device)")
-        case .keywordMemory:       Text("Keyword memory fallback")
-        case .longTermHistory:     Text("Long-term trend")
-        }
-    }
-
-    /// Expandable per-message evidence — which tools actually backed this specific reply, and hence
-    /// which of the user's own data it's grounded in. The tool loop already knows this (`toolsUsed` on
-    /// the message); this is purely a disclosure, not new computation. Empty for replies from a
-    /// non-tool-calling provider, matching `toolsUsed`'s own emptiness there.
-    @ViewBuilder
-    private func evidenceChain(for message: ChatMessage) -> some View {
-        let tools = ChatMessage.uniqueTools(from: message.toolsUsed)
-        if !tools.isEmpty {
-            let isExpanded = expandedEvidenceIds.contains(message.id)
-            VStack(alignment: .leading, spacing: 4) {
-                Button {
-                    withAnimation(reduceMotion ? nil : StrandMotion.fade) {
-                        if isExpanded { expandedEvidenceIds.remove(message.id) }
-                        else { expandedEvidenceIds.insert(message.id) }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.seal")
-                            .accessibilityHidden(true)
-                        // Source count sits in the collapsed header (#P12 12.1) so the ground is VISIBLE
-                        // without expanding — "grounded in 3 of your sources", not a mystery until tapped.
-                        Text("Grounded in \(tools.count) of your data sources")
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .accessibilityHidden(true)
-                    }
-                    .font(StrandFont.caption)
-                    .foregroundStyle(StrandPalette.textTertiary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isExpanded ? "Hide what grounded this answer" : "Show what grounded this answer")
-
-                if isExpanded {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(tools, id: \.self) { tool in
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                Image(systemName: "circle.fill")
-                                    .font(.system(size: 3))
-                                    .accessibilityHidden(true)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    // The source, then what it actually contributed (#P12 12.2): a label a
-                                    // user can read, plus the data behind it — reasoning, not a raw dump.
-                                    evidenceLabel(tool)
-                                        .foregroundStyle(StrandPalette.textSecondary)
-                                    evidenceDetail(tool)
-                                        .foregroundStyle(StrandPalette.textTertiary)
-                                }
-                            }
-                            .font(StrandFont.caption)
-                        }
-                    }
-                    .padding(.leading, Self.sideContentIndent)
-                }
-            }
-        } else if !message.localContextUsed.isEmpty {
-            let categories = message.localContextUsed
-            let isExpanded = expandedEvidenceIds.contains(message.id)
-            VStack(alignment: .leading, spacing: 4) {
-                Button {
-                    withAnimation(reduceMotion ? nil : StrandMotion.fade) {
-                        if isExpanded { expandedEvidenceIds.remove(message.id) }
-                        else { expandedEvidenceIds.insert(message.id) }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "lock.shield")
-                            .accessibilityHidden(true)
-                        Text("Data access")
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .accessibilityHidden(true)
-                    }
-                    .font(StrandFont.caption)
-                    .foregroundStyle(StrandPalette.textTertiary)
-                }
-                .buttonStyle(.plain)
-
-                if isExpanded {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(categories, id: \.self) { category in
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                Image(systemName: "circle.fill")
-                                    .font(.system(size: 3))
-                                    .accessibilityHidden(true)
-                                localContextLabel(category)
-                                    .foregroundStyle(StrandPalette.textSecondary)
-                                    .font(StrandFont.caption)
-                            }
-                        }
-                    }
-                    .padding(.leading, Self.sideContentIndent)
-                }
-            }
-        }
-    }
-
-    // MARK: - Action row (P6): advice → action without a navigation break
-
-    /// Three one-tap hops to common next steps after coaching advice, under the LAST reply only (like
-    /// Regenerate) so the transcript doesn't accumulate a row under every message. Not content-triggered
-    /// (the reply text isn't scanned for "you should breathe" etc.) — guessing intent from prose is
-    /// fragile; these are just the standing fast paths from advice to doing something about it.
-    private var actionRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                if !goalSetupStore.pending.isEmpty {
-                    actionChip(icon: "target", action: { activeSheet = .goalSetup }) { Text("Review draft") }
-                }
-                // Each title is a literal `Text(...)` at its own call site (not a `String` routed through
-                // `actionChip`'s parameter) — the same scanner-visibility reason as `evidenceLabel` above.
-                actionChip(icon: "wind", action: { navRouter.openBreathe() }) { Text("Breathe") }
-                // Hidden when the user turned Live Sessions off (Settings/Today's own toggle) — the chip
-                // would otherwise look tappable for a feature it can't actually open (#P3).
-                if liveSessionsBeta {
-                    actionChip(icon: "waveform.path.ecg", action: { navRouter.openLiveSession() }) { Text("Live Session") }
-                }
-                actionChip(icon: "calendar.badge.plus", action: { activeSheet = .plan }) { Text("Schedule a session") }
-            }
-        }
-        .padding(.top, 2)
-    }
-
-    private func actionChip<Content: View>(
-        icon: String, action: @escaping () -> Void, @ViewBuilder label: () -> Content
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: icon).accessibilityHidden(true)
-                label()
-            }
-            .font(StrandFont.caption)
-            .foregroundStyle(StrandPalette.textSecondary)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(StrandPalette.surfaceInset, in: Capsule(style: .continuous))
-            .overlay(Capsule(style: .continuous).strokeBorder(StrandPalette.hairline, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-    }
-
-    /// An empty coach bubble carrying three pulsing dots, rather than a system spinner with a label: the
-    /// point is "a message is being written", and a `ProgressView` says "the app is busy". The dots animate
-    /// through `.symbolEffect` where available (iOS 17 / macOS 14) and sit still otherwise — and always sit
-    /// still under Reduce Motion.
     private var typingIndicator: some View {
-        HStack(alignment: .top, spacing: 8) {
-            CoachAvatarView(size: Self.assistantAvatarSize)
-            typingDots
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .frostedCardSurface(tint: StrandPalette.chargeColor, cornerRadius: CoachRadius.card)
-                .clipShape(CoachBubbleShape(side: .coach))
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small).tint(StrandPalette.accent)
+            Text("Coach is thinking…")
+                .font(StrandFont.subhead)
+                .foregroundStyle(StrandPalette.textSecondary)
             Spacer(minLength: 0)
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .frostedCardSurface(tint: StrandPalette.chargeColor, cornerRadius: 16)
+        .frame(maxWidth: 320, alignment: .leading)
         .accessibilityLabel("Coach is thinking")
     }
 
-    @ViewBuilder
-    private var typingDots: some View {
-        let dots = Image(systemName: "ellipsis")
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundStyle(StrandPalette.accent)
-        if #available(iOS 17.0, macOS 14.0, *), !reduceMotion {
-            dots.symbolEffect(.variableColor.iterative.dimInactiveLayers)
-        } else {
-            dots
-        }
-    }
-
-    /// Retry, optionally gated behind the provider's own `Retry-After`. When a 429 says "wait 30
-    /// seconds", an immediately-tappable Retry just earns a second 429 — so the button counts down and
-    /// enables itself, instead of leaving the user to guess how long "a moment" is.
-    @ViewBuilder
-    private func retryButton(waitSeconds: Int?) -> some View {
-        let ready = retryCountdown <= 0
-        Button { coach.regenerate() } label: {
-            Label(ready ? "Retry" : "Retry in \(retryCountdown)s", systemImage: "arrow.clockwise")
-                .font(StrandFont.footnote)
-                .foregroundStyle(StrandPalette.statusCritical)
-                .opacity(ready ? 1 : 0.6)
-        }
-        .buttonStyle(.plain)
-        .disabled(coach.sending || !ready)
-        .accessibilityLabel(ready ? "Retry sending your last message"
-                                  : "Retry available in \(retryCountdown) seconds")
-        .onAppear { retryCountdown = waitSeconds ?? 0 }
-        .onChangeCompat(of: coach.lastError.map { "\($0)" } ?? "") { _ in
-            retryCountdown = waitSeconds ?? 0   // a fresh failure restarts the wait
-        }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            if retryCountdown > 0 { retryCountdown -= 1 }
-        }
-    }
-
-    /// A failure used to strand the user with the question still typed and no one-tap way back. `Retry`
-    /// reuses `regenerate()`: after a failed send there's a user turn with no assistant reply after it
-    /// (the empty placeholder was already removed on error), so dropping from that turn and resending
-    /// is exactly a retry of the same question — no separate code path needed.
     private func errorBanner(_ message: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        StrandCard(padding: 14) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(StrandPalette.statusCritical)
@@ -1127,199 +604,292 @@ struct CoachView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Error: \(message)")
-
-            // The follow-up comes from the TYPED error (`AICoachError.recovery`), not from the message
-            // text: a rejected key needs the key screen, not a Retry that will fail identically, and a
-            // 4xx from the provider needs neither. Matching on the sentence would break in every
-            // language but English.
-            switch coach.lastError?.recovery ?? .retry(after: nil) {
-            case .reauthenticate:
-                Button { activeSheet = .settings } label: {
-                    Label("Enter your key again", systemImage: "key")
-                        .font(StrandFont.footnote)
-                        .foregroundStyle(StrandPalette.statusCritical)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open settings to enter your API key again")
-
-            case .retry(let after):
-                retryButton(waitSeconds: after)
-
-            case .none:
-                EmptyView()
-            }
-        }
-        .padding(14)
-        .background(StrandPalette.surfaceOverlay, in: RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous))
-    }
-
-    /// Same shape as `errorBanner`, informational tone (not `.statusCritical`) — nothing is wrong, the
-    /// user just hasn't opted in yet. The one persistent, always-visible signal that answers are generic
-    /// because data sharing is off, instead of the coach silently reading as "bad" (on-device feedback).
-    private var consentOffBanner: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "lock.fill")
-                .foregroundStyle(StrandPalette.accent)
-                .accessibilityHidden(true)
-            Text("Data access is off — Coach can't see your numbers.")
-                .font(StrandFont.subhead)
-                .foregroundStyle(StrandPalette.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            Button { activeSheet = .settings } label: {
-                Text("Turn on")
-                    .font(StrandFont.footnote)
-                    .foregroundStyle(StrandPalette.accent)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open settings to turn on data access")
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Data access is off. Coach can't see your numbers.")
-        .padding(14)
-        .background(StrandPalette.surfaceOverlay, in: RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous))
+        .accessibilityLabel("Error: \(message)")
     }
 
-    /// The starter prompts. WRAPPED, not a horizontal scroller: on a first run the scroller hid half the
-    /// suggestions off the right edge, which is exactly when the user most needs to see all of them.
-    private var suggestionChips: some View {
-        chipCloud(suggestions)
-    }
-
-    /// One chip row-set shared by the starter prompts and the post-card follow-ups.
-    private func chipCloud(_ prompts: [String]) -> some View {
-        FlowLayout(spacing: 8) {
-            ForEach(prompts, id: \.self) { prompt in
-                Button { send(prompt) } label: {
-                    Text(prompt)
-                        .font(StrandFont.captionNumber)
-                        .foregroundStyle(StrandPalette.textSecondary)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 8)
-                        .liquidGlass(in: Capsule(style: .continuous))
-                        .overlay(Capsule(style: .continuous).strokeBorder(StrandPalette.hairline, lineWidth: 1))
+    /// The inline "your key was turned away, here is the field" repair, shown under a rejection.
+    ///
+    /// Saving goes through `setKey`, which replaces the stored key and leaves the transcript alone. The
+    /// existing route was the Disconnect button, which also wipes the conversation and un-commits a
+    /// custom provider: far more than correcting a typo asks for, and named for an outcome the wearer
+    /// is trying to avoid. Twin of the Kotlin editor in `CoachChat`.
+    private var keyRepairPanel: some View {
+        StrandCard(padding: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Paste the corrected key. Your conversation is kept.")
+                    .font(StrandFont.footnote)
+                    .foregroundStyle(StrandPalette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                SecureField("Paste your \(coach.provider.displayName) API key", text: $keyFix)
+                    .textFieldStyle(.plain)
+                    .font(StrandFont.body)
+                    .foregroundStyle(StrandPalette.textPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(StrandPalette.surfaceInset, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(StrandPalette.hairline, lineWidth: 1))
+                    .onSubmit(saveRepairedKey)
+                    .accessibilityLabel("Corrected API key")
+                HStack {
+                    NoopButton("Update key", systemImage: "key.fill", kind: .primary, action: saveRepairedKey)
+                        .disabled(keyFix.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Spacer()
                 }
-                .buttonStyle(LiquidPressStyle())
-                .disabled(coach.sending)
-                .accessibilityLabel("Suggested prompt: \(prompt)")
             }
         }
-        .padding(.vertical, 1)
     }
 
-    /// Follow-up chips offered right after a card read (#P11 11.3), styled like `suggestionChips` but fed
-    /// from the engine's `cardSuggestions` (metric-specific) rather than the fixed starter set.
-    private var cardSuggestionChips: some View {
-        chipCloud(coach.cardSuggestions)
+    /// Store the corrected key and drop it from view state. `setKey` clears the error and the rejection
+    /// flag, which is what closes this panel.
+    private func saveRepairedKey() {
+        let trimmed = keyFix.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        coach.setKey(trimmed)
+        keyFix = ""
     }
 
-    // MARK: - Composer (docked)
+    private var suggestionChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(suggestions, id: \.self) { prompt in
+                    Button {
+                        send(prompt)
+                    } label: {
+                        Text(prompt)
+                            .font(StrandFont.captionNumber)
+                            .foregroundStyle(StrandPalette.textSecondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(StrandPalette.surfaceInset, in: Capsule(style: .continuous))
+                            .overlay(Capsule(style: .continuous).strokeBorder(StrandPalette.hairline, lineWidth: 1))
+                    }
+                    // Liquid tap response: the physical settle-inward every tappable liquid
+                    // affordance gets, replacing the flat `.plain` press.
+                    .buttonStyle(LiquidPressStyle())
+                    .disabled(coach.sending)
+                    .accessibilityLabel("Suggested prompt: \(prompt)")
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
 
+    /// K7: True when follow-up chips should show instead of the initial contextual chips —
+    /// i.e. the transcript is non-empty, the last message is from the assistant, and a reply
+    /// is not currently in flight.
+    private var showFollowUpChips: Bool {
+        guard let last = coach.messages.last, !coach.sending else { return false }
+        return last.role == .assistant
+    }
+
+    /// K7: Follow-up suggestion chips shown after each assistant reply, so the user can dig
+    /// deeper without typing. Uses the static `AICoachEngine.followUpSuggestions` list.
+    private var followUpChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(AICoachEngine.followUpSuggestions, id: \.self) { prompt in
+                    Button {
+                        send(prompt)
+                    } label: {
+                        Text(prompt)
+                            .font(StrandFont.captionNumber)
+                            .foregroundStyle(StrandPalette.textSecondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(StrandPalette.surfaceInset, in: Capsule(style: .continuous))
+                            .overlay(Capsule(style: .continuous).strokeBorder(StrandPalette.hairline, lineWidth: 1))
+                    }
+                    .buttonStyle(LiquidPressStyle())
+                    .disabled(coach.sending)
+                    .accessibilityLabel("Follow-up prompt: \(prompt)")
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+
+    /// K12: A subtle token estimate shown below the composer when the draft is non-empty.
+    /// Uses the ~4 chars/token heuristic — an estimate only, not an exact tokenizer count.
+    private func tokenEstimateBar(_ tokens: Int) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "speedometer")
+                .font(.system(size: 10))
+                .foregroundStyle(StrandPalette.textTertiary)
+            Text("~\(tokens) tokens")
+                .font(StrandFont.captionNumber)
+                .foregroundStyle(StrandPalette.textTertiary)
+            if tokens > 8000 {
+                Text("· may exceed small context windows")
+                    .font(StrandFont.captionNumber)
+                    .foregroundStyle(StrandPalette.textTertiary)
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    /// The input bar, a frosted overlay surface holding the field + Send, so the composer reads as a
+    /// distinct docked surface above the canvas rather than two floating controls.
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            TextField(coach.dataConsent ? "Ask Coach about your data…" : "Ask Coach…", text: $draft, axis: .vertical)
+            TextField("Ask Coach about your data…", text: $draft, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(StrandFont.body)
                 .foregroundStyle(StrandPalette.textPrimary)
-                // Grows with the text size rather than staying at a flat five lines: at
-                // `.accessibility1` and above a line holds only a few words, so five of them is a
-                // keyhole. The upper bound still exists — an unbounded field would push the send button
-                // off-screen.
-                .lineLimit(1...(dynamicTypeSize >= .accessibility1 ? 12 : 5))
+                .lineLimit(1...5)
+                .focused($composerFocused)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
-                .background(StrandPalette.surfaceInset, in: RoundedRectangle(cornerRadius: CoachRadius.field, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: CoachRadius.field, style: .continuous)
+                .background(StrandPalette.surfaceInset, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(composerFocused ? StrandPalette.focusRing : StrandPalette.hairline, lineWidth: 1))
-                // Tap-to-focus must cover the whole visible bar, not just the TextField's own tight
-                // glyph-rendering rect (#R1) — without an explicit shape here, the hit area follows the
-                // pre-padding geometry, so most of what reads as "the input bar" doesn't focus it and a
-                // tap can silently miss (worst near the trailing/vertical edges of the padded field).
-                .contentShape(RoundedRectangle(cornerRadius: CoachRadius.field, style: .continuous))
-                .focused($composerFocused)
                 .onSubmit { send(draft) }
-                // Apple Intelligence rewriting of a question before it is sent (iOS 18+); inert elsewhere.
-                .liquidWritingTools()
                 .accessibilityLabel("Question")
 
-            sendOrStopButton
+            // K4: on-device voice input (iOS only). macOS compiles this section out entirely.
+            #if os(iOS)
+            micButton
+            #endif
+
+            // Docked icon-only send affordance: a crisp accent-filled square sized to the
+            // composer row (not the full 48pt control height), so it routes through the same
+            // token fill/label colours as the button system without overpowering the field.
+            Button {
+                send(draft)
+            } label: {
+                Group {
+                    if coach.sending {
+                        ProgressView().controlSize(.small).tint(StrandPalette.goldDeepText)
+                    } else {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                }
+                .frame(width: 44, height: 38)
+                .foregroundStyle(StrandPalette.goldDeepText)
+                .background(StrandPalette.accent,
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(coach.sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .accessibilityLabel("Send")
         }
-        .padding(10)
-        // A floating glass capsule instead of a bordered box: on iOS 26 this is real Liquid Glass, below
-        // it the same `.ultraThinMaterial` the composer always had.
-        .liquidGlass(in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous)
-            .strokeBorder(composerFocused ? StrandPalette.focusRing : StrandPalette.hairline, lineWidth: 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: composerFocused)
-        .padding(.horizontal, 12)
-        // Breathing room above the safe area. Nothing is added for the tab bar any more: the iOS shell
-        // uses the PLATFORM bar, which is part of the safe area, so a bottom-docked composer is lifted
-        // clear of it by the system. The old `+ composerFloatingBarClearance` compensated for a custom
-        // bar drawn ON TOP of pushed content — keeping it now would double the gap.
-        .padding(.bottom, 8)
+        .padding(8)
+        .background(NoopPanelSurface(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .strokeBorder(StrandPalette.hairline, lineWidth: 1))
     }
 
-    /// While a reply streams, the send affordance becomes a Stop button; otherwise it sends the draft.
-    private var sendOrStopButton: some View {
+    // MARK: - K4: Voice input (iOS only)
+
+    #if os(iOS)
+    /// Mic button: starts/stops on-device speech recognition. Disabled when the locale lacks
+    /// on-device support or permission is denied; tapping when permission is not yet determined
+    /// triggers the system prompt.
+    private var micButton: some View {
         Button {
-            if coach.sending { coach.stop() } else { send(draft) }
+            toggleVoice()
         } label: {
-            sendGlyph
-                .font(StrandFont.headline)
-                .frame(width: 40, height: 40)
-                .foregroundStyle(StrandPalette.goldDeepText)
-                .background(StrandPalette.accent, in: Circle())
+            Group {
+                if voiceInput.isRecording {
+                    Image(systemName: "stop.circle.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(StrandPalette.statusCritical)
+                } else {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(canUseVoice ? StrandPalette.textSecondary : StrandPalette.textTertiary)
+                }
+            }
+            .frame(width: 36, height: 38)
+            .background(StrandPalette.surfaceInset,
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(StrandPalette.hairline, lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .disabled(!coach.sending && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .accessibilityLabel(coach.sending ? "Stop" : "Send")
-    }
-
-    /// Send ↔ Stop as a MORPH rather than a hard swap: the symbol-replace transition (iOS 17 / macOS 14)
-    /// keeps the button feeling like one control that changed its mind, which is what it is.
-    @ViewBuilder
-    private var sendGlyph: some View {
-        let glyph = Image(systemName: coach.sending ? "stop.fill" : "arrow.up")
-        if #available(iOS 17.0, macOS 14.0, *), !reduceMotion {
-            glyph.contentTransition(.symbolEffect(.replace))
-        } else {
-            glyph
+        .disabled(!micButtonEnabled)
+        .help(voiceInput.statusMessage ?? "Ask out loud")
+        .accessibilityLabel(voiceInput.isRecording ? "Stop voice input" : "Voice input")
+        .accessibilityHint(voiceInput.statusMessage ?? "Transcribes your question on-device")
+        .task {
+            // Pre-check on appear so the button reflects the right state without a tap.
+            if voiceInput.authorization == .notDetermined {
+                voiceInput.requestAuthorization { _ in }
+            }
         }
     }
 
-    // MARK: - Helpers
-
-    /// Show a time separator before the first message and whenever more than ~30 minutes passed since
-    /// the previous turn, so long chats gain temporal structure without a stamp on every bubble.
-    private func shouldShowTimestamp(at index: Int) -> Bool {
-        guard index < coach.messages.count else { return false }
-        guard index > 0 else { return true }
-        let prev = coach.messages[index - 1].date
-        let cur = coach.messages[index].date
-        return cur.timeIntervalSince(prev) > 30 * 60
+    /// Whether the mic button is tappable: not while sending, and only if voice is either
+    /// already usable or permission hasn't been asked yet (first tap triggers the prompt).
+    private var canUseVoice: Bool { voiceInput.canUseVoice }
+    private var micButtonEnabled: Bool {
+        !coach.sending && (canUseVoice || voiceInput.authorization == .notDetermined)
     }
 
-    /// A small glass pill rather than bare centred text, so a break in the conversation reads as a marker
-    /// on the thread instead of as a stray line of copy.
-    private func timeSeparator(_ date: Date) -> some View {
-        Text(date.formatted(.relative(presentation: .named)))
-            .font(StrandFont.footnote)
-            .foregroundStyle(StrandPalette.textTertiary)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 5)
-            .liquidGlass(in: Capsule(style: .continuous))
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 6)
+    private func toggleVoice() {
+        if voiceInput.isRecording {
+            voiceInput.stopTranscribing { finalText in
+                let trimmed = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    // Append to the draft (not replace) so a user can speak into existing text.
+                    draft = draft.isEmpty ? trimmed : "\(draft) \(trimmed)"
+                }
+            }
+        } else {
+            // First tap with undetermined permission triggers the system prompt; if granted,
+            // start transcribing immediately on the next tap. If already authorized, start now.
+            if voiceInput.authorization == .notDetermined {
+                voiceInput.requestAuthorization { state in
+                    if state == .authorized {
+                        voiceInput.startTranscribing { partial in
+                            draft = partial
+                        }
+                    }
+                }
+            } else {
+                voiceInput.startTranscribing { partial in
+                    draft = partial
+                }
+            }
+        }
+    }
+    #endif
+
+    private var privacyFootnote: some View {
+        Label {
+            Text(coach.provider == .custom
+                 ? "Coach talks only to the server URL you set. Point it at a local model (Ollama, LM Studio, llama.cpp) to keep everything on your own machine. Nothing is sent until you ask."
+                 : "This is the only feature that leaves \(Platform.deviceNounPhrase). It sends a summary of your metrics to \(coach.provider.displayName) using your own key. Nothing is sent until you ask.")
+                .font(StrandFont.footnote)
+                .foregroundStyle(StrandPalette.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "lock.shield")
+                .foregroundStyle(StrandPalette.textTertiary)
+        }
+        .accessibilityElement(children: .combine)
     }
 
-    private func isLastAssistant(_ message: ChatMessage) -> Bool {
-        coach.messages.last(where: { $0.role == .assistant })?.id == message.id
+    // MARK: - Actions
+
+    private func saveKey() {
+        let trimmed = keyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        coach.setKey(trimmed)
+        keyDraft = ""
     }
 
-    private func isLastUserTurn(_ message: ChatMessage) -> Bool {
-        coach.messages.last(where: { $0.role == .user })?.id == message.id
+    /// Commit the Custom (local) provider: save an optional key, then connect on the entered URL.
+    private func connectCustom() {
+        let trimmed = keyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            coach.setKey(trimmed)
+            keyDraft = ""
+        }
+        coach.connectCustom()
     }
 
     private func send(_ text: String) {
@@ -1327,106 +897,40 @@ struct CoachView: View {
         guard !trimmed.isEmpty, !coach.sending else { return }
         draft = ""
         composerFocused = false
-        // The house haptic vocabulary, not SwiftUI's `.sensoryFeedback` — that one is macOS 14+ and this
-        // screen ships to macOS 13, where `StrandHaptic` is simply a no-op.
-        StrandHaptic.light.play()
-        coach.startSend(trimmed)
+        Task { await coach.send(trimmed) }
+    }
+
+    /// K14: Trigger a subtle haptic when the Coach reply arrives. On iOS, a light impact feedback.
+    /// macOS doesn't have an equivalent simple API, so it's a no-op there.
+    private func triggerReplyHaptic() {
+        #if os(iOS)
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        #endif
+    }
+
+    /// K8: Save a coach reply to the journal as a note, so it appears alongside other journal
+    /// entries in Insights and can be reviewed later. Uses the existing journal API with a
+    /// fixed question ("Coach advice") and the reply text in the notes field.
+    private func saveAdvice(_ text: String) {
+        let day = Repository.localDayKey(Date())
+        Task {
+            await repo.saveJournalAnswer(
+                day: day,
+                question: "Coach advice",
+                answeredYes: true,
+                notes: text
+            )
+        }
     }
 
     private func scrollToEnd(_ proxy: ScrollViewProxy) {
-        // Still scrolls with Reduce Motion on — it just jumps. Not scrolling at all would strand the
-        // user above a reply that has already arrived.
-        withAnimation(reduceMotion ? nil : StrandMotion.fade) {
+        withAnimation(StrandMotion.fade) {
             if coach.sending {
                 proxy.scrollTo("typing", anchor: .bottom)
-            } else if let error = coach.errorText, !error.isEmpty {
-                proxy.scrollTo("error", anchor: .bottom)
             } else if let last = coach.messages.last {
                 proxy.scrollTo(last.id, anchor: .bottom)
             }
         }
-    }
-
-    /// Post a VoiceOver announcement without narrating every streamed token — only the moment a reply
-    /// finishes. Cross-platform: `UIAccessibility`/`NSAccessibility` are the only APIs for this, so there
-    /// is no shared abstraction to reuse (unlike `onChangeCompat`, which papers over an API-shape
-    /// difference rather than a platform-exclusive one).
-    private func announceReplyComplete() {
-        let message = String(localized: "Coach replied")
-        #if canImport(UIKit)
-        UIAccessibility.post(notification: .announcement, argument: message)
-        #elseif canImport(AppKit)
-        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
-                            userInfo: [.announcement: message])
-        #endif
-    }
-}
-
-extension View {
-    /// Present the Coach chat over a screen: fullScreenCover on iOS, a sheet on macOS (no
-    /// fullScreenCover there). The engine is passed in (a `View` extension can't read the caller's
-    /// @EnvironmentObject) and re-injected so the presented chat inherits it. Used by the Today entries.
-    @ViewBuilder func coachCover(isPresented: Binding<Bool>, coach: AICoachEngine) -> some View {
-        let content = NavigationStack {
-            CoachView()
-                .environmentObject(coach)
-                // Opening the chat IS having seen it — that's what clears the badge. Doing it here
-                // rather than per-entry-point means every route (Today card, floating button, More tab,
-                // notification deep link) clears it identically.
-                .onAppear { coach.markCoachMessagesSeen() }
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") { isPresented.wrappedValue = false }
-                    }
-                }
-        }
-        #if os(iOS)
-        self.fullScreenCover(isPresented: isPresented) { content }
-        #else
-        self.sheet(isPresented: isPresented) { content }
-        #endif
-    }
-}
-
-/// One source of truth for the Coach UI's corner radii, so the chat's bubbles / composer / cards don't
-/// scatter magic numbers. Kept local to Coach rather than added to the shared design system.
-enum CoachRadius {
-    static let bubble: CGFloat = 18
-    static let card: CGFloat = 18
-    static let field: CGFloat = 20
-    /// The ONE tight corner on the speaker's side. Small enough to read as a tail, large enough not to
-    /// look like a clipping bug at the accessibility text sizes.
-    static let tail: CGFloat = 5
-}
-
-/// A chat bubble with three round corners and one tight one on the speaker's side — the shape that makes a
-/// rounded rectangle read as a spoken turn. `UnevenRoundedRectangle` is plain SwiftUI (iOS 16+), so this
-/// needs no availability ladder and behaves identically on macOS.
-struct CoachBubbleShape: Shape {
-    enum Side { case user, coach }
-    var side: Side
-
-    func path(in rect: CGRect) -> Path {
-        let r = CoachRadius.bubble
-        let tail = CoachRadius.tail
-        let radii = RectangleCornerRadii(
-            topLeading: r,
-            bottomLeading: side == .coach ? tail : r,
-            bottomTrailing: side == .user ? tail : r,
-            topTrailing: r
-        )
-        return UnevenRoundedRectangle(cornerRadii: radii, style: .continuous).path(in: rect)
-    }
-}
-
-/// Cross-platform clipboard write for the Copy affordance (this screen compiles for iOS and macOS).
-enum CoachClipboard {
-    static func copy(_ text: String) {
-        #if canImport(UIKit)
-        UIPasteboard.general.string = text
-        #elseif canImport(AppKit)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        #endif
     }
 }

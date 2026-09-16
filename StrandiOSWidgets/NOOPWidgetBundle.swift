@@ -1,19 +1,18 @@
 import WidgetKit
 import SwiftUI
-import StrandDesign
 
-/// The widget extension entry point. Bundles the glanceable widget, the three-rings widget (redesign §9),
-/// and the live-HR Live Activity.
+/// The widget extension entry point. Bundles the glanceable widget, the live-HR Live Activity,
+/// the K10 Coach brief widget (stored morning brief on Lock Screen / Home Screen), the
+/// heart-rate trace widget (#1957), the stress curve widget (#2040), and the Lift Log session
+/// Live Activity.
 @main
 struct NOOPWidgetBundle: WidgetBundle {
-    init() {
-        // Widget extensions run in a separate process, so app-side registration does not carry over.
-        NoopSpecType.registerFonts()
-    }
-
     var body: some Widget {
         NOOPWidget()
-        NOOPRingsWidget()
         NOOPLiveActivity()
+        CoachBriefWidget()
+        HeartRateWidget()
+        StressWidget()
+        LiftLiveActivity()
     }
 }

@@ -60,6 +60,12 @@ enum CoachJournalPatternAnalyzer {
             let explicit = Dictionary(responses.map { ($0.day, $0.answeredYes) },
                                       uniquingKeysWith: { _, latest in latest })
             let yesDays = Set(explicit.compactMap { $0.value ? $0.key : nil })
+            // Upstream's `effect` now takes the control set EXPLICITLY rather than treating "not a
+            // behaviour day" as a control, because an unlogged day is not evidence of absence. Here the
+            // controls are the days this question was explicitly answered NO. That is also exactly what
+            // the previous inference produced: `aligned` is keyed only by days present in `explicit`,
+            // so every non-yes day in it is already a logged no — the reading does not change.
+            let noDays = Set(explicit.compactMap { $0.value ? nil : $0.key })
             guard explicit.values.contains(true), explicit.values.contains(false) else { continue }
 
             for lag in EffectRanker.lagSet {
@@ -70,6 +76,7 @@ enum CoachJournalPatternAnalyzer {
                     aligned[day] = value
                 }
                 guard let effect = BehaviorInsights.effect(behaviorDays: yesDays,
+                                                           controlDays: noDays,
                                                            outcomeByDay: aligned,
                                                            behavior: question,
                                                            outcome: outcomeName)

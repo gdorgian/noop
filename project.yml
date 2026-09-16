@@ -17,11 +17,11 @@ configFiles:
   Release: Config/BundleId.xcconfig
 settings:
   base:
-    MARKETING_VERSION: "10.5.0"
+    MARKETING_VERSION: "11.7.0"
     # iOS build number (CFBundleVersion). GLOBAL so the iOS app AND its widget extension inherit the
     # SAME value — they must match or iOS warns "extension version must match parent app" (#416).
     # macOS sets its own CFBundleVersion on the Strand target and is unaffected by this.
-    CURRENT_PROJECT_VERSION: "230"
+    CURRENT_PROJECT_VERSION: "394"
     # Overridden by the release/local xcodebuild command with the exact git revision. Keeping an explicit
     # fallback makes an ad-hoc Xcode build say "unknown" rather than leaking an unresolved $(...) token.
     NOOP_COMMIT_SHA: "unknown"
@@ -123,6 +123,9 @@ targets:
           # The liquid Today is now cross-platform: its iOS-only chrome (topBarTrailing / navigationBarTitleDisplayMode
           # / presentationCompactAdaptation / two-param onChange / sensoryFeedback) is guarded, so the mac split-view
           # shell hosts LiquidTodayView too. All Liquid/* now compile into the mac target.
+      # The stress screen is shared with iOS and prints levels through the widget's parity formatter,
+      # so its Foundation-only trace model belongs to the macOS app module as well.
+      - StrandiOSShared/StressTrace.swift
     # Oura BYO-app OAuth credentials. OuraConfig.xcconfig is a tracked wrapper that optionally
     # includes the untracked, gitignored Strand/Oura/OuraSecrets.xcconfig (template at
     # OuraSecrets.example.xcconfig) — absent secrets leave the $(OURA_*) references in the
@@ -207,6 +210,17 @@ targets:
       # Compile the exact cross-target snapshot source into the test bundle so the AltStore App Group
       # resolver is covered without adding this iOS/widget-only type to the macOS application module.
       - StrandiOSShared/WidgetSnapshot.swift
+      # Same reasoning for the heart-rate trace: the pure half of the widget is where every decision
+      # worth testing lives, and it is iOS/widget-only, so it is compiled into the test bundle rather
+      # than added to the macOS app.
+      - StrandiOSShared/HrTrace.swift
+      # And the stress curve's pure half (#2040), compiled directly into the test bundle so its
+      # geometry stays isolated from app state. This is also the only place that can compare the
+      # extension-safe `StressTrace.highBandFloor` copy with the analytics package constant.
+      - StrandiOSShared/StressTrace.swift
+      # And the widget cost counters, for the same reason again: pure, iOS-only, and the arithmetic is
+      # exactly the part that has been wrong twice on the Android side.
+      - StrandiOSShared/WidgetTelemetry.swift
     # Same wrapper as the app target, so the OURA_CLOUD_IMPORT-gated Oura tests compile exactly
     # when the app's Oura lane does (flag + creds both come from the untracked OuraSecrets.xcconfig).
     configFiles:
@@ -325,6 +339,9 @@ targets:
           # launch in StrandiOSApp.init) or the submit fails gracefully and only the foreground/"Run now"
           # paths run.
           - fetch
+          # A re-score continuation can run for minutes after a backgrounded offload, so it needs the
+          # long, deferrable processing class rather than another short refresh lease.
+          - processing
         # Permit every BGAppRefreshTask/BGProcessingTask identifier. Each derives from Bundle.main at
         # runtime so it tracks BUNDLE_ID_PREFIX, and each is registered from StrandiOSApp.init before
         # launch finishes. MUST match the registering site EXACTLY or iOS refuses to schedule/deliver.
@@ -338,6 +355,8 @@ targets:
           # Best-effort fallback that writes already-banked WHOOP data to HealthKit when iOS grants
           # background time. Fresh offloads also write immediately from their completion hook.
           - $(PRODUCT_BUNDLE_IDENTIFIER).healthwriteback
+          # Finishes a re-score that a backgrounded offload started and could not complete.
+          - $(PRODUCT_BUNDLE_IDENTIFIER).rescore
         NSBluetoothAlwaysUsageDescription: "Noop connects directly to your WHOOP strap to read heart rate, R-R intervals, battery and sensor data on your iPhone. Sharing occurs only through an export, backup, Apple Health write or Svea provider you explicitly enable."
         NSLocationWhenInUseUsageDescription: "Noop records your route during an outdoor workout to show distance, pace and a map, including while the screen is off. The route is stored locally unless you export or back up the activity."
         NSHealthShareUsageDescription: "Noop reads the Apple Health data types you approve to compute recovery, effort and sleep. They stay local unless you explicitly export, back up or consent to share a category with a configured Svea provider."
@@ -350,6 +369,10 @@ targets:
         # requests records) and turns an unexplained launch failure into a non-event.
         NSHealthClinicalHealthRecordsShareUsageDescription: "Noop does not read clinical health records. This appears only because the certificate used to sign Noop grants that capability."
         NSMotionUsageDescription: "Noop reads your iPhone's step count for a walking or running workout and shows it in the activity summary. It stays local unless you export or back up the activity."
+        # Svea voice input is on-device speech recognition; only the resulting text can reach the
+        # provider the wearer explicitly configured.
+        NSSpeechRecognitionUsageDescription: "Noop transcribes your spoken question on your iPhone so you can ask Svea without typing. Audio is not sent to the configured AI provider."
+        NSMicrophoneUsageDescription: "Noop uses the microphone only when you ask Svea a question by voice. Audio is transcribed on your iPhone; only the resulting text can be sent to the provider you configured."
         # #187: the opt-in AI Coach's "Custom (OpenAI-compatible)" provider can point at a LOCAL LLM on
         # the LAN (Ollama / LM Studio at http://192.168.x.x:11434). ATS blocks cleartext by default;
         # NSAllowsLocalNetworking exempts loopback/.local/private-LAN hosts ONLY — public HTTPS endpoints

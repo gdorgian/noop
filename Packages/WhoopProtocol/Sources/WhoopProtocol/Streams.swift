@@ -10,13 +10,38 @@ public struct HRSample: Equatable, Codable {
     public init(ts: Int, bpm: Int) { self.ts = ts; self.bpm = bpm }
 }
 
-/// WHICH sensor channel produced an R-R interval (#1071).
+/// Sensor-contact state carried by the standard BLE Heart Rate Measurement flags.
 ///
-/// A WHOOP strap exposes the same beat train over multiple TRANSPORTS: standard BLE 0x2A37, WHOOP's
-/// custom realtime packets, and historical type-47 records. They need distinct labels for exactly the
-/// same reason an Oura ring's optical channels do: measurements remain durable, while scoring chooses
-/// one source instead of silently concatenating copies of the night. `nil` remains the honest
-/// legacy/unknown value.
+/// This is deliberately a tri-state rather than a Bool: a peripheral that does not support contact
+/// detection has not said that contact is absent. `unsupported` is also the only valid result whenever
+/// flag bit 2 is clear, irrespective of the value in detected bit 1.
+public enum StandardHRContact: String, Equatable, Codable, Sendable {
+    case unsupported
+    case supportedNotDetected = "supported_not_detected"
+    case supportedDetected = "supported_detected"
+
+    /// Decode the BLE Heart Rate Measurement flags: bit 2 = supported, bit 1 = detected.
+    /// `unsupported` wins whenever bit 2 is clear, irrespective of detected bit 1.
+    /// Twin of Kotlin `StandardHrContact.fromMeasurementFlags`.
+    public static func fromMeasurementFlags(_ flags: UInt8) -> StandardHRContact {
+        if flags & 0x04 == 0 {
+            return .unsupported
+        } else if flags & 0x02 == 0 {
+            return .supportedNotDetected
+        } else {
+            return .supportedDetected
+        }
+    }
+}
+
+/// The sensor channel or transport that produced an R-R interval.
+///
+/// WHOOP 5 exposes one beat train over multiple transports; codes 5–7 distinguish those observations.
+/// WHOOP 4 and unlabelled legacy rows keep nil. An Oura ring has more than one optical channel:
+/// the green-quality tag (0x80) and the SpO2 tag (0x6E) both
+/// decode to R-R and both were stored, so the table held roughly TWO complete copies of every night —
+/// not duplicate rows to de-duplicate, but the SAME heartbeats measured twice. Labelling the channel is
+/// what lets scoring read one copy while both stay on disk as each other's cross-check.
 ///
 /// The raw values are the DURABLE, cross-platform storage codes for `rrInterval.srcChannel` and must
 /// stay in lockstep with Kotlin `RrSourceChannel` — they are written to SQLite and cross the `.noopbak`
@@ -39,22 +64,21 @@ public enum RRSourceChannel: Int, Equatable, Codable, Sendable, CaseIterable {
     /// is the question the channel choice for scoring rests on, and no stored night could answer it.
     /// Labelling only — both are read exactly as before.
     case ibiBare = 4
-    /// WHOOP's live, standard Bluetooth Heart Rate Measurement characteristic (0x2A37). Its receive-time
-    /// timestamp is normally 1–2 seconds after the matching historical record's embedded strap unix.
-    case whoopStandardBLE = 5
-    /// WHOOP historical R-R decoded by `extractHistoricalStreams` (type-47 on 5/MG and the equivalent
-    /// historical record path on 4.0). Its timestamp comes from the historical record itself.
-    case whoopHistorical = 6
-    /// WHOOP's proprietary live REALTIME_DATA stream. This is distinct from standard BLE 0x2A37 even
-    /// though both may carry the same live beat train; its timestamp is mapped from the strap clock.
-    case whoopRealtime = 7
+    /// WHOOP 5 v18 history, converted from wire ticks to milliseconds.
+    case whoop5Historical = 5
+    /// WHOOP 5 type-40 live transport, converted from wire ticks to milliseconds.
+    case whoop5Realtime = 6
+    /// WHOOP 5 standard BLE 0x2A37 live transport, already converted to milliseconds.
+    case whoop5Standard = 7
+
+    public var isWhoop5Transport: Bool { (5...7).contains(rawValue) }
 }
 
 public struct RRInterval: Equatable, Codable {
     public let ts: Int          // wall-clock unix seconds
     public let rrMs: Int
-    /// The sensor channel/transport this beat came from, or nil when the source is unknown (including
-    /// every row written before the column existed). See `RRSourceChannel`.
+    /// The sensor channel this beat came from, or nil when the source does not distinguish one (every
+    /// WHOOP 4 row, and legacy unlabelled rows). See `RRSourceChannel`.
     public let srcChannel: RRSourceChannel?
     /// #1008 diagnostics: this beat's EMISSION ORDER within the batch that delivered it, as stored in
     /// `rrInterval.ord`. nil on a decode (nothing has been stored yet) and on rows written before the
@@ -63,11 +87,33 @@ public struct RRInterval: Equatable, Codable {
     /// It is the one field that separates the two remaining explanations for a second carrying seven
     /// beats: contiguous ords mean ONE record's array carried them all, so the over-count is in the
     /// record's contents; repeated or non-monotonic ords mean SEPARATE deliveries each contributed to
-    /// that second, so the over-count is accumulation across offloads. WHOOP's wire format has no
-    /// channel field, so `srcChannel` can never answer this for a strap — `ord` is what is left.
+    /// that second, so the over-count is accumulation across offloads. WHOOP 5 transport labels
+    /// separate live/history origins, while `ord` preserves the array order within the selected origin.
     public let ord: Int?
-    public init(ts: Int, rrMs: Int, srcChannel: RRSourceChannel? = nil, ord: Int? = nil) {
-        self.ts = ts; self.rrMs = rrMs; self.srcChannel = srcChannel; self.ord = ord
+    /// Storage identity for equal beats in the same second. Defaults to zero so wire decoders and
+    /// callers that predate the widened database key remain source- and behaviour-compatible.
+    public let seq: Int
+    public init(ts: Int, rrMs: Int, srcChannel: RRSourceChannel? = nil, ord: Int? = nil, seq: Int = 0) {
+        self.ts = ts; self.rrMs = rrMs; self.srcChannel = srcChannel; self.ord = ord; self.seq = seq
+    }
+
+    private enum CodingKeys: String, CodingKey { case ts, rrMs, srcChannel, ord, seq }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ts = try c.decode(Int.self, forKey: .ts)
+        rrMs = try c.decode(Int.self, forKey: .rrMs)
+        srcChannel = try c.decodeIfPresent(RRSourceChannel.self, forKey: .srcChannel)
+        ord = try c.decodeIfPresent(Int.self, forKey: .ord)
+        seq = try c.decodeIfPresent(Int.self, forKey: .seq) ?? 0
+    }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(ts, forKey: .ts)
+        try c.encode(rrMs, forKey: .rrMs)
+        try c.encodeIfPresent(srcChannel, forKey: .srcChannel)
+        try c.encodeIfPresent(ord, forKey: .ord)
+        // Preserve the legacy encoded shape for the overwhelmingly common seq=0 row.
+        if seq != 0 { try c.encode(seq, forKey: .seq) }
     }
 }
 
@@ -336,8 +382,21 @@ public struct SleepStateSample: Equatable, Codable {
 /// `decodeWhoop5HistoricalV26`); a truncated frame can yield fewer than 24.
 public struct PpgWaveformSample: Equatable, Codable, Sendable {
     public let ts: Int          // wall-clock unix seconds (one record per second)
-    public let samples: [Int]   // raw i16 ADC counts @24 Hz, verbatim from `ppg_waveform` (usually 24)
-    public init(ts: Int, samples: [Int]) { self.ts = ts; self.samples = samples }
+    /// The window's 24 i16 DELTAS, verbatim from `ppg_waveform`. #2019: these are NOT absolute samples.
+    /// The strap sends a 25-sample window as one absolute code plus 24 deltas; reconstruct with
+    /// `ppgWaveformAbsolute(baseCode:deltas:)`.
+    public let samples: [Int]
+    public let burstIndex: Int?  // raw per-burst counter @21; nil for legacy archives
+    /// #2019: the absolute optical ADC code `samples` are deltas from, at frame-abs 23. nil on a row
+    /// written before it was read, and that nil is TRUE rather than merely missing: a delta series
+    /// cannot be inverted without its starting point, so those windows have no recoverable level.
+    public let baseCode: Int?
+    public init(ts: Int, samples: [Int], burstIndex: Int? = nil, baseCode: Int? = nil) {
+        self.ts = ts
+        self.samples = samples
+        self.burstIndex = burstIndex
+        self.baseCode = baseCode
+    }
 }
 
 /// One wire slot in the 5/MG v18 auxiliary-field record. The `rawValue` is the slot's bit position in
@@ -758,11 +817,16 @@ private func toWall(_ deviceTs: Int?, _ deviceClockRef: Int, _ wallClockRef: Int
 ///
 /// HR/R-R are taken ONLY from REALTIME_DATA (type 40). REALTIME_RAW_DATA (type 43) also
 /// carries an HR byte but streams alongside type-40 during raw collection, so routing both
-/// would double-count HR for the same instants. CRC-failed and non-ok frames are skipped.
+/// would double-count HR for the same instants. Frames whose integrity verdict is negative are
+/// skipped — no row is derived from a frame that is not intact.
 public func extractStreams(_ parsed: [ParsedFrame],
                            deviceClockRef: Int, wallClockRef: Int) -> Streams {
     var out = Streams()
     for r in parsed {
+        // `ok` is now the FULL verdict — header checksum, payload CRC32 and structural length — so it
+        // alone rejects everything the two-part check used to. The `crcOK` half is kept for the same
+        // reason as in `extractHistoricalStreams`: a parse result decoded from a capture written before
+        // the verdict widened carries the old constant `ok: true` beside a false `crcOK`.
         if !r.ok || r.crcOK == false { continue }
         let p = r.parsed
         switch r.typeName {
@@ -773,9 +837,8 @@ public func extractStreams(_ parsed: [ParsedFrame],
             }
             // Unlike Python, drop RR rows when timestamp is absent (a ts-less RR row is unstorable).
             if let ts = ts, let rrs = p["rr_intervals"]?.intArrayValue {
-                for rr in rrs {
-                    out.rr.append(RRInterval(ts: ts, rrMs: rr, srcChannel: .whoopRealtime))
-                }
+                let source = p["rr_source_channel"]?.intValue.flatMap(RRSourceChannel.init(rawValue:))
+                for rr in rrs { out.rr.append(RRInterval(ts: ts, rrMs: rr, srcChannel: source)) }
             }
         case "EVENT":
             // EVENT timestamps are real RTC unix seconds — already wall-clock, NOT offset.

@@ -13,9 +13,29 @@ on:
     branches: [main]
     paths:
       - 'Strand/**'
+      # The app-target TESTS, not just the sources they cover. The `Test Strand` step below runs
+      # StrandTests, but a PR touching only those tests matched nothing here, so it built and ran
+      # nothing: one that failed to compile, or simply failed, merged unverified and went red on the
+      # next unrelated PR that happened to touch `Strand/**`, mis-attributing the breakage to whoever
+      # that was.
+      #
+      # This is the only test directory that needs naming, and the reason is layout rather than
+      # oversight: Android's tests sit under `android/**` and the package suites under `Packages/**`,
+      # both already inside their subject's glob, while StrandTests is a SIBLING of `Strand/` instead
+      # of part of it. `project.yml` does not cover it either — the target takes
+      # `sources: [StrandTests]`, a directory, so adding a test file changes no other tracked path.
+      - 'StrandTests/**'
       - 'StrandiOS/**'
       - 'StrandiOSShared/**'
       - 'StrandiOSWidgets/**'
+      # The watch app and its complications, for the same reason StrandTests is named above: the
+      # NOOPiOS scheme BUILDS them (NOOPiOS embeds NOOPWatch, which embeds NOOPWatchComplications),
+      # but neither directory sits under any glob here, so a PR touching only them matched nothing
+      # and compiled nothing. A broken watch target merged unverified and surfaced on the next PR
+      # that happened to touch Strand/**, pointing at the wrong change. #2227 translated 25
+      # complication strings and got no build at all, which is what surfaced this.
+      - 'NOOPWatch/**'
+      - 'NOOPWatchComplications/**'
       - 'Packages/**'
       - 'project.yml'
       - '.github/workflows/app-build.yml'

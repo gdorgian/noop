@@ -10,6 +10,16 @@ import WhoopProtocol
 /// moved past a failed write would silently drop that span from Apple Health forever.
 final class ShortcutHealthExportTests: XCTestCase {
 
+    /// A synthetic bucket whose extremes equal its mean.
+    ///
+    /// The export path reads only `bpm`, so a spread inside the bucket is not what these tests are
+    /// about. Written once here rather than repeated at every call site, and deliberately NOT a default
+    /// on `HRBucket` itself: production builds those from `MIN(bpm)`/`MAX(bpm)`, and a type-level default
+    /// would let a real one silently claim its mean as its range, which is the bug #2032 was.
+    private func flatBucket(ts: Int, bpm: Double) -> HRBucket {
+        HRBucket(ts: ts, bpm: bpm, minBpm: bpm, maxBpm: bpm)
+    }
+
     private let utc = TimeZone(secondsFromGMT: 0)!
     private var defaults: UserDefaults!
     private var suiteName: String!
@@ -100,14 +110,14 @@ final class ShortcutHealthExportTests: XCTestCase {
 
     func testAggregateBucketsHRIntoWindowsAscending() {
         // hrBuckets(900) keys are already the window starts; bpm means round half-up.
-        let hr = [HRBucket(ts: 900, bpm: 61.5), HRBucket(ts: 0, bpm: 61.4)]
+        let hr = [flatBucket(ts: 900, bpm: 61.5), flatBucket(ts: 0, bpm: 61.4)]
         let windows = ShortcutHealthExport.aggregate(hr: hr, rr: [], steps: [], end: 1800)
         XCTAssertEqual(windows, [Window(start: 0, hr: 61), Window(start: 900, hr: 62)])
     }
 
     // Only windows holding ≥1 value are emitted — an empty middle window produces NO line.
     func testAggregateSkipsEmptyWindows() {
-        let hr = [HRBucket(ts: 0, bpm: 60), HRBucket(ts: 1800, bpm: 70)]
+        let hr = [flatBucket(ts: 0, bpm: 60), flatBucket(ts: 1800, bpm: 70)]
         let windows = ShortcutHealthExport.aggregate(hr: hr, rr: [], steps: [], end: 2700)
         XCTAssertEqual(windows.map(\.start), [0, 1800])
     }
@@ -115,7 +125,7 @@ final class ShortcutHealthExportTests: XCTestCase {
     // Data at/after `end` (the still-open window) is excluded — it would otherwise be frozen
     // partial and never revisited once the watermark advances.
     func testAggregateExcludesOpenWindow() {
-        let hr = [HRBucket(ts: 0, bpm: 60), HRBucket(ts: 900, bpm: 70)]
+        let hr = [flatBucket(ts: 0, bpm: 60), flatBucket(ts: 900, bpm: 70)]
         let windows = ShortcutHealthExport.aggregate(hr: hr, rr: [], steps: [], end: 900)
         XCTAssertEqual(windows, [Window(start: 0, hr: 60)])
     }
@@ -200,50 +210,13 @@ final class ShortcutHealthExportTests: XCTestCase {
 
     // MARK: - Export + watermark (advance only on success)
 
-    // A write marks the span PENDING, never confirmed: the rows are in the file but nothing has logged
-    // them yet. Advancing the watermark here is what silently destroyed spans for anyone who had not
-    // wired up a Shortcut, because the next export then truncated rows nothing had read.
-    func testExportWritesFileAndMarksSpanPendingNotConfirmed() async throws {
-        let source = FakeReads(hr: [HRBucket(ts: 0, bpm: 62)])
+    func testExportWritesFileAndAdvancesWatermark() async throws {
+        let source = FakeReads(hr: [flatBucket(ts: 0, bpm: 62)])
         let outcome = await ShortcutHealthExport.export(
             source: source, deviceId: "dev", now: Date(timeIntervalSince1970: 10_000),
             defaults: defaults, directory: dir, timeZone: utc)
         XCTAssertEqual(outcome, .written(lines: 1))
         XCTAssertEqual(try fileText(), "62,,,1970-01-01 00:00")
-        XCTAssertEqual(defaults.integer(forKey: ShortcutHealthExport.pendingKey), 9_900)
-        XCTAssertEqual(defaults.integer(forKey: ShortcutHealthExport.watermarkKey), 0)
-    }
-
-    // Confirm promotes pending → confirmed, and only then does the span stop being offered.
-    func testConfirmPromotesPendingAndThenTheFileGoesEmpty() async throws {
-        _ = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 0, bpm: 62)]), deviceId: "dev",
-            now: Date(timeIntervalSince1970: 10_000),
-            defaults: defaults, directory: dir, timeZone: utc)
-        ShortcutHealthExport.confirm(defaults: defaults)
-        XCTAssertEqual(defaults.integer(forKey: ShortcutHealthExport.watermarkKey), 9_900)
-        XCTAssertEqual(defaults.integer(forKey: ShortcutHealthExport.pendingKey), 0)
-
-        let after = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 0, bpm: 62)]), deviceId: "dev",
-            now: Date(timeIntervalSince1970: 10_060),
-            defaults: defaults, directory: dir, timeZone: utc)
-        XCTAssertEqual(after, .nothingNew)
-        XCTAssertEqual(try fileText(), "")
-    }
-
-    // A confirm with nothing pending must not move the watermark — otherwise a stray second run of the
-    // Shortcut's confirm step would skip whatever had been written since.
-    func testConfirmWithNothingPendingIsANoOp() {
-        defaults.set(5_000, forKey: ShortcutHealthExport.watermarkKey)
-        ShortcutHealthExport.confirm(defaults: defaults)
-        XCTAssertEqual(defaults.integer(forKey: ShortcutHealthExport.watermarkKey), 5_000)
-    }
-
-    func testConfirmNeverMovesTheWatermarkBackwards() {
-        defaults.set(9_900, forKey: ShortcutHealthExport.watermarkKey)
-        defaults.set(900, forKey: ShortcutHealthExport.pendingKey)   // stale, from an older write
-        ShortcutHealthExport.confirm(defaults: defaults)
         XCTAssertEqual(defaults.integer(forKey: ShortcutHealthExport.watermarkKey), 9_900)
     }
 
@@ -260,7 +233,7 @@ final class ShortcutHealthExportTests: XCTestCase {
     func testExportWriteFailureLeavesWatermark() async {
         // Destination directory doesn't exist → the atomic write throws → watermark must not move.
         let missing = dir.appendingPathComponent("nope")
-        let source = FakeReads(hr: [HRBucket(ts: 0, bpm: 62)])
+        let source = FakeReads(hr: [flatBucket(ts: 0, bpm: 62)])
         let outcome = await ShortcutHealthExport.export(
             source: source, deviceId: "dev", now: Date(timeIntervalSince1970: 10_000),
             defaults: defaults, directory: missing, timeZone: utc)
@@ -271,7 +244,7 @@ final class ShortcutHealthExportTests: XCTestCase {
     func testExportNothingNewWhenWatermarkCoversNow() async throws {
         defaults.set(9_900, forKey: ShortcutHealthExport.watermarkKey)
         let outcome = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 0, bpm: 62)]), deviceId: "dev",
+            source: FakeReads(hr: [flatBucket(ts: 0, bpm: 62)]), deviceId: "dev",
             now: Date(timeIntervalSince1970: 10_000),
             defaults: defaults, directory: dir, timeZone: utc)
         XCTAssertEqual(outcome, .nothingNew)
@@ -281,72 +254,36 @@ final class ShortcutHealthExportTests: XCTestCase {
         XCTAssertEqual(try fileText(), "")
     }
 
-    // The regression that made this whole model necessary: rows exported → app closes again before any
-    // Shortcut read them → under the old contract the file was truncated and the span was gone for good.
-    // UNCONFIRMED rows must survive a second export instead.
-    func testUnconfirmedRowsSurviveASecondExport() async throws {
+    // The #167 duplication repro: rows exported → app closes again with no new complete window →
+    // the file must be EMPTY, or the Shortcut re-imports the previous rows on every automation run.
+    func testNothingNewTruncatesStaleFileSoShortcutCannotReimport() async throws {
         _ = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 0, bpm: 62)]), deviceId: "dev",
+            source: FakeReads(hr: [flatBucket(ts: 0, bpm: 62)]), deviceId: "dev",
             now: Date(timeIntervalSince1970: 10_000),
             defaults: defaults, directory: dir, timeZone: utc)
         XCTAssertEqual(try fileText(), "62,,,1970-01-01 00:00")
         let second = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 0, bpm: 62)]), deviceId: "dev",
-            now: Date(timeIntervalSince1970: 10_060),   // +60s — same 15-min window, nothing NEW
+            source: FakeReads(hr: [flatBucket(ts: 0, bpm: 62)]), deviceId: "dev",
+            now: Date(timeIntervalSince1970: 10_060),   // +60s — same 15-min window, nothing new
             defaults: defaults, directory: dir, timeZone: utc)
-        XCTAssertEqual(second, .written(lines: 1))
-        XCTAssertEqual(try fileText(), "62,,,1970-01-01 00:00",
-                       "rows nothing has confirmed must be re-offered, not destroyed")
+        XCTAssertEqual(second, .nothingNew)
+        XCTAssertEqual(try fileText(), "", "stale rows must not survive a nothing-new export (#167)")
     }
 
-    // #167 still holds — the duplication it guarded against is now prevented by the confirm step rather
-    // than by truncating unread rows.
-    func testConfirmedRowsAreNotReOffered() async throws {
+    // Full-file REPLACE: the second export's file contains only the new span — never an append
+    // (the Shortcut has no dedup; re-offered lines would be double-logged into Health).
+    func testExportReplacesWholeFile() async throws {
         _ = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 0, bpm: 62)]), deviceId: "dev",
-            now: Date(timeIntervalSince1970: 10_000),
-            defaults: defaults, directory: dir, timeZone: utc)
-        ShortcutHealthExport.confirm(defaults: defaults)
-        _ = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 0, bpm: 62)]), deviceId: "dev",
-            now: Date(timeIntervalSince1970: 10_060),
-            defaults: defaults, directory: dir, timeZone: utc)
-        XCTAssertEqual(try fileText(), "", "a confirmed span must never be offered twice")
-    }
-
-    // Full-file REPLACE, never an append — but the replacement covers everything back to the CONFIRMED
-    // mark, so an unconfirmed earlier window is carried forward rather than dropped.
-    func testExportReplacesFileAndCarriesUnconfirmedRowsForward() async throws {
-        _ = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 0, bpm: 62)]), deviceId: "dev",
+            source: FakeReads(hr: [flatBucket(ts: 0, bpm: 62)]), deviceId: "dev",
             now: Date(timeIntervalSince1970: 10_000),
             defaults: defaults, directory: dir, timeZone: utc)
         let outcome = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 0, bpm: 62), HRBucket(ts: 9_900, bpm: 70)]),
-            deviceId: "dev", now: Date(timeIntervalSince1970: 20_000),
-            defaults: defaults, directory: dir, timeZone: utc)
-        XCTAssertEqual(outcome, .written(lines: 2))
-        XCTAssertEqual(try fileText(), "62,,,1970-01-01 00:00\n70,,,1970-01-01 02:45")
-        XCTAssertEqual(defaults.integer(forKey: ShortcutHealthExport.pendingKey), 19_800)
-        XCTAssertEqual(defaults.integer(forKey: ShortcutHealthExport.watermarkKey), 0)
-    }
-
-    // Once the first span is confirmed, the next export carries only what came after it.
-    func testExportAfterConfirmContainsOnlyTheNewSpan() async throws {
-        _ = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 0, bpm: 62)]), deviceId: "dev",
-            now: Date(timeIntervalSince1970: 10_000),
-            defaults: defaults, directory: dir, timeZone: utc)
-        ShortcutHealthExport.confirm(defaults: defaults)
-        // The real store is queried from the confirmed mark, so only the newer bucket comes back —
-        // `aggregate` bounds the upper edge only and relies on the query for the lower one.
-        let outcome = await ShortcutHealthExport.export(
-            source: FakeReads(hr: [HRBucket(ts: 9_900, bpm: 70)]),
-            deviceId: "dev", now: Date(timeIntervalSince1970: 20_000),
+            source: FakeReads(hr: [flatBucket(ts: 9_900, bpm: 70)]), deviceId: "dev",
+            now: Date(timeIntervalSince1970: 20_000),
             defaults: defaults, directory: dir, timeZone: utc)
         XCTAssertEqual(outcome, .written(lines: 1))
         XCTAssertEqual(try fileText(), "70,,,1970-01-01 02:45")
-        XCTAssertEqual(defaults.integer(forKey: ShortcutHealthExport.pendingKey), 19_800)
+        XCTAssertEqual(defaults.integer(forKey: ShortcutHealthExport.watermarkKey), 19_800)
     }
 
     func testResetWatermark() {
