@@ -126,7 +126,7 @@ struct NoopAppShell: View {
         case .ages: NoopAct6Screens(navigation: navigation)
         case .svea: NoopAct7Screens(navigation: navigation)
         case .goals: NoopAct8Screens(navigation: navigation, labDraft: labDraft)
-        case .instrument: NoopAct9Screens(navigation: navigation)
+        case .instrument: NoopAct9Screens(navigation: navigation, data: .prototype)
         }
     }
 
@@ -319,6 +319,7 @@ struct NoopVerifiedAppShell: View {
     @EnvironmentObject private var repo: Repository
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var labDraft = NoopLabReviewDraft()
+    @StateObject private var instrumentStore = NoopInstrumentLiveStore()
 
     /// The four Act 8 screens that are safe to show outside the fixture shell.
     ///
@@ -340,10 +341,17 @@ struct NoopVerifiedAppShell: View {
         .data, .importHistory, .reading, .imported, .rejected, .backup
     ]
 
+    /// Act 9's catalog is static, but every value and every relationship comes from the local record.
+    /// The prototype person never crosses this boundary.
+    private static let canonicalInstrumentRoutes: Set<NoopRoute> = [
+        .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects
+    ]
+
     private var usesCanonicalCanvas: Bool {
         Self.canonicalLabRoutes.contains(navigation.route)
             || Self.canonicalBreatheRoutes.contains(navigation.route)
             || Self.canonicalDataRoutes.contains(navigation.route)
+            || Self.canonicalInstrumentRoutes.contains(navigation.route)
     }
 
     var body: some View {
@@ -358,6 +366,8 @@ struct NoopVerifiedAppShell: View {
                     NoopBreatheScreens(navigation: navigation)
                 } else if Self.canonicalDataRoutes.contains(navigation.route) {
                     NoopDataScreen(navigation: navigation)
+                } else if Self.canonicalInstrumentRoutes.contains(navigation.route) {
+                    NoopAct9Screens(navigation: navigation, data: instrumentStore.data)
                 } else {
                     NoopVerifiedRouteScreen(
                         route: navigation.route,
@@ -387,7 +397,8 @@ struct NoopVerifiedAppShell: View {
 
             if let overlay = navigation.overlay {
                 Group {
-                    if Self.canonicalDataRoutes.contains(navigation.route) {
+                    if Self.canonicalDataRoutes.contains(navigation.route)
+                        || Self.canonicalInstrumentRoutes.contains(navigation.route) {
                         // Data uses only the static format catalog and the real destructive confirmation;
                         // neither contains prototype measurements.
                         NoopOverlayHost(overlay: overlay, navigation: navigation)
@@ -413,16 +424,28 @@ struct NoopVerifiedAppShell: View {
         // like the fixture shell. Without this, SwiftUI first removes the status-bar safe area and
         // NoopScreen adds 56 pt again, putting every verified Lab/Breathe page about 60 pt too low.
         .ignoresSafeArea(.container, edges: usesCanonicalCanvas ? .top : [])
+        .task(id: instrumentLoadKey) {
+            guard instrumentLoadKey != nil else { return }
+            await instrumentStore.load(from: repo)
+        }
+    }
+
+    private var instrumentLoadKey: Int? {
+        Self.canonicalInstrumentRoutes.contains(navigation.route) ? repo.refreshSeq : nil
     }
 
     @ViewBuilder
     private var verifiedAmbientGlow: some View {
         if usesCanonicalCanvas {
             let isLab = Self.canonicalLabRoutes.contains(navigation.route)
+            let isData = Self.canonicalDataRoutes.contains(navigation.route)
+            let isInstrument = Self.canonicalInstrumentRoutes.contains(navigation.route)
             let color: Color = isLab
                 ? NoopHTMLColor.warm
-                : (Self.canonicalDataRoutes.contains(navigation.route) ? NoopHTMLColor.blush : NoopHTMLColor.blue)
-            let opacity = isLab ? 0.15 : (Self.canonicalDataRoutes.contains(navigation.route) ? 0.13 : 0.17)
+                : isData
+                    ? NoopHTMLColor.blush
+                    : isInstrument ? NoopHTMLColor.night : NoopHTMLColor.blue
+            let opacity = isLab ? 0.15 : isData ? 0.13 : isInstrument ? 0.16 : 0.17
             VStack {
                 Ellipse()
                     .fill(RadialGradient(
@@ -492,6 +515,10 @@ struct NoopVerifiedAppShell: View {
                 case .reading, .imported, .rejected:
                     // These are forward-only states and draw no back control.
                     return
+                case .instrumentIndex:
+                    navigation.reset(to: .trends)
+                case .instrumentMetric, .instrumentCompare, .instrumentEffects:
+                    navigation.back(or: .instrumentIndex)
                 default:
                     // Keep the fail-closed placeholder's existing behaviour until that route gets
                     // its own verified production screen.

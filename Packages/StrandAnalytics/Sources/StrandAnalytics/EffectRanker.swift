@@ -118,6 +118,24 @@ public enum EffectRanker {
         return sorted(rows)
     }
 
+    /// Rank behaviours whose journal carries explicit yes/no answers rather than treating every
+    /// unmentioned outcome day as a "no". This is the honest path for sparse journals: a missing
+    /// answer is unknown and contributes to neither side of the comparison.
+    public static func rank(responses: [String: [String: Bool]],
+                            outcomeByDay: [String: Double],
+                            outcome: String) -> [RankedEffect] {
+        var rows: [RankedEffect] = []
+        for name in responses.keys.sorted() {
+            guard let answers = responses[name],
+                  let row = bestLag(responsesByDay: answers,
+                                    outcomeByDay: outcomeByDay,
+                                    behavior: name,
+                                    outcome: outcome) else { continue }
+            rows.append(row)
+        }
+        return sorted(rows)
+    }
+
     /// Find the best-lag RankedEffect for ONE behaviour against ONE outcome, or nil when no
     /// lag in `lagSet` yields a computable effect that clears the group gate.
     public static func bestLag(behaviorDays: Set<String>,
@@ -145,6 +163,45 @@ public enum EffectRanker {
                 best = (lag, e)
             }
         }
+        guard let chosen = best else { return nil }
+        let pairs = Swift.min(chosen.effect.nWith, chosen.effect.nWithout)
+        return RankedEffect(behavior: behavior, outcome: outcome, lag: chosen.lag,
+                            effect: chosen.effect, confidence: confidence(forPairs: pairs))
+    }
+
+    /// Explicit-answer twin of `bestLag(behaviorDays:...)`. Only days carrying a journal answer
+    /// enter the split; `true` is the with group, `false` is the without group, and absent stays absent.
+    public static func bestLag(responsesByDay: [String: Bool],
+                               outcomeByDay: [String: Double],
+                               behavior: String,
+                               outcome: String) -> RankedEffect? {
+        let yesDays = Set(responsesByDay.compactMap { $0.value ? $0.key : nil })
+        var best: (lag: Int, effect: BehaviorEffect)?
+
+        for lag in lagSet {
+            var alignedOutcome: [String: Double] = [:]
+            alignedOutcome.reserveCapacity(responsesByDay.count)
+            for day in responsesByDay.keys {
+                guard let outcomeDay = CorrelationEngine.shiftDay(day, by: lag),
+                      let value = outcomeByDay[outcomeDay] else { continue }
+                alignedOutcome[day] = value
+            }
+            guard let effect = BehaviorInsights.effect(behaviorDays: yesDays,
+                                                        outcomeByDay: alignedOutcome,
+                                                        behavior: behavior,
+                                                        outcome: outcome),
+                  Swift.min(effect.nWith, effect.nWithout) >= BehaviorInsights.minGroupForSignificance
+            else { continue }
+
+            if let current = best {
+                let better = abs(effect.cohensD) > abs(current.effect.cohensD)
+                    || (abs(effect.cohensD) == abs(current.effect.cohensD) && lag < current.lag)
+                if better { best = (lag, effect) }
+            } else {
+                best = (lag, effect)
+            }
+        }
+
         guard let chosen = best else { return nil }
         let pairs = Swift.min(chosen.effect.nWith, chosen.effect.nWithout)
         return RankedEffect(behavior: behavior, outcome: outcome, lag: chosen.lag,

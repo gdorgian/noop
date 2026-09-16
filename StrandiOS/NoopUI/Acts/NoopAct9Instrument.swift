@@ -1,5 +1,7 @@
 #if os(iOS)
 import SwiftUI
+import StrandAnalytics
+import WhoopStore
 
 // MARK: - Act 9 · The instrument
 
@@ -8,12 +10,28 @@ import SwiftUI
 /// Debug-only `--demo-seed` shell. Release data is supplied by the verified app shell instead.
 struct NoopAct9Screens: View {
     @ObservedObject var navigation: NoopNavigation
+    let data: NoopInstrumentData
+    @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     @SceneStorage("noop.act9.range") private var rangeRaw = NoopInstrumentRange.ninety.rawValue
     @SceneStorage("noop.act9.filter") private var filterRaw = NoopInstrumentGroupFilter.all.rawValue
 
+    init(navigation: NoopNavigation, data: NoopInstrumentData) {
+        self.navigation = navigation
+        self.data = data
+    }
+
+    private var presentedData: NoopInstrumentData {
+        data.adjustedForSchedule(
+            isNightWorker: NoopScheduleInference.isNightWorker(kind: scheduleKind)
+        )
+    }
+
     private var range: Binding<NoopInstrumentRange> {
         Binding(
-            get: { NoopInstrumentRange(rawValue: rangeRaw) ?? .ninety },
+            get: {
+                let requested = NoopInstrumentRange(rawValue: rangeRaw) ?? .ninety
+                return requested.isAvailable(total: presentedData.historyCount) ? requested : .all
+            },
             set: { rangeRaw = $0.rawValue }
         )
     }
@@ -24,22 +42,25 @@ struct NoopAct9Screens: View {
             NoopInstrumentIndexScreen(
                 navigation: navigation,
                 range: range,
-                filterRaw: $filterRaw
+                filterRaw: $filterRaw,
+                data: presentedData
             )
         case .instrumentMetric:
             NoopInstrumentMetricScreen(
                 navigation: navigation,
-                range: range
+                range: range,
+                data: presentedData
             )
         case .instrumentCompare:
-            NoopInstrumentCompareScreen(navigation: navigation, range: range)
+            NoopInstrumentCompareScreen(navigation: navigation, range: range, data: presentedData)
         case .instrumentEffects:
-            NoopInstrumentEffectsScreen(navigation: navigation, range: range)
+            NoopInstrumentEffectsScreen(navigation: navigation, range: range, data: presentedData)
         default:
             NoopInstrumentIndexScreen(
                 navigation: navigation,
                 range: range,
-                filterRaw: $filterRaw
+                filterRaw: $filterRaw,
+                data: presentedData
             )
         }
     }
@@ -49,8 +70,7 @@ private struct NoopInstrumentIndexScreen: View {
     @ObservedObject var navigation: NoopNavigation
     @Binding var range: NoopInstrumentRange
     @Binding var filterRaw: String
-
-    private let data = NoopInstrumentDemoData.shared
+    let data: NoopInstrumentData
 
     private var filter: NoopInstrumentGroupFilter {
         NoopInstrumentGroupFilter(rawValue: filterRaw) ?? .all
@@ -79,7 +99,11 @@ private struct NoopInstrumentIndexScreen: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                NoopInstrumentRangeControl(range: $range, worn: data.wornCount(for: range))
+                NoopInstrumentRangeControl(
+                    range: $range,
+                    worn: data.indexNightCount(for: range),
+                    availableDays: data.historyCount
+                )
                     // Swift's multiline text block resolves seven points shorter than the
                     // browser's explicit 13.5/21.6 line box. Keep the next authored edge at
                     // the HTML's y=222 instead of letting every row drift upward.
@@ -163,10 +187,11 @@ private struct NoopInstrumentIndexScreen: View {
 private struct NoopInstrumentRangeControl: View {
     @Binding var range: NoopInstrumentRange
     let worn: Int
+    let availableDays: Int
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            NoopInstrumentRangeTabs(range: $range)
+            NoopInstrumentRangeTabs(range: $range, availableDays: availableDays)
 
             HStack(alignment: .firstTextBaseline, spacing: 7) {
                 Text("\(worn)")
@@ -185,34 +210,39 @@ private struct NoopInstrumentRangeControl: View {
     private var note: String {
         switch range {
         case .all:
-            "nights actually behind this answer, of 258 on record"
+            "nights actually behind this answer, of \(availableDays) on record"
         case .year:
-            "nights on record — there is no more history than this"
+            if range.isAvailable(total: availableDays) {
+                "nights actually behind this answer. You asked for 365."
+            } else {
+                "nights on record — there is no more history than this"
+            }
         case .thirty, .ninety:
-            "nights actually behind this answer. You asked for \(range.dayCount)."
+            "nights actually behind this answer. You asked for \(range.requestedDayCount ?? availableDays)."
         }
     }
 }
 
 private struct NoopInstrumentRangeTabs: View {
     @Binding var range: NoopInstrumentRange
+    let availableDays: Int
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(NoopInstrumentRange.allCases) { item in
                 Button {
-                    guard item.isAvailable else { return }
+                    guard item.isAvailable(total: availableDays) else { return }
                     withAnimation(.easeInOut(duration: 0.22)) { range = item }
                 } label: {
                     Text(item.rawValue)
                         .font(NoopHTMLFont.sans(12.5, weight: .semibold))
-                        .foregroundStyle(item == range ? Color(hex: 0xC6CEE8) : item.isAvailable ? NoopHTMLColor.copy : NoopHTMLColor.ink.opacity(0.38))
+                        .foregroundStyle(item == range ? Color(hex: 0xC6CEE8) : item.isAvailable(total: availableDays) ? NoopHTMLColor.copy : NoopHTMLColor.ink.opacity(0.38))
                         .frame(maxWidth: .infinity)
                         .frame(height: 38)
                         .background(item == range ? NoopHTMLColor.night.opacity(0.20) : .clear, in: RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(NoopHTMLPressStyle())
-                .disabled(!item.isAvailable)
+                .disabled(!item.isAvailable(total: availableDays))
                 .accessibilityAddTraits(item == range ? .isSelected : [])
             }
         }
@@ -378,8 +408,8 @@ private struct NoopInstrumentBackHeader: View {
 private struct NoopInstrumentMetricScreen: View {
     @ObservedObject var navigation: NoopNavigation
     @Binding var range: NoopInstrumentRange
+    let data: NoopInstrumentData
 
-    private let data = NoopInstrumentDemoData.shared
     private var model: NoopInstrumentMetricModel {
         data.metric(key: navigation.instrumentMetricKey, range: range)
     }
@@ -415,7 +445,11 @@ private struct NoopInstrumentMetricScreen: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                NoopInstrumentRangeControl(range: $range, worn: model.worn)
+                NoopInstrumentRangeControl(
+                    range: $range,
+                    worn: model.worn,
+                    availableDays: data.historyCount
+                )
                     .padding(.top, 14)
 
                 VStack(alignment: .leading, spacing: 11) {
@@ -648,8 +682,8 @@ private struct NoopInstrumentMetricChart: View {
 private struct NoopInstrumentCompareScreen: View {
     @ObservedObject var navigation: NoopNavigation
     @Binding var range: NoopInstrumentRange
+    let data: NoopInstrumentData
 
-    private let data = NoopInstrumentDemoData.shared
     private var model: NoopInstrumentComparisonModel {
         data.comparison(
             firstKey: navigation.instrumentCompareAKey,
@@ -688,7 +722,11 @@ private struct NoopInstrumentCompareScreen: View {
                         }
                     }
 
-                    NoopInstrumentRangeControl(range: $range, worn: model.worn)
+                    NoopInstrumentRangeControl(
+                        range: $range,
+                        worn: model.worn,
+                        availableDays: data.historyCount
+                    )
 
                     comparisonChartCard
                     comparisonFitCard
@@ -906,7 +944,12 @@ struct NoopInstrumentSignalPickerSheet: View {
     @ObservedObject var navigation: NoopNavigation
     let slot: NoopInstrumentSignalSlot
 
-    private let data = NoopInstrumentDemoData.shared
+    @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
+    private var data: NoopInstrumentData {
+        NoopInstrumentData.prototype.adjustedForSchedule(
+            isNightWorker: NoopScheduleInference.isNightWorker(kind: scheduleKind)
+        )
+    }
     private var selectedKey: String {
         slot == .first ? navigation.instrumentCompareAKey : navigation.instrumentCompareBKey
     }
@@ -1015,13 +1058,14 @@ struct NoopInstrumentSignalPickerSheet: View {
 private struct NoopInstrumentEffectsScreen: View {
     @ObservedObject var navigation: NoopNavigation
     @Binding var range: NoopInstrumentRange
+    let data: NoopInstrumentData
 
     @State private var selectedBehaviorKey: String?
-    private let data = NoopInstrumentDemoData.shared
 
-    init(navigation: NoopNavigation, range: Binding<NoopInstrumentRange>) {
+    init(navigation: NoopNavigation, range: Binding<NoopInstrumentRange>, data: NoopInstrumentData) {
         self.navigation = navigation
         self._range = range
+        self.data = data
         _selectedBehaviorKey = State(initialValue: nil)
     }
 
@@ -1055,7 +1099,7 @@ private struct NoopInstrumentEffectsScreen: View {
 
                 VStack(alignment: .leading, spacing: 11) {
                     // The final HTML intentionally omits the nights-count line on this route.
-                    NoopInstrumentRangeTabs(range: $range)
+                    NoopInstrumentRangeTabs(range: $range, availableDays: data.historyCount)
 
                     switch model.state {
                     case .ranked:
@@ -1170,11 +1214,13 @@ private struct NoopInstrumentEffectsScreen: View {
                 .foregroundStyle(NoopHTMLColor.copy)
                 .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Sleep regularity is doing the work instead. It is on Rhythm, and it is not a behaviour you log — it is one you keep.")
-                .font(NoopHTMLFont.sans(12))
-                .foregroundStyle(Color(hex: 0x7F8A85))
-                .lineSpacing(3.6)
-                .fixedSize(horizontal: false, vertical: true)
+            if let detail = model.nothingDetail {
+                Text(detail)
+                    .font(NoopHTMLFont.sans(12))
+                    .foregroundStyle(Color(hex: 0x7F8A85))
+                    .lineSpacing(3.6)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(17)
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
@@ -1381,15 +1427,23 @@ private enum NoopInstrumentRange: String, CaseIterable, Identifiable {
     case all = "All"
 
     var id: String { rawValue }
-    var dayCount: Int {
+    var requestedDayCount: Int? {
         switch self {
         case .thirty: 30
         case .ninety: 90
         case .year: 365
-        case .all: 258
+        case .all: nil
         }
     }
-    var isAvailable: Bool { dayCount <= 258 }
+
+    func dayCount(total: Int) -> Int {
+        min(requestedDayCount ?? total, total)
+    }
+
+    func isAvailable(total: Int) -> Bool {
+        guard let requestedDayCount else { return true }
+        return requestedDayCount <= total
+    }
 }
 
 private enum NoopInstrumentGroup: String, CaseIterable, Identifiable {
@@ -1637,6 +1691,7 @@ private struct NoopInstrumentEffectsModel {
     let rows: [NoopInstrumentEffectRow]
     let learningLines: [String]
     let eligibleCount: Int
+    let nothingDetail: String?
     let pair: NoopInstrumentPairModel
     let dose: NoopInstrumentDoseModel
 }
@@ -1670,13 +1725,17 @@ private struct NoopInstrumentRankedBehavior {
     let percent: Double
 }
 
-private struct NoopInstrumentDemoData {
-    static let shared = NoopInstrumentDemoData()
+struct NoopInstrumentData {
+    static let prototype = NoopInstrumentData()
+    static let empty = NoopInstrumentData(dayKeys: [], values: [:], drinkDoses: [])
     private static let count = 258
 
-    let signals: [NoopInstrumentSignal]
+    fileprivate let signals: [NoopInstrumentSignal]
+    let historyCount: Int
     private let values: [String: [Double?]]
-    private let drinkDoses: [Double]
+    private let drinkDoses: [Double?]
+    private let dayKeys: [String]
+    private let isPrototype: Bool
 
     init() {
         let gaps = Set([3, 17, 34, 52, 61, 79, 96, 112, 130, 151, 177, 203].map { Self.count - 1 - $0 })
@@ -1737,7 +1796,10 @@ private struct NoopInstrumentDemoData {
         generated["b_walk"] = make { walk[$0] }
         generated["b_hard"] = make { hard[$0] }
         values = generated
-        drinkDoses = drinks
+        drinkDoses = drinks.map(Optional.some)
+        dayKeys = (0..<Self.count).map { "prototype-\($0)" }
+        historyCount = Self.count
+        isPrototype = true
 
         signals = [
             .init(key: "rhr", name: "Resting pulse", group: .night, unit: "bpm", decimals: 0, better: -1, threshold: 1.2),
@@ -1765,18 +1827,68 @@ private struct NoopInstrumentDemoData {
         ]
     }
 
-    func signal(key: String) -> NoopInstrumentSignal? { signals.first { $0.key == key } }
-
-    func wornCount(for range: NoopInstrumentRange) -> Int {
-        tail(values["hrv"] ?? [], count: range.dayCount).compactMap { $0 }.count
+    private init(
+        dayKeys: [String],
+        values: [String: [Double?]],
+        drinkDoses: [Double?],
+        signals: [NoopInstrumentSignal]? = nil,
+        isPrototype: Bool = false
+    ) {
+        self.signals = signals ?? Self.prototype.signals
+        self.dayKeys = dayKeys
+        historyCount = dayKeys.count
+        self.values = values
+        self.drinkDoses = drinkDoses
+        self.isPrototype = isPrototype
     }
 
-    func snapshots(group: NoopInstrumentGroup, range: NoopInstrumentRange) -> [NoopInstrumentSnapshot] {
+    fileprivate func adjustedForSchedule(isNightWorker: Bool) -> NoopInstrumentData {
+        guard isNightWorker else { return self }
+        let renamed = signals.map { signal in
+            guard signal.key == "reg" else { return signal }
+            return NoopInstrumentSignal(
+                key: signal.key,
+                name: "Anchor drift",
+                group: signal.group,
+                unit: signal.unit,
+                decimals: signal.decimals,
+                better: signal.better,
+                threshold: signal.threshold,
+                hours: signal.hours,
+                big: signal.big,
+                behavior: signal.behavior
+            )
+        }
+        return NoopInstrumentData(
+            dayKeys: dayKeys,
+            values: values,
+            drinkDoses: drinkDoses,
+            signals: renamed,
+            isPrototype: isPrototype
+        )
+    }
+
+    fileprivate func signal(key: String) -> NoopInstrumentSignal? { signals.first { $0.key == key } }
+
+    fileprivate func indexNightCount(for range: NoopInstrumentRange) -> Int {
+        let count = range.dayCount(total: historyCount)
+        let nightSeries = signals
+            .filter { $0.group == .night }
+            .map { Array((values[$0.key] ?? []).suffix(count)) }
+        guard !nightSeries.isEmpty else { return 0 }
+        return (0..<count).reduce(into: 0) { total, index in
+            if nightSeries.contains(where: { index < $0.count && $0[index] != nil }) {
+                total += 1
+            }
+        }
+    }
+
+    fileprivate func snapshots(group: NoopInstrumentGroup, range: NoopInstrumentRange) -> [NoopInstrumentSnapshot] {
         signals.filter { $0.group == group }.map { snapshot($0, range: range) }
     }
 
     private func snapshot(_ signal: NoopInstrumentSignal, range: NoopInstrumentRange) -> NoopInstrumentSnapshot {
-        let shown = tail(values[signal.key] ?? [], count: range.dayCount)
+        let shown = tail(values[signal.key] ?? [], count: range.dayCount(total: historyCount))
         let clean = shown.compactMap { $0 }
         let first = shown.compactMap { $0 }.first
         let last = shown.compactMap { $0 }.last
@@ -1786,17 +1898,23 @@ private struct NoopInstrumentDemoData {
         let style: NoopInstrumentChangeStyle
 
         if signal.behavior {
-            let rate = clean.reduce(0, +) / Double(max(1, clean.count)) * 7
-            value = String(format: "%.1f", rate)
-            let half = shown.count / 2
-            let early = shown.prefix(half).compactMap { $0 }
-            let late = shown.suffix(from: half).compactMap { $0 }
-            let earlyRate = early.reduce(0, +) / Double(max(1, early.count))
-            let lateRate = late.reduce(0, +) / Double(max(1, late.count))
-            let movement = (lateRate - earlyRate) * 7
-            let flat = abs(movement) < signal.threshold
-            delta = flat ? "about the same" : (movement > 0 ? "+" : "−") + String(format: "%.1f a week", abs(movement))
-            style = flat ? .flat : .neutral
+            if clean.isEmpty {
+                value = "—"
+                delta = "no days yet"
+                style = .thin
+            } else {
+                let rate = clean.reduce(0, +) / Double(clean.count) * 7
+                value = String(format: "%.1f", rate)
+                let half = shown.count / 2
+                let early = shown.prefix(half).compactMap { $0 }
+                let late = shown.suffix(from: half).compactMap { $0 }
+                let earlyRate = early.reduce(0, +) / Double(max(1, early.count))
+                let lateRate = late.reduce(0, +) / Double(max(1, late.count))
+                let movement = (lateRate - earlyRate) * 7
+                let flat = abs(movement) < signal.threshold
+                delta = flat ? "about the same" : (movement > 0 ? "+" : "−") + String(format: "%.1f a week", abs(movement))
+                style = flat ? .flat : .neutral
+            }
         } else {
             value = Self.format(last, signal: signal)
             let movement = (last ?? 0) - (first ?? last ?? 0)
@@ -1891,13 +2009,279 @@ private struct NoopInstrumentDemoData {
     }
 }
 
-private extension NoopInstrumentDemoData {
+@MainActor
+final class NoopInstrumentLiveStore: ObservableObject {
+    @Published private(set) var data = NoopInstrumentData.empty
+    @Published private(set) var isLoading = false
+
+    private var loadedRefreshSequence: Int?
+
+    func load(from repo: Repository) async {
+        let sequence = repo.refreshSeq
+        guard loadedRefreshSequence != sequence else { return }
+        isLoading = true
+        let loaded = await NoopInstrumentData.load(from: repo)
+        guard !Task.isCancelled else {
+            isLoading = false
+            return
+        }
+        data = loaded
+        loadedRefreshSequence = sequence
+        isLoading = false
+    }
+}
+
+@MainActor
+private extension NoopInstrumentData {
+    static func load(from repo: Repository) async -> NoopInstrumentData {
+        typealias DaySeries = [String: Double]
+
+        func resolved(_ key: String, source: String = Repository.whoopSource) async -> DaySeries {
+            let result = await repo.resolvedSeries(
+                key: key,
+                source: source,
+                days: 4_000,
+                fullHistory: true
+            )
+            return Dictionary(result.values.map { ($0.day, $0.value) }, uniquingKeysWith: { _, latest in latest })
+        }
+
+        var bySignal: [String: DaySeries] = [:]
+        bySignal["rhr"] = await resolved("rhr")
+        bySignal["hrv"] = await resolved("hrv")
+        bySignal["breath"] = await resolved("resp_rate")
+        let skinTemperature = await resolved("skin_temp")
+        // The Act 9 signal is explicitly a deviation "from your own". WHOOP CSV imports carry
+        // absolute wrist temperature under the same legacy key, so those values stay absent here
+        // rather than being mislabeled as deviations.
+        bySignal["temp"] = skinTemperature.filter { !VitalBands.isAbsoluteSkinTemp($0.value) }
+        bySignal["spo2"] = await resolved("spo2")
+        bySignal["recovery"] = await resolved("recovery")
+        let strapSteps = await resolved("steps")
+        let appleSteps = await resolved("steps", source: Repository.appleHealthSource)
+        // The product's default step source is Apple Health, but a measured strap total is still
+        // a real signal and fills days Apple does not carry.
+        bySignal["steps"] = strapSteps.merging(appleSteps) { _, apple in apple }
+        bySignal["load"] = await resolved("strain")
+        bySignal["cap"] = await resolved("vo2max_est")
+        if bySignal["cap"]?.isEmpty != false {
+            bySignal["cap"] = await resolved("vo2max", source: Repository.appleHealthSource)
+        }
+        bySignal["age"] = await resolved("body_age")
+        bySignal["weight"] = await resolved("weight", source: Repository.appleHealthSource)
+
+        let sleepMinutes = await resolved("sleep_total_min")
+        let deepMinutes = await resolved("sleep_deep_min")
+        let remMinutes = await resolved("sleep_rem_min")
+        bySignal["sleep"] = sleepMinutes.mapValues { $0 / 60.0 }
+        bySignal["deep"] = ratioSeries(part: deepMinutes, total: sleepMinutes)
+        bySignal["rem"] = ratioSeries(part: remMinutes, total: sleepMinutes)
+
+        let sleepSessions = await repo.allSleepSessions(days: 4_000)
+        bySignal["reg"] = bedtimeDriftSeries(sessions: sleepSessions)
+
+        // The persisted `stress` metric is a 0...3 daily score (or /100 from Xiaomi), while this
+        // design asks for measured stress MINUTES. Those quantities are not interchangeable, so the
+        // row remains absent until a genuine minutes series exists.
+
+        let journal = await repo.journalEntries(days: 4_000)
+        let numericJournal = await repo.numericJournalSeries()
+
+        let behaviorRules: [(key: String, matches: (String) -> Bool)] = [
+            ("b_drink", { exactTimeQuestion($0, tokens: ["after 20", "after 8 pm", "after 8pm"]) && alcoholQuestion($0) }),
+            ("b_caff", { exactTimeQuestion($0, tokens: ["after 14", "after 2 pm", "after 2pm"]) && caffeineQuestion($0) }),
+            ("b_late", { normalized($0).contains("late meal") || normalized($0).contains("eat close to bedtime") }),
+            ("b_screen", { normalized($0).contains("screen past midnight") || normalized($0).contains("screen after midnight") }),
+            ("b_hard", {
+                let value = normalized($0)
+                return value.contains("hard session") || value.contains("hard workout") || value.contains("strenuous session")
+            })
+        ]
+
+        var knownBehaviorDays: [String: Set<String>] = [:]
+        var yesBehaviorDays: [String: Set<String>] = [:]
+        for rule in behaviorRules {
+            let matching = journal.filter { rule.matches($0.question) }
+            if !matching.isEmpty {
+                knownBehaviorDays[rule.key] = Set(matching.map(\.day))
+                yesBehaviorDays[rule.key] = Set(matching.filter(\.answeredYes).map(\.day))
+            }
+        }
+
+        var allDays = Set(bySignal.values.flatMap(\.keys))
+        allDays.formUnion(journal.map(\.day))
+        if !allDays.isEmpty {
+            let calendar = Calendar.current
+            let today = calendar.dateComponents([.year, .month, .day], from: Date())
+            if let year = today.year, let month = today.month, let day = today.day {
+                allDays.insert(String(format: "%04d-%02d-%02d", year, month, day))
+            }
+        }
+        let dayKeys = continuousDays(from: allDays)
+        guard !dayKeys.isEmpty else { return .empty }
+
+        var aligned: [String: [Double?]] = [:]
+        for signal in Self.prototype.signals {
+            let series = bySignal[signal.key] ?? [:]
+            aligned[signal.key] = dayKeys.map { series[$0] }
+        }
+
+        for rule in behaviorRules {
+            guard let knownDays = knownBehaviorDays[rule.key] else { continue }
+            let yesDays = yesBehaviorDays[rule.key] ?? []
+            aligned[rule.key] = dayKeys.map { day in
+                guard knownDays.contains(day) else { return nil }
+                return yesDays.contains(day) ? 1.0 : 0.0
+            }
+        }
+
+        if let steps = bySignal["steps"], !steps.isEmpty {
+            aligned["b_walk"] = dayKeys.map { day in
+                steps[day].map { $0 >= 8_000 ? 1.0 : 0.0 }
+            }
+        }
+
+        // Dose is genuinely "per drink", so a numeric alcohol item is usable even when the
+        // journal wording does not establish the Act 9 ranking row's stricter after-20:00 claim.
+        var alcoholDoseByDay: [String: Double] = [:]
+        for (question, series) in numericJournal where alcoholQuestion(question) {
+            for (day, dose) in series { alcoholDoseByDay[day] = max(alcoholDoseByDay[day] ?? 0, dose) }
+        }
+        for entry in journal where entry.answeredYes && alcoholQuestion(entry.question) {
+            if alcoholDoseByDay[entry.day] == nil { alcoholDoseByDay[entry.day] = 1 }
+        }
+        let knownAlcoholDays = Set(journal.lazy.filter { alcoholQuestion($0.question) }.map(\.day))
+        let doses: [Double?] = dayKeys.map { day in
+            guard knownAlcoholDays.contains(day) else { return nil }
+            return alcoholDoseByDay[day] ?? 0
+        }
+
+        return NoopInstrumentData(dayKeys: dayKeys, values: aligned, drinkDoses: doses)
+    }
+
+    static func ratioSeries(part: [String: Double], total: [String: Double]) -> [String: Double] {
+        var result: [String: Double] = [:]
+        for (day, partValue) in part {
+            guard let totalValue = total[day], totalValue > 0 else { continue }
+            result[day] = partValue / totalValue * 100
+        }
+        return result
+    }
+
+    static func bedtimeDriftSeries(sessions: [CachedSleepSession]) -> [String: Double] {
+        let calendar = Calendar.current
+        var longestByWakeDay: [String: CachedSleepSession] = [:]
+        for session in sessions where session.endTs > session.effectiveStartTs {
+            let wakeDay = dayKey(for: session.endTs, calendar: calendar)
+            let duration = session.endTs - session.effectiveStartTs
+            if let current = longestByWakeDay[wakeDay], current.endTs - current.effectiveStartTs >= duration {
+                continue
+            }
+            longestByWakeDay[wakeDay] = session
+        }
+
+        let starts: [(day: String, minute: Double)] = longestByWakeDay.map { day, session in
+            let date = Date(timeIntervalSince1970: TimeInterval(session.effectiveStartTs))
+            let components = calendar.dateComponents([.hour, .minute, .second], from: date)
+            let minute = Double((components.hour ?? 0) * 60 + (components.minute ?? 0))
+                + Double(components.second ?? 0) / 60
+            return (day, minute)
+        }
+        guard !starts.isEmpty else { return [:] }
+
+        let turn = 2 * Double.pi
+        let sine = starts.reduce(0.0) { $0 + sin($1.minute / 1_440 * turn) }
+        let cosine = starts.reduce(0.0) { $0 + cos($1.minute / 1_440 * turn) }
+        var angle = atan2(sine, cosine)
+        if angle < 0 { angle += turn }
+        let anchorMinute = angle / turn * 1_440
+
+        return Dictionary(uniqueKeysWithValues: starts.map { item in
+            let direct = abs(item.minute - anchorMinute)
+            return (item.day, min(direct, 1_440 - direct))
+        })
+    }
+
+    static func continuousDays(from rawDays: Set<String>) -> [String] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let parsed = rawDays.compactMap { day -> Date? in
+            let parts = day.split(separator: "-")
+            guard parts.count == 3,
+                  let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]) else { return nil }
+            return calendar.date(from: DateComponents(year: year, month: month, day: day))
+        }
+        guard let first = parsed.min() else { return [] }
+        let last = min(parsed.max() ?? Date(), calendar.startOfDay(for: Date()))
+        guard first <= last else { return [] }
+
+        var result: [String] = []
+        var cursor = first
+        while cursor <= last {
+            let components = calendar.dateComponents([.year, .month, .day], from: cursor)
+            if let year = components.year, let month = components.month, let day = components.day {
+                result.append(String(format: "%04d-%02d-%02d", year, month, day))
+            }
+            guard let next = calendar.date(byAdding: .day, value: 1, to: cursor), next > cursor else { break }
+            cursor = next
+        }
+        return result
+    }
+
+    static func dayKey(for timestamp: Int, calendar: Calendar) -> String {
+        let components = calendar.dateComponents(
+            [.year, .month, .day],
+            from: Date(timeIntervalSince1970: TimeInterval(timestamp))
+        )
+        return String(
+            format: "%04d-%02d-%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
+        )
+    }
+
+    static func normalized(_ value: String) -> String {
+        value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .lowercased()
+            .replacingOccurrences(of: ":", with: "")
+    }
+
+    static func exactTimeQuestion(_ value: String, tokens: [String]) -> Bool {
+        let value = normalized(value)
+        return tokens.contains { value.contains($0.replacingOccurrences(of: ":", with: "")) }
+    }
+
+    static func alcoholQuestion(_ value: String) -> Bool {
+        let value = normalized(value)
+        return value.contains("alcohol") || value.contains("drink")
+    }
+
+    static func caffeineQuestion(_ value: String) -> Bool {
+        normalized(value).contains("caffeine")
+    }
+}
+
+private extension NoopInstrumentData {
     static let axisLabels: [NoopInstrumentRange: [String]] = [
         .thirty: ["30d", "20d", "10d", "now"],
         .ninety: ["90d", "60d", "30d", "now"],
         .year: ["365d", "240d", "120d", "now"],
         .all: ["Dec", "Mar", "Jun", "now"]
     ]
+
+    func axisLabels(for range: NoopInstrumentRange) -> [String] {
+        guard !isPrototype, range == .all else { return Self.axisLabels[range] ?? [] }
+        let keys = Array(dayKeys.suffix(range.dayCount(total: historyCount)))
+        guard !keys.isEmpty else { return ["", "", "", ""] }
+        let positions = [0, keys.count / 3, (keys.count * 2) / 3]
+        let monthLabels = positions.map { index in
+            let parts = keys[index].split(separator: "-")
+            guard parts.count == 3, let month = Int(parts[1]), (1...12).contains(month) else { return "" }
+            return Calendar.current.shortMonthSymbols[month - 1]
+        }
+        return monthLabels + ["now"]
+    }
 
     static let lagWords = ["same night", "next morning", "two days on"]
 
@@ -1912,7 +2296,7 @@ private extension NoopInstrumentDemoData {
 
     func metric(key: String, range: NoopInstrumentRange) -> NoopInstrumentMetricModel {
         let metricSignal = signal(key: key) ?? signals.first(where: { $0.key == "hrv" })!
-        let raw = tail(values[metricSignal.key] ?? [], count: range.dayCount)
+        let raw = tail(values[metricSignal.key] ?? [], count: range.dayCount(total: historyCount))
         let series = metricSignal.behavior ? trailingWeeklyRate(raw) : raw
         let clean = series.compactMap { $0 }
         let ends = firstAndLast(series)
@@ -1934,6 +2318,9 @@ private extension NoopInstrumentDemoData {
         }()
         let read: String = {
             if thin {
+                if !isPrototype, clean.isEmpty {
+                    return "No recorded value falls inside this window. Noop leaves it blank rather than filling the gap."
+                }
                 return "There are \(clean.count) nights of this. Noop will keep it on the list and say nothing else about it until there are twenty-one."
             }
             if flat {
@@ -1942,7 +2329,7 @@ private extension NoopInstrumentDemoData {
             let ending = metricSignal.better == 0
                 ? "."
                 : good ? ", in the direction you would want." : ", which is the direction you would not."
-            return "\(change > 0 ? "Up" : "Down") \(changeAmount) over \(wornCount(for: range)) nights\(ending)"
+            return "\(change > 0 ? "Up" : "Down") \(changeAmount) over \(clean.count) nights\(ending)"
         }()
 
         let deltaAmount = metricSignal.hours
@@ -1961,7 +2348,10 @@ private extension NoopInstrumentDemoData {
         let moves = signals
             .filter { $0.key != metricSignal.key }
             .map { other -> (NoopInstrumentSignal, NoopInstrumentCorrelation) in
-                let result = bestLag(first: tail(values[other.key] ?? [], count: range.dayCount), second: raw)
+                let result = bestLag(
+                    first: tail(values[other.key] ?? [], count: range.dayCount(total: historyCount)),
+                    second: raw
+                )
                 return (other, result)
             }
             .filter { $0.1.count >= 21 && abs($0.1.coefficient) >= 0.22 }
@@ -1992,22 +2382,28 @@ private extension NoopInstrumentDemoData {
             value: Self.format(ends.last, signal: metricSignal),
             unit: metricSignal.behavior ? "days a week" : metricSignal.unit,
             read: read,
-            worn: wornCount(for: range),
-            span: range == .all ? "All 258 nights" : "Last \(range.rawValue) days",
+            worn: clean.count,
+            span: range == .all ? "All \(historyCount) nights" : "Last \(range.rawValue) days",
             delta: delta,
             style: style,
             thin: thin,
-            thinNote: "Blood oxygen started recording nineteen nights ago and two of those were not worn. Noop needs twenty-one to say anything about direction, so it says this instead of drawing you an arrow.",
-            chartNote: thin
-                ? "The band is the day-to-day spread. With this few nights it is most of the picture, which is the honest reading."
-                : "The band is the three-day spread around each point. The dashed line is the fit, and it is only drawn when the change clears the noise at this length.",
+            thinNote: isPrototype
+                ? "Blood oxygen started recording nineteen nights ago and two of those were not worn. Noop needs twenty-one to say anything about direction, so it says this instead of drawing you an arrow."
+                : clean.isEmpty
+                    ? "No recorded nights fall inside this window. Noop keeps the signal on the list and waits for a real measurement instead of filling the gap."
+                    : "Only \(clean.count) recorded night\(clean.count == 1 ? "" : "s") \(clean.count == 1 ? "falls" : "fall") inside this window. Noop needs twenty-one to say anything about direction, so it says this instead of drawing you an arrow.",
+            chartNote: !isPrototype && clean.isEmpty
+                ? "There is no line, spread, or fit to draw until this signal has a recorded value."
+                : thin
+                    ? "The band is the day-to-day spread. With this few nights it is most of the picture, which is the honest reading."
+                    : "The band is the three-day spread around each point. The dashed line is the fit, and it is only drawn when the change clears the noise at this length.",
             chart: .init(
                 line: line,
                 bandTop: bandTop,
                 bandBottom: bandBottom,
                 fitStart: fit?.start,
                 fitEnd: fit?.end,
-                axis: Self.axisLabels[range] ?? []
+                axis: axisLabels(for: range)
             ),
             moves: Array(moves)
         )
@@ -2017,8 +2413,9 @@ private extension NoopInstrumentDemoData {
         let first = signal(key: firstKey) ?? signals.first(where: { $0.key == "hrv" })!
         let second = signal(key: secondKey) ?? signals.first(where: { $0.key == "reg" })!
         let safeShift = min(2, max(0, shift))
-        let firstRaw = tail(values[first.key] ?? [], count: range.dayCount)
-        let secondRaw = tail(values[second.key] ?? [], count: range.dayCount)
+        let window = range.dayCount(total: historyCount)
+        let firstRaw = tail(values[first.key] ?? [], count: window)
+        let secondRaw = tail(values[second.key] ?? [], count: window)
         let firstSampled = sampledInterpolated(firstRaw, maximum: 60)
         let secondSampled = sampledInterpolated(secondRaw, maximum: 60)
         let firstScale = chartScale(values: firstSampled, width: 300, height: 130, padding: 10)
@@ -2057,10 +2454,10 @@ private extension NoopInstrumentDemoData {
         return NoopInstrumentComparisonModel(
             first: first,
             second: second,
-            worn: wornCount(for: range),
+            worn: fit.count,
             firstLine: firstLine,
             secondLine: secondLine,
-            axis: Self.axisLabels[range] ?? [],
+            axis: axisLabels(for: range),
             secondLegend: second.name + (safeShift == 0 ? "" : " · shifted \(safeShift) day\(safeShift > 1 ? "s" : "")"),
             fitCount: fit.count,
             fitCoefficient: Self.signed(fit.coefficient, amount: Self.decimal(abs(fit.coefficient), places: 2)),
@@ -2078,31 +2475,70 @@ private extension NoopInstrumentDemoData {
         mode: NoopInstrumentEffectsMode,
         doseMode: NoopInstrumentDoseMode
     ) -> NoopInstrumentEffectsModel {
-        let target = tail(values["recovery"] ?? [], count: range.dayCount)
+        let window = range.dayCount(total: historyCount)
+        let target = tail(values["recovery"] ?? [], count: window)
         let targetValues = target.compactMap { $0 }
         let targetMean = targetValues.reduce(0, +) / Double(max(1, targetValues.count))
-        let ranked = Self.behaviors.map { behavior -> NoopInstrumentRankedBehavior in
-            let behaviorValues = tail(values[behavior.key] ?? [], count: range.dayCount)
-            var bestDifference = 0.0
-            var bestLag = 0
-            var bestStats: NoopInstrumentGroupStats?
-            for lag in 0...2 {
-                let stats = groupStats(behavior: behaviorValues, target: target, lag: lag)
-                guard stats.withCount >= 5, stats.withoutCount >= 5 else { continue }
-                let difference = stats.withMean - stats.withoutMean
-                if abs(difference) > abs(bestDifference) {
-                    bestDifference = difference
-                    bestLag = lag
-                    bestStats = stats
+        let ranked: [NoopInstrumentRankedBehavior]
+        if isPrototype {
+            ranked = Self.behaviors.map { behavior -> NoopInstrumentRankedBehavior in
+                let behaviorValues = tail(values[behavior.key] ?? [], count: window)
+                var bestDifference = 0.0
+                var bestLag = 0
+                var bestStats: NoopInstrumentGroupStats?
+                for lag in 0...2 {
+                    let stats = groupStats(behavior: behaviorValues, target: target, lag: lag)
+                    guard stats.withCount >= 5, stats.withoutCount >= 5 else { continue }
+                    let difference = stats.withMean - stats.withoutMean
+                    if abs(difference) > abs(bestDifference) {
+                        bestDifference = difference
+                        bestLag = lag
+                        bestStats = stats
+                    }
                 }
+                return .init(
+                    behavior: behavior,
+                    difference: bestDifference,
+                    lag: bestLag,
+                    stats: bestStats,
+                    percent: targetMean == 0 ? 0 : bestDifference / targetMean * 100
+                )
             }
-            return .init(
-                behavior: behavior,
-                difference: bestDifference,
-                lag: bestLag,
-                stats: bestStats,
-                percent: targetMean == 0 ? 0 : bestDifference / targetMean * 100
+        } else {
+            let keys = Array(dayKeys.suffix(window))
+            let outcomeByDay = Dictionary(uniqueKeysWithValues: zip(keys, target).compactMap { day, value in
+                value.map { (day, $0) }
+            })
+            var behaviorResponses: [String: [String: Bool]] = [:]
+            for behavior in Self.behaviors {
+                let behaviorValues = tail(values[behavior.key] ?? [], count: window)
+                behaviorResponses[behavior.key] = Dictionary(
+                    uniqueKeysWithValues: zip(keys, behaviorValues).compactMap { day, value in
+                        value.map { (day, $0 > 0) }
+                    }
+                )
+            }
+            let engineRows = EffectRanker.rank(
+                responses: behaviorResponses,
+                outcomeByDay: outcomeByDay,
+                outcome: "Readiness"
             )
+            let rowsByKey = Dictionary(uniqueKeysWithValues: engineRows.map { ($0.behavior, $0) })
+            ranked = Self.behaviors.map { behavior in
+                guard let result = rowsByKey[behavior.key] else {
+                    return .init(behavior: behavior, difference: 0, lag: 0, stats: nil, percent: 0)
+                }
+                let behaviorValues = tail(values[behavior.key] ?? [], count: window)
+                let stats = groupStats(behavior: behaviorValues, target: target, lag: result.lag)
+                let difference = result.effect.delta
+                return .init(
+                    behavior: behavior,
+                    difference: difference,
+                    lag: result.lag,
+                    stats: stats,
+                    percent: targetMean == 0 ? 0 : difference / targetMean * 100
+                )
+            }
         }
         let eligible = ranked.filter { $0.stats != nil }
         let cleared = eligible
@@ -2124,7 +2560,10 @@ private extension NoopInstrumentDemoData {
             case .nothing:
                 return "Six behaviours against your readiness, at three lags each. This window has an answer you may not enjoy."
             case .learning:
-                return "Six behaviours against your readiness. Two of them do not have enough days on both sides yet, and it says which side is short."
+                if isPrototype {
+                    return "Six behaviours against your readiness. Two of them do not have enough days on both sides yet, and it says which side is short."
+                }
+                return "Six behaviours against your readiness. \(short.count) of them do not have enough days on both sides yet, and it says which side is short."
             case .ranked:
                 return "Six behaviours against your readiness, at the lag where the effect actually lands — not the day you did the thing."
             }
@@ -2147,7 +2586,7 @@ private extension NoopInstrumentDemoData {
             if !short.isEmpty {
                 var thinRows: [(behavior: NoopInstrumentBehavior, stats: NoopInstrumentGroupStats)] = []
                 for item in short {
-                    let behaviorValues = tail(values[item.behavior.key] ?? [], count: range.dayCount)
+                    let behaviorValues = tail(values[item.behavior.key] ?? [], count: window)
                     let stats = groupStats(behavior: behaviorValues, target: target, lag: 1)
                     thinRows.append((behavior: item.behavior, stats: stats))
                 }
@@ -2156,7 +2595,7 @@ private extension NoopInstrumentDemoData {
 
             var candidates: [(behavior: NoopInstrumentBehavior, stats: NoopInstrumentGroupStats)] = []
             for behavior in Self.behaviors {
-                let behaviorValues = tail(values[behavior.key] ?? [], count: range.dayCount)
+                let behaviorValues = tail(values[behavior.key] ?? [], count: window)
                 let stats = groupStats(behavior: behaviorValues, target: target, lag: 1)
                 candidates.append((behavior: behavior, stats: stats))
             }
@@ -2170,7 +2609,8 @@ private extension NoopInstrumentDemoData {
         let learningLines = learningSource.map { item -> String in
             let stats = item.stats
             let thinWith = stats.withCount <= stats.withoutCount
-            let missing = max(1, 5 - (thinWith ? stats.withCount : stats.withoutCount))
+            let rawMissing = 5 - (thinWith ? stats.withCount : stats.withoutCount)
+            let missing = isPrototype ? max(1, rawMissing) : max(0, rawMissing)
             let action = thinWith
                 ? "Log \(missing) more day\(missing > 1 ? "s" : "") with it."
                 : "Give it \(missing) more day\(missing > 1 ? "s" : "") off."
@@ -2181,7 +2621,7 @@ private extension NoopInstrumentDemoData {
             ?? cleared.first
             ?? ranked.first { $0.behavior.key == "b_drink" }!
         let pairStats = selected.stats ?? groupStats(
-            behavior: tail(values[selected.behavior.key] ?? [], count: range.dayCount),
+            behavior: tail(values[selected.behavior.key] ?? [], count: window),
             target: target,
             lag: 1
         )
@@ -2193,6 +2633,9 @@ private extension NoopInstrumentDemoData {
             rows: rows,
             learningLines: learningLines,
             eligibleCount: eligible.count,
+            nothingDetail: isPrototype
+                ? "Sleep regularity is doing the work instead. It is on Rhythm, and it is not a behaviour you log — it is one you keep."
+                : nil,
             pair: pair,
             dose: doseModel(range: range, forced: doseMode)
         )
@@ -2238,19 +2681,21 @@ private extension NoopInstrumentDemoData {
     }
 
     func doseModel(range: NoopInstrumentRange, forced: NoopInstrumentDoseMode) -> NoopInstrumentDoseModel {
-        let deep = tail(values["deep"] ?? [], count: range.dayCount)
-        let doses = Array(drinkDoses.suffix(min(range.dayCount, drinkDoses.count)))
+        let window = range.dayCount(total: historyCount)
+        let deep = tail(values["deep"] ?? [], count: window)
+        let doses = Array(drinkDoses.suffix(min(window, drinkDoses.count)))
         var doseNights = 0
-        for index in deep.indices where deep[index] != nil && doses[max(0, index - 1)] > 0 {
-            doseNights += 1
+        for index in deep.indices where index > 0 && index - 1 < doses.count {
+            if deep[index] != nil, let dose = doses[index - 1], dose > 0 {
+                doseNights += 1
+            }
         }
 
         var sumX = 0.0, sumY = 0.0, sumXX = 0.0, sumXY = 0.0
         var count = 0
         if deep.count > 1 {
             for index in 1..<deep.count {
-                guard let y = deep[index] else { continue }
-                let x = doses[index - 1]
+                guard let y = deep[index], index - 1 < doses.count, let x = doses[index - 1] else { continue }
                 count += 1
                 sumX += x
                 sumY += y
@@ -2259,7 +2704,17 @@ private extension NoopInstrumentDemoData {
             }
         }
         let denominator = Double(count) * sumXX - sumX * sumX
-        let personal = count > 2 ? (Double(count) * sumXY - sumX * sumY) / (denominator == 0 ? 1 : denominator) : 0
+        let handoffPersonal = count > 2
+            ? (Double(count) * sumXY - sumX * sumY) / (denominator == 0 ? 1 : denominator)
+            : 0
+        let enginePairs: [(Double, Double)] = deep.indices.compactMap { index in
+            guard index > 0, index - 1 < doses.count,
+                  let dose = doses[index - 1], let value = deep[index] else { return nil }
+            return (dose, value)
+        }
+        let personal = isPrototype
+            ? handoffPersonal
+            : (CorrelationEngine.pearson(enginePairs)?.slope ?? 0)
         let published = -6.0
         let weight = Double(doseNights) / Double(doseNights + 18)
         let blended = published * (1 - weight) + personal * weight
@@ -2385,6 +2840,27 @@ private extension NoopInstrumentDemoData {
     }
 
     func correlation(first: [Double?], second: [Double?], lag: Int) -> NoopInstrumentCorrelation {
+        if !isPrototype {
+            let count = min(dayKeys.count, min(first.count, second.count))
+            guard lag >= 0, count > lag else {
+                return .init(coefficient: 0, count: 0, lag: lag)
+            }
+            let keys = Array(dayKeys.suffix(count))
+            let firstValues = Array(first.suffix(count))
+            let secondValues = Array(second.suffix(count))
+            let firstSeries = zip(keys, firstValues).compactMap { day, value in
+                value.map { (day: day, value: $0) }
+            }
+            let secondSeries = zip(keys, secondValues).compactMap { day, value in
+                value.map { (day: day, value: $0) }
+            }
+            let pairedCount = (0..<(count - lag)).reduce(into: 0) { result, index in
+                if firstValues[index] != nil, secondValues[index + lag] != nil { result += 1 }
+            }
+            let result = CorrelationEngine.lagged(x: firstSeries, y: secondSeries, lagDays: lag)
+            return .init(coefficient: result?.r ?? 0, count: result?.n ?? pairedCount, lag: lag)
+        }
+
         var count = 0
         var sumA = 0.0, sumB = 0.0, sumAA = 0.0, sumBB = 0.0, sumAB = 0.0
         guard lag >= 0, first.count > lag else { return .init(coefficient: 0, count: 0, lag: lag) }
