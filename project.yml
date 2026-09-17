@@ -287,10 +287,10 @@ targets:
     info:
       path: StrandiOS/Resources/Info.plist
       properties:
-        CFBundleName: Noop
+        CFBundleName: "Noop Aura"
         # The approved installed name for this fork. Keep both keys in lockstep and verify the packaged
         # Info.plist; upstream/fork merges have changed the Home Screen label before.
-        CFBundleDisplayName: Noop
+        CFBundleDisplayName: "Noop Aura"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NoopCommitSHA: "$(NOOP_COMMIT_SHA)"
@@ -405,7 +405,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(IOS_BUNDLE_ID)
-        PRODUCT_NAME: "Noop"
+        PRODUCT_NAME: "Noop Aura"
         # Keep the Swift module stable while changing the installed product name. The iOS tests and
         # downstream source imports predate the installed-product rename and intentionally use this identifier.
         PRODUCT_MODULE_NAME: NOOP_Staging
@@ -449,7 +449,7 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).noop.ios.tests
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Noop.app/Noop"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Noop Aura.app/Noop Aura"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
   # WidgetKit + Live Activity extension — the iOS analogue of the macOS menu-bar
@@ -467,7 +467,7 @@ targets:
     info:
       path: StrandiOSWidgets/Info.plist
       properties:
-        CFBundleDisplayName: Noop
+        CFBundleDisplayName: "Noop Aura"
         # Version keys MUST live here in the generated-Info.plist properties — NOT hand-edited into the
         # file — because xcodegen regenerates StrandiOSWidgets/Info.plist on every `xcodegen generate`
         # (which every release runs for the version bump) and would otherwise rewrite them to its
