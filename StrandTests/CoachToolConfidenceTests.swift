@@ -11,6 +11,24 @@ import WhoopStore
 @MainActor
 final class CoachToolConfidenceTests: XCTestCase {
 
+    /// The context these tests read is assembled from the SEVEN-CATEGORY grants, not the older
+    /// `dataConsent` flag alone — with nothing granted the context is empty and the confidence line has
+    /// nowhere to appear. Grant everything for the duration and put the wearer's real grants back after,
+    /// so this suite cannot leak consent into another.
+    private var savedGrants: SveaDataGrants?
+
+    override func setUp() {
+        super.setUp()
+        savedGrants = SveaDataGrants.load()
+        SveaDataGrants.all.save()
+    }
+
+    override func tearDown() {
+        savedGrants?.save()
+        savedGrants = nil
+        super.tearDown()
+    }
+
     private func makeEngine(days: [DailyMetric] = []) -> AICoachEngine {
         let repo = Repository(deviceId: "test-charge-confidence-\(UUID().uuidString)")
         repo.days = days

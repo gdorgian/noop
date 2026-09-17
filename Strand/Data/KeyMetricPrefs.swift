@@ -56,7 +56,11 @@ enum KeyMetric: String, CaseIterable, Identifiable {
     /// The canonical grid order. Every tile the editor can offer, in the order it lists them.
     static let canonicalOrder: [KeyMetric] = [
         .charge, .effort, .rest, .hrv, .restingHr,
-        .bloodOxygen, .respiratory, .steps, .weight, .calories,
+        // `skinTemp` sits with the other overnight vitals. It reached this enum from upstream without
+        // ever being listed here, which left the tile defined but unreachable: the edit sheet offers
+        // exactly this list, so no wearer could add it. Upstream never caught it because the assertion
+        // that every case is offered is this fork's own test.
+        .bloodOxygen, .respiratory, .skinTemp, .steps, .weight, .calories,
     ]
 
     /// The tiles a fresh install SHOWS — deliberately not all of them.
@@ -70,7 +74,7 @@ enum KeyMetric: String, CaseIterable, Identifiable {
     /// rows in YOUR CARDS. Six of the ten tiles were restating something already on screen.
     ///
     /// What remains is exactly the set this grid is the only home for. Nothing is removed from the app:
-    /// every tile stays in `canonicalOrder`, so the EDIT sheet still offers all ten and a wearer who wants
+    /// every tile stays in `canonicalOrder`, so the EDIT sheet still offers all eleven and a wearer who wants
     /// Recovery on the grid can add it back. A wearer who has already customised the grid is untouched —
     /// `decodeEnabled` only falls back to this when nothing is stored.
     static let defaultOrder: [KeyMetric] = [

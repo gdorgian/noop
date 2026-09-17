@@ -13,6 +13,11 @@ final class CoachMyLogsAndZonesTests: XCTestCase {
         AICoachEngine(repo: Repository(deviceId: "test-mylogs-\(UUID().uuidString)"))
     }
 
+    /// These read context/tool availability assembled from the SEVEN-CATEGORY grants rather than the
+    /// older `dataConsent` flag alone; with nothing granted there is nothing to assert against. Grant
+    /// everything for the duration and put the wearer's real grants back after.
+    private var savedGrants: SveaDataGrants?
+
     override func setUp() {
         super.setUp()
         CaffeineLogStore.shared.clearAll()
@@ -63,6 +68,12 @@ final class CoachMyLogsAndZonesTests: XCTestCase {
     /// The core long-history tools are on the wire, and the full-purpose (except patterns) census is pinned
     /// so any future addition is a deliberately reviewed cost bump rather than drift.
     func testToolCensusIncludesLongHistoryToolsAndIsPinned() {
+        // The offered list is filtered by the SEVEN-CATEGORY grants, so the census only means anything
+        // with them granted. Scoped to this test — the refusal tests in this suite need the real
+        // (ungranted) state.
+        let restore = SveaDataGrants.load()
+        SveaDataGrants.all.save()
+        defer { restore.save() }
         let engine = makeEngine()
         engine.toolConsent = ToolConsent(enabled: Set(CoachPurpose.allCases.filter { $0 != .patterns }))
         XCTAssertTrue(engine.coachTools.contains(.myLogs))

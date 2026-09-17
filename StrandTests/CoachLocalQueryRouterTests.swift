@@ -3,6 +3,24 @@ import XCTest
 
 @MainActor
 final class CoachLocalQueryRouterTests: XCTestCase {
+
+    /// These read context/tool availability assembled from the SEVEN-CATEGORY grants rather than the
+    /// older `dataConsent` flag alone; with nothing granted there is nothing to assert against. Grant
+    /// everything for the duration and put the wearer's real grants back after.
+    private var savedGrants: SveaDataGrants?
+
+    override func setUp() {
+        super.setUp()
+        savedGrants = SveaDataGrants.load()
+        SveaDataGrants.all.save()
+    }
+
+    override func tearDown() {
+        savedGrants?.save()
+        savedGrants = nil
+        super.tearDown()
+    }
+
     func testRecognisesExplicitMultiYearWeightQuestion() {
         XCTAssertEqual(CoachLocalQueryRouter.metricHistoryRequest(for: "How has my weight changed over 3 years?"),
                        .init(metric: "weight", days: 1_095))

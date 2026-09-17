@@ -5447,17 +5447,27 @@ struct TodayView: View {
 
     /// "d MMM · HH:mm–HH:mm", start-only when the row has no real end (#157). The "· N bpm"
     /// segment was dropped: the StatTile caption is lineLimit(1) and date + range + bpm clips,     /// avg HR remains on the Workouts screen.
-    /// `static` and non-private so it is testable without building a view: the body reads only
-    /// `Self.hrTimeFmt` and the active locale, never instance state.
+    // #perf: fixed-locale, hoisted to static so a workout list doesn't allocate a DateFormatter per row
+    // per render.
+    //
+    // Pinned to `d MMM` rather than a localised date: the caption shares one tile line with the start
+    // time, and the fork's own width test pins that shape. Localising the ORDER (some locales put the
+    // month first) is an i18n follow-up that has to be measured against the same width budget rather
+    // than dropped in — see `testCaptionFitsTheTileWidthBudget`.
+    private static let workoutDateFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "d MMM"
+        return f
+    }()
+
+    /// `static` and non-private so it is testable without building a view: the body reads only the two
+    /// static formatters, never instance state.
     static func workoutCaption(_ w: WorkoutRow) -> String {
         let start = Date(timeIntervalSince1970: TimeInterval(w.startTs))
         // Date + START time only. An end time pushes the caption past the tile's width and it
-        // ellipsises, so the range was deliberately dropped on this fork's line. The DATE stays
-        // localised (upstream's i18n work) rather than pinned to en_US_POSIX.
-        let date = start.formatted(
-            .dateTime.day().month(.abbreviated).locale(AppLanguage.activeLocale)
-        )
-        return "\(date) · \(Self.hrTimeFmt.string(from: start))"
+        // ellipsises, which is the regression `testCaptionHasNoTimeRange` guards.
+        return "\(Self.workoutDateFmt.string(from: start)) · \(Self.hrTimeFmt.string(from: start))"
     }
 
     /// Thousands-grouped integer string (steps / calories).

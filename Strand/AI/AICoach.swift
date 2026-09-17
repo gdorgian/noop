@@ -3110,6 +3110,14 @@ final class AICoachEngine: ObservableObject {
             blocks.append(await myLogsTool(kind: "lab", days: 90))
             categories.append(.personalPatterns)
         }
+        // Any path that QUOTES a recovery number must carry the caveat that qualifies it. The tool path
+        // appends this already (`runCoachTool`); the non-tool context lost it when this assembly moved to
+        // the seven-category grants, which let the coach state a Charge figure on this path with no
+        // "calibrating" warning attached — the number without the thing that says how much to trust it.
+        // Gated on `.vitals`, the grant that puts the recovery number here in the first place.
+        if grants.allows(.vitals), let confidence = await chargeConfidenceBlock() {
+            blocks.append(confidence)
+        }
         return PreparedNonToolContext(text: blocks.joined(separator: "\n\n"),
                                       categories: Array(Set(categories)))
     }

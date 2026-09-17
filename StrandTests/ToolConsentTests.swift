@@ -106,17 +106,25 @@ final class ToolConsentTests: XCTestCase {
         XCTAssertEqual(CoachDataAccessMode.current(for: [.coreBiometrics]), .expert)
     }
 
-    func testMemoryContextNeedsBothMasterAndMemoryGrants() {
+    /// The local memory index NEVER reaches a provider, whatever is granted.
+    ///
+    /// This used to assert the older, looser contract — memory context rode along once the master and
+    /// memory purposes were both granted. The seven-category grant model replaced that: none of its
+    /// categories is a proxy for cross-conversation memory, so `memoryContextAllowed` is now a constant
+    /// `false` and the index stays on the phone. The assertion is inverted deliberately, and it is
+    /// STRICTER than what it replaced: no combination of grants can turn it back on.
+    func testMemoryContextIsNeverFoldedIntoProviderText() {
         let engine = AICoachEngine(repo: Repository(deviceId: "test-memory-context-\(UUID().uuidString)"))
-        engine.toolConsent = ToolConsent(enabled: [.memory])
-        engine.dataConsent = false
-        XCTAssertFalse(engine.memoryContextAllowed)
-
-        engine.dataConsent = true
-        XCTAssertTrue(engine.memoryContextAllowed)
-
-        engine.toolConsent = ToolConsent(enabled: [.coreBiometrics])
-        XCTAssertFalse(engine.memoryContextAllowed)
+        for consent in [ToolConsent(enabled: [.memory]),
+                        ToolConsent(enabled: [.coreBiometrics]),
+                        ToolConsent(enabled: Set(CoachPurpose.allCases))] {
+            for data in [false, true] {
+                engine.toolConsent = consent
+                engine.dataConsent = data
+                XCTAssertFalse(engine.memoryContextAllowed,
+                               "memory context must never reach a provider (dataConsent: \(data))")
+            }
+        }
     }
 
     func testToolModeContextFiltersMemoryAndPlanBeforeTheProviderSeesThem() {

@@ -19,12 +19,21 @@ final class PlanContextBlockTests: XCTestCase {
 
     private var today: String { Repository.localDayKey(Date()) }
 
+    /// These read context/tool availability assembled from the SEVEN-CATEGORY grants rather than the
+    /// older `dataConsent` flag alone; with nothing granted there is nothing to assert against. Grant
+    /// everything for the duration and put the wearer's real grants back after.
+    private var savedGrants: SveaDataGrants?
+
     override func setUp() {
         super.setUp()
+        savedGrants = SveaDataGrants.load()
+        SveaDataGrants.all.save()
         CoachPlanStore.shared.clearAll()
     }
 
     override func tearDown() {
+        savedGrants?.save()
+        savedGrants = nil
         CoachPlanStore.shared.clearAll()
         super.tearDown()
     }
