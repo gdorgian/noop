@@ -101,7 +101,9 @@ struct CustomClient: AIProviderClient {
     /// Pure: unwrap an OpenAI-compatible chat-completions body into the assistant text. Appends
     /// `truncationNote` when the server stopped early (`finish_reason == "length"`) so a context-
     /// window cutoff is never silent. No network — unit-tested.
-    func parseChatContent(_ json: [String: Any]) throws -> String {
+    /// `isLocalServer` is passed IN rather than read from UserDefaults so this stays pure and unit-
+    /// testable without a configured app. Callers use `Self.isLocalCustomServer`.
+    func parseChatContent(_ json: [String: Any], isLocalServer: Bool = Self.isLocalCustomServer) throws -> String {
         guard let choices = json["choices"] as? [[String: Any]],
               let first = choices.first,
               let message = first["message"] as? [String: Any],
@@ -110,7 +112,7 @@ struct CustomClient: AIProviderClient {
             throw emptyReplyError(json)   // #1074: surface the provider's real error if the 200 body has one
         }
         if (first["finish_reason"] as? String)?.lowercased() == "length" {
-            return content + Self.truncationNote(isLocalServer: Self.isLocalCustomServer)
+            return content + Self.truncationNote(isLocalServer: isLocalServer)
         }
         return content
     }

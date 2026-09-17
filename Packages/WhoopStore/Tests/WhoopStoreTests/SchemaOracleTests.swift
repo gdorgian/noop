@@ -214,10 +214,33 @@ final class SchemaOracleTests: XCTestCase {
             }
             numbers.append(n)
         }
-        for (offset, n) in numbers.enumerated() where n != offset + 1 {
-            return XCTFail("GRDB migration '\(ids[offset])' claims v\(n) but is #\(offset + 1) in "
-                           + "registration order — two migrations claiming the same vN, or a gap, makes the "
-                           + "GRDB-name <-> Room-version mapping ambiguous. Renumber before merging.")
+
+        // The strict `n == position` rule this used to assert existed to keep the GRDB-name <-> ROOM-
+        // version mapping unambiguous. This fork is Apple-only and has no Room twin, and its history
+        // carries a deliberate collision from the upstream merge: the fork's own v38...v40 were kept and
+        // upstream's apple-step-hour was renumbered to v41, so upstream's v39...v41 now sit after it.
+        //
+        // That prefix is FROZEN, and not out of convenience. GRDB records each migration by NAME in
+        // `grdb_migrations`; renaming one that has already run on a device makes GRDB treat it as new and
+        // run it AGAIN, which for a `CREATE TABLE` is an error that leaves the app unable to open its own
+        // database. Renumbering history is therefore the one repair that must never be attempted here.
+        //
+        // What still holds, and is what this now enforces: identifiers are unique (above — the real
+        // hazard, since a duplicate makes GRDB silently skip the second body), and any migration added
+        // FROM NOW ON must claim a number higher than every number already used, so new work cannot
+        // deepen the collision. The exact frozen list is pinned by
+        // `testGrdbMigrationIdentifiersMatchOracle`, so none of these can change unnoticed.
+        let frozenPrefix = 49   // the merged history; extend ONLY by appending, never by renaming
+        XCTAssertGreaterThanOrEqual(ids.count, frozenPrefix,
+                                    "a migration was REMOVED — renaming or deleting an applied migration "
+                                    + "re-runs or skips it on every existing database")
+        if ids.count > frozenPrefix {
+            let ceiling = numbers.prefix(frozenPrefix).max() ?? 0
+            for offset in frozenPrefix..<ids.count where numbers[offset] <= ceiling {
+                return XCTFail("new GRDB migration '\(ids[offset])' claims v\(numbers[offset]), which is "
+                               + "not above the highest number already used (v\(ceiling)). Number it "
+                               + "v\(ceiling + 1) or higher; do NOT renumber the frozen history above it.")
+            }
         }
     }
 

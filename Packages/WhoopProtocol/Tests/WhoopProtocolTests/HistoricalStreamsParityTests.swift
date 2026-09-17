@@ -30,7 +30,7 @@ final class HistoricalStreamsParityTests: XCTestCase {
                         deviceClockRef: deviceClockRef, wallClockRef: wallClockRef)
         XCTAssertEqual(streams.hr, gold.hr.map { HRSample(ts: $0.ts, bpm: $0.bpm) })
         XCTAssertEqual(streams.rr, gold.rr.map {
-            RRInterval(ts: $0.ts, rrMs: $0.rr_ms, srcChannel: .whoopHistorical)
+            RRInterval(ts: $0.ts, rrMs: $0.rr_ms, srcChannel: .whoop5Historical)
         })
         XCTAssertGreaterThan(streams.hr.count, 0)
     }

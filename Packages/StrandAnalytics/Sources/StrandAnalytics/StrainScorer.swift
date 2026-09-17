@@ -31,6 +31,21 @@ import WhoopProtocol
 
 public enum StrainScorer {
 
+    /// Additive cardiovascular work and its existing user-facing compression, from one HR series.
+    public struct CardioLoadResult: Equatable, Sendable {
+        public let trimp: Double
+        public let effort: Double
+        public let sampleCount: Int
+        public let spanSeconds: Int
+
+        public init(trimp: Double, effort: Double, sampleCount: Int, spanSeconds: Int) {
+            self.trimp = trimp
+            self.effort = effort
+            self.sampleCount = sampleCount
+            self.spanSeconds = spanSeconds
+        }
+    }
+
     // MARK: - Constants (strain.py)
 
     /// Minimum HR readings before computing strain on a DENSE stream (≈10 min at 1 Hz).
@@ -390,6 +405,71 @@ public enum StrainScorer {
             strainUncached(hr, maxHR: maxHR, restingHR: restingHR, method: method, sex: sex,
                            denominator: resolvedDenominator, diag: nil, day: day)
         }
+    }
+
+    /// Raw TRIMP for aggregation plus the existing 0...100 Effort view of the same work.
+    /// Callers sum `trimp`; logarithmic `effort` is intentionally non-additive.
+    public static func cardioLoad(_ hr: [HRSample], maxHR: Double? = nil,
+                                  restingHR: Double = defaultRestingHR,
+                                  method: Method = .edwards, sex: String = "male") -> CardioLoadResult? {
+        let effMax = maxHR ?? Double(defaultMaxHR())
+        let span = max(0, (hr.map(\.ts).max() ?? 0) - (hr.map(\.ts).min() ?? 0))
+        let enough = hr.count >= minReadings || (hr.count >= minSparseReadings && span >= minSpanSeconds)
+        guard enough, effMax > restingHR else { return nil }
+        let durations = sampleDurationsMinutes(hr)
+        let reserve = effMax - restingHR
+        let trimp: Double
+        let denominator = logMapDenominator(method: method, sex: sex)
+        switch method {
+        case .edwards:
+            trimp = edwardsTRIMP(hr, restingHR: restingHR, hrReserve: reserve, durations: durations)
+        case .banister:
+            let b = sex.lowercased().hasPrefix("f") ? banisterBWomen : banisterBMen
+            trimp = banisterTRIMP(hr, restingHR: restingHR, hrReserve: reserve, durations: durations,
+                                  b: b, floorRatePerMinute: banisterBaselineRatePerMinute(b: b))
+        }
+        return CardioLoadResult(trimp: trimp, effort: trimpToStrain(trimp, denominator: denominator),
+                                sampleCount: hr.count, spanSeconds: span)
+    }
+
+    /// Classic Edwards TRIMP for the Training Load screen, based on percentage of HRmax.
+    ///
+    /// This is intentionally separate from NOOP's daily Effort recipe, which uses heart-rate reserve.
+    /// Recording gaps longer than two minutes contribute no duration; pricing the gap would invent work
+    /// while the sensor was silent.
+    public static func edwardsTrainingLoad(_ hr: [HRSample], maxHR: Double? = nil) -> CardioLoadResult? {
+        let effectiveMax = maxHR ?? Double(defaultMaxHR())
+        guard effectiveMax > 0 else { return nil }
+        let ordered = hr.sorted { $0.ts < $1.ts }
+        let span = max(0, (ordered.last?.ts ?? 0) - (ordered.first?.ts ?? 0))
+        let enough = ordered.count >= minReadings
+            || (ordered.count >= minSparseReadings && span >= minSpanSeconds)
+        guard enough else { return nil }
+
+        var durations = [Double](repeating: fallbackSampleMin, count: ordered.count)
+        if ordered.count > 1 {
+            for index in 0..<(ordered.count - 1) {
+                let gap = ordered[index + 1].ts - ordered[index].ts
+                durations[index] = gap > 0 && Double(gap) <= maxSampleGapMin * 60
+                    ? Double(gap) / 60 : 0
+            }
+            durations[ordered.count - 1] = durations.dropLast().last(where: { $0 > 0 }) ?? fallbackSampleMin
+        }
+
+        var trimp = 0.0
+        for index in ordered.indices {
+            let percentage = Double(ordered[index].bpm) / effectiveMax
+            let weight: Double
+            if percentage >= 0.90 { weight = 5 }
+            else if percentage >= 0.80 { weight = 4 }
+            else if percentage >= 0.70 { weight = 3 }
+            else if percentage >= 0.60 { weight = 2 }
+            else if percentage >= 0.50 { weight = 1 }
+            else { weight = 0 }
+            trimp += weight * durations[index]
+        }
+        return CardioLoadResult(trimp: trimp, effort: trimpToStrain(trimp),
+                                sampleCount: ordered.count, spanSeconds: span)
     }
 
     /// One line naming what an Effort score was computed FROM, or why it could not be computed.

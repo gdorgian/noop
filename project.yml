@@ -71,6 +71,10 @@ packages:
     path: Packages/WhoopStore
   StrandAnalytics:
     path: Packages/StrandAnalytics
+  # Pure training/strength analytics (sessions, volume, load, status). No UI, no network, no store —
+  # WhoopStore's native-training tables decode into its value types, so it sits below the store.
+  StrandTraining:
+    path: Packages/StrandTraining
   StrandImport:
     path: Packages/StrandImport
   StrandDesign:
@@ -193,6 +197,7 @@ targets:
       - package: WhoopProtocol
       - package: WhoopStore
       - package: StrandAnalytics
+      - package: StrandTraining
       - package: StrandImport
       - package: StrandDesign
       - package: SemanticMemory
@@ -230,6 +235,7 @@ targets:
       - target: Strand
       - package: WhoopProtocol
       - package: WhoopStore
+      - package: StrandTraining
       - package: OuraProtocol
       - package: SemanticMemory
     settings:
@@ -424,6 +430,7 @@ targets:
       - package: WhoopProtocol
       - package: WhoopStore
       - package: StrandAnalytics
+      - package: StrandTraining
       - package: StrandImport
       - package: StrandDesign
       - package: SemanticMemory

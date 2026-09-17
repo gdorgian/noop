@@ -331,6 +331,13 @@ struct RootView: View {
             // #1862: the Today Coach card's launcher hands off here, so the send/stream/consent surface
             // stays in exactly one place.
             case .coach: selection = .coach
+            // Destinations the fork's iOS shell routes that the macOS sidebar also hosts as rows of its
+            // own. Without these the switch is not exhaustive and this target does not build — which is
+            // how they were missed: RootView is excluded from the iOS target, so the iOS build stays
+            // green while macOS breaks.
+            case .breathe: selection = .breathe
+            case .dataSources: selection = .dataSources
+            case .sleep: selection = .sleep
             case nil: break
             }
             if dest != nil { router.requestedDestination = nil }

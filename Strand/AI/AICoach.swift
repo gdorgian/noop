@@ -227,6 +227,15 @@ enum AIKeyStore {
 /// whether a countdown should restart, and the tests assert on the CASE rather than its rendered
 /// sentence — matching a localized string would pass in English and fail in German.
 enum AICoachError: LocalizedError, Equatable {
+    /// Whether an HTTP status means the stored key itself was turned away, as opposed to the provider
+    /// being busy, broken, or asked for something it does not have.
+    ///
+    /// Named rather than left as two literals in two switches because it is the hinge the key-repair
+    /// affordance hangs on, and it decides what the wearer is told to go and do. Widen it and a rate
+    /// limit starts demanding a new key; narrow it and the trap this exists to remove comes straight
+    /// back. Ported from ryanbr/noop v11.7; pairs with this engine's `keyRejected`.
+    static func isKeyRejection(_ status: Int) -> Bool { status == 401 || status == 403 }
+
     case noKey
     case emptyQuestion
     case badKey
@@ -4246,17 +4255,20 @@ final class AICoachEngine: ObservableObject {
     }
 
     /// One derived stress line for the coach context: the Baevsky Stress Index over TODAY's R-R, read
-    /// via the store exactly as `StressView` does (`storeHandle()` → `rrIntervals(deviceId:from:to:)`),
-    /// then summarised to a single number with `StressIndex.stressIndex(rr:)`. Returns nil when the
-    /// store is unavailable or there are too few clean beats (the histogram needs >= 20), so the line is
-    /// simply absent, never a fabricated value. Summary-only: the raw R-R never leaves the device.
+    /// through the SAME all-source facade the Stress screen uses, then summarised to a single number
+    /// with `StressIndex.stressIndex(rr:)`. Returns nil when there are too few clean beats (the
+    /// histogram needs >= 20), so the line is simply absent, never a fabricated value. Summary-only:
+    /// the raw R-R never leaves the device.
+    ///
+    /// `repo.rrIntervals(from:to:)`, NOT `store.rrIntervals(deviceId: repo.deviceId, …)`: pinning the
+    /// read to the currently active strap silently drops beats banked under a replaced or second
+    /// registered strap, so the coach would describe a different day from the one the Stress screen
+    /// shows the wearer.
     func stressIndexLine() async -> String? {
         let cal = Calendar.current
         let from = Int(cal.startOfDay(for: Date()).timeIntervalSince1970)
         let to = Int(Date().timeIntervalSince1970)
-        guard let store = await repo.storeHandle() else { return nil }
-        let rr = (try? await store.rrIntervals(
-            deviceId: repo.deviceId, from: from, to: to, limit: Int.max)) ?? []
+        let rr = await repo.rrIntervals(from: from, to: to, limit: Int.max)
         guard let si = StressIndex.stressIndex(rr: rr) else { return nil }
         var line = Self.stressIndexSummary(si: si)
 

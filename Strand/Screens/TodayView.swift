@@ -4242,7 +4242,7 @@ struct TodayView: View {
                             StatTile(
                                 label: "\(WorkoutSource.displaySport(w.sport))",
                                 value: workoutDuration(w),
-                                caption: workoutCaption(w),
+                                caption: Self.workoutCaption(w),
                                 accent: StrandPalette.effortTint(fraction: (w.strain ?? 0) / StrainScorer.maxStrain),
                                 delta: w.energyKcal.map { "\(Int($0.rounded())) kcal" },
                                 deltaColor: StrandPalette.metricAmber
@@ -5447,14 +5447,17 @@ struct TodayView: View {
 
     /// "d MMM · HH:mm–HH:mm", start-only when the row has no real end (#157). The "· N bpm"
     /// segment was dropped: the StatTile caption is lineLimit(1) and date + range + bpm clips,     /// avg HR remains on the Workouts screen.
-    private func workoutCaption(_ w: WorkoutRow) -> String {
+    /// `static` and non-private so it is testable without building a view: the body reads only
+    /// `Self.hrTimeFmt` and the active locale, never instance state.
+    static func workoutCaption(_ w: WorkoutRow) -> String {
         let start = Date(timeIntervalSince1970: TimeInterval(w.startTs))
+        // Date + START time only. An end time pushes the caption past the tile's width and it
+        // ellipsises, so the range was deliberately dropped on this fork's line. The DATE stays
+        // localised (upstream's i18n work) rather than pinned to en_US_POSIX.
         let date = start.formatted(
             .dateTime.day().month(.abbreviated).locale(AppLanguage.activeLocale)
         )
-        guard w.endTs > w.startTs else { return "\(date) · \(Self.hrTimeFmt.string(from: start))" }
-        let end = Date(timeIntervalSince1970: TimeInterval(w.endTs))
-        return "\(date) · \(Self.hrTimeFmt.string(from: start))-\(Self.hrTimeFmt.string(from: end))"
+        return "\(date) · \(Self.hrTimeFmt.string(from: start))"
     }
 
     /// Thousands-grouped integer string (steps / calories).

@@ -234,7 +234,18 @@ extension WhoopStore {
     public func upsertSleepSessions(_ sessions: [CachedSleepSession], deviceId: String) async throws -> Int {
         try syncWrite { db in
             var n = 0
+            // Fork-only analysis invalidation (`AnalysisInputRevision`): a sleep session that is a scoring
+            // INPUT must stamp the days it covers, or a rescore can reuse a stored score whose sleep has
+            // since moved. Sessions the engine itself derived are output, not input, and stay silent.
+            var changedInputTimestamps = Set<Int>()
+            let isComputedNamespace = deviceId.hasSuffix("-noop")
             for s in sessions {
+                // A hand-edited session remains a scoring INPUT even though it is stored beside the
+                // engine's `-noop` output. Ordinary detected sessions are derived output and stay silent.
+                let tracksAnalysisInput = !isComputedNamespace || s.userEdited
+                let before = tracksAnalysisInput
+                    ? try Self.storedSleepSession(db, deviceId: deviceId, startTs: s.startTs)
+                    : nil
                 if !s.userEdited, let existing = try Self.storedSleepSession(db, deviceId: deviceId, startTs: s.startTs),
                    !existing.userEdited {
                     let candidate = CachedSleepSession(startTs: s.startTs, endTs: s.endTs, efficiency: nil,
@@ -266,7 +277,19 @@ extension WhoopStore {
                                      s.restingHr, s.avgHrv, s.stagesJSON, s.userEdited, s.startTsAdjusted,
                                      s.stagingSparse])
                 n += db.changesCount
+                if tracksAnalysisInput,
+                   let after = try Self.storedSleepSession(db, deviceId: deviceId, startTs: s.startTs),
+                   before != after {
+                    changedInputTimestamps.formUnion([
+                        before?.effectiveStartTs ?? after.effectiveStartTs,
+                        before?.endTs ?? after.endTs,
+                        after.effectiveStartTs,
+                        after.endTs,
+                    ])
+                }
             }
+            try Self.markAnalysisInputsChanged(db, deviceId: deviceId,
+                                               timestamps: changedInputTimestamps)
             return n
         }
     }
@@ -648,6 +671,42 @@ extension WhoopStore {
                 WHERE deviceId = ? AND day >= ? AND day <= ?
                 ORDER BY day ASC
                 """, arguments: [deviceId, from, to])
+                .map {
+                    DailyMetric(day: $0["day"], totalSleepMin: $0["totalSleepMin"],
+                                efficiency: $0["efficiency"], deepMin: $0["deepMin"],
+                                remMin: $0["remMin"], lightMin: $0["lightMin"],
+                                disturbances: $0["disturbances"], restingHr: $0["restingHr"],
+                                avgHrv: $0["avgHrv"], recovery: $0["recovery"],
+                                strain: $0["strain"], exerciseCount: $0["exerciseCount"],
+                                spo2Pct: $0["spo2Pct"], skinTempDevC: $0["skinTempDevC"],
+                                respRateBpm: $0["respRateBpm"],
+                                steps: $0["steps"], activeKcalEst: $0["activeKcalEst"],
+                                spo2Red: $0["spo2Red"], spo2Ir: $0["spo2Ir"], avgSdnn: $0["avgSdnn"],
+                                skinTempC: $0["skinTempC"],
+                                sleepHrOnly: $0["sleepHrOnly"])
+                }
+        }
+    }
+
+    /// Newest-first page used by resumable history migrations. Unlike the range API this never
+    /// materializes the complete daily history merely to select the next small batch.
+    ///
+    /// Restored from the fork's own line after the v11.7 merge resolved this file to upstream and
+    /// dropped it. Adapted rather than copied back: it uses this file's `syncRead` and selects the two
+    /// columns upstream added (`skinTempC`, `sleepHrOnly`), so the two reads cannot return differently
+    /// shaped rows for the same day.
+    public func dailyMetrics(deviceId: String,
+                             before day: String,
+                             limit: Int) async throws -> [DailyMetric] {
+        try syncRead { db in
+            try Row.fetchAll(db, sql: """
+                SELECT day, totalSleepMin, efficiency, deepMin, remMin, lightMin, disturbances,
+                       restingHr, avgHrv, recovery, strain, exerciseCount,
+                       spo2Pct, skinTempDevC, respRateBpm, steps, activeKcalEst,
+                       spo2Red, spo2Ir, avgSdnn, skinTempC, sleepHrOnly FROM dailyMetric
+                WHERE deviceId = ? AND day < ?
+                ORDER BY day DESC LIMIT ?
+                """, arguments: [deviceId, day, max(0, limit)])
                 .map {
                     DailyMetric(day: $0["day"], totalSleepMin: $0["totalSleepMin"],
                                 efficiency: $0["efficiency"], deepMin: $0["deepMin"],

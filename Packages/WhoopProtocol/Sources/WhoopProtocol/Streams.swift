@@ -837,7 +837,12 @@ public func extractStreams(_ parsed: [ParsedFrame],
             }
             // Unlike Python, drop RR rows when timestamp is absent (a ts-less RR row is unstorable).
             if let ts = ts, let rrs = p["rr_intervals"]?.intArrayValue {
+                // An explicit channel on the wire wins; otherwise this IS the proprietary realtime
+                // stream by construction, so stamp it rather than leaving the provenance unknown. R-R
+                // rows whose transport is unknown cannot be told apart later, and telling the live and
+                // historical trains apart is exactly what the R-R transport work needs.
                 let source = p["rr_source_channel"]?.intValue.flatMap(RRSourceChannel.init(rawValue:))
+                    ?? .whoop5Realtime
                 for rr in rrs { out.rr.append(RRInterval(ts: ts, rrMs: rr, srcChannel: source)) }
             }
         case "EVENT":

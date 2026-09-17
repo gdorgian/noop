@@ -297,7 +297,11 @@ public func extractHistoricalStreams(_ parsed: [ParsedFrame],
                 out.hr.append(HRSample(ts: ts, bpm: bpm))
             }
             if let rrs = p["rr_intervals"]?.intArrayValue {
+                // Explicit channel on the wire wins; otherwise these came out of a historical record by
+                // construction, so stamp it rather than leaving the transport unknown. Distinguishing the
+                // historical train from the live one is the whole point of the channel.
                 let source = p["rr_source_channel"]?.intValue.flatMap(RRSourceChannel.init(rawValue:))
+                    ?? .whoop5Historical
                 for rr in rrs { out.rr.append(RRInterval(ts: ts, rrMs: rr, srcChannel: source)) }
             }
             if let red = p["spo2_red"]?.intValue {
@@ -422,7 +426,10 @@ public func extractHistoricalStreams(_ parsed: [ParsedFrame],
                 out.hr.append(HRSample(ts: ts, bpm: bpm))
             }
             if let ts = rtTs, let rrs = p["rr_intervals"]?.intArrayValue {
-                for rr in rrs { out.rr.append(RRInterval(ts: ts, rrMs: rr)) }
+                // `.whoop5Historical`, not realtime: the channel records the TRANSPORT these beats
+                // reached us over, and this whole function decodes the historical offload. The record
+                // type is REALTIME_RAW_DATA, but it is being replayed out of history, not streamed.
+                for rr in rrs { out.rr.append(RRInterval(ts: ts, rrMs: rr, srcChannel: .whoop5Historical)) }
             }
         case "EVENT":
             // EVENT carries the strap RTC's real-unix seconds. Correct for a grossly-stale RTC

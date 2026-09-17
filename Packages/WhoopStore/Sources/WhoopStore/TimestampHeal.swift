@@ -10,10 +10,15 @@ extension WhoopStore {
     public struct TimestampHealResult: Equatable, Sendable {
         public let rawRowsDeleted: Int
         public let computedRowsDeleted: Int
+        /// Compact union of raw UTC-day buckets changed by the repair. Computed-only cleanup has no
+        /// raw-input interval and therefore leaves this nil.
+        public let affectedUTCInterval: Range<Int>?
         public var didChange: Bool { rawRowsDeleted > 0 || computedRowsDeleted > 0 }
-        public init(rawRowsDeleted: Int, computedRowsDeleted: Int) {
+        public init(rawRowsDeleted: Int, computedRowsDeleted: Int,
+                    affectedUTCInterval: Range<Int>? = nil) {
             self.rawRowsDeleted = rawRowsDeleted
             self.computedRowsDeleted = computedRowsDeleted
+            self.affectedUTCInterval = affectedUTCInterval
         }
     }
 
@@ -58,7 +63,17 @@ extension WhoopStore {
             // omitting six of these tables. One list means a stream added later is healed AND counted AND
             // named in the breakdown, or none of the three - never silently one of them.
             var rawDeleted = 0
+            var affectedBuckets: [String: Set<Int>] = [:]
             for (_, table) in WhoopStore.rawTableKeys {
+                // Capture compact day buckets BEFORE deleting them. This one-time repair may remove many
+                // rows, but the number of distinct (device, UTC-day) pairs stays small.
+                for row in try Row.fetchAll(db, sql: """
+                    SELECT deviceId, CAST(ts / 86400 AS INTEGER) AS utcDay
+                    FROM \(table) WHERE ts < ? OR ts > ?
+                    GROUP BY deviceId, CAST(ts / 86400 AS INTEGER)
+                    """, arguments: [lo, hi]) {
+                    affectedBuckets[row["deviceId"], default: []].insert(row["utcDay"])
+                }
                 try db.execute(sql: "DELETE FROM \(table) WHERE ts < ? OR ts > ?",
                                arguments: [lo, hi])
                 rawDeleted += db.changesCount
@@ -80,8 +95,23 @@ extension WhoopStore {
                            arguments: [hi, lo])
             computedDeleted += db.changesCount
 
+            // Invalidate only when something changed. Raw deletions carry their exact UTC buckets;
+            // computed-only cleanup still advances the global gate so the forced repair pass cannot be
+            // mistaken for an idle tick.
+            for (deviceId, buckets) in affectedBuckets {
+                try WhoopStore.markAnalysisInputsChanged(
+                    db, deviceId: deviceId, timestamps: buckets.map { $0 * 86_400 })
+            }
+            if rawDeleted == 0, computedDeleted > 0 { try WhoopStore.bumpSensorWriteSeq(db) }
+            let allBuckets = affectedBuckets.values.flatMap { $0 }
+            let affectedInterval: Range<Int>? = allBuckets.min().flatMap { lowerDay in
+                allBuckets.max().map { upperDay in
+                    (lowerDay * 86_400)..<((upperDay + 1) * 86_400)
+                }
+            }
             return TimestampHealResult(rawRowsDeleted: rawDeleted,
-                                       computedRowsDeleted: computedDeleted)
+                                       computedRowsDeleted: computedDeleted,
+                                       affectedUTCInterval: affectedInterval)
         }
     }
 

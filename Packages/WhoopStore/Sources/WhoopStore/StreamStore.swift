@@ -187,6 +187,11 @@ extension WhoopStore {
         var v18Written = 0
         var ppgWaveformWritten = 0
         let result: (Int, Int, Int, Int, Int, Int, Int, Int) = try syncWrite { db in
+            // Timestamps whose insert ACTUALLY changed a row. Only real scoring-input changes stamp the
+            // analysis gate below: a duplicate or empty offload leaves both the global sequence and the
+            // per-UTC-day revisions untouched, so it cannot trigger a redundant rescore. Fork-only
+            // mechanism (`AnalysisInputRevision`); upstream has no equivalent and rescores unconditionally.
+            var changedAnalysisTimestamps = Set<Int>()
             var hr = 0, rr = 0, ev = 0, bat = 0
             var spo2 = 0, skin = 0, resp = 0, grav = 0
             // Reuse one prepared statement per table instead of recompiling the same SQL on every
@@ -201,7 +206,9 @@ extension WhoopStore {
                     """)
                 for s in streams.hr {
                     try stmt.execute(arguments: [deviceId, s.ts, s.bpm])
-                    hr += db.changesCount
+                    let changedHr = db.changesCount
+                    hr += changedHr
+                    if changedHr > 0 { changedAnalysisTimestamps.insert(s.ts) }
                 }
             }
             if !streams.rr.isEmpty {
@@ -250,6 +257,7 @@ extension WhoopStore {
                                                  r.srcChannel?.rawValue])
                     let inserted = db.changesCount
                     rr += inserted
+                    if inserted > 0 { changedAnalysisTimestamps.insert(r.ts) }
                     if inserted == 0, let source = r.srcChannel,
                        source == .whoop5Historical || source == .whoop5Standard {
                         // Canonical precedence is history > standard > native/legacy. The winning
@@ -268,7 +276,9 @@ extension WhoopStore {
                 for e in streams.events {
                     let json = try WhoopStore.encodePayload(e.payload)
                     try stmt.execute(arguments: [deviceId, e.ts, e.kind, json])
-                    ev += db.changesCount
+                    let changedEv = db.changesCount
+                    ev += changedEv
+                    if changedEv > 0 { changedAnalysisTimestamps.insert(e.ts) }
                 }
             }
             if !streams.battery.isEmpty {
@@ -278,6 +288,8 @@ extension WhoopStore {
                     """)
                 for b in streams.battery {
                     try stmt.execute(arguments: [deviceId, b.ts, b.soc, b.mv, b.charging])
+                    // Battery is deliberately NOT stamped: it is not a scoring input, so a charge
+                    // reading must never invalidate a day's analysis.
                     bat += db.changesCount
                 }
             }
@@ -288,7 +300,9 @@ extension WhoopStore {
                     """)
                 for s in streams.spo2 {
                     try stmt.execute(arguments: [deviceId, s.ts, s.red, s.ir])
-                    spo2 += db.changesCount
+                    let changedSpo2 = db.changesCount
+                    spo2 += changedSpo2
+                    if changedSpo2 > 0 { changedAnalysisTimestamps.insert(s.ts) }
                 }
             }
             // `aux1Raw`/`aux2Raw` (v31) are the two auxiliary thermal channels riding the same v18 record
@@ -301,7 +315,9 @@ extension WhoopStore {
                     """)
                 for s in streams.skinTemp {
                     try stmt.execute(arguments: [deviceId, s.ts, s.raw, s.aux1Raw, s.aux2Raw])
-                    skin += db.changesCount
+                    let changedSkin = db.changesCount
+                    skin += changedSkin
+                    if changedSkin > 0 { changedAnalysisTimestamps.insert(s.ts) }
                 }
             }
             if !streams.resp.isEmpty {
@@ -311,7 +327,9 @@ extension WhoopStore {
                     """)
                 for s in streams.resp {
                     try stmt.execute(arguments: [deviceId, s.ts, s.raw])
-                    resp += db.changesCount
+                    let changedResp = db.changesCount
+                    resp += changedResp
+                    if changedResp > 0 { changedAnalysisTimestamps.insert(s.ts) }
                 }
             }
             // `dynAccel` (v31) is the strap's OWN gravity-removed motion magnitude for the same second —
@@ -324,7 +342,9 @@ extension WhoopStore {
                     """)
                 for s in streams.gravity {
                     try stmt.execute(arguments: [deviceId, s.ts, s.x, s.y, s.z, s.dynAccel])
-                    grav += db.changesCount
+                    let changedGrav = db.changesCount
+                    grav += changedGrav
+                    if changedGrav > 0 { changedAnalysisTimestamps.insert(s.ts) }
                 }
             }
             // WHOOP5 step counter (#78). Persist-only, the count is not surfaced in the return tuple
@@ -344,6 +364,7 @@ extension WhoopStore {
                     let inserted = db.changesCount
                     insertedSteps += inserted
                     if inserted > 0 { insertedStepTimestamps.append(s.ts) }
+                    if inserted > 0 { changedAnalysisTimestamps.insert(s.ts) }
                 }
                 stepDataRevision.record(deviceId: deviceId, insertedTimestamps: insertedStepTimestamps)
             }
@@ -360,6 +381,7 @@ extension WhoopStore {
                     """)
                 for s in streams.sleepState {
                     try stmt.execute(arguments: [deviceId, s.ts, s.state, s.rawByte])
+                    if db.changesCount > 0 { changedAnalysisTimestamps.insert(s.ts) }
                 }
             }
             // PPG-derived HR from the v26 optical buffer (#156). Persist-only, same as steps, the count
@@ -373,6 +395,7 @@ extension WhoopStore {
                     """)
                 for s in streams.ppgHr {
                     try stmt.execute(arguments: [deviceId, s.ts, s.bpm, s.conf])
+                    if db.changesCount > 0 { changedAnalysisTimestamps.insert(s.ts) }
                 }
             }
             // RAW v26 optical PPG waveform (#156 follow-up) — the samples `ppgHr` above is derived FROM.
@@ -405,9 +428,14 @@ extension WhoopStore {
                     let blob = V18AuxCodec.pack(s)
                     if blob.isEmpty { continue }
                     try stmt.execute(arguments: [deviceId, s.ts, blob])
+                    if db.changesCount > 0 { changedAnalysisTimestamps.insert(s.ts) }
                     v18Written += 1
                 }
             }
+            // Stamp only REAL scoring-input changes, so a duplicate/empty offload cannot invalidate
+            // a day that did not actually move.
+            try WhoopStore.markAnalysisInputsChanged(db, deviceId: deviceId,
+                                                     timestamps: changedAnalysisTimestamps)
             return (hr, rr, ev, bat, spo2, skin, resp, grav)
         }
 

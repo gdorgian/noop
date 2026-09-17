@@ -53,6 +53,22 @@ public enum BackupSettings {
         "profile.heightCm": .double,
         "profile.waistCm": .double,
         "profile.hrMax": .int,
+        // This fork's own HR zone BANDS. They qualify on the same grounds as HR-max: hand-set by the
+        // wearer, about the person rather than the device, and painful to reconstruct from memory after
+        // a restore. Their wire form is deliberately locale-independent (see `HRZoneEdges`), because a
+        // backup written on one device is restored on another. BOTH bound sets travel even though only
+        // one is live, for the same reason the app keeps both — a restore should return the wearer to
+        // exactly where they were, including the mode they had tried and switched away from.
+        //
+        // Without these the fork's custom zones were silently dropped by every backup/restore round
+        // trip, which is a data-loss bug rather than a missing nicety. `.noopbak` keys are additive, so
+        // restoring them cannot break a backup written without them.
+        "profile.zoneMode": .string,
+        "profile.zonePercentEdges": .string,
+        "profile.zoneBpmEdges": .string,
+        // Upstream stores its (bpm-only) custom zones under this one key. This fork's zones are richer
+        // and live in the three keys above, but the key stays whitelisted so a backup written by
+        // upstream — or by a wearer migrating from it — still carries its bands across.
         "profile.hrZoneThresholds": .string,
         "units.system": .string,
         "units.distance": .string,
@@ -79,6 +95,9 @@ public enum BackupSettings {
         "profile.heightCm": "profile.heightCm",
         "profile.waistCm": "profile.waistCm",
         "profile.hrMax": "profile.hrMaxOverride",
+        "profile.zoneMode": "profile.zoneMode",
+        "profile.zonePercentEdges": "profile.zonePercentEdges",
+        "profile.zoneBpmEdges": "profile.zoneBpmEdges",
         "profile.hrZoneThresholds": "profile.hrZoneThresholds",
         "units.system": "units.system",
         "units.distance": "units.distance",

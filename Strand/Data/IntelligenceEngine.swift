@@ -574,6 +574,34 @@ final class IntelligenceEngine: ObservableObject {
         )]
     }
 
+    /// Daily 0-3 stress-proxy points — the SAME z-score formula `StressView` derives live when nothing
+    /// is stored for a day (`StressMath.rawScore`/`.squash` over a rolling RHR/HRV baseline), computed
+    /// here so it can be PERSISTED and therefore charted (`plot_metric`'s generic day-series lookup only
+    /// finds keys that are actually in the store — "stress" never was). `days` must be oldest->newest;
+    /// the baseline for each day is up to the 30 days ending the day BEFORE it, the exact window
+    /// `StressModel.init` uses, so a plotted chart and the live Stress screen never disagree. A day with
+    /// neither a resting HR nor an HRV reading (and no baseline to fall back on either) is skipped — no
+    /// fabricated value.
+    nonisolated static func stressProxyRows(days: [DailyMetric]) -> [MetricPoint] {
+        var rows: [MetricPoint] = []
+        for (idx, today) in days.enumerated() {
+            let baseline = idx > 0 ? Array(days[0..<idx].suffix(30)) : []
+            let rhrBase = baseline.compactMap { $0.restingHr }.map(Double.init)
+            let hrvBase = baseline.compactMap { $0.avgHrv }
+            let meanRHR = StressMath.mean(rhrBase)
+            let sdRHR = StressMath.std(rhrBase, mean: meanRHR)
+            let meanHRV = StressMath.mean(hrvBase)
+            let sdHRV = StressMath.std(hrvBase, mean: meanHRV)
+            let rhrToday = today.restingHr.map(Double.init)
+            let hrvToday = today.avgHrv
+            guard (rhrToday != nil && meanRHR != nil) || (hrvToday != nil && meanHRV != nil) else { continue }
+            let raw = StressMath.rawScore(rhrToday: rhrToday, meanRHR: meanRHR, sdRHR: sdRHR,
+                                          hrvToday: hrvToday, meanHRV: meanHRV, sdHRV: sdHRV)
+            rows.append(MetricPoint(day: today.day, key: "stress", value: StressMath.squash(raw)))
+        }
+        return rows
+    }
+
     /// Manual "refresh Fitness Age" (the button on the not-ready card): recompute the weekly Fitness Age NOW
     /// from the PERSISTED merged daily history , NO raw-HR rescoring , and upsert it. Same gate
     /// (`fitnessAgeRows`) + date/window logic as the recompute pass, so it reads exactly what the readiness

@@ -43,6 +43,12 @@ final class RawDataCollectorParityTests: XCTestCase {
 
     func testAndroidAndAppleOracleCopiesAreByteIdentical() throws {
         let android = repoRoot.appendingPathComponent("android/app/src/test/resources/raw_data_collector_parity.json")
+        // This fork is Apple-only and carries no `android/` tree, so there is no second copy to keep in
+        // lockstep. Skip rather than fail: the assertion guards a parity contract that does not exist
+        // here, and it runs in full again if the Android tree is ever restored beside it.
+        guard FileManager.default.fileExists(atPath: android.path) else {
+            throw XCTSkip("no android/ tree in this Apple-only fork, so there is no second oracle copy")
+        }
         XCTAssertEqual(try oracleData(), try Data(contentsOf: android),
                        "Raw-data collector parity oracle copies must change together")
     }

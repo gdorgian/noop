@@ -1289,8 +1289,23 @@ struct LiquidTodayView: View {
 
     /// A metric's spark values inside the chosen window, oldest → newest.
     private func windowedSpark(_ key: String) -> [Double] {
-        let cutoff = sparkWindowCutoffKey
-        return (kSparks[key] ?? []).filter { $0.0 >= cutoff }.map { $0.1 }
+        Self.windowedSpark(points: kSparks[key] ?? [], cutoffKey: sparkWindowCutoffKey,
+                           maxPoints: keyMetricsWindowDays)
+    }
+
+    /// The spark series for a tile: the date window first, with a count-based fallback for sparse data.
+    ///
+    /// The date window is the normal path and keeps a stale import from being read as a current trend.
+    /// But as the ONLY path a sparse series dies in it — someone who weighs themselves every few weeks
+    /// has fewer than two points inside 2/7/14 days, so the Weight tile drew nothing while its number
+    /// was right. So: window first, and only when it cannot draw a line (< 2 points) fall back to the
+    /// last `maxPoints` MEASUREMENTS of the full series. Dense metrics never reach the fallback.
+    ///
+    /// `static` and pure so the rule is testable without building a view.
+    static func windowedSpark(points: [(String, Double)], cutoffKey: String, maxPoints: Int) -> [Double] {
+        let windowed = points.filter { $0.0 >= cutoffKey }
+        if windowed.count >= 2 { return windowed.map { $0.1 } }
+        return Array(points.suffix(maxPoints)).map { $0.1 }
     }
 
     /// The Key-Metrics header's trailing label for the chosen detailed-graph window (Android twin).

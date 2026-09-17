@@ -662,6 +662,107 @@ final class Repository: ObservableObject {
     // `nonisolated` because the pure static decision helpers below take it as a DEFAULT ARGUMENT, and a
     // default value is evaluated in the caller's context — which for a `nonisolated static func` is not
     // the main actor. Without this the constant is main-actor isolated and those defaults do not compile.
+    // MARK: - Pure helpers restored from the fork's own line
+    //
+    // Dropped when the v11.7 merge resolved this file to upstream. All three are `nonisolated`
+    // and pure, which is what lets them be unit-tested with no store and no app.
+
+    /// Rebuild the sleep-only fields for days with a manually corrected session. Historical imports have no
+    /// raw streams, so `IntelligenceEngine` cannot always create a computed daily row after an edit; deriving
+    /// this overlay from the stored, re-clipped stages makes the edited duration immediately authoritative.
+    nonisolated static func applyingEditedSleepSessions(_ sessions: [CachedSleepSession],
+                                                        to days: [DailyMetric]) -> [DailyMetric] {
+        guard sessions.contains(where: \.userEdited) else { return days }
+        let offsetSec = TimeZone.current.secondsFromGMT()
+        let habitualBlocks = sessions.compactMap { session -> SleepStageTotals.HistoryBlock? in
+            let start = session.effectiveStartTs, end = session.endTs
+            guard end > start else { return nil }
+            let midpoint = start + (end - start) / 2
+            return SleepStageTotals.HistoryBlock(
+                start: start,
+                end: end,
+                dayKey: AnalyticsEngine.dayString(midpoint, offsetSec: offsetSec)
+            )
+        }
+        let habitualMidsleepSec = SleepStageTotals.habitualMidsleepSec(habitualBlocks, offsetSec: offsetSec)
+        let sessionsByDay = Dictionary(grouping: sessions) { session in
+            AnalyticsEngine.dayString(session.endTs, offsetSec: offsetSec)
+        }
+
+        return days.map { daily in
+            guard let daySessions = sessionsByDay[daily.day], daySessions.contains(where: \.userEdited) else {
+                return daily
+            }
+            let editedStages = Dictionary(
+                daySessions.filter(\.userEdited).map { ($0.startTs, $0.stagesJSON) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            let onsets = Dictionary(
+                daySessions.map { ($0.startTs, $0.effectiveStartTs) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            guard let aggregate = SleepStageTotals.dailyAggregateHonoringEdits(
+                detected: daySessions.map { (startTs: $0.startTs, stagesJSON: $0.stagesJSON) },
+                edited: editedStages,
+                onsetByStart: onsets,
+                offsetSec: offsetSec,
+                habitualMidsleepSec: habitualMidsleepSec
+            ), aggregate.editApplied else {
+                return daily
+            }
+            return daily.takingEditedSleepFields(from: aggregate.sleep)
+        }
+    }
+
+    /// Fold Mi Band days into the dashboard as the LOWEST-priority source.
+    ///
+    /// The Mi Fitness import has always landed in the same tables under `xiaomi-band`, but `refresh()`
+    /// only ever asked for the strap, its computed sibling, Apple Health and activity files — so a year of
+    /// imported history was visible on the Mi Band screen and nowhere else. It was never a separate store;
+    /// the dashboard was simply one query short.
+    ///
+    /// Precedence is strap-wins, field by field:
+    ///   • a day the strap covers keeps every value it has, and Mi Band fills only the fields it left nil;
+    ///   • a day the strap never saw (anything before the WHOOP) is taken from Mi Band whole.
+    ///
+    /// This is the same shape as `mergeActivityFileSteps`, expressed through `fillingNilFields` rather
+    /// than a hand-written field list, so a field added to `DailyMetric` later cannot be silently dropped.
+    ///
+    /// What this DOESN'T do, and can't: give those days a Recovery or an Effort. Recovery is scored from
+    /// HRV over R-R intervals against a personal baseline, and Effort from a per-second heart-rate series
+    /// through the HRR zones — the Mi Fitness export contains neither (it carries daily avg/min/max HR and
+    /// no beat-to-beat data at all). So Mi Band days fill in sleep, steps, resting HR and SpO2 and stay
+    /// honestly blank on the two scores, rather than being handed a number derived from nothing.
+    nonisolated static func mergeXiaomi(into base: [DailyMetric], _ xiaomi: [DailyMetric]) -> [DailyMetric] {
+        guard !xiaomi.isEmpty else { return base }
+        // Last-wins on a duplicate day rather than `uniqueKeysWithValues`, which TRAPS if `base` ever
+        // carries two rows for one day — same safe convention as the other builders here.
+        var byDay = Dictionary(base.map { ($0.day, $0) }, uniquingKeysWith: { _, last in last })
+        for row in xiaomi {
+            if let existing = byDay[row.day] {
+                byDay[row.day] = existing.fillingNilFields(from: row)   // strap wins; Mi Band fills gaps
+            } else {
+                byDay[row.day] = row                                   // a day the strap never saw
+            }
+        }
+        return byDay.values.sorted { $0.day < $1.day }
+    }
+
+    /// The weight shown across all three Today screens: a real Apple Health reading wins (today's/most-
+    /// recent daily row `> 10 kg` — guards against a stray 0/garbage sample), else the newest point in a
+    /// widened "weight"/apple-health series (weight is logged sparsely; a reading from weeks ago is still
+    /// real data, unlike a fabricated number), else the user's self-reported profile weight. Never nil —
+    /// the profile field always has SOME value — so callers never need their own "—" case for weight.
+    /// `isFromProfile` lets a caller show an honest "from profile" caption on the fallback tier, mirroring
+    /// classic Today's original `weightTile`. Pure/nonisolated: any Today screen can call it synchronously
+    /// once it has already fetched its own inputs, without re-deriving the three-tier fallback itself.
+    nonisolated static func resolveWeightKg(latestAppleWeightKg: Double?, seriesFallbackKg: Double?,
+                                            profileWeightKg: Double) -> (kg: Double, isFromProfile: Bool) {
+        if let kg = latestAppleWeightKg, kg > 10 { return (kg, false) }
+        if let kg = seriesFallbackKg, kg > 10 { return (kg, false) }
+        return (profileWeightKg, true)
+    }
+
     nonisolated static let whoopSource = "my-whoop"
     /// The device id Mi Band imports are banked under, kept beside `whoopSource` so a source comparison
     /// never hard-codes the string.
@@ -3552,6 +3653,41 @@ extension DailyMetric {
             // figures being taken were derived, so leaving `self`'s behind would caption the source's
             // hypnogram with the import's staging — and an import's is always nil. (#1801)
             sleepHrOnly: source.sleepHrOnly
+        )
+    }
+}
+
+extension DailyMetric {
+    /// Applies the stage totals re-derived from a user-edited session while retaining fields that stages
+    /// cannot truthfully recompute, such as disturbances and overnight vitals.
+    ///
+    /// Restored from the fork's own line after the v11.7 merge dropped it, and ADAPTED: this tree's
+    /// `DailyMetric` also carries `avgSdnn`, `skinTempC` and `sleepHrOnly`, none of which a stage
+    /// re-derivation can speak to, so they are carried across from `self` like the other vitals.
+    func takingEditedSleepFields(from source: SleepStageTotals.DailySleep) -> DailyMetric {
+        DailyMetric(
+            day: day,
+            totalSleepMin: source.totalSleepMin,
+            efficiency: source.efficiency,
+            deepMin: source.deepMin,
+            remMin: source.remMin,
+            lightMin: source.lightMin,
+            disturbances: disturbances,
+            restingHr: restingHr,
+            avgHrv: avgHrv,
+            recovery: recovery,
+            strain: strain,
+            exerciseCount: exerciseCount,
+            spo2Pct: spo2Pct,
+            skinTempDevC: skinTempDevC,
+            respRateBpm: respRateBpm,
+            steps: steps,
+            activeKcalEst: activeKcalEst,
+            spo2Red: spo2Red,
+            spo2Ir: spo2Ir,
+            avgSdnn: avgSdnn,
+            skinTempC: skinTempC,
+            sleepHrOnly: sleepHrOnly
         )
     }
 }
