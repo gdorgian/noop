@@ -130,6 +130,11 @@ targets:
       # The stress screen is shared with iOS and prints levels through the widget's parity formatter,
       # so its Foundation-only trace model belongs to the macOS app module as well.
       - StrandiOSShared/StressTrace.swift
+      # The binding text the first-run gate points at ("The full terms are in TERMS.md, shipped
+      # with Noop Aura"). It shipped in the repository and not in either app, which made that
+      # sentence false and left `plumbing/terms` with nothing to render. Read by `TermsDocument`.
+      - path: TERMS.md
+        buildPhase: resources
     # Oura BYO-app OAuth credentials. OuraConfig.xcconfig is a tracked wrapper that optionally
     # includes the untracked, gitignored Strand/Oura/OuraSecrets.xcconfig (template at
     # OuraSecrets.example.xcconfig) — absent secrets leave the $(OURA_*) references in the
@@ -285,6 +290,11 @@ targets:
       # Installed by Tools/bootstrap-nomic.sh before xcodegen. The final app contains the pinned model;
       # there is no runtime download and no model load during ordinary app launch.
       - path: Vendor/Nomic/Resources
+        buildPhase: resources
+      # The binding text the first-run gate points at ("The full terms are in TERMS.md, shipped
+      # with Noop Aura"). It shipped in the repository and not in either app, which made that
+      # sentence false and left `plumbing/terms` with nothing to render. Read by `TermsDocument`.
+      - path: TERMS.md
         buildPhase: resources
     # Same tracked wrapper as the macOS target (Strand/Oura/ is shared, not per-platform).
     configFiles:
