@@ -127,6 +127,7 @@ struct NoopAppShell: View {
         case .svea: NoopAct7Screens(navigation: navigation)
         case .goals: NoopAct8Screens(navigation: navigation, labDraft: labDraft)
         case .instrument: NoopAct9Screens(navigation: navigation, data: .prototype)
+        case .lift: NoopAct10Screens(navigation: navigation)
         }
     }
 
@@ -147,6 +148,9 @@ struct NoopAppShell: View {
         case .goals: NoopHTMLColor.warm
         case .instrument: NoopHTMLColor.night
         case .effort: usesWarmEffortAmbient ? NoopHTMLColor.warm : NoopHTMLColor.blue
+        // PROVISIONAL, and the same value the default would have given. Stated explicitly so the
+        // act's ambient is a named decision design can change rather than an inherited accident.
+        case .lift: NoopHTMLColor.blue
         default: NoopHTMLColor.blue
         }
     }
@@ -347,11 +351,22 @@ struct NoopVerifiedAppShell: View {
         .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects
     ]
 
+    /// Act 10 is canonical from the start. The Lift Log is not a prototype fixture: the session, the
+    /// engine, the persistence and the 1,324-exercise catalogue are all real, local and already
+    /// shipping — so these routes belong on the measured side of the boundary rather than behind
+    /// `--demo-seed`. The screens themselves are placeholders until design lands them; being
+    /// canonical is what makes `--noop-route lift-live` reach one in an ordinary Debug build.
+    private static let canonicalLiftRoutes: Set<NoopRoute> = [
+        .liftLive, .liftLibrary, .liftProgram, .liftDetail,
+        .liftEdit, .liftImport, .liftReview, .liftMuscles
+    ]
+
     private var usesCanonicalCanvas: Bool {
         Self.canonicalLabRoutes.contains(navigation.route)
             || Self.canonicalBreatheRoutes.contains(navigation.route)
             || Self.canonicalDataRoutes.contains(navigation.route)
             || Self.canonicalInstrumentRoutes.contains(navigation.route)
+            || Self.canonicalLiftRoutes.contains(navigation.route)
     }
 
     var body: some View {
@@ -368,6 +383,8 @@ struct NoopVerifiedAppShell: View {
                     NoopDataScreen(navigation: navigation)
                 } else if Self.canonicalInstrumentRoutes.contains(navigation.route) {
                     NoopAct9Screens(navigation: navigation, data: instrumentStore.data)
+                } else if Self.canonicalLiftRoutes.contains(navigation.route) {
+                    NoopAct10Screens(navigation: navigation)
                 } else {
                     NoopVerifiedRouteScreen(
                         route: navigation.route,
@@ -637,6 +654,7 @@ private struct NoopVerifiedRouteScreen: View {
         case .svea: "Svea"
         case .goals: "Goals and labs"
         case .instrument: "The instrument"
+        case .lift: "The lift"
         }
     }
 
@@ -711,6 +729,16 @@ private struct NoopVerifiedRouteScreen: View {
         case .instrumentMetric: "One signal"
         case .instrumentCompare: "Two at once"
         case .instrumentEffects: "What moves you"
+        // Act 10. PROVISIONAL copy: these are placeholders so the routes resolve and can be
+        // launched. Replace each with design's wording as its screen lands.
+        case .liftLive: "Lift session"
+        case .liftLibrary: "Lift Log"
+        case .liftProgram: "Program"
+        case .liftDetail: "Lift detail"
+        case .liftEdit: "Edit session"
+        case .liftImport: "Import a program"
+        case .liftReview: "Review the import"
+        case .liftMuscles: "Muscles"
         }
     }
 }

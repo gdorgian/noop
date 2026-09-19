@@ -11,6 +11,7 @@ enum NoopAct: Int, CaseIterable {
     case svea
     case goals
     case instrument
+    case lift
 }
 
 enum NoopTab: String, CaseIterable, Identifiable {
@@ -104,6 +105,15 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case goal, setGoal = "set", labs, picker, review, marker
     // Act 9
     case instrumentIndex = "index", instrumentMetric = "metric", instrumentCompare = "compare", instrumentEffects = "effects"
+    // Act 10. Every raw value is PREFIXED, because `NoopRoute` is one flat enum across all ten acts
+    // and four of Act 10's names are already spoken for: `live` and `detail` by Act 3, `review` by
+    // Act 8, and `"import"` by Act 5's `importHistory`. Swift would reject the duplicates outright,
+    // and the raw value is load-bearing beyond compilation — it is the view identity the shell
+    // animates on and the `--noop-route` argument design launches with. The prefix also makes that
+    // argument read the way the screen is named: `--noop-route lift-live`.
+    case liftLive = "lift-live", liftLibrary = "lift-library", liftProgram = "lift-program"
+    case liftDetail = "lift-detail", liftEdit = "lift-edit", liftImport = "lift-import"
+    case liftReview = "lift-review", liftMuscles = "lift-muscles"
 
     var id: String { rawValue }
 
@@ -121,6 +131,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .coach, .gate, .setup, .consent, .memory: .svea
         case .goal, .setGoal, .labs, .picker, .review, .marker: .goals
         case .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects: .instrument
+        case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
+             .liftReview, .liftMuscles: .lift
         }
     }
 
@@ -143,6 +155,11 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .imported, .rejected, .backup,
              .goal, .setGoal, .labs, .picker, .review, .marker:
             .you
+        // Act 10 is deliberately not a sixth tab. A lift is an effort, so it lights the same key
+        // Act 3 does.
+        case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
+             .liftReview, .liftMuscles:
+            .today
         }
     }
 
@@ -834,6 +851,10 @@ final class NoopNavigation: ObservableObject {
             enterLabPicker()
         case .instrument:
             reset(to: .history)
+        case .lift:
+            // PROVISIONAL. Mirrors Act 3, whose + enters `pick` to choose a session. Design has not
+            // yet said what Act 10's + does; change this when it has.
+            push(.liftLibrary)
         }
     }
 
