@@ -58,7 +58,7 @@ struct NoopAct5Screens: View {
         "Units": "Metric", "Temperature": "°C", "Effort": "0–100", "Appearance": "Dark",
         "Chart colours": "Titanium", "Sleep chart": "Hypnogram", "Card surface": "Frosted",
         "App icon": "Titanium", "Power saving at": "20%", "Double tap": "Sleep mark",
-        "Language": "English", "Svea’s voice": "Plain"
+        "Language": "English", "Svea’s manner": "Plain"
     ]
     @State private var baselinesRestarting = false
     @State private var settingsSearch = ""
@@ -250,12 +250,12 @@ private extension NoopAct5Screens {
             HStack(spacing: 4) {
                 ForEach(choices, id: \.self) { choice in
                     let disabled = disabledChoices.contains(choice)
-                    let selected = !disabled && (title == "Svea’s voice"
+                    let selected = !disabled && (title == "Svea’s manner"
                         ? navigation.coachVoice.rawValue == choice
                         : preferences[title] == choice)
                     Button {
                         guard !disabled else { return }
-                        if title == "Svea’s voice", let voice = NoopCoachVoice(rawValue: choice) {
+                        if title == "Svea’s manner", let voice = NoopCoachVoice(rawValue: choice) {
                             navigation.coachVoice = voice
                             preferences[title] = choice
                             if voice == .off {
@@ -2194,7 +2194,7 @@ private extension NoopAct5Screens {
                     Divider().overlay(NoopHTMLColor.border)
                     copyRow("Memory", detail: "what she keeps between conversations", symbol: "sparkles", tint: Self.blush) { navigation.push(.memory) }
                     Divider().overlay(NoopHTMLColor.border)
-                    segmentRow("Svea’s voice", detail: "plain writes a paragraph, quiet writes a line", choices: ["Plain", "Quiet", "Direct", "Off"])
+                    segmentRow("Svea’s manner", detail: "plain writes a paragraph, quiet writes a line", choices: ["Plain", "Quiet", "Direct", "Off"])
                 }
 
                 settingsGroup("Backup and data") {

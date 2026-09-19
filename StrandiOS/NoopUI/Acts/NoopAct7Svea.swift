@@ -340,7 +340,7 @@ private struct NoopSveaCoach: View {
             ]
         case .off:
             return [
-                "No brief this morning. You have Svea set to Off, so nothing was fetched and no request left the phone — ask below and she answers."
+                "No brief this morning. Svea’s manner is set to Off, so nothing was fetched and no request left the phone — ask below and she answers."
             ]
         }
     }
@@ -726,7 +726,7 @@ private struct NoopSveaSetup: View {
                     NoopSveaRouteTitle("Provider and key")
                     providerCard
                     modelCard
-                    voiceCard
+                    mannerCard
                     consentLink
                 }
                 .padding(.horizontal, 20)
@@ -831,22 +831,22 @@ private struct NoopSveaSetup: View {
         }
     }
 
-    private var voiceCard: some View {
+    private var mannerCard: some View {
         NoopSveaPlainCard(radius: 24, horizontalPadding: 16, topPadding: 16, bottomPadding: 16) {
             VStack(alignment: .leading, spacing: 14) {
                 NoopSveaEyebrow("How it talks")
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Voice")
+                    Text("Manner")
                         .font(NoopHTMLFont.sans(12.5))
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                     HStack(spacing: 6) {
                         ForEach(NoopCoachVoice.allCases) { voice in
                             NoopSveaChip(voice.rawValue, selected: navigation.coachVoice == voice) {
-                                selectVoice(voice)
+                                selectManner(voice)
                             }
                         }
                     }
-                    Text(voiceNote)
+                    Text(mannerNote)
                         .font(NoopHTMLFont.sans(11.5))
                         .foregroundStyle(Color(hex: 0x7F8A85))
                         .noopSveaLineBox(fontSize: 11.5, ratio: 1.55)
@@ -978,7 +978,7 @@ private struct NoopSveaSetup: View {
         keyEndingVisible = false
     }
 
-    private func selectVoice(_ voice: NoopCoachVoice) {
+    private func selectManner(_ voice: NoopCoachVoice) {
         navigation.coachVoice = voice
         if voice == .off {
             proactive = "Never"
@@ -1017,12 +1017,12 @@ private struct NoopSveaSetup: View {
         ]
     }
 
-    private var voiceNote: String {
+    private var mannerNote: String {
         switch navigation.coachVoice {
         case .plain: return "Three short paragraphs, in sentences. The default, and the only one that explains itself."
         case .quiet: return "One line, no reasoning. For people who want the read and not the read-out."
         case .direct: return "Two lines, imperative. Says what to do and stops — it will not soften a call you may disagree with."
-        case .off: return "No briefs and no generated coaching. The rest of Noop remains available."
+        case .off: return "No brief, and nothing scheduled in the background — nothing leaves the phone unless you ask. Ask her anything and she still answers."
         }
     }
 }
