@@ -66749,49 +66749,49 @@
         }
       }
     },
-    "Every metric is an unvalidated approximation. Don't use NOOP to diagnose, treat, or make any health decision. Always consult a qualified professional.": {
+    "Every metric is an unvalidated approximation. Don't use Noop Aura to diagnose, treat, or make any health decision. Always consult a qualified professional.": {
       "extractionState": "manual",
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jede Metrik ist eine nicht validierte Näherung. Nutze NOOP nicht, um zu diagnostizieren, zu behandeln oder Gesundheitsentscheidungen zu treffen. Ziehe immer qualifiziertes Fachpersonal hinzu."
+            "value": "Jede Metrik ist eine nicht validierte Näherung. Nutze Noop Aura nicht, um zu diagnostizieren, zu behandeln oder Gesundheitsentscheidungen zu treffen. Ziehe immer qualifiziertes Fachpersonal hinzu."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cada métrica es una aproximación no validada. No use NOOP para diagnosticar, tratar o tomar cualquier decisión de salud. Siempre consulte a un profesional calificado."
+            "value": "Cada métrica es una aproximación no validada. No use Noop Aura para diagnosticar, tratar o tomar cualquier decisión de salud. Siempre consulte a un profesional calificado."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chaque métrique est une approximation non validée. N'utilisez pas NOOP pour diagnostiquer, traiter ou prendre une décision de santé. Consultez toujours un professionnel qualifié."
+            "value": "Chaque métrique est une approximation non validée. N'utilisez pas Noop Aura pour diagnostiquer, traiter ou prendre une décision de santé. Consultez toujours un professionnel qualifié."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Каждая метрика — непроверенное приближение. Не используйте NOOP для диагностики, лечения или принятия решений о здоровье. Всегда консультируйтесь с квалифицированным специалистом."
+            "value": "Каждая метрика — непроверенное приближение. Не используйте Noop Aura для диагностики, лечения или принятия решений о здоровье. Всегда консультируйтесь с квалифицированным специалистом."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有指标均为未经临床验证的估算值。请勿使用 NOOP 进行诊断、治疗或做出任何医疗与健康决策。如遇身体不适，请务必咨询具有资质的专业医生。"
+            "value": "所有指标均为未经临床验证的估算值。请勿使用 Noop Aura 进行诊断、治疗或做出任何医疗与健康决策。如遇身体不适，请务必咨询具有资质的专业医生。"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cada métrica é uma aproximação não validada. Não uses o NOOP para diagnosticar, tratar ou tomar qualquer decisão de saúde. Consulta sempre um profissional qualificado."
+            "value": "Cada métrica é uma aproximação não validada. Não uses o Noop Aura para diagnosticar, tratar ou tomar qualquer decisão de saúde. Consulta sempre um profissional qualificado."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Każda metryka jest niepotwierdzonym przybliżeniem. Nie używaj NOOP do diagnozowania, leczenia lub podejmowania jakichkolwiek decyzji zdrowotnych. Zawsze skonsultuj się z wykwalifikowanym specjalistą."
+            "value": "Każda metryka jest niepotwierdzonym przybliżeniem. Nie używaj Noop Aura do diagnozowania, leczenia lub podejmowania jakichkolwiek decyzji zdrowotnych. Zawsze skonsultuj się z wykwalifikowanym specjalistą."
           }
         }
       }
@@ -102719,49 +102719,49 @@
         }
       }
     },
-    "NOOP is an unofficial project: not affiliated with, endorsed by, or sponsored by WHOOP, Inc. \"WHOOP\" is their trademark, used only to name the hardware NOOP works with.": {
+    "Noop Aura is an unofficial project: not affiliated with, endorsed by, or sponsored by WHOOP, Inc. \"WHOOP\" is their trademark, used only to name the hardware Noop Aura works with.": {
       "extractionState": "manual",
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP ist ein inoffizielles Projekt: nicht mit WHOOP, Inc. verbunden, nicht von ihr unterstützt oder gesponsert. „WHOOP“ ist deren Marke und wird nur verwendet, um die Hardware zu benennen, mit der NOOP arbeitet."
+            "value": "Noop Aura ist ein inoffizielles Projekt: nicht mit WHOOP, Inc. verbunden, nicht von ihr unterstützt oder gesponsert. „WHOOP“ ist deren Marke und wird nur verwendet, um die Hardware zu benennen, mit der Noop Aura arbeitet."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP es un proyecto no oficial: no afiliado, respaldado por, o patrocinado por WHOOP, Inc. \"WHOOP\" es su marca, utilizado sólo para nombrar el hardware con el que trabaja NOOP."
+            "value": "Noop Aura es un proyecto no oficial: no afiliado, respaldado por, o patrocinado por WHOOP, Inc. \"WHOOP\" es su marca, utilizado sólo para nombrar el hardware con el que trabaja Noop Aura."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP est un projet non officiel : il n'est ni affilié à, ni approuvé par, ni sponsorisé par WHOOP, Inc. « WHOOP » est leur marque déposée, utilisée uniquement pour désigner le matériel avec lequel NOOP fonctionne."
+            "value": "Noop Aura est un projet non officiel : il n'est ni affilié à, ni approuvé par, ni sponsorisé par WHOOP, Inc. « WHOOP » est leur marque déposée, utilisée uniquement pour désigner le matériel avec lequel Noop Aura fonctionne."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP — неофициальный проект: не связан с WHOOP, Inc., не одобрен и не спонсируется ею. «WHOOP» — их товарный знак, используемый здесь только для обозначения оборудования, с которым работает NOOP."
+            "value": "Noop Aura — неофициальный проект: не связан с WHOOP, Inc., не одобрен и не спонсируется ею. «WHOOP» — их товарный знак, используемый здесь только для обозначения оборудования, с которым работает Noop Aura."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP 是一个非官方的独立开源项目：未隶属、未获授权也未由 WHOOP, Inc. 赞助。“WHOOP”仅为其商标，在此仅用于说明 NOOP 所适配的硬件设备。"
+            "value": "Noop Aura 是一个非官方的独立开源项目：未隶属、未获授权也未由 WHOOP, Inc. 赞助。“WHOOP”仅为其商标，在此仅用于说明 Noop Aura 所适配的硬件设备。"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP é um projeto não oficial: não afiliado, endossado ou patrocinado pela WHOOP, Inc. \"WHOOP\" é a tua marca comercial, utilizada apenas para nomear o hardware com o qual a NOOP trabalha."
+            "value": "Noop Aura é um projeto não oficial: não afiliado, endossado ou patrocinado pela WHOOP, Inc. \"WHOOP\" é a tua marca comercial, utilizada apenas para nomear o hardware com o qual a Noop Aura trabalha."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP to nieoficjalny projekt: nie powiązany, nie wspierany ani sponsorowany przez WHOOP, Inc. „WHOOP” jest ich znakiem towarowym, używanym jedynie do określenia sprzętu, z którym współpracuje NOOP."
+            "value": "Noop Aura to nieoficjalny projekt: nie powiązany, nie wspierany ani sponsorowany przez WHOOP, Inc. „WHOOP” jest ich znakiem towarowym, używanym jedynie do określenia sprzętu, z którym współpracuje Noop Aura."
           }
         }
       }
@@ -102830,49 +102830,49 @@
         }
       }
     },
-    "NOOP is free and provided \"as is\", with no warranty. Liability is limited to the maximum extent the law that applies to you allows, and nothing here removes protections your local law won't let us remove.": {
+    "Noop Aura is free and provided \"as is\", with no warranty. Liability is limited to the maximum extent the law that applies to you allows, and nothing here removes protections your local law won't let us remove.": {
       "extractionState": "manual",
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP ist kostenlos und wird „wie besehen“ bereitgestellt, ohne Gewährleistung. Die Haftung ist im maximal zulässigen Umfang des für dich geltenden Rechts begrenzt, und nichts hier nimmt dir Schutz, den dein lokales Recht uns nicht zu nehmen erlaubt."
+            "value": "Noop Aura ist kostenlos und wird „wie besehen“ bereitgestellt, ohne Gewährleistung. Die Haftung ist im maximal zulässigen Umfang des für dich geltenden Rechts begrenzt, und nichts hier nimmt dir Schutz, den dein lokales Recht uns nicht zu nehmen erlaubt."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP es libre y proporcionado \"como es\", sin garantía. La responsabilidad se limita al máximo de la ley que se aplica a usted permite, y nada aquí elimina las protecciones que su ley local no nos permite eliminar."
+            "value": "Noop Aura es libre y proporcionado \"como es\", sin garantía. La responsabilidad se limita al máximo de la ley que se aplica a usted permite, y nada aquí elimina las protecciones que su ley local no nos permite eliminar."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP est gratuit et fourni « en l'état », sans garantie. La responsabilité est limitée dans toute la mesure permise par la loi qui vous est applicable, et rien ici ne supprime les protections que votre législation locale ne nous permet pas de supprimer."
+            "value": "Noop Aura est gratuit et fourni « en l'état », sans garantie. La responsabilité est limitée dans toute la mesure permise par la loi qui vous est applicable, et rien ici ne supprime les protections que votre législation locale ne nous permet pas de supprimer."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP предоставляется бесплатно и «как есть», без каких-либо гарантий. Ответственность ограничена в максимальной степени, допустимой применимым к вам законодательством, и ничто здесь не отменяет защиту, которую местное законодательство не позволяет отменить."
+            "value": "Noop Aura предоставляется бесплатно и «как есть», без каких-либо гарантий. Ответственность ограничена в максимальной степени, допустимой применимым к вам законодательством, и ничто здесь не отменяет защиту, которую местное законодательство не позволяет отменить."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP 是免费且“按原样”提供的，不提供任何形式的保修。我们的责任在适用法律允许的最大范围内受到限制，但这并不排除您当地法律赋予您的不可剥夺的权利。"
+            "value": "Noop Aura 是免费且“按原样”提供的，不提供任何形式的保修。我们的责任在适用法律允许的最大范围内受到限制，但这并不排除您当地法律赋予您的不可剥夺的权利。"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O NOOP é gratuito e fornecido \"tal como está\", sem garantia. A responsabilidade é limitada até ao limite máximo permitido pela lei que se lhe aplica, e nada aqui remove as proteções que a tua lei local não nos permite remover."
+            "value": "O Noop Aura é gratuito e fornecido \"tal como está\", sem garantia. A responsabilidade é limitada até ao limite máximo permitido pela lei que se lhe aplica, e nada aqui remove as proteções que a tua lei local não nos permite remover."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP jest darmowy i dostarczany w stanie takim, jakim jest, bez gwarancji. Odpowiedzialność jest ograniczona w maksymalnym zakresie, na jaki pozwala obowiązujące Cię prawo, i nic tutaj nie usuwa zabezpieczeń, których Twoje lokalne prawo nie pozwoli nam usunąć."
+            "value": "Noop Aura jest darmowy i dostarczany w stanie takim, jakim jest, bez gwarancji. Odpowiedzialność jest ograniczona w maksymalnym zakresie, na jaki pozwala obowiązujące Cię prawo, i nic tutaj nie usuwa zabezpieczeń, których Twoje lokalne prawo nie pozwoli nam usunąć."
           }
         }
       }
@@ -104187,49 +104187,49 @@
         }
       }
     },
-    "NOOP talks to your strap's firmware over an unofficial, independently-mapped protocol. There is a residual risk to the device, its data, and its connection to official services. You assume that risk.": {
+    "Noop Aura talks to your strap's firmware over an unofficial, independently-mapped protocol. There is a residual risk to the device, its data, and its connection to official services. You assume that risk.": {
       "extractionState": "manual",
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP spricht mit der Firmware deines Straps über ein inoffizielles, unabhängig rekonstruiertes Protokoll. Es bleibt ein Restrisiko für das Gerät, seine Daten und seine Verbindung zu offiziellen Diensten. Dieses Risiko übernimmst du."
+            "value": "Noop Aura spricht mit der Firmware deines Straps über ein inoffizielles, unabhängig rekonstruiertes Protokoll. Es bleibt ein Restrisiko für das Gerät, seine Daten und seine Verbindung zu offiziellen Diensten. Dieses Risiko übernimmst du."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP habla con el firmware de su correa sobre un protocolo no oficial, de forma independiente. Existe un riesgo residual para el dispositivo, sus datos y su conexión con los servicios oficiales. Asumes ese riesgo."
+            "value": "Noop Aura habla con el firmware de su correa sobre un protocolo no oficial, de forma independiente. Existe un riesgo residual para el dispositivo, sus datos y su conexión con los servicios oficiales. Asumes ese riesgo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP communique avec le micrologiciel de votre bracelet via un protocole non officiel, cartographié de manière indépendante. Il subsiste un risque résiduel pour l'appareil, ses données et sa connexion aux services officiels. Vous assumez ce risque."
+            "value": "Noop Aura communique avec le micrologiciel de votre bracelet via un protocole non officiel, cartographié de manière indépendante. Il subsiste un risque résiduel pour l'appareil, ses données et sa connexion aux services officiels. Vous assumez ce risque."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP взаимодействует с прошивкой вашего браслета по неофициальному, самостоятельно изученному протоколу. Остаётся некоторый риск для устройства, его данных и связи с официальными сервисами. Вы принимаете этот риск на себя."
+            "value": "Noop Aura взаимодействует с прошивкой вашего браслета по неофициальному, самостоятельно изученному протоколу. Остаётся некоторый риск для устройства, его данных и связи с официальными сервисами. Вы принимаете этот риск на себя."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP 通过非官方的独立逆向协议与您的手环固件进行通信。这可能对设备本身、内部数据以及其与官方服务的连接产生潜在风险。您必须自行承担该风险。"
+            "value": "Noop Aura 通过非官方的独立逆向协议与您的手环固件进行通信。这可能对设备本身、内部数据以及其与官方服务的连接产生潜在风险。您必须自行承担该风险。"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O NOOP comunica com o firmware da tua bracelete através de um protocolo não oficial, mapeado de forma independente. Existe um risco residual para o dispositivo, os teus dados e a ligação aos serviços oficiais. Assumes esse risco."
+            "value": "O Noop Aura comunica com o firmware da tua bracelete através de um protocolo não oficial, mapeado de forma independente. Existe um risco residual para o dispositivo, os teus dados e a ligação aos serviços oficiais. Assumes esse risco."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "NOOP komunikuje się z oprogramowaniem Twojego paska za pośrednictwem nieoficjalnego, niezależnie mapowanego protokołu. Istnieje ryzyko resztkowe dla urządzenia, jego danych i połączenia z oficjalnymi usługami. Zakładasz to ryzyko."
+            "value": "Noop Aura komunikuje się z oprogramowaniem Twojego paska za pośrednictwem nieoficjalnego, niezależnie mapowanego protokołu. Istnieje ryzyko resztkowe dla urządzenia, jego danych i połączenia z oficjalnymi usługami. Zakładasz to ryzyko."
           }
         }
       }
@@ -170069,49 +170069,49 @@
         }
       }
     },
-    "Using NOOP may breach WHOOP's Terms of Service": {
+    "Using Noop Aura may breach WHOOP's Terms of Service": {
       "extractionState": "manual",
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die Nutzung von NOOP kann gegen WHOOPs Nutzungsbedingungen verstoßen"
+            "value": "Die Nutzung von Noop Aura kann gegen WHOOPs Nutzungsbedingungen verstoßen"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Utilizar NOOP puede violar los Términos de servicio de WHOOP"
+            "value": "Utilizar Noop Aura puede violar los Términos de servicio de WHOOP"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Utiliser NOOP peut enfreindre les conditions d'utilisation de WHOOP"
+            "value": "Utiliser Noop Aura peut enfreindre les conditions d'utilisation de WHOOP"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Использование NOOP может нарушать условия использования WHOOP"
+            "value": "Использование Noop Aura может нарушать условия использования WHOOP"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用 NOOP 可能违反 WHOOP 的服务条款"
+            "value": "使用 Noop Aura 可能违反 WHOOP 的服务条款"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "A utilização do NOOP pode violar os Termos de Serviço do WHOOP"
+            "value": "A utilização do Noop Aura pode violar os Termos de Serviço do WHOOP"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Korzystanie z NOOP może naruszyć Warunki świadczenia usług WHOOP"
+            "value": "Korzystanie z Noop Aura może naruszyć Warunki świadczenia usług WHOOP"
           }
         }
       }

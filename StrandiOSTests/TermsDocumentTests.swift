@@ -57,7 +57,7 @@ final class TermsDocumentTests: XCTestCase {
 
     func testParseSplitsHeadingsNumbersPreambleAndClosing() {
         let document = TermsDocument.parse("""
-        # NOOP — Terms
+        # Noop Aura — Terms
 
         **Version 9.9**
 
@@ -80,7 +80,7 @@ final class TermsDocumentTests: XCTestCase {
         *A closing note.*
         """)
 
-        XCTAssertEqual(document.title, "NOOP — Terms")
+        XCTAssertEqual(document.title, "Noop Aura — Terms")
         XCTAssertEqual(document.version, "9.9")
         XCTAssertTrue(document.preamble.contains("Not legal advice."))
         XCTAssertTrue(document.preamble.contains("Accept before continuing."))
