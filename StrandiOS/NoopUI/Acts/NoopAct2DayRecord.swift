@@ -297,6 +297,7 @@ struct NoopEnergyReading: Equatable {
         case .appleSplit, .strapWornTime, .mixed:
             guard let total = s.totalBurnedSoFar, total > 0 else { return nil }
             let basal = s.basalBurnedSoFar ?? 0, active = s.activeBurnedSoFar ?? 0
+            let hasSplit = s.basalBurnedSoFar != nil && s.activeBurnedSoFar != nil && basal + active > 0
             let measuredH = (s.coverage.overall ?? 1) * elapsedH
             let missed = Int((elapsedH - measuredH).rounded())
             let seen = hoursWord(measuredH), all = hoursWord(elapsedH)
@@ -334,8 +335,10 @@ struct NoopEnergyReading: Equatable {
                          heroNote: partial
                             ? "spent in the \(seen) hours it saw \u{2014} the gap is not in this figure"
                             : "spent in the hours it measured, basal and active together",
-                         segments: split(basal, active, soft: false),
-                         legend: [("basal \(grouped(tens(basal)))", .basal), ("active \(grouped(tens(active)))", .active)],
+                         // The strap writes one whole-day total with no basal/active split; an unknown
+                         // split is left out rather than drawn as two zeros.
+                         segments: hasSplit ? split(basal, active, soft: false) : [],
+                         legend: hasSplit ? [("basal \(grouped(tens(basal)))", .basal), ("active \(grouped(tens(active)))", .active)] : [],
                          projection: projection ?? "",
                          projectionIsLive: projection != nil,
                          coverage: coverage,

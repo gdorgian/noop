@@ -21,7 +21,7 @@ settings:
     # iOS build number (CFBundleVersion). GLOBAL so the iOS app AND its widget extension inherit the
     # SAME value — they must match or iOS warns "extension version must match parent app" (#416).
     # macOS sets its own CFBundleVersion on the Strand target and is unaffected by this.
-    CURRENT_PROJECT_VERSION: "394"
+    CURRENT_PROJECT_VERSION: "1104"
     # Overridden by the release/local xcodebuild command with the exact git revision. Keeping an explicit
     # fallback makes an ad-hoc Xcode build say "unknown" rather than leaking an unresolved $(...) token.
     NOOP_COMMIT_SHA: "unknown"

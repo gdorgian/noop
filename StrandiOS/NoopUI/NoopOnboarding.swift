@@ -51,6 +51,9 @@ struct NoopOnboardingView: View {
                 .offset(y: -235)
             Spacer()
         }
+        // Wider than the phone: let it draw past the edges without widening the onboarding stack,
+        // which laid the terms gate above it out at 470 pt and pushed it off both edges.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
         .allowsHitTesting(false)
     }

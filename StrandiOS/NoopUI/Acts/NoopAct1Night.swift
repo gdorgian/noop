@@ -444,6 +444,15 @@ struct NoopAct1Screens: View {
         let drinkSummary = drinks == 0 ? "no drinks" : "\(drinks == 3 ? "3+" : String(drinks)) \(drinks == 1 ? "drink" : "drinks")"
         let count = navigation.nightJournalNotes.count
         let noteSummary = count == 0 ? "" : ", \(count) \(count == 1 ? "note" : "notes")"
+        guard NoopContentPolicy.allowsPrototypeContent else {
+            // Release: the saved time and only the parts the wearer chose (-1 = not chosen).
+            var parts: [String] = []
+            if navigation.nightJournalMood >= 0 { parts.append("\(mood) day") }
+            if drinks >= 0 { parts.append(drinkSummary) }
+            if count > 0 { parts.append("\(count) \(count == 1 ? "note" : "notes")") }
+            let time = navigation.nightJournalSavedAt.map { " " + AppClock.hourMinuteFormatter().string(from: $0) } ?? ""
+            return "Logged\(time)" + (parts.isEmpty ? "" : " — " + parts.joined(separator: ", "))
+        }
         return "Logged \(isNightWorker ? "06:50" : "22:41") — \(mood) day, \(drinkSummary)\(noteSummary)"
     }
 

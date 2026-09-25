@@ -305,6 +305,7 @@ struct NoopAct2Screens: View {
 
     private var sessionCardTitle: String {
         if let finished = navigation.finishedSessionToday { return finished.workout.act3.name }
+        if day != nil { return "Choose a session" }
         return restDay ? "Rest" : navigation.selectedWorkout.act3.name
     }
 
@@ -317,8 +318,12 @@ struct NoopAct2Screens: View {
             return "\(finished.minutes) min · \(chargeCost) of today’s charge, and \(sleepNeedMinutes) minutes on tonight’s need."
         }
         if let finished = navigation.finishedSessionToday {
-            return "\(finished.minutes) min · saved from this session’s measured record."
+            let duration = finished.durationSeconds <= 0
+                ? "Duration unavailable"
+                : finished.durationSeconds < 30 ? "Under 1 min" : "\(finished.minutes) min"
+            return "\(duration) · saved from this session’s measured record."
         }
+        if day != nil { return "Your recorded workout appears here after it ends." }
         return restDay
             ? "Nothing today. Tomorrow is the earliest this pays off."
             : navigation.selectedWorkout.act3.note
@@ -438,6 +443,10 @@ struct NoopAct2Screens: View {
                             Text(isNightWorker ? "Deep came early, before the heat. Nothing to fix." : "Deep came early. Nothing to fix.")
                                 .font(NoopHTMLFont.sans(11.5))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
+                            } else if let note = todayLastSleepNote {
+                                Text(note)
+                                    .font(NoopHTMLFont.sans(11.5))
+                                    .foregroundStyle(Color(hex: 0x7F8A85))
                             }
                         }
                         Spacer()
@@ -449,24 +458,20 @@ struct NoopAct2Screens: View {
                     .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.night.opacity(0.2), lineWidth: 0.5))
                     }
 
-                    if day == nil || day?.briefWrittenAt != nil {
                     Button { navigation.push(.coach) } label: {
                         HStack(spacing: 13) {
                             Act2SveaOrb()
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Svea has read your morning")
+                                Text(day == nil || day?.briefWrittenAt != nil
+                                     ? "Svea has read your morning" : "Ask Svea")
                                     .font(NoopHTMLFont.sans(14.5, weight: .semibold))
-                                // The receipt counts signals and proposals the brief does not record;
-                                // production keeps the card, which only appears once a brief exists.
-                                if day == nil {
-                                Text("Written at 07:12 from five measured signals — with one proposal you can turn down")
+                                Text(todaySveaSubtitle)
                                     .font(NoopHTMLFont.sans(12))
                                     .foregroundStyle(Color(hex: 0xB7C3C9))
                                     // CSS 12px / 1.5 = two 18pt line boxes.
                                     .lineSpacing(3.36)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .frame(height: 36, alignment: .leading)
-                                }
                             }
                             Spacer(minLength: 4)
                             Act2CSSChevron(size: 8, color: Color(hex: 0xA9B4E0))
@@ -483,14 +488,13 @@ struct NoopAct2Screens: View {
                         .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.night.opacity(0.3), lineWidth: 0.5))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
-                    }
 
                     Button { navigation.push(.day) } label: {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(alignment: .firstTextBaseline) {
                                 NoopSectionLabel("The day so far")
                                 Spacer()
-                                Text(todaySpan ?? dayContext.span)
+                                Text(todaySpan ?? (day == nil ? dayContext.span : "\u{2014}"))
                                     .font(NoopHTMLFont.sans(11))
                                     .foregroundStyle(NoopHTMLColor.faint)
                                     .monospacedDigit()
@@ -507,6 +511,15 @@ struct NoopAct2Screens: View {
                                 .lineSpacing(3.5)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.vertical, 1.75)
+                            } else {
+                                Text(todayHeartValues == nil
+                                     ? "No heart-rate samples were recorded for this span."
+                                     : "The line uses recorded five-minute heart-rate averages.")
+                                    .font(NoopHTMLFont.sans(12.5))
+                                    .foregroundStyle(NoopHTMLColor.copy)
+                                    .lineSpacing(3.5)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.vertical, 1.75)
                             }
                         }
                         .padding(.horizontal, 16)
@@ -529,7 +542,6 @@ struct NoopAct2Screens: View {
                                 NoopSectionLabel("Today's session", color: Color(hex: 0xC8934B))
                                 // Three states, one card. Title and line crossfade; the card, its
                                 // tint, its eyebrow and its chevron never move, and it is never absent.
-                                if day == nil || navigation.finishedSessionToday != nil {
                                 Text(sessionCardTitle)
                                     .font(NoopHTMLFont.sans(14.5, weight: .semibold))
                                     .foregroundStyle(NoopHTMLColor.ink)
@@ -539,7 +551,6 @@ struct NoopAct2Screens: View {
                                     .lineSpacing(3.36)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .multilineTextAlignment(.leading)
-                                }
                             }
                             .id(sessionCardTitle + sessionCardLine)
                             .transition(.opacity)
@@ -622,7 +633,9 @@ struct NoopAct2Screens: View {
     /// "Hi, {name}" by day, "Evening, {name}" for a night worker — the HTML's two greetings.
     private var todayGreeting: String? {
         guard day != nil else { return dayContext.eyebrow }
-        guard let name = displayName else { return nil }
+        guard let name = displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            return isNightWorker ? "Evening" : "Hi"
+        }
         return isNightWorker ? "Evening, \(name)" : "Hi, \(name)"
     }
 
@@ -639,6 +652,26 @@ struct NoopAct2Screens: View {
             ? "\(NoopRestRecord.duration(diff)) over your need"
             : "\(NoopRestRecord.duration(-diff)) short of your need"
         return "\(lead) \u{00B7} \(NoopRestRecord.duration(night.asleepMin)), \(delta)"
+    }
+
+    /// Imported stage totals can fill the design's second sleep line without claiming a cause or
+    /// timing that a totals-only WHOOP backup cannot establish.
+    private var todayLastSleepNote: String? {
+        guard let stages = day?.rest.latest?.stages else { return nil }
+        let parts = [("Deep", stages.deep), ("REM", stages.rem)]
+            .filter { $0.1 > 0 }
+            .map { "\($0.0) \(NoopRestRecord.duration($0.1))" }
+        return parts.isEmpty ? nil : parts.joined(separator: " \u{00B7} ")
+    }
+
+    private var todaySveaSubtitle: String {
+        guard let day else {
+            return "Written at 07:12 from five measured signals — with one proposal you can turn down"
+        }
+        guard let written = day.briefWrittenAt else {
+            return "Open the conversation and ask about your record."
+        }
+        return "Written at \(AppClock.hourMinuteFormatter().string(from: written))"
     }
 
     /// "06:41 → 14:20": from waking (or midnight) to now.
@@ -1485,7 +1518,7 @@ struct NoopAct2Screens: View {
                     if todayHeartValues != nil {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                NoopSectionLabel("Today · \(todaySpan ?? dayContext.span)")
+                                NoopSectionLabel(day == nil ? "Today · \(dayContext.span)" : todaySpan.map { "Today · \($0)" } ?? "Today")
                                 Spacer()
                                 Text(heartRangeText ?? "")
                                     .font(NoopHTMLFont.sans(11))
@@ -1843,7 +1876,7 @@ struct NoopAct2Screens: View {
                             Act2ScrubbableDayChart(values: values, selected: $selectedHeartPoint, resting: todayRestingLine)
                                 .frame(height: 150)
                             HStack {
-                                let axis = dayAxis ?? dayContext.axis
+                                let axis = dayAxis ?? (day == nil ? dayContext.axis : ["", "", "", ""])
                                 Text(axis[0]); Spacer()
                                 Text(axis[1]); Spacer()
                                 Text(axis[2]); Spacer()
@@ -2123,7 +2156,7 @@ struct NoopAct2Screens: View {
                             }
                             .frame(height: 76, alignment: .bottom)
                             HStack {
-                                let axis = stressAxis ?? dayContext.axis
+                                let axis = stressAxis ?? (day == nil ? dayContext.axis : ["", "", "", ""])
                                 Text(axis[0]); Spacer()
                                 Text(axis[1]); Spacer()
                                 Text(axis[2]); Spacer()
@@ -2620,6 +2653,7 @@ private struct NoopTodayEnergyCard: View {
                     }
                 }
                 if let reading {
+                    if !reading.segments.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         GeometryReader { proxy in
                             HStack(spacing: 2) {
@@ -2639,6 +2673,7 @@ private struct NoopTodayEnergyCard: View {
                                 }
                             }
                         }
+                    }
                     }
                     if !reading.projection.isEmpty {
                         Text(reading.projection)
@@ -3140,10 +3175,10 @@ private struct Act2BreathingOrb: View {
 
     private func orb(_ frame: Act2OrbFrame) -> some View {
         ZStack {
-            if !measured {
-            Act2ChargeTicks(frame: frame)
+            // Keep the HTML's 306 pt surround in the measured state. An unscored surround has no
+            // active ticks or pointer: those would falsely imply an intraday Charge reading.
+            Act2ChargeTicks(frame: frame, scored: !measured)
                 .frame(width: 306, height: 306)
-            }
 
             Circle()
                 .fill(
@@ -3277,6 +3312,7 @@ private struct Act2BreathingOrb: View {
 
 private struct Act2ChargeTicks: View {
     let frame: Act2OrbFrame
+    let scored: Bool
 
     var body: some View {
         Canvas { context, size in
@@ -3304,10 +3340,12 @@ private struct Act2ChargeTicks: View {
                     y: tickCenter.y + outward.dy * length / 2
                 ))
 
-                let on = index <= frame.activeTick
-                let ghost = !on && index <= frame.wakeTick
+                let on = scored && index <= frame.activeTick
+                let ghost = scored && !on && index <= frame.wakeTick
                 let color: Color
-                if on {
+                if !scored {
+                    color = Color(hex: 0x7F8A85).opacity(0.38)
+                } else if on {
                     let opacity = 0.32 + 0.68 * Double(index) / Double(max(1, frame.activeTick))
                     color = frame.tickColor.opacity(opacity)
                 } else if ghost {
@@ -3322,6 +3360,7 @@ private struct Act2ChargeTicks: View {
                 )
             }
 
+            guard scored else { return }
             let markerRadians = (-125 + frame.fraction * 250) * .pi / 180
             let outward = CGVector(dx: sin(markerRadians), dy: -cos(markerRadians))
             let tangent = CGVector(dx: cos(markerRadians), dy: sin(markerRadians))

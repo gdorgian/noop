@@ -246,10 +246,10 @@ struct StrandiOSApp: App {
                     Task { try? await health.writeWeight(kg: kg) }
                 }
                 .noopAccent(accentRaw, customHex: accentCustomHex)
-                // Dynamic Type now scales the prose/label roles (StrandFont). Cap the upper end so the
-                // fixed-geometry tiles/gauges stay legible at the largest accessibility sizes rather than
-                // clipping; the common Larger-Text range still scales fully.
-                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                // The Aura screens are drawn to the design's point sizes (402 × 874 canvas), so text is
+                // held at the standard size (100%) whatever the iPhone's Text Size is set to (owner
+                // decision, 25 Sep 2026). A smaller system size used to shrink every screen.
+                .dynamicTypeSize(.large)
                 .onReceive(model.live.$heartRate) { receivedBPM in
                     // #911: anchor the Live Activity on the SAME shared `Repository.widgetAnchor` the
                     // Home/Lock widget and the watch snapshot use, so this fourth surface can't drift to a
@@ -568,6 +568,10 @@ private struct iOSRootView: View {
             RootTabView(homeScreenQuickActionsEnabled:
                 demoBypass || (onboarded && acceptedTerms == Terms.currentVersion
                     && automaticLaunchSheetResolved))
+                // The shell measures wider than the phone (its screens draw 470 pt decorations), and
+                // that width became the whole window's: the terms gate and onboarding above it were laid
+                // out 470 pt wide and cut off at both edges. Held to the screen's width here.
+                .frame(width: UIScreen.main.bounds.width)
             if !onboarded && !demoBypass {
                 NoopOnboardingView(onFinished: {
                     onboarded = true

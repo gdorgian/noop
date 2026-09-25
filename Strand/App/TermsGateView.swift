@@ -330,9 +330,11 @@ struct TermsGateView: View {
         .padding(.bottom, 10)
         .background {
             LinearGradient(
+                // Fade only across the bar's 20 pt top padding, so the agreement never shows through
+                // the button (it did while the fade ran to 30% of the bar).
                 stops: [
                     .init(color: NoopPalette.canvas.opacity(0), location: 0),
-                    .init(color: NoopPalette.canvas, location: 0.30),
+                    .init(color: NoopPalette.canvas, location: 0.11),
                     .init(color: NoopPalette.canvas, location: 1),
                 ],
                 startPoint: .top,

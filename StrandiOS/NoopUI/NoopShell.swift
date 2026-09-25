@@ -490,6 +490,9 @@ struct NoopNightAmbientGlow: View {
                     .offset(y: -170)
                 Spacer()
             }
+            // The 470 pt ellipse is wider than the phone. A flexible frame lets it draw past the
+            // edges without widening the shell, which pushed the + sheets and the terms gate off-screen.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
@@ -515,6 +518,9 @@ struct NoopVerifiedAppShell: View {
     @StateObject private var historyStore = NoopHistoryStore()
     @StateObject private var effortStore = NoopEffortStore()
     @StateObject private var agesStore = NoopAgesStore()
+    /// Today's day-log counts as last written to the journal, and the day they belong to.
+    @State private var journalSynced: [NoopDayLogKind: Int] = [:]
+    @State private var journalSyncedDay: String?
     @EnvironmentObject private var profile: ProfileStore
     @EnvironmentObject private var model: AppModel
     /// Observed so the Rest header's battery chip redraws when the strap reports a new charge.
@@ -679,23 +685,11 @@ struct NoopVerifiedAppShell: View {
             }
 
             if let overlay = navigation.overlay {
-                Group {
-                    if Self.canonicalDataRoutes.contains(navigation.route)
-                        || Self.canonicalInstrumentRoutes.contains(navigation.route) {
-                        // Data uses only the static format catalog and the real destructive confirmation;
-                        // neither contains prototype measurements.
-                        NoopOverlayHost(overlay: overlay, navigation: navigation)
-                    } else {
-                        NoopBottomSheet(title: "Recorded data", dismiss: navigation.dismissOverlay, showsDone: true) {
-                            Text("Only information already present in your local record is shown in this build.")
-                                .font(NoopHTMLFont.sans(13))
-                                .foregroundStyle(NoopHTMLColor.copy)
-                                .lineSpacing(3)
-                                .padding(.bottom, 8)
-                        }
-                    }
-                }
-                .zIndex(20)
+                // Every sheet is the designed one. Those that carry figures read the wearer's record in
+                // Release (day log, night journal, logged items, goal editor); the rest are catalogs,
+                // confirmations of real actions, or navigation.
+                NoopOverlayHost(overlay: overlay, navigation: navigation)
+                    .zIndex(20)
             }
         }
         .foregroundStyle(NoopHTMLColor.ink)
@@ -717,6 +711,16 @@ struct NoopVerifiedAppShell: View {
         .task(id: restLoadKey) {
             guard restLoadKey != nil else { return }
             await restStore.load(from: repo)
+        }
+        .task(id: "\(repo.loaded)-\(Repository.localDayKey(Date()))") {
+            guard repo.loaded else { return }
+            await loadJournal()
+        }
+        .onChange(of: navigation.dayLogCounts) { _, counts in
+            writeDayLog(counts)
+        }
+        .onChange(of: navigation.nightJournalRevision) { _, _ in
+            writeNightJournal()
         }
         .task(id: youLoadKey) {
             guard youLoadKey != nil else { return }
@@ -767,6 +771,101 @@ struct NoopVerifiedAppShell: View {
         Self.canonicalNightRoutes.contains(navigation.route) ? "\(repo.loaded)-\(repo.refreshSeq)" : nil
     }
 
+    // MARK: Journal — the + sheets write the wearer's record
+
+    private static let nightJournalDayKey = "noop.nightJournal.savedDay"
+    private static let nightJournalAtKey = "noop.nightJournal.savedAt"
+
+    /// Today's journal, mood and night-journal state from the stores. The day log's counts are the
+    /// journal's numeric answers under the tile names; the night journal's drinks are the same
+    /// "Alcohol" answer, so the two sheets never disagree.
+    private func loadJournal() async {
+        let day = Repository.localDayKey(Date())
+        let entries = await repo.journalEntries(days: 2).filter { $0.day == day }
+        var counts: [NoopDayLogKind: Int] = [:]
+        for kind in NoopDayLogKind.allCases {
+            guard let entry = entries.first(where: { $0.question == kind.rawValue }), entry.answeredYes else { continue }
+            counts[kind] = max(1, Int((entry.numericValue ?? 1).rounded()))
+        }
+        journalSynced = counts
+        journalSyncedDay = day
+        navigation.loadDayLogCounts(counts)
+
+        let defaults = UserDefaults.standard
+        let savedToday = defaults.string(forKey: Self.nightJournalDayKey) == day
+        let mood = await repo.mood(day: day)
+        navigation.nightJournalMood = mood.map { $0 - 1 } ?? -1
+        if let drinks = counts[.alcohol] {
+            navigation.nightJournalDrinks = min(drinks, 3)
+        } else {
+            navigation.nightJournalDrinks = entries.contains { $0.question == NoopDayLogKind.alcohol.rawValue } ? 0 : -1
+        }
+        navigation.nightJournalNotes = Set(NoopNightJournalSheet.noteItems.filter { note in
+            entries.contains { $0.question == note && $0.answeredYes }
+        })
+        navigation.nightJournalSaved = savedToday
+        let at = defaults.double(forKey: Self.nightJournalAtKey)
+        navigation.nightJournalSavedAt = savedToday && at > 0 ? Date(timeIntervalSince1970: at) : nil
+    }
+
+    /// Writes only what changed since the last write. A new day starts from nothing, so a count
+    /// carried over from yesterday is never written as a "no" for today.
+    private func writeDayLog(_ counts: [NoopDayLogKind: Int]) {
+        let day = Repository.localDayKey(Date())
+        let previous = journalSyncedDay == day ? journalSynced : [:]
+        journalSynced = counts
+        journalSyncedDay = day
+        for kind in NoopDayLogKind.allCases {
+            let now = counts[kind, default: 0], before = previous[kind, default: 0]
+            guard now != before else { continue }
+            if kind == .coffee, now > before {
+                // The tile's promise: a coffee starts the caffeine clock.
+                for _ in before..<now { CaffeineLogStore.shared.log(at: Date()) }
+            }
+            Task {
+                if now > 0 {
+                    await repo.saveJournalNumeric(day: day, question: kind.rawValue, value: Double(now))
+                } else {
+                    await repo.saveJournalAnswer(day: day, question: kind.rawValue, answeredYes: false)
+                }
+            }
+        }
+    }
+
+    /// Save writes mood, drinks and the four notes; Delete removes the mood and answers the notes no.
+    /// Unchosen fields (-1) are not written.
+    private func writeNightJournal() {
+        let day = Repository.localDayKey(Date())
+        let defaults = UserDefaults.standard
+        let saved = navigation.nightJournalSaved
+        if saved {
+            defaults.set(day, forKey: Self.nightJournalDayKey)
+            defaults.set((navigation.nightJournalSavedAt ?? Date()).timeIntervalSince1970, forKey: Self.nightJournalAtKey)
+        } else {
+            defaults.removeObject(forKey: Self.nightJournalDayKey)
+            defaults.removeObject(forKey: Self.nightJournalAtKey)
+        }
+        let mood = navigation.nightJournalMood
+        let drinks = navigation.nightJournalDrinks
+        let notes = navigation.nightJournalNotes
+        if saved, drinks >= 0 {
+            var counts = navigation.dayLogCounts
+            counts[.alcohol] = drinks > 0 ? drinks : nil
+            navigation.loadDayLogCounts(counts)   // written by writeDayLog through onChange
+        }
+        Task {
+            if saved, mood >= 0 {
+                await repo.saveMood(day: day, value: mood + 1)
+            } else if !saved, let store = await repo.storeHandle() {
+                _ = try? await store.deleteMetricSeriesPoint(deviceId: MoodStore.moodDeviceId, day: day,
+                                                             key: MoodStore.moodKey)
+            }
+            for note in NoopNightJournalSheet.noteItems {
+                await repo.saveJournalAnswer(day: day, question: note, answeredYes: saved && notes.contains(note))
+            }
+        }
+    }
+
     private var instrumentLoadKey: Int? {
         Self.canonicalInstrumentRoutes.contains(navigation.route) ? repo.refreshSeq : nil
     }
@@ -798,6 +897,8 @@ struct NoopVerifiedAppShell: View {
                     .offset(y: isLab ? -170 : -150)
                 Spacer()
             }
+            // Wider than the phone; see NoopNightAmbientGlow.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()
             .allowsHitTesting(false)
         }
@@ -1779,7 +1880,8 @@ private struct NoopNightJournalSheet: View {
     @State private var drinks = 0
     @State private var notes: Set<String> = ["Screens in bed"]
     private let moods = ["Rough", "Off", "Fine", "Good", "Great"]
-    private let noteItems = ["Coffee after 2pm", "Big meal late", "Screens in bed", "Hard day"]
+    static let noteItems = ["Coffee after 2pm", "Big meal late", "Screens in bed", "Hard day"]
+    private var noteItems: [String] { Self.noteItems }
 
     init(navigation: NoopNavigation) {
         self.navigation = navigation
@@ -1819,9 +1921,11 @@ private struct NoopNightJournalSheet: View {
                                 Text("Start a session")
                                     .font(NoopHTMLFont.sans(14, weight: .semibold))
                                     .foregroundStyle(NoopHTMLColor.ink)
-                                Text("Today’s recommendation, from wherever you are")
-                                    .font(.custom("Instrument Sans", fixedSize: 11.5))
-                                    .foregroundStyle(Color(hex: 0x7F8A85))
+                                if NoopContentPolicy.allowsPrototypeContent {
+                                    Text("Today’s recommendation, from wherever you are")
+                                        .font(.custom("Instrument Sans", fixedSize: 11.5))
+                                        .foregroundStyle(Color(hex: 0x7F8A85))
+                                }
                             }
                             Spacer(minLength: 4)
                             NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.chevronDim)
@@ -1915,6 +2019,8 @@ private struct NoopNightJournalSheet: View {
                             navigation.nightJournalDrinks = drinks
                             navigation.nightJournalNotes = notes
                             navigation.nightJournalSaved = true
+                            navigation.nightJournalSavedAt = Date()
+                            navigation.nightJournalRevision += 1
                             navigation.dismissOverlay()
                         } label: {
                             Text("Save")
@@ -1928,10 +2034,13 @@ private struct NoopNightJournalSheet: View {
 
                         Button {
                             if navigation.nightJournalSaved {
+                                let fixture = NoopContentPolicy.allowsPrototypeContent
                                 navigation.nightJournalSaved = false
-                                navigation.nightJournalMood = 3
-                                navigation.nightJournalDrinks = 0
-                                navigation.nightJournalNotes = ["Screens in bed"]
+                                navigation.nightJournalMood = fixture ? 3 : -1
+                                navigation.nightJournalDrinks = fixture ? 0 : -1
+                                navigation.nightJournalNotes = fixture ? ["Screens in bed"] : []
+                                navigation.nightJournalSavedAt = nil
+                                navigation.nightJournalRevision += 1
                             }
                             navigation.dismissOverlay()
                         } label: {
@@ -2017,9 +2126,11 @@ private struct NoopDayLogSheet: View {
                                 Text("Start a session")
                                     .font(NoopHTMLFont.sans(14, weight: .semibold))
                                     .foregroundStyle(NoopHTMLColor.ink)
-                                Text("Today’s recommendation, from wherever you are")
-                                    .font(NoopHTMLFont.sans(11.5))
-                                    .foregroundStyle(Color(hex: 0x7F8A85))
+                                if NoopContentPolicy.allowsPrototypeContent {
+                                    Text("Today’s recommendation, from wherever you are")
+                                        .font(NoopHTMLFont.sans(11.5))
+                                        .foregroundStyle(Color(hex: 0x7F8A85))
+                                }
                             }
                             Spacer(minLength: 4)
                             NoopChevron()
@@ -2046,12 +2157,14 @@ private struct NoopDayLogSheet: View {
                         }
                     }
 
-                    Text("Everything logged here turns up in tonight's read — that is the only reason the app asks.")
-                        .font(NoopHTMLFont.sans(11.5))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .lineSpacing(4.6)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(height: 37, alignment: .top)
+                    if NoopContentPolicy.allowsPrototypeContent {
+                        Text("Everything logged here turns up in tonight's read — that is the only reason the app asks.")
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(NoopHTMLColor.faint)
+                            .lineSpacing(4.6)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(height: 37, alignment: .top)
+                    }
 
                     VStack(spacing: 8) {
                         Button("Done", action: navigation.dismissOverlay)
@@ -2189,6 +2302,9 @@ private struct NoopDayLogSheetTopBorder: Shape {
 private struct NoopLoggedItemsSheet: View {
     @ObservedObject var navigation: NoopNavigation
     @SceneStorage("noop.trends.logged-filter") private var storedFilter = NoopLoggedFilter.all.rawValue
+    @EnvironmentObject private var repo: Repository
+    /// Release: the wearer's own last three days. The example list is the Debug design fixture only.
+    @State private var liveDays: [NoopLoggedDay] = []
 
     private var filter: NoopLoggedFilter {
         get { NoopLoggedFilter(rawValue: storedFilter) ?? .all }
@@ -2196,7 +2312,7 @@ private struct NoopLoggedItemsSheet: View {
     }
 
     private var filteredDays: [NoopLoggedDay] {
-        NoopLoggedDay.canonical.compactMap { day in
+        (NoopContentPolicy.allowsPrototypeContent ? NoopLoggedDay.canonical : liveDays).compactMap { day in
             let items = day.items.filter { filter.includes($0.kind) }
             return items.isEmpty ? nil : NoopLoggedDay(label: day.label, items: items)
         }
@@ -2303,6 +2419,10 @@ private struct NoopLoggedItemsSheet: View {
         }
         .ignoresSafeArea()
         .transition(.move(edge: .bottom).combined(with: .opacity))
+        .task {
+            guard !NoopContentPolicy.allowsPrototypeContent else { return }
+            liveDays = await NoopLoggedDay.recorded(from: repo)
+        }
     }
 
     private func loggedDay(_ day: NoopLoggedDay) -> some View {
@@ -2406,6 +2526,75 @@ private struct NoopLoggedDay: Identifiable {
         if sleeps > 0 { parts.append(sleeps == 1 ? "sleep" : "\(sleeps) sleeps") }
         if logs > 0 { parts.append("\(logs) \(logs == 1 ? "log" : "logs")") }
         return parts.joined(separator: " · ")
+    }
+
+    /// The last three local days from the record: sessions as recorded, the night that ended that
+    /// day (time asleep from its stages), and journal entries answered yes. Nothing is estimated;
+    /// a day with none of these is left out, as in the design.
+    @MainActor
+    static func recorded(from repo: Repository, now: Date = Date()) async -> [NoopLoggedDay] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let clock = AppClock.hourMinuteFormatter()
+        let workouts = await repo.workoutRows(days: 4)
+        let journal = await repo.journalEntries(days: 4)
+        let rest = NoopRestStore()
+        await rest.load(from: repo)
+        let nights = rest.record.slots.compactMap { $0 }
+        let coffee = CaffeineLogStore.shared.intakes
+        let longDate = DateFormatter()
+        longDate.locale = Locale(identifier: "en_GB")
+        longDate.dateFormat = "EEEE d MMMM"
+
+        var days: [NoopLoggedDay] = []
+        for offset in 0..<3 {
+            guard let start = calendar.date(byAdding: .day, value: -offset, to: today),
+                  let end = calendar.date(byAdding: .day, value: 1, to: start) else { continue }
+            let span = Int(start.timeIntervalSince1970)..<Int(end.timeIntervalSince1970)
+            var items: [NoopLoggedItem] = []
+            for workout in workouts.filter({ span.contains($0.startTs) }).sorted(by: { $0.startTs > $1.startTs }) {
+                var detail = clock.string(from: Date(timeIntervalSince1970: TimeInterval(workout.startTs)))
+                    + " · \(workout.noopMinutes) min"
+                if let avg = workout.avgHr { detail += " · avg \(avg) bpm" }
+                items.append(.init(kind: .session, name: workout.sport, detail: detail, figure: "",
+                                   glyph: workout.sport.localizedCaseInsensitiveContains("cycl") ? .bike : .bolt))
+            }
+            if let night = nights.last(where: { $0.endDate >= start && $0.endDate < end }) {
+                let minutes = Int(night.asleepMin.rounded())
+                items.append(.init(kind: .sleep, name: "Slept \(minutes / 60)h \(minutes % 60)m",
+                                   detail: night.window.replacingOccurrences(of: "–", with: "→"),
+                                   figure: "", glyph: .bed))
+            }
+            let dayKey = Repository.localDayKey(start)
+            for entry in journal.filter({ $0.day == dayKey && $0.answeredYes }) {
+                let count = entry.numericValue.map { Int($0.rounded()) } ?? 1
+                var detail = ""
+                if entry.question == NoopDayLogKind.coffee.rawValue {
+                    detail = coffee.filter { $0.at >= start && $0.at < end }
+                        .sorted { $0.at < $1.at }
+                        .map { clock.string(from: $0.at) }
+                        .joined(separator: " · ")
+                }
+                items.append(.init(kind: .log, name: entry.question, detail: detail,
+                                   figure: count > 1 ? "×\(count)" : "", glyph: glyph(forLog: entry.question)))
+            }
+            guard !items.isEmpty else { continue }
+            let label = offset == 0 ? "Today" : offset == 1 ? "Yesterday" : longDate.string(from: start)
+            days.append(NoopLoggedDay(label: label, items: items))
+        }
+        return days
+    }
+
+    private static func glyph(forLog name: String) -> NoopCanonicalGlyphName {
+        switch NoopDayLogKind(rawValue: name) {
+        case .coffee: .cup
+        case .water: .drop
+        case .meal: .plate
+        case .alcohol: .glass
+        case .nap: .bed
+        case .intimacy: .heart
+        case nil: .check
+        }
     }
 
     static let canonical: [NoopLoggedDay] = [

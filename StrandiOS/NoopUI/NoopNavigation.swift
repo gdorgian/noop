@@ -547,9 +547,15 @@ final class NoopNavigation: ObservableObject {
     @Published var nightJournalSaved = false
     // The journal sheet is recreated on every + tap. Keep its committed choices with the
     // navigation owner so Edit restores what was saved and Cancel discards only the draft.
-    @Published var nightJournalMood = 3
-    @Published var nightJournalDrinks = 0
-    @Published var nightJournalNotes: Set<String> = ["Screens in bed"]
+    // Release starts empty (-1 = not chosen); the example choices are the Debug design fixture only.
+    // The production shell loads the day's saved answers from the journal and mood stores.
+    @Published var nightJournalMood = NoopContentPolicy.allowsPrototypeContent ? 3 : -1
+    @Published var nightJournalDrinks = NoopContentPolicy.allowsPrototypeContent ? 0 : -1
+    @Published var nightJournalNotes: Set<String> = NoopContentPolicy.allowsPrototypeContent ? ["Screens in bed"] : []
+    /// When the night journal was saved; nil when the entry came from the store without a time.
+    @Published var nightJournalSavedAt: Date?
+    /// Bumped by the sheet's Save and Delete so the production shell writes the entry once.
+    @Published var nightJournalRevision = 0
     @Published private(set) var dayLogCounts: [NoopDayLogKind: Int]
     @Published var askFocusRequest = 0
     @Published var coachVoice: NoopCoachVoice {
@@ -723,6 +729,12 @@ final class NoopNavigation: ObservableObject {
 
     func clearDayLog() {
         dayLogCounts = [:]
+        persistDayLog()
+    }
+
+    /// Replaces today's counts with what the journal holds (production shell only).
+    func loadDayLogCounts(_ counts: [NoopDayLogKind: Int]) {
+        dayLogCounts = counts.filter { $0.value > 0 }
         persistDayLog()
     }
 
