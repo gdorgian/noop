@@ -54,6 +54,37 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertFalse(snapshot.bonded)
     }
 
+    func testLegacyRecoveryIsMaskedWithoutErasingOtherWidgetMeasurements() throws {
+        // This is the old on-disk shape: `recovery` held morning Recovery while the widget called it
+        // Charge. Upgrading must not display the number, but must preserve the independent fields.
+        let legacy = """
+        {"recovery":72,"bpm":58,"batteryPct":84,"bonded":true,"updated":0,
+         "effort":38,"rest":81,"hrv":64,"restingHr":52}
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(WidgetSnapshot.self, from: legacy)
+        let display = decoded.verifiedForDisplay()
+
+        XCTAssertNil(display.recovery)
+        XCTAssertEqual(display.bpm, 58)
+        XCTAssertEqual(display.batteryPct, 84)
+        XCTAssertEqual(display.effort, 38)
+        XCTAssertEqual(display.rest, 81)
+        XCTAssertEqual(display.hrv, 64)
+        XCTAssertEqual(display.restingHr, 52)
+        XCTAssertTrue(display.bonded)
+    }
+
+    func testOnlyIntradayLedgerSourceMayDisplayCharge() {
+        var snapshot = renderedSnapshot()
+        XCTAssertNil(snapshot.verifiedForDisplay().recovery)
+
+        snapshot.chargeSource = "morning-recovery"
+        XCTAssertNil(snapshot.verifiedForDisplay().recovery)
+
+        snapshot.chargeSource = WidgetSnapshot.intradayChargeSource
+        XCTAssertEqual(snapshot.verifiedForDisplay().recovery, 72)
+    }
+
     private func renderedSnapshot(updated: Date = Date(timeIntervalSince1970: 1_700_000_000)) -> WidgetSnapshot {
         WidgetSnapshot(recovery: 72, bpm: 58, batteryPct: 84, bonded: true, updated: updated,
                        effort: 38, rest: 81, hrv: 64, restingHr: 52,

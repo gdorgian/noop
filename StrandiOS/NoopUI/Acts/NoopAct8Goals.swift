@@ -393,11 +393,24 @@ struct NoopAct8Screens: View {
 private struct NoopGoalJourney: View {
     @ObservedObject var navigation: NoopNavigation
     @ObservedObject private var goalStore = CoachGoalStore.shared
+    @ObservedObject private var tracking = GoalTrackingStore.shared
+    @EnvironmentObject private var repo: Repository
     @AppStorage("noop.html.active-goal-kind") private var activeKind = NoopGoalKind.distance.rawValue
     @AppStorage("noop.html.active-goal-title") private var activeTitle = "Half marathon on 26 October, finishing comfortably."
     @State private var weekState = "open"
 
     var body: some View {
+        if NoopContentPolicy.allowsPrototypeContent {
+            prototypeJourney
+        } else if let goal = activeStoredGoal {
+            liveJourney(goal)
+        } else {
+            // No goal yet: the journey has nothing to draw, so Set is the page.
+            NoopGoalSet(navigation: navigation)
+        }
+    }
+
+    private var prototypeJourney: some View {
         NoopScreen(bottomInset: 118, topInset: 56) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 12) {
@@ -533,6 +546,132 @@ private struct NoopGoalJourney: View {
         }
     }
 
+    // MARK: Production journey
+
+    /// The journey over `GoalTrackingStore`: the route drawn to the measured progress, the tracker's
+    /// own verdict and reason, and the goal's dated waypoints. Svea's week proposal and the biomarker
+    /// summary have no production source here and are left out.
+    private func liveJourney(_ goal: CoachGoal) -> some View {
+        let snapshot = tracking.snapshot(for: goal.id)
+        let progress = snapshot?.progressFraction
+        return NoopScreen(bottomInset: 118, topInset: 56) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 12) {
+                    Button { navigation.reset(to: .you) } label: {
+                        ZStack {
+                            Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+                            NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
+                        }.frame(width: 34, height: 34)
+                    }.buttonStyle(.plain)
+                    Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                    Spacer()
+                    Button("Change it") { navigation.push(.setGoal) }
+                        .buttonStyle(NoopHTMLButtonStyle(kind: .secondary))
+                        .frame(height: 30)
+                }
+                .padding(.horizontal, -2)
+
+                HStack {
+                    NoopSectionLabel("One goal at a time")
+                    Spacer()
+                    if let deadline = goal.targetDate {
+                        let weeks = max(0, Calendar.current.dateComponents([.weekOfYear], from: Date(), to: deadline).weekOfYear ?? 0)
+                        Text("\(weeks) weeks to \(deadline.formatted(.dateTime.day().month(.wide)))")
+                            .font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                    }
+                }.padding(.top, 8)
+
+                NoopGoalRouteGraphic(progress: progress, deadline: goal.targetDate)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(goal.title)
+                        .font(NoopHTMLFont.outfit(25, weight: .light)).tracking(-0.7).lineSpacing(2)
+                }
+                .padding(.horizontal, 2)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
+
+                if let snapshot, !snapshot.reason.isEmpty {
+                    let good = snapshot.health == .onTrack
+                    let tint = good ? NoopHTMLColor.green : snapshot.health == .building || snapshot.health == .paused ? NoopHTMLColor.night : Color(hex: 0xF2B45C)
+                    NoopAct8GradientCard(
+                        tint: tint, degrees: 158, startOpacity: 0.15, endColor: Color.white.opacity(0.02),
+                        borderOpacity: 0.34, padding: EdgeInsets(top: 17, leading: 17, bottom: 16, trailing: 17)
+                    ) {
+                        VStack(alignment: .leading, spacing: 11) {
+                            HStack(spacing: 9) {
+                                Circle().fill(tint).shadow(color: tint, radius: 5).frame(width: 8, height: 8)
+                                NoopSectionLabel(snapshot.health.label, color: tint)
+                            }
+                            Text(snapshot.reason)
+                                .font(NoopHTMLFont.sans(13.5)).foregroundStyle(Color(hex: 0xDCE3E0)).lineSpacing(6.3)
+                        }
+                    }
+                    .padding(.top, 14)
+                }
+
+                if !goal.milestones.isEmpty {
+                    let next = snapshot?.nextMilestone?.id
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack {
+                            NoopSectionLabel("Waypoints")
+                            Spacer()
+                            Text("only ticked when it happened").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                        }.padding(.bottom, 2)
+                        ForEach(Array(goal.milestones.enumerated()), id: \.element.id) { index, milestone in
+                            let done = milestone.achievedAt != nil
+                            HStack(alignment: .top, spacing: 12) {
+                                Group {
+                                    if done { Circle().fill(Color(hex: 0xF2B45C)).shadow(color: Color(hex: 0xF2B45C), radius: 6) }
+                                    else { Circle().stroke(Color.white.opacity(0.24), style: StrokeStyle(lineWidth: 1.6, dash: [3, 3])) }
+                                }.frame(width: 17, height: 17).padding(.top, 2)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("\(milestone.value.formatted(.number.precision(.fractionLength(0...1)))) \(goal.kind.unit)")
+                                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(done ? NoopHTMLColor.ink : NoopHTMLColor.inkSoft)
+                                    Text(done ? "done \((milestone.achievedAt ?? Date()).formatted(.dateTime.day().month(.wide)))"
+                                              : milestone.expectedDate.formatted(.dateTime.day().month(.wide)))
+                                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(2)
+                                }
+                                Spacer()
+                                NoopPill(text: done ? "reached" : milestone.id == next ? "next" : "ahead",
+                                         color: done ? Color(hex: 0xF6DCB4) : NoopHTMLColor.copy)
+                            }.padding(.vertical, 14)
+                            if index < goal.milestones.count - 1 { Divider().overlay(NoopHTMLColor.border) }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 24))
+                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                    .padding(.top, 10)
+                }
+
+                NoopAct8BiomarkerLink(detail: nil) { navigation.push(.labs) }
+                    .padding(.top, 10)
+                Text(liveEvidenceNote(for: goal))
+                    .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                    .padding(.horizontal, 2)
+                    .padding(.top, 6)
+            }
+        }
+        .task(id: repo.refreshSeq) { await tracking.refresh(repo: repo) }
+    }
+
+    private func liveEvidenceNote(for goal: CoachGoal) -> String {
+        switch goal.kind {
+        case .run:
+            return "Running distance comes from recorded sessions with distance data; an unrecorded run is not credited."
+        case .weight:
+            return "Body-weight progress uses dated scale entries in your record, not an estimate from the strap."
+        case .custom:
+            return "This goal is saved as written. Noop does not have a measurement for its progress yet."
+        default:
+            return "Progress is shown only when a matching measurement or planned step is recorded. Missing days are not guessed."
+        }
+    }
+
     private var activeStoredGoal: CoachGoal? {
         NoopContentPolicy.allowsPrototypeContent ? nil : goalStore.activeGoals.first
     }
@@ -609,7 +748,31 @@ private struct NoopGoalJourney: View {
 }
 
 private struct NoopGoalRouteGraphic: View {
+    /// Production: the tracker's measured progress (0...1); nil draws the route with nothing done.
+    /// The prototype keeps its 46%.
+    var progress: Double?? = .none
+    /// Production: the goal's own date for the finish label; nil hides it.
+    var deadline: Date? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var deadlineLabel: String? {
+        if case .none = progress { return "26 OCTOBER" }
+        return deadline.map { $0.formatted(.dateTime.day().month(.wide)).uppercased() }
+    }
+
+    private var progressText: String {
+        switch progress {
+        case .none: "46%"
+        case .some(let value): value.map { "\(Int((min(1, max(0, $0)) * 100).rounded()))%" } ?? "\u{2014}"
+        }
+    }
+
+    private var done: Double {
+        switch progress {
+        case .none: 0.46
+        case .some(let value): min(1, max(0, value ?? 0))
+        }
+    }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
@@ -650,15 +813,15 @@ private struct NoopGoalRouteGraphic: View {
                         for index in 0..<36 {
                             let t0 = Double(index) / 36
                             let t1 = Double(index + 1) / 36
-                            let done = t1 <= 0.46
-                            let edge = !done && t0 <= 0.46
+                            let isDone = t1 <= done
+                            let edge = !isDone && t0 <= done
                             var segment = Path()
                             segment.move(to: point(t0))
                             segment.addLine(to: point(t1))
                             target.stroke(
                                 segment,
-                                with: .color(done ? Color(hex: 0xF2B45C) : edge ? Color(hex: 0xF2B45C).opacity(0.5) : Color.white.opacity(0.11)),
-                                style: StrokeStyle(lineWidth: done ? 7 : 4, lineCap: .round)
+                                with: .color(isDone ? Color(hex: 0xF2B45C) : edge ? Color(hex: 0xF2B45C).opacity(0.5) : Color.white.opacity(0.11)),
+                                style: StrokeStyle(lineWidth: isDone ? 7 : 4, lineCap: .round)
                             )
                         }
                     }
@@ -671,12 +834,12 @@ private struct NoopGoalRouteGraphic: View {
                     drawSegments(&context)
 
                     for t in [0.06, 0.30, 0.52, 0.76, 0.97] {
-                        let done = t <= 0.46
+                        let reached = t <= done
                         let center = point(t)
-                        let radius: CGFloat = done ? 6 : 5
+                        let radius: CGFloat = reached ? 6 : 5
                         let dot = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
-                        context.fill(dot, with: .color(done ? Color(hex: 0xF2B45C) : NoopHTMLColor.canvas))
-                        context.stroke(dot, with: .color(done ? Color(hex: 0xF6DCB4) : Color.white.opacity(0.3)), lineWidth: 1.8)
+                        context.fill(dot, with: .color(reached ? Color(hex: 0xF2B45C) : NoopHTMLColor.canvas))
+                        context.stroke(dot, with: .color(reached ? Color(hex: 0xF6DCB4) : Color.white.opacity(0.3)), lineWidth: 1.8)
                     }
                 }
                 .frame(width: 330, height: 220)
@@ -685,7 +848,7 @@ private struct NoopGoalRouteGraphic: View {
                     Spacer()
                     HStack(alignment: .bottom) {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text("46%")
+                            Text(progressText)
                                 .font(NoopHTMLFont.outfit200(50))
                                 .tracking(-2.25)
                                 .shadow(color: .black.opacity(0.75), radius: 12, y: 2)
@@ -702,14 +865,16 @@ private struct NoopGoalRouteGraphic: View {
                 VStack {
                     HStack {
                         Spacer()
+                        if let deadlineLabel {
                         VStack(alignment: .trailing, spacing: 3) {
-                            Text("26 OCTOBER")
+                            Text(deadlineLabel)
                                 .font(NoopHTMLFont.sans(9.5, weight: .semibold))
                                 .tracking(1.14)
                                 .foregroundStyle(NoopHTMLColor.faint)
                             Text("the day itself")
                                 .font(NoopHTMLFont.sans(11))
                                 .foregroundStyle(NoopHTMLColor.copy)
+                        }
                         }
                     }
                     Spacer()
@@ -801,7 +966,7 @@ private struct NoopAct8GradientCard<Content: View>: View {
 }
 
 private struct NoopAct8BiomarkerLink: View {
-    let detail: String
+    let detail: String?
     let action: () -> Void
 
     var body: some View {
@@ -812,12 +977,14 @@ private struct NoopAct8BiomarkerLink: View {
                     Text("Biomarkers")
                         .font(NoopHTMLFont.sans(13.5))
                         .foregroundStyle(NoopHTMLColor.ink)
+                    if let detail {
                     Text(detail)
                         .font(NoopHTMLFont.sans(11.5))
                         .foregroundStyle(Color(hex: 0x7F8A85))
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
             .padding(.horizontal, 16)
             .frame(minHeight: 66)
@@ -833,14 +1000,82 @@ private struct NoopAct8BiomarkerLink: View {
 
 // MARK: - Set goal
 
+/// Production goal details are deliberately separate from the HTML fixture keys. A Debug design
+/// session may save its example person to `noop.html.*`, but a later Release install must never
+/// interpret those examples as values the wearer entered and confirmed.
+private enum NoopProductionGoalDetails {
+    static let prefix = "noop.goal.production"
+    static let confirmedKindKey = "\(prefix).details-kind"
+
+    static func distance(_ choice: String, custom: String) -> Double? {
+        switch choice {
+        case "5K": return 5
+        case "10K": return 10
+        case "Half marathon": return 21.0975
+        case "Marathon": return 42.195
+        case "Custom":
+            guard let value = Double(custom.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: ",", with: ".")),
+                  value.isFinite, value > 0 else { return nil }
+            return value
+        default: return nil
+        }
+    }
+
+    static func validFinishTime(_ value: String) -> Bool {
+        let fields = value.split(separator: ":", omittingEmptySubsequences: false)
+        guard (fields.count == 2 || fields.count == 3),
+              fields.allSatisfy({ Int($0) != nil }) else { return false }
+        let parts = fields.compactMap { Int($0) }
+        let hours = parts.count == 3 ? parts[0] : 0
+        let minutes = parts.count == 3 ? parts[1] : parts[0]
+        let seconds = parts.count == 3 ? parts[2] : parts[1]
+        return hours >= 0 && hours < 100 && minutes >= 0 && minutes < 60 && seconds >= 0 && seconds < 60
+            && hours * 3600 + minutes * 60 + seconds > 0
+    }
+
+    static func ready(for kind: NoopGoalKind, defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.string(forKey: confirmedKindKey) == kind.rawValue,
+              !(defaults.string(forKey: "\(prefix).draft-title") ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        switch kind {
+        case .distance, .pace:
+            guard let activity = defaults.string(forKey: "\(prefix).activity"),
+                  ["Run", "Ride", "Swim", "Walk"].contains(activity) else { return false }
+            if kind == .pace {
+                return distance(defaults.string(forKey: "\(prefix).event-distance") ?? "",
+                                custom: defaults.string(forKey: "\(prefix).custom-event-distance") ?? "") != nil
+                    && validFinishTime(defaults.string(forKey: "\(prefix).finish-time") ?? "")
+            }
+            return distance(defaults.string(forKey: "\(prefix).distance") ?? "",
+                            custom: defaults.string(forKey: "\(prefix).custom-distance") ?? "") != nil
+        case .composition:
+            guard let metric = defaults.string(forKey: "\(prefix).composition-metric"),
+                  ["Weight", "Waist", "Body fat"].contains(metric),
+                  let value = Double((defaults.string(forKey: "\(prefix).target-value") ?? "")
+                    .replacingOccurrences(of: ",", with: ".")), value.isFinite, value > 0 else { return false }
+            return metric != "Body fat" || value <= 100
+        case .sleep:
+            // The current goal model tracks sessions per week, not nights in a sleep window.
+            return false
+        }
+    }
+}
+
 private struct NoopGoalSet: View {
     @ObservedObject var navigation: NoopNavigation
     @ObservedObject private var goalStore = CoachGoalStore.shared
     @AppStorage("noop.html.goal-week-index") private var weekIndex = 4
+    @AppStorage("noop.goal.production.week-index") private var productionWeekIndex = -1
     @AppStorage("noop.html.goal-draft-title") private var draftTitle = "Half marathon on 26 October, finishing comfortably."
+    @AppStorage("noop.goal.production.draft-title") private var productionDraftTitle = ""
+    @AppStorage("noop.goal.production.details-revision") private var productionDetailsRevision = 0
     @AppStorage("noop.html.active-goal-kind") private var activeKind = NoopGoalKind.distance.rawValue
     @AppStorage("noop.html.active-goal-title") private var activeTitle = "Half marathon on 26 October, finishing comfortably."
     @State private var showCommitConfirmation = false
+    @EnvironmentObject private var coach: AICoachEngine
+    /// Production: the wearer's own evidence for the feasibility engine, loaded once.
+    @State private var evidence: GoalFeasibility.Evidence?
     private let labels = ["6 weeks", "2 months", "10 weeks", "3 months", "15 weeks", "4 months", "20 weeks", "5 months", "6 months", "8 months", "10 months", "a year"]
 
     var body: some View {
@@ -857,7 +1092,12 @@ private struct NoopGoalSet: View {
                             NoopSectionLabel("What are you aiming at")
                             NoopFlowLayout(spacing: 7) {
                                 ForEach(NoopGoalKind.allCases) { kind in
+                                    // The sleep goal is saved as a sessions-per-week goal, which it is
+                                    // not; it is off until a nights-in-window kind exists (owner decision,
+                                    // 24 Sep). Goals already saved that way are kept, untouched.
+                                    let unavailable = !NoopContentPolicy.allowsPrototypeContent && kind == .sleep
                                     Button {
+                                        guard !unavailable else { return }
                                         navigation.selectedGoal = kind
                                         navigation.show(.goalEditor)
                                     } label: {
@@ -867,16 +1107,23 @@ private struct NoopGoalSet: View {
                                             .background(navigation.selectedGoal == kind ? Color(hex: 0xF2B45C) : Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 11))
                                             .overlay(RoundedRectangle(cornerRadius: 11).stroke(navigation.selectedGoal == kind ? .clear : Color.white.opacity(0.1), lineWidth: 0.5))
                                     }.buttonStyle(.plain)
+                                    .disabled(unavailable)
+                                    .opacity(unavailable ? 0.38 : 1)
                                 }
                             }
                             HStack {
                                 Text("By when").font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
                                 Spacer()
-                                Text(labels[selectedWeekIndex]).font(.system(size: 12.5, weight: .semibold, design: .monospaced)).foregroundStyle(Color(hex: 0xF6DCB4))
+                                Text(selectedWeekIndex >= 0 ? labels[selectedWeekIndex] : "Choose")
+                                    .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(Color(hex: 0xF6DCB4))
                             }.padding(.top, 4)
                             HStack(alignment: .bottom, spacing: 5) {
                                 ForEach(labels.indices, id: \.self) { index in
-                                    Button { weekIndex = index } label: {
+                                    Button {
+                                        if NoopContentPolicy.allowsPrototypeContent { weekIndex = index }
+                                        else { productionWeekIndex = index }
+                                    } label: {
                                         RoundedRectangle(cornerRadius: 3)
                                             .fill(index == selectedWeekIndex ? Color(hex: 0xF2B45C) : index < selectedWeekIndex ? Color(hex: 0xF2B45C).opacity(0.32) : Color.white.opacity(0.1))
                                             .frame(height: index == selectedWeekIndex ? 34 : 24)
@@ -887,56 +1134,91 @@ private struct NoopGoalSet: View {
                         }
                     }
 
-                    NoopAct8GradientCard(
-                        tint: feasibility.color,
-                        degrees: 158,
-                        startOpacity: 0.15,
-                        endColor: Color.white.opacity(0.02),
-                        borderOpacity: 0.34,
-                        padding: EdgeInsets(top: 17, leading: 17, bottom: 16, trailing: 17)
-                    ) {
-                        VStack(alignment: .leading, spacing: 11) {
-                            HStack(spacing: 9) {
-                                Circle().fill(feasibility.color).shadow(color: feasibility.color, radius: 5).frame(width: 8, height: 8)
-                                NoopSectionLabel(feasibility.kicker, color: feasibility.light)
-                            }
-                            Text(feasibility.body).font(NoopHTMLFont.sans(13.5)).foregroundStyle(Color(hex: 0xDCE3E0)).lineSpacing(4)
-                            if let fix = feasibility.fix {
-                                VStack(alignment: .leading, spacing: 7) {
-                                    NoopSectionLabel("What the data would accept")
-                                    Text(fix).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(3)
-                                }.padding(12).background(NoopHTMLColor.canvas.opacity(0.4), in: RoundedRectangle(cornerRadius: 16))
-                            }
-                            VStack(alignment: .leading, spacing: 10) {
-                                ForEach(NoopGoalEvidence.all) { evidence in
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        HStack { Text(evidence.name).font(NoopHTMLFont.sans(12.5)); Spacer(); Text(evidence.value).font(.system(size: 11.5, weight: .semibold, design: .monospaced)) }
-                                        NoopProgressBar(
-                                            progress: evidence.progress * feasibility.factor,
-                                            color: evidenceColor(for: evidence),
-                                            height: 6
-                                        )
-                                        Text(evidence.note).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                    if NoopContentPolicy.allowsPrototypeContent {
+                        NoopAct8GradientCard(
+                            tint: feasibility.color,
+                            degrees: 158,
+                            startOpacity: 0.15,
+                            endColor: Color.white.opacity(0.02),
+                            borderOpacity: 0.34,
+                            padding: EdgeInsets(top: 17, leading: 17, bottom: 16, trailing: 17)
+                        ) {
+                            VStack(alignment: .leading, spacing: 11) {
+                                HStack(spacing: 9) {
+                                    Circle().fill(feasibility.color).shadow(color: feasibility.color, radius: 5).frame(width: 8, height: 8)
+                                    NoopSectionLabel(feasibility.kicker, color: feasibility.light)
+                                }
+                                Text(feasibility.body).font(NoopHTMLFont.sans(13.5)).foregroundStyle(Color(hex: 0xDCE3E0)).lineSpacing(4)
+                                if let fix = feasibility.fix {
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        NoopSectionLabel("What the data would accept")
+                                        Text(fix).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(3)
+                                    }.padding(12).background(NoopHTMLColor.canvas.opacity(0.4), in: RoundedRectangle(cornerRadius: 16))
+                                }
+                                VStack(alignment: .leading, spacing: 10) {
+                                    ForEach(NoopGoalEvidence.all) { evidence in
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            HStack { Text(evidence.name).font(NoopHTMLFont.sans(12.5)); Spacer(); Text(evidence.value).font(.system(size: 11.5, weight: .semibold, design: .monospaced)) }
+                                            NoopProgressBar(
+                                                progress: evidence.progress * feasibility.factor,
+                                                color: evidenceColor(for: evidence),
+                                                height: 6
+                                            )
+                                            Text(evidence.note).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                                        }
                                     }
                                 }
+                                .padding(.top, 8)
+                                .padding(.bottom, 5)
                             }
-                            .padding(.top, 8)
-                            .padding(.bottom, 5)
+                        }
+
+                        NoopHTMLCard(radius: 24, padding: 16) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                NoopSectionLabel("Safety check", color: Color(hex: 0xF3C888))
+                                Text(feasibility.safety).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(3)
+                                Text("Noop will not build a route that adds more than ten percent of weekly load a week, and it will hold a week back rather than meet a date. If that means the date moves, it says the date moves.")
+                                    .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
+                            }
+                        }
+                    } else if let assessment = liveAssessment, assessment.verdict != .unknown {
+                        let style = Self.style(for: assessment.verdict)
+                        NoopAct8GradientCard(
+                            tint: style.color, degrees: 158, startOpacity: 0.15, endColor: Color.white.opacity(0.02),
+                            borderOpacity: 0.34, padding: EdgeInsets(top: 17, leading: 17, bottom: 16, trailing: 17)
+                        ) {
+                            VStack(alignment: .leading, spacing: 11) {
+                                HStack(spacing: 9) {
+                                    Circle().fill(style.color).shadow(color: style.color, radius: 5).frame(width: 8, height: 8)
+                                    NoopSectionLabel(style.kicker, color: style.light)
+                                }
+                                Text(assessment.rationale).font(NoopHTMLFont.sans(13.5)).foregroundStyle(Color(hex: 0xDCE3E0)).lineSpacing(4)
+                                if let fix = assessment.suggestion {
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        NoopSectionLabel("What the data would accept")
+                                        Text(fix).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(3)
+                                    }.padding(12).background(NoopHTMLColor.canvas.opacity(0.4), in: RoundedRectangle(cornerRadius: 16))
+                                }
+                            }
                         }
                     }
 
-                    NoopHTMLCard(radius: 24, padding: 16) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            NoopSectionLabel("Safety check", color: Color(hex: 0xF3C888))
-                            Text(feasibility.safety).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(3)
-                            Text("Noop will not build a route that adds more than ten percent of weekly load a week, and it will hold a week back rather than meet a date. If that means the date moves, it says the date moves.")
-                                .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
-                        }
+                    Button(commitLabel) {
+                        if !goalValuesReady { navigation.show(.goalEditor) }
+                        else if !deadlineReady { return }
+                        else if commitIsPlain { commit() }
+                        else { showCommitConfirmation = true }
                     }
+                    .buttonStyle(NoopGoalCommitStyle(primary: commitIsPlain))
+                    .disabled(goalValuesReady && !deadlineReady)
 
-                    Button(feasibility.commitLabel) {
-                        if feasibility.kind == .realistic { commit() } else { showCommitConfirmation = true }
-                    }.buttonStyle(NoopGoalCommitStyle(primary: feasibility.kind == .realistic))
+                    if !NoopContentPolicy.allowsPrototypeContent && !detailsReady {
+                        Text(goalValuesReady
+                             ? "Choose when you want to reach this goal before committing it."
+                             : "Choose and save the values for this goal before committing it.")
+                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                            .padding(.horizontal, 2)
+                    }
 
                     Text("One goal at a time, on purpose. A second one would compete with the first for the same nights of sleep, and the app would have to pretend it did not.")
                         .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3).padding(.horizontal, 2)
@@ -955,6 +1237,52 @@ private struct NoopGoalSet: View {
                 }
             }
         }
+        .task {
+            guard !NoopContentPolicy.allowsPrototypeContent, evidence == nil else { return }
+            evidence = await coach.goalEvidence()
+        }
+    }
+
+    // MARK: Production feasibility
+
+    /// The engine's verdict on the goal as drafted, over the wearer's own evidence.
+    private var liveAssessment: GoalFeasibility.Assessment? {
+        guard detailsReady, let evidence else { return nil }
+        return GoalFeasibility.assess(goal: draftGoal(), evidence: evidence)
+    }
+
+    private var detailsReady: Bool {
+        goalValuesReady && deadlineReady
+    }
+
+    private var goalValuesReady: Bool {
+        NoopContentPolicy.allowsPrototypeContent
+            || (productionDetailsRevision >= 0 && NoopProductionGoalDetails.ready(for: navigation.selectedGoal))
+    }
+
+    private var deadlineReady: Bool {
+        NoopContentPolicy.allowsPrototypeContent || selectedWeekIndex >= 0
+    }
+
+    private var commitIsPlain: Bool {
+        guard !NoopContentPolicy.allowsPrototypeContent else { return feasibility.kind == .realistic }
+        let verdict = liveAssessment?.verdict
+        return verdict == nil || verdict == .supported || verdict == .unknown
+    }
+
+    private var commitLabel: String {
+        guard !NoopContentPolicy.allowsPrototypeContent else { return feasibility.commitLabel }
+        guard goalValuesReady else { return "Set goal details" }
+        guard deadlineReady else { return "Choose a date" }
+        return commitIsPlain ? "Keep this route" : "Commit anyway"
+    }
+
+    private static func style(for verdict: GoalFeasibility.Verdict) -> (kicker: String, color: Color, light: Color) {
+        switch verdict {
+        case .supported, .unknown: ("The data says yes", NoopHTMLColor.green, Color(hex: 0x8FEFC0))
+        case .ambitious: ("Possible, with one condition", Color(hex: 0xF2B45C), Color(hex: 0xF6DCB4))
+        case .unrealistic: ("The data says not by then", Color(hex: 0xE9A288), Color(hex: 0xF0BBA6))
+        }
     }
 
     private var feasibility: NoopGoalFeasibility {
@@ -962,7 +1290,10 @@ private struct NoopGoalSet: View {
         if selectedWeekIndex <= 3 { return .ambitious }
         return .realistic
     }
-    private var selectedWeekIndex: Int { max(0, min(labels.count - 1, weekIndex)) }
+    private var selectedWeekIndex: Int {
+        if NoopContentPolicy.allowsPrototypeContent { return max(0, min(labels.count - 1, weekIndex)) }
+        return labels.indices.contains(productionWeekIndex) ? productionWeekIndex : -1
+    }
     private func evidenceColor(for evidence: NoopGoalEvidence) -> Color {
         let value = evidence.progress * feasibility.factor
         if value > 0.7 { return NoopHTMLColor.green }
@@ -970,55 +1301,69 @@ private struct NoopGoalSet: View {
         return Color(hex: 0xE9A288)
     }
     private func commit() {
+        guard detailsReady else { navigation.show(.goalEditor); return }
         activeKind = navigation.selectedGoal.rawValue
-        activeTitle = draftTitle
+        activeTitle = NoopContentPolicy.allowsPrototypeContent ? draftTitle : productionDraftTitle
+        let draft = draftGoal()
+        for existing in goalStore.activeGoals {
+            goalStore.setAside(existing.id, reason: "Replaced by the new one-goal route")
+        }
+        let risky = !commitIsPlain
+        let acknowledgement: CoachGoal.RiskAcknowledgement? = !risky ? nil : .init(
+            verdict: NoopContentPolicy.allowsPrototypeContent ? feasibility.kicker
+                : liveAssessment.map { Self.style(for: $0.verdict).kicker } ?? "",
+            reason: "Confirmed with Commit anyway",
+            date: Date()
+        )
+        goalStore.commit(draft, acknowledgedRisk: acknowledgement)
+        navigation.reset(to: .goal)
+    }
+
+    /// The goal as the controls currently describe it.
+    private func draftGoal() -> CoachGoal {
         let defaults = UserDefaults.standard
-        let deadlineWeeks = [6, 8, 10, 12, 15, 16, 20, 22, 26, 35, 43, 52][selectedWeekIndex]
+        let prefix = NoopContentPolicy.allowsPrototypeContent ? "noop.html.goal" : NoopProductionGoalDetails.prefix
+        let deadlineWeeks = [6, 8, 10, 12, 15, 16, 20, 22, 26, 35, 43, 52][max(0, selectedWeekIndex)]
         let deadline = Calendar.current.date(byAdding: .weekOfYear, value: deadlineWeeks, to: Date())
         let kind: CoachGoal.Kind
         let baseline: Double?
         let target: Double?
         switch navigation.selectedGoal {
         case .distance:
-            kind = .run
-            baseline = 12
-            switch defaults.string(forKey: "noop.html.goal.distance") ?? "Half marathon" {
-            case "5K": target = 5
-            case "10K": target = 10
-            case "Marathon": target = 42.195
-            default: target = 21.0975
-            }
+            let activity = defaults.string(forKey: "\(prefix).activity") ?? "Run"
+            kind = activity == "Run" ? .run : .custom
+            // The example person's first 12 km run is not the wearer's baseline; the tracker measures one.
+            baseline = NoopContentPolicy.allowsPrototypeContent ? 12 : nil
+            let selectedDistance = defaults.string(forKey: "\(prefix).distance") ?? "Half marathon"
+            let distance = NoopProductionGoalDetails.distance(selectedDistance,
+                custom: defaults.string(forKey: "\(prefix).custom-distance") ?? "")
+            target = kind == .run ? distance : nil
         case .pace:
-            kind = .run
+            // `CoachGoal.run` measures distance in km; no pace measurement exists for this route.
+            // Hold the user's finish-time goal instead of falsely judging it as a running-distance goal.
+            kind = .custom
             baseline = nil
             target = nil
         case .sleep:
             kind = .consistency
             baseline = nil
-            target = Double(defaults.string(forKey: "noop.html.goal.sleep-nights") ?? "5")
+            target = Double(defaults.string(forKey: "\(prefix).sleep-nights") ?? "5")
         case .composition:
-            kind = (defaults.string(forKey: "noop.html.goal.composition-metric") ?? "Weight") == "Weight" ? .weight : .custom
+            kind = (defaults.string(forKey: "\(prefix).composition-metric") ?? "Weight") == "Weight" ? .weight : .custom
             baseline = nil
-            target = Double(defaults.string(forKey: "noop.html.goal.target-value") ?? "")
+            target = kind == .weight ? Double((defaults.string(forKey: "\(prefix).target-value") ?? "")
+                .replacingOccurrences(of: ",", with: ".")) : nil
         }
-        for existing in goalStore.activeGoals {
-            goalStore.setAside(existing.id, reason: "Replaced by the new one-goal route")
-        }
-        let draft = CoachGoal(
+        // An untouched draft still holds the example sentence; production names the goal by its kind.
+        let title = NoopContentPolicy.allowsPrototypeContent ? draftTitle : productionDraftTitle
+        return CoachGoal(
             kind: kind,
-            title: draftTitle,
+            title: title,
             baseline: baseline,
             target: target,
             targetDate: deadline,
             history: [.init(date: Date(), what: "Set in the Noop Journey")]
         )
-        let acknowledgement: CoachGoal.RiskAcknowledgement? = feasibility.kind == .realistic ? nil : .init(
-            verdict: feasibility.kicker,
-            reason: "Confirmed with Commit anyway",
-            date: Date()
-        )
-        goalStore.commit(draft, acknowledgedRisk: acknowledgement)
-        navigation.reset(to: .goal)
     }
 }
 
@@ -1028,13 +1373,15 @@ struct NoopGoalEditorSheet: View {
     @ObservedObject var navigation: NoopNavigation
     @State private var activity = "Run"
     @State private var distance = "Half marathon"
+    @State private var customDistance = ""
     @State private var eventDistance = "10K"
-    @State private var finishTime = "00:52:00"
+    @State private var customEventDistance = ""
+    @State private var finishTime = ""
     @State private var sleepAnchor = "23:00–07:00"
     @State private var sleepDrift = "±45 min"
     @State private var nights = "5"
     @State private var compositionMetric = "Weight"
-    @State private var targetValue = "72"
+    @State private var targetValue = ""
 
     var body: some View {
         NoopBottomSheet(title: navigation.selectedGoal.rawValue, dismiss: navigation.dismissOverlay, showsDone: true) {
@@ -1044,9 +1391,15 @@ struct NoopGoalEditorSheet: View {
                     case .distance:
                         fieldPicker("Activity", selection: $activity, values: ["Run", "Ride", "Swim", "Walk"])
                         fieldPicker("Target distance", selection: $distance, values: ["5K", "10K", "Half marathon", "Marathon", "Custom"])
+                        if distance == "Custom" {
+                            textField("Distance in kilometres", text: $customDistance, keyboard: .decimalPad)
+                        }
                     case .pace:
                         fieldPicker("Activity", selection: $activity, values: ["Run", "Ride", "Swim", "Walk"])
                         fieldPicker("Event distance", selection: $eventDistance, values: ["5K", "10K", "Half marathon", "Marathon", "Custom"])
+                        if eventDistance == "Custom" {
+                            textField("Distance in kilometres", text: $customEventDistance, keyboard: .decimalPad)
+                        }
                         textField("Target finish time", text: $finishTime, keyboard: .numbersAndPunctuation)
                         Text("Finish time and target pace stay linked.").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
                     case .sleep:
@@ -1055,14 +1408,24 @@ struct NoopGoalEditorSheet: View {
                         fieldPicker("Nights each week", selection: $nights, values: ["4", "5", "6", "7"])
                     case .composition:
                         fieldPicker("Metric", selection: $compositionMetric, values: ["Weight", "Waist", "Body fat"])
+                            .onChange(of: compositionMetric) { oldMetric, newMetric in
+                                if oldMetric != newMetric { targetValue = "" }
+                            }
                         textField("Target value", text: $targetValue, keyboard: .decimalPad)
                         Text(compositionMetric == "Weight" ? "kg" : compositionMetric == "Waist" ? "cm" : "%")
                             .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
                     }
-                    Text("Prefilled from your current profile and record. Every value remains editable.")
+                    Text(NoopContentPolicy.allowsPrototypeContent
+                         ? "Prefilled from your current profile and record. Every value remains editable."
+                         : "Choose your own target. Noop does not fill these values from an example person or an unconfirmed profile.")
                         .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                     Button("Save goal details") { save() }
                         .buttonStyle(NoopHTMLButtonStyle(kind: .primary, fullWidth: true))
+                        .disabled(!canSave)
+                    if !canSave {
+                        Text("Enter a valid target before saving.")
+                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                    }
                 }
             }.frame(maxHeight: 470)
         }
@@ -1090,35 +1453,74 @@ struct NoopGoalEditorSheet: View {
     }
     private func load() {
         let defaults = UserDefaults.standard
-        activity = defaults.string(forKey: "noop.html.goal.activity") ?? "Run"
-        distance = defaults.string(forKey: "noop.html.goal.distance") ?? "Half marathon"
-        eventDistance = defaults.string(forKey: "noop.html.goal.event-distance") ?? "10K"
-        finishTime = defaults.string(forKey: "noop.html.goal.finish-time") ?? "00:52:00"
-        sleepAnchor = defaults.string(forKey: "noop.html.goal.sleep-anchor") ?? "23:00–07:00"
-        sleepDrift = defaults.string(forKey: "noop.html.goal.sleep-drift") ?? "±45 min"
-        nights = defaults.string(forKey: "noop.html.goal.sleep-nights") ?? "5"
-        compositionMetric = defaults.string(forKey: "noop.html.goal.composition-metric") ?? "Weight"
-        targetValue = defaults.string(forKey: "noop.html.goal.target-value") ?? "72"
+        let isPrototype = NoopContentPolicy.allowsPrototypeContent
+        let prefix = isPrototype ? "noop.html.goal" : NoopProductionGoalDetails.prefix
+        // A different goal kind must not inherit previously confirmed details as if they described it.
+        let reuse = isPrototype || defaults.string(forKey: NoopProductionGoalDetails.confirmedKindKey) == navigation.selectedGoal.rawValue
+        activity = reuse ? defaults.string(forKey: "\(prefix).activity") ?? "Run" : "Run"
+        distance = reuse ? defaults.string(forKey: "\(prefix).distance") ?? "Half marathon" : "Half marathon"
+        customDistance = reuse ? defaults.string(forKey: "\(prefix).custom-distance") ?? "" : ""
+        eventDistance = reuse ? defaults.string(forKey: "\(prefix).event-distance") ?? "10K" : "10K"
+        customEventDistance = reuse ? defaults.string(forKey: "\(prefix).custom-event-distance") ?? "" : ""
+        finishTime = reuse ? defaults.string(forKey: "\(prefix).finish-time") ?? (isPrototype ? "00:52:00" : "") : ""
+        sleepAnchor = reuse ? defaults.string(forKey: "\(prefix).sleep-anchor") ?? "23:00–07:00" : "23:00–07:00"
+        sleepDrift = reuse ? defaults.string(forKey: "\(prefix).sleep-drift") ?? "±45 min" : "±45 min"
+        nights = reuse ? defaults.string(forKey: "\(prefix).sleep-nights") ?? "5" : "5"
+        compositionMetric = reuse ? defaults.string(forKey: "\(prefix).composition-metric") ?? "Weight" : "Weight"
+        targetValue = reuse ? defaults.string(forKey: "\(prefix).target-value") ?? (isPrototype ? "72" : "") : ""
+    }
+
+    private var canSave: Bool {
+        if NoopContentPolicy.allowsPrototypeContent { return true }
+        switch navigation.selectedGoal {
+        case .distance:
+            return NoopProductionGoalDetails.distance(distance, custom: customDistance) != nil
+        case .pace:
+            return NoopProductionGoalDetails.distance(eventDistance, custom: customEventDistance) != nil
+                && NoopProductionGoalDetails.validFinishTime(finishTime)
+        case .composition:
+            guard let value = Double(targetValue.replacingOccurrences(of: ",", with: ".")),
+                  value.isFinite, value > 0 else { return false }
+            return compositionMetric != "Body fat" || value <= 100
+        case .sleep:
+            return false
+        }
     }
     private func save() {
+        guard canSave else { return }
         let defaults = UserDefaults.standard
-        defaults.set(activity, forKey: "noop.html.goal.activity")
-        defaults.set(distance, forKey: "noop.html.goal.distance")
-        defaults.set(eventDistance, forKey: "noop.html.goal.event-distance")
-        defaults.set(finishTime, forKey: "noop.html.goal.finish-time")
-        defaults.set(sleepAnchor, forKey: "noop.html.goal.sleep-anchor")
-        defaults.set(sleepDrift, forKey: "noop.html.goal.sleep-drift")
-        defaults.set(nights, forKey: "noop.html.goal.sleep-nights")
-        defaults.set(compositionMetric, forKey: "noop.html.goal.composition-metric")
-        defaults.set(targetValue, forKey: "noop.html.goal.target-value")
+        let isPrototype = NoopContentPolicy.allowsPrototypeContent
+        let prefix = isPrototype ? "noop.html.goal" : NoopProductionGoalDetails.prefix
+        defaults.set(activity, forKey: "\(prefix).activity")
+        defaults.set(distance, forKey: "\(prefix).distance")
+        defaults.set(customDistance, forKey: "\(prefix).custom-distance")
+        defaults.set(eventDistance, forKey: "\(prefix).event-distance")
+        defaults.set(customEventDistance, forKey: "\(prefix).custom-event-distance")
+        defaults.set(finishTime, forKey: "\(prefix).finish-time")
+        defaults.set(sleepAnchor, forKey: "\(prefix).sleep-anchor")
+        defaults.set(sleepDrift, forKey: "\(prefix).sleep-drift")
+        defaults.set(nights, forKey: "\(prefix).sleep-nights")
+        defaults.set(compositionMetric, forKey: "\(prefix).composition-metric")
+        defaults.set(targetValue, forKey: "\(prefix).target-value")
         let title: String
         switch navigation.selectedGoal {
-        case .distance: title = "\(distance) \(activity.lowercased()), finishing comfortably."
-        case .pace: title = "\(eventDistance) \(activity.lowercased()) in \(finishTime)."
+        case .distance:
+            let label = distance == "Custom" ? "\(customDistance) km" : distance
+            title = isPrototype
+                ? "\(label) \(activity.lowercased()), finishing comfortably."
+                : "\(label) \(activity.lowercased())."
+        case .pace:
+            let label = eventDistance == "Custom" ? "\(customEventDistance) km" : eventDistance
+            title = "\(label) \(activity.lowercased()) in \(finishTime)."
         case .sleep: title = "Sleep inside \(sleepAnchor), \(nights) nights each week."
         case .composition: title = "\(compositionMetric) at \(targetValue) \(compositionMetric == "Weight" ? "kg" : compositionMetric == "Waist" ? "cm" : "%")."
         }
-        defaults.set(title, forKey: "noop.html.goal-draft-title")
+        defaults.set(title, forKey: isPrototype ? "noop.html.goal-draft-title" : "\(prefix).draft-title")
+        if !isPrototype {
+            defaults.set(navigation.selectedGoal.rawValue, forKey: NoopProductionGoalDetails.confirmedKindKey)
+            defaults.set(defaults.integer(forKey: "\(prefix).details-revision") + 1,
+                         forKey: "\(prefix).details-revision")
+        }
         navigation.dismissOverlay()
     }
 }
@@ -1269,7 +1671,7 @@ private struct NoopLabsHome: View {
                                         .font(NoopHTMLFont.sans(10.5, weight: .semibold))
                                         .foregroundStyle(marker.isOutside ? Color(hex: 0xF6DCB4) : NoopHTMLColor.copy)
                                 }
-                                NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                                NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                             }
                             .frame(minHeight: 62)
                             .padding(.vertical, 13)
@@ -1446,7 +1848,7 @@ private struct NoopLabPicker: View {
                     Text("Choose from Photos")
                         .font(NoopHTMLFont.sans(13.5, weight: .medium))
                     Spacer()
-                    NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                    NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 48)
@@ -1480,7 +1882,7 @@ private struct NoopLabPicker: View {
                         .multilineTextAlignment(.leading)
                 }
                 Spacer(minLength: 0)
-                NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
@@ -1500,7 +1902,7 @@ private struct NoopLabPicker: View {
     private var footnote: some View {
         Text("Cancelling here adds nothing, and a photo you back out of is not remembered.")
             .font(NoopHTMLFont.sans(11.5))
-            .foregroundStyle(Color(hex: 0x57605C))
+            .foregroundStyle(NoopHTMLColor.faint)
             .lineSpacing(NoopSpecType.lineSpacing(size: 11.5, cssLineHeight: 1.6, face: NoopSpecType.Face.sansRegular))
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 2)

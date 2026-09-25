@@ -1,8 +1,8 @@
 import XCTest
 @testable import StrandAnalytics
 
-/// The ordering behind the Today "Momentum" card: which single thing is worth saying now, and in what
-/// order the rest follow onto the Momentum page. All of it is pure, so it is pinned here rather than
+/// The ordering behind Aura's "What changed" findings: which single thing is worth saying now, and in
+/// what order the rest follow. All of it is pure, so it is pinned here rather than
 /// argued about against a live screen.
 final class MomentumFeedTests: XCTestCase {
 
@@ -20,12 +20,12 @@ final class MomentumFeedTests: XCTestCase {
     func testTierOrderBeatsEveryTimeOfDayNudge() {
         // A positive insight is favoured by the evening nudge; a time-critical goal is not. The goal
         // must still win — the nudge may only reorder WITHIN a tier.
-        let out = MomentumFeed.rank([msg(.streak), msg(.planDeviation)], hour: evening)
-        XCTAssertEqual(out.map(\.kind), [.planDeviation, .streak])
+        let out = MomentumFeed.rank([msg(.hrvTrend), msg(.planDeviation)], hour: evening)
+        XCTAssertEqual(out.map(\.kind), [.planDeviation, .hrvTrend])
     }
 
     func testExplicitUserStatusOutranksEverything() {
-        let out = MomentumFeed.rank([msg(.hrvTrend), msg(.stepGoal), msg(.statusOverride)], hour: afternoon)
+        let out = MomentumFeed.rank([msg(.hrvTrend), msg(.sleepCatchUp), msg(.statusOverride)], hour: afternoon)
         XCTAssertEqual(out.first?.kind, .statusOverride)
     }
 
@@ -38,11 +38,11 @@ final class MomentumFeedTests: XCTestCase {
 
     // MARK: - Time of day
 
-    /// THE POINT of the feature: the SAME candidate set reads differently at three times of day.
+    /// The same allowed candidates can still change their lead as the day moves toward sleep.
     func testSameCandidatesReorderAcrossTheDay() {
-        let pool = [msg(.recoveryRead), msg(.stepGoal), msg(.sleepCatchUp)]
+        let pool = [msg(.recoveryRead), msg(.sleepCatchUp)]
         XCTAssertEqual(MomentumFeed.rank(pool, hour: morning).first?.kind, .recoveryRead)
-        XCTAssertEqual(MomentumFeed.rank(pool, hour: afternoon).first?.kind, .stepGoal)
+        XCTAssertEqual(MomentumFeed.rank(pool, hour: afternoon).first?.kind, .recoveryRead)
         XCTAssertEqual(MomentumFeed.rank(pool, hour: evening).first?.kind, .sleepCatchUp)
     }
 
@@ -74,10 +74,9 @@ final class MomentumFeedTests: XCTestCase {
 
     // MARK: - Tone
 
-    /// The regression this rule exists for: an afternoon step read is nudged hard, a rest-day warning is
-    /// not — yet "you have had three straining days" is the more important thing to say.
+    /// An evening sleep-debt read is nudged hard, yet "three straining days" is still more important.
     func testCriticalMessageOutranksAHardNudgedPeer() {
-        let out = MomentumFeed.rank([msg(.stepGoal), msg(.restDayNeeded, tone: .critical)], hour: afternoon)
+        let out = MomentumFeed.rank([msg(.sleepCatchUp), msg(.restDayNeeded, tone: .critical)], hour: evening)
         XCTAssertEqual(out.first?.kind, .restDayNeeded)
     }
 
@@ -86,36 +85,36 @@ final class MomentumFeedTests: XCTestCase {
     func testCriticalToneIsBounded() {
         XCTAssertLessThan(MomentumFeed.criticalBonus, MomentumFeed.tierWeight)
         for hour in 0..<24 {
-            let out = MomentumFeed.rank([msg(.streak, tone: .critical), msg(.statusOverride)], hour: hour)
+            let out = MomentumFeed.rank([msg(.hrvTrend, tone: .critical), msg(.statusOverride)], hour: hour)
             XCTAssertEqual(out.first?.kind, .statusOverride,
                            "an explicit user status must still lead at \(hour)h")
         }
     }
 
     func testHourIsNormalisedSoNoInputTraps() {
-        XCTAssertEqual(MomentumFeed.timeBonus(.stepGoal, hour: 14),
-                       MomentumFeed.timeBonus(.stepGoal, hour: 38))
-        XCTAssertEqual(MomentumFeed.timeBonus(.stepGoal, hour: 14),
-                       MomentumFeed.timeBonus(.stepGoal, hour: -10))
+        XCTAssertEqual(MomentumFeed.timeBonus(.sleepCatchUp, hour: 14),
+                       MomentumFeed.timeBonus(.sleepCatchUp, hour: 38))
+        XCTAssertEqual(MomentumFeed.timeBonus(.sleepCatchUp, hour: 14),
+                       MomentumFeed.timeBonus(.sleepCatchUp, hour: -10))
     }
 
     // MARK: - Hysteresis
 
     func testIncumbentHoldsTheCardDuringItsDwell() {
         let now = Date()
-        let last = MomentumLastShown(kind: .stepGoal, at: now.addingTimeInterval(-10 * 60))
-        // Morning, so recoveryRead outranks stepGoal by a whole tier — but the dwell has not passed.
-        let out = MomentumFeed.rank([msg(.recoveryRead), msg(.stepGoal)],
+        let last = MomentumLastShown(kind: .sleepCatchUp, at: now.addingTimeInterval(-10 * 60))
+        // Morning, so recoveryRead outranks sleepCatchUp — but the dwell has not passed.
+        let out = MomentumFeed.rank([msg(.recoveryRead), msg(.sleepCatchUp)],
                                     hour: morning, lastShown: last, now: now)
-        XCTAssertEqual(out.first?.kind, .stepGoal, "the card must not change under the reader")
+        XCTAssertEqual(out.first?.kind, .sleepCatchUp, "the card must not change under the reader")
         XCTAssertEqual(out.count, 2, "the challenger is held behind it, not dropped")
     }
 
     func testChallengerTakesTheCardOnceTheDwellHasPassed() {
         let now = Date()
-        let last = MomentumLastShown(kind: .stepGoal,
+        let last = MomentumLastShown(kind: .sleepCatchUp,
                                      at: now.addingTimeInterval(-MomentumFeed.minDwellSeconds - 60))
-        let out = MomentumFeed.rank([msg(.recoveryRead), msg(.stepGoal)],
+        let out = MomentumFeed.rank([msg(.recoveryRead), msg(.sleepCatchUp)],
                                     hour: morning, lastShown: last, now: now)
         XCTAssertEqual(out.first?.kind, .recoveryRead)
     }
@@ -124,19 +123,19 @@ final class MomentumFeedTests: XCTestCase {
     /// trade places every time an input twitches.
     func testNearEqualRivalDoesNotTakeTheCardAfterTheDwell() {
         let now = Date()
-        let last = MomentumLastShown(kind: .weightMilestone,
+        let last = MomentumLastShown(kind: .trainingSuggestion,
                                      at: now.addingTimeInterval(-MomentumFeed.minDwellSeconds - 60))
-        // Both are tier 2 and neither is nudged at this hour, so the margin is 0.
-        let out = MomentumFeed.rank([msg(.milestone), msg(.weightMilestone)],
-                                    hour: morning, lastShown: last, now: now)
-        XCTAssertEqual(out.first?.kind, .weightMilestone)
+        // Both are tier 3 and neither is nudged in the afternoon, so the margin is 0.
+        let out = MomentumFeed.rank([msg(.recoveryRead), msg(.trainingSuggestion)],
+                                    hour: afternoon, lastShown: last, now: now)
+        XCTAssertEqual(out.first?.kind, .trainingSuggestion)
     }
 
     /// Something actually wrong interrupts. A dwell timer is not a reason to stay quiet about it.
     func testCriticalMessageBreaksTheDwell() {
         let now = Date()
-        let last = MomentumLastShown(kind: .stepGoal, at: now.addingTimeInterval(-60))
-        let out = MomentumFeed.rank([msg(.restDayNeeded, tone: .critical), msg(.stepGoal)],
+        let last = MomentumLastShown(kind: .sleepCatchUp, at: now.addingTimeInterval(-60))
+        let out = MomentumFeed.rank([msg(.restDayNeeded, tone: .critical), msg(.sleepCatchUp)],
                                     hour: afternoon, lastShown: last, now: now)
         XCTAssertEqual(out.first?.kind, .restDayNeeded)
     }
@@ -145,16 +144,16 @@ final class MomentumFeedTests: XCTestCase {
     /// candidates would swap the card on every pass, which is the flicker the dwell exists to stop.
     func testCriticalIncumbentStillHoldsAgainstAnotherCritical() {
         let now = Date()
-        let last = MomentumLastShown(kind: .stepGoal, at: now.addingTimeInterval(-60))
-        let out = MomentumFeed.rank([msg(.restDayNeeded, tone: .critical), msg(.stepGoal, tone: .critical)],
+        let last = MomentumLastShown(kind: .sleepCatchUp, at: now.addingTimeInterval(-60))
+        let out = MomentumFeed.rank([msg(.restDayNeeded, tone: .critical), msg(.sleepCatchUp, tone: .critical)],
                                     hour: afternoon, lastShown: last, now: now)
-        XCTAssertEqual(out.first?.kind, .stepGoal)
+        XCTAssertEqual(out.first?.kind, .sleepCatchUp)
     }
 
     /// An incumbent whose message no longer applies simply loses the card — it must not be resurrected.
     func testIncumbentThatIsNoLongerACandidateIsNotRestored() {
         let now = Date()
-        let last = MomentumLastShown(kind: .stepGoal, at: now.addingTimeInterval(-60))
+        let last = MomentumLastShown(kind: .sleepCatchUp, at: now.addingTimeInterval(-60))
         let out = MomentumFeed.rank([msg(.recoveryRead)], hour: morning, lastShown: last, now: now)
         XCTAssertEqual(out.map(\.kind), [.recoveryRead])
     }
@@ -166,30 +165,30 @@ final class MomentumFeedTests: XCTestCase {
     }
 
     func testPastDayDropsEveryActionableKind() {
-        let pool = [msg(.stepGoal), msg(.planDeviation), msg(.recoveryRead), msg(.hrvTrend)]
+        let pool = [msg(.sleepCatchUp), msg(.planDeviation), msg(.recoveryRead), msg(.hrvTrend)]
         let out = MomentumFeed.rank(pool, hour: afternoon, retrospective: true)
         XCTAssertEqual(Set(out.map(\.kind)), [.recoveryRead, .hrvTrend])
         XCTAssertTrue(out.allSatisfy(\.kind.isRetrospective))
     }
 
     func testPastDayWithOnlyActionableKindsYieldsNothing() {
-        let out = MomentumFeed.rank([msg(.stepGoal), msg(.planDeviation)],
+        let out = MomentumFeed.rank([msg(.sleepCatchUp), msg(.planDeviation)],
                                     hour: afternoon, retrospective: true)
-        XCTAssertTrue(out.isEmpty, "a past day must not be told to walk 2,340 more steps")
+        XCTAssertTrue(out.isEmpty, "a past day must not be given a live sleep or plan instruction")
     }
 
     /// The Momentum page renders the whole list, so equal-scoring candidates must not shuffle between
     /// two runs over identical input.
     func testEqualScoresKeepTheirInputOrder() {
-        let pool = [msg(.milestone), msg(.weightMilestone)]
+        let pool = [msg(.recoveryRead), msg(.trainingSuggestion)]
         for _ in 0..<20 {
-            XCTAssertEqual(MomentumFeed.rank(pool, hour: morning).map(\.kind),
-                           [.milestone, .weightMilestone])
+            XCTAssertEqual(MomentumFeed.rank(pool, hour: afternoon).map(\.kind),
+                           [.recoveryRead, .trainingSuggestion])
         }
     }
 
-    func testRankReturnsEveryCandidateNotJustTheWinner() {
-        let pool = [msg(.streak), msg(.stepGoal), msg(.recoveryRead), msg(.planDeviation)]
+    func testRankReturnsEveryAllowedCandidateNotJustTheWinner() {
+        let pool = [msg(.hrvTrend), msg(.sleepCatchUp), msg(.recoveryRead), msg(.planDeviation)]
         XCTAssertEqual(MomentumFeed.rank(pool, hour: morning).count, pool.count)
     }
 
@@ -226,6 +225,45 @@ final class MomentumFeedTests: XCTestCase {
     }
 }
 
+/// Aura's policy boundary: these tests make the design cut structural rather than a view convention.
+final class MomentumAuraAllowListTests: XCTestCase {
+    private func msg(_ kind: MomentumKind) -> MomentumMessage {
+        MomentumMessage(kind: kind, tone: .neutral, headline: kind.rawValue, detail: "d")
+    }
+
+    private let expected: [MomentumKind] = [
+        .statusOverride, .calibrating, .planDeviation, .recoveryRead,
+        .restDayNeeded, .trainingSuggestion, .sleepCatchUp, .hrvTrend,
+        .bedtimeTarget, .strapBattery, .healthAlert, .milestone,
+    ]
+
+    func testNamedAllowListIsExactlyTheTwelveApprovedKinds() {
+        XCTAssertEqual(MomentumAuraAllowList.kinds, expected)
+        XCTAssertEqual(Set(MomentumAuraAllowList.kinds.map(\.rawValue)).count, 12)
+    }
+
+    func testSixRetiredKindsAreRemovedBeforeRankingAndCounting() {
+        let retired: [MomentumKind] = [
+            .weeklyTrainingGoal, .streak, .stepGoal,
+            .stepsBelowUsual, .weightMilestone, .cyclePhase,
+        ]
+        let input = retired.map(msg) + expected.map(msg)
+        let output = MomentumFeed.rank(input, hour: 14)
+
+        XCTAssertEqual(output.count, 12)
+        XCTAssertEqual(Set(output.map { $0.kind.rawValue }), Set(expected.map(\.rawValue)))
+        XCTAssertTrue(retired.allSatisfy { kind in !output.contains { $0.kind == kind } })
+    }
+
+    func testOnlyRetiredKindsProduceTheTrueEmptyState() {
+        let retired: [MomentumKind] = [
+            .weeklyTrainingGoal, .streak, .stepGoal,
+            .stepsBelowUsual, .weightMilestone, .cyclePhase,
+        ]
+        XCTAssertTrue(MomentumFeed.rank(retired.map(msg), hour: 20).isEmpty)
+    }
+}
+
 /// The four kinds added so Momentum can speak about the things the app already knows but the feed had no
 /// channel for: a raised health alert, tonight's bedtime target, a strap that will not survive the night,
 /// and the cycle phase.
@@ -245,9 +283,9 @@ final class MomentumNewKindsTests: XCTestCase {
     // MARK: - Health alert
 
     /// Critical tone plus a time-critical tier: something the app believes is wrong must not sit under a
-    /// step goal. It still cannot displace an explicit statement from the wearer themselves.
+    /// recovery read. It still cannot displace an explicit statement from the wearer themselves.
     func testHealthAlertLeadsUnlessTheWearerHasSaidOtherwise() {
-        let out = MomentumFeed.rank([msg(.stepGoal), msg(.recoveryRead),
+        let out = MomentumFeed.rank([msg(.sleepCatchUp), msg(.recoveryRead),
                                      msg(.healthAlert, tone: .critical)], hour: morning)
         XCTAssertEqual(out.first?.kind, .healthAlert)
 
@@ -291,26 +329,26 @@ final class MomentumNewKindsTests: XCTestCase {
         XCTAssertEqual(MomentumFeed.timeBonus(.strapBattery, hour: morning), 0)
         XCTAssertGreaterThan(MomentumFeed.timeBonus(.strapBattery, hour: evening), 0)
 
-        let out = MomentumFeed.rank([msg(.streak), msg(.sleepCatchUp), msg(.strapBattery, tone: .caution)],
+        let out = MomentumFeed.rank([msg(.hrvTrend), msg(.sleepCatchUp), msg(.strapBattery, tone: .caution)],
                                     hour: evening)
         XCTAssertEqual(out.first?.kind, .strapBattery)
     }
 
     // MARK: - Cycle
 
-    /// A phase is a true statement about the day being read, so unlike the others it survives a past day.
-    func testCyclePhaseIsRetrospectiveAndSitsInTheContextTier() {
+    /// The upstream model can still describe a phase, but Aura deliberately keeps the engine dark.
+    func testCyclePhaseRemainsRepresentableButIsCutFromAura() {
         XCTAssertTrue(MomentumKind.cyclePhase.isRetrospective)
         XCTAssertEqual(MomentumKind.cyclePhase.tier, 5)
 
         let out = MomentumFeed.rank([msg(.cyclePhase), msg(.recoveryRead)],
                                     hour: morning, retrospective: true)
-        XCTAssertEqual(Set(out.map(\.kind)), [.cyclePhase, .recoveryRead])
+        XCTAssertEqual(out.map(\.kind), [.recoveryRead])
     }
 
-    /// Context must never take the card from something actionable.
-    func testCyclePhaseDoesNotOutrankAnActionableRead() {
+    /// Two retired mechanics do not create a phantom count or a non-empty surface.
+    func testCutContextAndStepMechanicsProduceNoFinding() {
         let out = MomentumFeed.rank([msg(.cyclePhase), msg(.stepGoal)], hour: 14)
-        XCTAssertEqual(out.first?.kind, .stepGoal)
+        XCTAssertTrue(out.isEmpty)
     }
 }

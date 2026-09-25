@@ -26,6 +26,9 @@ enum ActiveWorkoutPersistence {
         var avgHr: Int
         var peakHr: Int
         var liveStrain: Double
+        /// The chosen coaching zone belongs to this session, not the most recent picker state.
+        /// Optional so snapshots written before this field existed still decode.
+        var targetZone: Int? = nil
         var pausedAtSec: Int? = nil
         var pausedDurationSec: Int? = nil
     }
@@ -56,6 +59,7 @@ enum ActiveWorkoutPersistence {
             avgHr: max(0, raw.avgHr),
             peakHr: max(0, raw.peakHr),
             liveStrain: raw.liveStrain.isFinite ? max(0, raw.liveStrain) : 0,
+            targetZone: raw.targetZone.flatMap { (1...5).contains($0) ? $0 : nil },
             pausedAtSec: raw.pausedAtSec.flatMap { $0 > 0 ? $0 : nil },
             pausedDurationSec: raw.pausedDurationSec.map { max(0, $0) },
         )

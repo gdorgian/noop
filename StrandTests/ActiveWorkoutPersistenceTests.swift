@@ -17,11 +17,13 @@ final class ActiveWorkoutPersistenceTests: XCTestCase {
         avgHr: Int = 133,
         peakHr: Int = 145,
         liveStrain: Double = 8.4,
+        targetZone: Int? = nil,
         pausedAtSec: Int? = nil,
         pausedDurationSec: Int? = nil
     ) -> ActiveWorkoutPersistence.Snapshot {
         ActiveWorkoutPersistence.Snapshot(startSec: startSec, sport: sport, samples: samples,
                                           avgHr: avgHr, peakHr: peakHr, liveStrain: liveStrain,
+                                          targetZone: targetZone,
                                           pausedAtSec: pausedAtSec, pausedDurationSec: pausedDurationSec)
     }
 
@@ -36,9 +38,24 @@ final class ActiveWorkoutPersistenceTests: XCTestCase {
     // MARK: - pure codec round-trip
 
     func testEncodeDecodeRoundTripsEveryField() {
-        let original = snapshot(pausedAtSec: 1_700_000_120, pausedDurationSec: 45)
+        let original = snapshot(targetZone: 3, pausedAtSec: 1_700_000_120, pausedDurationSec: 45)
         let decoded = ActiveWorkoutPersistence.decode(ActiveWorkoutPersistence.encode(original))
         XCTAssertEqual(decoded, original)
+    }
+
+    func testLegacySnapshotWithoutTargetZoneStillDecodes() {
+        let legacy = Data("""
+            {"startSec":1700000000,"sport":"Cycling","samples":[],"avgHr":0,
+             "peakHr":0,"liveStrain":0}
+            """.utf8)
+        let decoded = ActiveWorkoutPersistence.decode(legacy)
+        XCTAssertEqual(decoded?.sport, "Cycling")
+        XCTAssertNil(decoded?.targetZone)
+    }
+
+    func testInvalidPersistedTargetZoneIsIgnored() {
+        XCTAssertNil(ActiveWorkoutPersistence.decode(
+            ActiveWorkoutPersistence.encode(snapshot(targetZone: 9)))?.targetZone)
     }
 
     func testRoundTripWithNoSamples() {

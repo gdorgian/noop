@@ -55,6 +55,8 @@ struct NoopAct9Screens: View {
             NoopInstrumentCompareScreen(navigation: navigation, range: range, data: presentedData)
         case .instrumentEffects:
             NoopInstrumentEffectsScreen(navigation: navigation, range: range, data: presentedData)
+        case .instrumentRaw, .instrumentCapture:
+            NoopInstrumentRawScreen(navigation: navigation)
         default:
             NoopInstrumentIndexScreen(
                 navigation: navigation,
@@ -159,6 +161,13 @@ private struct NoopInstrumentIndexScreen: View {
                             detail: "the ranking, the lag, and what one more costs",
                             glyph: .bolt,
                             action: { navigation.push(.instrumentEffects) }
+                        )
+                        Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                        NoopInstrumentDoor(
+                            title: "Raw capture",
+                            detail: "record the 100 Hz motion stream to this phone",
+                            glyph: .bolt,
+                            action: { navigation.push(.instrumentRaw) }
                         )
                     }
                     .padding(.horizontal, 16)
@@ -311,7 +320,7 @@ private struct NoopInstrumentGroupCard: View {
                             .fixedSize(horizontal: true, vertical: false)
                             .frame(minWidth: 86, alignment: .trailing)
 
-                            NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                            NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                                 .frame(width: 7)
                         }
                         .frame(minHeight: 68)
@@ -330,17 +339,24 @@ private struct NoopInstrumentGroupCard: View {
 }
 
 private struct NoopInstrumentSparkline: View {
-    let points: [CGPoint]
+    let points: [CGPoint?]
     let color: Color
 
     var body: some View {
         Canvas { context, _ in
-            guard let first = points.first else { return }
             var path = Path()
-            path.move(to: first)
-            for point in points.dropFirst() { path.addLine(to: point) }
+            var previousWasMeasured = false
+            for point in points {
+                guard let point else {
+                    previousWasMeasured = false
+                    continue
+                }
+                if previousWasMeasured { path.addLine(to: point) }
+                else { path.move(to: point) }
+                previousWasMeasured = true
+            }
             context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round))
-            if let last = points.last {
+            if let last = points.compactMap({ $0 }).last {
                 context.fill(Path(ellipseIn: CGRect(x: last.x - 2.4, y: last.y - 2.4, width: 4.8, height: 4.8)), with: .color(color))
             }
         }
@@ -364,7 +380,7 @@ private struct NoopInstrumentDoor: View {
                     Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
                 }
                 Spacer(minLength: 8)
-                NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
             .frame(minHeight: 60)
             .contentShape(Rectangle())
@@ -402,6 +418,452 @@ private struct NoopInstrumentBackHeader: View {
         }
         .padding(.horizontal, -2)
         .padding(.bottom, 16)
+    }
+}
+
+/// The visual grammar follows instrument/raw and instrument/capture. Prototype sample rows are
+/// confined to `--demo-seed`; outside that Debug fixture every value comes from persisted IMU data.
+private struct NoopInstrumentRawScreen: View {
+    @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var live: LiveState
+    @StateObject private var store = RawDataSessionStore()
+    @State private var now = Date()
+    @State private var deleteCandidate: RawDataSessionStore.Session?
+    @State private var errorMessage: String?
+    @State private var exporting = false
+
+    private var isDemo: Bool { NoopContentPolicy.allowsPrototypeContent }
+    private var sessions: [RawDataSessionStore.Session] {
+        guard isDemo else { return store.sessions }
+        let fixtures: [(String, TimeInterval)] = [
+            ("0f3a91", 0), ("0e77c4", -86_400),
+            ("0d1b58", -7 * 86_400), ("0c9042", -9 * 86_400)
+        ]
+        var result = fixtures.filter { !navigation.instrumentDemoRawDeletedIDs.contains($0.0) }.map { id, offset in
+            let start = Int64((now.addingTimeInterval(offset).timeIntervalSince1970) * 1_000)
+            return RawDataSessionStore.Session(
+                id: id, deviceId: "debug-fixture", startedAtMs: start,
+                endedAtMs: start + (id == "0f3a91" ? 252_000 : 710_000),
+                capturedStartedAtMs: start, capturedEndedAtMs: start + 252_000,
+                comment: "", exported: false, lastExportedAtMs: nil, events: []
+            )
+        }
+        if let demoArmedAt = navigation.instrumentDemoRawArmedAt {
+            result.insert(.init(id: "demo-live", deviceId: "debug-fixture",
+                                startedAtMs: Int64(demoArmedAt.timeIntervalSince1970 * 1_000),
+                                endedAtMs: nil, capturedStartedAtMs: nil, capturedEndedAtMs: nil,
+                                comment: "", exported: false, lastExportedAtMs: nil, events: []), at: 0)
+        }
+        return result
+    }
+
+    private var active: RawDataSessionStore.Session? {
+        isDemo ? sessions.first(where: \.active) : store.active
+    }
+
+    private var selected: RawDataSessionStore.Session? {
+        if let id = navigation.instrumentRawSessionID {
+            return sessions.first { $0.id == id }
+        }
+        return sessions.first { !$0.active }
+    }
+
+    var body: some View {
+        Group {
+            if navigation.route == .instrumentCapture { captureScreen }
+            else { rawScreen }
+        }
+        .task { restoreActiveCaptureIfPossible() }
+        .onChange(of: live.bonded) { _, bonded in
+            if bonded { restoreActiveCaptureIfPossible() }
+        }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { now = $0 }
+        .alert("Raw capture", isPresented: Binding(
+            get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
+        .confirmationDialog("Delete this capture?", isPresented: Binding(
+            get: { deleteCandidate != nil }, set: { if !$0 { deleteCandidate = nil } }
+        ), titleVisibility: .visible) {
+            Button("Delete capture", role: .destructive) {
+                guard let candidate = deleteCandidate else { return }
+                deleteCandidate = nil
+                if isDemo {
+                    navigation.instrumentDemoRawDeletedIDs.insert(candidate.id)
+                    navigation.back(or: .instrumentRaw)
+                } else if store.removeMetadata(candidate.id) { navigation.back(or: .instrumentRaw) }
+                else { errorMessage = "The capture could not be deleted. Its record was kept so you can try again." }
+            }
+            Button("Cancel", role: .cancel) { deleteCandidate = nil }
+        } message: { Text("Its local session record and captured motion data will be deleted permanently.") }
+    }
+
+    private var rawScreen: some View {
+        NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 0) {
+                NoopInstrumentBackHeader(label: "Ask it something") {
+                    navigation.back(or: .instrumentIndex)
+                }
+                Text("Raw capture")
+                    .font(NoopHTMLFont.outfit(25)).tracking(-0.625)
+                    .foregroundStyle(NoopHTMLColor.ink)
+                Text("Accelerometer and gyroscope at 100 Hz from a connected WHOOP 5/MG, written to this phone. Nothing is uploaded or fed into another Noop screen.")
+                    .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                    .lineSpacing(4.5).fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
+
+                armCard.padding(.top, 16)
+                VStack(alignment: .leading, spacing: 10) {
+                    NoopSectionLabel("What it will record")
+                    specRow("Channels", "accel · gyro")
+                    specRow("Rate", "100 Hz")
+                    specRow("Written to", "this phone")
+                    specRow("Leaves the phone", "only if you export")
+                }
+                .padding(.horizontal, 16).padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+                .padding(.top, 12)
+
+                HStack {
+                    NoopSectionLabel("Captures on this phone")
+                    Spacer()
+                    Text("\(sessions.count) files")
+                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                }
+                .padding(.horizontal, 4).padding(.top, 18).padding(.bottom, 9)
+
+                if sessions.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("No captures yet").font(NoopHTMLFont.sans(13))
+                            .foregroundStyle(NoopHTMLColor.ink)
+                        Text("Arm one above. Nothing is running in the background and nothing starts on its own.")
+                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(17).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(sessions) { session in
+                            Button {
+                                navigation.instrumentRawSessionID = session.id
+                                navigation.push(.instrumentCapture)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text("cap_\(session.id.suffix(6))")
+                                            .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
+                                            .foregroundStyle(NoopHTMLColor.ink)
+                                        Text(isDemo ? Self.demoDate(session.id) : Self.date(session.startedAtMs))
+                                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                                    }
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 3) {
+                                        Text(isDemo ? Self.demoDuration(session.id) : Self.duration(session, now: now))
+                                            .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
+                                            .foregroundStyle(NoopHTMLColor.ink)
+                                        Text(Self.size(stats(for: session).bytes))
+                                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                                    }
+                                    NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
+                                }
+                                .frame(minHeight: 68).contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            if session.id != sessions.last?.id {
+                                Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 15)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                }
+                Text("Captures remain on this phone until you delete them. Export opens the iOS share sheet; Noop does not send a capture on its own.")
+                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
+                    .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 2).padding(.top, 13)
+            }
+        }
+    }
+
+    private var armCard: some View {
+        let active = self.active
+        let stats = active.map { stats(for: $0) }
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Circle().fill(active == nil ? Color.white.opacity(0.2) : Color(hex: 0xE3574E))
+                    .frame(width: 9, height: 9)
+                Text(active == nil ? "Not recording" : live.bonded || isDemo ? "Recording" : "Armed · disconnected")
+                    .font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.4)
+                    .textCase(.uppercase)
+                    .foregroundStyle(active == nil ? NoopHTMLColor.copy : Color(hex: 0xF2B3AE))
+            }
+            HStack(alignment: .bottom) {
+                Text(active.map { Self.duration($0, now: now) } ?? "00:00")
+                    .font(.system(size: active == nil ? 26 : 38, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(active == nil ? Color(hex: 0x3E4643) : NoopHTMLColor.ink)
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(Self.size(stats?.bytes ?? 0))
+                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                    Text(active == nil ? "nothing recorded now" : "100 Hz · \(stats?.coveredSeconds ?? 0) s covered")
+                        .font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.copy)
+                }
+            }
+            Text(active == nil
+                 ? "Arming records until you stop it. It does not stop when you leave this screen. A connected WHOOP 5/MG is required."
+                 : live.bonded || isDemo
+                    ? "The strap is sending 100 Hz motion data. This uses noticeable battery and continues after you leave this screen until you stop it."
+                    : "The strap is disconnected, so no new samples can arrive. The capture remains armed and can resume when the strap reconnects.")
+                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0xB7C3C9))
+                .lineSpacing(3.5).fixedSize(horizontal: false, vertical: true)
+            Button {
+                if active == nil { start() }
+                else { Task { await stop() } }
+            } label: {
+                Text(active == nil ? "Arm capture" : "Stop recording")
+                    .font(NoopHTMLFont.sans(15, weight: .semibold))
+                    .foregroundStyle(active == nil ? NoopHTMLColor.ink : Color(hex: 0x1A0705))
+                    .frame(maxWidth: .infinity).frame(height: 56)
+                    .background(active == nil ? Color.white.opacity(0.07) : Color(hex: 0xE3574E),
+                                in: RoundedRectangle(cornerRadius: 18))
+                    .overlay(RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(active == nil ? Color.white.opacity(0.16) : Color.clear, lineWidth: 0.5))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(active == nil ? NoopHTMLColor.card : Color(hex: 0xE3574E).opacity(0.09),
+                    in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22)
+            .strokeBorder(active == nil ? NoopHTMLColor.border : Color(hex: 0xE3574E).opacity(0.42), lineWidth: 0.5))
+    }
+
+    private var captureScreen: some View {
+        NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 0) {
+                NoopInstrumentBackHeader(label: "Raw capture") {
+                    navigation.back(or: .instrumentRaw)
+                }
+                if let selected {
+                    Text("cap_\(selected.id.suffix(6))")
+                        .font(.system(size: 19, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                    Text(isDemo ? "Today 14:02:09 → 14:06:21 · Europe/Stockholm" : Self.date(selected.startedAtMs))
+                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .padding(.top, 5)
+                    let stats = stats(for: selected)
+                    VStack(spacing: 0) {
+                        captureRow("Duration", isDemo ? "4:12.4" : Self.duration(selected, now: now))
+                        captureRow("Channels", "2")
+                        captureRow("Rate", "100 Hz")
+                        captureRow("Samples / channel", "\(stats.coveredSeconds * 100)")
+                        captureRow("Covered seconds", "\(stats.coveredSeconds)")
+                        captureRow("Size on disk", Self.size(stats.bytes))
+                        specRow("Source", "WHOOP 5/MG", minHeight: 46)
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 4)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                    .padding(.top, 16)
+                    VStack(alignment: .leading, spacing: 11) {
+                        HStack {
+                            NoopSectionLabel("Samples per channel")
+                            Spacer()
+                            Text("100 Hz").font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                        }
+                        coverageRow("accel", stats.coveredSeconds * 100)
+                        coverageRow("gyro", stats.coveredSeconds * 100)
+                        Text(isDemo
+                             ? "Debug example: the gyro gap is drawn as a flat stretch. No actual sensor file is represented here."
+                             : "Only complete recorded seconds are counted. An exact gap-by-gap waveform is not available here, so none is invented.")
+                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(16).background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                    .padding(.top, 12)
+                    Button { Task { await export(selected) } } label: {
+                        Text(exporting ? "Preparing export…" : "Export capture")
+                            .font(NoopHTMLFont.sans(14, weight: .semibold))
+                            .frame(maxWidth: .infinity).frame(height: 52)
+                    }
+                    .buttonStyle(.plain).disabled(exporting || selected.active)
+                    .foregroundStyle(NoopHTMLColor.ink)
+                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 17))
+                    .padding(.top, 12)
+                    Button { deleteCandidate = selected } label: {
+                        Text("Delete this capture").font(NoopHTMLFont.sans(14))
+                            .frame(maxWidth: .infinity).frame(height: 52)
+                    }
+                    .buttonStyle(.plain).disabled(selected.active)
+                    .foregroundStyle(NoopHTMLColor.ink)
+                    .overlay(RoundedRectangle(cornerRadius: 17)
+                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
+                    .padding(.top, 8)
+                    Text("Export creates a local ZIP of the recorded stream and opens the share sheet. Where it goes after that is your decision.")
+                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 2).padding(.top, 12)
+                } else {
+                    Text("This capture is no longer on this phone.")
+                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                }
+            }
+        }
+    }
+
+    private func specRow(_ name: String, _ value: String, minHeight: CGFloat = 17) -> some View {
+        HStack(spacing: 12) {
+            Text(name).font(NoopHTMLFont.sans(12.5)).foregroundStyle(Color(hex: 0xC6CEC9))
+            Spacer(minLength: 0)
+            Text(value).font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(NoopHTMLColor.ink).multilineTextAlignment(.trailing)
+        }
+        .frame(minHeight: minHeight)
+    }
+
+    private func captureRow(_ name: String, _ value: String) -> some View {
+        specRow(name, value, minHeight: 46)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Color.white.opacity(0.06)).frame(height: 0.5)
+            }
+    }
+
+    private func coverageRow(_ name: String, _ count: Int) -> some View {
+        HStack(spacing: 11) {
+            Text(name).font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                .frame(width: 52, alignment: .leading)
+            if isDemo {
+                HStack(alignment: .bottom, spacing: 1.5) {
+                    ForEach(0..<40, id: \.self) { index in
+                        let gap = name == "gyro" && (22..<25).contains(index)
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(gap ? Color.white.opacity(0.08) : NoopHTMLColor.blue.opacity(0.55))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: gap ? 3 : 8 + CGFloat((index * 7) % 5) * 2.4)
+                    }
+                }
+                .frame(height: 20)
+            } else {
+                Rectangle().fill(NoopHTMLColor.blue.opacity(count == 0 ? 0.15 : 0.55))
+                    .frame(height: 12).clipShape(RoundedRectangle(cornerRadius: 3))
+            }
+            Text(count.formatted(.number.grouping(.automatic)))
+                .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+        }
+        .foregroundStyle(NoopHTMLColor.ink)
+    }
+
+    private func stats(for session: RawDataSessionStore.Session) -> ImuSessionFileStore.Stats {
+        if isDemo {
+            let bytes: Int64 = switch session.id {
+            case "0f3a91": 3_100_000
+            case "0e77c4": 8_700_000
+            case "0d1b58": 800_000
+            case "0c9042": 16_400_000
+            default: 0
+            }
+            return .init(bytes: bytes, coveredSeconds: session.id == "0f3a91" ? 252 : 0,
+                         firstTs: nil)
+        }
+        let from = Int(session.startedAtMs / 1_000)
+        let endMs = session.endedAtMs ?? Int64(now.timeIntervalSince1970 * 1_000)
+        return ImuSessionFileStore.shared.stats(session.id, from: from, to: Int(endMs / 1_000))
+    }
+
+    private func start() {
+        if isDemo { navigation.instrumentDemoRawArmedAt = now; return }
+        guard live.bonded, model.ble.isWhoop5 else {
+            errorMessage = "Connect a WHOOP 5/MG before arming a capture."
+            return
+        }
+        guard let session = store.start(deviceId: model.ble.deviceId) else { return }
+        guard model.ble.startGroundTruthRawCapture(sessionId: session.id) else {
+            store.stop()
+            _ = store.removeMetadata(session.id)
+            errorMessage = "The motion stream could not be started. No capture was kept."
+            return
+        }
+    }
+
+    private func restoreActiveCaptureIfPossible() {
+        guard !isDemo, let session = store.active, live.bonded, model.ble.isWhoop5 else { return }
+        _ = model.ble.startGroundTruthRawCapture(sessionId: session.id)
+    }
+
+    private func stop() async {
+        if isDemo { navigation.instrumentDemoRawArmedAt = nil; return }
+        await model.ble.stopGroundTruthRawCapture()
+        store.stop()
+    }
+
+    private func export(_ session: RawDataSessionStore.Session) async {
+        if isDemo {
+            errorMessage = "This is a Debug design example, not a captured sensor file. Connect a WHOOP 5/MG outside demo mode to export real data."
+            return
+        }
+        guard let endMs = session.endedAtMs else { return }
+        exporting = true
+        defer { exporting = false }
+        let from = Int(session.startedAtMs / 1_000)
+        let to = Int(endMs / 1_000)
+        let segments = ImuSessionFileStore.shared.exportSegments(session.id, from: from, to: to)
+        guard !segments.isEmpty else {
+            errorMessage = "There are no complete motion samples to export from this capture."
+            return
+        }
+        var entries = store.exportEntries(for: session, sensorAvailable: true)
+        entries += segments.map { FileExport.BundleEntry(name: "imu/\($0.name)", data: $0.data) }
+        if await FileExport.exportBundle(entries: entries,
+                                         suggestedName: "noop-5mg-raw-\(session.id).zip") == nil {
+            errorMessage = "The export file could not be created or shared."
+        } else {
+            store.markExported(session.id)
+        }
+    }
+
+    private static func date(_ milliseconds: Int64) -> String {
+        Date(timeIntervalSince1970: Double(milliseconds) / 1_000)
+            .formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private static func demoDate(_ id: String) -> String {
+        switch id {
+        case "0f3a91": "Today 14:02"
+        case "0e77c4": "Yesterday 08:41"
+        case "0d1b58": "Tue 16 Sep 19:20"
+        case "0c9042": "Sun 14 Sep 07:55"
+        default: "Today"
+        }
+    }
+
+    private static func demoDuration(_ id: String) -> String {
+        switch id {
+        case "0f3a91": "4:12"
+        case "0e77c4": "11:50"
+        case "0d1b58": "1:04"
+        case "0c9042": "22:31"
+        default: "0:00"
+        }
+    }
+
+    private static func duration(_ session: RawDataSessionStore.Session, now: Date) -> String {
+        let end = session.endedAtMs ?? Int64(now.timeIntervalSince1970 * 1_000)
+        let seconds = max(0, Int((end - session.startedAtMs) / 1_000))
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private static func size(_ bytes: Int64) -> String {
+        bytes < 1_000_000 ? "\(max(0, bytes / 1_000)) kB"
+            : String(format: "%.1f MB", Double(bytes) / 1_000_000)
     }
 }
 
@@ -654,12 +1116,21 @@ private struct NoopInstrumentMetricChart: View {
                 context.fill(band, with: .color(NoopHTMLColor.night.opacity(0.13)))
             }
 
-            if let first = chart.line.first {
-                var line = Path()
-                line.move(to: point(first))
-                for item in chart.line.dropFirst() { line.addLine(to: point(item)) }
-                context.stroke(line, with: .color(NoopHTMLColor.night), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            var line = Path()
+            var previousWasMeasured = false
+            for item in chart.line {
+                guard let item else {
+                    previousWasMeasured = false
+                    continue
+                }
+                if previousWasMeasured {
+                    line.addLine(to: point(item))
+                } else {
+                    line.move(to: point(item))
+                }
+                previousWasMeasured = true
             }
+            context.stroke(line, with: .color(NoopHTMLColor.night), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
 
             if let fitStart = chart.fitStart, let fitEnd = chart.fitEnd {
                 var fit = Path()
@@ -668,7 +1139,7 @@ private struct NoopInstrumentMetricChart: View {
                 context.stroke(fit, with: .color(NoopHTMLColor.ink.opacity(0.42)), style: StrokeStyle(lineWidth: 1.2, dash: [4, 5]))
             }
 
-            if let last = chart.line.last {
+            if let last = chart.line.compactMap({ $0 }).last {
                 let center = point(last)
                 context.fill(Path(ellipseIn: CGRect(x: center.x - 3.6, y: center.y - 3.6, width: 7.2, height: 7.2)), with: .color(NoopHTMLColor.night))
             }
@@ -705,7 +1176,9 @@ private struct NoopInstrumentCompareScreen: View {
                         .font(NoopHTMLFont.outfit(25))
                         .tracking(-0.625)
                         .foregroundStyle(NoopHTMLColor.ink)
-                    Text("Same axis, same window. The shift control asks whether one of them arrives a day late.")
+                    Text(data.isPrototype
+                         ? "Same axis, same window. The shift control asks whether one of them arrives a day late."
+                         : "Same axis, same window. The shift control compares readings on the same day and up to two days apart.")
                         .font(NoopHTMLFont.sans(13.5))
                         .foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(4.2)
@@ -915,13 +1388,23 @@ private struct NoopInstrumentComparisonChart: View {
         Canvas { context, size in
             let xOffset = max(0, (size.width - 300) / 2)
             func point(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x + xOffset, y: p.y) }
-            func draw(_ points: [CGPoint], color: Color, dash: [CGFloat]) {
-                guard let first = points.first else { return }
+            func draw(_ points: [CGPoint?], color: Color, dash: [CGFloat]) {
                 var path = Path()
-                path.move(to: point(first))
-                for item in points.dropFirst() { path.addLine(to: point(item)) }
+                var previousWasMeasured = false
+                for item in points {
+                    guard let item else {
+                        previousWasMeasured = false
+                        continue
+                    }
+                    if previousWasMeasured {
+                        path.addLine(to: point(item))
+                    } else {
+                        path.move(to: point(item))
+                    }
+                    previousWasMeasured = true
+                }
                 context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: dash))
-                if let last = points.last {
+                if let last = points.compactMap({ $0 }).last {
                     let center = point(last)
                     context.fill(Path(ellipseIn: CGRect(x: center.x - 3.4, y: center.y - 3.4, width: 6.8, height: 6.8)), with: .color(color))
                 }
@@ -1086,7 +1569,7 @@ private struct NoopInstrumentEffectsScreen: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("What actually moves you")
+                    Text(data.isPrototype ? "What actually moves you" : "Patterns in your record")
                         .font(NoopHTMLFont.outfit(25))
                         .tracking(-0.625)
                         .foregroundStyle(NoopHTMLColor.ink)
@@ -1111,7 +1594,9 @@ private struct NoopInstrumentEffectsScreen: View {
                     }
 
                     withWithoutCard
-                    doseCard
+                    // The prototype's −6% deep-sleep alcohol prior has no published source in
+                    // this app. Never present it as a measured or literature-backed Release fact.
+                    if data.isPrototype { doseCard }
 
                     Text("Every line on this screen is an association in your own days, written by the engine that found it. None of them is a claim that one thing caused another.")
                         .font(NoopHTMLFont.sans(11.5))
@@ -1524,13 +2009,14 @@ private struct NoopInstrumentSnapshot: Identifiable {
     let unit: String
     let delta: String
     let style: NoopInstrumentChangeStyle
-    let points: [CGPoint]
+    let points: [CGPoint?]
 
     var id: String { signal.key }
 }
 
 private struct NoopInstrumentMetricChartModel {
-    let line: [CGPoint]
+    /// Nil splits the line at an unmeasured day instead of synthesizing a point.
+    let line: [CGPoint?]
     let bandTop: [CGPoint]
     let bandBottom: [CGPoint]
     let fitStart: CGPoint?
@@ -1577,8 +2063,9 @@ private struct NoopInstrumentComparisonModel {
     let first: NoopInstrumentSignal
     let second: NoopInstrumentSignal
     let worn: Int
-    let firstLine: [CGPoint]
-    let secondLine: [CGPoint]
+    /// Nil preserves a missing observation as a visible gap, never an invented point.
+    let firstLine: [CGPoint?]
+    let secondLine: [CGPoint?]
     let axis: [String]
     let secondLegend: String
     let fitCount: Int
@@ -1735,7 +2222,7 @@ struct NoopInstrumentData {
     private let values: [String: [Double?]]
     private let drinkDoses: [Double?]
     private let dayKeys: [String]
-    private let isPrototype: Bool
+    fileprivate let isPrototype: Bool
 
     init() {
         let gaps = Set([3, 17, 34, 52, 61, 79, 96, 112, 130, 151, 177, 203].map { Self.count - 1 - $0 })
@@ -1946,7 +2433,7 @@ struct NoopInstrumentData {
             unit: signal.behavior ? "days a week" : signal.unit,
             delta: delta,
             style: style,
-            points: Self.sparkPoints(shown)
+            points: Self.sparkPoints(shown, interpolate: isPrototype)
         )
     }
 
@@ -1979,32 +2466,38 @@ struct NoopInstrumentData {
         return formatter
     }()
 
-    private static func sparkPoints(_ values: [Double?]) -> [CGPoint] {
+    private static func sparkPoints(_ values: [Double?], interpolate: Bool) -> [CGPoint?] {
         let step = values.count > 46 ? Int(ceil(Double(values.count) / 46.0)) : 1
-        let sampled: [Double?] = values.enumerated()
-            .filter { $0.offset.isMultiple(of: step) }
-            .map(\.element)
-        var interpolated = sampled
-        var previous: Double?
-        for index in interpolated.indices {
-            if let value = interpolated[index] {
-                previous = value
-            } else {
-                var nextIndex = index
-                while nextIndex < interpolated.count, interpolated[nextIndex] == nil { nextIndex += 1 }
-                let next = nextIndex < interpolated.count ? interpolated[nextIndex] : previous
-                interpolated[index] = previous == nil ? next : next == nil ? previous : ((previous ?? 0) + (next ?? 0)) / 2
+        // Keep every measured day in Release, even at subpixel spacing. Sampling could skip an
+        // unmeasured day and falsely join the two adjacent readings in a tiny sparkline.
+        let sampled: [Double?] = interpolate
+            ? values.enumerated().filter { $0.offset.isMultiple(of: step) }.map(\.element)
+            : values
+        var chartValues = sampled
+        if interpolate {
+            var previous: Double?
+            for index in chartValues.indices {
+                if let value = chartValues[index] {
+                    previous = value
+                } else {
+                    var nextIndex = index
+                    while nextIndex < chartValues.count, chartValues[nextIndex] == nil { nextIndex += 1 }
+                    let next = nextIndex < chartValues.count ? chartValues[nextIndex] : previous
+                    chartValues[index] = previous == nil ? next : next == nil ? previous : ((previous ?? 0) + (next ?? 0)) / 2
+                }
             }
         }
-        let clean = interpolated.compactMap { $0 }
+        let clean = chartValues.compactMap { $0 }
         guard !clean.isEmpty else { return [] }
         let low = clean.min() ?? 0
         let high = clean.max() ?? low + 1
         let span = high - low == 0 ? 1 : high - low
-        return clean.enumerated().map { index, value in
-            let x = CGFloat(index) / CGFloat(max(1, clean.count - 1)) * 86
-            let y = 26 - CGFloat((value - low) / span) * 20 - 3
-            return CGPoint(x: x, y: y)
+        return chartValues.enumerated().map { index, value in
+            value.map {
+                let x = CGFloat(index) / CGFloat(max(1, chartValues.count - 1)) * 86
+                let y = 26 - CGFloat(($0 - low) / span) * 20 - 3
+                return CGPoint(x: x, y: y)
+            }
         }
     }
 }
@@ -2337,13 +2830,17 @@ private extension NoopInstrumentData {
             : Self.decimal(abs(change), places: metricSignal.decimals)
         let delta = thin ? "\(clean.count) nights" : flat ? "no real change" : Self.signed(change, amount: deltaAmount)
 
-        let sampled = sampledInterpolated(series, maximum: 60)
-        let scale = chartScale(values: sampled, width: 300, height: 122, padding: 8)
-        let line = sampled.enumerated().map { scale.point(value: $0.element, index: $0.offset) }
-        let rolling = rollingRange(sampled, radius: 3)
+        let sampled = isPrototype
+            ? sampledInterpolated(series, maximum: 60).map(Optional.some)
+            : sampledMeasured(series, maximum: 60)
+        let hasGaps = sampled.contains { $0 == nil }
+        let scale = chartScale(values: sampled.compactMap { $0 }, count: sampled.count,
+                               width: 300, height: 122, padding: 8)
+        let line = sampled.enumerated().map { index, value in value.map { scale.point(value: $0, index: index) } }
+        let rolling = hasGaps ? [] : rollingRange(sampled.compactMap { $0 }, radius: 3)
         let bandTop = rolling.enumerated().map { scale.point(value: $0.element.upperBound, index: $0.offset) }
         let bandBottom = rolling.enumerated().reversed().map { scale.point(value: $0.element.lowerBound, index: $0.offset) }
-        let fit = (!thin && !flat) ? regression(values: sampled, scale: scale) : nil
+        let fit = (!thin && !flat) ? regressionMeasured(values: sampled, scale: scale) : nil
 
         let moves = signals
             .filter { $0.key != metricSignal.key }
@@ -2394,6 +2891,8 @@ private extension NoopInstrumentData {
                     : "Only \(clean.count) recorded night\(clean.count == 1 ? "" : "s") \(clean.count == 1 ? "falls" : "fall") inside this window. Noop needs twenty-one to say anything about direction, so it says this instead of drawing you an arrow.",
             chartNote: !isPrototype && clean.isEmpty
                 ? "There is no line, spread, or fit to draw until this signal has a recorded value."
+                : !isPrototype && hasGaps
+                    ? "Only recorded points are drawn. Missing days are left as gaps, and no spread band is drawn across them."
                 : thin
                     ? "The band is the day-to-day spread. With this few nights it is most of the picture, which is the honest reading."
                     : "The band is the three-day spread around each point. The dashed line is the fit, and it is only drawn when the change clears the noise at this length.",
@@ -2416,12 +2915,18 @@ private extension NoopInstrumentData {
         let window = range.dayCount(total: historyCount)
         let firstRaw = tail(values[first.key] ?? [], count: window)
         let secondRaw = tail(values[second.key] ?? [], count: window)
-        let firstSampled = sampledInterpolated(firstRaw, maximum: 60)
-        let secondSampled = sampledInterpolated(secondRaw, maximum: 60)
-        let firstScale = chartScale(values: firstSampled, width: 300, height: 130, padding: 10)
-        let secondScale = chartScale(values: secondSampled, width: 300, height: 130, padding: 10)
-        let firstLine = firstSampled.enumerated().map { firstScale.point(value: $0.element, index: $0.offset) }
-        let secondLine = secondSampled.enumerated().map { secondScale.point(value: $0.element, index: $0.offset) }
+        let firstSampled = isPrototype
+            ? sampledInterpolated(firstRaw, maximum: 60).map(Optional.some)
+            : sampledMeasured(firstRaw, maximum: 60)
+        let secondSampled = isPrototype
+            ? sampledInterpolated(secondRaw, maximum: 60).map(Optional.some)
+            : sampledMeasured(secondRaw, maximum: 60)
+        let firstScale = chartScale(values: firstSampled.compactMap { $0 }, count: firstSampled.count,
+                                    width: 300, height: 130, padding: 10)
+        let secondScale = chartScale(values: secondSampled.compactMap { $0 }, count: secondSampled.count,
+                                     width: 300, height: 130, padding: 10)
+        let firstLine = firstSampled.enumerated().map { index, value in value.map { firstScale.point(value: $0, index: index) } }
+        let secondLine = secondSampled.enumerated().map { index, value in value.map { secondScale.point(value: $0, index: index) } }
         let fit = correlation(first: firstRaw, second: secondRaw, lag: safeShift)
         let clears = abs(fit.coefficient) >= 0.28 && fit.count >= 21
         let strength = abs(fit.coefficient) >= 0.6
@@ -2439,7 +2944,8 @@ private extension NoopInstrumentData {
             return .init(
                 lag: lag,
                 label: lag == 0 ? "same day" : lag == 1 ? "+1 day" : "+2 days",
-                coefficient: Self.signed(result.coefficient, amount: Self.decimal(abs(result.coefficient), places: 2)),
+                coefficient: !isPrototype && result.count == 0
+                    ? "—" : Self.signed(result.coefficient, amount: Self.decimal(abs(result.coefficient), places: 2)),
                 selected: lag == safeShift
             )
         }
@@ -2447,9 +2953,18 @@ private extension NoopInstrumentData {
             .map { correlation(first: firstRaw, second: secondRaw, lag: $0) }
             .max { abs($0.coefficient) < abs($1.coefficient) } ?? .init(coefficient: 0, count: 0, lag: 0)
         let bestName = best.lag == 0 ? "same day" : "+\(best.lag) day\(best.lag > 1 ? "s" : "")"
-        let shiftRead = best.lag == 0
-            ? "Shifting does not improve it: whatever these two share, they share it on the same day."
-            : "Reading \(second.name.lowercased()) \(best.lag) day\(best.lag > 1 ? "s" : "") later fits better than reading them together — the effect arrives after the day it was caused on, which is exactly what the lag treatment on the effects screen is for."
+        let shiftRead: String
+        if !isPrototype && best.count == 0 {
+            shiftRead = "No paired readings are available for this window yet. A day shift cannot be compared."
+        } else if isPrototype {
+            shiftRead = best.lag == 0
+                ? "Shifting does not improve it: whatever these two share, they share it on the same day."
+                : "Reading \(second.name.lowercased()) \(best.lag) day\(best.lag > 1 ? "s" : "") later fits better than reading them together — the effect arrives after the day it was caused on, which is exactly what the lag treatment on the effects screen is for."
+        } else {
+            shiftRead = best.lag == 0
+                ? "The strongest observed association is on the same day. This does not establish cause."
+                : "The observed association is strongest when \(second.name.lowercased()) is read \(best.lag) day\(best.lag > 1 ? "s" : "") later. Timing alone does not establish cause."
+        }
 
         return NoopInstrumentComparisonModel(
             first: first,
@@ -2460,11 +2975,12 @@ private extension NoopInstrumentData {
             axis: axisLabels(for: range),
             secondLegend: second.name + (safeShift == 0 ? "" : " · shifted \(safeShift) day\(safeShift > 1 ? "s" : "")"),
             fitCount: fit.count,
-            fitCoefficient: Self.signed(fit.coefficient, amount: Self.decimal(abs(fit.coefficient), places: 2)),
+            fitCoefficient: !isPrototype && fit.count == 0
+                ? "—" : Self.signed(fit.coefficient, amount: Self.decimal(abs(fit.coefficient), places: 2)),
             clears: clears,
             fitRead: fitRead,
             shifts: options,
-            bestLabel: "strongest at \(bestName)",
+            bestLabel: !isPrototype && best.count == 0 ? "no paired readings" : "strongest observed at \(bestName)",
             shiftRead: shiftRead
         )
     }
@@ -2558,14 +3074,18 @@ private extension NoopInstrumentData {
         let intro: String = {
             switch state {
             case .nothing:
-                return "Six behaviours against your readiness, at three lags each. This window has an answer you may not enjoy."
+                return isPrototype
+                    ? "Six behaviours against your readiness, at three lags each. This window has an answer you may not enjoy."
+                    : "No logged behaviour clears the association threshold in this window. That is also a result."
             case .learning:
                 if isPrototype {
                     return "Six behaviours against your readiness. Two of them do not have enough days on both sides yet, and it says which side is short."
                 }
                 return "Six behaviours against your readiness. \(short.count) of them do not have enough days on both sides yet, and it says which side is short."
             case .ranked:
-                return "Six behaviours against your readiness, at the lag where the effect actually lands — not the day you did the thing."
+                return isPrototype
+                    ? "Six behaviours against your readiness, at the lag where the effect actually lands — not the day you did the thing."
+                    : "Logged behaviours compared with readiness on the same day and up to two days later. These are associations, not causal effects."
             }
         }()
 
@@ -2789,6 +3309,13 @@ private extension NoopInstrumentData {
         return result.compactMap { $0 }
     }
 
+    /// Keep missing observations missing in the real record; the prototype alone uses a filled line.
+    func sampledMeasured(_ values: [Double?], maximum _: Int) -> [Double?] {
+        // Canvas can draw the full year. Decimating this series could skip a missing day and
+        // connect two measured days across an unmarked gap.
+        values
+    }
+
     struct ChartScale {
         let low: Double
         let span: Double
@@ -2804,10 +3331,12 @@ private extension NoopInstrumentData {
         }
     }
 
-    func chartScale(values: [Double], width: CGFloat, height: CGFloat, padding: CGFloat) -> ChartScale {
+    func chartScale(values: [Double], count: Int? = nil,
+                    width: CGFloat, height: CGFloat, padding: CGFloat) -> ChartScale {
         let low = values.min() ?? 0
         let high = values.max() ?? low + 1
-        return .init(low: low, span: high == low ? 1 : high - low, count: values.count, width: width, height: height, padding: padding)
+        return .init(low: low, span: high == low ? 1 : high - low, count: count ?? values.count,
+                     width: width, height: height, padding: padding)
     }
 
     func rollingRange(_ values: [Double], radius: Int) -> [ClosedRange<Double>] {
@@ -2837,6 +3366,24 @@ private extension NoopInstrumentData {
             scale.point(value: intercept, index: 0),
             scale.point(value: intercept + slope * Double(values.count - 1), index: values.count - 1)
         )
+    }
+
+    func regressionMeasured(values: [Double?], scale: ChartScale) -> (start: CGPoint, end: CGPoint)? {
+        let measured = values.enumerated().compactMap { index, value -> (Double, Double)? in
+            value.map { (Double(index), $0) }
+        }
+        guard measured.count >= 2 else { return nil }
+        let count = Double(measured.count)
+        let sumX = measured.map(\.0).reduce(0, +)
+        let sumY = measured.map(\.1).reduce(0, +)
+        let sumXX = measured.map { $0.0 * $0.0 }.reduce(0, +)
+        let sumXY = measured.map { $0.0 * $0.1 }.reduce(0, +)
+        let denominator = count * sumXX - sumX * sumX
+        guard denominator != 0 else { return nil }
+        let slope = (count * sumXY - sumX * sumY) / denominator
+        let intercept = (sumY - slope * sumX) / count
+        return (scale.point(value: intercept, index: 0),
+                scale.point(value: intercept + slope * Double(max(0, values.count - 1)), index: max(0, values.count - 1)))
     }
 
     func correlation(first: [Double?], second: [Double?], lag: Int) -> NoopInstrumentCorrelation {

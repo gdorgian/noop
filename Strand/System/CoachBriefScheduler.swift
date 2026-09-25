@@ -50,7 +50,50 @@ enum CoachBriefScheduler {
     static let notificationCategoryId = "coach-brief"
     private static let requestIdPrefix = "coach-brief-"
 
-    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: K.enabled) }
+    static var isEnabled: Bool {
+        #if os(iOS)
+        // The iPhone redesign retired this independent daily timer. Svea's proactive controls
+        // have their own explicit consent and execution path; an older saved K5 toggle must not
+        // silently make a provider request when those controls say Never or Voice Off.
+        false
+        #else
+        UserDefaults.standard.bool(forKey: K.enabled)
+        #endif
+    }
+
+    #if os(iOS)
+    /// Called at every iOS launch before the coach or its background tasks are attached. This is
+    /// deliberately idempotent: older builds may have left a request, notification, or widget cache
+    /// behind, and an upgrade can be interrupted between launches. Keep the locally stored brief
+    /// text itself (the user's data); only retire its delivery state and the extension's stale copy.
+    static func retireIOSScheduleIfNeeded() {
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: K.enabled) { defaults.set(false, forKey: K.enabled) }
+        if defaults.bool(forKey: K.hasUnconsumed) { defaults.set(false, forKey: K.hasUnconsumed) }
+
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: bgTaskIdentifier)
+
+        let center = UNUserNotificationCenter.current()
+        let prefix = requestIdPrefix
+        let category = notificationCategoryId
+        center.getPendingNotificationRequests { requests in
+            let ids = requests.filter {
+                $0.identifier.hasPrefix(prefix) && $0.content.categoryIdentifier == category
+            }.map(\.identifier)
+            if !ids.isEmpty { center.removePendingNotificationRequests(withIdentifiers: ids) }
+        }
+        center.getDeliveredNotifications { notifications in
+            let ids = notifications.map(\.request).filter {
+                $0.identifier.hasPrefix(prefix) && $0.content.categoryIdentifier == category
+            }.map(\.identifier)
+            if !ids.isEmpty { center.removeDeliveredNotifications(withIdentifiers: ids) }
+        }
+
+        if widgetBriefText != nil || widgetBriefDate != nil {
+            publishToWidget(nil)
+        }
+    }
+    #endif
 
     /// Time-of-day to generate, minutes since local midnight. Clamped to a valid minute. Default 07:00.
     static var timeMinutes: Int {
@@ -125,6 +168,13 @@ enum CoachBriefScheduler {
     static func setEnabled(_ on: Bool,
                             generateBrief: @escaping () async -> String?,
                             completion: (@MainActor (EnableOutcome) -> Void)? = nil) {
+        #if os(iOS)
+        // A legacy screen can still be compiled into the iOS target. It cannot re-arm the
+        // retired timer, request notification permission, or override Svea's new preference.
+        retireIOSScheduleIfNeeded()
+        completion?(.off)
+        return
+        #else
         guard on else {
             UserDefaults.standard.set(false, forKey: K.enabled)
             cancel()
@@ -160,6 +210,7 @@ enum CoachBriefScheduler {
                 }
             }
         }
+        #endif
     }
 
     /// Update the time-of-day and reschedule so the new time takes effect immediately.
@@ -362,6 +413,7 @@ enum CoachBriefScheduler {
     /// Submit a background-refresh request for *no earlier than* the next chosen time. iOS decides when
     /// (and whether) to actually run it — best-effort, same honesty as `ScheduledDebugExport`.
     private static func submitBackgroundRequest() {
+        guard isEnabled else { return }
         let request = BGAppRefreshTaskRequest(identifier: bgTaskIdentifier)
         request.earliestBeginDate = Date(timeIntervalSinceNow: secondsToNextOccurrence(timeMinutes))
         try? BGTaskScheduler.shared.submit(request)

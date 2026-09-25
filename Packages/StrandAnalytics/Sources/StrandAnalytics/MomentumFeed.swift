@@ -181,6 +181,39 @@ public struct MomentumLastShown: Equatable, Sendable {
     }
 }
 
+// MARK: - Aura visibility policy
+
+/// The only finding kinds allowed to reach Aura's **What changed** surface.
+///
+/// This is intentionally an explicit allow-list rather than a `switch` in a card view. Upstream may
+/// add another `MomentumKind`, or reintroduce a builder branch for one of the six retired mechanics;
+/// neither can become visible until it is deliberately added here. Filtering happens before ranking,
+/// so rejected candidates cannot affect ordering, counts, badges, or the empty state.
+public enum MomentumAuraAllowList {
+    public static let kinds: [MomentumKind] = [
+        .statusOverride,
+        .calibrating,
+        .planDeviation,
+        .recoveryRead,
+        .restDayNeeded,
+        .trainingSuggestion,
+        .sleepCatchUp,
+        .hrvTrend,
+        .bedtimeTarget,
+        .strapBattery,
+        .healthAlert,
+        .milestone,
+    ]
+
+    public static func contains(_ kind: MomentumKind) -> Bool {
+        kinds.contains(kind)
+    }
+
+    public static func filter(_ candidates: [MomentumMessage]) -> [MomentumMessage] {
+        candidates.filter { contains($0.kind) }
+    }
+}
+
 // MARK: - Ranking
 
 public enum MomentumFeed {
@@ -281,7 +314,12 @@ public enum MomentumFeed {
                             lastShown: MomentumLastShown? = nil,
                             now: Date = Date(),
                             retrospective: Bool = false) -> [MomentumMessage] {
-        let pool = retrospective ? candidates.filter { $0.kind.isRetrospective } : candidates
+        // This boundary is deliberately ahead of every rank/count/empty-state decision. A retired
+        // kind is absent, rather than merely hidden by the final card renderer.
+        let visibleCandidates = MomentumAuraAllowList.filter(candidates)
+        let pool = retrospective
+            ? visibleCandidates.filter { $0.kind.isRetrospective }
+            : visibleCandidates
         guard !pool.isEmpty else { return [] }
 
         // Stable sort: equal scores keep the builder's own order, so the output cannot shuffle between

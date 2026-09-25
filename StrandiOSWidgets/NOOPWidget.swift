@@ -417,10 +417,10 @@ private struct WidgetScoreRing: View {
 }
 
 struct NOOPWidget: Widget {
-    let kind = "NOOPWidget"
+    static let kind = NoopWidgetFamilyRegistry.family(.glanceable).configurationKind
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: NOOPProvider()) { entry in
+        StaticConfiguration(kind: Self.kind, provider: NOOPProvider()) { entry in
             if #available(iOS 17.0, *) {
                 NOOPWidgetView(entry: entry)
                     .containerBackground(StrandPalette.surfaceBase, for: .widget)
@@ -430,7 +430,7 @@ struct NOOPWidget: Widget {
                     .background(StrandPalette.surfaceBase)
             }
         }
-        .configurationDisplayName("NOOP")
+        .configurationDisplayName(NoopWidgetFamilyRegistry.family(.glanceable).title)
         .description("Charge, Effort and Rest as score rings, plus live HR and strap battery at a glance.")
         .supportedFamilies([
             .systemSmall, .systemMedium, .systemLarge,

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import WhoopStore
 
 enum NoopAct: Int, CaseIterable {
     case night = 1
@@ -88,7 +89,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 1
     case rest, tonight, why, debt, alarm
     // Act 2
-    case today, inbox, charge, day, vitals, stress, heart
+    case today, inbox, charge, day, energy, vitals, stress, heart
     case breathe, bcatalog, bplayer, bsweep, bfound
     // Act 3
     case session, pick, ready, live, intervals, detail, across
@@ -105,6 +106,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case goal, setGoal = "set", labs, picker, review, marker
     // Act 9
     case instrumentIndex = "index", instrumentMetric = "metric", instrumentCompare = "compare", instrumentEffects = "effects"
+    case instrumentRaw = "instrument-raw", instrumentCapture = "instrument-capture"
     // Act 10. Every raw value is PREFIXED, because `NoopRoute` is one flat enum across all ten acts
     // and four of Act 10's names are already spoken for: `live` and `detail` by Act 3, `review` by
     // Act 8, and `"import"` by Act 5's `importHistory`. Swift would reject the duplicates outright,
@@ -120,7 +122,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     var act: NoopAct {
         switch self {
         case .rest, .tonight, .why, .debt, .alarm: .night
-        case .today, .inbox, .charge, .day, .vitals, .stress, .heart,
+        case .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound: .day
         case .session, .pick, .ready, .live, .intervals, .detail, .across: .effort
         case .trends, .capacity, .rhythm, .year: .picture
@@ -130,7 +132,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .ages, .building, .driver, .method, .health: .ages
         case .coach, .gate, .setup, .consent, .memory: .svea
         case .goal, .setGoal, .labs, .picker, .review, .marker: .goals
-        case .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects: .instrument
+        case .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects,
+             .instrumentRaw, .instrumentCapture: .instrument
         case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles: .lift
         }
@@ -141,14 +144,15 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         switch self {
         case .rest, .tonight, .why, .debt, .alarm:
             .rest
-        case .today, .inbox, .charge, .day, .vitals, .stress, .heart,
+        case .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound,
              .session, .pick, .ready, .live, .intervals, .detail, .across,
              .coach, .gate, .setup, .consent, .memory:
             .today
         case .trends, .capacity, .rhythm, .year,
              .ages, .building, .driver, .method, .health,
-             .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects:
+             .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects,
+             .instrumentRaw, .instrumentCapture:
             .trends
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
              .widgets, .lab, .automations, .onboard, .pair, .position, .importHistory, .reading,
@@ -165,7 +169,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
 
     var hidesBottomBar: Bool {
         switch self {
-        case .ready, .live, .intervals, .onboard, .pair, .bplayer, .bsweep: true
+        case .ready, .live, .intervals, .onboard, .pair, .bplayer, .bsweep,
+             .liftLive, .liftProgram, .liftEdit, .liftImport, .liftReview: true
         default: false
         }
     }
@@ -223,7 +228,7 @@ struct NoopFinishedSessionRecord: Codable, Equatable {
     let sleepNeedMinutes: Int?
 
     var minutes: Int {
-        max(1, Int((Double(durationSeconds) / 60).rounded()))
+        max(0, Int((Double(durationSeconds) / 60).rounded()))
     }
 
     func whenLabel(relativeTo now: Date = Date()) -> String {
@@ -371,6 +376,8 @@ final class NoopNavigation: ObservableObject {
     @Published var detailSession: NoopSessionDetailSelection?
     /// Change 4. The session a `history` row opened, so `detail` renders that one.
     @Published var historyWorkout: NoopWorkout?
+    /// Production: the stored session `detail` shows (a row tapped, or the one just saved).
+    @Published var liveDetailRow: WorkoutRow?
 
     /// `plumbing/data` is one screen with two doors and three transient states between them.
     /// Reading, written and rejected are what the screen BECOMES during an import — never routes.
@@ -412,7 +419,10 @@ final class NoopNavigation: ObservableObject {
 
     /// The canonical fixture opens part-way into a steady ride, so its clock starts at 14:32. The
     /// live bar and the live screen read the same number rather than disagreeing by that offset.
-    private var sessionDisplayOffset: Int { selectedWorkout.act3.isIntervals ? 0 : 872 }
+    private var sessionDisplayOffset: Int {
+        guard NoopContentPolicy.allowsPrototypeContent else { return 0 }
+        return selectedWorkout.act3.isIntervals ? 0 : 872
+    }
 
     func sessionElapsedDisplay(at date: Date) -> Int {
         sessionElapsed(at: date) + sessionDisplayOffset
@@ -457,6 +467,33 @@ final class NoopNavigation: ObservableObject {
         if let data = try? JSONEncoder().encode(record) {
             defaults.set(data, forKey: Self.finishedSessionKey)
         }
+        finishSessionArrival()
+    }
+
+    /// A real recorder may have resumed from disk after the picker state was reset, or may have
+    /// started from the native workout catalogue with a sport absent from the five HTML templates.
+    /// Never write the picker default as that session's name or substitute its example duration.
+    func endRecordedSession(workout: NoopWorkout?, row: WorkoutRow?, at endedAt: Date = Date()) {
+        liveDetailRow = row
+        if let workout, let row {
+            let record = NoopFinishedSessionRecord(
+                day: Self.dayFormatter.string(from: endedAt), workout: workout, endedAt: endedAt,
+                durationSeconds: max(0, Int((row.durationS ?? Double(row.endTs - row.startTs)).rounded())),
+                distanceKilometres: row.distanceM.map { $0 / 1000 },
+                chargeCost: nil, sleepNeedMinutes: nil
+            )
+            finishedSession = record
+            if let data = try? JSONEncoder().encode(record) {
+                defaults.set(data, forKey: Self.finishedSessionKey)
+            }
+        } else {
+            finishedSession = nil
+            defaults.removeObject(forKey: Self.finishedSessionKey)
+        }
+        finishSessionArrival()
+    }
+
+    private func finishSessionArrival() {
         detailSession = nil
         historyWorkout = nil
         overlay = nil
@@ -523,10 +560,22 @@ final class NoopNavigation: ObservableObject {
     /// Act 9 carries the chosen signal above its four routes so a dossier opened from Trends or
     /// Svea survives the shell's deliberate per-route view recreation.
     @Published var instrumentMetricKey = "hrv"
+    @Published var instrumentRawSessionID: String?
+    // Debug-only raw capture fixture state survives the route identity change between the two pages.
+    @Published var instrumentDemoRawArmedAt: Date?
+    @Published var instrumentDemoRawDeletedIDs: Set<String> = []
     @Published var instrumentCompareAKey = "hrv"
     @Published var instrumentCompareBKey = "reg"
     @Published var instrumentCompareShift = 0
     @Published private(set) var labPhotoRequestID = 0
+    /// Act 10 route payloads live above the per-route views for the same reason the running
+    /// session does: the shell deliberately recreates a screen whenever its route changes.
+    @Published var selectedLiftProgramID: String?
+    @Published var selectedLiftSessionID: String?
+    /// A lift opened from the shared workout history, by its start time (the saved workout row and the
+    /// lift session share it). Consumed by `lift-detail` when it loads.
+    @Published var liftDetailStartTs: Int?
+    @Published var liftDetailReturnRoute: NoopRoute = .today
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -852,8 +901,7 @@ final class NoopNavigation: ObservableObject {
         case .instrument:
             reset(to: .history)
         case .lift:
-            // PROVISIONAL. Mirrors Act 3, whose + enters `pick` to choose a session. Design has not
-            // yet said what Act 10's + does; change this when it has.
+            // Act 10's canonical + destination is the program library.
             push(.liftLibrary)
         }
     }
@@ -902,10 +950,32 @@ final class NoopNavigation: ObservableObject {
             back(or: .settings)
         case .importHistory, .backup:
             back(or: .data)
+        case .energy:
+            back(or: .today)
         case .instrumentIndex:
             back(or: .trends)
         case .instrumentMetric, .instrumentCompare, .instrumentEffects:
             back(or: .instrumentIndex)
+        case .instrumentRaw:
+            back(or: .instrumentIndex)
+        case .instrumentCapture:
+            back(or: .instrumentRaw)
+        case .liftLive:
+            return
+        case .liftLibrary:
+            back(or: .session)
+        case .liftProgram:
+            back(or: .liftLibrary)
+        case .liftDetail:
+            back(or: liftDetailReturnRoute)
+        case .liftEdit:
+            back(or: .liftDetail)
+        case .liftImport:
+            back(or: .liftLibrary)
+        case .liftReview:
+            back(or: .liftImport)
+        case .liftMuscles:
+            back(or: .liftDetail)
         default:
             back()
         }

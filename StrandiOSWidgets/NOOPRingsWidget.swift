@@ -71,10 +71,10 @@ struct NOOPRingsWidgetView: View {
 }
 
 struct NOOPRingsWidget: Widget {
-    let kind = "NOOPRingsWidget"
+    static let kind = NoopWidgetFamilyRegistry.family(.rings).configurationKind
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: NOOPProvider()) { entry in
+        StaticConfiguration(kind: Self.kind, provider: NOOPProvider()) { entry in
             if #available(iOS 17.0, *) {
                 NOOPRingsWidgetView(entry: entry)
                     .containerBackground(StrandPalette.surfaceBase, for: .widget)
@@ -84,7 +84,7 @@ struct NOOPRingsWidget: Widget {
                     .background(StrandPalette.surfaceBase)
             }
         }
-        .configurationDisplayName("Noop Aura Rings")
+        .configurationDisplayName(NoopWidgetFamilyRegistry.family(.rings).title)
         .description("Charge, Effort and Rest as three rings, just like Today.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }

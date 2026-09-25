@@ -2,6 +2,8 @@ import SwiftUI
 
 struct NoopAct6Screens: View {
     @ObservedObject var navigation: NoopNavigation
+    /// The production shell's measured ages (one engine). Nil only in the seeded Debug shell.
+    var measured: NoopAgesRecord? = nil
     @AppStorage("noop.html.selected-age-driver") private var selectedDriver = 0
     @AppStorage("noop.html.nights-recorded") private var nightsRecorded = 221
     // Onboarding step 2's answer. `ages` says "night" in two places that mean the time of day
@@ -11,6 +13,16 @@ struct NoopAct6Screens: View {
     private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
 
     var body: some View {
+        if let measured {
+            if measured.bodyAge == nil { liveBuilding }
+            else if navigation.route == .driver, !measured.drivers.isEmpty { liveDriver(measured) }
+            else { liveAges(measured) }
+        } else {
+            demoBody
+        }
+    }
+
+    @ViewBuilder private var demoBody: some View {
         switch navigation.route {
         case .ages:
             // Change 8.1. Under seven recorded nights `ages` shows this INSTEAD of itself — it is a
@@ -132,7 +144,7 @@ struct NoopAct6Screens: View {
                                 }
                             }
                         }
-                        Text("Each factor is measured against the norm for someone your age. They do not add up to the number above — the model is not a sum.")
+                        Text("Each factor is compared with a reference. Their signed effects are combined with an overlap adjustment to estimate Body Age; the final estimate is bounded.")
                             .font(NoopHTMLFont.sans(11.5))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .lineSpacing(3)
@@ -460,7 +472,7 @@ struct NoopAct6Screens: View {
                         NoopSectionLabel("What it is not")
                         ForEach(NoopAgeNot.all, id: \.self) { sentence in
                             HStack(alignment: .top, spacing: 10) {
-                                Circle().fill(NoopHTMLColor.faint).frame(width: 5, height: 5).padding(.top, 7)
+                                Circle().fill(NoopHTMLColor.chevronDim).frame(width: 5, height: 5).padding(.top, 7)
                                 Text(sentence)
                                     .font(NoopHTMLFont.sans(13))
                                     .foregroundStyle(NoopHTMLColor.copy)
@@ -696,19 +708,23 @@ private struct NoopAgeChangeChip: View {
 
 private struct NoopAgeOrb: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var age: Int? = 34
+    var animated = true
+    var isOlder = false
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
-            let seconds = timeline.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !animated)) { timeline in
+            let seconds = animated ? timeline.date.timeIntervalSinceReferenceDate : 0
             let morph = NoopA4Animation.morph(seconds: seconds, duration: 24, reversed: false)
-            let spin = reduceMotion ? 0 : seconds.truncatingRemainder(dividingBy: 60) / 60 * 360
+            let spin = reduceMotion || !animated ? 0 : seconds.truncatingRemainder(dividingBy: 60) / 60 * 360
+            let accent = isOlder ? NoopHTMLColor.warm : NoopHTMLColor.green
 
             ZStack {
                 Circle()
                     .fill(
                         RadialGradient(
                             stops: [
-                                .init(color: NoopHTMLColor.green.opacity(0.30), location: 0),
+                                .init(color: accent.opacity(0.30), location: 0),
                                 .init(color: .clear, location: 0.62)
                             ],
                             center: .center,
@@ -725,11 +741,11 @@ private struct NoopAgeOrb: View {
                             stops: [
                                 .init(color: Color(hex: 0x080B0A), location: 0),
                                 .init(color: Color(hex: 0x080B0A), location: 0.30),
-                                .init(color: NoopHTMLColor.green.opacity(0.10), location: 0.39),
-                                .init(color: NoopHTMLColor.green.opacity(0.34), location: 0.53),
-                                .init(color: Color(hex: 0x30CE84, alpha: 0.80), location: 0.70),
-                                .init(color: Color(hex: 0x9EF0CC, alpha: 0.42), location: 0.85),
-                                .init(color: NoopHTMLColor.green.opacity(0.10), location: 0.95),
+                                .init(color: accent.opacity(0.10), location: 0.39),
+                                .init(color: accent.opacity(0.34), location: 0.53),
+                                .init(color: isOlder ? accent.opacity(0.80) : Color(hex: 0x30CE84, alpha: 0.80), location: 0.70),
+                                .init(color: isOlder ? accent.opacity(0.42) : Color(hex: 0x9EF0CC, alpha: 0.42), location: 0.85),
+                                .init(color: accent.opacity(0.10), location: 0.95),
                                 .init(color: .clear, location: 1)
                             ],
                             center: .center,
@@ -742,18 +758,21 @@ private struct NoopAgeOrb: View {
                     .rotationEffect(.degrees(morph.rotation))
                     .blur(radius: 3)
 
-                NoopAgeMiniSpeckField()
+                NoopAgeMiniSpeckField(isOlder: isOlder)
                     .frame(width: 126, height: 126)
                     .rotationEffect(.degrees(spin))
 
-                Text("34")
-                    .font(NoopHTMLFont.outfit200(38))
-                    .tracking(-1.52)
-                    .monospacedDigit()
-                    .shadow(color: .black.opacity(0.6), radius: 9, y: 2)
+                if let age {
+                    Text("\(age)")
+                        .font(NoopHTMLFont.outfit200(38))
+                        .tracking(-1.52)
+                        .monospacedDigit()
+                        .shadow(color: .black.opacity(0.6), radius: 9, y: 2)
+                }
             }
         }
         .frame(width: 132, height: 132)
+        .opacity(animated ? 1 : 0.7)
     }
 }
 
@@ -766,6 +785,7 @@ private struct NoopAgeMiniSpeck: Identifiable {
 }
 
 private struct NoopAgeMiniSpeckField: View {
+    var isOlder = false
     private static func hash(_ value: Int) -> Double {
         let x = sin(Double(value) * 127.1 + 311.7) * 43_758.5453
         return x - floor(x)
@@ -789,9 +809,9 @@ private struct NoopAgeMiniSpeckField: View {
             ZStack(alignment: .topLeading) {
                 ForEach(Self.specks) { speck in
                     Circle()
-                        .fill(Color(hex: 0xD8FFEC, alpha: speck.opacity))
+                        .fill(isOlder ? NoopHTMLColor.warm.opacity(speck.opacity) : Color(hex: 0xD8FFEC, alpha: speck.opacity))
                         .frame(width: speck.size, height: speck.size)
-                        .shadow(color: Color(hex: 0x68E6A4, alpha: 0.8), radius: speck.size * 1.3)
+                        .shadow(color: isOlder ? NoopHTMLColor.warm.opacity(0.8) : Color(hex: 0x68E6A4, alpha: 0.8), radius: speck.size * 1.3)
                         .position(x: speck.x * proxy.size.width, y: speck.y * proxy.size.height)
                 }
             }
@@ -801,16 +821,34 @@ private struct NoopAgeMiniSpeckField: View {
 }
 
 private struct NoopAgeBand: View {
+    /// Production: the body age, the calendar age and the half-width of the band. Nil draws the
+    /// prototype's 34 inside 29–39 at 40.
+    var live: (age: Double, chrono: Double, band: Double)? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var bandVisible = false
+
+    /// The design's scale: the band and the calendar age, with three years of margin either side.
+    private var scale: (min: Double, span: Double) {
+        guard let live else { return (26, 17) }
+        let lo = min(live.age - live.band, live.chrono) - 3
+        let hi = max(live.age + live.band, live.chrono) + 3
+        return (lo, max(1, hi - lo))
+    }
+    private func x(_ value: Double, _ width: CGFloat) -> CGFloat {
+        width * CGFloat((value - scale.min) / scale.span)
+    }
+    private var values: (lo: Double, hi: Double, age: Double, chrono: Double) {
+        guard let live else { return (29, 39, 34, 40) }
+        return (live.age - live.band, live.age + live.band, live.age, live.chrono)
+    }
 
     var body: some View {
         VStack(spacing: 9) {
             GeometryReader { geo in
-                let bandLow = geo.size.width * 3 / 17
-                let bandHigh = geo.size.width * 13 / 17
-                let bodyAge = geo.size.width * 8 / 17
-                let chronological = geo.size.width * 14 / 17
+                let bandLow = x(values.lo, geo.size.width)
+                let bandHigh = x(values.hi, geo.size.width)
+                let bodyAge = x(values.age, geo.size.width)
+                let chronological = x(values.chrono, geo.size.width)
                 ZStack(alignment: .topLeading) {
                     Capsule()
                         .fill(Color.white.opacity(0.13))
@@ -834,7 +872,7 @@ private struct NoopAgeBand: View {
                         .offset(x: bandHigh - 1, y: 21)
                     Rectangle().fill(NoopHTMLColor.ink.opacity(0.45)).frame(width: 1, height: 24)
                         .offset(x: chronological - 0.5, y: 16)
-                    Text("you are 40")
+                    Text("you are \(Int(values.chrono.rounded()))")
                         .font(NoopHTMLFont.sans(10))
                         .foregroundStyle(NoopHTMLColor.copy)
                         .fixedSize()
@@ -849,11 +887,11 @@ private struct NoopAgeBand: View {
             }
             .frame(height: 62)
             HStack {
-                Text("29").foregroundStyle(NoopHTMLColor.muted)
+                Text("\(Int(values.lo.rounded()))").foregroundStyle(NoopHTMLColor.muted)
                 Spacer()
-                Text("± 5 year band").foregroundStyle(Color(hex: 0x8B958F))
+                Text("± \(Int((live?.band ?? 5).rounded())) year band").foregroundStyle(Color(hex: 0x8B958F))
                 Spacer()
-                Text("39").foregroundStyle(NoopHTMLColor.muted)
+                Text("\(Int(values.hi.rounded()))").foregroundStyle(NoopHTMLColor.muted)
             }
             .font(NoopHTMLFont.sans(11))
         }
@@ -989,7 +1027,7 @@ private struct NoopAgeDriverRow: View {
                 .frame(width: 98, alignment: .leading)
             GeometryReader { geo in
                 let center = geo.size.width / 2
-                let width = geo.size.width * CGFloat((6 + magnitude / 2.9 * 42) / 100)
+                let width = geo.size.width * CGFloat((6 + min(magnitude / 2.9, 1) * 42) / 100)
                 ZStack(alignment: .topLeading) {
                     Rectangle().fill(Color.white.opacity(0.16))
                         .frame(width: 1, height: 20)
@@ -1030,7 +1068,7 @@ private struct NoopAgeHealthHubRow: View {
                         .minimumScaleFactor(0.85)
                 }
                 Spacer(minLength: 0)
-                NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
@@ -1060,7 +1098,7 @@ private struct NoopAgeMethodRow: View {
                         .minimumScaleFactor(0.85)
                 }
                 Spacer(minLength: 0)
-                NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
@@ -1328,7 +1366,7 @@ private struct NoopAgeRequirementMark: View {
         Group {
             if status == "Optional" {
                 Rectangle()
-                    .fill(NoopHTMLColor.faint)
+                    .fill(NoopHTMLColor.chevronDim)
                     .frame(width: 15, height: 1.5)
                     .frame(width: 15, height: 15, alignment: .top)
                     .offset(y: 7)
@@ -1409,7 +1447,7 @@ private struct NoopAgeHealthLinks: View {
                         .minimumScaleFactor(0.90)
                 }
                 Spacer(minLength: 0)
-                NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.faint)
+                NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
             .frame(minHeight: 60)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1470,4 +1508,295 @@ private struct NoopHealthVital {
         .init(name: "Blood oxygen", value: "97", unit: "%", baseline: "within your usual range"),
         .init(name: "Skin temperature", value: "−0.2", unit: "°C", baseline: "against your own baseline")
     ]
+}
+
+// MARK: - Production (one engine: VitalityEngine)
+
+private extension NoopAct6Screens {
+    func liveAges(_ r: NoopAgesRecord) -> some View {
+        let age = r.bodyAge ?? 0
+        let isOlder = age > Double(r.chronoAge)
+        let years = Int((Double(r.chronoAge) - age).rounded())
+        let deltaLine = years == 0 ? "the same as your age"
+            : "\(abs(years)) \(abs(years) == 1 ? "year" : "years") \(years > 0 ? "younger" : "older") than your age"
+        let lo = Int((age - r.band).rounded()), hi = Int((age + r.band).rounded())
+        let drivers = r.drivers.map {
+            NoopAgeDriver(id: $0.key, name: $0.name, effect: NoopAgesRecord.effect($0.years), protective: $0.years < 0,
+                          lead: "", rank: "", current: "", average: "", minimum: "", maximum: "", scale: "",
+                          trend: [], trendNote: "", move: "", caveat: "")
+        }
+        return NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 12) {
+                NoopAgeBackHeader(label: "Trends") { navigation.back(or: .trends) }
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(abs(years))")
+                            .font(NoopHTMLFont.outfit(23, weight: .light))
+                            .foregroundStyle(isOlder ? NoopHTMLColor.warm : NoopHTMLColor.green)
+                        NoopAgeMicroLabel(years == 0 ? "years different" : (isOlder ? "years older" : "years younger"), alignment: .leading)
+                    }
+                    .frame(width: 88, alignment: .leading)
+                    Spacer()
+                    NoopAgeOrb(age: Int(age.rounded()), isOlder: isOlder)
+                    Spacer()
+                    Color.clear.frame(width: 88)
+                }
+                .padding(.vertical, 2)
+
+                NoopHTMLCard(radius: 24, padding: 0) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        NoopSectionLabel("Body age")
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack(alignment: .firstTextBaseline, spacing: 9) {
+                                Text("\(Int(age.rounded()))")
+                                    .font(NoopHTMLFont.outfit200(76))
+                                    .tracking(-3.8)
+                                    .frame(height: 68.4, alignment: .top)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("years").font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                                    Text(deltaLine)
+                                        .font(NoopHTMLFont.sans(13.5, weight: .medium))
+                                        .foregroundStyle(isOlder ? NoopHTMLColor.warm : NoopHTMLColor.green)
+                                }
+                                .padding(.bottom, 5)
+                            }
+                            NoopAgeBand(live: (age, Double(r.chronoAge), r.band))
+                            Text("The band is part of the number. Anywhere inside it is the same reading \u{2014} and yours runs from \(lo) to \(hi).")
+                                .font(NoopHTMLFont.sans(11.5))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                                .lineSpacing(3)
+                        }
+                        .offset(y: -13)
+                        .padding(.bottom, -6.5)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+                    .padding(.bottom, 20)
+                }
+
+                if !drivers.isEmpty {
+                    HStack {
+                        NoopSectionLabel("What's moving it")
+                        Spacer()
+                        Text("signed, per factor").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                    }
+                    .padding(.horizontal, 2)
+                    .padding(.top, 8)
+                    NoopHTMLCard(radius: 24, padding: 0) {
+                        VStack(spacing: 11) {
+                            HStack {
+                                NoopSectionLabel("\u{2190} takes years off", color: Color(hex: 0x8FEFC0))
+                                Spacer()
+                                NoopSectionLabel("adds years \u{2192}", color: Color(hex: 0xF3C888))
+                            }
+                            VStack(spacing: 0) {
+                                ForEach(Array(drivers.enumerated()), id: \.offset) { index, item in
+                                    Button {
+                                        selectedDriver = index
+                                        navigation.push(.driver)
+                                    } label: {
+                                        NoopAgeDriverRow(item: item)
+                                    }
+                                    .buttonStyle(NoopHTMLPressStyle())
+                                    if index < drivers.count - 1 { Divider().overlay(NoopHTMLColor.border).frame(height: 0.5) }
+                                }
+                            }
+                            Text("Each factor is compared with a reference. Their signed effects are combined with an overlap adjustment to estimate Body Age; the final estimate is bounded.")
+                                .font(NoopHTMLFont.sans(11.5))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                                .lineSpacing(3)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 15)
+                        .padding(.bottom, 16)
+                    }
+                }
+
+                if r.history.count >= 2, let first = r.history.first, let last = r.history.last {
+                    let change = last.age - first.age
+                    let fmt: DateFormatter = { let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("d MMM"); return f }()
+                    let axis = [0, 1, 2, 3].map { r.history[min(r.history.count - 1, $0 * (r.history.count - 1) / 3)].end }
+                    NoopHTMLCard(radius: 24, padding: 16) {
+                        VStack(alignment: .leading, spacing: 13) {
+                            HStack {
+                                NoopSectionLabel("Body age over time")
+                                Spacer()
+                                NoopAgeChangeChip(text: "\(change < 0 ? "\u{2212}" : "+")\(abs(change).formatted(.number.precision(.fractionLength(1)))) yr since \(fmt.string(from: first.end))")
+                            }
+                            NoopBodyAgeHistoryChart(values: r.history.map(\.age))
+                            HStack {
+                                ForEach(Array(axis.enumerated()), id: \.offset) { index, date in
+                                    Text(fmt.string(from: date))
+                                    if index < axis.count - 1 { Spacer() }
+                                }
+                            }
+                            .font(NoopHTMLFont.sans(10.5))
+                            .foregroundStyle(NoopHTMLColor.faint)
+                        }
+                    }
+                }
+
+                if r.fitnessAge != nil || r.vo2max != nil {
+                    NoopHTMLCard(radius: 24, padding: 16) {
+                        VStack(alignment: .leading, spacing: 13) {
+                            NoopSectionLabel("A different question")
+                            HStack(spacing: 9) {
+                                if let fa = r.fitnessAge {
+                                    NoopAgeLavenderMetric(title: "Fitness age", value: "\(Int(fa.rounded()))", unit: "\u{00B1} 5 yr")
+                                }
+                                if let vo2 = r.vo2max {
+                                    NoopAgeLavenderMetric(title: "VO\u{2082} max", value: vo2.formatted(.number.precision(.fractionLength(1))), unit: "ml/kg/min")
+                                }
+                            }
+                            (
+                                Text("Fitness Age compares one thing \u{2014} how much oxygen you can use \u{2014} against norms for your sex and age. ")
+                                + Text("It is not a biological age.").font(NoopHTMLFont.sans(11.5, weight: .semibold)).foregroundColor(NoopHTMLColor.inkSoft)
+                                + Text(" It reads none of the sleep or variability signals above, so it can sit years away from Body Age without either being wrong.")
+                            )
+                                .font(NoopHTMLFont.sans(11.5))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                                .lineSpacing(3)
+                        }
+                    }
+                }
+
+                NoopAgeDisclaimer("Estimates from a wrist sensor, not a diagnosis. Body Age is a statistical comparison against population data \u{2014} it is not a prediction about you, and no part of this screen is a medical device.")
+            }
+        }
+    }
+
+    /// One driver: its signed years, its rank among the factors, where the current week sits against
+    /// the six-month average on the design's scale, and its last ten weeks — all from the engine's own
+    /// inputs. The per-factor story ("what would move it") and caveat are example copy and are omitted.
+    func liveDriver(_ r: NoopAgesRecord) -> some View {
+        let index = min(max(selectedDriver, 0), r.drivers.count - 1)
+        let d = r.drivers[index]
+        let weeks = r.weeklyInputs[d.key] ?? []
+        let present = weeks.compactMap { $0 }
+        let current = weeks.last ?? nil
+        let average = present.isEmpty ? nil : present.reduce(0, +) / Double(present.count)
+        let scale = NoopAgesRecord.scale(for: d.key)
+        func show(_ v: Double) -> String {
+            switch d.key {
+            case "vo2max": v.formatted(.number.precision(.fractionLength(1)))
+            case "consistency": "\(Int(v.rounded()))%"
+            case "steps": v.formatted(.number.precision(.fractionLength(1))) + "k"
+            case "hrv": "\(Int(v.rounded())) ms"
+            case "sleep": v.formatted(.number.precision(.fractionLength(1))) + " h"
+            default: "\(Int(v.rounded()))"
+            }
+        }
+        let ordinals = ["1st", "2nd", "3rd", "4th", "5th", "6th"]
+        let trendNote: String = {
+            guard let current, let average else { return "" }
+            return current >= average ? "up from the six-month average" : "down from the six-month average"
+        }()
+        let item = NoopAgeDriver(
+            id: d.key, name: d.name, effect: NoopAgesRecord.effect(d.years), protective: d.years < 0, lead: "",
+            rank: "\(ordinals[min(index, ordinals.count - 1)]) largest of \(r.drivers.count)",
+            current: current.map { show($0) + " now" } ?? "",
+            average: average.map { show($0) + " six-month" } ?? "",
+            minimum: scale?.min ?? "", maximum: scale?.max ?? "", scale: scale?.words ?? "",
+            trend: Array(present.suffix(10)), trendNote: trendNote, move: "", caveat: "")
+        return NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 12) {
+                NoopAgeBackHeader(label: "Your ages") { navigation.back(or: .ages) }
+                NoopHTMLCard(radius: 24, padding: 18) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            NoopSectionLabel(item.name)
+                            Spacer()
+                            Text(item.rank).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                        }
+                        HStack(alignment: .firstTextBaseline, spacing: 9) {
+                            Text(item.effect)
+                                .font(NoopHTMLFont.outfit200(52))
+                                .tracking(-2.2)
+                                .foregroundStyle(item.color)
+                                .frame(height: 52, alignment: .top)
+                            Text(item.protective ? "off Body Age" : "onto Body Age")
+                                .font(NoopHTMLFont.sans(13))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                                .padding(.bottom, 4)
+                        }
+                        if scale != nil, current != nil, average != nil {
+                            NoopDriverScale(item: item)
+                        }
+                    }
+                }
+                if item.trend.count >= 2 {
+                    NoopHTMLCard(radius: 24, padding: 16) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                NoopSectionLabel("Ten weeks")
+                                Spacer()
+                                Text(item.trendNote).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                            }
+                            NoopAgeDriverTrendChart(item: item)
+                        }
+                    }
+                }
+                NoopAgeDisclaimer("Estimates from a wrist sensor, not a diagnosis. No part of this screen is a medical device.")
+            }
+        }
+    }
+
+    /// No validated estimate yet: keep the orb as a still, quiet calibration mark with no number.
+    /// Amber is reserved for a validated Body Age older than the wearer's confirmed age, never for
+    /// missing data or a profile still awaiting confirmation.
+    var liveBuilding: some View {
+        let needsProfile = (measured?.chronoAge ?? 0) <= 0
+        return NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 12) {
+                NoopAgeBackHeader(label: "Trends") { navigation.back(or: .trends) }
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Body age")
+                            .font(NoopHTMLFont.sans(13, weight: .semibold))
+                            .foregroundStyle(NoopHTMLColor.green)
+                        Text(measured?.buildReason ?? "Checking recorded signals")
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                    }
+                    .frame(width: 88, alignment: .leading)
+                    Spacer()
+                    NoopAgeOrb(age: nil, animated: false)
+                    Spacer()
+                    Color.clear.frame(width: 88)
+                }
+                .padding(.vertical, 2)
+                NoopHTMLCard(radius: 24, padding: 18) {
+                    VStack(alignment: .leading, spacing: 13) {
+                        NoopSectionLabel("Body age")
+                        HStack(alignment: .bottom, spacing: 10) {
+                            Text("\u{2014}")
+                                .font(NoopHTMLFont.outfit200(70))
+                                .tracking(-3.5)
+                                .foregroundStyle(Color(hex: 0x3E4643))
+                                .frame(height: 63, alignment: .top)
+                            Text("\u{00B1} 5 yr\nnot yet available")
+                                .font(NoopHTMLFont.sans(13))
+                                .foregroundStyle(Color(hex: 0x8B958F))
+                                .padding(.bottom, 8)
+                        }
+                        Text(needsProfile
+                             ? "Confirm your profile before Body Age can use your age."
+                             : "No Body Age estimate is available from your recorded signals yet.")
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                            .lineSpacing(3)
+                    }
+                }
+                if needsProfile {
+                    Button("Confirm your profile") { navigation.enter(.record, from: .you) }
+                        .font(NoopHTMLFont.sans(13, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.green)
+                        .buttonStyle(NoopHTMLPressStyle())
+                        .padding(.horizontal, 2)
+                }
+                NoopAgeDisclaimer("Estimates from a wrist sensor, not a diagnosis. No part of this screen is a medical device.", topPadding: 0)
+            }
+        }
+    }
 }

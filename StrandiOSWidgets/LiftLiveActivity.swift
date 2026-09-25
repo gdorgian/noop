@@ -3,144 +3,228 @@ import SwiftUI
 import ActivityKit
 import StrandDesign
 
-/// Live Activity for a running Lift Log session — the minimised session bar, on the Lock Screen and
-/// in the Dynamic Island.
+/// Aura's one Lift presentation on the Lock Screen and in every Dynamic Island size.
 ///
-/// It carries the same four things the in-app bar does, in the same order, because it is answering
-/// the same question from further away: what am I doing, on what, with what numbers, and how long.
-/// The colour language matches too — green while a set is being worked, amber through the rest.
-///
-/// THE CLOCK TICKS WITHOUT THE APP. Both timers are `Text(timerInterval:)`, driven by dates in the
-/// content state, so the Lock Screen counts on its own between pushes. The app only sends a new
-/// state when something actually changes (stage, set, heart rate), never once a second to animate a
-/// number.
+/// There are deliberately no controls here. A tap opens `lift-live`, where Pause, Next and Finish
+/// have enough context to be safe. Every word, clock anchor and progress value comes from the same
+/// `LiftSessionController.Presentation` that feeds the in-app bar.
 struct LiftLiveActivity: Widget {
+    private let aura = NoopPalette.accent
+    private let bodyInk = Color(.sRGB, red: 198 / 255, green: 206 / 255, blue: 201 / 255, opacity: 1)
+    private let disabledInk = NoopPalette.textQuiet
+
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: LiftActivityAttributes.self) { context in
-            lockScreen(context.state, program: context.attributes.programName)
-                .activityBackgroundTint(StrandPalette.surfaceBase)
-                .activitySystemActionForegroundColor(StrandPalette.textPrimary)
+            lockScreen(context)
+                .activityBackgroundTint(NoopPalette.canvas)
+                .activitySystemActionForegroundColor(NoopPalette.textPrimary)
+                .widgetURL(URL(string: "noop://lift-live"))
         } dynamicIsland: { context in
-            let tint = tint(context.state)
-            return DynamicIsland {
+            DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Label(context.state.exercise, systemImage: "dumbbell.fill")
-                        .font(.caption).lineLimit(1)
-                        .foregroundStyle(tint)
+                    HStack(spacing: 8) {
+                        stateMark(context.state, size: 7)
+                        Text(context.attributes.programName)
+                            .font(NoopSpecType.subline.weight(.semibold))
+                            .foregroundStyle(bodyInk)
+                            .lineLimit(1)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Label {
-                        Text(context.state.bpm.map(String.init) ?? "—").monospacedDigit()
-                    } icon: {
-                        Image(systemName: "heart.fill")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(context.state.bpm == nil
-                                     ? StrandPalette.textTertiary
-                                     : StrandPalette.metricRose)
+                    clock(context.state, compact: false)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    HStack {
-                        Text(context.state.detail ?? context.state.status)
-                            .font(.caption).lineLimit(1)
-                            .foregroundStyle(StrandPalette.textSecondary)
-                        Spacer(minLength: 8)
-                        clock(context.state, tint: tint)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    }
+                    expandedBottom(context.state)
                 }
             } compactLeading: {
-                Image(systemName: "dumbbell.fill").foregroundStyle(tint)
+                stateMark(context.state, size: 7)
+                    .frame(width: 18, height: 18)
             } compactTrailing: {
-                clock(context.state, tint: tint)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                clock(context.state, compact: true)
+                    .frame(minWidth: 36, alignment: .trailing)
             } minimal: {
-                Image(systemName: "dumbbell.fill").foregroundStyle(tint)
+                stateMark(context.state, size: 8)
+                    .frame(width: 22, height: 22)
             }
+            .widgetURL(URL(string: "noop://lift-live"))
         }
     }
 
-    /// Green while working, amber through the rest — the sheet's and the bar's colour language.
-    private func tint(_ state: LiftActivityAttributes.ContentState) -> Color {
-        state.isResting ? StrandPalette.metricAmber : StrandPalette.statusPositive
-    }
+    private func lockScreen(_ context: ActivityViewContext<LiftActivityAttributes>) -> some View {
+        let state = context.state
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                stateMark(state, size: 8)
+                Text("Noop · \(context.attributes.programName)")
+                    .font(NoopSpecType.captionMicro)
+                    .tracking(NoopSpecType.Tracking.captionMicro)
+                    .textCase(.uppercase)
+                    .foregroundStyle(NoopPalette.textSecondary)
+                    .lineLimit(1)
+            }
 
-    private func lockScreen(_ state: LiftActivityAttributes.ContentState,
-                            program: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "dumbbell.fill")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(tint(state))
-
-            VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .lastTextBaseline, spacing: 14) {
                 Text(state.exercise)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(StrandPalette.textPrimary)
+                    .font(.custom(NoopSpecType.Face.outfitLight, fixedSize: 22))
+                    .tracking(-0.44)
+                    .foregroundStyle(NoopPalette.textPrimary)
                     .lineLimit(1)
-                Text(state.detail.map { "\(state.status) — \($0)" } ?? state.status)
-                    .font(.caption)
-                    .foregroundStyle(StrandPalette.textSecondary)
-                    .lineLimit(1)
-                // Two variables in an HStack rather than one interpolated string: the extension has
-                // no catalog, so a literal separator here would be untranslatable copy shipped to
-                // ten locales. Everything user-facing arrives pre-localized from the app.
-                HStack(spacing: 6) {
-                    Text(state.progress)
-                    Text(program)
-                }
-                .font(.caption2)
-                .foregroundStyle(StrandPalette.textTertiary)
-                .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
+                clock(state, compact: false)
             }
 
-            Spacer(minLength: 8)
-
-            // Heart rate then clock, side by side — the minimised bar's layout, because this is the
-            // same bar seen from the Lock Screen. Stacking them looked misaligned:
-            // `Text(timerInterval:)` reserves width for the widest value it could show, so a
-            // trailing-aligned timer does not visually line up with the text under it.
-            //
-            // The heart rate is ALWAYS present, dash and all. A readout that vanishes when the strap
-            // stops reading is indistinguishable from a missing feature — which is exactly how it
-            // was first reported.
-            HStack(spacing: 10) {
-                Label {
-                    Text(state.bpm.map(String.init) ?? "—").monospacedDigit()
-                } icon: {
-                    Image(systemName: "heart.fill")
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(state.status)
+                    .font(.custom(NoopSpecType.Face.sansRegular, fixedSize: 12.5))
+                    .foregroundStyle(bodyInk)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if let detail = state.detail {
+                    Text(detail)
+                        .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 12.5))
+                        .monospacedDigit()
+                        .foregroundStyle(NoopPalette.textPrimary)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(state.bpm == nil
-                                 ? StrandPalette.textTertiary
-                                 : StrandPalette.metricRose)
-
-                clock(state, tint: tint(state))
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
             }
+
+            progress(state, showsLabel: true)
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
     }
 
-    /// Counts DOWN through a rest (the number you act on) and UP through a set, both self-ticking.
-    ///
-    /// Both branches use `Text(timerInterval:)`, which is the API widgets are given for a clock that
-    /// advances without the app pushing. `Text(date, style: .timer)` looks equivalent and is not: on
-    /// the Lock Screen it rendered "25 minutes" — a rounded, prose duration — where a gym timer has
-    /// to read 25:02. Verified in the simulator, which is the only reason it was caught.
-    ///
-    /// An overrun rest (`restEndsAt` already past) counts UP from when it was due, which is the
-    /// honest reading: you are over, and by how much. A zero-length range would render nothing, so
-    /// the end is pushed a day out — well beyond any session.
-    private func clock(_ state: LiftActivityAttributes.ContentState, tint: Color) -> some View {
-        let counter: some View = {
-            if let ends = state.restEndsAt, ends > .now {
-                return Text(timerInterval: .now...ends, countsDown: true)
+    private func expandedBottom(_ state: LiftActivityAttributes.ContentState) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(state.exercise)
+                .font(.custom(NoopSpecType.Face.outfitLight, fixedSize: 23))
+                .tracking(-0.575)
+                .foregroundStyle(NoopPalette.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(state.status)
+                    .font(.custom(NoopSpecType.Face.sansRegular, fixedSize: 12.5))
+                    .foregroundStyle(bodyInk)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if let detail = state.detail {
+                    Text(detail)
+                        .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 12.5))
+                        .monospacedDigit()
+                        .foregroundStyle(NoopPalette.textPrimary)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
             }
-            let from = state.restEndsAt ?? state.stageStartedAt
-            return Text(timerInterval: from...from.addingTimeInterval(86_400), countsDown: false)
-        }()
-        return counter
-            .monospacedDigit()
-            .foregroundStyle(tint)
+
+            progress(state, showsLabel: false)
+        }
+        .padding(.top, 2)
+    }
+
+    private func progress(_ state: LiftActivityAttributes.ContentState,
+                          showsLabel: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.12))
+                    Capsule()
+                        .fill(stateInk(state))
+                        .frame(width: proxy.size.width * progressFraction(state))
+                }
+            }
+            .frame(height: 3)
+
+            if showsLabel {
+                Text(state.progress)
+                    .font(.custom(NoopSpecType.Face.sansRegular, fixedSize: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(NoopPalette.textQuiet)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func clock(_ state: LiftActivityAttributes.ContentState,
+                       compact: Bool) -> some View {
+        if state.isReady && !state.isPaused {
+            Text("Ready")
+                .font(.custom(NoopSpecType.Face.outfitRegular,
+                              fixedSize: compact ? 12.5 : 20))
+                .tracking(compact ? -0.31 : -0.5)
+                .foregroundStyle(stateInk(state))
+                .lineLimit(1)
+                .fixedSize()
+        } else if state.isPaused {
+            Text(duration(state.heldClockSeconds ?? 0))
+                .font(.custom(NoopSpecType.Face.outfitLight,
+                              fixedSize: compact ? 13.5 : 31))
+                .tracking(compact ? -0.34 : -0.775)
+                .monospacedDigit()
+                .foregroundStyle(disabledInk)
+                .lineLimit(1)
+                .fixedSize()
+        } else if state.isResting, let end = state.restEndsAt, end > .now {
+            Text(timerInterval: .now...end, countsDown: true)
+                .font(.custom(NoopSpecType.Face.outfitLight,
+                              fixedSize: compact ? 13.5 : 31))
+                .tracking(compact ? -0.34 : -0.775)
+                .monospacedDigit()
+                .foregroundStyle(bodyInk)
+                .lineLimit(1)
+                .fixedSize()
+        } else {
+            Text(timerInterval: state.stageStartedAt...state.stageStartedAt.addingTimeInterval(86_400),
+                 countsDown: false)
+                .font(.custom(NoopSpecType.Face.outfitLight,
+                              fixedSize: compact ? 13.5 : 31))
+                .tracking(compact ? -0.34 : -0.775)
+                .monospacedDigit()
+                .foregroundStyle(stateInk(state))
+                .lineLimit(1)
+                .fixedSize()
+        }
+    }
+
+    @ViewBuilder
+    private func stateMark(_ state: LiftActivityAttributes.ContentState,
+                           size: CGFloat) -> some View {
+        if state.isPaused {
+            Circle()
+                .stroke(disabledInk, lineWidth: 1.4)
+                .frame(width: size, height: size)
+        } else if state.isReady {
+            Circle()
+                .stroke(aura, lineWidth: 1.5)
+                .background(Circle().fill(aura.opacity(0.15)))
+                .shadow(color: aura.opacity(0.7), radius: 4.5)
+                .frame(width: size, height: size)
+        } else {
+            Circle()
+                .fill(stateInk(state))
+                .shadow(color: state.isResting ? .clear : aura.opacity(0.7), radius: 4.5)
+                .frame(width: size, height: size)
+        }
+    }
+
+    private func stateInk(_ state: LiftActivityAttributes.ContentState) -> Color {
+        if state.isPaused { return disabledInk }
+        if state.isResting && !state.isReady { return bodyInk }
+        return aura
+    }
+
+    private func progressFraction(_ state: LiftActivityAttributes.ContentState) -> CGFloat {
+        guard state.setsPlanned > 0 else { return 0 }
+        return min(1, max(0, CGFloat(state.setsDone) / CGFloat(state.setsPlanned)))
+    }
+
+    private func duration(_ seconds: Int) -> String {
+        let safe = max(0, seconds)
+        return String(format: "%d:%02d", safe / 60, safe % 60)
     }
 }

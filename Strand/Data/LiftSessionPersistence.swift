@@ -27,6 +27,12 @@ enum LiftSessionPersistence {
         var stage: StageBox
         var sets: [RecordedSet]
         var stageStartedAt: Int
+        /// Pause state is optional so snapshots written before Aura's pause control continue to
+        /// decode. `pausedAt` is the held wall-clock instant; `totalPausedSec` is used by the
+        /// session clock, while the engine's current stage anchors are shifted only on resume.
+        var isPaused: Bool?
+        var pausedAt: Int?
+        var totalPausedSec: Int?
         /// Numbers typed into sets that have NOT happened yet, and slots marked a warm-up in
         /// advance. Both are intent the user has already expressed, so a crash must not cost them —
         /// that is the whole point of this snapshot.
@@ -135,7 +141,10 @@ enum LiftSessionPersistence {
                          programId: String?,
                          programName: String?,
                          pendingValues: [LiftSlot: LiftSessionController.PendingSetValues],
-                         pendingWarmups: Set<LiftSlot>) -> Snapshot {
+                         pendingWarmups: Set<LiftSlot>,
+                         isPaused: Bool = false,
+                         pausedAt: Int? = nil,
+                         totalPausedSec: Int = 0) -> Snapshot {
         Snapshot(
             startSec: engine.startTs,
             programId: programId,
@@ -161,6 +170,9 @@ enum LiftSessionPersistence {
                                      restSec: $0.restSec)
             },
             stageStartedAt: engine.stageStartedAt,
+            isPaused: isPaused,
+            pausedAt: pausedAt,
+            totalPausedSec: totalPausedSec,
             // Sorted so the encoded snapshot is stable: a dictionary and a set have no order, and an
             // unstable encoding would rewrite the defaults blob on every tick for no reason.
             pendingValues: pendingValues

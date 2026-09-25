@@ -159,7 +159,7 @@ struct CoachBriefWidgetView: View {
 }
 
 struct CoachBriefWidget: Widget {
-    static let kind = "CoachBriefWidget"
+    static let kind = NoopWidgetFamilyRegistry.family(.coachBrief).configurationKind
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: Self.kind, provider: CoachBriefProvider()) { entry in
@@ -172,7 +172,7 @@ struct CoachBriefWidget: Widget {
                     .background(StrandPalette.surfaceBase)
             }
         }
-        .configurationDisplayName("Coach Brief")
+        .configurationDisplayName(NoopWidgetFamilyRegistry.family(.coachBrief).title)
         .description("Today's coaching brief at a glance. Tap to open Coach.")
         .supportedFamilies([
             .systemSmall,

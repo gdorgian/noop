@@ -426,6 +426,20 @@ struct LiftSessionEngine: Equatable {
         stageStartedAt = previous.stageStartedAt
     }
 
+    /// Move the live stage's time anchors forward after a pause.
+    ///
+    /// A pause is not elapsed set or rest time. The controller holds the wall-clock instant at
+    /// which the pause began; when work resumes it advances both anchors by the paused duration.
+    /// That keeps the working clock and the rest countdown frozen without changing any completed
+    /// set or pretending the session started later than it did.
+    mutating func shiftLiveStage(by seconds: Int) {
+        guard seconds > 0, stage != .finished else { return }
+        stageStartedAt += seconds
+        if case .resting(let slot, let endsAt) = stage {
+            stage = .resting(slot, endsAt: endsAt + seconds)
+        }
+    }
+
     private mutating func pushHistory() {
         history.append(Snapshot(plan: plan, stage: stage,
                                 sets: sets, stageStartedAt: stageStartedAt))

@@ -1551,7 +1551,7 @@ struct NoopDataScreen: View {
             case .none:
                 EmptyView()
             case .chevron:
-                NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             case let .value(text, color):
                 Text(text)
                     .font(NoopHTMLFont.sans(12.5, weight: .medium))

@@ -27,9 +27,8 @@ struct StrandiOSApp: App {
     /// observes it and presents the Devices manager.
     @StateObject private var router: NavRouter
     @State private var liveActivity = LiveActivityController()
-    /// Refreshes an unchanged measured BPM before ActivityKit's 120-second stale date. BLE suppresses
-    /// duplicate integer values, so an event-only pipeline could otherwise mark a genuinely steady live
-    /// heart rate stale even while the strap remained connected.
+    /// Checks activity state while connected. A keep-alive is never counted as a new sensor sample:
+    /// if BLE has not supplied a timestamped reading, ActivityKit must let the figure go stale.
     private let liveActivityKeepAlive = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     /// The Lift Log session's own Live Activity. Separate from the live-HR one above: while a gym
     /// session is open this is the banner that matters (it carries the heart rate too), so the HR
@@ -56,11 +55,20 @@ struct StrandiOSApp: App {
         // The redesign fonts are owned by StrandDesign's resource bundle. Register them before any
         // SwiftUI text resolves a face; the widget repeats this in its own process.
         NoopSpecType.registerFonts()
+        #if DEBUG
+        // Alternate icons are frozen exports of the same native orb drawings used by Breathe and
+        // Svea. The explicit launch flag keeps asset generation out of ordinary app launches.
+        NoopAppIconAssetExporter.exportIfRequested()
+        #endif
 
         // One-time migration off the retired card/button/both Coach-entry picker onto the three
         // independent entry toggles (banner/header-icon/floating-button). No-op after the first launch
         // that has them. Must run before any Today/RootTabView reads its @AppStorage default.
         CoachEntryPrefs.migrateIfNeeded()
+        // Retire the pre-Aura iPhone daily-brief scheduler before any coach instance or new Svea
+        // background task starts. A saved old toggle must not cause a provider request while the
+        // new proactive control is Never or Voice Off. macOS keeps its existing scheduler.
+        CoachBriefScheduler.retireIOSScheduleIfNeeded()
 
         // Install the wearer's awake window before ANYTHING stages a night: the daytime false-sleep
         // guard (#90) and the cold-start midsleep anchor (#547) both derive from it, and a pass that
@@ -242,7 +250,7 @@ struct StrandiOSApp: App {
                 // fixed-geometry tiles/gauges stay legible at the largest accessibility sizes rather than
                 // clipping; the common Larger-Text range still scales fully.
                 .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-                .onReceive(model.live.$heartRate) { _ in
+                .onReceive(model.live.$heartRate) { receivedBPM in
                     // #911: anchor the Live Activity on the SAME shared `Repository.widgetAnchor` the
                     // Home/Lock widget and the watch snapshot use, so this fourth surface can't drift to a
                     // different day at the rollover (it previously read `days.last(where: recovery != nil)`,
@@ -250,43 +258,63 @@ struct StrandiOSApp: App {
                     // Memoized: this closure fires on EVERY live-HR tick, so re-deriving the anchor here
                     // scanned the whole history + hit the DateFormatter lock ~1-3x/sec (#1051-shaped).
                     let day = model.repo.cachedWidgetAnchor()
+                    // @Published emits before its stored property changes. Use the emitted sample,
+                    // not a cached model value, so the activity's value and timestamp match.
+                    let currentBPM = model.live.connected ? receivedBPM : nil
                     liveActivity.update(
-                        bpm: model.live.connected ? (model.bpm ?? model.live.heartRate) : nil,
+                        bpm: currentBPM,
                         recovery: day?.recovery.map { Int($0.rounded()) },
                         connected: model.live.connected && !liftSession.isActive,
-                        effort: day?.strain.map { Int($0.rounded()) }
+                        effort: day?.strain.map { Int($0.rounded()) },
+                        zoneNumber: currentBPM.map { model.profile.hrZoneSet.zoneNumber(forBPM: Double($0)) },
+                        ceilingBPM: model.liveActivityCeilingBPM,
+                        newReading: true,
+                        suppressedByLift: liftSession.isActive
                     )
                     pushLiftActivity()
                 }
-                // End the Live Activity the moment the link drops, even if no further HR tick arrives.
+                // On disconnect, remove the figure immediately while retaining the last timestamped
+                // reading in the status line. The wearer can still see why the activity is quiet.
                 .onReceive(model.live.$connected) { isConnected in
                     // #911: same shared anchor as the heartRate site above, so the Live Activity, the
                     // widget, the watch and Today never disagree about which day they describe. Memoized
                     // (shares the heartRate site's cache; recomputes only on a data refresh or day-roll).
                     let day = model.repo.cachedWidgetAnchor()
+                    let currentBPM = isConnected ? (model.bpm ?? model.live.heartRate) : nil
                     liveActivity.update(
-                        bpm: isConnected ? (model.bpm ?? model.live.heartRate) : nil,
+                        bpm: currentBPM,
                         recovery: day?.recovery.map { Int($0.rounded()) },
                         connected: isConnected && !liftSession.isActive,
-                        effort: day?.strain.map { Int($0.rounded()) }
+                        effort: day?.strain.map { Int($0.rounded()) },
+                        zoneNumber: currentBPM.map { model.profile.hrZoneSet.zoneNumber(forBPM: Double($0)) },
+                        ceilingBPM: model.liveActivityCeilingBPM,
+                        suppressedByLift: liftSession.isActive
                     )
                 }
                 .onReceive(liveActivityKeepAlive) { _ in
-                    guard model.live.connected,
+                    guard model.live.connected, !liftSession.isActive,
                           let bpm = model.bpm ?? model.live.heartRate else { return }
                     let day = model.repo.cachedWidgetAnchor()
                     liveActivity.update(
                         bpm: bpm,
                         recovery: day?.recovery.map { Int($0.rounded()) },
                         connected: true,
-                        effort: day?.strain.map { Int($0.rounded()) }
+                        effort: day?.strain.map { Int($0.rounded()) },
+                        zoneNumber: model.profile.hrZoneSet.zoneNumber(forBPM: Double(bpm)),
+                        ceilingBPM: model.liveActivityCeilingBPM
                     )
                 }
                 // The gym session's own banner. Driven off the session's 1 Hz tick so a stage change
                 // reaches the Lock Screen promptly; the controller decides what is actually worth
                 // pushing, since the widget's clocks tick on their own.
-                .onReceive(liftSession.$now) { _ in pushLiftActivity() }
-                .onReceive(liftSession.$engine) { _ in pushLiftActivity() }
+                .onReceive(liftSession.$now) { _ in
+                    if liftSession.isActive { liveActivity.suspendForLift() }
+                    pushLiftActivity()
+                }
+                .onReceive(liftSession.$engine) { _ in
+                    if liftSession.isActive { liveActivity.suspendForLift() }
+                    pushLiftActivity()
+                }
                 // #911/#759: republish the Home/Lock-Screen widget whenever the dashboard caches actually
                 // change mid-session. The only other publish site is the scenePhase .active handler, so
                 // during a long foreground session the widget froze at the last-foreground snapshot while
@@ -482,13 +510,17 @@ struct StrandiOSApp: App {
             programName: liftSession.programName ?? String(localized: "Session"),
             state: LiftActivityAttributes.ContentState(
                 isResting: p.isResting,
+                isPaused: p.isPaused,
+                isReady: p.isReady,
                 exercise: p.exercise,
                 status: p.status,
                 detail: p.detail,
-                bpm: model.live.connected ? (model.bpm ?? model.live.heartRate) : nil,
                 progress: String(localized: "\(p.setsDone) of \(p.setsPlanned) sets done"),
+                setsDone: p.setsDone,
+                setsPlanned: p.setsPlanned,
                 stageStartedAt: p.stageStartedAt,
-                restEndsAt: p.restEndsAt))
+                restEndsAt: p.restEndsAt,
+                heldClockSeconds: p.heldClockSeconds))
     }
 }
 
@@ -503,6 +535,9 @@ private struct iOSRootView: View {
     @AppStorage("noop.onboarded") private var onboarded = false
     @AppStorage("noop.lastSeenChangelogVersion") private var lastSeenChangelog = ""
     @AppStorage("noop.acceptedTermsVersion") private var acceptedTerms = ""
+    /// Local consent record. The gate promises version + time, so the iOS root must write both just
+    /// like the shared desktop root does.
+    @AppStorage("noop.acceptedTermsAt") private var acceptedTermsAt = ""
     @State private var showWhatsNew = false
     /// Starts false so a cold-launch external action can't race this view's onAppear decision about the
     /// automatic What's New sheet. It becomes true only when no sheet is due or its dismissal completes.
@@ -550,6 +585,7 @@ private struct iOSRootView: View {
                     // Keep any external action behind the gate while the accepted-terms change decides
                     // whether What's New must present next. This write must precede acceptedTerms.
                     automaticLaunchSheetResolved = false
+                    acceptedTermsAt = ISO8601DateFormatter().string(from: Date())
                     acceptedTerms = Terms.currentVersion
                 })
                     .transition(.opacity)
@@ -637,6 +673,11 @@ enum DemoScreens {
         case "explore":  return AnyView(MetricExplorerView())
         case "compare":  return AnyView(CompareView())
         case "settings": return AnyView(SettingsView())
+        // Aura launch surfaces. These are Debug-only full-frame capture entries: Release builds
+        // can reach them only through their real gate/sheet presentation paths.
+        case "release": return AnyView(WhatsNewView(presentation: .bump, onClose: {}))
+        case "releasebell": return AnyView(WhatsNewView(presentation: .bell, onClose: {}))
+        case "terms": return AnyView(TermsGateView(onAccept: {}))
         case "chargebreakdown": return AnyView(ChargeBreakdownDemoHost())
         case "devices":  return AnyView(DevicesView())
         case "devicescatalog": return AnyView(DeviceCardCatalog())

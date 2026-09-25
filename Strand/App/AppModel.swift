@@ -891,6 +891,7 @@ final class AppModel: ObservableObject {
                 avgHr: w.avgHr,
                 peakHr: w.peakHr,
                 liveStrain: w.liveStrain,
+                targetZone: w.targetZone,
                 pausedAtSec: w.pausedAt.map { Int($0.timeIntervalSince1970) },
                 pausedDurationSec: Int(w.pausedDuration)))
     }
@@ -907,9 +908,11 @@ final class AppModel: ObservableObject {
         w.avgHr = snap.avgHr
         w.peakHr = snap.peakHr
         w.liveStrain = snap.liveStrain
+        w.targetZone = snap.targetZone
         w.pausedAt = snap.pausedAtSec.map { Date(timeIntervalSince1970: TimeInterval($0)) }
         w.pausedDuration = TimeInterval(snap.pausedDurationSec ?? 0)
         activeWorkout = w
+        zoneTrainingTargetZone = w.targetZone
 
         // Rebuild the transient GPS lifecycle flag as well as the durable workout value. Without this,
         // a distance workout restored after an OS kill resumes as a non-GPS workout: Resume never
@@ -951,8 +954,9 @@ final class AppModel: ObservableObject {
     }
 
     /// Finish the active workout: finalize the GPS route (#524), score the captured HR window, and save it
-    /// as a `WorkoutRow`. A session with no HR window AND no real GPS route is discarded quietly (parity
-    /// with Android) , but a GPS-only walk with HR not streaming still saves. Double-buzz confirms.
+    /// as a `WorkoutRow`. An explicitly recorded session still saves its measured duration when the
+    /// strap supplies no HR and GPS supplies no route; it must not vanish merely because sensors were
+    /// unavailable. In that case physiological metrics and distance remain absent. Double-buzz confirms.
     func endWorkout() {
         guard let w = activeWorkout else { return }
         activeWorkout = nil
@@ -971,16 +975,6 @@ final class AppModel: ObservableObject {
             route = gpsRecorder.capturedRoute()
         }
         let samples = w.samples
-        // Save when there's an HR window OR a real GPS route , a GPS-only walk (HR not streaming) is
-        // still a workout (parity with Android's `samples.size < 2 && track.size < 2` discard gate).
-        guard samples.count >= 2 || route != nil else {
-            // Workouts & GPS test mode: record WHY a session vanished (too short / no route), tagged `.workouts`.
-            emitWorkoutsTrace(WorkoutsTrace.sessionLine(
-                event: "discarded", sportKey: WorkoutSource.traceSportKey(w.sport),
-                hrSamples: samples.count, gpsPoints: route == nil ? 0 : nil))
-            lastWorkout = nil
-            return
-        }
         let end = Date()
         let avg = samples.isEmpty ? nil
             : Int((Double(samples.map(\.bpm).reduce(0, +)) / Double(samples.count)).rounded())
@@ -1819,6 +1813,14 @@ final class AppModel: ObservableObject {
         case .always: return true
         case .workout: return activeWorkout != nil || liveSessionActive
         }
+    }
+
+    /// The Lock Screen may use amber only when the wearer enabled the ceiling and its chosen
+    /// scope is active. A high heart rate alone does not authorize an attention state.
+    var liveActivityCeilingBPM: Int? {
+        guard behavior.zoneCoaching, hrCeilingScopeActive, live.bonded, live.worn,
+              let threshold = resolvedHRCeilingBPM, threshold.isFinite else { return nil }
+        return Int(threshold.rounded(.up))
     }
 
     /// Called by `LiveSessionRunner` so the workout-only ceiling scope and target-zone coach cover both

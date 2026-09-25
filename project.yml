@@ -325,14 +325,22 @@ targets:
         # so this makes the app's own motion match the panel rather than making scrolling faster. Frame
         # COST is the separate problem, handled by the liquid idle stand-down.
         CADisableMinimumFrameDuration: true
-        # Alternate app icons (v3 "Titanium & Gold"). The primary icon stays the asset-catalog
-        # AppIcon (machined titanium); the alternate "AppIcon-Navy" (blued titanium) is declared
-        # here so UIApplication.setAlternateIconName("AppIcon-Navy") can switch to it at runtime.
+        # Alternate app icons. The primary asset is Aura; Appearance can switch among Titanium,
+        # the existing Navy reference, Breathe and Orb at runtime.
         # CFBundleIconFiles is intentionally empty — the artwork lives in the asset catalog, shipped
         # via ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS, so no loose PNGs are listed here.
         CFBundleIcons:
           CFBundleAlternateIcons:
+            AppIcon-Titanium:
+              CFBundleIconFiles: []
+              UIPrerenderedIcon: false
+            AppIcon-Breathe:
+              CFBundleIconFiles: []
+              UIPrerenderedIcon: false
             AppIcon-Navy:
+              CFBundleIconFiles: []
+              UIPrerenderedIcon: false
+            AppIcon-Orb:
               CFBundleIconFiles: []
               UIPrerenderedIcon: false
         NSSupportsLiveActivities: true

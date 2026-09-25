@@ -1,14 +1,50 @@
 import Foundation
 import SwiftUI
 import UIKit
+import PhotosUI
+import StrandAnalytics
+import StrandDesign
+import WhoopStore
 
 // MARK: - Act 5 · You and the plumbing
 
 struct NoopAct5Screens: View {
     @ObservedObject var navigation: NoopNavigation
+    /// The production shell's measured hub record. Nil only in the seeded Debug shell.
+    var you: NoopYouRecord? = nil
+    var battery: Int? = nil
+    /// The production shell's history list; read only when `you` is set.
+    var history: NoopHistoryRecord? = nil
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var live: LiveState
     @EnvironmentObject private var coach: AICoachEngine
+    @EnvironmentObject private var profile: ProfileStore
+    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
+    /// The same gate Energy uses: until the wearer confirms them, the profile's starting values are
+    /// examples and are not printed as theirs.
+    @AppStorage("noop.energy.profileConfirmed") private var profileConfirmed = false
+    @EnvironmentObject private var behavior: BehaviorStore
+
+    // The app's real settings, bound in the production shell. Defaults match the classic Settings
+    // screen's, so an unset key reads here exactly as it does everywhere else in the app.
+    @AppStorage(UnitPrefs.temperatureKey) private var temperatureRaw = ""
+    @AppStorage(UnitPrefs.effortScaleKey) private var effortScaleRaw = ""
+    @AppStorage(QuietMotionPrefs.enabledKey) private var quietMotionOn = false
+    @AppStorage(UnitPrefs.liveActivityKey) private var liveActivityOn = true
+    @AppStorage(PuffinExperiment.powerSavingKey) private var powerSavingOn = false
+    @AppStorage(PuffinExperiment.powerSavingBatteryPctKey) private var powerSavingPct = 20
+    @AppStorage(PuffinExperiment.pauseHrvDisabledKey) private var pauseHrvDisabled = false
+    @AppStorage(PuffinExperiment.autoDetectWorkoutsKey) private var autoDetectOn = false
+    @AppStorage(PuffinExperiment.journalReminderKey) private var journalReminderOn = true
+    @AppStorage("workoutKeepScreenOn") private var keepScreenOn = false
+    @AppStorage("notif.quietHoursEnabled") private var quietHoursOn = false
+    @AppStorage("inactivity.enabled") private var inactivityOn = false
+    @AppStorage(PuffinExperiment.experimentalSleepV2Key) private var sleepV2On = true
+    @AppStorage(PuffinExperiment.motionAwareWakeKey) private var motionAwareWakeOn = false
+    @AppStorage(PuffinExperiment.keepRealtimeForDataKey) private var continuousHrvOn = false
+    @AppStorage(PuffinExperiment.continuousHrvOvernightOnlyKey) private var hrvOvernightOnly = true
+    @AppStorage(PuffinExperiment.spo2CandidateDisplayKey) private var spo2EstimateOn = false
+    @AppStorage(PuffinFrameRecorder.enabledKey) private var frameRecorderOn = false
 
     @AppStorage(PuffinExperiment.deepDataKey) private var deepDataEnabled = false
     @AppStorage(PuffinExperiment.broadcastHrKey) private var broadcastHrEnabled = false
@@ -17,6 +53,11 @@ struct NoopAct5Screens: View {
     @SceneStorage("noop.act5.history-filter") private var historyFilter = "All"
     @State private var openZone: Int?
     @State private var hasPhoto = false
+    @State private var photoItem: PhotosPickerItem?
+    @State private var confirmingProfile = false
+    @State private var dailyLogOn = ScheduledDebugExport.isEnabled
+    @State private var showingPairWizard = false
+    @EnvironmentObject private var health: HealthKitBridge
     @State private var sex = "Male"
     @State private var birthDay = 12
     @State private var birthMonth = 1
@@ -57,12 +98,14 @@ struct NoopAct5Screens: View {
     @State private var preferences: [String: String] = [
         "Units": "Metric", "Temperature": "°C", "Effort": "0–100", "Appearance": "Dark",
         "Chart colours": "Titanium", "Sleep chart": "Hypnogram", "Card surface": "Frosted",
-        "App icon": "Titanium", "Power saving at": "20%", "Double tap": "Sleep mark",
+        "App icon": "Aura", "Power saving at": "20%", "Double tap": "Sleep mark",
         "Language": "English", "Svea’s manner": "Plain"
     ]
     @State private var baselinesRestarting = false
     @State private var settingsSearch = ""
     @State private var actionNotice: String?
+    @State private var showReleaseNotes = false
+    @State private var selectedAppIcon = NoopAppIconChoice.current
 
     @State private var selectedShift: String?
     @State private var paired = false
@@ -88,6 +131,11 @@ struct NoopAct5Screens: View {
             case .pair: pairingScreen
             case .position: positionScreen
             default: youScreen
+            }
+        }
+        .sheet(isPresented: $showReleaseNotes) {
+            WhatsNewView(presentation: .bell) {
+                showReleaseNotes = false
             }
         }
         .alert("Clear the stored strap flag?", isPresented: Binding(
@@ -145,10 +193,104 @@ private extension NoopAct5Screens {
         return names[max(0, min(11, birthMonth - 1))]
     }
 
-    func isEnabled(_ key: String) -> Bool { enabled.contains(key) }
+    /// The production shell. Every switch and choice then reads and writes the app's real setting,
+    /// and one with no feature behind it is drawn in the designed "Later" state instead of as a switch.
+    var measured: Bool { you != nil }
+
+    func isEnabled(_ key: String) -> Bool {
+        if measured { return liveToggle(key)?.wrappedValue ?? false }
+        return enabled.contains(key)
+    }
 
     func flip(_ key: String) {
+        if measured {
+            guard let binding = liveToggle(key) else { return }
+            binding.wrappedValue.toggle()
+            toggleSideEffect(key)
+            return
+        }
         if enabled.contains(key) { enabled.remove(key) } else { enabled.insert(key) }
+    }
+
+    /// True in production for a switch with no real setting behind it.
+    func isLater(_ key: String) -> Bool { measured && liveToggle(key) == nil }
+
+    func liveToggle(_ key: String) -> Binding<Bool>? {
+        switch key {
+        case "Reduce motion in Noop": $quietMotionOn
+        case "Live heart rate in the Dynamic Island": $liveActivityOn
+        case "Battery alerts": $behavior.batteryAlerts
+        case "Power saving": $powerSavingOn
+        // Stored as "pause disabled"; the switch asks the positive question.
+        case "Pause the HRV stream when low": Binding(get: { !pauseHrvDisabled }, set: { pauseHrvDisabled = !$0 })
+        case "Offer a workout it spotted": $autoDetectOn
+        case "Journal reminder": $journalReminderOn
+        case "Keep the screen on in a workout": $keepScreenOn
+        case "Quiet hours": $quietHoursOn
+        case "Move reminder": $inactivityOn
+        case "Stress check-ins": $behavior.stressCheckIn
+        case "Illness early warning": $behavior.illnessWatch
+        case "Buzz if I go over": $behavior.zoneCoaching
+        case "Sleep staging V2": $sleepV2On
+        case "Motion-aware wake": $motionAwareWakeOn
+        case "Continuous HRV capture": $continuousHrvOn
+        case "Overnight only": $hrvOvernightOnly
+        case "SpO₂ strap estimate": $spo2EstimateOn
+        case "Record protocol frames": $frameRecorderOn
+        default: nil
+        }
+    }
+
+    /// The same follow-ups the classic Settings screen runs when these change.
+    func toggleSideEffect(_ key: String) {
+        switch key {
+        case "Continuous HRV capture": model.ble.setKeepRealtimeForData(continuousHrvOn)
+        case "Overnight only": model.ble.setKeepRealtimeForData(PuffinExperiment.keepRealtimeForDataEnabled)
+        case "SpO₂ strap estimate": Task { await model.intelligence.analyzeRecent(); await model.repo.refresh() }
+        case "Illness early warning": if behavior.illnessWatch { IllnessNotifier.requestAuthorization() }
+        default: break
+        }
+    }
+
+    /// The stored choice for a segmented row, or nil when production has nothing behind it.
+    func liveChoice(_ title: String) -> Binding<String>? {
+        switch title {
+        case "Units":
+            Binding(get: { UnitSystem(rawValue: unitSystemRaw) == .imperial ? "Imperial" : "Metric" },
+                    set: { unitSystemRaw = ($0 == "Imperial" ? UnitSystem.imperial : .metric).rawValue })
+        case "Temperature":
+            Binding(get: {
+                UnitPrefs.resolveTemperature(system: UnitSystem(rawValue: unitSystemRaw) ?? .metric,
+                                             override: temperatureRaw) == .fahrenheit ? "°F" : "°C"
+            }, set: { temperatureRaw = ($0 == "°F" ? TemperatureUnit.fahrenheit : .celsius).rawValue })
+        case "Effort":
+            Binding(get: { UnitPrefs.resolveEffortScale(effortScaleRaw) == .whoop ? "0–21" : "0–100" },
+                    set: { effortScaleRaw = ($0 == "0–21" ? EffortScale.whoop : .hundred).rawValue })
+        case "Power saving at":
+            Binding(get: { "\(powerSavingPct)%" },
+                    set: { powerSavingPct = Int($0.dropLast()) ?? powerSavingPct })
+        case "Double tap":
+            Binding(get: {
+                switch behavior.doubleTapAction {
+                case .sleepMark: "Sleep mark"
+                case .none: "Nothing"
+                default: ""
+                }
+            }, set: { behavior.doubleTapAction = $0 == "Sleep mark" ? .sleepMark : .none })
+        // Dark is the only designed appearance and English the only shipped language.
+        case "Appearance": .constant("Dark")
+        case "Language": .constant("English")
+        default: nil
+        }
+    }
+
+    /// Choices a real setting cannot hold, drawn disabled in production.
+    func unsupportedChoices(_ title: String) -> Set<String> {
+        guard measured else { return [] }
+        switch title {
+        case "Double tap": return ["Log water"]
+        default: return []
+        }
     }
 
     func pageTitle(_ title: String, copy: String) -> some View {
@@ -157,11 +299,13 @@ private extension NoopAct5Screens {
                 .font(NoopHTMLFont.outfit(25))
                 .tracking(-0.6)
                 .foregroundStyle(NoopHTMLColor.ink)
-            Text(copy)
-                .font(NoopHTMLFont.sans(13.5))
-                .tracking(-0.15)
-                .foregroundStyle(NoopHTMLColor.copy)
-                .lineSpacing(4)
+            if !copy.isEmpty {
+                Text(copy)
+                    .font(NoopHTMLFont.sans(13.5))
+                    .tracking(-0.15)
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .lineSpacing(4)
+            }
         }
     }
 
@@ -182,7 +326,7 @@ private extension NoopAct5Screens {
             .padding(.bottom, -10)
     }
 
-    func copyRow(_ title: String, detail: String, symbol: String? = nil, tint: Color = NoopHTMLColor.blue, value: String? = nil, action: (() -> Void)? = nil) -> some View {
+    func copyRow(_ title: String, detail: String?, symbol: String? = nil, tint: Color = NoopHTMLColor.blue, value: String? = nil, action: (() -> Void)? = nil) -> some View {
         Button { action?() } label: {
             HStack(spacing: 13) {
                 if let symbol {
@@ -193,13 +337,50 @@ private extension NoopAct5Screens {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                    if let detail {
+                        Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                    }
                 }
                 Spacer(minLength: 8)
                 if let value {
                     Text(value).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 if action != nil { NoopChevron() }
+            }
+            .padding(.vertical, 13)
+            .frame(minHeight: 58)
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+    }
+
+    func canonicalLinkRow(
+        _ title: String,
+        detail: String,
+        glyph: NoopCanonicalGlyphName,
+        tint: Color,
+        value: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 13) {
+                NoopCanonicalGlyph(name: glyph, size: 19, color: tint)
+                    .frame(width: 21)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(NoopHTMLFont.sans(13.5))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                    Text(detail)
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(Color(hex: 0x7F8A85))
+                        .lineSpacing(2)
+                }
+                Spacer(minLength: 8)
+                if let value {
+                    Text(value)
+                        .font(NoopHTMLFont.sans(12))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                }
+                NoopChevron()
             }
             .padding(.vertical, 13)
             .frame(minHeight: 58)
@@ -215,12 +396,16 @@ private extension NoopAct5Screens {
                     Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
                 }
                 Spacer(minLength: 8)
+                if isLater(title) {
+                    NoopLaterChip()
+                } else {
                 NoopA5TintToggle(isOn: isEnabled(title), tint: tint) {
                     if persistent, isEnabled(title) {
                         labFlagToClear = title
                     } else {
                         flip(title)
                     }
+                }
                 }
             }
             .padding(.vertical, 13)
@@ -249,10 +434,11 @@ private extension NoopAct5Screens {
             }
             HStack(spacing: 4) {
                 ForEach(choices, id: \.self) { choice in
-                    let disabled = disabledChoices.contains(choice)
+                    let disabled = disabledChoices.contains(choice) || unsupportedChoices(title).contains(choice)
+                    let live = measured ? liveChoice(title) : nil
                     let selected = !disabled && (title == "Svea’s manner"
                         ? navigation.coachVoice.rawValue == choice
-                        : preferences[title] == choice)
+                        : (live?.wrappedValue ?? preferences[title]) == choice)
                     Button {
                         guard !disabled else { return }
                         if title == "Svea’s manner", let voice = NoopCoachVoice(rawValue: choice) {
@@ -264,6 +450,8 @@ private extension NoopAct5Screens {
                                 coach.proactiveLevel = .off
                                 SveaProactiveBackgroundTask.updateSchedule(enabled: false)
                             }
+                        } else if let live {
+                            live.wrappedValue = choice
                         } else {
                             preferences[title] = choice
                         }
@@ -295,6 +483,27 @@ private extension NoopAct5Screens {
         NoopScreen(topInset: 52) {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(spacing: 2) {
+                    if let you {
+                        NoopBodyClock(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour,
+                                      showsNow: true,
+                                      initials: NoopYouRecord.initials(profile.displayName),
+                                      photo: profile.avatarImage)
+                        if let name = profile.displayName {
+                            Text(name)
+                                .font(NoopHTMLFont.outfit(27, weight: .light))
+                                .tracking(-0.8)
+                        }
+                        // The prototype's line goes on to claim how tightly the need has held; no
+                        // template exists for that, so only the window and the need are stated.
+                        if let onset = you.usualOnsetHour, let wake = you.usualWakeHour {
+                            Text("Asleep \(NoopYouRecord.clock(onset)) \u{2192} \(NoopYouRecord.clock(wake)) \u{00B7} a \(NoopRestRecord.duration(you.needMin)) need")
+                                .font(NoopHTMLFont.sans(12.5))
+                                .foregroundStyle(Color(hex: 0x8B958F))
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(3)
+                                .frame(maxWidth: 300)
+                        }
+                    } else {
                     NoopBodyClock()
                     Text("Gabriel")
                         .font(NoopHTMLFont.outfit(27, weight: .light))
@@ -305,6 +514,7 @@ private extension NoopAct5Screens {
                         .multilineTextAlignment(.center)
                         .lineSpacing(3)
                         .frame(maxWidth: 300)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 9) {
@@ -312,11 +522,20 @@ private extension NoopAct5Screens {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 8) {
                                 NoopSectionLabel("Your record", color: Color(hex: 0xC08E98))
+                                if you == nil {
                                 HStack(spacing: 10) {
                                     recordFact("29", "years")
                                     recordFact(heightDisplay, "")
                                     recordFact(weightDisplay, "")
                                     recordFact(sex.lowercased(), "")
+                                }
+                                } else if profileConfirmed {
+                                HStack(spacing: 10) {
+                                    recordFact("\(profile.age)", "years")
+                                    recordFact(liveHeightDisplay, "")
+                                    recordFact(liveWeightDisplay, "")
+                                    recordFact(liveSexDisplay, "")
+                                }
                                 }
                             }
                             Spacer()
@@ -333,21 +552,39 @@ private extension NoopAct5Screens {
                         .padding(.horizontal, 2)
                         .padding(.top, 8)
 
+                    if let you {
+                        // Values are the wearer's; the explanatory copy is the example person's
+                        // (221 nights, a hill in June) and has no template, so it is left out.
+                        // A planning target, not a measured need (owner decision, 24 Sep): never tagged "learned".
+                        coreCard("Your sleep need", value: NoopRestRecord.duration(you.needMin),
+                                 tag: nil, copy: nil)
+                        if let onset = you.usualOnsetHour {
+                            coreCard("Your bedtime hour", value: NoopYouRecord.clock(onset), tag: "learned", copy: nil)
+                        }
+                        // hrMax falls back to an age formula; an unconfirmed age is an example, so the
+                        // maximum is printed only once the age is the wearer's or they entered one.
+                        coreCard("Your zones", value: NoopZoneSource.current(profile).trusted
+                                    ? "5 zones \u{00B7} max \(profile.hrMax)" : "5 zones",
+                                 tag: NoopZoneSource.current(profile).tag, copy: nil) {
+                            navigation.push(.zones)
+                        }
+                    } else {
                     coreCard("Your sleep need", value: "7h 12m", tag: "learned", copy: "Worked out from 221 nights of your own sleep, not from a recommendation for adults in general. It moves slowly and tells you when it does.")
                     coreCard("Your bedtime hour", value: "23:20", tag: "learned", copy: "Learned from 221 nights. Everything the app says about regularity is measured against this hour, not against a clock you set.")
                     coreCard("Your zones", value: "5 zones · max \(maximumHeartRate)", tag: "measured", copy: "From a maximum Noop actually saw on a hill in June and a resting rate of 58. Tap to see what each zone is for.") {
                         navigation.push(.zones)
                     }
+                    }
 
                     dividedCard {
                         VStack(spacing: 0) {
-                            copyRow("Your journey", detail: "half marathon, 26 October · 46% recorded", symbol: "sparkles", tint: Self.blush) { navigation.push(.goal) }
+                            copyRow("Your journey", detail: you == nil ? "half marathon, 26 October · 46% recorded" : nil, symbol: "sparkles", tint: Self.blush) { navigation.push(.goal) }
                             Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Biomarkers", detail: "your own bloodwork, dated and kept here", symbol: "drop", tint: Self.blush, value: "\(NoopLabCatalog.markerCount)") { navigation.push(.labs) }
+                            copyRow("Biomarkers", detail: "your own bloodwork, dated and kept here", symbol: "drop", tint: Self.blush, value: you == nil ? "\(NoopLabCatalog.markerCount)" : nil) { navigation.push(.labs) }
                             Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Your strap", detail: "WHOOP 5.0 / MG · synced 2 min ago", symbol: "applewatch", value: "52%") { navigation.push(.strap) }
+                            copyRow("Your strap", detail: you == nil ? "WHOOP 5.0 / MG · synced 2 min ago" : liveStrapDetail, symbol: "applewatch", value: you == nil ? "52%" : battery.map { "\($0)%" }) { navigation.push(.strap) }
                             Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Everything you logged", detail: "sessions, sleeps, coffees", symbol: "waveform.path.ecg", tint: Self.blush, value: "142") { navigation.push(.history) }
+                            copyRow("Everything you logged", detail: "sessions, sleeps, coffees", symbol: "waveform.path.ecg", tint: Self.blush, value: you == nil ? "142" : nil) { navigation.push(.history) }
                             Divider().overlay(NoopHTMLColor.border)
                             copyRow("Data and permissions", detail: "what is kept, and what leaves", symbol: "shield", tint: Self.blush) { navigation.push(.data) }
                             Divider().overlay(NoopHTMLColor.border)
@@ -377,7 +614,29 @@ private extension NoopAct5Screens {
         }
     }
 
-    func coreCard(_ title: String, value: String, tag: String, copy: String, action: (() -> Void)? = nil) -> some View {
+    // MARK: You, measured
+
+    private var liveImperial: Bool { UnitSystem(rawValue: unitSystemRaw) == .imperial }
+    private var liveHeightDisplay: String {
+        let cm = Int(profile.heightCm.rounded())
+        guard liveImperial else { return "\(cm) cm" }
+        let inches = Int((profile.heightCm / 2.54).rounded())
+        return "\(inches / 12)\u{2032} \(inches % 12)\u{2033}"
+    }
+    private var liveWeightDisplay: String {
+        liveImperial ? "\(Int((profile.weightKg * 2.20462).rounded())) lb" : String(format: "%.1f kg", profile.weightKg)
+    }
+    private var liveSexDisplay: String {
+        switch profile.sex { case "female": "female"; case "male": "male"; default: "other" }
+    }
+    /// The active strap's model, from the device registry. Nil when none is paired.
+    private var liveStrapDetail: String? {
+        guard let registry = model.deviceRegistry,
+              let active = registry.devices.first(where: { $0.id == registry.activeDeviceId }) else { return nil }
+        return active.displayName
+    }
+
+    func coreCard(_ title: String, value: String, tag: String?, copy: String?, action: (() -> Void)? = nil) -> some View {
         Button { action?() } label: {
             NoopHTMLCard(radius: 20, padding: 16) {
                 VStack(alignment: .leading, spacing: 10) {
@@ -387,9 +646,13 @@ private extension NoopAct5Screens {
                             Text(value).font(NoopHTMLFont.outfit(27, weight: .light)).tracking(-0.8).monospacedDigit()
                         }
                         Spacer()
-                        NoopPill(text: tag, color: tag == "learned" ? Self.blushLight : Color(hex: 0xC9D0EE))
+                        if let tag {
+                            NoopPill(text: tag, color: tag == "learned" ? Self.blushLight : Color(hex: 0xC9D0EE))
+                        }
                     }
-                    Text(copy).font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                    if let copy {
+                        Text(copy).font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                    }
                 }
             }
         }
@@ -400,6 +663,32 @@ private extension NoopAct5Screens {
 private struct NoopBodyClock: View {
     private static let blush = Color(hex: 0xE08A9B)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Local hours on the 24-hour dial (00 at the top). The defaults are the prototype person's; the
+    /// production caller passes the wearer's usual window, or nil to draw no arc.
+    var onsetHour: Double? = 23.333
+    var wakeHour: Double? = 6.533
+    /// Production places the now-marker at the real time; the prototype keeps its drawn position.
+    var showsNow = false
+    var initials: String? = "G"
+    var photo: Image? = nil
+
+    private static let markRadius: CGFloat = 94.5
+
+    private func point(_ hour: Double) -> CGSize {
+        let angle = hour / 24 * 2 * .pi
+        return CGSize(width: sin(angle) * Self.markRadius, height: -cos(angle) * Self.markRadius)
+    }
+
+    private var nowHour: Double {
+        let c = Calendar.current.dateComponents([.hour, .minute], from: Date())
+        return Double(c.hour ?? 0) + Double(c.minute ?? 0) / 60
+    }
+
+    private func inSleep(_ hour: Int) -> Bool {
+        guard let onset = onsetHour, let wake = wakeHour else { return false }
+        let h = Double(hour)
+        return onset <= wake ? (h >= onset && h <= wake) : (h >= onset || h <= wake)
+    }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
@@ -435,6 +724,7 @@ private struct NoopBodyClock: View {
                     .stroke(Color.white.opacity(0.05), style: StrokeStyle(lineWidth: 17.5, lineCap: .butt))
                     .frame(width: 189, height: 189)
 
+                if onsetHour != nil && wakeHour != nil {
                 sleepArc
                     .stroke(Self.blush.opacity(0.9), style: StrokeStyle(lineWidth: 15.4, lineCap: .round))
                     .frame(width: 189, height: 189)
@@ -455,10 +745,11 @@ private struct NoopBodyClock: View {
                         style: StrokeStyle(lineWidth: 15.4, lineCap: .round)
                     )
                     .frame(width: 189, height: 189)
+                }
 
                 ForEach(0..<24, id: \.self) { hour in
                     let major = hour % 6 == 0
-                    let inSleep = hour <= 6
+                    let inSleep = showsNow ? self.inSleep(hour) : hour <= 6
                     Capsule()
                         .fill(major ? Color.white.opacity(0.5) : inSleep ? Self.blush.opacity(0.3) : Color.white.opacity(0.14))
                         .frame(width: major ? 1.6 : 1, height: major ? 6.2 : 3.1)
@@ -476,16 +767,20 @@ private struct NoopBodyClock: View {
                     .frame(width: 7, height: 7)
                     .shadow(color: .white.opacity(0.9), radius: 6)
                     .opacity(reduceMotion ? 1 : 0.35 + nowWave * 0.65)
-                    .offset(x: -54.2, y: -77.4)
+                    .offset(showsNow ? point(nowHour) : CGSize(width: -54.2, height: -77.4))
+                if let wake = wakeHour {
                 Circle()
                     .fill(NoopHTMLColor.canvas)
                     .overlay(Circle().stroke(Color(hex: 0xF2C4CE), lineWidth: 2))
                     .frame(width: 10.7, height: 10.7)
-                    .offset(x: 93.5, y: 13.2)
+                    .offset(showsNow ? point(wake) : CGSize(width: 93.5, height: 13.2))
+                }
+                if let onset = onsetHour {
                 Circle()
                     .fill(Color(hex: 0x8B99D6))
                     .frame(width: 7, height: 7)
-                    .offset(x: -16.4, y: -93.1)
+                    .offset(showsNow ? point(onset) : CGSize(width: -16.4, height: -93.1))
+                }
 
                 Circle()
                     .fill(
@@ -504,10 +799,19 @@ private struct NoopBodyClock: View {
                     .overlay(Circle().stroke(Self.blush.opacity(0.4), lineWidth: 0.5))
                     .overlay(Circle().stroke(Color.white.opacity(0.06), lineWidth: 1).padding(1))
                     .shadow(color: Self.blush.opacity(0.24), radius: 17)
-                Text("G")
-                    .font(NoopHTMLFont.outfit(42, weight: .light))
-                    .tracking(-1.25)
-                    .foregroundStyle(Color(hex: 0xF6D3DA))
+                if let photo {
+                    photo.resizable().scaledToFill()
+                        .frame(width: 112, height: 112)
+                        .clipShape(Circle())
+                } else if let initials {
+                    Text(initials)
+                        .font(NoopHTMLFont.outfit(42, weight: .light))
+                        .tracking(-1.25)
+                        .foregroundStyle(Color(hex: 0xF6D3DA))
+                } else {
+                    // No photo and no name: the spec's fallback is the brand mark, never an empty disc.
+                    BrandMark(size: 44)
+                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -515,9 +819,11 @@ private struct NoopBodyClock: View {
     }
 
     private var sleepArc: some Shape {
-        Circle()
-            .trim(from: 0, to: (6.533 + 24 - 23.333) / 24)
-            .rotation(.degrees(-90 + 23.333 * 15))
+        let onset = onsetHour ?? 0, wake = wakeHour ?? 0
+        let span = (wake - onset + 24).truncatingRemainder(dividingBy: 24)
+        return Circle()
+            .trim(from: 0, to: span / 24)
+            .rotation(.degrees(-90 + onset * 15))
     }
 
     private func clockLabel(_ value: String, x: CGFloat, y: CGFloat) -> some View {
@@ -538,6 +844,10 @@ private extension NoopAct5Screens {
                 act5BackHeader("You") { navigation.back(or: .you) }
                 pageTitle("Your record", copy: "Six facts and two calibrations. These set your zones, your calorie estimate and your body age — nothing else in the app asks you anything.")
                     .padding(.bottom, 6)
+
+                if measured {
+                    liveRecordBody
+                } else {
 
                 NoopHTMLCard(radius: 22, padding: 16) {
                     VStack(alignment: .leading, spacing: 13) {
@@ -628,8 +938,192 @@ private extension NoopAct5Screens {
                 .padding(16)
                 .background(Self.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
                 .overlay(RoundedRectangle(cornerRadius: 22).stroke(Self.blush.opacity(0.2), lineWidth: 0.5))
+                }
             }
         }
+        .sheet(isPresented: $confirmingProfile) {
+            NoopEnergyProfileConfirmation(profile: profile) {
+                profileConfirmed = true
+                confirmingProfile = false
+                Task { await WidgetSnapshot.publish(from: model) }
+            }
+            .presentationDetents([.large])
+        }
+        .onChangeCompat(of: photoItem) { item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self) { profile.setAvatar(data) }
+                photoItem = nil
+            }
+        }
+    }
+
+    // MARK: Your record, measured
+
+    /// The same rows over the wearer's stored profile. Until the starting example values are
+    /// confirmed they print as "—" and any tap opens the one-time confirmation; after that each
+    /// stepper writes the profile directly.
+    @ViewBuilder
+    var liveRecordBody: some View {
+        NoopHTMLCard(radius: 22, padding: 16) {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack(spacing: 14) {
+                    Group {
+                        if let photo = profile.avatarImage {
+                            photo.resizable().scaledToFill()
+                        } else if let initials = NoopYouRecord.initials(profile.displayName) {
+                            Text(initials).font(NoopHTMLFont.outfit(31, weight: .light)).foregroundStyle(Self.blushLight)
+                        } else {
+                            BrandMark(size: 30)
+                        }
+                    }
+                    .frame(width: 68, height: 68)
+                    .clipShape(Circle())
+                    .background(Color(hex: 0x1B1D1C), in: Circle())
+                    .overlay(Circle().stroke(Self.blush.opacity(0.4), lineWidth: 0.5))
+
+                    VStack(spacing: 7) {
+                        PhotosPicker(selection: $photoItem, matching: .images) {
+                            Text(profile.hasAvatar ? "Change photo" : "Choose photo")
+                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .foregroundStyle(Self.blushLight)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 40)
+                                .background(Self.blush.opacity(0.11), in: RoundedRectangle(cornerRadius: 13))
+                                .overlay(RoundedRectangle(cornerRadius: 13).stroke(Self.blush.opacity(0.3), lineWidth: 0.5))
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                        if profile.hasAvatar {
+                            Button("Remove photo") { profile.clearAvatar() }
+                                .font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x7F8A85)).frame(height: 32)
+                        }
+                    }
+                }
+                Text("Optional. It stays on this phone and is never uploaded — Noop has no account to upload it to.")
+                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+            }
+            .padding(.vertical, 3.5)
+        }
+
+        dividedCard {
+            VStack(spacing: 0) {
+                liveDateOfBirthRow
+                Divider().overlay(NoopHTMLColor.border)
+                HStack(spacing: 13) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Sex").font(NoopHTMLFont.sans(13.5))
+                        Text("used in the calorie and VO₂max models")
+                            .font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+                            .lineLimit(1).minimumScaleFactor(0.82)
+                    }
+                    Spacer(minLength: 4)
+                    liveSexControl
+                }
+                .frame(minHeight: 66)
+                .padding(.vertical, 13)
+                Divider().overlay(NoopHTMLColor.border)
+                stepperRow("Height", detail: liveImperial ? "stepped in whole inches" : "stepped in centimetres",
+                           value: profileConfirmed ? liveHeightDisplay : "\u{2014}",
+                           minus: { editProfile { profile.heightCm = max(120, profile.heightCm - (liveImperial ? 2.54 : 1)) } },
+                           plus: { editProfile { profile.heightCm = min(230, profile.heightCm + (liveImperial ? 2.54 : 1)) } })
+                Divider().overlay(NoopHTMLColor.border)
+                stepperRow("Weight", detail: liveImperial ? "stepped in pounds" : "stepped in half kilos",
+                           value: profileConfirmed ? liveWeightDisplay : "\u{2014}",
+                           minus: { editProfile { profile.weightKg = max(30, profile.weightKg - (liveImperial ? 0.45359 : 0.5)) } },
+                           plus: { editProfile { profile.weightKg = min(250, profile.weightKg + (liveImperial ? 0.45359 : 0.5)) } })
+                Divider().overlay(NoopHTMLColor.border)
+                stepperRow("Waist", detail: "optional — adds a VO₂max estimate, nothing else",
+                           value: profile.waistCm > 0
+                                ? (liveImperial ? "\(Int((profile.waistCm / 2.54).rounded()))\u{2033}" : "\(Int(profile.waistCm.rounded())) cm")
+                                : "Not set",
+                           minus: { profile.waistCm = profile.waistCm <= 60 ? 0 : profile.waistCm - (liveImperial ? 2.54 : 1) },
+                           plus: { profile.waistCm = profile.waistCm == 0 ? 80 : min(160, profile.waistCm + (liveImperial ? 2.54 : 1)) })
+                Divider().overlay(NoopHTMLColor.border)
+                // No observed maximum is stored, so the row speaks only of an override the wearer set.
+                stepperRow("Maximum heart rate", detail: profile.hrMaxOverride > 0 ? "manual override" : "",
+                           value: profile.hrMaxOverride > 0 || profileConfirmed ? "\(profile.hrMax) bpm" : "\u{2014}",
+                           minus: { profile.hrMaxOverride = max(100, profile.hrMax - 1) },
+                           plus: { profile.hrMaxOverride = min(220, profile.hrMax + 1) })
+                Divider().overlay(NoopHTMLColor.border)
+                copyRow("Your zones", detail: "five bands, derived from the two anchors above", value: "5 zones") { navigation.push(.zones) }
+                    .frame(height: 92)
+                Divider().overlay(NoopHTMLColor.border)
+                stepperRow("Step calibration", detail: "counter ticks per step — leave at 1.0 unless steps run high",
+                           value: String(format: "%.1f", profile.stepTicksPerStep),
+                           minus: { profile.stepTicksPerStep = max(0.5, profile.stepTicksPerStep - 0.1) },
+                           plus: { profile.stepTicksPerStep = min(3, profile.stepTicksPerStep + 0.1) })
+            }
+        }
+
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Why the waist is optional").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+            Text("It adds an estimated VO₂max. It does not sharpen your body age — that model cancels the body term out — so Noop will not nag you for it.")
+                .font(NoopHTMLFont.sans(12.5)).foregroundStyle(Color(hex: 0xC9BEC0)).lineSpacing(4)
+        }
+        .padding(16)
+        .background(Self.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Self.blush.opacity(0.2), lineWidth: 0.5))
+    }
+
+    /// Edits to the four confirmed facts go through the confirmation first, once.
+    func editProfile(_ change: () -> Void) {
+        guard profileConfirmed else { confirmingProfile = true; return }
+        change()
+    }
+
+    var liveDateOfBirthRow: some View {
+        let calendar = Calendar(identifier: .gregorian)
+        let parts = calendar.dateComponents([.day, .month, .year], from: profile.dateOfBirth)
+        let day = parts.day ?? 1, month = parts.month ?? 1, year = parts.year ?? 1990
+        let monthLabel = DateFormatter().monthSymbols[max(0, min(11, month - 1))]
+        func set(_ d: Int, _ m: Int, _ y: Int) {
+            editProfile {
+                var c = DateComponents(); c.year = y; c.month = m
+                let days = calendar.range(of: .day, in: .month, for: calendar.date(from: c) ?? Date())?.count ?? 28
+                c.day = min(d, days)
+                if let date = calendar.date(from: c) { profile.dateOfBirth = date }
+            }
+        }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Date of birth").font(NoopHTMLFont.sans(13.5))
+                Spacer()
+                Text(profileConfirmed ? "\(day) \(monthLabel) \(String(year)) \u{00B7} \(profile.age) years" : "\u{2014}")
+                    .font(NoopHTMLFont.sans(12)).foregroundStyle(Self.blushLight)
+            }
+            HStack(spacing: 7) {
+                compactStepper(value: profileConfirmed ? "\(day)" : "\u{2014}", label: "day",
+                               minus: { set(day == 1 ? 31 : day - 1, month, year) }, plus: { set(day == 31 ? 1 : day + 1, month, year) })
+                compactStepper(value: profileConfirmed ? String(monthLabel.prefix(3)) : "\u{2014}", label: "month",
+                               minus: { set(day, month == 1 ? 12 : month - 1, year) }, plus: { set(day, month == 12 ? 1 : month + 1, year) })
+                compactStepper(value: profileConfirmed ? "\(year)" : "\u{2014}", label: "year",
+                               minus: { set(day, month, max(1930, year - 1)) }, plus: { set(day, month, min(2012, year + 1)) })
+            }
+            Text("Your age is derived from this, so it advances on its own. Nothing else in the app asks for it.")
+                .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(2)
+        }
+        .padding(.vertical, 11.5)
+    }
+
+    var liveSexControl: some View {
+        HStack(spacing: 3) {
+            ForEach([("Male", "male"), ("Female", "female"), ("Other", "nonbinary")], id: \.0) { label, value in
+                let selected = profileConfirmed && profile.sex == value
+                Button { editProfile { profile.sex = value } } label: {
+                    Text(label)
+                        .font(NoopHTMLFont.sans(11.5, weight: selected ? .semibold : .regular))
+                        .lineLimit(1).minimumScaleFactor(0.85).fixedSize(horizontal: true, vertical: false)
+                        .foregroundStyle(selected ? Self.blushLight : NoopHTMLColor.copy)
+                        .frame(maxWidth: .infinity).frame(height: 32)
+                        .background(selected ? Self.blush.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11))
+                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .frame(width: 114)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
     }
 
     var dateOfBirthRow: some View {
@@ -681,6 +1175,7 @@ private extension NoopAct5Screens {
             VStack(spacing: 1) {
                 Text(value).font(NoopHTMLFont.outfit(15)).lineLimit(1)
                 Text(label.uppercased()).font(NoopHTMLFont.sans(8.5, weight: .semibold)).tracking(0.7).foregroundStyle(Color(hex: 0x7F8A85))
+                    .lineLimit(1).fixedSize()
             }
             .frame(maxWidth: .infinity)
             Button(action: plus) { Image(systemName: "plus").font(.system(size: 9, weight: .semibold)).frame(width: 26, height: 26) }
@@ -730,16 +1225,28 @@ private extension NoopAct5Screens {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 14) {
                 act5BackHeader("Your record") { navigation.back(or: .record) }
-                pageTitle("Your zones", copy: "Built from two numbers Noop has actually seen on you, not from your age.")
+                pageTitle("Your zones", copy: measured ? "" : "Built from two numbers Noop has actually seen on you, not from your age.")
                     .padding(.bottom, 3)
 
                 HStack(spacing: 9) {
+                    if measured {
+                        // No maximum is observed anywhere in the app, so "Measured maximum" cannot be
+                        // claimed. The maximum the zones are built on is shown, named for where it came
+                        // from; the resting anchor is measured.
+                        let source = NoopZoneSource.current(profile)
+                        anchorCard(value: source.trusted ? "\(profile.hrMax)" : "\u{2014}", title: source.maximumTitle,
+                                   copy: source.tag ?? "")
+                        if let resting = liveRestingAnchor {
+                            anchorCard(value: "\(resting)", title: "Resting rate", copy: "Overnight average across the last fourteen nights, updated every morning.")
+                        }
+                    } else {
                     anchorCard(value: "\(maximumHeartRate)", title: "Measured maximum", copy: "Seen on the climb out of the valley, 14 June. Not estimated from your age.")
                     anchorCard(value: "58", title: "Resting rate", copy: "Overnight average across the last fourteen nights, updated every morning.")
+                    }
                 }
 
                 VStack(spacing: 9) {
-                    ForEach(Array(Self.zones.enumerated()), id: \.offset) { index, zone in
+                    ForEach(Array((measured ? liveZones : Self.zones).enumerated()), id: \.offset) { index, zone in
                         Button { withAnimation(.easeOut(duration: 0.18)) { openZone = openZone == index ? nil : index } } label: {
                             VStack(alignment: .leading, spacing: 11) {
                                 HStack(spacing: 11) {
@@ -752,7 +1259,9 @@ private extension NoopAct5Screens {
                                     Text(zone.range).font(NoopHTMLFont.outfit(16)).foregroundStyle(NoopHTMLColor.inkSoft).monospacedDigit()
                                 }
                                 if openZone == index {
+                                    if !zone.use.isEmpty {
                                     Text(zone.use).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
+                                    }
                                     HStack(spacing: 10) {
                                         Text("Lower edge").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted)
                                         NoopProgressBar(progress: zone.progress, color: zone.color, height: 4)
@@ -770,6 +1279,7 @@ private extension NoopAct5Screens {
                     }
                 }
 
+                if !measured {
                 VStack(alignment: .leading, spacing: 9) {
                     Text("These update themselves").font(NoopHTMLFont.sans(13.5, weight: .semibold))
                     Text("When your resting pulse or your measured maximum moves, the edges move with them and you get one line about it in Trends. There is no annual retest to remember.")
@@ -778,6 +1288,7 @@ private extension NoopAct5Screens {
                 .padding(16)
                 .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
                 .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.blue.opacity(0.2), lineWidth: 0.5))
+                }
             }
         }
     }
@@ -790,9 +1301,36 @@ private extension NoopAct5Screens {
                     Text("bpm").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.muted)
                 }
                 Text(title).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.inkSoft)
-                Text(copy).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                if !copy.isEmpty {
+                    Text(copy).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                }
             }
         }
+    }
+
+    /// The profile's own five zones, named by number. The design's "use" lines describe its own
+    /// bands, which do not line up with these, so none is printed.
+    var liveZones: [NoopA5Zone] {
+        let set = profile.hrZoneSet
+        return Self.zones.enumerated().compactMap { index, template in
+            guard set.zones.indices.contains(index) else { return nil }
+            let z = set.zones[index]
+            let lo = Int(z.lower.rounded()), hi = Int(z.upper.rounded())
+            // An age formula over an unconfirmed example age is not the wearer's zone.
+            let trusted = NoopZoneSource.current(profile).trusted
+            return NoopA5Zone(name: NoopZoneSource.name(index + 1), range: trusted ? "\(lo)\u{2013}\(hi)" : "\u{2014}",
+                              percent: "\(Int((z.lowerPct * 100).rounded()))\u{2013}\(Int((z.upper / set.maxHR * 100).rounded()))% of your maximum",
+                              lower: trusted ? "\(lo) bpm" : "\u{2014}", progress: z.lowerPct, color: template.color,
+                              // The "use" lines describe the design's bands, not the app's zones.
+                              use: "")
+        }
+    }
+
+    /// Mean resting heart rate over the last fourteen recorded nights.
+    var liveRestingAnchor: Int? {
+        let values = model.repo.days.suffix(14).compactMap(\.restingHr)
+        guard !values.isEmpty else { return nil }
+        return Int((Double(values.reduce(0, +)) / Double(values.count)).rounded())
     }
 
     static let zones: [NoopA5Zone] = [
@@ -840,9 +1378,15 @@ private extension NoopAct5Screens {
                 }
 
                 HStack(spacing: 9) {
+                    if measured, let h = history {
+                        historyMetricTile("\(h.monthSessions)", label: "sessions in \(h.monthName)")
+                        historyMetricTile(NoopRestRecord.duration(Double(h.monthMovingMin)), label: "moving")
+                        historyMetricTile("\(h.monthLoad)", label: "load")
+                    } else {
                     historyMetricTile("12", label: "sessions in August")
                     historyMetricTile("8h 40m", label: "moving")
                     historyMetricTile("302", label: "load")
+                    }
                 }
 
                 Button {
@@ -859,7 +1403,7 @@ private extension NoopAct5Screens {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                        NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                     }
                     .padding(.vertical, 14)
                     .padding(.horizontal, 16)
@@ -937,7 +1481,7 @@ private extension NoopAct5Screens {
                     .font(NoopHTMLFont.sans(11.5))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                 if item.opensSomething {
-                    NoopFixedChevron(direction: .right, color: NoopHTMLColor.faint)
+                    NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                 }
             }
             .frame(minHeight: 55)
@@ -947,8 +1491,35 @@ private extension NoopAct5Screens {
         .disabled(!item.opensSomething)
     }
 
+    /// The measured list in the prototype's row shapes. Session rows keep no workout identity yet, so
+    /// they carry no chevron until the session record screen is wired.
+    var liveHistoryDays: [NoopA5HistoryDay] {
+        (history?.days ?? []).map { day in
+            NoopA5HistoryDay(day: day.label, summary: "", items: day.entries.map { e in
+                switch e.kind {
+                case .session:
+                    NoopA5HistoryItem(kind: .session, name: e.name, detail: e.detail, value: e.value,
+                                      symbol: Self.glyph(forSport: e.sport))
+                case .sleep:
+                    NoopA5HistoryItem(kind: .sleep, name: e.name, detail: e.detail, value: e.value, symbol: .bed)
+                case .log:
+                    NoopA5HistoryItem(kind: .log, name: e.name, detail: e.detail, value: e.value, symbol: .check)
+                }
+            })
+        }
+    }
+
+    static func glyph(forSport sport: String?) -> NoopCanonicalGlyphName {
+        let s = (sport ?? "").lowercased()
+        if s.contains("cycl") || s.contains("bike") || s.contains("ride") { return .bike }
+        if s.contains("walk") || s.contains("hik") { return .walk }
+        if s.contains("strength") || s.contains("weight") || s.contains("lift") { return .weight }
+        if s.contains("swim") { return .wave }
+        return .bolt
+    }
+
     var filteredHistory: [NoopA5HistoryDay] {
-        Self.history.compactMap { day in
+        (measured ? liveHistoryDays : Self.history).compactMap { day in
             let items = day.items.filter { item in
                 historyFilter == "All" ||
                     (historyFilter == "Sessions" && item.kind == .session) ||
@@ -1068,7 +1639,247 @@ private struct NoopA5HistoryDay: Identifiable {
 // MARK: Your strap
 
 private extension NoopAct5Screens {
+    @ViewBuilder
     var strapScreen: some View {
+        if measured { liveStrapScreen } else { prototypeStrapScreen }
+    }
+
+    // MARK: Your strap, measured
+
+    /// The strap screen over the live connection, the battery estimator, the Health bridge and the
+    /// real strap-log export. Controls with no feature behind them are drawn "Later".
+    var liveStrapScreen: some View {
+        let connected = live.connected
+        let report = health.lastWritebackReport
+        let wroteKinds = report?.entries.filter { $0.count > 0 }.count ?? 0
+        let relative = RelativeDateTimeFormatter()
+        return NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 12) {
+                act5BackHeader("You") { navigation.back(or: .you) }
+                pageTitle("Your strap", copy: liveStrapDetail ?? "No strap paired")
+
+                NoopHTMLCard(radius: 24, padding: 18) {
+                    VStack(spacing: 16) {
+                        HStack(spacing: 18) {
+                            NoopStrapBatteryRing(percent: battery,
+                                                 daysLeft: live.batteryEstimate.map { BatteryEstimator.label(hours: $0.remainingHours) })
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack(spacing: 8) {
+                                    Circle()
+                                        .fill(connected ? Self.green : NoopHTMLColor.faint)
+                                        .frame(width: 8, height: 8)
+                                        .shadow(color: connected ? Self.green.opacity(0.7) : .clear, radius: 5)
+                                    Text(connected ? "Connected and reading" : "Disconnected")
+                                        .font(NoopHTMLFont.sans(14, weight: .semibold))
+                                }
+                                strapFact("Secure link", connected && live.encryptedBond ? "Encrypted" : "\u{2014}")
+                                strapFact("On wrist", connected ? (live.worn ? "Yes" : "No") : "\u{2014}")
+                            }
+                        }
+                        Button {
+                            if connected { model.ble.syncNow() } else { model.ble.connectFromSystem() }
+                        } label: {
+                            HStack(spacing: 9) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                Text(connected ? "Sync now" : "Reconnect")
+                            }
+                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            .foregroundStyle(NoopHTMLColor.blueInk)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 17))
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                    }
+                }
+
+                NoopHTMLCard(radius: 22, padding: 16) {
+                    VStack(alignment: .leading, spacing: 13) {
+                        HStack(spacing: 11) {
+                            NoopCanonicalGlyph(name: .heart, size: 20, color: Self.green).frame(width: 21)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Apple Health").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                Text(health.auth != .authorized ? "not connected"
+                                     : report.map { "wrote \(wroteKinds) kinds \u{00B7} \(relative.localizedString(for: $0.completedAt, relativeTo: Date()))" }
+                                        ?? "connected")
+                                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                            }
+                            Spacer()
+                            NoopHTMLToggle(isOn: health.auth == .authorized, color: Self.green) {
+                                if health.auth != .authorized { Task { await health.requestAuthorization() } }
+                            }
+                        }
+                        NoopFlowLayout(spacing: 6) {
+                            ForEach(["Sleep", "Workouts", "Heart rate", "HRV", "Respiration", "Body temp"], id: \.self) { kind in
+                                Text(kind)
+                                    .font(NoopHTMLFont.sans(10.5, weight: .medium))
+                                    .foregroundStyle(NoopHTMLColor.inkSoft)
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 27)
+                                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+                                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
+                            }
+                        }
+                        let authorized = health.auth == .authorized
+                        Button {
+                            guard authorized, !health.syncing else { return }
+                            Task { _ = await health.sync() }
+                        } label: {
+                            Text(!authorized ? "Turn on Apple Health to sync" : "Sync Apple Health now")
+                                .font(NoopHTMLFont.sans(13, weight: .semibold))
+                                .foregroundStyle(authorized ? Color(hex: 0x8FE3B4) : NoopHTMLColor.faint)
+                                .frame(maxWidth: .infinity).frame(height: 46)
+                                .background(authorized ? Self.green.opacity(0.13) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 15))
+                                .overlay(RoundedRectangle(cornerRadius: 15).stroke(authorized ? Self.green.opacity(0.36) : Color.white.opacity(0.08), lineWidth: 0.5))
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                        .disabled(!authorized)
+                        Text("Noop writes to Health and never reads your Health history back in — the only exception is your phone's step count, which fills days the strap could not estimate.")
+                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                        Button { navigation.push(.apple) } label: {
+                            HStack(spacing: 12) {
+                                Text("What crossed, and what did not")
+                                    .font(NoopHTMLFont.sans(13))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Spacer(minLength: 8)
+                                NoopChevron()
+                            }
+                            .padding(.top, 13)
+                            .overlay(alignment: .top) {
+                                Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                            }
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                    }
+                }
+
+                dividedCard {
+                    VStack(spacing: 0) {
+                        toggleRow("Continuous pulse", detail: "Off means pulse only during sessions and sleep. Saves about a day and a half.")
+                        Divider().overlay(NoopHTMLColor.border)
+                        toggleRow("Temperature", detail: "Off costs you the skin-temperature vital and the early warning it gives. Saves about six hours.")
+                        Divider().overlay(NoopHTMLColor.border)
+                        toggleRow("Blood oxygen", detail: "Overnight only. Costs about four hours a week.")
+                        Divider().overlay(NoopHTMLColor.border)
+                        toggleRow("Stay connected in the background", detail: "Off and Noop only reads when you open it — you lose live heart rate and the nightly backfill runs late.")
+                    }
+                }
+
+                NoopHTMLCard(radius: 22, padding: 16) {
+                    VStack(alignment: .leading, spacing: 11) {
+                        HStack {
+                            Text("Buzz strength").font(NoopHTMLFont.sans(13.5))
+                            Spacer()
+                            NoopLaterChip()
+                        }
+                        Button {
+                            guard connected else { return }
+                            model.ble.buzzStrapOnce()
+                            pinged = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { pinged = false }
+                        } label: {
+                            Text(pinged ? "Buzzing now — follow the sound" : "Buzz the strap to find it")
+                                .font(NoopHTMLFont.sans(13, weight: .semibold))
+                                .foregroundStyle(pinged ? NoopHTMLColor.blueLight : NoopHTMLColor.inkSoft)
+                                .frame(maxWidth: .infinity).frame(height: 46)
+                                .background(pinged ? NoopHTMLColor.blue.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
+                                .overlay(RoundedRectangle(cornerRadius: 15).stroke(pinged ? NoopHTMLColor.blue.opacity(0.45) : Color.white.opacity(0.12), lineWidth: 0.5))
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                        .disabled(!connected)
+                        .opacity(connected ? 1 : 0.38)
+                    }
+                }
+
+                Button { navigation.push(.notifs) } label: {
+                    HStack(spacing: 13) {
+                        NoopCanonicalGlyph(name: .bell, size: 19, color: Self.blush)
+                            .frame(width: 20)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Buzz for phone notifications")
+                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            Text("designed · not built yet")
+                                .font(NoopHTMLFont.sans(11.5))
+                                .foregroundStyle(Color(hex: 0x7F8A85))
+                        }
+                        Spacer(minLength: 8)
+                        NoopChevron()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 15)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+
+                NoopHTMLCard(radius: 22, padding: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        NoopSectionLabel("Strap log")
+                        HStack(spacing: 8) {
+                            logButton("Copy", symbol: "doc.on.doc", done: lastLogAction == "Copied") {
+                                if let url = ScheduledDebugExport.runNow(),
+                                   let text = try? String(contentsOf: url, encoding: .utf8) {
+                                    UIPasteboard.general.string = text
+                                    lastLogAction = "Copied"
+                                }
+                            }
+                            logButton("Save…", symbol: "square.and.arrow.up", done: lastLogAction == "Saved") {
+                                if let url = ScheduledDebugExport.runNow() {
+                                    FileExport.exportFile(at: url)
+                                    lastLogAction = "Saved"
+                                }
+                            }
+                        }
+                        Divider().overlay(NoopHTMLColor.border)
+                        HStack(spacing: 13) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Save one copy a day").font(NoopHTMLFont.sans(13))
+                                Text("A timestamped file at 22:00, on this phone. Off by default.")
+                                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                            }
+                            Spacer()
+                            NoopHTMLToggle(isOn: dailyLogOn) {
+                                dailyLogOn.toggle()
+                                if dailyLogOn { ScheduledDebugExport.setTimeMinutes(22 * 60) }
+                                ScheduledDebugExport.setEnabled(dailyLogOn)
+                            }
+                        }
+                        Text("Send this log when a sync or a reading looks wrong. It is the one thing that makes a bug report answerable.")
+                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                    }
+                }
+
+                NoopHTMLRow(title: "Manage straps",
+                            detail: pairedStrapCount == 1 ? "one band paired" : "\(pairedStrapCount) bands paired",
+                            symbol: "link", value: nil) {
+                    navigation.push(.devices)
+                }
+
+                Button {
+                    if connected { model.ble.disconnect() } else { model.ble.connectFromSystem() }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: connected ? "xmark.circle" : "arrow.triangle.2.circlepath")
+                        Text(connected ? "Disconnect this strap" : "Reconnect")
+                    }
+                    .font(NoopHTMLFont.sans(13, weight: .semibold))
+                    .foregroundStyle(connected ? Color(hex: 0xF3A472) : NoopHTMLColor.blueLight)
+                    .frame(maxWidth: .infinity).frame(height: 50)
+                    .background((connected ? NoopHTMLColor.amber : NoopHTMLColor.blue).opacity(0.09), in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke((connected ? NoopHTMLColor.amber : NoopHTMLColor.blue).opacity(0.26), lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+
+                Text("Every switch here says what it costs you in battery, because that is the only reason anyone turns one off.")
+                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
+            }
+        }
+    }
+
+    var pairedStrapCount: Int { model.deviceRegistry?.devices.count ?? 0 }
+
+    var prototypeStrapScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
                 act5BackHeader("You") { navigation.back(or: .you) }
@@ -1474,7 +2285,91 @@ private extension NoopAct5Screens {
 // MARK: Apple Health
 
 private extension NoopAct5Screens {
-    var appleHealthScreen: some View {
+    @ViewBuilder var appleHealthScreen: some View {
+        if measured { liveAppleHealthScreen } else { prototypeAppleHealthScreen }
+    }
+
+    /// Apple Health over the bridge's own last write-back: one row per group it wrote, the count it
+    /// wrote and whether iOS let every kind in the group through. The HTML's per-kind lifetime totals,
+    /// the step-source chart and the "Health holds these" list have no source in the bridge.
+    var liveAppleHealthScreen: some View {
+        let report = health.lastWritebackReport
+        let refused = report?.entries.filter { $0.authorizedTypes < $0.totalTypes } ?? []
+        return NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 14) {
+                act5BackHeader("Your strap") { navigation.back(or: .strap) }
+                pageTitle("Apple Health", copy: "")
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("An imported score never becomes your score")
+                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.blueLight)
+                    Text("Another app\u{2019}s readiness or sleep score is kept under its own name and is never shown as Charge, Effort or Rest. Noop recomputes its own from the raw pulse, variability and sleep it can see.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(Color(hex: 0xB7C3C9))
+                        .lineSpacing(3)
+                }
+                .padding(.horizontal, 15)
+                .padding(.vertical, 14)
+                .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.blue.opacity(0.20), lineWidth: 0.5))
+
+                if let report, !report.entries.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .firstTextBaseline) {
+                            NoopSectionLabel("Every kind, and what happened to it")
+                            Spacer()
+                            Text(refused.isEmpty ? "all crossing" : "\(refused.count) needs you")
+                                .font(NoopHTMLFont.sans(11))
+                                .foregroundStyle(NoopHTMLColor.faint)
+                        }
+                        .padding(.horizontal, 2)
+                        dividedCard {
+                            ForEach(Array(report.entries.enumerated()), id: \.offset) { index, entry in
+                                let blocked = entry.authorizedTypes < entry.totalTypes
+                                appleKindRow(AppleKind(title: entry.id,
+                                                       value: blocked ? "refused" : entry.count.formatted(),
+                                                       copy: "", state: blocked ? -1 : entry.count > 0 ? 1 : 0),
+                                             openHealth: true)
+                                if index < report.entries.count - 1 { Divider().overlay(NoopHTMLColor.border) }
+                            }
+                        }
+                        Text("iOS never tells an app that a read was refused \u{2014} a denied kind and a kind with no data look identical from in here. That is why this page counts what was written rather than claiming everything worked.")
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(NoopHTMLColor.faint)
+                            .lineSpacing(4)
+                            .padding(.horizontal, 2)
+                    }
+                }
+
+                Button { navigation.enter(.importHistory, from: .data) } label: {
+                    HStack(spacing: 13) {
+                        NoopCanonicalGlyph(name: .upload, size: 19, color: NoopHTMLColor.blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Bring history in").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("the one-time import \u{2014} a Health export, or any of the other eleven formats")
+                                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                        }
+                        Spacer(minLength: 8)
+                        NoopChevron()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 15)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                .padding(.bottom, 22)
+            }
+        }
+        .task {
+            // The report lives for the session; the page is where someone looks for it, so write once.
+            guard health.auth == .authorized, health.lastWritebackReport == nil, !health.syncing else { return }
+            _ = await health.sync()
+        }
+    }
+
+    var prototypeAppleHealthScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 14) {
                 act5BackHeader("Your strap") { navigation.back(or: .strap) }
@@ -1663,7 +2558,7 @@ private extension NoopAct5Screens {
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
     }
 
-    func appleKindRow(_ item: AppleKind) -> some View {
+    func appleKindRow(_ item: AppleKind, openHealth: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 11) {
             Circle()
                 .fill(item.state < 0 ? NoopHTMLColor.warm : item.state == 0 ? Color.white.opacity(0.16) : Self.green)
@@ -1678,12 +2573,20 @@ private extension NoopAct5Screens {
                         .foregroundStyle(item.state < 0 ? NoopHTMLColor.warm : Color(hex: 0x8B958F))
                         .monospacedDigit()
                 }
+                if !item.copy.isEmpty {
                 Text(item.copy)
                     .font(NoopHTMLFont.sans(11.5))
                     .foregroundStyle(item.state < 0 ? Color(hex: 0xC8934B) : Color(hex: 0x7F8A85))
                     .lineSpacing(3)
+                }
                 if item.state < 0 {
-                    Button { healthAccessFixed = true } label: {
+                    Button {
+                        if openHealth, let url = URL(string: "x-apple-health://") {
+                            UIApplication.shared.open(url)
+                        } else {
+                            healthAccessFixed = true
+                        }
+                    } label: {
                         Text("Open Health → Noop")
                             .font(NoopHTMLFont.sans(11.5, weight: .semibold))
                             .foregroundStyle(NoopHTMLColor.warm)
@@ -1726,6 +2629,8 @@ private extension NoopAct5Screens {
                     automationSegment("When it comes off", detail: "the moment the skin contact breaks", choices: ["Nothing", "Lock the phone", "Run a Shortcut"])
                     Divider().overlay(NoopHTMLColor.border)
                     automationSegment("When it goes back on", detail: "and it knows loose from off", choices: ["Nothing", "Run a Shortcut"])
+                    // iOS cannot lock the phone for an app, and the design has no field to name the
+                    // Shortcut, so in production both rows are Later rather than choices that do nothing.
                 }
 
                 automationGroup("Quietly, in the background", note: "each one costs a buzz you did not ask for") {
@@ -1742,29 +2647,30 @@ private extension NoopAct5Screens {
                         if isEnabled("Buzz if I go over") {
                             Divider().overlay(NoopHTMLColor.border)
                             VStack(alignment: .leading, spacing: 11) {
-                                automationBareSegment(["Profile zone", "Fixed bpm"], selection: ceilingMode) { ceilingMode = $0 }
-                                if ceilingMode == "Profile zone" {
-                                    automationBareSegment(["Zone 3", "Zone 4", "Zone 5"], selection: ceilingZone) { ceilingZone = $0 }
+                                automationBareSegment(["Profile zone", "Fixed bpm"], selection: shownCeilingMode) { setCeilingMode($0) }
+                                if shownCeilingMode == "Profile zone" {
+                                    automationBareSegment(["Zone 3", "Zone 4", "Zone 5"], selection: shownCeilingZone) { setCeilingZone($0) }
                                 } else {
                                     HStack(spacing: 18) {
                                         Spacer()
-                                        automationStepButton(plus: false) { ceilingBPM = max(120, ceilingBPM - 2) }
-                                        Text("\(ceilingBPM) bpm")
+                                        automationStepButton(plus: false) { setCeilingBPM(shownCeilingBPM - 2) }
+                                        Text("\(shownCeilingBPM) bpm")
                                             .font(NoopHTMLFont.outfit(30, weight: .light))
                                             .tracking(-0.9)
                                             .monospacedDigit()
                                             .frame(minWidth: 104)
-                                        automationStepButton(plus: true) { ceilingBPM = min(200, ceilingBPM + 2) }
+                                        automationStepButton(plus: true) { setCeilingBPM(shownCeilingBPM + 2) }
                                         Spacer()
                                     }
                                 }
+                                if let armsAt = resolvedCeilingBPMShown {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("ARMS AT \(resolvedCeilingBPM) BPM")
+                                    Text("ARMS AT \(armsAt) BPM")
                                         .font(NoopHTMLFont.sans(10, weight: .semibold))
                                         .tracking(1)
                                         .foregroundStyle(Self.blushLight)
-                                    Text(ceilingMode == "Profile zone"
-                                         ? "\(ceilingZone) starts at \(resolvedCeilingBPM) bpm on your record. It arms with that number, and it moves if your maximum does."
+                                    Text(shownCeilingMode == "Profile zone"
+                                         ? "\(shownCeilingZone) starts at \(armsAt) bpm on your record. It arms with that number, and it moves if your maximum does."
                                          : "It arms with exactly this number, whatever your zones do later.")
                                         .font(NoopHTMLFont.sans(11.5))
                                         .foregroundStyle(Color(hex: 0xC9BEC0))
@@ -1774,6 +2680,7 @@ private extension NoopAct5Screens {
                                 .padding(.vertical, 11)
                                 .background(Self.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
                                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Self.blush.opacity(0.20), lineWidth: 0.5))
+                                }
                             }
                             .padding(.vertical, 13)
                         }
@@ -1790,6 +2697,40 @@ private extension NoopAct5Screens {
                     .padding(.bottom, 20)
             }
         }
+    }
+
+    // Production reads and writes the ceiling `AppModel` arms from; the prototype keeps its own state.
+    var shownCeilingMode: String {
+        guard measured else { return ceilingMode }
+        return behavior.hrCeilingThresholdMode == .bpm ? "Fixed bpm" : "Profile zone"
+    }
+    func setCeilingMode(_ value: String) {
+        guard measured else { ceilingMode = value; return }
+        behavior.hrCeilingThresholdMode = value == "Fixed bpm" ? .bpm : .zone
+    }
+    /// The zone it arms at is the one above the highest allowed zone.
+    var shownCeilingZone: String {
+        guard measured else { return ceilingZone }
+        return "Zone \(min(max(behavior.hrCeilingAllowedZone, 1), 4) + 1)"
+    }
+    func setCeilingZone(_ value: String) {
+        guard measured else { ceilingZone = value; return }
+        behavior.hrCeilingAllowedZone = (Int(value.dropFirst(5)) ?? 5) - 1
+    }
+    var shownCeilingBPM: Int { measured ? behavior.hrCeilingBPM : ceilingBPM }
+    func setCeilingBPM(_ value: Int) {
+        let clamped = min(200, max(120, value))
+        if measured { behavior.hrCeilingBPM = clamped } else { ceilingBPM = clamped }
+    }
+    /// Where it arms: the lower edge of the chosen zone on the wearer's own zones (nil until those are
+    /// the wearer's), or the fixed number.
+    var resolvedCeilingBPMShown: Int? {
+        guard measured else { return resolvedCeilingBPM }
+        if behavior.hrCeilingThresholdMode == .bpm { return behavior.hrCeilingBPM }
+        guard profileConfirmed || profile.hrMaxOverride > 0 || profile.hasCustomHRZones else { return nil }
+        let zones = profile.hrZoneSet.zones
+        let index = min(max(behavior.hrCeilingAllowedZone, 1), 4)
+        return zones.indices.contains(index) ? Int(zones[index].lower.rounded()) : nil
     }
 
     var resolvedCeilingBPM: Int {
@@ -1823,9 +2764,15 @@ private extension NoopAct5Screens {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(title).font(NoopHTMLFont.sans(13.5))
                 Spacer()
-                Text(detail).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+                if measured {
+                    NoopLaterChip()
+                } else {
+                    Text(detail).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+                }
             }
-            automationBareSegment(choices, selection: preferences[title] ?? choices[0]) { preferences[title] = $0 }
+            if !measured {
+                automationBareSegment(choices, selection: preferences[title] ?? choices[0]) { preferences[title] = $0 }
+            }
         }
         .padding(.vertical, 13)
     }
@@ -1864,21 +2811,24 @@ private extension NoopAct5Screens {
 }
 
 private struct NoopStrapBatteryRing: View {
-    let percent: Int
+    let percent: Int?
+    var daysLeft: String? = "~6.2 days"
 
     var body: some View {
         ZStack {
             Circle().stroke(Color.white.opacity(0.08), lineWidth: 9)
             Circle()
-                .trim(from: 0, to: Double(percent) / 100)
+                .trim(from: 0, to: Double(percent ?? 0) / 100)
                 .stroke(NoopHTMLColor.blue, style: StrokeStyle(lineWidth: 9, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 1) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text("\(percent)").font(NoopHTMLFont.outfit(38, weight: .ultraLight)).tracking(-1.5).foregroundStyle(NoopHTMLColor.blue)
+                    Text(percent.map(String.init) ?? "\u{2014}").font(NoopHTMLFont.outfit(38, weight: .ultraLight)).tracking(-1.5).foregroundStyle(NoopHTMLColor.blue)
                     Text("%").font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x8B958F))
                 }
-                Text("~6.2 days").font(NoopHTMLFont.sans(10)).foregroundStyle(Color(hex: 0x7F8A85))
+                if let daysLeft {
+                    Text(daysLeft).font(NoopHTMLFont.sans(10)).foregroundStyle(Color(hex: 0x7F8A85))
+                }
             }
         }
         .frame(width: 118, height: 118)
@@ -1888,7 +2838,157 @@ private struct NoopStrapBatteryRing: View {
 // MARK: Manage straps
 
 private extension NoopAct5Screens {
+    @ViewBuilder
     var devicesScreen: some View {
+        if measured { liveDevicesScreen } else { prototypeDevicesScreen }
+    }
+
+    // MARK: Manage straps, measured
+
+    var liveDevices: [PairedDevice] {
+        (model.deviceRegistry?.devices ?? []).filter { $0.status != .archived && $0.sourceKind == .liveBLE }
+    }
+
+    var liveDevicesScreen: some View {
+        let registry = model.deviceRegistry
+        let relative = RelativeDateTimeFormatter()
+        return NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 13) {
+                act5BackHeader("Your strap") { navigation.back(or: .strap) }
+                pageTitle("Manage straps", copy: "Noop can hold several bands and remembers each one's nights. Only one is connected at a time.")
+                    .padding(.bottom, 5)
+
+                VStack(spacing: 10) {
+                    ForEach(liveDevices, id: \.id) { device in
+                        let isActive = device.id == registry?.activeDeviceId
+                        let connectedHere = isActive && live.connected
+                        let meta = connectedHere
+                            ? [battery.map { "\($0)%" }, live.encryptedBond ? "encrypted" : nil].compactMap { $0 }.joined(separator: " \u{00B7} ")
+                            : "last seen \(relative.localizedString(for: Date(timeIntervalSince1970: TimeInterval(device.lastSeenAt)), relativeTo: Date()))"
+                        liveDeviceCard(device, meta: meta, active: connectedHere, isActive: isActive)
+                    }
+                }
+
+                if let deviceNotice {
+                    Text(deviceNotice)
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(Color(hex: 0x8FE3B4))
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Self.green.opacity(0.09), in: RoundedRectangle(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Self.green.opacity(0.25), lineWidth: 0.5))
+                }
+
+                Button { showingPairWizard = true } label: {
+                    Label("Pair a new strap", systemImage: "plus")
+                        .font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.blueInk)
+                        .frame(maxWidth: .infinity).frame(height: 54)
+                        .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 18))
+                        .shadow(color: NoopHTMLColor.blue.opacity(0.26), radius: 12, y: 8)
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+
+                Button { model.ble.scanForWhoops() } label: {
+                    Label("Re-scan for straps", systemImage: "arrow.triangle.2.circlepath")
+                        .font(NoopHTMLFont.sans(13, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.inkSoft)
+                        .frame(maxWidth: .infinity).frame(height: 50)
+                        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.11), lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+
+                Text("Forgetting a strap removes the pairing, not the nights. Its history stays in your record and stays in your export.")
+                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
+            }
+        }
+        .sheet(isPresented: $showingPairWizard) {
+            AddDeviceWizard(live: live) { showingPairWizard = false }
+        }
+    }
+
+    func liveDeviceCard(_ device: PairedDevice, meta: String, active: Bool, isActive: Bool) -> some View {
+        let isWhoop4 = device.model.contains("4.0")
+        return NoopHTMLCard(radius: 22, padding: 16, tint: active ? NoopHTMLColor.blue : nil) {
+            VStack(alignment: .leading, spacing: 15) {
+                HStack(spacing: 12) {
+                    NoopCanonicalGlyph(name: .watch, size: 22, color: active ? NoopHTMLColor.blue : Color(hex: 0x7F8A85))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(device.displayName).font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                        if !meta.isEmpty {
+                            Text(meta).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                        }
+                    }
+                    Spacer()
+                    NoopPill(text: active ? "Connected" : "Paired", color: active ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
+                }
+                HStack(spacing: 7) {
+                    Button {
+                        if active {
+                            model.ble.disconnect()
+                            deviceNotice = "\(device.displayName) is disconnected. Its pairing and history remain."
+                        } else {
+                            model.deviceRegistry?.setActive(device.id)
+                            model.ble.connectFromSystem()
+                            deviceNotice = "\(device.displayName) is now the connected strap."
+                        }
+                    } label: {
+                        Text(active ? "Disconnect" : "Switch to this")
+                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .foregroundStyle(active ? NoopHTMLColor.inkSoft : NoopHTMLColor.blueLight)
+                            .frame(maxWidth: .infinity).frame(height: 44)
+                            .background(active ? Color.white.opacity(0.05) : NoopHTMLColor.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(active ? Color.white.opacity(0.11) : NoopHTMLColor.blue.opacity(0.34), lineWidth: 0.5))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+
+                    Button {
+                        // Archive, never `forget`: the registry's forget deletes the recorded nights,
+                        // and the design promises the pairing goes while the history stays.
+                        if isActive { model.ble.forgetDevice(device.peripheralId) }
+                        model.deviceRegistry?.archive(device.id)
+                        deviceNotice = "Pairing forgotten. Its history remains in your record and export."
+                    } label: {
+                        Text("Forget")
+                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .foregroundStyle(Color(hex: 0xF3A472))
+                            .padding(.horizontal, 18).frame(height: 44)
+                            .background(NoopHTMLColor.amber.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(NoopHTMLColor.amber.opacity(0.26), lineWidth: 0.5))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                }
+                if isWhoop4 && active {
+                    HStack(spacing: 9) {
+                        TextField("a name for this band", text: $renameDraft)
+                            .font(.system(size: 12.5, design: .monospaced))
+                            .foregroundStyle(NoopHTMLColor.inkSoft)
+                            .padding(.horizontal, 13).frame(height: 40)
+                            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 13))
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+                        Button("Rename") {
+                            let value = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !value.isEmpty else { return }
+                            model.ble.renameStrap(value)
+                            model.deviceRegistry?.rename(device.id, to: value)
+                            renameDraft = ""
+                            deviceNotice = "Renamed to \(value). The strap is rebooting to apply it."
+                        }
+                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.blueLight)
+                        .padding(.horizontal, 15).frame(height: 40)
+                        .background(NoopHTMLColor.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 13))
+                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(NoopHTMLColor.blue.opacity(0.34), lineWidth: 0.5))
+                    }
+                    Text("A 4.0 can be renamed over Bluetooth — useful for a second-hand band still carrying its old owner's name. The strap reboots to apply it.")
+                        .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                }
+            }
+        }
+    }
+
+    var prototypeDevicesScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 13) {
                 act5BackHeader("Your strap") { navigation.back(or: .strap) }
@@ -2066,8 +3166,26 @@ private extension NoopAct5Screens {
 // MARK: Settings
 
 private extension NoopAct5Screens {
+    var settingsInitialScrollID: String? {
+        #if DEBUG
+        CommandLine.arguments.contains("--noop-settings-icons") ? "settings-app-icon" : nil
+        #else
+        nil
+        #endif
+    }
+
+    var settingsZoneDetail: String {
+        guard measured else { return "five bands from two measured anchors" }
+        switch NoopZoneSource.current(profile) {
+        case .custom: return "five bands set by you"
+        case .manualMax: return "five bands from the maximum you set"
+        case .estimated: return "five bands from an estimated maximum"
+        case .unconfirmed: return "five bands; confirm your profile to calculate the limits"
+        }
+    }
+
     var settingsScreen: some View {
-        NoopScreen(topInset: 56) {
+        NoopScreen(topInset: 56, initialScrollID: settingsInitialScrollID) {
             VStack(alignment: .leading, spacing: 12) {
                 act5BackHeader("You") { navigation.back(or: .you) }
                 pageTitle("Settings", copy: "Eleven groups, every switch written with what it costs you. The sharp edges live in the Lab at the foot.")
@@ -2090,7 +3208,8 @@ private extension NoopAct5Screens {
                 settingsGroup("You") {
                     copyRow("Your record", detail: "photo, birth, sex, height, weight, waist, maximum", symbol: "person", tint: Self.blush) { navigation.push(.record) }
                     Divider().overlay(NoopHTMLColor.border)
-                    copyRow("Your zones", detail: "five bands from two measured anchors", symbol: "chart.bar", tint: Self.blush, value: "5") { navigation.push(.zones) }
+                    copyRow("Your zones", detail: settingsZoneDetail,
+                            symbol: "chart.bar", tint: Self.blush, value: "5") { navigation.push(.zones) }
                     Divider().overlay(NoopHTMLColor.border)
                     actionRow(
                         baselinesRestarting ? "Baselines restarting from tonight" : "Recalibrate your baselines",
@@ -2099,7 +3218,17 @@ private extension NoopAct5Screens {
                             : "Restart the four-night build-up if a bad week — being ill, a flight — set it wrong.",
                         symbol: "gauge.with.dots.needle.50percent",
                         tint: baselinesRestarting ? Self.green : Self.blush
-                    ) { baselinesRestarting.toggle() }
+                    ) {
+                        // Production runs the real re-anchor the classic screen uses: no day is deleted,
+                        // only the day the four baselines re-learn from moves, then a rescore.
+                        if measured && !baselinesRestarting {
+                            Baselines.recalibrateRecoveryBaselines()
+                            Task { await model.intelligence.analyzeRecent(); await model.repo.refresh() }
+                            baselinesRestarting = true
+                        } else if !measured {
+                            baselinesRestarting.toggle()
+                        }
+                    }
                 }
                 .padding(.top, 3)
 
@@ -2112,7 +3241,13 @@ private extension NoopAct5Screens {
                 }
 
                 settingsGroup("Appearance") {
-                    copyRow("Widgets", detail: "three, and what each one answers", symbol: "square.grid.2x2", tint: Self.blush, value: "3") { navigation.push(.widgets) }
+                    copyRow(
+                        "Widgets",
+                        detail: "\(widgetFamilyCountWord) families, and what each one answers",
+                        symbol: "square.grid.2x2",
+                        tint: Self.blush,
+                        value: String(NoopWidgetFamilyRegistry.count)
+                    ) { navigation.push(.widgets) }
                     Divider().overlay(NoopHTMLColor.border)
                     segmentRow(
                         "Appearance",
@@ -2138,13 +3273,15 @@ private extension NoopAct5Screens {
                     Divider().overlay(NoopHTMLColor.border)
                     soonRow("Day-cycle sky", detail: "a backdrop that moves with the hour", glyph: .today)
                     Divider().overlay(NoopHTMLColor.border)
-                    soonRow("App icon", detail: "a second icon for your home screen", glyph: .grid)
+                    appIconPickerRow.id("settings-app-icon")
                 }
 
                 settingsGroup("Your strap") {
-                    copyRow("Your strap", detail: "battery, sensors, sync, log and Apple Health", symbol: "applewatch", tint: Self.blush, value: "52%") { navigation.push(.strap) }
+                    copyRow("Your strap", detail: "battery, sensors, sync, log and Apple Health", symbol: "applewatch", tint: Self.blush,
+                            value: measured ? battery.map { "\($0)%" } : "52%") { navigation.push(.strap) }
                     Divider().overlay(NoopHTMLColor.border)
-                    copyRow("Manage straps", detail: "pair, switch, forget or rename a band", symbol: "link", tint: Self.blush, value: sparePresent ? "2" : "1") { navigation.push(.devices) }
+                    copyRow("Manage straps", detail: "pair, switch, forget or rename a band", symbol: "link", tint: Self.blush,
+                            value: measured ? "\(pairedStrapCount)" : (sparePresent ? "2" : "1")) { navigation.push(.devices) }
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Live heart rate in the Dynamic Island", detail: "Also puts it on the Lock Screen while a session runs.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
@@ -2216,7 +3353,15 @@ private extension NoopAct5Screens {
                     Divider().overlay(NoopHTMLColor.border)
                     soonRow("How Noop works", detail: "how sleep is sorted, how the scores build, where the numbers come from", glyph: .globe)
                     Divider().overlay(NoopHTMLColor.border)
-                    soonRow("What’s new", detail: "the changelog, in plain words", glyph: .file)
+                    canonicalLinkRow(
+                        "What’s new",
+                        detail: "the four readings in 11.7, and every version before it",
+                        glyph: .file,
+                        tint: Self.blush,
+                        value: currentChangelogDisplayVersion
+                    ) {
+                        showReleaseNotes = true
+                    }
                     Divider().overlay(NoopHTMLColor.border)
                     soonRow("Set up Apple Watch", detail: "what it is good at, and where it is lighter than the strap", glyph: .watch)
                 }
@@ -2285,6 +3430,13 @@ private extension NoopAct5Screens {
         }
     }
 
+    var currentChangelogDisplayVersion: String {
+        let raw = AppChangelog.currentVersion
+        let parts = raw.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count >= 3, parts.last == "0" else { return raw }
+        return parts.dropLast().joined(separator: ".")
+    }
+
     func soonRow(_ title: String, detail: String, glyph: NoopCanonicalGlyphName) -> some View {
         HStack(spacing: 13) {
             NoopCanonicalGlyph(name: glyph, size: 19, color: Color(hex: 0x4E5854))
@@ -2313,6 +3465,96 @@ private extension NoopAct5Screens {
         .padding(.vertical, 14)
     }
 
+    var appIconPickerRow: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 13) {
+                NoopCanonicalGlyph(name: .grid, size: 19, color: NoopHTMLColor.blueLight)
+                    .frame(width: 21)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("App icon")
+                        .font(NoopHTMLFont.sans(13.5))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                    Text(selectedAppIcon.detail)
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(Color(hex: 0x7F8A85))
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 9), count: 3),
+                spacing: 9
+            ) {
+                ForEach(NoopAppIconChoice.allCases) { choice in
+                    let selected = choice == selectedAppIcon
+                    Button {
+                        selectAppIcon(choice)
+                    } label: {
+                        VStack(spacing: 8) {
+                            NoopAppIconArtwork(choice: choice)
+                                .frame(width: 46, height: 46)
+                                .clipShape(RoundedRectangle(cornerRadius: 10.3, style: .continuous))
+                                .shadow(color: .black.opacity(0.34), radius: 6.5, y: 2.3)
+                            Text(choice.rawValue)
+                                .font(NoopHTMLFont.sans(11, weight: .semibold))
+                                .foregroundStyle(selected ? Color(hex: 0x9FE2FB) : Color(hex: 0x8B958F))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 6)
+                        .padding(.top, 9)
+                        .padding(.bottom, 8)
+                        .background(
+                            selected ? NoopHTMLColor.blue.opacity(0.10) : Color.white.opacity(0.04),
+                            in: RoundedRectangle(cornerRadius: 16)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(
+                                    selected ? NoopHTMLColor.blue.opacity(0.50) : Color.white.opacity(0.08),
+                                    lineWidth: 0.5
+                                )
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 16))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    .accessibilityLabel("Use the \(choice.rawValue) app icon")
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+            }
+
+            Text("iOS shows its own alert when the icon changes, and the new one can take a moment to appear on the Home Screen. Nothing else about the app changes.")
+                .font(NoopHTMLFont.sans(11))
+                .foregroundStyle(Color(hex: 0x7F8A85))
+                .lineSpacing(3.5)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 16)
+        .onAppear {
+            selectedAppIcon = NoopAppIconChoice.current
+        }
+    }
+
+    func selectAppIcon(_ choice: NoopAppIconChoice) {
+        guard choice != selectedAppIcon else { return }
+        guard UIApplication.shared.supportsAlternateIcons else {
+            actionNotice = "This iPhone does not allow alternate app icons. The current icon remains selected."
+            return
+        }
+
+        UIApplication.shared.setAlternateIconName(choice.alternateIconName) { error in
+            DispatchQueue.main.async {
+                if let error {
+                    actionNotice = "The icon did not change. iOS said: \(error.localizedDescription)"
+                } else {
+                    selectedAppIcon = choice
+                    preferences["App icon"] = choice.rawValue
+                }
+            }
+        }
+    }
+
     func actionRow(_ title: String, detail: String, symbol: String, tint: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 13) {
@@ -2333,34 +3575,54 @@ private extension NoopAct5Screens {
 // MARK: Widgets
 
 private extension NoopAct5Screens {
+    var widgetFamilyCountWord: String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.numberStyle = .spellOut
+        return formatter.string(from: NSNumber(value: NoopWidgetFamilyRegistry.count)) ?? String(NoopWidgetFamilyRegistry.count)
+    }
+
     var widgetsScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 14) {
                 act5BackHeader("Settings", action: navigation.back)
-                pageTitle("Widgets", copy: "Three, and each answers one question without opening the app.")
-                    .padding(.bottom, 2)
+                pageTitle(
+                    "Widgets",
+                    copy: measured
+                        ? "\(widgetFamilyCountWord.capitalized) families."
+                        : "\(widgetFamilyCountWord.capitalized) families. The three below are drawn in full; the rest are named underneath, and each one answers a single question without opening the app."
+                )
+
+                // The three drawn widgets carry the example person's figures; production lists the
+                // families without them rather than show numbers that are not the wearer's.
+                if !measured {
 
                 widgetSurface(colors: [Color(hex: 0x14384A), Color(hex: 0x0C1A24), NoopHTMLColor.canvas], minHeight: 242) {
                     NoopSectionLabel("Home Screen · small", color: Color.white.opacity(0.5))
                     HStack(alignment: .top, spacing: 13) {
                         VStack(alignment: .leading) {
                             HStack(spacing: 6) { Circle().fill(NoopHTMLColor.blue).frame(width: 7, height: 7); NoopSectionLabel("Charge", color: Color(hex: 0x8B958F)) }
+                                .offset(y: 1)
                             Spacer()
                             HStack(alignment: .firstTextBaseline, spacing: 5) {
                                 Text("56").font(NoopHTMLFont.outfit200(44)).tracking(-1.3)
                                 Text("of 92").font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
                             }
+                            // Flip-checked against the 402×874 HTML: Swift's one flexible spacer
+                            // seats this group six points too high while the header and footer land.
+                            .offset(y: 6)
                             VStack(alignment: .leading, spacing: 8) {
                                 widgetChargeTrack
-                                Text("Enough for the evening").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.inkSoft)
+                                Text("Plenty left").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.inkSoft)
                             }
+                            .offset(y: 1)
                         }
                         .frame(width: 146, height: 146, alignment: .leading)
                         .padding(15)
                         .background(NoopHTMLColor.canvas.opacity(0.74), in: RoundedRectangle(cornerRadius: 26))
                         .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
                         .shadow(color: .black.opacity(0.45), radius: 15, y: 12)
-                        Text("Am I good for what I had planned? The bar carries the day’s spend, the pale stretch behind it is what you woke with.")
+                        Text("How much of the day have I got left? The bar carries the day’s spend, the pale stretch behind it is what you woke with.")
                             .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color.white.opacity(0.62)).lineSpacing(4)
                     }
                 }
@@ -2368,14 +3630,27 @@ private extension NoopAct5Screens {
                 widgetSurface(colors: [Color(hex: 0x1E2340), Color(hex: 0x111421), NoopHTMLColor.canvas], minHeight: 291) {
                     NoopSectionLabel("Home Screen · medium", color: Color.white.opacity(0.5))
                     HStack(spacing: 16) {
-                        VStack(alignment: .leading) {
+                        VStack(alignment: .leading, spacing: 0) {
                             NoopSectionLabel("Last night", color: Self.lavender)
+                                .offset(y: 1)
                             Spacer()
-                            Text("7h 12m").font(NoopHTMLFont.outfit(32, weight: .ultraLight))
-                            Text("7m over your need").font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x8B958F))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("7h 12m").font(NoopHTMLFont.outfit(32, weight: .ultraLight))
+                                Text("7m over your need")
+                                    .font(NoopHTMLFont.sans(11))
+                                    .foregroundStyle(Color(hex: 0x8B958F))
+                                    .offset(y: -5)
+                            }
+                            .offset(y: -2)
                             Spacer()
-                            Text("Deep came early. Nothing to fix.").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.inkSoft)
+                            // `text-wrap: pretty` deliberately makes this two lines in the HTML.
+                            Text("Deep came early. Nothing\nto fix.")
+                                .font(NoopHTMLFont.sans(11))
+                                .foregroundStyle(NoopHTMLColor.inkSoft)
+                                .lineSpacing(2)
+                                .offset(y: -4)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         Divider().overlay(Color.white.opacity(0.07))
                         VStack(alignment: .leading) {
                             HStack(alignment: .bottom, spacing: 7) {
@@ -2445,8 +3720,56 @@ private extension NoopAct5Screens {
                         .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color.white.opacity(0.62)).lineSpacing(4)
                 }
 
-                Text("Long-press your Home Screen, tap the +, and search Noop. All three read the last sync — they never wake the strap on their own.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
+                }
+
+                VStack(spacing: 0) {
+                    ForEach(Array(NoopWidgetFamilyRegistry.families.enumerated()), id: \.element.id) { index, family in
+                        if index > 0 {
+                            Divider().overlay(Color.white.opacity(0.06))
+                        }
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(family.title)
+                                    .font(NoopHTMLFont.sans(13))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Text(family.detail)
+                                    .font(NoopHTMLFont.sans(11.5))
+                                    .foregroundStyle(Color(hex: 0x7F8A85))
+                                    .lineSpacing(2.7)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 8)
+                            if family.isNew {
+                                Text("new")
+                                    .font(NoopHTMLFont.sans(9, weight: .semibold))
+                                    .tracking(0.9)
+                                    .textCase(.uppercase)
+                                    .foregroundStyle(NoopHTMLColor.blueLight)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 5)
+                                            .stroke(NoopHTMLColor.blue.opacity(0.4), lineWidth: 0.5)
+                                    )
+                            }
+                        }
+                        .padding(.vertical, 12)
+                        .frame(minHeight: 56)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 26))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 26)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                )
+
+                Text("Long-press your Home Screen, tap the +, and search Noop. Every one of them reads the last sync — none of them wakes the strap on its own, and none of them shows a figure the app itself would withhold.")
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(Color(hex: 0x7F8A85))
+                    .lineSpacing(4)
+                    .padding(.horizontal, 2)
             }
         }
     }

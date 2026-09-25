@@ -161,13 +161,15 @@ final class WatchSessionBridge: NSObject, ObservableObject {
         // at all (a fresh, never-synced phone) the flags stay false and the watch shows its neutral
         // "open NOOP on your iPhone" empty state instead of implying calibration is underway.
         let hasAnyDay = day != nil
-        let charge = day?.recovery
+        // "Charge" is an intraday figure nothing computes yet; morning recovery may not stand in for it
+        // (owner decision, 24 Sep). No number, and not "calibrating" either — it is not on its way.
+        let charge: Double? = nil
         let effort = day?.strain
         let rest = restScore
 
         let snap = WatchScoreSnapshot(
             charge: charge,
-            chargeCalibrating: hasAnyDay && charge == nil,
+            chargeCalibrating: false,
             effort: effort,
             effortCalibrating: hasAnyDay && effort == nil,
             rest: rest,

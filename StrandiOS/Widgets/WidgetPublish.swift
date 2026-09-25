@@ -1,5 +1,6 @@
 #if os(iOS)
 import Foundation
+import StrandAnalytics
 import WidgetKit
 
 extension WidgetSnapshot {
@@ -98,8 +99,75 @@ extension WidgetSnapshot {
         // would decode the App Group blob twice on any publish that could not score, and this file
         // already went to the trouble of removing one such decode from the live path.
         let storedStress: WidgetSnapshot? = stress == nil ? load() : nil
+
+        // Resting pulse is a separate widget family from live heart rate. Preserve seven
+        // chronological nightly slots, including absences, so a strap-off gap stays a gap rather
+        // than collapsing the line or becoming a zero-height reading.
+        var restingWeek: [Int?] = Array(days.suffix(7)).map(\.restingHr)
+        if restingWeek.count < 7 {
+            restingWeek.insert(contentsOf: Array<Int?>(repeating: nil, count: 7 - restingWeek.count), at: 0)
+        }
+        let publishedRestingWeek = restingWeek.contains(where: { $0 != nil }) ? restingWeek : nil
+
+        // Feed the Energy widget through the same engine the app uses. `activeKcalEst` is the strap
+        // path's total-for-covered-time despite its legacy name; EnergyEngine owns that distinction.
+        // With no activity-shape history available here the projection remains nil, which is honest:
+        // the widget omits the range instead of inventing one. A profile-only result may expose the
+        // modelled 24-hour basal value, clearly labelled as "about", but never as measured spend.
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+        let startOfTomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday)
+            ?? startOfToday.addingTimeInterval(86_400)
+        let energyContext = EnergyEngine.DayContext(
+            isToday: true,
+            dayDurationSeconds: startOfTomorrow.timeIntervalSince(startOfToday),
+            elapsedSeconds: now.timeIntervalSince(startOfToday)
+        )
+        let energyProfile = UserProfile(
+            weightKg: model.profile.weightKg,
+            heightCm: model.profile.heightCm,
+            age: Double(model.profile.age),
+            sex: model.profile.sex,
+            stepTicksPerStep: model.profile.stepTicksPerStep
+        )
+        let energySummary = EnergyEngine.summarize(
+            .init(
+                day: day?.day ?? Repository.localDayKey(now),
+                strapTotalKcal: day?.activeKcalEst,
+                steps: day?.steps
+            ),
+            profile: energyProfile,
+            context: energyContext
+        )
+        func roundedEnergy(_ value: Double?) -> Int? {
+            guard let value, value.isFinite, value > 0 else { return nil }
+            return Int(value.rounded())
+        }
+        let energySnapshot: NoopWidgetEnergySnapshot? = {
+            // The profile store starts with example demographics. The Energy page requires the
+            // wearer to replace and confirm them; widgets must obey the same gate or an unconfirmed
+            // install can expose a plausible but invented calorie estimate on the Home Screen.
+            guard UserDefaults.standard.bool(forKey: "noop.energy.profileConfirmed") else { return nil }
+            let bmr = roundedEnergy(energySummary.estimatedBMR24h)
+            let total = roundedEnergy(energySummary.totalBurnedSoFar)
+            guard bmr != nil || total != nil else { return nil }
+            return NoopWidgetEnergySnapshot(
+                estimatedBMR24h: bmr,
+                basalBurnedSoFar: roundedEnergy(energySummary.basalBurnedSoFar),
+                activeBurnedSoFar: roundedEnergy(energySummary.activeBurnedSoFar),
+                totalBurnedSoFar: total,
+                projectedLow: roundedEnergy(energySummary.projectedRangeKcal?.lowerBound),
+                projectedHigh: roundedEnergy(energySummary.projectedRangeKcal?.upperBound),
+                coverage: energySummary.coverage.overall,
+                source: energySummary.source.rawValue,
+                profileConfirmed: true
+            )
+        }()
         let snap = WidgetSnapshot(
-            recovery: day?.recovery.map { Int($0.rounded()) },
+            // Every widget labels this field "Charge", and nothing computes an intraday charge yet.
+            // Morning recovery is not allowed to stand in for it (owner decision, 24 Sep), so the
+            // widgets receive no figure and draw their honest-null dash until a ledger exists.
+            recovery: nil,
             bpm: model.bpm ?? model.live.heartRate,
             batteryPct: activeBatteryPct(from: model),
             bonded: model.live.bonded,
@@ -109,6 +177,8 @@ extension WidgetSnapshot {
             rest: restScore.map { Int($0.rounded()) },
             hrv: day?.avgHrv.map { Int($0.rounded()) },
             restingHr: day?.restingHr,
+            restingHrWeek: publishedRestingWeek,
+            energy: energySnapshot,
             effortDisplay: effortDisplay,
             effortWhoop: effortScale == .whoop,
             // nil when the curve could not be scored at all, which must not blank a widget that already

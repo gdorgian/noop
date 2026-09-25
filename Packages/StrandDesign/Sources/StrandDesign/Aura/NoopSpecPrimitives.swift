@@ -706,7 +706,7 @@ public struct NoopSpecTabBar: View {
         return Button(action: tab.action) {
             HStack(spacing: 7) {
                 tab.icon
-                    .foregroundStyle(on ? onAccent : NoopPalette.textDim)   // ICON takes the ink too
+                    .foregroundStyle(on ? onAccent : NoopPalette.chevronDim)   // graphical ink only
                 if on {
                     Text(tab.label)
                         .noopText(NoopSpecType.Role.buttonLabel)

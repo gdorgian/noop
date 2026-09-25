@@ -13,7 +13,14 @@ enum NoopHTMLColor {
     static let inkSoft = Color(hex: 0xC6CEC9)
     static let copy = Color(hex: 0x939C97)
     static let muted = Color(hex: 0x6C7570)
-    static let faint = Color(hex: 0x57605C)
+    /// Quiet ink, #7F8A85 (5.5:1 on canvas). Carries captions and every other former use of #57605C
+    /// since design's 20 September contrast pass retired #57605C for type. The name is kept so the
+    /// ~190 call sites did not churn; it no longer means "dimmer than quiet".
+    static let faint = Color(hex: 0x7F8A85)
+    /// #57605C, 3.0:1 — legal only for graphical marks the final HTML still draws in it: the row
+    /// chevron's 1.5–1.6 pt stroke, Act 6's bullet dot and optional-input tick, and the faded
+    /// checkbox on "What we will not ask". Never type.
+    static let chevronDim = Color(hex: 0x57605C)
     static let blue = Color(hex: 0x17A2E6)
     static let blueLight = Color(hex: 0x8FD3F5)
     static let blueDeep = Color(hex: 0x0E6E9C)
@@ -234,14 +241,18 @@ struct NoopBackHeader: View {
 }
 
 struct NoopBatteryChip: View {
-    var percent: Int
+    /// The active device's reported charge. Nil when nothing has reported one: the chip keeps its
+    /// place and its door to the strap screen, and prints an em dash over an empty cell — absent is
+    /// never drawn as 0% or as a remembered number (copy law rule 11).
+    var percent: Int?
     var action: (() -> Void)?
 
-    private var isLow: Bool { percent <= 20 }
+    private var isLow: Bool { percent.map { $0 <= 20 } ?? false }
     private var fillFraction: CGFloat {
-        CGFloat(max(0, min(100, percent))) / 100
+        CGFloat(max(0, min(100, percent ?? 0))) / 100
     }
     private var tint: Color {
+        guard let percent else { return NoopHTMLColor.blueLight }
         if percent <= 10 { return NoopHTMLColor.amber }
         if percent <= 20 { return NoopHTMLColor.warm }
         return NoopHTMLColor.blueLight
@@ -275,7 +286,7 @@ struct NoopBatteryChip: View {
                     .fill(isLow ? tint : NoopHTMLColor.ink.opacity(0.4))
                     .frame(width: 1.6, height: 4.4)
                 }
-                Text("\(percent)%")
+                Text(percent.map { "\($0)%" } ?? "\u{2014}")
                     .font(NoopHTMLFont.sans(12, weight: .semibold))
                     .tracking(-0.12)
                     .monospacedDigit()
@@ -339,7 +350,7 @@ struct NoopSectionLabel: View {
 }
 
 struct NoopChevron: View {
-    var color: Color = NoopHTMLColor.faint
+    var color: Color = NoopHTMLColor.chevronDim
 
     var body: some View {
         NoopFixedChevron(direction: .right, color: color)
@@ -618,6 +629,416 @@ struct NoopOrb: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+// MARK: - App-icon artwork shared with the live orbs
+
+/// The cyan sphere used by Breathe. The screen and icon use one drawing primitive; the icon's
+/// palette is the flattened, top-of-inhale treatment specified by the final five-icon sheet.
+struct NoopBreatheSphereArtwork: View {
+    enum Treatment { case screen, icon }
+
+    let treatment: Treatment
+    let diameter: CGFloat
+    var shadowBlur: CGFloat = 0
+    var shadowY: CGFloat = 0
+    var shadowOpacity: Double = 0
+
+    var body: some View {
+        let icon = treatment == .icon
+        let center = icon ? UnitPoint(x: 0.42, y: 0.36) : UnitPoint(x: 0.38, y: 0.32)
+        let farthestX = max(center.x, 1 - center.x)
+        let farthestY = max(center.y, 1 - center.y)
+        let farthestCorner = diameter * sqrt(farthestX * farthestX + farthestY * farthestY)
+
+        Circle()
+            .fill(
+                RadialGradient(
+                    stops: icon
+                        ? [
+                            .init(color: Color(hex: 0xE4F6FF), location: 0),
+                            .init(color: NoopHTMLColor.blueLight, location: 0.50),
+                            .init(color: NoopHTMLColor.blue, location: 1)
+                        ]
+                        : [
+                            .init(color: Color(hex: 0x9FE2FB), location: 0),
+                            .init(color: Color(hex: 0x2FB2F0), location: 0.55),
+                            .init(color: Color(hex: 0x0A5F92), location: 1)
+                        ],
+                    center: center,
+                    startRadius: 0,
+                    endRadius: farthestCorner
+                )
+            )
+            .frame(width: diameter, height: diameter)
+            .shadow(
+                color: Color(hex: 0x0B6FA8).opacity(shadowOpacity),
+                radius: shadowBlur / 2,
+                y: shadowY
+            )
+    }
+}
+
+/// Svea's small lit blob. The alternate icon scales this same source and composes the bloom inside
+/// the tile; the gate's large hollow aura remains its own, deliberately different drawing.
+struct NoopSveaBlobArtwork: View {
+    let diameter: CGFloat
+    var shadowRadius: CGFloat = 0
+
+    var body: some View {
+        let center = UnitPoint(x: 0.44, y: 0.38)
+        let farthestX = max(center.x, 1 - center.x)
+        let farthestY = max(center.y, 1 - center.y)
+
+        NoopA4BlobShape(radii: .init(
+            tlx: 0.58, tly: 0.49,
+            trx: 0.42, try_: 0.55,
+            brx: 0.46, bry: 0.45,
+            blx: 0.54, bly: 0.51
+        ))
+        .fill(
+            RadialGradient(
+                stops: [
+                    .init(color: Color(hex: 0xDDE3F6), location: 0),
+                    .init(color: NoopHTMLColor.night, location: 0.58),
+                    .init(color: Color(hex: 0x4A56A8), location: 1)
+                ],
+                center: center,
+                startRadius: 0,
+                endRadius: diameter * sqrt(farthestX * farthestX + farthestY * farthestY)
+            )
+        )
+        .frame(width: diameter, height: diameter)
+        .shadow(color: NoopHTMLColor.night.opacity(0.55), radius: shadowRadius)
+    }
+}
+
+enum NoopAppIconChoice: String, CaseIterable, Identifiable {
+    case titanium = "Titanium"
+    case aura = "Aura"
+    case navy = "Navy"
+    case breathe = "Breathe"
+    case orb = "Orb"
+
+    var id: String { rawValue }
+
+    var alternateIconName: String? {
+        switch self {
+        case .titanium: "AppIcon-Titanium"
+        case .aura: nil
+        case .navy: "AppIcon-Navy"
+        case .breathe: "AppIcon-Breathe"
+        case .orb: "AppIcon-Orb"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .titanium: "Titanium · the one that matches the strap"
+        case .aura: "Aura · the default, on the app’s own ground with the bloom"
+        case .navy: "Navy · the blue alternate you already had"
+        case .breathe: "Breathe · the today orb, caught mid-breath"
+        case .orb: "Orb · Svea, rendered from the app’s own drawing"
+        }
+    }
+
+    static var current: Self {
+        switch UIApplication.shared.alternateIconName {
+        case "AppIcon-Titanium": .titanium
+        case "AppIcon-Navy": .navy
+        case "AppIcon-Breathe": .breathe
+        case "AppIcon-Orb": .orb
+        default: .aura
+        }
+    }
+}
+
+enum NoopAppIconAppearance: CaseIterable {
+    case standard
+    case dark
+
+    var exportSuffix: String {
+        switch self {
+        case .standard: ""
+        case .dark: "-Dark"
+        }
+    }
+}
+
+/// The exact five-up artwork used by Settings and by the DEBUG asset exporter. Breathe and Orb
+/// compose the same sphere/blob primitives as their in-app counterparts, which prevents a second
+/// hand-maintained orb from drifting away from the app.
+struct NoopAppIconArtwork: View {
+    let choice: NoopAppIconChoice
+    var appearance: NoopAppIconAppearance = .standard
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = min(proxy.size.width, proxy.size.height)
+            ZStack {
+                ground(size)
+                switch choice {
+                case .titanium, .aura:
+                    instrument(size)
+                case .navy:
+                    if appearance == .dark {
+                        instrument(size)
+                    } else {
+                        Image("NavyTitanium")
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: size, height: size)
+                    }
+                case .breathe:
+                    breathingOrb(size)
+                case .orb:
+                    sveaOrb(size)
+                }
+            }
+            .frame(width: size, height: size)
+            .clipped()
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
+
+    @ViewBuilder
+    private func ground(_ size: CGFloat) -> some View {
+        if appearance == .dark {
+            // iOS supplies the dark Home Screen ground. Keeping our variant transparent lets that
+            // system surface show through while the icon's identity and exact geometry stay ours.
+            Color.clear
+        } else {
+            switch choice {
+            case .titanium:
+                NoopCSSLinearGradient(
+                    stops: [
+                        .init(color: Color(hex: 0xE7E3DA), location: 0),
+                        .init(color: Color(hex: 0xC2BCB0), location: 0.38),
+                        .init(color: Color(hex: 0xDAD5CA), location: 0.58),
+                        .init(color: Color(hex: 0xA49E92), location: 1)
+                    ],
+                    degrees: 147
+                )
+            case .aura:
+                iconRadial(
+                    size: size,
+                    center: UnitPoint(x: 0.40, y: 0.34),
+                    stops: [
+                        .init(color: Color(hex: 0x1D2E38), location: 0),
+                        .init(color: Color(hex: 0x0C1216), location: 0.46),
+                        .init(color: Color(hex: 0x060808), location: 1)
+                    ]
+                )
+            case .navy:
+                Color.clear
+            case .breathe:
+                iconRadial(
+                    size: size,
+                    center: UnitPoint(x: 0.44, y: 0.36),
+                    stops: [
+                        .init(color: Color(hex: 0x0E2430), location: 0),
+                        .init(color: Color(hex: 0x071016), location: 0.52),
+                        .init(color: Color(hex: 0x04080B), location: 1)
+                    ]
+                )
+            case .orb:
+                iconRadial(
+                    size: size,
+                    center: UnitPoint(x: 0.44, y: 0.36),
+                    stops: [
+                        .init(color: Color(hex: 0x161B28), location: 0),
+                        .init(color: Color(hex: 0x0A0C12), location: 0.52),
+                        .init(color: Color(hex: 0x06070A), location: 1)
+                    ]
+                )
+            }
+        }
+    }
+
+    private func iconRadial(size: CGFloat, center: UnitPoint, stops: [Gradient.Stop]) -> some View {
+        let farthestX = max(center.x, 1 - center.x)
+        let farthestY = max(center.y, 1 - center.y)
+        return Rectangle()
+            .fill(
+                RadialGradient(
+                    stops: stops,
+                    center: center,
+                    startRadius: 0,
+                    endRadius: size * sqrt(farthestX * farthestX + farthestY * farthestY)
+                )
+            )
+            .frame(width: size, height: size)
+    }
+
+    private func instrument(_ size: CGFloat) -> some View {
+        let glow = choice == .aura
+        return ZStack {
+            NoopInstrumentArc(choice: choice, appearance: appearance)
+                .frame(width: size, height: size)
+                .shadow(
+                    color: glow ? NoopHTMLColor.blue.opacity(appearance == .dark ? 0.56 : 0.70) : .clear,
+                    radius: glow ? size * 0.045 : 0
+                )
+
+            Circle()
+                .fill(instrumentCoreColor)
+                .frame(width: size * 0.18, height: size * 0.18)
+                .shadow(
+                    color: glow ? NoopHTMLColor.blue.opacity(appearance == .dark ? 0.56 : 0.70) : .clear,
+                    radius: glow ? size * 0.045 : 0
+                )
+        }
+    }
+
+    private var instrumentCoreColor: Color {
+        switch (choice, appearance) {
+        case (.aura, _): NoopHTMLColor.blueLight
+        case (.navy, .dark): Color(hex: 0xE8B84B)
+        case (.titanium, .dark): Color(hex: 0xDAD5CA)
+        default: NoopHTMLColor.blue
+        }
+    }
+
+    private func breathingOrb(_ size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        stops: [
+                            .init(color: NoopHTMLColor.blue.opacity(0.50), location: 0),
+                            .init(color: NoopHTMLColor.blue.opacity(0), location: 0.68),
+                            .init(color: .clear, location: 1)
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: size * 0.66 / 2 * sqrt(2)
+                    )
+                )
+                .frame(width: size * 0.66, height: size * 0.66)
+
+            Circle()
+                .stroke(NoopHTMLColor.blueLight, lineWidth: max(2, size * 0.055))
+                .frame(width: size * 0.78, height: size * 0.78)
+
+            NoopBreatheSphereArtwork(treatment: .icon, diameter: size * 0.40)
+        }
+    }
+
+    private func sveaOrb(_ size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        stops: [
+                            .init(color: NoopHTMLColor.night.opacity(0.42), location: 0),
+                            .init(color: NoopHTMLColor.night.opacity(0), location: 0.66),
+                            .init(color: .clear, location: 1)
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: size * 0.84 / 2 * sqrt(2)
+                    )
+                )
+                .frame(width: size * 0.84, height: size * 0.84)
+
+            NoopSveaBlobArtwork(diameter: size * 0.50)
+        }
+    }
+}
+
+private struct NoopInstrumentArc: View {
+    let choice: NoopAppIconChoice
+    let appearance: NoopAppIconAppearance
+
+    var body: some View {
+        Canvas(rendersAsynchronously: false) { context, size in
+            let side = min(size.width, size.height)
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let stroke = side * 0.135
+            let centerRadius = side * 0.39 - stroke / 2
+            let dabRadius = stroke / 2
+            let steps = max(240, Int(side * 1.65))
+            let palette: [UInt32]
+            switch (choice, appearance) {
+            case (.aura, _):
+                palette = [0x9BDDF8, 0x17A2E6, 0x0B6591]
+            case (.navy, .dark):
+                palette = [0xFCEBA8, 0xE8B84B, 0xC8902F]
+            case (.titanium, .dark):
+                palette = [0xF4F0E6, 0xB8B0A2, 0x736E66]
+            default:
+                palette = [0x4A453C, 0x2A2720, 0x171510]
+            }
+
+            for index in 0...steps {
+                let t = Double(index) / Double(steps)
+                // The repo generator's exact family geometry: 302° of ink with round caps, the
+                // 58° cap-centre gap symmetrical about twelve o'clock.
+                let degrees = 241 - 302 * t
+                let radians = degrees * Double.pi / 180
+                let point = CGPoint(
+                    x: center.x + centerRadius * cos(radians),
+                    y: center.y + centerRadius * sin(radians)
+                )
+                let color = interpolate(palette, t)
+                context.fill(
+                    Path(ellipseIn: CGRect(
+                        x: point.x - dabRadius,
+                        y: point.y - dabRadius,
+                        width: stroke,
+                        height: stroke
+                    )),
+                    with: .color(color)
+                )
+            }
+        }
+    }
+
+    private func interpolate(_ colors: [UInt32], _ t: Double) -> Color {
+        let segment = min(colors.count - 2, Int(t * Double(colors.count - 1)))
+        let local = t * Double(colors.count - 1) - Double(segment)
+        func channel(_ hex: UInt32, _ shift: UInt32) -> Double {
+            Double((hex >> shift) & 0xff) / 255
+        }
+        let a = colors[segment]
+        let b = colors[segment + 1]
+        func mix(_ x: Double, _ y: Double) -> Double { x + (y - x) * local }
+        return Color(
+            .sRGB,
+            red: mix(channel(a, 16), channel(b, 16)),
+            green: mix(channel(a, 8), channel(b, 8)),
+            blue: mix(channel(a, 0), channel(b, 0)),
+            opacity: 1
+        )
+    }
+}
+
+#if DEBUG
+@MainActor
+enum NoopAppIconAssetExporter {
+    static func exportIfRequested() {
+        guard CommandLine.arguments.contains("--export-noop-icons") else { return }
+        DispatchQueue.main.async {
+            let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("NoopIconExports", isDirectory: true)
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            for choice in NoopAppIconChoice.allCases {
+                for appearance in NoopAppIconAppearance.allCases {
+                    let view = NoopAppIconArtwork(choice: choice, appearance: appearance)
+                        .frame(width: 1024, height: 1024)
+                        .environment(\.colorScheme, appearance == .dark ? .dark : .light)
+                    let renderer = ImageRenderer(content: view)
+                    renderer.scale = 1
+                    renderer.isOpaque = appearance == .standard
+                    renderer.proposedSize = ProposedViewSize(width: 1024, height: 1024)
+                    guard let data = renderer.uiImage?.pngData() else { continue }
+                    let name = "AppIcon-\(choice.rawValue)\(appearance.exportSuffix)-1024.png"
+                    try? data.write(to: directory.appendingPathComponent(name), options: .atomic)
+                }
+            }
+        }
+    }
+}
+#endif
 
 struct NoopSparkline: View {
     var values: [Double]

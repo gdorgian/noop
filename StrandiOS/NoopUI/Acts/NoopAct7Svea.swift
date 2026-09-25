@@ -60,6 +60,11 @@ private struct NoopSveaCoach: View {
         NoopSveaScrollScreen(bottomInset: 206) {
             VStack(spacing: 0) {
                 coachHeader
+                if !NoopSveaFixture.enabled {
+                    liveConversation
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                } else {
                 VStack(alignment: .leading, spacing: 10) {
                     briefCard
                     proposalCard
@@ -115,6 +120,7 @@ private struct NoopSveaCoach: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
+                }
             }
         }
         // Keep the fixed composer out of the scroll view's layout calculation. Otherwise its
@@ -289,8 +295,15 @@ private struct NoopSveaCoach: View {
     private var composer: some View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
+                if NoopSveaFixture.enabled {
                 suggestion("Should I lift today?", kind: "answer")
                 suggestion(briefLabel, kind: "declined")
+                } else {
+                    // The engine's own contextual chips, derived from the wearer's bands on device.
+                    ForEach(Array(coach.suggestions.prefix(2)), id: \.self) { chip in
+                        liveSuggestion(chip)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -321,6 +334,149 @@ private struct NoopSveaCoach: View {
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.10), lineWidth: 0.5))
             .shadow(color: .black.opacity(0.45), radius: 13, y: 8)
         }
+    }
+
+    // MARK: Measured conversation (production)
+
+    /// Today's brief, if the engine wrote one: the newest brief-origin message dated today.
+    private var todaysBrief: ChatMessage? {
+        coach.messages.last { $0.origin == .brief && Calendar.current.isDateInToday($0.date) }
+    }
+
+    /// The brief's paragraphs without the heading the engine files it under.
+    private func paragraphs(_ text: String) -> [String] {
+        var body = text
+        if body.hasPrefix(AICoachEngine.briefHeading) {
+            body = String(body.dropFirst(AICoachEngine.briefHeading.count))
+        }
+        return body.components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    @ViewBuilder
+    private var liveConversation: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if navigation.coachVoice == .off || todaysBrief != nil {
+                liveBriefCard
+            }
+            ForEach(coach.messages.filter { $0.id != todaysBrief?.id }) { message in
+                if message.role == .user {
+                    liveUserBubble(message.text)
+                } else {
+                    liveGeneratedCard(paragraphs(message.text))
+                }
+            }
+            if coach.sending {
+                liveGeneratedCard(["\u{258C}"])
+            }
+            if let error = coach.errorText {
+                Text(error)
+                    .font(NoopHTMLFont.sans(12.5))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .noopSveaLineBox(fontSize: 12.5, ratio: 1.55)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 18))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.10), lineWidth: 0.5))
+            }
+            Text("Everything periwinkle on this screen was generated. Everything in a bordered tile with a monospace figure was measured on your wrist. The app will never mix those two into one sentence.")
+                .font(NoopHTMLFont.sans(11))
+                .foregroundStyle(NoopHTMLColor.faint)
+                .noopSveaLineBox(fontSize: 11, ratio: 1.6)
+                .padding(.horizontal, 2)
+                .padding(.top, 4)
+        }
+    }
+
+    /// The prototype's brief card over the real brief. The "Grounded in — measured" tiles need the
+    /// figures the brief read, which the engine does not store beside it, so they are left out.
+    private var liveBriefCard: some View {
+        let off = navigation.coachVoice == .off
+        let fmt = AppClock.hourMinuteFormatter()
+        return NoopSveaGradientCard(
+            tint: NoopHTMLColor.night, startOpacity: 0.14, endOpacity: 0.03, angle: 160,
+            borderOpacity: 0.30, radius: 26, horizontalPadding: 16, topPadding: 16, bottomPadding: 15
+        ) {
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(spacing: 8) {
+                    NoopSveaEyebrow(off ? "Proactive briefs · paused"
+                                    : "Today's brief · \(todaysBrief.map { fmt.string(from: $0.date) } ?? "")",
+                                    size: 9.5, color: Color(hex: 0xC9D0EE))
+                        .fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
+                    Text(off ? "PAUSED" : "WRITTEN")
+                        .font(NoopHTMLFont.sans(9, weight: .semibold))
+                        .tracking(1.08)
+                        .foregroundStyle(Color(hex: 0xA9B4E0))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(NoopHTMLColor.night.opacity(0.45), lineWidth: 0.5))
+                }
+                ForEach(off
+                        ? ["Proactive briefs are paused while Svea's manner is Off. You can still ask a question below."]
+                        : paragraphs(todaysBrief?.text ?? ""), id: \.self) { paragraph in
+                    Text(paragraph)
+                        .font(NoopHTMLFont.sans(14))
+                        .foregroundStyle(Color(hex: 0xDCE3E0))
+                        .noopSveaLineBox(fontSize: 14, ratio: 1.62)
+                }
+            }
+        }
+    }
+
+    private func liveGeneratedCard(_ lines: [String]) -> some View {
+        NoopSveaGradientCard(
+            tint: NoopHTMLColor.night, startOpacity: 0.10, endOpacity: 0.02, angle: 160,
+            borderOpacity: 0.24, radius: 22, horizontalPadding: 15, topPadding: 14, bottomPadding: 13
+        ) {
+            VStack(alignment: .leading, spacing: 9) {
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(NoopHTMLFont.sans(13.5))
+                        .foregroundStyle(Color(hex: 0xDCE3E0))
+                        .noopSveaLineBox(fontSize: 13.5, ratio: 1.55)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func liveUserBubble(_ text: String) -> some View {
+        HStack {
+            Spacer(minLength: 0)
+            Text(text)
+                .font(NoopHTMLFont.sans(13.5))
+                .foregroundStyle(NoopHTMLColor.ink)
+                .noopSveaLineBox(fontSize: 13.5, ratio: 1.5)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .frame(maxWidth: (UIScreen.main.bounds.width - 40) * 0.8, alignment: .leading)
+                .background(Color.white.opacity(0.08),
+                            in: UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18,
+                                                       bottomTrailingRadius: 6, topTrailingRadius: 18))
+                .overlay(UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18,
+                                                bottomTrailingRadius: 6, topTrailingRadius: 18)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 0.5))
+        }
+    }
+
+    private func liveSuggestion(_ label: String) -> some View {
+        Button {
+            guard !coach.sending else { return }
+            Task { await coach.send(label) }
+        } label: {
+            Text(label)
+                .font(NoopHTMLFont.sans(12, weight: .semibold))
+                .foregroundStyle(NoopHTMLColor.inkSoft)
+                .lineLimit(1)
+                .padding(.horizontal, 13)
+                .frame(height: 35)
+                .background(Color(hex: 0x171C1A, alpha: 0.90), in: RoundedRectangle(cornerRadius: 13))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.10), lineWidth: 0.5))
+        }
+        .buttonStyle(NoopHTMLPressStyle())
     }
 
     private var brief: [String] {
@@ -419,6 +575,12 @@ private struct NoopSveaCoach: View {
     private func sendQuestion() {
         let clean = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
+        if !NoopSveaFixture.enabled {
+            question = ""
+            askFocused = false
+            Task { await coach.send(clean) }
+            return
+        }
         beginAnswer(clean, kind: clean.localizedCaseInsensitiveContains(briefPhrase) ? "declined" : "answer")
         question = ""
         askFocused = false
@@ -597,7 +759,7 @@ private struct NoopSveaDeclinedAnswer: View {
                                     .font(NoopHTMLFont.sans(12.5))
                                     .foregroundStyle(NoopHTMLColor.inkSoft)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                NoopSveaChevron(size: 7, color: NoopHTMLColor.faint)
+                                NoopSveaChevron(size: 7, color: NoopHTMLColor.chevronDim)
                             }
                             .frame(minHeight: 30)
                         }
@@ -715,6 +877,15 @@ private struct NoopSveaSetup: View {
         ("Freely", "may also raise a session, a drift or a run of poor nights")
     ]
 
+    private var shownProactiveOptions: [(String, String)] {
+        if NoopSveaFixture.enabled { return proactiveOptions }
+        return [
+            ("Never", "Svea only speaks when asked"),
+            ("When something changed", "may send a brief or a detected change"),
+            ("Freely", "may also raise sessions, trends or goals")
+        ]
+    }
+
     var body: some View {
         NoopSveaScrollScreen(bottomInset: 130) {
             VStack(spacing: 0) {
@@ -737,12 +908,13 @@ private struct NoopSveaSetup: View {
             provider = coach.provider.noopDisplayName
             let explicitlyEnabled = backgroundProactiveEnabled && proactive != "Never"
             if navigation.coachVoice == .off || !explicitlyEnabled {
-                proactive = "Never"
-                backgroundProactiveEnabled = false
                 coach.proactiveLevel = .off
-                SveaProactiveBackgroundTask.updateSchedule(enabled: false)
+                // Voice Off pauses and later restores the chosen level. The scheduler's persisted
+                // permission gate cancels work now without erasing that preference.
+                SveaProactiveBackgroundTask.updateSchedule(enabled: backgroundProactiveEnabled)
             } else {
                 coach.proactiveLevel = proactive == "Freely" ? .normal : .important
+                SveaProactiveBackgroundTask.updateSchedule(enabled: true)
             }
         }
     }
@@ -819,6 +991,7 @@ private struct NoopSveaSetup: View {
                             .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Color(hex: 0xA9B4E0))
                             .multilineTextAlignment(.trailing)
+                            .lineLimit(2)
                             .frame(maxWidth: 118, alignment: .trailing)
                     }
                     .frame(minHeight: 62)
@@ -856,7 +1029,7 @@ private struct NoopSveaSetup: View {
                     Text("How often it speaks first")
                         .font(NoopHTMLFont.sans(12.5))
                         .foregroundStyle(NoopHTMLColor.inkSoft)
-                    ForEach(Array(proactiveOptions.enumerated()), id: \.offset) { index, item in
+                    ForEach(Array(shownProactiveOptions.enumerated()), id: \.offset) { index, item in
                         Button { selectProactive(item.0) } label: {
                             HStack(spacing: 11) {
                                 NoopSveaRadioMark(selected: proactive == item.0)
@@ -879,7 +1052,9 @@ private struct NoopSveaSetup: View {
                         .buttonStyle(NoopHTMLPressStyle())
                     }
                     if proactive != "Never" {
-                        Text("Enabled by you: Svea may contact \(provider) in the background only for these proactive briefs.")
+                        Text(NoopSveaFixture.enabled
+                            ? "Enabled by you: Svea may contact \(provider) in the background only for these proactive briefs."
+                            : "Enabled by you: Svea may contact \(provider) in the background for proactive briefs.")
                             .font(NoopHTMLFont.sans(11))
                             .foregroundStyle(Color(hex: 0xA9B4E0))
                             .noopSveaLineBox(fontSize: 11, ratio: 1.55)
@@ -981,11 +1156,12 @@ private struct NoopSveaSetup: View {
     private func selectManner(_ voice: NoopCoachVoice) {
         navigation.coachVoice = voice
         if voice == .off {
-            proactive = "Never"
-            backgroundProactiveEnabled = false
             coach.proactiveLevel = .off
-            SveaProactiveBackgroundTask.updateSchedule(enabled: false)
+        } else {
+            coach.proactiveLevel = backgroundProactiveEnabled && proactive != "Never"
+                ? (proactive == "Freely" ? .normal : .important) : .off
         }
+        SveaProactiveBackgroundTask.updateSchedule(enabled: backgroundProactiveEnabled)
     }
 
     private func selectProactive(_ value: String) {
@@ -1002,6 +1178,15 @@ private struct NoopSveaSetup: View {
     }
 
     private var models: [ModelRow] {
+        if !NoopSveaFixture.enabled {
+            let conversationModel = coach.model(for: .chat)
+            let chartModel = coach.model(for: .cardAnalysis)
+            return [
+                .init(title: "The daily brief", detail: "uses the conversation model", value: modelLabel(conversationModel)),
+                .init(title: "Conversation", detail: "your selected model", value: modelLabel(conversationModel)),
+                .init(title: "Charts", detail: "card analysis, when available", value: modelLabel(chartModel))
+            ]
+        }
         let values: [String]
         switch provider {
         case "OpenAI": values = ["gpt-5", "gpt-5-mini", "gpt-5"]
@@ -1017,12 +1202,19 @@ private struct NoopSveaSetup: View {
         ]
     }
 
+    private func modelLabel(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Not selected" : value
+    }
+
     private var mannerNote: String {
         switch navigation.coachVoice {
         case .plain: return "Three short paragraphs, in sentences. The default, and the only one that explains itself."
         case .quiet: return "One line, no reasoning. For people who want the read and not the read-out."
         case .direct: return "Two lines, imperative. Says what to do and stops — it will not soften a call you may disagree with."
-        case .off: return "No brief, and nothing scheduled in the background — nothing leaves the phone unless you ask. Ask her anything and she still answers."
+        case .off:
+            return NoopSveaFixture.enabled
+                ? "No brief, and nothing scheduled in the background — nothing leaves the phone unless you ask. Ask her anything and she still answers."
+                : "Off pauses proactive briefs. Choosing another voice restores your saved frequency; Ask still works when you choose to use it."
         }
     }
 }
@@ -1117,20 +1309,30 @@ private struct NoopSveaConsent: View {
             VStack(alignment: .leading, spacing: 12) {
                 NoopSveaFlowRow(
                     color: NoopHTMLColor.blue,
-                    title: "Stays here, always",
-                    detail: "your key, the raw sensor stream, the index Svea remembers, and every number the app computes."
+                    title: NoopSveaFixture.enabled ? "Stays here, always" : "Kept locally",
+                    detail: NoopSveaFixture.enabled
+                        ? "your key, the raw sensor stream, the index Svea remembers, and every number the app computes."
+                        : "If you add a key, Noop stores it in the iPhone keychain and sends it to your chosen provider for authentication. Raw sensor samples and Svea’s local search index are not attached to requests."
                 )
                 NoopSveaFlowRow(
                     color: NoopHTMLColor.night,
-                    title: proactive == "Never" ? "Goes out when you ask" : "Goes out when you ask or enable a brief",
-                    detail: proactive == "Never"
-                        ? "a short text summary of the grants below, plus your question. Nothing is sent in the background."
-                        : "a short text summary of the grants below, plus your question. Your enabled proactive brief may contact the provider in the background."
+                    title: NoopSveaFixture.enabled
+                        ? (proactive == "Never" ? "Goes out when you ask" : "Goes out when you ask or enable a brief")
+                        : "When a request runs",
+                    detail: NoopSveaFixture.enabled
+                        ? (proactive == "Never"
+                            ? "a short text summary of the grants below, plus your question. Nothing is sent in the background."
+                            : "a short text summary of the grants below, plus your question. Your enabled proactive brief may contact the provider in the background.")
+                        : (proactive == "Never"
+                            ? "Your question, recent conversation and permitted context may be sent when you ask. No proactive brief is scheduled."
+                            : "Your question, recent conversation and permitted context may be sent. Enabled proactive briefs may also contact the provider in the background.")
                 )
                 NoopSveaFlowRow(
                     color: NoopHTMLColor.muted,
-                    title: "Never goes out",
-                    detail: "anything ungranted — and it is removed before the request is built, not filtered from the reply."
+                    title: NoopSveaFixture.enabled ? "Never goes out" : "Excluded by Noop",
+                    detail: NoopSveaFixture.enabled
+                        ? "anything ungranted — and it is removed before the request is built, not filtered from the reply."
+                        : "Noop does not add ungranted data categories. Anything you type into a question can still be sent."
                 )
             }
         }
@@ -1224,24 +1426,40 @@ private struct NoopSveaConsent: View {
     private var promptCard: some View {
         NoopSveaPlainCard(radius: 24, horizontalPadding: 16, topPadding: 16, bottomPadding: 16) {
             VStack(alignment: .leading, spacing: 10) {
-                NoopSveaEyebrow("The prompt, as it would go out")
+                NoopSveaEyebrow(NoopSveaFixture.enabled ? "The prompt, as it would go out" : "What Svea may include")
                 VStack(alignment: .leading, spacing: 6) {
-                    promptLine(NoopScheduleInference.isNightWorker(kind: scheduleKind)
-                               ? "Last sleep: 7h 12m, need 7h 05m, deep 1h 34m."
-                               : "Last night: 7h 12m, need 7h 05m, deep 1h 34m.", grant: "sleep")
-                    promptLine("HRV 68 ms (4-night rise), resting pulse 52.", grant: "vitals")
-                    promptLine("Journal: no alcohol, coffee before 11:00, late meal Friday.", grant: "journal")
-                    promptLine("Private entries: mood 3, medication logged.", grant: "tender")
-                    promptLine("Body age 34 ± 5, pace 0.8×.", grant: "ages")
-                    Text("Question: should I lift today?")
-                        .font(.system(size: 11.5, design: .monospaced))
-                        .foregroundStyle(NoopHTMLColor.inkSoft)
-                        .noopSveaLineBox(fontSize: 11.5, ratio: 1.6)
+                    if NoopSveaFixture.enabled {
+                        promptLine(NoopScheduleInference.isNightWorker(kind: scheduleKind)
+                                   ? "Last sleep: 7h 12m, need 7h 05m, deep 1h 34m."
+                                   : "Last night: 7h 12m, need 7h 05m, deep 1h 34m.", grant: "sleep")
+                        promptLine("HRV 68 ms (4-night rise), resting pulse 52.", grant: "vitals")
+                        promptLine("Journal: no alcohol, coffee before 11:00, late meal Friday.", grant: "journal")
+                        promptLine("Private entries: mood 3, medication logged.", grant: "tender")
+                        promptLine("Body age 34 ± 5, pace 0.8×.", grant: "ages")
+                        Text("Question: should I lift today?")
+                            .font(.system(size: 11.5, design: .monospaced))
+                            .foregroundStyle(NoopHTMLColor.inkSoft)
+                            .noopSveaLineBox(fontSize: 11.5, ratio: 1.6)
+                    } else {
+                        promptLine("Sleep and recovery: recent timing and stages", grant: "sleep")
+                        promptLine("Effort and workouts: recent sessions", grant: "effort")
+                        promptLine("Vitals: available pulse and other readings", grant: "vitals")
+                        promptLine("Journal: non-sensitive entries", grant: "journal")
+                        promptLine("Sensitive journal entries", grant: "tender")
+                        promptLine("Age estimates, when available", grant: "ages")
+                        promptLine("Recorded lab results", grant: "labs")
+                        Text("Your question and some recent conversation may also be included.")
+                            .font(.system(size: 11.5, design: .monospaced))
+                            .foregroundStyle(NoopHTMLColor.inkSoft)
+                            .noopSveaLineBox(fontSize: 11.5, ratio: 1.6)
+                    }
                 }
                 .padding(13)
                 .background(NoopHTMLColor.canvas.opacity(0.60), in: RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
-                Text("Struck-through lines are what your current grants remove. It is the whole payload — there is no second, quieter request.")
+                Text(NoopSveaFixture.enabled
+                    ? "Struck-through lines are what your current grants remove. It is the whole payload — there is no second, quieter request."
+                    : "Struck-through categories are not added by Noop. This is a guide, not an exact request preview: the request is assembled when you ask or an enabled brief runs, and can also include app instructions and permitted tool definitions. Opening this page sends nothing.")
                     .font(NoopHTMLFont.sans(11))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                     .noopSveaLineBox(fontSize: 11, ratio: 1.55)
@@ -1254,7 +1472,18 @@ private struct NoopSveaConsent: View {
     private static let deep = ["sleep": true, "effort": true, "vitals": true, "journal": true, "tender": true, "ages": true, "labs": true]
 
     private var allGrants: [NoopSveaGrant] {
-        [
+        if !NoopSveaFixture.enabled {
+            return [
+                .init(id: "sleep", title: "Sleep and recovery", detail: "available timing, stages and recent sleep records", loss: "Noop adds no sleep context to requests"),
+                .init(id: "effort", title: "Effort and workouts", detail: "recorded sessions and available effort data", loss: "Noop adds no workout context to requests"),
+                .init(id: "vitals", title: "Vitals and trends", detail: "available HRV, pulse, respiration and temperature readings", loss: "Noop adds no vitals context to requests"),
+                .init(id: "journal", title: "Journal — behaviour", detail: "non-sensitive entries you recorded", loss: "Noop adds no non-sensitive journal entries"),
+                .init(id: "tender", title: "Journal — sensitive topics", detail: "entries you marked private, such as mood or medication", loss: "Noop adds no sensitive journal entries"),
+                .init(id: "ages", title: "Body age and estimates", detail: "available age estimates and their context", loss: "Noop adds no age estimates"),
+                .init(id: "labs", title: "Lab results", detail: "results you entered in the lab book", loss: "Noop adds no lab results")
+            ]
+        }
+        return [
             .init(id: "sleep", title: "Sleep and recovery", detail: "stages, timing, your need, the last 60 nights", loss: "no brief, no bedtime advice, no read on a bad night"),
             .init(id: "effort", title: "Effort and workouts", detail: "sessions, strain, time in zones", loss: "it cannot propose or judge a session"),
             .init(id: "vitals", title: "Vitals and trends", detail: "HRV, resting pulse, respiration, skin temperature", loss: "no illness read, and no reason behind a proposal"),
@@ -1270,6 +1499,14 @@ private struct NoopSveaConsent: View {
     }
 
     private var presetNote: String {
+        if !NoopSveaFixture.enabled {
+            switch preset {
+            case "Essentials": return "Noop may add sleep and effort context. Other categories stay off unless you enable them below."
+            case "Deep insights": return "All seven categories are enabled, including lab results and sensitive journal topics. You can turn any one off below."
+            case "Edited by hand": return "Your individual choices below control which categories Noop may add."
+            default: return "Noop may add sleep, effort, vitals, non-sensitive journal entries and available age estimates. Sensitive entries and labs remain off."
+            }
+        }
         switch preset {
         case "Essentials": return "Sleep and effort only. Svea can read the night and the session, and knows nothing about your day, your labs or anything you wrote."
         case "Deep insights": return "Everything, including lab results and sensitive journal topics. The most useful and the most exposed; a grant you should make deliberately rather than by preset."
@@ -1366,7 +1603,9 @@ private struct NoopSveaMemory: View {
             if showDeleteAll {
                 NoopBottomSheet(title: "Delete all memories?", dismiss: { showDeleteAll = false }) {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("This deletes Svea’s local index immediately. Nothing was stored at the provider.")
+                        Text(NoopSveaFixture.enabled
+                            ? "This deletes Svea’s local index immediately. Nothing was stored at the provider."
+                            : "This removes Svea’s memories from this phone and deletes its local search index. It cannot remove earlier requests retained by your provider.")
                             .font(NoopHTMLFont.sans(13))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .noopSveaLineBox(fontSize: 13, ratio: 1.55)
@@ -1447,7 +1686,9 @@ private struct NoopSveaMemory: View {
                     Button("Delete all") { showDeleteAll = true }
                         .buttonStyle(NoopSveaWarmButtonStyle())
                 }
-                Text("Deleting is immediate and local. It does not ask the provider to forget anything, because nothing was stored there — and the screen says so rather than implying a reach it does not have.")
+                Text(NoopSveaFixture.enabled
+                    ? "Deleting is immediate and local. It does not ask the provider to forget anything, because nothing was stored there — and the screen says so rather than implying a reach it does not have."
+                    : "Delete all removes the local memories and search index. Earlier requests or replies may remain with your provider under its own retention policy.")
                     .font(NoopHTMLFont.sans(11))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                     .noopSveaLineBox(fontSize: 11, ratio: 1.55)
@@ -1468,7 +1709,7 @@ private struct NoopSveaMemory: View {
                         .foregroundStyle(Color(hex: 0x7F8A85))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                NoopSveaChevron(size: 8, color: NoopHTMLColor.faint)
+                NoopSveaChevron(size: 8, color: NoopHTMLColor.chevronDim)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
@@ -1507,7 +1748,7 @@ private struct NoopSveaMemory: View {
         if usesDemoMemories {
             return "Eleven facts, each one traceable to the day you said it. Nothing here was inferred about you in the background — a memory only forms out of something you wrote or logged."
         }
-        return "\(indexCount) \(indexCount == 1 ? "fact" : "facts"), each one traceable to the day it entered your record. Nothing here was inferred about you in the background — a memory only forms out of something you wrote or logged."
+        return "\(indexCount) \(indexCount == 1 ? "memory" : "memories") kept on this phone. Some may come from conversations or tool results; you can inspect and remove them here."
     }
 
     private var indexCount: Int {
@@ -1839,26 +2080,7 @@ private struct NoopSveaMiniOrb: View {
                     .opacity(0.60 + pulse * 0.40)
                     .scaleEffect(1 + pulse * 0.06)
 
-                NoopA4BlobShape(radii: .init(
-                    tlx: 0.58, tly: 0.49,
-                    trx: 0.42, try_: 0.55,
-                    brx: 0.46, bry: 0.45,
-                    blx: 0.54, bly: 0.51
-                ))
-                .fill(
-                    RadialGradient(
-                        stops: [
-                            .init(color: Color(hex: 0xDDE3F6), location: 0),
-                            .init(color: NoopHTMLColor.night, location: 0.58),
-                            .init(color: Color(hex: 0x4A56A8), location: 1)
-                        ],
-                        center: UnitPoint(x: 0.44, y: 0.38),
-                        startRadius: 0,
-                        endRadius: 25.06
-                    )
-                )
-                .frame(width: 30, height: 30)
-                .shadow(color: NoopHTMLColor.night.opacity(0.55), radius: 7)
+                NoopSveaBlobArtwork(diameter: 30, shadowRadius: 7)
             }
         }
         .frame(width: 34, height: 34)

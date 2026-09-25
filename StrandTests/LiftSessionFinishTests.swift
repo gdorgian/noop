@@ -30,6 +30,37 @@ final class LiftSessionFinishTests: XCTestCase {
         super.tearDown()
     }
 
+    func testSecondStartCannotReplaceAnInFlightLift() {
+        let c = controller()
+        XCTAssertTrue(c.start(plan: plan(), programId: "first", programName: "Upper A"))
+        c.advance()
+        let original = c.engine
+        XCTAssertFalse(c.start(plan: [LiftPlanItem(exercise: "Squat", targetSets: 1)],
+                               programId: "second", programName: "Lower A"))
+        XCTAssertEqual(c.engine, original)
+        XCTAssertEqual(c.programId, "first")
+    }
+
+    func testFailedSaveKeepsTheSessionAndAllowsRetry() {
+        let c = controller()
+        c.start(plan: plan(), programId: "first", programName: "Upper A")
+        c.advance()
+        c.updateSet(slot(0, 1), weightKg: 55, reps: 8, rpe: nil, isWarmup: false)
+        c.advance()
+        let before = c.engine
+        XCTAssertTrue(c.beginSaving())
+        XCTAssertFalse(c.beginSaving(), "a second save must not race the first")
+        c.discard()
+        c.advance()
+        XCTAssertEqual(c.engine, before, "saving may not mutate or discard the snapshot")
+        c.saveFailed()
+        XCTAssertEqual(c.engine, before)
+        XCTAssertEqual(c.setsToSave(completingUnfinished: false).first?.weightKg, 55)
+        XCTAssertTrue(c.beginSaving(), "the same durable session can be saved again")
+        c.finishedSaving()
+        XCTAssertNil(c.engine)
+    }
+
     /// Bench set 1 done with only its weight typed, bench set 2 done untyped, the rest never started.
     private func halfDoneSession() -> LiftSessionController {
         let c = controller()

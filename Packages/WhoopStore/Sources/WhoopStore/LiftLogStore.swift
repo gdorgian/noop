@@ -465,6 +465,37 @@ extension WhoopStore {
         }
     }
 
+    /// Save the editor's program header and complete line list together. A line-write failure rolls
+    /// back the header too, avoiding a renamed program whose targets were silently left behind.
+    public func saveLiftProgram(_ program: LiftProgramRow, items: [LiftProgramItemRow]) async throws {
+        guard items.allSatisfy({ $0.programId == program.id && $0.deviceId == program.deviceId }) else {
+            throw NSError(domain: "NoopLiftLog", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "Program line belongs to another program"])
+        }
+        try syncWrite { db in
+            try db.execute(sql: """
+                INSERT INTO liftProgram (id, deviceId, name, note, createdAt, updatedAt, archived)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name = excluded.name, note = excluded.note,
+                    updatedAt = excluded.updatedAt, archived = excluded.archived
+                """, arguments: [program.id, program.deviceId, program.name, program.note,
+                                   program.createdAt, program.updatedAt, program.archived])
+            try db.execute(sql: "DELETE FROM liftProgramItem WHERE programId = ?", arguments: [program.id])
+            for item in items {
+                try db.execute(sql: """
+                    INSERT INTO liftProgramItem
+                        (id, deviceId, programId, ord, exercise, targetSets,
+                         targetRepsLow, targetRepsHigh, targetRpe, targetWeightKg, restSec, note)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, arguments: [item.id, item.deviceId, item.programId, item.ord,
+                                      item.exercise, item.targetSets, item.targetRepsLow,
+                                      item.targetRepsHigh, item.targetRpe, item.targetWeightKg,
+                                      item.restSec, item.note])
+            }
+        }
+    }
+
     /// Programs for a device, most recently touched first. `includeArchived` defaults false so the
     /// picker shows only live programs.
     public func liftPrograms(deviceId: String, includeArchived: Bool = false) async throws -> [LiftProgramRow] {
@@ -628,6 +659,34 @@ extension WhoopStore {
         }
     }
 
+    /// Replace one corrected session's set list in a single database transaction. A failed insert
+    /// leaves the original rows intact, so the editor never reports a correction it only half-saved.
+    @discardableResult
+    public func replaceLiftSessionSets(sessionId: String, rows: [LiftSetRow]) async throws -> Int {
+        guard rows.allSatisfy({ $0.sessionId == sessionId }) else {
+            throw NSError(domain: "NoopLiftLog", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Set belongs to another session"])
+        }
+        return try syncWrite { db in
+            try db.execute(sql: "DELETE FROM liftSet WHERE sessionId = ?", arguments: [sessionId])
+            for r in rows {
+                try db.execute(sql: """
+                    INSERT INTO liftSet
+                        (id, deviceId, sessionId, ord, exercise, primaryMuscle, secondaryMuscles,
+                         setIndex, weightKg, reps, rpe, isWarmup, startTs, endTs, restSec, note)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, arguments: [
+                        r.id, r.deviceId, r.sessionId, r.ord, r.exercise,
+                        r.primaryMuscle?.rawValue,
+                        LiftMuscle.encodeList(r.secondaryMuscles, excluding: r.primaryMuscle),
+                        r.setIndex, r.weightKg, r.reps, r.rpe, r.isWarmup,
+                        r.startTs, r.endTs, r.restSec, r.note,
+                    ])
+            }
+            return rows.count
+        }
+    }
+
     /// Every set in a session, in the order they were performed.
     public func liftSets(sessionId: String) async throws -> [LiftSetRow] {
         try syncRead { db in
@@ -636,6 +695,16 @@ extension WhoopStore {
                 WHERE sessionId = ?
                 ORDER BY ord ASC
                 """, arguments: [sessionId]).map(LiftSetRow.decode)
+        }
+    }
+
+    /// Delete one recorded set while correcting a finished session. The parent session remains;
+    /// callers recompute every displayed aggregate from the rows that survive.
+    @discardableResult
+    public func deleteLiftSet(id: String) async throws -> Bool {
+        try syncWrite { db in
+            try db.execute(sql: "DELETE FROM liftSet WHERE id = ?", arguments: [id])
+            return db.changesCount > 0
         }
     }
 

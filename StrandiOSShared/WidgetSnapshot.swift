@@ -1,10 +1,150 @@
 import Foundation
 
+/// The user-visible widget families registered by Noop.
+///
+/// WidgetKit's bundle also contains Live Activity configurations. Those are delivery surfaces for
+/// the Live heart rate and Lift session families, not extra entries in the widget gallery, so a raw
+/// count of `Widget` conformers is not the number the Settings screen is promising. This registry is
+/// the single source for the gallery-facing count, names and descriptions used by both targets.
+public struct NoopWidgetFamilyDefinition: Identifiable, Hashable, Sendable {
+    public enum ID: String, CaseIterable, Sendable {
+        case glanceable
+        case liveHeartRate
+        case coachBrief
+        case restingPulse
+        case stress
+        case liftSession
+        case energy
+        case rings
+    }
+
+    public let id: ID
+    public let title: String
+    public let detail: String
+    public let configurationKind: String
+    public let isNew: Bool
+
+    public init(id: ID, title: String, detail: String, configurationKind: String,
+                isNew: Bool = false) {
+        self.id = id
+        self.title = title
+        self.detail = detail
+        self.configurationKind = configurationKind
+        self.isNew = isNew
+    }
+}
+
+public enum NoopWidgetFamilyRegistry {
+    public static let families: [NoopWidgetFamilyDefinition] = [
+        .init(
+            id: .glanceable,
+            title: "Glanceable",
+            detail: "the night, then the day — the three faces above",
+            configurationKind: "NOOPWidget"
+        ),
+        .init(
+            id: .liveHeartRate,
+            title: "Live heart rate",
+            detail: "one figure, mid-session, at arm’s length",
+            configurationKind: "HeartRateWidget"
+        ),
+        .init(
+            id: .coachBrief,
+            title: "The coach brief",
+            detail: "Svea’s morning line, marked as written",
+            configurationKind: "CoachBriefWidget"
+        ),
+        .init(
+            id: .restingPulse,
+            title: "Resting pulse",
+            detail: "this morning, with the week behind it",
+            configurationKind: "RestingPulseWidget"
+        ),
+        .init(
+            id: .stress,
+            title: "Stress",
+            detail: "a word and a ladder, never a percentage",
+            configurationKind: "StressWidget"
+        ),
+        .init(
+            id: .liftSession,
+            title: "Lift session",
+            detail: "the next session as a name and its lines",
+            configurationKind: "LiftLiveActivity"
+        ),
+        .init(
+            id: .energy,
+            title: "Energy",
+            detail: "what today has cost, and where it is heading",
+            configurationKind: "EnergyWidget",
+            isNew: true
+        ),
+        .init(
+            id: .rings,
+            title: "Rings",
+            detail: "charge, effort and sleep seen at once",
+            configurationKind: "NOOPRingsWidget",
+            isNew: true
+        ),
+    ]
+
+    public static var count: Int { families.count }
+
+    public static func family(_ id: NoopWidgetFamilyDefinition.ID) -> NoopWidgetFamilyDefinition {
+        // Every enum case is declared exactly once above. A programmer error here must fail during
+        // development instead of letting the app silently advertise a family with no registration.
+        guard let family = families.first(where: { $0.id == id }) else {
+            preconditionFailure("No widget family registered for \(id.rawValue)")
+        }
+        return family
+    }
+}
+
+/// The energy values a widget is allowed to repeat from the app's Energy engine.
+/// Every field is optional because absence means unknown, never zero. The widget may show the
+/// modelled all-day basal figure on a cold start, but it must not promote that model to measured
+/// spend, invent a basal/active split, or manufacture a projection range.
+public struct NoopWidgetEnergySnapshot: Codable, Equatable, Sendable {
+    public var estimatedBMR24h: Int?
+    public var basalBurnedSoFar: Int?
+    public var activeBurnedSoFar: Int?
+    public var totalBurnedSoFar: Int?
+    public var projectedLow: Int?
+    public var projectedHigh: Int?
+    public var coverage: Double?
+    public var source: String?
+    /// Explicitly set only after the wearer entered and confirmed the four profile inputs.
+    /// Old snapshots decode nil and therefore cannot reveal pre-confirmation estimates.
+    public var profileConfirmed: Bool?
+
+    public init(estimatedBMR24h: Int? = nil, basalBurnedSoFar: Int? = nil,
+                activeBurnedSoFar: Int? = nil, totalBurnedSoFar: Int? = nil,
+                projectedLow: Int? = nil, projectedHigh: Int? = nil,
+                coverage: Double? = nil, source: String? = nil,
+                profileConfirmed: Bool? = nil) {
+        self.estimatedBMR24h = estimatedBMR24h
+        self.basalBurnedSoFar = basalBurnedSoFar
+        self.activeBurnedSoFar = activeBurnedSoFar
+        self.totalBurnedSoFar = totalBurnedSoFar
+        self.projectedLow = projectedLow
+        self.projectedHigh = projectedHigh
+        self.coverage = coverage
+        self.source = source
+        self.profileConfirmed = profileConfirmed
+    }
+}
+
 /// Small, Codable glance snapshot shared between the iOS app and its widget/Live-Activity extension
 /// via an App Group. The app writes it; the widget reads it. Keeping it tiny avoids any cross-process
 /// database access — the widget never opens SQLite.
 public struct WidgetSnapshot: Codable, Equatable {
-    public var recovery: Int?    // Charge (0–100)
+    /// Legacy key retained for compatibility with saved snapshots. The widget labels it Charge,
+    /// so a value is displayable only when its source is the intraday ledger, not morning recovery.
+    public var recovery: Int?
+    /// Absent on snapshots written before the Charge/Recovery split. Only a real intraday-ledger
+    /// publisher may set this to `intradayChargeSource`; old values are masked on every read.
+    public var chargeSource: String?
+    public static let intradayChargeSource = "intraday-ledger-v1"
     public var bpm: Int?
     public var batteryPct: Int?
     public var bonded: Bool
@@ -15,6 +155,12 @@ public struct WidgetSnapshot: Codable, Equatable {
     public var rest: Int?        // Rest (sleep_performance) score, 0–100
     public var hrv: Int?         // HRV (ms), whole-number for the glance
     public var restingHr: Int?   // Resting heart rate (bpm)
+    /// Seven chronological nightly resting-pulse slots. A nil slot is a real gap, not zero; the
+    /// Resting pulse widget renders it as a hairline and never joins across it.
+    public var restingHrWeek: [Int?]?
+    /// Today's Energy-engine output, already reduced to the fields the medium widget is allowed to
+    /// show. Nil until the app has enough profile/source data to build even an honest cold start.
+    public var energy: NoopWidgetEnergySnapshot?
     // #313 Effort scale for the glance. Pre-formatted at publish time because the widget extension
     // cannot read the app's plain UserDefaults `effort.scale` key (it lives outside the App Group).
     // When nil (older snapshot), the widget falls back to whole-number `effort` on the 0–100 axis.
@@ -42,11 +188,14 @@ public struct WidgetSnapshot: Codable, Equatable {
     public var stressDay: Int?
 
     public init(recovery: Int?, bpm: Int?, batteryPct: Int?, bonded: Bool, updated: Date,
+                chargeSource: String? = nil,
                 effort: Int? = nil, rest: Int? = nil, hrv: Int? = nil, restingHr: Int? = nil,
+                restingHrWeek: [Int?]? = nil, energy: NoopWidgetEnergySnapshot? = nil,
                 effortDisplay: String? = nil, effortWhoop: Bool? = nil,
                 hrSeries: [HrPoint]? = nil, stressSeries: [StressPoint]? = nil,
                 stressDay: Int? = nil) {
         self.recovery = recovery
+        self.chargeSource = chargeSource
         self.bpm = bpm
         self.batteryPct = batteryPct
         self.bonded = bonded
@@ -55,6 +204,8 @@ public struct WidgetSnapshot: Codable, Equatable {
         self.rest = rest
         self.hrv = hrv
         self.restingHr = restingHr
+        self.restingHrWeek = restingHrWeek
+        self.energy = energy
         self.effortDisplay = effortDisplay
         self.effortWhoop = effortWhoop
         self.hrSeries = hrSeries
@@ -142,11 +293,22 @@ public struct WidgetSnapshot: Codable, Equatable {
     }
 
     public static var placeholder: WidgetSnapshot {
+        #if DEBUG && targetEnvironment(simulator)
         // Gallery / pre-publish stand-in: realistic Charge · Effort · Rest on the 0–100 axis so the
         // three-ring Home Screen layouts (and the large grid) preview with filled arcs, not dashes.
         WidgetSnapshot(recovery: 72, bpm: 58, batteryPct: 84, bonded: true, updated: Date(),
                        effort: 38, rest: 81, hrv: 64, restingHr: 52,
+                       restingHrWeek: [51, 54, 50, 53, 52, 50, 52],
+                       energy: .init(estimatedBMR24h: 1_650, basalBurnedSoFar: 890,
+                                     activeBurnedSoFar: 390, totalBurnedSoFar: 1_280,
+                                     projectedLow: 1_900, projectedHigh: 2_150,
+                                     coverage: 0.86, source: "strapWornTime", profileConfirmed: true),
                        effortDisplay: "38", effortWhoop: false)
+        #else
+        // A release widget gallery is user-visible. It must not present fixture measurements as
+        // if they belonged to the wearer before the app has published a real snapshot.
+        return unavailable
+        #endif
     }
 
     /// Honest runtime state when the app has not published a readable snapshot yet. Unlike
@@ -160,7 +322,18 @@ public struct WidgetSnapshot: Codable, Equatable {
         guard let defaults = UserDefaults(suiteName: suiteName),
               let data = defaults.data(forKey: storageKey),
               let snap = try? JSONDecoder().decode(WidgetSnapshot.self, from: data) else { return nil }
-        return snap
+        return snap.verifiedForDisplay()
+    }
+
+    /// Migrate in memory, not by deleting the shared blob: a previous app version could have saved
+    /// morning Recovery under the field now labelled Charge. Preserve the live pulse, Rest, Effort,
+    /// stress, and other measurements while refusing to render that unverified Charge number.
+    func verifiedForDisplay() -> WidgetSnapshot {
+        var verified = self
+        if verified.chargeSource != Self.intradayChargeSource {
+            verified.recovery = nil
+        }
+        return verified
     }
 
     /// Persist this snapshot into the shared suite, folding the live bpm into the trace on the way.
@@ -214,6 +387,7 @@ public struct WidgetSnapshot: Codable, Equatable {
     static func renderedContentChanged(from previous: WidgetSnapshot?, to next: WidgetSnapshot) -> Bool {
         guard let previous else { return true }
         return previous.recovery != next.recovery
+            || previous.chargeSource != next.chargeSource
             || previous.bpm != next.bpm
             || previous.batteryPct != next.batteryPct
             || previous.bonded != next.bonded
@@ -221,6 +395,8 @@ public struct WidgetSnapshot: Codable, Equatable {
             || previous.rest != next.rest
             || previous.hrv != next.hrv
             || previous.restingHr != next.restingHr
+            || previous.restingHrWeek != next.restingHrWeek
+            || previous.energy != next.energy
             || previous.effortDisplay != next.effortDisplay
             || previous.effortWhoop != next.effortWhoop
             // The curve joins the comparison (#2040): a publish that scored a fresh hour and changed

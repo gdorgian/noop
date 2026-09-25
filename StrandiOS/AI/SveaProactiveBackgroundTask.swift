@@ -6,6 +6,21 @@ import Foundation
 /// proactive briefs; provider traffic remains impossible at the default value.
 enum SveaProactiveBackgroundTask {
     static let enabledKey = "noop.svea.backgroundProactiveEnabled"
+    private static let proactiveKey = "noop.html.svea-proactive"
+    private static let voiceKey = "noop.html.svea-voice"
+
+    /// The old enabled bit alone is not permission: it can survive an upgrade after the newer
+    /// Never/Off controls were introduced. Voice Off pauses a chosen level; Never revokes it.
+    static func permitsBackground(enabled: Bool, proactive: String?, voice: String?) -> Bool {
+        enabled && (proactive == "When something changed" || proactive == "Freely") && voice != "Off"
+    }
+
+    private static var userAllowsBackground: Bool {
+        let defaults = UserDefaults.standard
+        return permitsBackground(enabled: defaults.bool(forKey: enabledKey),
+                                 proactive: defaults.string(forKey: proactiveKey),
+                                 voice: defaults.string(forKey: voiceKey))
+    }
 
     static var identifier: String {
         (Bundle.main.bundleIdentifier ?? "com.noopapp.noop") + ".sveaproactive"
@@ -32,8 +47,9 @@ enum SveaProactiveBackgroundTask {
     static func updateSchedule(enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: enabledKey)
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
-        guard enabled,
+        guard userAllowsBackground,
               UserDefaults.standard.bool(forKey: "ai.dataConsent"),
+              CoachFeaturePrefs.isEnabled,
               !SveaDataGrants.load().allowed.isEmpty else { return }
 
         let request = BGProcessingTaskRequest(identifier: identifier)
@@ -45,7 +61,7 @@ enum SveaProactiveBackgroundTask {
 
     private static func handle(_ task: BGProcessingTask) {
         let work = Task { @MainActor in
-            guard UserDefaults.standard.bool(forKey: enabledKey),
+            guard userAllowsBackground,
                   let coach,
                   CoachFeaturePrefs.isEnabled,
                   coach.dataConsent,

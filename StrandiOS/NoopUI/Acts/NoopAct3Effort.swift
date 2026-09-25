@@ -1,8 +1,21 @@
 import Foundation
+import StrandAnalytics
+import StrandImport
 import SwiftUI
+import WhoopStore
 
 struct NoopAct3Screens: View {
     @ObservedObject var navigation: NoopNavigation
+    /// The production shell's recorded sessions. Nil only in the seeded Debug shell, which keeps the
+    /// design's example person; set, every screen draws from the record and the real recorder.
+    var effort: NoopEffortRecord? = nil
+    var battery: Int? = nil
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var live: LiveState
+    @EnvironmentObject private var profile: ProfileStore
+    @EnvironmentObject private var liftSession: LiftSessionController
+    /// Production: the running session that refused a start, while its refusal is up.
+    @State private var refusal: NoopRunningSession?
 
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     @SceneStorage("noop.act3.rest-day") private var restDay = false
@@ -14,6 +27,21 @@ struct NoopAct3Screens: View {
     }
 
     var body: some View {
+        if let effort {
+            productionBody(effort)
+                .overlay {
+                    if let refusal {
+                        NoopSessionRefusal(session: refusal,
+                                           goToIt: { self.refusal = nil; refusal.go(navigation: navigation, lift: liftSession) },
+                                           notNow: { withAnimation(NoopMotion.swap) { self.refusal = nil } })
+                    }
+                }
+        } else {
+            demoBody
+        }
+    }
+
+    @ViewBuilder private var demoBody: some View {
         switch navigation.route {
         case .session:
             sessionScreen
@@ -608,7 +636,7 @@ struct NoopAct3Screens: View {
                 navigation.push(.history)
             } label: {
                 HStack(spacing: 9) {
-                    Text("All \(Act3AcrossFixture.record.count) sessions in your history")
+                    Text("All \(snapshot.totalCount) sessions in your history")
                         .font(NoopHTMLFont.sans(12.5))
                         .foregroundStyle(NoopHTMLColor.blueLight)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1110,11 +1138,15 @@ struct NoopAct3Screens: View {
     private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
 
     private func showDetail(for row: Act3AcrossSession) {
+        if let stored = row.row {
+            openStored(stored)
+            return
+        }
         let day = row.daysAgo == 1 ? "Yesterday" : row.dayLabel
         let distance = row.distance.map { " · \(Act3AcrossFixture.compactDecimal($0)) km" } ?? ""
         navigation.historyWorkout = nil
         navigation.detailSession = NoopSessionDetailSelection(
-            workout: row.sport.workout,
+            workout: row.sport.workout ?? .steadyRide,
             headerLine: "\(day) · \(row.duration) min\(distance)",
             durationLabel: "\(row.duration):00",
             load: row.load
@@ -1249,6 +1281,20 @@ private enum Act3AcrossSport: String, CaseIterable, Hashable {
     }
 }
 
+/// A sport as the across screen draws it: the fixture's five kinds, or any stored session's sport name.
+private struct Act3SportKey: Hashable {
+    let name: String
+    let glyph: NoopCanonicalGlyphName
+    var warm = false
+    var workout: NoopWorkout? = nil
+
+    var color: Color { warm ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue }
+}
+
+private extension Act3AcrossSport {
+    var key: Act3SportKey { Act3SportKey(name: name, glyph: glyph, warm: self == .intervals, workout: workout) }
+}
+
 private enum Act3AcrossSource: Equatable {
     case strap
     case imported
@@ -1265,15 +1311,19 @@ private enum Act3AcrossSource: Equatable {
 
 private struct Act3AcrossSession: Identifiable {
     let daysAgo: Int
-    let sport: Act3AcrossSport
+    let sport: Act3SportKey
     let duration: Int
     let load: Int
     let distance: Double?
     let source: Act3AcrossSource
+    /// Production: the stored session this row stands for, and its day column.
+    var row: WorkoutRow? = nil
+    var dayText: String? = nil
 
-    var id: Int { daysAgo }
+    var id: String { row.map { "\($0.startTs)-\($0.sport)" } ?? "\(daysAgo)" }
 
     var dayLabel: String {
+        if let dayText { return dayText }
         if daysAgo == 1 { return "Yest." }
         if daysAgo < 7 {
             let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -1305,11 +1355,11 @@ private struct Act3AcrossCost: Identifiable {
 }
 
 private struct Act3AcrossSportSummary: Identifiable {
-    let kind: Act3AcrossSport
+    let kind: Act3SportKey
     let timeLabel: String
     let share: CGFloat
     let meta: String
-    var id: Act3AcrossSport { kind }
+    var id: String { kind.name }
 }
 
 private struct Act3AcrossSnapshot {
@@ -1321,6 +1371,8 @@ private struct Act3AcrossSnapshot {
     let topSportNote: String
     let rows: [Act3AcrossSession]
     let rowsNote: String
+    /// Every session on record, for the history link.
+    var totalCount: Int = Act3AcrossFixture.record.count
 }
 
 private enum Act3AcrossFixture {
@@ -1360,7 +1412,7 @@ private enum Act3AcrossFixture {
             result.append(
                 Act3AcrossSession(
                     daysAgo: day,
-                    sport: sport,
+                    sport: sport.key,
                     duration: duration,
                     load: load,
                     distance: distance,
@@ -1427,7 +1479,7 @@ private enum Act3AcrossFixture {
             var minutes = 0
             var load = 0
         }
-        var totals: [Act3AcrossSport: Totals] = [:]
+        var totals: [Act3SportKey: Totals] = [:]
         for session in sessions {
             var value = totals[session.sport] ?? Totals()
             value.count += 1
@@ -1436,7 +1488,7 @@ private enum Act3AcrossFixture {
             totals[session.sport] = value
         }
         let ordered = totals.sorted { lhs, rhs in
-            if lhs.value.minutes == rhs.value.minutes { return lhs.key.rawValue < rhs.key.rawValue }
+            if lhs.value.minutes == rhs.value.minutes { return lhs.key.name < rhs.key.name }
             return lhs.value.minutes > rhs.value.minutes
         }
         let maximumMinutes = max(1, ordered.first?.value.minutes ?? 1)
@@ -1468,7 +1520,9 @@ private enum Act3AcrossFixture {
             tiles: tiles,
             costs: costs,
             sports: sports,
-            topSportNote: ordered.first.map { "most of it \($0.key.phrase)" } ?? "",
+            topSportNote: ordered.first.flatMap { entry in
+                Act3AcrossSport.allCases.first { $0.name == entry.key.name }.map { "most of it \($0.phrase)" }
+            } ?? "",
             rows: shownRows,
             rowsNote: rowsNote
         )
@@ -1664,6 +1718,7 @@ private struct Act3HeartbeatOrb: View {
     let zone: String
     let outside: Bool
     let paused: Bool
+    var hasPulse = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var startedAt = Date()
@@ -1694,7 +1749,7 @@ private struct Act3HeartbeatOrb: View {
                     .frame(width: 210, height: 150)
                     .opacity(glow)
                 VStack(spacing: 8) {
-                    Text("\(bpm)")
+                    Text(hasPulse ? "\(bpm)" : "\u{2014}")
                         .font(NoopHTMLFont.outfit200(92))
                         .tracking(-4.6)
                         .foregroundStyle(paused ? Color(hex: 0x7F8A85) : outside ? Color(hex: 0xFBDCAA) : Color(hex: 0xF6FDFF))
@@ -1895,10 +1950,18 @@ private struct Act3LiveScreen: View {
     let paused: Bool
     let pauseAction: () -> Void
     let endAction: () -> Void
+    /// Production: the recorder's figures. `hasPulse` false draws a dash rather than a number, `stats`
+    /// replaces the three fixture figures, `zoneLabel` names the wearer's own zone, and the two
+    /// auto-pause sentences (the recorder has no auto-pause) are dropped.
+    var measured = false
+    var hasPulse = true
+    var stats: [String]? = nil
+    var zoneLabel: String? = nil
+    var hasBand = true
 
     private var over: Bool { bpm > model.high }
     private var under: Bool { bpm < model.low }
-    private var outside: Bool { over || under }
+    private var outside: Bool { hasPulse && (over || under) }
 
     var body: some View {
         let canvasWidth = UIScreen.main.bounds.width
@@ -1912,11 +1975,14 @@ private struct Act3LiveScreen: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(model.name).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.inkSoft)
-                    Text("hold \(model.low)–\(model.high)").font(NoopHTMLFont.sans(10.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                    if hasBand {
+                        Text("hold \(model.low)–\(model.high)").font(NoopHTMLFont.sans(10.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                    }
                 }
             }
 
-            Act3HeartbeatOrb(bpm: bpm, zone: zoneName, outside: outside, paused: paused)
+            Act3HeartbeatOrb(bpm: bpm, zone: zoneLabel ?? zoneName, outside: hasPulse && outside, paused: paused,
+                             hasPulse: hasPulse)
             .frame(maxHeight: .infinity)
 
             VStack(alignment: .leading, spacing: 9) {
@@ -1926,6 +1992,7 @@ private struct Act3LiveScreen: View {
                         Capsule().fill(NoopHTMLColor.blue.opacity(0.42))
                             .frame(width: proxy.size.width * (position(model.high) - position(model.low)), height: 4)
                             .offset(x: proxy.size.width * position(model.low))
+                            .opacity(hasBand ? 1 : 0)
                         ZStack {
                             Circle()
                                 .fill((outside ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue).opacity(0.18))
@@ -1937,6 +2004,7 @@ private struct Act3LiveScreen: View {
                         }
                             .frame(width: 14, height: 14)
                             .offset(x: proxy.size.width * position(bpm) - 7)
+                            .opacity(hasPulse ? 1 : 0)
                     }
                     .frame(height: 24)
                 }
@@ -1948,9 +2016,9 @@ private struct Act3LiveScreen: View {
             }
 
             HStack {
-                liveStat(String(format: "%.1f", Double(elapsed) / 60 * 0.35), label: "km")
-                liveStat("\((model.low + model.high) / 2 - 2)", label: "avg pulse")
-                liveStat(outside ? "88%" : "91%", label: "in zone")
+                liveStat(stats?[0] ?? String(format: "%.1f", Double(elapsed) / 60 * 0.35), label: "km")
+                liveStat(stats?[1] ?? "\((model.low + model.high) / 2 - 2)", label: "avg pulse")
+                liveStat(stats?[2] ?? (outside ? "88%" : "91%"), label: "in zone")
             }
             .padding(.vertical, 14)
             .padding(.horizontal, 4)
@@ -1961,9 +2029,11 @@ private struct Act3LiveScreen: View {
                 Act3CircleControl(glyph: paused ? .play : .pause, active: paused, isStop: false, action: pauseAction)
                 Act3CircleControl(glyph: .stop, active: false, isStop: true, action: endAction)
             }
-            Text(paused ? "Tap play, or just start moving" : "Auto-pauses when you stop")
-                .font(NoopHTMLFont.sans(11))
-                .foregroundStyle(NoopHTMLColor.faint)
+            if !measured {
+                Text(paused ? "Tap play, or just start moving" : "Auto-pauses when you stop")
+                    .font(NoopHTMLFont.sans(11))
+                    .foregroundStyle(NoopHTMLColor.faint)
+            }
         }
         .frame(width: max(0, canvasWidth - 44), height: max(0, canvasHeight - 80))
         .padding(.top, 54)
@@ -1986,6 +2056,8 @@ private struct Act3LiveScreen: View {
     }
 
     private var cue: String {
+        if measured && paused { return "Paused." }
+        if measured && (!hasPulse || !hasBand) { return "" }
         if paused { return "Paused. It will pick up on its own when you start moving." }
         if over { return "\(bpm - model.high) beats over. Ease off and let it come back down." }
         if under { return "\(model.low - bpm) beats under. Lift it a little if that feels easy." }
@@ -2232,4 +2304,773 @@ private extension NoopAct3Screens {
         Act3Zone(name: "Hard", low: 128, high: 152, color: Color(hex: 0xF2B45C)),
         Act3Zone(name: "All out", low: 152, high: 190, color: NoopHTMLColor.amber)
     ]
+}
+
+// MARK: - Production (the measured record and the real recorder)
+
+/// The five session templates as plans: a name, a length and a zone the wearer's own bands resolve to
+/// beats per minute. What each would "cost today", whether it fits, and why — the prescription the
+/// design writes — needs an engine the app does not have and is left out.
+private extension NoopWorkout {
+    static func matchingRecordedSport(_ sport: String) -> NoopWorkout? {
+        allCases.first { $0.catalogSport.caseInsensitiveCompare(sport) == .orderedSame }
+    }
+
+    /// The profile zone (1–5) the template trains in; nil for a session with no single zone.
+    var targetZone: Int? {
+        switch self {
+        case .steadyRide, .easySwim: 2
+        case .longWalk: 1
+        case .intervals: 5
+        case .strength: nil
+        }
+    }
+
+    /// The catalogue sport the recorder saves the session under.
+    var catalogSport: String {
+        switch self {
+        case .steadyRide: "Cycling"
+        case .intervals: "HIIT"
+        case .longWalk: "Walking"
+        case .strength: "Strength"
+        case .easySwim: "Pool swim"
+        }
+    }
+}
+
+private extension NoopAct3Screens {
+    @ViewBuilder
+    func productionBody(_ effort: NoopEffortRecord) -> some View {
+        switch navigation.route {
+        case .pick: livePicker
+        case .ready: liveReady
+        case .live, .intervals: liveSession
+        case .detail: liveDetail(effort)
+        case .across: liveAcross(effort)
+        default: liveSessionHome(effort)
+        }
+    }
+
+    /// Profile zones are the wearer's only once the age behind them is confirmed or a max was set.
+    var zonesTrusted: Bool { NoopZoneSource.current(profile).trusted }
+
+    /// The template's band in beats per minute from the wearer's zones; nil without a single zone or
+    /// before the zones are the wearer's own.
+    func band(_ workout: NoopWorkout) -> (low: Int, high: Int)? {
+        guard zonesTrusted, let number = workout.targetZone else { return nil }
+        let zones = profile.hrZoneSet.zones
+        guard zones.indices.contains(number - 1) else { return nil }
+        let z = zones[number - 1]
+        return (Int(z.lower.rounded()), Int(z.upper.rounded()))
+    }
+
+    func bandText(_ workout: NoopWorkout) -> String {
+        band(workout).map { "\($0.low)\u{2013}\($0.high)" } ?? "\u{2014}"
+    }
+
+    /// The app's own five zones, by number: the design's band names do not line up with them.
+    static let zoneNames = (1...5).map(NoopZoneSource.name)
+
+    // MARK: Session home
+
+    func liveSessionHome(_ effort: NoopEffortRecord) -> some View {
+        let workout = navigation.selectedWorkout
+        let chosen = navigation.workoutChosenByUser
+        return NoopScreen(topInset: 58) {
+            VStack(spacing: 0) {
+                Act3HomeHeader(title: isNightWorker ? "This shift's session" : "Today's session",
+                               eyebrow: "\(Self.weekdayFormatter.string(from: Date())), \(AppClock.hourMinuteFormatter().string(from: Date()))") {
+                    NoopBatteryChip(percent: battery) { navigation.push(.strap) }
+                }
+
+                VStack(spacing: 9) {
+                    VStack(alignment: .leading, spacing: 13) {
+                        if chosen {
+                            NoopSectionLabel("Your choice", color: NoopHTMLColor.blue)
+                        }
+                        Text(workout.act3.name)
+                            .font(NoopHTMLFont.outfit(29, weight: .light))
+                            .tracking(-0.85)
+                        HStack(spacing: 14) {
+                            heroMetric("\(workout.act3.duration)", label: "minutes")
+                            Rectangle().fill(Color.white.opacity(0.12)).frame(width: 0.5, height: 30)
+                            heroMetric(bandText(workout), label: "bpm to hold")
+                        }
+                        .padding(.top, 4)
+                        .padding(.bottom, 2)
+                        VStack(spacing: 8) {
+                            Act3ActionButton("Get ready", height: 54, radius: 18, fontSize: 15, primary: true) {
+                                if model.activeWorkout != nil { navigation.push(.live) }
+                                else if !refuseIfRunning() {
+                                    navigation.push(workout == .strength ? .liftLibrary : .ready)
+                                }
+                            }
+                            Act3ActionButton("Choose something else", height: 46, radius: 16) { navigation.push(.pick) }
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+                    .padding(.bottom, 16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background {
+                        NoopCSSLinearGradient(colors: [NoopHTMLColor.blue.opacity(0.16), NoopHTMLColor.blue.opacity(0.03)],
+                                              degrees: 158)
+                            .clipShape(RoundedRectangle(cornerRadius: 24))
+                    }
+                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(NoopHTMLColor.blue.opacity(0.3), lineWidth: 0.5))
+
+                    liveWeekCard(effort)
+
+                    if let last = effort.workouts.first {
+                        Button { openStored(last) } label: {
+                            HStack(spacing: 13) {
+                                NoopCanonicalGlyph(name: Self.glyph(for: last.sport), size: 21, color: NoopHTMLColor.blue)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(Self.dayWord(last.startTs)) \u{00B7} \(last.sport)")
+                                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                    Text(Self.meta(last))
+                                        .font(NoopHTMLFont.sans(11.5))
+                                        .foregroundStyle(Color(hex: 0x7F8A85))
+                                        .monospacedDigit()
+                                }
+                                Spacer()
+                                NoopChevron()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 15)
+                            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                    }
+
+                    Button { navigation.push(.across) } label: {
+                        HStack(spacing: 13) {
+                            NoopCanonicalGlyph(name: .trends, size: 21, color: NoopHTMLColor.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Every session, in aggregate")
+                                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                Text("\(effort.workouts.count) on record \u{00B7} \(effort.sessions(inLast: 30).count) in the last thirty days")
+                                    .font(NoopHTMLFont.sans(11.5))
+                                    .foregroundStyle(Color(hex: 0x7F8A85))
+                                    .monospacedDigit()
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            NoopChevron()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 15)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 14)
+            }
+        }
+    }
+
+    func liveWeekCard(_ effort: NoopEffortRecord) -> some View {
+        let total = effort.week.compactMap(\.value).reduce(0, +)
+        return NoopHTMLCard(radius: 20, padding: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    NoopSectionLabel("Load, last seven days")
+                    Spacer()
+                    Text("\(Int(total.rounded())) total")
+                        .font(NoopHTMLFont.sans(11))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .monospacedDigit()
+                }
+                HStack(alignment: .bottom, spacing: 6) {
+                    ForEach(effort.week.indices, id: \.self) { index in
+                        let value = effort.week[index].value ?? 0
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(value > 78 ? Color(hex: 0xF2B45C) : value <= 0 ? Color.white.opacity(0.07) : NoopHTMLColor.blue.opacity(0.5))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: max(3, CGFloat(min(100, value)) / 100 * 62))
+                    }
+                }
+                .frame(height: 62, alignment: .bottom)
+                HStack(spacing: 6) {
+                    ForEach(effort.week.indices, id: \.self) { index in
+                        let today = index == effort.week.count - 1
+                        Text(effort.week[index].label)
+                            .font(NoopHTMLFont.sans(9.5, weight: today ? .semibold : .regular))
+                            .foregroundStyle(today ? NoopHTMLColor.blueLight : NoopHTMLColor.faint)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Picker
+
+    var livePicker: some View {
+        NoopScreen(topInset: 56) {
+            VStack(spacing: 0) {
+                Act3BackHeader(label: "Today's session") { back(to: .session) }
+                    .padding(.horizontal, -2)
+                VStack(spacing: 14) {
+                    Text("Choose something else")
+                        .font(NoopHTMLFont.outfit(25))
+                        .tracking(-0.625)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(spacing: 9) {
+                        ForEach(NoopWorkout.allCases) { workout in
+                            let selected = navigation.selectedWorkout == workout
+                            Button {
+                                navigation.selectedWorkout = workout
+                                navigation.workoutChosenByUser = true
+                                // Strength is a lift: it continues into Act 10's library, whose back
+                                // returns to the session.
+                                if workout == .strength { navigation.push(.liftLibrary) }
+                                else { navigation.reset(to: .session) }
+                            } label: {
+                                HStack(spacing: 13) {
+                                    Act3WorkoutGlyph(workout: workout, size: 21, color: NoopHTMLColor.blue)
+                                        .frame(width: 21)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(workout.act3.name).font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                                        Text("\(workout.act3.duration) min" + (band(workout).map { " \u{00B7} \($0.low)\u{2013}\($0.high) bpm" } ?? ""))
+                                            .font(NoopHTMLFont.sans(11.5))
+                                            .foregroundStyle(Color(hex: 0x7F8A85))
+                                            .monospacedDigit()
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 15)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(selected ? NoopHTMLColor.blue.opacity(0.09) : NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                                .overlay(RoundedRectangle(cornerRadius: 20).stroke(selected ? NoopHTMLColor.blue.opacity(0.34) : NoopHTMLColor.border, lineWidth: 0.5))
+                            }
+                            .buttonStyle(NoopHTMLPressStyle())
+                        }
+                    }
+                }
+                .padding(.top, 8)
+            }
+        }
+    }
+
+    // MARK: Ready
+
+    var liveReady: some View {
+        let workout = navigation.selectedWorkout
+        let canvasWidth = UIScreen.main.bounds.width
+        let canvasHeight = UIScreen.main.bounds.height
+        let zone = workout.targetZone
+        return VStack(spacing: 0) {
+            HStack {
+                Button { navigation.reset(to: .session) } label: {
+                    ZStack {
+                        Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+                        NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
+                    }
+                    .frame(width: 34, height: 34)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                NoopSectionLabel("Ready")
+                Spacer()
+                Color.clear.frame(width: 34, height: 34)
+            }
+            .frame(width: max(0, canvasWidth - 36))
+            .padding(.top, 56)
+
+            VStack(spacing: 26) {
+                VStack(spacing: 9) {
+                    Act3WorkoutGlyph(workout: workout, size: 30, color: NoopHTMLColor.blue)
+                    Text(workout.act3.name)
+                        .font(NoopHTMLFont.outfit(31, weight: .light))
+                        .tracking(-0.9)
+                        .multilineTextAlignment(.center)
+                    Text("\(workout.act3.duration) minutes" + (band(workout).map { " \u{00B7} hold \($0.low)\u{2013}\($0.high) bpm" } ?? ""))
+                        .font(NoopHTMLFont.sans(13.5))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                        .monospacedDigit()
+                }
+
+                if zonesTrusted, let zone {
+                    VStack(spacing: 10) {
+                        GeometryReader { proxy in
+                            HStack(spacing: 3) {
+                                ForEach(0..<5, id: \.self) { index in
+                                    Rectangle()
+                                        .fill(index == zone - 1 ? NoopHTMLColor.blue : Color.white.opacity(0.07))
+                                        .frame(width: max(0, (proxy.size.width - 12) / 5))
+                                }
+                            }
+                        }
+                        .frame(height: 12)
+                        .clipShape(Capsule())
+                        HStack(spacing: 3) {
+                            ForEach(0..<5, id: \.self) { index in
+                                Text(Self.zoneNames[index])
+                                    .font(NoopHTMLFont.sans(9.5, weight: index == zone - 1 ? .semibold : .regular))
+                                    .foregroundStyle(index == zone - 1 ? NoopHTMLColor.inkSoft : NoopHTMLColor.faint)
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                        Text("Your target is the lit stretch: \(Self.zoneNames[zone - 1]) is where this session lives.")
+                            .font(NoopHTMLFont.sans(12.5))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                            .lineSpacing(3)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 4)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 11) {
+                    if zonesTrusted, zone != nil {
+                        liveReadyCheck(.bell, "One buzz if you drift out of the zone, and one when you come back. Nothing else will interrupt you.")
+                    }
+                    liveReadyCheck(.check, "No ring to close, no medal at the end. The session is done when the minutes are done.")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 15)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+            }
+            .frame(maxHeight: .infinity)
+            .frame(width: max(0, canvasWidth - 48))
+            .padding(.top, 20)
+
+            VStack(spacing: 8) {
+                Act3ActionButton("Start", height: 60, radius: 20, fontSize: 16, primary: true) {
+                    guard !refuseIfRunning() else { return }
+                    model.startWorkout(sport: workout.catalogSport, targetZone: zonesTrusted ? zone : nil)
+                    navigation.beginSession(at: model.activeWorkout?.start ?? Date())
+                    navigation.push(.live)
+                }
+                .shadow(color: NoopHTMLColor.blue.opacity(0.3), radius: 13, y: 8)
+                Button("Not now") { navigation.reset(to: .session) }
+                    .font(NoopHTMLFont.sans(13))
+                    .foregroundStyle(Color(hex: 0x7F8A85))
+                    .frame(height: 44)
+            }
+            .frame(width: max(0, canvasWidth - 48))
+            .padding(.top, 18)
+            .padding(.bottom, 26)
+        }
+        .frame(width: canvasWidth, height: canvasHeight)
+        .background(NoopHTMLColor.canvas)
+    }
+
+    /// Raises the designer's refusal when a session of either kind is running; true when it refused.
+    func refuseIfRunning() -> Bool {
+        guard let running = NoopRunningSession.current(app: model, lift: liftSession, navigation: navigation) else {
+            return false
+        }
+        withAnimation(NoopMotion.swap) { refusal = running }
+        return true
+    }
+
+    /// Opens a stored session: a lift recorded in Act 10 opens its lift detail, anything else the
+    /// session detail.
+    func openStored(_ row: WorkoutRow) {
+        if row.sport == LiftingImporter.sport && row.source == "manual" {
+            navigation.selectedLiftSessionID = nil
+            navigation.liftDetailStartTs = row.startTs
+            navigation.liftDetailReturnRoute = navigation.route
+            navigation.push(.liftDetail)
+            return
+        }
+        navigation.detailSession = nil
+        navigation.historyWorkout = nil
+        navigation.liveDetailRow = row
+        navigation.push(.detail)
+    }
+
+    func liveReadyCheck(_ glyph: NoopCanonicalGlyphName, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            NoopCanonicalGlyph(name: glyph, size: 17, color: NoopHTMLColor.blue).frame(width: 18)
+            Text(text)
+                .font(NoopHTMLFont.sans(12.5))
+                .foregroundStyle(Color(hex: 0xB7C3C9))
+                .act3LineBox(fontSize: 12.5, ratio: 1.5)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: Live
+
+    @ViewBuilder var liveSession: some View {
+        if let active = model.activeWorkout {
+            // The durable recorder owns this face after a relaunch. The selected HTML template may
+            // still be its default, or another workout chosen while the original kept running.
+            let matched = NoopWorkout.matchingRecordedSport(active.sport)
+            let template = (matched ?? .steadyRide).act3
+            let target = active.targetZone
+            let zones = profile.hrZoneSet.zones
+            let band: (low: Int, high: Int)? = {
+                guard zonesTrusted, let target, zones.indices.contains(target - 1) else { return nil }
+                let zone = zones[target - 1]
+                return (Int(zone.lower.rounded()), Int(zone.upper.rounded()))
+            }()
+            let shown = Act3WorkoutModel(
+                name: active.sport, symbol: template.symbol, duration: template.duration,
+                low: band?.low ?? 0, high: band?.high ?? 999, load: 0, fit: "", isInsideToday: true,
+                reason: "", note: "", isIntervals: false,
+                primaryZone: target.map(NoopZoneSource.name) ?? "", detail: template.detail)
+            TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let elapsed = Int(active.elapsed(at: timeline.date))
+            let bpm = live.heartRate
+            let samples = active.samples
+            let inZone: String = {
+                guard let band, !samples.isEmpty else { return "\u{2014}" }
+                let inside = samples.filter { $0.bpm >= band.low && $0.bpm < band.high }.count
+                return "\(Int((Double(inside) / Double(samples.count) * 100).rounded()))%"
+            }()
+            let zoneNumber = bpm.map { profile.hrZoneSet.zoneNumber(forBPM: Double($0)) } ?? 0
+            Act3LiveScreen(
+                model: shown,
+                elapsed: elapsed,
+                bpm: bpm ?? 0,
+                paused: active.isPaused,
+                pauseAction: {
+                    model.toggleWorkoutPause()
+                    navigation.toggleSessionPause(at: timeline.date)
+                },
+                endAction: {
+                    model.endWorkout()
+                    let saved = model.lastWorkout
+                    navigation.endRecordedSession(workout: matched, row: saved)
+                },
+                measured: true,
+                hasPulse: bpm != nil,
+                stats: ["\u{2014}", active.avgHr > 0 ? "\(active.avgHr)" : "\u{2014}", inZone],
+                zoneLabel: bpm == nil ? "" : (zonesTrusted && zoneNumber > 0 ? Self.zoneNames[zoneNumber - 1] : ""),
+                hasBand: band != nil
+            )
+            }
+        } else {
+            NoopScreen(topInset: 58) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Act3BackHeader(label: "Session") { navigation.reset(to: .session) }
+                    Text("No session is running")
+                        .font(NoopHTMLFont.outfit(27, weight: .light))
+                    Text("Choose a session when you are ready. Nothing has been recorded here.")
+                        .font(NoopHTMLFont.sans(13))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                }
+            }
+        }
+    }
+
+    // MARK: Detail
+
+    func liveDetail(_ effort: NoopEffortRecord) -> some View {
+        let row = navigation.liveDetailRow ?? effort.workouts.first
+        return NoopScreen(topInset: 56) {
+            VStack(spacing: 0) {
+                Act3BackHeader(label: detailBackLabel) {
+                    navigation.canGoBack ? navigation.back() : navigation.dismissFinishedSessionDetail()
+                }
+                .padding(.horizontal, -2)
+
+                if let row {
+                    VStack(spacing: 14) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(row.sport)
+                                .font(NoopHTMLFont.outfit(27, weight: .light))
+                                .tracking(-0.756)
+                            Text(Self.detailLine(row))
+                                .font(NoopHTMLFont.sans(13))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                                .monospacedDigit()
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 9), GridItem(.flexible())], spacing: 9) {
+                            detailTile(Self.clock(row), unit: "min", label: "moving time")
+                            if let avg = row.avgHr { detailTile("\(avg)", unit: "bpm", label: "average pulse") }
+                            if let max = row.maxHr { detailTile("\(max)", unit: "bpm", label: "highest", warm: true) }
+                        }
+
+                        Act3LiveDetailPulse(row: row)
+
+                        Text("No score, no grade, no medal. A session is a thing you did and a cost you paid, and both are written down plainly.")
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(NoopHTMLColor.faint)
+                            .act3LineBox(fontSize: 11.5, ratio: 1.6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 2)
+                    }
+                    .padding(.top, 9)
+                }
+            }
+        }
+    }
+
+    // MARK: Across
+
+    func liveAcross(_ effort: NoopEffortRecord) -> some View {
+        let history = effort.historyDays()
+        let range = acrossRange
+        let days = range == .all ? history : min(range.windowDays, max(history, 1))
+        let sessions = effort.sessions(inLast: max(1, days))
+        let snapshot = Self.liveSnapshot(sessions: sessions, days: days, range: range, history: history,
+                                         allCount: effort.workouts.count)
+        return NoopScreen(topInset: 56) {
+            VStack(spacing: 0) {
+                Act3BackHeader(label: isNightWorker ? "This shift's session" : "Today's session") { back(to: .session) }
+                    .padding(.horizontal, -2)
+                    .padding(.bottom, 2)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Every session")
+                        .font(NoopHTMLFont.outfit(25))
+                        .tracking(-0.625)
+                    Text("How much you actually did, over a window you choose \u{2014} the same figures one session is priced in, added up.")
+                        .font(NoopHTMLFont.sans(13))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                        .act3LineBox(fontSize: 13, ratio: 1.55)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 8)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 0) {
+                        ForEach(Act3AcrossRange.allCases) { option in
+                            let available = option == .all || option.windowDays <= max(history, 1)
+                            Button { if available { acrossRange = option } } label: {
+                                Text(option.label)
+                                    .font(NoopHTMLFont.sans(12, weight: .semibold))
+                                    .foregroundStyle(range == option ? NoopHTMLColor.blueLight
+                                                     : available ? NoopHTMLColor.copy : NoopHTMLColor.ink.opacity(0.34))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(range == option ? NoopHTMLColor.blue.opacity(0.20) : Color.clear,
+                                                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!available)
+                        }
+                    }
+                    .padding(3)
+                    .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(Color.white.opacity(0.07), lineWidth: 0.5))
+                    HStack(alignment: .firstTextBaseline, spacing: 7) {
+                        Text("\(snapshot.days)")
+                            .font(NoopHTMLFont.outfit(17, weight: .light))
+                            .monospacedDigit()
+                        Text(snapshot.countNote)
+                            .font(NoopHTMLFont.sans(12))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
+                            .act3LineBox(fontSize: 12, ratio: 1.5)
+                    }
+                    .padding(.horizontal, 3)
+                }
+                .padding(.top, 14)
+
+                VStack(spacing: 9) {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 9), GridItem(.flexible())], spacing: 9) {
+                        ForEach(snapshot.tiles) { tile in acrossTile(tile) }
+                    }
+                    if !snapshot.costs.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 10) {
+                                NoopCanonicalGlyph(name: .moon, size: 18, color: NoopHTMLColor.night)
+                                Text("What it cost you").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            }
+                            ForEach(snapshot.costs) { cost in
+                                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                    Text(cost.label).font(NoopHTMLFont.sans(12.5)).foregroundStyle(Color(hex: 0xB7C3C9))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Text(cost.value).font(NoopHTMLFont.sans(13, weight: .semibold)).monospacedDigit().fixedSize()
+                                }
+                            }
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(NoopHTMLColor.night.opacity(0.08), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(NoopHTMLColor.night.opacity(0.20), lineWidth: 0.5))
+                    }
+                    if !snapshot.sports.isEmpty { acrossSportsCard(snapshot) }
+                    if !snapshot.rows.isEmpty { acrossSessionsCard(snapshot) }
+                    Text("Every comparison here is you against you. No age-group ranking, no weekly grade, and no calorie total \u{2014} Noop does not keep one, and a training month is not a number out of ten.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .act3LineBox(fontSize: 11.5, ratio: 1.6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 2)
+                }
+                .padding(.top, 14)
+            }
+        }
+    }
+
+    static func liveSnapshot(sessions: [WorkoutRow], days: Int, range: Act3AcrossRange, history: Int,
+                             allCount: Int) -> Act3AcrossSnapshot {
+        let minutes = sessions.reduce(0) { $0 + $1.noopMinutes }
+        let load = sessions.compactMap(\.strain).reduce(0, +)
+        let distances = sessions.compactMap(\.distanceM)
+        let moving = minutes < 600 ? ("\(minutes)", "min") : ("\(Int((Double(minutes) / 60).rounded()))", "hours")
+        var tiles = [
+            Act3AcrossTile(value: "\(sessions.count)", unit: sessions.count == 1 ? "session" : "sessions", label: "you actually did"),
+            Act3AcrossTile(value: moving.0, unit: moving.1, label: "moving, with stopped time taken off"),
+            Act3AcrossTile(value: "\(Int(load.rounded()))", unit: "load", label: "the unit one session is priced in")
+        ]
+        if !distances.isEmpty {
+            tiles.append(Act3AcrossTile(value: "\(Int((distances.reduce(0, +) / 1000).rounded()))", unit: "km",
+                                        label: "ridden, walked and swum"))
+        }
+        let calendar = Calendar.current
+        let trainedDays = Set(sessions.map { calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.startTs))) }).count
+        let costs = days > 0 ? [Act3AcrossCost(label: "Days you did not train", value: "\(max(0, days - trainedDays)) of \(days)")] : []
+
+        struct Totals { var count = 0; var minutes = 0; var load = 0.0 }
+        var totals: [String: Totals] = [:]
+        for session in sessions {
+            var t = totals[session.sport] ?? Totals()
+            t.count += 1; t.minutes += session.noopMinutes; t.load += session.strain ?? 0
+            totals[session.sport] = t
+        }
+        let ordered = totals.sorted { $0.value.minutes == $1.value.minutes ? $0.key < $1.key : $0.value.minutes > $1.value.minutes }
+        let top = max(1, ordered.first?.value.minutes ?? 1)
+        let sports = ordered.map { name, t in
+            Act3AcrossSportSummary(
+                kind: Act3SportKey(name: name, glyph: glyph(for: name)),
+                timeLabel: timeLabel(t.minutes),
+                share: CGFloat(t.minutes) / CGFloat(top),
+                meta: "\(t.count) \(t.count == 1 ? "session" : "sessions") \u{00B7} \(Int((Double(t.minutes) / Double(t.count)).rounded())) min each \u{00B7} load \(Int((t.load / Double(t.count)).rounded())) a time")
+        }
+        let shown = sessions.prefix(8).map { row in
+            Act3AcrossSession(daysAgo: 0, sport: Act3SportKey(name: row.sport, glyph: glyph(for: row.sport)),
+                              duration: row.noopMinutes, load: Int((row.strain ?? 0).rounded()),
+                              distance: row.distanceM.map { ($0 / 100).rounded() / 10 },
+                              source: row.noopSourceLabel == "Health" ? .health : row.noopSourceLabel == "imported" ? .imported : .strap,
+                              row: row, dayText: shortDay(row.startTs))
+        }
+        let countNote: String
+        if sessions.count < 3 {
+            countNote = "days, with \(sessions.count) \(sessions.count == 1 ? "session" : "sessions") in them \u{2014} too few to average anything on, and Noop will not try."
+        } else if range == .all || days >= history {
+            countNote = "days on record. There is no more history than this."
+        } else {
+            countNote = "days of your record, and every session inside them"
+        }
+        return Act3AcrossSnapshot(
+            days: days, countNote: countNote, tiles: tiles, costs: costs, sports: sports,
+            topSportNote: "",
+            rows: Array(shown),
+            rowsNote: shown.count < sessions.count ? "newest \(shown.count) of \(sessions.count)" : "all \(sessions.count)",
+            totalCount: allCount)
+    }
+
+    static func timeLabel(_ minutes: Int) -> String {
+        minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h " + String(format: "%02dm", minutes % 60)
+    }
+
+    static func glyph(for sport: String) -> NoopCanonicalGlyphName {
+        let s = sport.lowercased()
+        if s.contains("cycl") || s.contains("ride") || s.contains("bike") || s.contains("spin") { return .bike }
+        if s.contains("walk") || s.contains("hik") { return .walk }
+        if s.contains("swim") || s.contains("row") || s.contains("water") { return .wave }
+        if s.contains("strength") || s.contains("weight") || s.contains("lift") || s.contains("body") { return .weight }
+        if s.contains("hiit") || s.contains("interval") { return .bolt }
+        return .spark
+    }
+
+    static let weekdayFormatter: DateFormatter = {
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("EEEE"); return f
+    }()
+
+    static func dayWord(_ ts: Int) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(ts))
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "Today" }
+        if calendar.isDateInYesterday(date) { return "Yesterday" }
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("d MMM")
+        return f.string(from: date)
+    }
+
+    /// The across list's day column: "Yest.", a weekday inside the week, else "12 Sep".
+    static func shortDay(_ ts: Int) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(ts))
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "Today" }
+        if calendar.isDateInYesterday(date) { return "Yest." }
+        let f = DateFormatter()
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: Date())).day ?? 99
+        f.setLocalizedDateFormatFromTemplate(days < 7 ? "EEE" : "d MMM")
+        return f.string(from: date)
+    }
+
+    /// "42 min · load 48 · 14.8 km".
+    static func meta(_ row: WorkoutRow) -> String {
+        var parts = ["\(row.noopMinutes) min"]
+        if let strain = row.strain { parts.append("load \(Int(strain.rounded()))") }
+        if let d = row.distanceM, d > 0 { parts.append(String(format: "%.1f km", d / 1000)) }
+        return parts.joined(separator: " \u{00B7} ")
+    }
+
+    /// "Yesterday, 17:04 · 42 min · 14.8 km".
+    static func detailLine(_ row: WorkoutRow) -> String {
+        let start = Date(timeIntervalSince1970: TimeInterval(row.startTs))
+        var parts = ["\(dayWord(row.startTs)), \(AppClock.hourMinuteFormatter().string(from: start))", "\(row.noopMinutes) min"]
+        if let d = row.distanceM, d > 0 { parts.append(String(format: "%.1f km", d / 1000)) }
+        return parts.joined(separator: " \u{00B7} ")
+    }
+
+    /// "42:10".
+    static func clock(_ row: WorkoutRow) -> String {
+        let seconds = Int((row.durationS ?? Double(row.endTs - row.startTs)).rounded())
+        return "\(seconds / 60):" + String(format: "%02d", seconds % 60)
+    }
+}
+
+/// The detail's pulse card for a stored session: its own heart rate across its own span. There is no
+/// asked zone on a stored row, so no band is shaded and nothing is read into the line.
+private struct Act3LiveDetailPulse: View {
+    let row: WorkoutRow
+    @EnvironmentObject private var repo: Repository
+    @State private var values: [Double] = []
+
+    var body: some View {
+        Group {
+            if values.count >= 2 {
+                VStack(alignment: .leading, spacing: 11) {
+                    NoopSectionLabel("Pulse against the zone")
+                    Act3PulseChart(values: values, low: 0, high: 0)
+                        .frame(height: 104)
+                    HStack {
+                        ForEach(Array(axis.enumerated()), id: \.offset) { index, label in
+                            Text(label)
+                            if index < axis.count - 1 { Spacer() }
+                        }
+                    }
+                    .font(NoopHTMLFont.sans(10.5))
+                    .foregroundStyle(NoopHTMLColor.faint)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+            }
+        }
+        .task(id: row.startTs) {
+            let samples = await repo.hrSamples(from: row.startTs, to: row.endTs)
+            guard samples.count >= 2 else { values = []; return }
+            let n = min(24, samples.count)
+            values = (0..<n).map { i in
+                let lo = i * samples.count / n, hi = max(lo + 1, (i + 1) * samples.count / n)
+                let slice = samples[lo..<hi]
+                return min(150, max(88, Double(slice.map(\.bpm).reduce(0, +)) / Double(slice.count)))
+            }
+        }
+    }
+
+    private var axis: [String] {
+        let fmt = AppClock.hourMinuteFormatter()
+        let span = row.endTs - row.startTs
+        return (0..<4).map { fmt.string(from: Date(timeIntervalSince1970: TimeInterval(row.startTs + span * $0 / 3))) }
+    }
 }

@@ -71,8 +71,9 @@ public enum NoopPalette {
     public static let textTertiary = srgb(139, 149, 143)     // #8B958F
     public static let textQuiet = srgb(127, 138, 133)        // #7F8A85
     public static let textFaint = srgb(108, 117, 112)        // #6C7570
-    /// Axis labels and other type that should be present but never read first.
-    public static let textDim = srgb(87, 96, 92)             // #57605C
+    /// Graphical row chevrons only. At 3.0:1 on the base surface this value is valid for
+    /// non-text UI, but it must never be used for type; quiet type uses `textQuiet`.
+    public static let chevronDim = srgb(87, 96, 92)          // #57605C
 
     /// Ink for type sitting ON an accent TINT. Ink on a full-strength accent fill is
     /// `NoopSpecTokens.onAura` (#04121A), which is darker on purpose.

@@ -303,7 +303,7 @@ private struct StressTimeAxis: View {
 }
 
 struct StressWidget: Widget {
-    static let kind = "StressWidget"
+    static let kind = NoopWidgetFamilyRegistry.family(.stress).configurationKind
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: Self.kind, provider: StressProvider()) { entry in
@@ -316,7 +316,7 @@ struct StressWidget: Widget {
                     .background(StrandPalette.surfaceBase)
             }
         }
-        .configurationDisplayName("Stress")
+        .configurationDisplayName(NoopWidgetFamilyRegistry.family(.stress).title)
         .description("Today's stress as an hour-by-hour curve.")
         .supportedFamilies([.systemMedium])
     }

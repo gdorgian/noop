@@ -334,7 +334,7 @@ public struct NoopStrapBatteryChip: View {
                 }
                 Text(pct.map { "\(Int(($0 * 100).rounded()))%" } ?? "—")
                     .noopText(NoopSpecType.Role.chipValue)
-                    .foregroundStyle(pct == nil ? NoopPalette.textDim : (hue ?? NoopSpecTokens.textBody))
+                    .foregroundStyle(pct == nil ? NoopPalette.textQuiet : (hue ?? NoopSpecTokens.textBody))
             }
             .padding(.horizontal, 11)
             .frame(height: 30)

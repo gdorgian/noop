@@ -241,7 +241,7 @@ private struct HrTimeAxis: View {
 }
 
 struct HeartRateWidget: Widget {
-    static let kind = "HeartRateWidget"
+    static let kind = NoopWidgetFamilyRegistry.family(.liveHeartRate).configurationKind
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: Self.kind, provider: HeartRateProvider()) { entry in
@@ -254,7 +254,7 @@ struct HeartRateWidget: Widget {
                     .background(StrandPalette.surfaceBase)
             }
         }
-        .configurationDisplayName("Heart Rate")
+        .configurationDisplayName(NoopWidgetFamilyRegistry.family(.liveHeartRate).title)
         .description("Live heart rate with the last three hours as a trace.")
         .supportedFamilies([.systemMedium])
     }

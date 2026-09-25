@@ -24,7 +24,28 @@
 	<dict>
 		<key>CFBundleAlternateIcons</key>
 		<dict>
+			<key>AppIcon-Titanium</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array/>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>AppIcon-Breathe</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array/>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
 			<key>AppIcon-Navy</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array/>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>AppIcon-Orb</key>
 			<dict>
 				<key>CFBundleIconFiles</key>
 				<array/>

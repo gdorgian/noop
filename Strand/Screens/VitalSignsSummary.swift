@@ -35,6 +35,10 @@ struct BodyVitalReading: Identifiable {
     /// knowing it runs high for you. Pure formatted data (a number and a unit), never a sentence.
     /// Defaulted so existing call sites keep compiling unchanged.
     var secondary: String? = nil
+    /// The personal baseline the value was banded against — its centre and spread — when the vital has
+    /// one (SpO₂ never does). Lets a surface draw the wearer's own zone instead of re-deriving it.
+    /// Defaulted so existing call sites keep compiling unchanged.
+    var personal: BaselineState? = nil
 
     var id: String { key }
 
@@ -304,7 +308,8 @@ enum BodyVitalSigns {
                 day: respRow?.day,
                 source: respRow?.source,
                 missingCaption: String(localized: "No respiratory-rate value"),
-                sparkline: trail(respPoints)
+                sparkline: trail(respPoints),
+                personal: Baselines.foldHistory(history(before: respRow?.day, respPoints), cfg: Baselines.respCfg)
             ),
             BodyVitalReading(
                 key: "spo2",
@@ -382,7 +387,8 @@ enum BodyVitalSigns {
                 day: rhrRow?.day,
                 source: rhrRow?.source,
                 missingCaption: String(localized: "No resting HR value"),
-                sparkline: trail(rhrPoints)
+                sparkline: trail(rhrPoints),
+                personal: Baselines.foldHistory(history(before: rhrRow?.day, rhrPoints), cfg: Baselines.restingHRCfg)
             ),
             BodyVitalReading(
                 key: "hrv",
@@ -401,7 +407,8 @@ enum BodyVitalSigns {
                 source: hrvRow?.source,
                 missingCaption: String(localized: "No HRV value"),
                 sparkline: trail(hrvPoints),
-                caveat: hrvCaveat   // #1118
+                caveat: hrvCaveat,   // #1118
+                personal: Baselines.foldHistory(history(before: hrvRow?.day, hrvPoints), cfg: Baselines.hrvCfg)
             ),
             BodyVitalReading(
                 key: "skin",
@@ -421,7 +428,12 @@ enum BodyVitalSigns {
                 sparkline: trail(skinSeries.filter { VitalBands.isAbsoluteSkinTemp($0.value) == skinIsAbsolute }),
                 // #1636: the deviation this absolute was derived from, shown beneath it. Only when the
                 // headline IS the absolute — on a deviation-led tile it would just repeat the value.
-                secondary: skinSecondary
+                secondary: skinSecondary,
+                personal: skin.map { value in
+                    Baselines.foldHistory(
+                        VitalBands.skinTempHistory(matching: value, in: history(before: skinRow?.day, skinSeries)),
+                        cfg: skinIsAbsolute ? Baselines.metricCfg["skin_temp"]! : VitalBands.skinTempDeviationCfg)
+                }
             ),
         ]
     }

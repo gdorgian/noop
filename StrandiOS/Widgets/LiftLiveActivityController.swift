@@ -51,10 +51,12 @@ final class LiftLiveActivityController {
         // Everything a person would notice, EXCLUDING the clocks (which tick client-side) and the
         // heart rate (handled by its own interval below).
         let signature = [
-            state.isResting ? "rest" : "work", state.exercise, state.status,
+            state.isPaused ? "paused" : state.isResting ? "rest" : "work",
+            state.exercise, state.status,
             state.detail ?? "", state.progress,
             "\(state.stageStartedAt.timeIntervalSince1970)",
             "\(state.restEndsAt?.timeIntervalSince1970 ?? 0)",
+            "\(state.heldClockSeconds ?? -1)",
         ].joined(separator: "|")
 
         let contentChanged = signature != lastSignature

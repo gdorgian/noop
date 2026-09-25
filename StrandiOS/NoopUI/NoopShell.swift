@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import WhoopStore
+import StrandDesign
 
 /// The canonical HTML contains a complete, deterministic example person so every state can be
 /// reviewed in Simulator. Those values are permitted only in an explicitly seeded Debug process.
@@ -17,8 +18,10 @@ enum NoopContentPolicy {
 
 struct NoopAppShell: View {
     @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var liftSession: LiftSessionController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var labDraft = NoopLabReviewDraft()
+    @StateObject private var liftFlow = NoopLiftFlowModel()
     @State private var dragTranslation: CGSize = .zero
 
     var body: some View {
@@ -48,8 +51,17 @@ struct NoopAppShell: View {
                         // Change 2. Directly above the tab bar, on every screen, while a session runs
                         // or is paused. Not dismissible: a running session the app has quietly
                         // forgotten is worse than a bar that will not go away.
-                        if navigation.sessionRunning {
-                            NoopLiveBar(navigation: navigation)
+                        if liftSession.isActive {
+                            NoopLiftLiveBar(navigation: navigation)
+                                .frame(width: max(0, viewportWidth - 28))
+                                .transition(.asymmetric(
+                                    insertion: reduceMotion
+                                        ? .opacity
+                                        : .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .identity
+                                ))
+                        } else if navigation.sessionRunning {
+                            NoopCardioLiveBar(navigation: navigation)
                                 .frame(width: max(0, viewportWidth - 28))
                                 .transition(.asymmetric(
                                     insertion: reduceMotion
@@ -82,14 +94,16 @@ struct NoopAppShell: View {
             .contentShape(Rectangle())
             .simultaneousGesture(backGesture)
             // Content ends above the bar: its 46 pt plus the 6 pt gap.
-            .environment(\.noopLiveBarInset, navigation.sessionRunning && !navigation.route.hidesBottomBar ? 52 : 0)
+            .environment(\.noopLiveBarInset,
+                         (liftSession.isActive || navigation.sessionRunning)
+                            && !navigation.route.hidesBottomBar ? 52 : 0)
         }
         .frame(width: UIScreen.main.bounds.width)
         // Every act uses the canonical 402 x 874 canvas behind both system bars. Their
         // own HTML paddings place content at y=58/56 and the nav 26pt from the true bottom.
         .ignoresSafeArea(
             .container,
-            edges: navigation.route.act == .night || navigation.route.act == .day || navigation.route.act == .effort || navigation.route.act == .picture || navigation.route.act == .plumbing || navigation.route.act == .ages || navigation.route.act == .svea || navigation.route.act == .goals || navigation.route.act == .instrument ? .all : []
+            edges: navigation.route.act == .night || navigation.route.act == .day || navigation.route.act == .effort || navigation.route.act == .picture || navigation.route.act == .plumbing || navigation.route.act == .ages || navigation.route.act == .svea || navigation.route.act == .goals || navigation.route.act == .instrument || navigation.route.act == .lift ? .all : []
         )
         .onChange(of: navigation.route) { oldRoute, newRoute in
             if oldRoute == .review, newRoute != .review {
@@ -127,81 +141,22 @@ struct NoopAppShell: View {
         case .svea: NoopAct7Screens(navigation: navigation)
         case .goals: NoopAct8Screens(navigation: navigation, labDraft: labDraft)
         case .instrument: NoopAct9Screens(navigation: navigation, data: .prototype)
-        case .lift: NoopAct10Screens(navigation: navigation)
+        case .lift: NoopAct10Screens(navigation: navigation, flow: liftFlow)
         }
     }
 
-    private var ambientColor: Color {
-        switch navigation.route.act {
-        case .night: NoopHTMLColor.night
-        case .picture: NoopHTMLColor.green
-        // Act 6 keeps the same green ambient on every child screen. The Health branch changes
-        // only the selected navigation pill to warm; the canonical HTML never recolours the aura.
-        case .ages: NoopHTMLColor.green
-        case .plumbing:
-            switch navigation.route {
-            case .strap, .devices, .pair: NoopHTMLColor.blue
-            case .lab: NoopHTMLColor.night
-            default: NoopHTMLColor.blush
-            }
-        case .svea: NoopHTMLColor.night
-        case .goals: NoopHTMLColor.warm
-        case .instrument: NoopHTMLColor.night
-        case .effort: usesWarmEffortAmbient ? NoopHTMLColor.warm : NoopHTMLColor.blue
-        // PROVISIONAL, and the same value the default would have given. Stated explicitly so the
-        // act's ambient is a named decision design can change rather than an inherited accident.
-        case .lift: NoopHTMLColor.blue
-        default: NoopHTMLColor.blue
-        }
-    }
+    private var ambientColor: Color { NoopAmbient.color(for: navigation.route, warmEffort: usesWarmEffortAmbient) }
+
+    private var ambientOpacity: Double { NoopAmbient.opacity(for: navigation.route, warmEffort: usesWarmEffortAmbient) }
 
     private var usesWarmEffortAmbient: Bool {
         !navigation.workoutChosenByUser || navigation.selectedWorkout == .intervals || navigation.selectedWorkout == .strength
     }
 
-    private var ambientOpacity: Double {
-        switch navigation.route.act {
-        case .picture, .ages, .goals: 0.15
-        case .instrument: 0.16
-        case .svea: 0.16
-        case .effort: usesWarmEffortAmbient ? 0.15 : 0.17
-        case .plumbing:
-            switch navigation.route {
-            case .strap, .devices, .pair: 0.14
-            default: 0.13
-            }
-        default: 0.17
-        }
-    }
-
     @ViewBuilder
     private var ambientGlow: some View {
         if navigation.route.act == .night {
-            TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
-                let elapsed = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 9)
-                let wave = (1 - cos(elapsed / 9 * 2 * .pi)) / 2
-                VStack {
-                    Ellipse()
-                        .fill(
-                            RadialGradient(
-                                stops: [
-                                    .init(color: NoopHTMLColor.night.opacity(0.20), location: 0),
-                                    .init(color: NoopHTMLColor.night.opacity(0), location: 0.70)
-                                ],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 312
-                            )
-                        )
-                        .frame(width: 470, height: 430)
-                        .blur(radius: 18)
-                        .opacity(reduceMotion ? 0.72 : 0.55 + wave * 0.35)
-                        .offset(y: -170)
-                    Spacer()
-                }
-            }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+            NoopNightAmbientGlow()
         } else {
             VStack {
                 Ellipse()
@@ -257,18 +212,24 @@ struct NoopAppShell: View {
 
 /// Change 2 · the live bar. Left the workout, centre the ticking clock, right the pulse — or
 /// `Paused` where the pulse was. Tapping it returns to the session's own screen.
-private struct NoopLiveBar: View {
+private struct NoopCardioLiveBar: View {
     @ObservedObject var navigation: NoopNavigation
+    /// Production: the recorder's clock and the strap's pulse instead of the fixture's.
+    var measured = false
+    @EnvironmentObject private var app: AppModel
+    @EnvironmentObject private var live: LiveState
 
     private var model: Act3WorkoutModel { navigation.selectedWorkout.act3 }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let elapsed = navigation.sessionElapsed(at: timeline.date)
-            let shown = navigation.sessionElapsedDisplay(at: timeline.date)
-            Button { navigation.push(navigation.liveRoute) } label: {
+            let shown = measured
+                ? Int(app.activeWorkout?.elapsed(at: timeline.date) ?? 0)
+                : navigation.sessionElapsedDisplay(at: timeline.date)
+            Button { navigation.push(measured ? .live : navigation.liveRoute) } label: {
                 HStack(spacing: 12) {
-                    Text(model.name)
+                    Text(measured ? (app.activeWorkout?.sport ?? "Session") : model.name)
                         .font(NoopHTMLFont.sans(13, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.ink)
                         .lineLimit(1)
@@ -277,13 +238,14 @@ private struct NoopLiveBar: View {
                         .monospacedDigit()
                         .foregroundStyle(NoopHTMLColor.blueLight)
                     Spacer(minLength: 4)
-                    if navigation.sessionPaused {
+                    if measured ? (app.activeWorkout?.isPaused ?? false) : navigation.sessionPaused {
                         Text("Paused")
                             .font(NoopHTMLFont.sans(12, weight: .semibold))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                     } else {
                         HStack(alignment: .firstTextBaseline, spacing: 3) {
-                            Text("\(Self.bpm(model: model, elapsed: elapsed))")
+                            Text(measured ? (live.heartRate.map(String.init) ?? "\u{2014}")
+                                          : "\(Self.bpm(model: model, elapsed: elapsed))")
                                 .font(NoopHTMLFont.sans(13, weight: .semibold))
                                 .monospacedDigit()
                                 .foregroundStyle(NoopHTMLColor.ink)
@@ -314,6 +276,226 @@ private struct NoopLiveBar: View {
     }
 }
 
+/// Act 10's one in-app projection of the root-owned Lift session. It has no controls and no local
+/// clock. Tapping it returns to `lift-live`; every displayed value comes from the controller that
+/// also drives the Lock Screen and Dynamic Island.
+private struct NoopLiftLiveBar: View {
+    @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var session: LiftSessionController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
+
+    private var unitSystem: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0,
+                                paused: reduceMotion || session.isPaused)) { timeline in
+            if let presentation = session.presentation(system: unitSystem) {
+                Button {
+                    session.isPresented = true
+                    navigation.reset(to: .liftLive)
+                } label: {
+                    HStack(spacing: 11) {
+                        Circle()
+                            .fill(dotColor(presentation))
+                            .frame(width: 8, height: 8)
+                            .opacity(dotOpacity(at: timeline.date, presentation: presentation))
+
+                        Text(presentation.exercise)
+                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            .foregroundStyle(presentation.isPaused
+                                ? NoopHTMLColor.inkSoft : NoopHTMLColor.ink)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+
+                        Spacer(minLength: 0)
+
+                        Text(clock(presentation))
+                            .font(clockFont(presentation))
+                            .tracking(presentation.isPaused || presentation.isReady ? 0 : -0.34)
+                            .monospacedDigit()
+                            .foregroundStyle(clockColor(presentation))
+                            .lineLimit(1)
+                            .fixedSize()
+
+                        Text(setLabel(presentation))
+                            .font(NoopHTMLFont.sans(12, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(presentation.isPaused
+                                ? Color(hex: 0x7F8A85) : NoopHTMLColor.muted)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: 46)
+                    .frame(maxWidth: .infinity)
+                    .background {
+                        ZStack {
+                            NoopGlass(radius: 20)
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(fillColor(presentation))
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(borderColor(presentation), lineWidth: 0.5)
+                    }
+                    .shadow(color: Color.black.opacity(0.45), radius: 13, y: 8)
+                    .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                .accessibilityLabel("Open the running lift session")
+            }
+        }
+        .frame(height: 46)
+    }
+
+    private func fillColor(_ p: LiftSessionController.Presentation) -> Color {
+        if p.isPaused { return Color.white.opacity(0.06) }
+        if p.isResting && !p.isReady { return Color.white.opacity(0.07) }
+        return NoopHTMLColor.blue.opacity(0.14)
+    }
+
+    private func borderColor(_ p: LiftSessionController.Presentation) -> Color {
+        if p.isPaused { return Color.white.opacity(0.16) }
+        if p.isResting && !p.isReady { return Color.white.opacity(0.17) }
+        return NoopHTMLColor.blue.opacity(0.40)
+    }
+
+    private func dotColor(_ p: LiftSessionController.Presentation) -> Color {
+        if p.isPaused { return Color(hex: 0x7F8A85) }
+        if p.isResting && !p.isReady { return NoopHTMLColor.blueLight }
+        return NoopHTMLColor.blue
+    }
+
+    private func clockColor(_ p: LiftSessionController.Presentation) -> Color {
+        if p.isPaused { return Color(hex: 0x7F8A85) }
+        if p.isResting || p.isReady { return NoopHTMLColor.blueLight }
+        return NoopHTMLColor.ink
+    }
+
+    private func clockFont(_ p: LiftSessionController.Presentation) -> Font {
+        if p.isPaused || p.isReady { return NoopHTMLFont.sans(13, weight: .semibold) }
+        return NoopHTMLFont.outfit(17, weight: .regular)
+    }
+
+    private func dotOpacity(at date: Date,
+                            presentation: LiftSessionController.Presentation) -> Double {
+        guard !reduceMotion, !presentation.isPaused else { return 1 }
+        let phase = date.timeIntervalSinceReferenceDate
+            .truncatingRemainder(dividingBy: 1.1) / 1.1
+        return 0.45 + 0.55 * (0.5 - 0.5 * cos(phase * 2 * .pi))
+    }
+
+    private func clock(_ p: LiftSessionController.Presentation) -> String {
+        if p.isPaused { return "Paused" }
+        if p.isReady { return "Ready" }
+        if p.isResting, let remaining = session.engine?.restRemaining(now: session.now) {
+            return format(remaining)
+        }
+        guard let engine = session.engine else { return "0:00" }
+        return format(max(0, session.now - engine.stageStartedAt))
+    }
+
+    private func setLabel(_ p: LiftSessionController.Presentation) -> String {
+        guard let engine = session.engine else { return "" }
+        if p.isResting && !p.isReady { return "rest" }
+
+        let slot: LiftSlot?
+        if p.isReady, let current = engine.currentSlot {
+            slot = engine.slotAfter(current)
+        } else {
+            slot = engine.currentSlot ?? engine.nextPendingSlot
+        }
+        guard let slot, let item = engine.planItem(for: slot) else {
+            return "\(p.setsDone)/\(p.setsPlanned)"
+        }
+        return "Set \(slot.setIndex)/\(item.targetSets)"
+    }
+
+    private func format(_ seconds: Int) -> String {
+        let safe = max(0, seconds)
+        return String(format: "%d:%02d", safe / 60, safe % 60)
+    }
+}
+
+/// Each act's ambient glow — one rule, read by the seeded shell and the production shell alike.
+enum NoopAmbient {
+    static func color(for route: NoopRoute, warmEffort: Bool) -> Color {
+        switch route.act {
+        case .night: NoopHTMLColor.night
+        case .picture: NoopHTMLColor.green
+        // Act 6 keeps the same green ambient on every child screen. The Health branch changes
+        // only the selected navigation pill to warm; the canonical HTML never recolours the aura.
+        case .ages: NoopHTMLColor.green
+        case .plumbing:
+            switch route {
+            case .strap, .devices, .pair: NoopHTMLColor.blue
+            case .lab: NoopHTMLColor.night
+            default: NoopHTMLColor.blush
+            }
+        case .svea: NoopHTMLColor.night
+        case .goals: NoopHTMLColor.warm
+        case .instrument: NoopHTMLColor.night
+        case .effort: warmEffort ? NoopHTMLColor.warm : NoopHTMLColor.blue
+        // PROVISIONAL, and the same value the default would have given. Stated explicitly so the
+        // act's ambient is a named decision design can change rather than an inherited accident.
+        case .lift: NoopHTMLColor.blue
+        default: NoopHTMLColor.blue
+        }
+    }
+
+    static func opacity(for route: NoopRoute, warmEffort: Bool) -> Double {
+        switch route.act {
+        case .picture, .ages, .goals: 0.15
+        case .instrument: 0.16
+        case .svea: 0.16
+        case .effort: warmEffort ? 0.15 : 0.17
+        case .plumbing:
+            switch route {
+            case .strap, .devices, .pair: 0.14
+            default: 0.13
+            }
+        default: 0.17
+        }
+    }
+}
+
+/// Act 1's slow lavender glow, shared by both shells so the measured Rest screen sits on exactly the
+/// ambient the seeded one does.
+struct NoopNightAmbientGlow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
+            let elapsed = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 9)
+            let wave = (1 - cos(elapsed / 9 * 2 * .pi)) / 2
+            VStack {
+                Ellipse()
+                    .fill(
+                        RadialGradient(
+                            stops: [
+                                .init(color: NoopHTMLColor.night.opacity(0.20), location: 0),
+                                .init(color: NoopHTMLColor.night.opacity(0), location: 0.70)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 312
+                        )
+                    )
+                    .frame(width: 470, height: 430)
+                    .blur(radius: 18)
+                    .opacity(reduceMotion ? 0.72 : 0.55 + wave * 0.35)
+                    .offset(y: -170)
+                Spacer()
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+}
+
 /// Fail-closed production surface. It deliberately renders only values present in the local record;
 /// the richly populated canonical person remains a Debug-only visual fixture in `NoopAppShell`.
 /// As individual canonical screens gain verified adapters they can replace this route-by-route, but
@@ -321,9 +503,22 @@ private struct NoopLiveBar: View {
 struct NoopVerifiedAppShell: View {
     @ObservedObject var navigation: NoopNavigation
     @EnvironmentObject private var repo: Repository
+    @EnvironmentObject private var liftSession: LiftSessionController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var labDraft = NoopLabReviewDraft()
     @StateObject private var instrumentStore = NoopInstrumentLiveStore()
+    @StateObject private var liftFlow = NoopLiftFlowModel()
+    @StateObject private var restStore = NoopRestStore()
+    @StateObject private var dayStore = NoopDayStore()
+    @StateObject private var trendsStore = NoopTrendsStore()
+    @StateObject private var youStore = NoopYouStore()
+    @StateObject private var historyStore = NoopHistoryStore()
+    @StateObject private var effortStore = NoopEffortStore()
+    @StateObject private var agesStore = NoopAgesStore()
+    @EnvironmentObject private var profile: ProfileStore
+    @EnvironmentObject private var model: AppModel
+    /// Observed so the Rest header's battery chip redraws when the strap reports a new charge.
+    @EnvironmentObject private var live: LiveState
 
     /// The four Act 8 screens that are safe to show outside the fixture shell.
     ///
@@ -332,7 +527,7 @@ struct NoopVerifiedAppShell: View {
     /// canonical shell is still fixture-backed, so it stays behind `--demo-seed`; routing these
     /// four here is what replaces the generic Local-record list with the screens the design
     /// actually specifies.
-    private static let canonicalLabRoutes: Set<NoopRoute> = [.labs, .picker, .review, .marker]
+    private static let canonicalLabRoutes: Set<NoopRoute> = [.labs, .picker, .review, .marker, .goal, .setGoal]
 
     /// Breathe runs on the real protocol catalog, the strap's buzz and `ResonanceEngine`. With no
     /// strap it paces on screen and says so; with no sweep it says there is no pace yet. Nothing on
@@ -348,7 +543,8 @@ struct NoopVerifiedAppShell: View {
     /// Act 9's catalog is static, but every value and every relationship comes from the local record.
     /// The prototype person never crosses this boundary.
     private static let canonicalInstrumentRoutes: Set<NoopRoute> = [
-        .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects
+        .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects,
+        .instrumentRaw, .instrumentCapture
     ]
 
     /// Act 10 is canonical from the start. The Lift Log is not a prototype fixture: the session, the
@@ -361,8 +557,43 @@ struct NoopVerifiedAppShell: View {
         .liftEdit, .liftImport, .liftReview, .liftMuscles
     ]
 
+    /// Act 1's home. Measured from the same sleep pipeline the classic Sleep tab uses; a night with no
+    /// record stays absent, and sentences design has written only for the example person are omitted.
+    private static let canonicalNightRoutes: Set<NoopRoute> = [.rest, .debt, .alarm, .tonight]
+
+    /// Act 2's home. Charge left and every sentence written only for the example person are absent.
+    private static let canonicalDayRoutes: Set<NoopRoute> = [.today, .vitals, .stress, .heart, .day, .inbox]
+
+    /// Act 4's home: four weekly lines and the attendance grid from the stored daily rows. Body age
+    /// stays out until its engine is chosen.
+    private static let canonicalPictureRoutes: Set<NoopRoute> = [.trends, .capacity, .rhythm]
+
+    /// Act 6 on one engine (`VitalityEngine`): hero, band, drivers and history from the same call.
+    /// Driver detail, the method page and the health hub have no production source and stay out.
+    private static let canonicalAgesRoutes: Set<NoopRoute> = [.ages, .building, .driver]
+
+    /// Act 3 on the stored sessions and the real recorder. The prescription (what today can take,
+    /// what a session would cost) has no engine and stays out.
+    private static let canonicalEffortRoutes: Set<NoopRoute> = [.session, .pick, .ready, .live, .intervals, .detail, .across]
+
+    /// Act 7 runs on the real coach engine, grants and memory; its prototype conversation is gated on
+    /// `--demo-seed` inside the act.
+    private static let canonicalSveaRoutes: Set<NoopRoute> = [.coach, .gate, .setup, .consent, .memory]
+
+    /// Act 5's hub: the wearer's own name, photo, usual sleep window and need. The rest of Act 5 is
+    /// wired separately, screen by screen.
+    private static let canonicalYouRoutes: Set<NoopRoute> = [.you, .record, .zones, .settings, .lab, .position, .strap, .history, .devices, .notifs, .apple, .widgets, .automations]
+
     private var usesCanonicalCanvas: Bool {
-        Self.canonicalLabRoutes.contains(navigation.route)
+        navigation.route == .energy
+            || Self.canonicalNightRoutes.contains(navigation.route)
+            || Self.canonicalDayRoutes.contains(navigation.route)
+            || Self.canonicalPictureRoutes.contains(navigation.route)
+            || Self.canonicalEffortRoutes.contains(navigation.route)
+            || Self.canonicalAgesRoutes.contains(navigation.route)
+            || Self.canonicalSveaRoutes.contains(navigation.route)
+            || Self.canonicalYouRoutes.contains(navigation.route)
+            || Self.canonicalLabRoutes.contains(navigation.route)
             || Self.canonicalBreatheRoutes.contains(navigation.route)
             || Self.canonicalDataRoutes.contains(navigation.route)
             || Self.canonicalInstrumentRoutes.contains(navigation.route)
@@ -375,7 +606,32 @@ struct NoopVerifiedAppShell: View {
             verifiedAmbientGlow
 
             Group {
-                if Self.canonicalLabRoutes.contains(navigation.route) {
+                if navigation.route == .energy {
+                    NoopVerifiedEnergyScreen(navigation: navigation)
+                } else if Self.canonicalSveaRoutes.contains(navigation.route) {
+                    NoopAct7Screens(navigation: navigation)
+                } else if Self.canonicalYouRoutes.contains(navigation.route) {
+                    NoopAct5Screens(navigation: navigation, you: youStore.record,
+                                    battery: WidgetSnapshot.activeBatteryPct(from: model),
+                                    history: historyStore.record)
+                } else if Self.canonicalAgesRoutes.contains(navigation.route) {
+                    NoopAct6Screens(navigation: navigation, measured: agesStore.record)
+                } else if Self.canonicalEffortRoutes.contains(navigation.route) {
+                    NoopAct3Screens(navigation: navigation, effort: effortStore.record,
+                                    battery: WidgetSnapshot.activeBatteryPct(from: model))
+                } else if Self.canonicalPictureRoutes.contains(navigation.route) {
+                    NoopAct4Screens(navigation: navigation, trends: trendsStore.record,
+                                    battery: WidgetSnapshot.activeBatteryPct(from: model),
+                                    ages: agesStore.record)
+                } else if Self.canonicalDayRoutes.contains(navigation.route) {
+                    NoopAct2Screens(navigation: navigation, day: dayStore.record,
+                                    battery: WidgetSnapshot.activeBatteryPct(from: model),
+                                    liveBPM: live.connected ? live.heartRate : nil,
+                                    displayName: profile.displayName)
+                } else if Self.canonicalNightRoutes.contains(navigation.route) {
+                    NoopAct1Screens(navigation: navigation, rest: restStore.record,
+                                    battery: WidgetSnapshot.activeBatteryPct(from: model))
+                } else if Self.canonicalLabRoutes.contains(navigation.route) {
                     NoopAct8Screens(navigation: navigation, labDraft: labDraft)
                 } else if Self.canonicalBreatheRoutes.contains(navigation.route) {
                     NoopBreatheScreens(navigation: navigation)
@@ -384,7 +640,7 @@ struct NoopVerifiedAppShell: View {
                 } else if Self.canonicalInstrumentRoutes.contains(navigation.route) {
                     NoopAct9Screens(navigation: navigation, data: instrumentStore.data)
                 } else if Self.canonicalLiftRoutes.contains(navigation.route) {
-                    NoopAct10Screens(navigation: navigation)
+                    NoopAct10Screens(navigation: navigation, flow: liftFlow)
                 } else {
                     NoopVerifiedRouteScreen(
                         route: navigation.route,
@@ -402,8 +658,18 @@ struct NoopVerifiedAppShell: View {
                 )
 
             if !navigation.route.hidesBottomBar {
-                VStack {
+                VStack(spacing: 6) {
                     Spacer()
+                    if liftSession.isActive {
+                        NoopLiftLiveBar(navigation: navigation)
+                            .frame(width: max(0, UIScreen.main.bounds.width - 28))
+                            .transition(reduceMotion
+                                ? .opacity
+                                : .move(edge: .bottom).combined(with: .opacity))
+                    } else if model.activeWorkout != nil {
+                        NoopCardioLiveBar(navigation: navigation, measured: true)
+                            .frame(width: max(0, UIScreen.main.bounds.width - 28))
+                    }
                     NoopBottomNavigation(navigation: navigation)
                         .frame(width: max(0, UIScreen.main.bounds.width - 28))
                         .padding(.bottom, 26)
@@ -437,6 +703,9 @@ struct NoopVerifiedAppShell: View {
         .preferredColorScheme(.dark)
         .contentShape(Rectangle())
         .simultaneousGesture(verifiedBackGesture)
+        .environment(\.noopLiveBarInset,
+                     (liftSession.isActive || navigation.sessionRunning || model.activeWorkout != nil)
+                        && !navigation.route.hidesBottomBar ? 52 : 0)
         // Canonical pages measure their 56 pt header inset from the full 402 x 874 canvas, exactly
         // like the fixture shell. Without this, SwiftUI first removes the status-bar safe area and
         // NoopScreen adds 56 pt again, putting every verified Lab/Breathe page about 60 pt too low.
@@ -445,6 +714,57 @@ struct NoopVerifiedAppShell: View {
             guard instrumentLoadKey != nil else { return }
             await instrumentStore.load(from: repo)
         }
+        .task(id: restLoadKey) {
+            guard restLoadKey != nil else { return }
+            await restStore.load(from: repo)
+        }
+        .task(id: youLoadKey) {
+            guard youLoadKey != nil else { return }
+            await youStore.load(from: repo)
+            if navigation.route == .history { await historyStore.load(from: repo) }
+        }
+        .task(id: trendsLoadKey) {
+            guard trendsLoadKey != nil else { return }
+            await trendsStore.load(from: repo)
+        }
+        .task(id: agesLoadKey) {
+            guard agesLoadKey != nil else { return }
+            await agesStore.load(from: repo, profile: profile)
+        }
+        .task(id: effortLoadKey) {
+            guard effortLoadKey != nil else { return }
+            await effortStore.load(from: repo)
+        }
+        .task(id: dayLoadKey) {
+            guard dayLoadKey != nil else { return }
+            await dayStore.load(from: repo, profile: profile)
+        }
+    }
+
+    private var youLoadKey: String? {
+        Self.canonicalYouRoutes.contains(navigation.route)
+            ? "\(navigation.route.rawValue)-\(repo.loaded)-\(repo.refreshSeq)" : nil
+    }
+
+    private var trendsLoadKey: String? {
+        Self.canonicalPictureRoutes.contains(navigation.route) ? "\(repo.loaded)-\(repo.refreshSeq)" : nil
+    }
+
+    private var agesLoadKey: String? {
+        Self.canonicalAgesRoutes.contains(navigation.route) || navigation.route == .trends
+            ? "\(repo.loaded)-\(repo.refreshSeq)" : nil
+    }
+
+    private var effortLoadKey: String? {
+        Self.canonicalEffortRoutes.contains(navigation.route) ? "\(repo.loaded)-\(repo.refreshSeq)" : nil
+    }
+
+    private var dayLoadKey: String? {
+        Self.canonicalDayRoutes.contains(navigation.route) ? "\(repo.loaded)-\(repo.refreshSeq)" : nil
+    }
+
+    private var restLoadKey: String? {
+        Self.canonicalNightRoutes.contains(navigation.route) ? "\(repo.loaded)-\(repo.refreshSeq)" : nil
     }
 
     private var instrumentLoadKey: Int? {
@@ -453,16 +773,15 @@ struct NoopVerifiedAppShell: View {
 
     @ViewBuilder
     private var verifiedAmbientGlow: some View {
-        if usesCanonicalCanvas {
-            let isLab = Self.canonicalLabRoutes.contains(navigation.route)
-            let isData = Self.canonicalDataRoutes.contains(navigation.route)
-            let isInstrument = Self.canonicalInstrumentRoutes.contains(navigation.route)
-            let color: Color = isLab
-                ? NoopHTMLColor.warm
-                : isData
-                    ? NoopHTMLColor.blush
-                    : isInstrument ? NoopHTMLColor.night : NoopHTMLColor.blue
-            let opacity = isLab ? 0.15 : isData ? 0.13 : isInstrument ? 0.16 : 0.17
+        if usesCanonicalCanvas && navigation.route.act == .night {
+            NoopNightAmbientGlow()
+        } else if usesCanonicalCanvas {
+            let act = navigation.route.act
+            let isLab = act == .ages || act == .svea || act == .goals
+            // Amber meant "above what today can take" — a verdict production has no engine for.
+            let warmEffort = false
+            let color = NoopAmbient.color(for: navigation.route, warmEffort: warmEffort)
+            let opacity = NoopAmbient.opacity(for: navigation.route, warmEffort: warmEffort)
             VStack {
                 Ellipse()
                     .fill(RadialGradient(
@@ -536,6 +855,10 @@ struct NoopVerifiedAppShell: View {
                     navigation.reset(to: .trends)
                 case .instrumentMetric, .instrumentCompare, .instrumentEffects:
                     navigation.back(or: .instrumentIndex)
+                case .instrumentRaw:
+                    navigation.back(or: .instrumentIndex)
+                case .instrumentCapture:
+                    navigation.back(or: .instrumentRaw)
                 default:
                     // Keep the fail-closed placeholder's existing behaviour until that route gets
                     // its own verified production screen.
@@ -669,6 +992,7 @@ private struct NoopVerifiedRouteScreen: View {
         case .inbox: "Updates"
         case .charge: "Charge"
         case .day: "The day so far"
+        case .energy: "What today has cost"
         case .vitals: "Vitals"
         case .stress: "Stress"
         case .heart: "Heart"
@@ -729,8 +1053,9 @@ private struct NoopVerifiedRouteScreen: View {
         case .instrumentMetric: "One signal"
         case .instrumentCompare: "Two at once"
         case .instrumentEffects: "What moves you"
-        // Act 10. PROVISIONAL copy: these are placeholders so the routes resolve and can be
-        // launched. Replace each with design's wording as its screen lands.
+        case .instrumentRaw: "Raw capture"
+        case .instrumentCapture: "Capture"
+        // Act 10 · The Lift.
         case .liftLive: "Lift session"
         case .liftLibrary: "Lift Log"
         case .liftProgram: "Program"
@@ -751,7 +1076,7 @@ enum NoopCanonicalGlyphName {
     case read, scale, alarm, bell, screen, watch, cloud
     case shield, download, upload, trash, globe, ruler, sparkSingle, camera
     case person, sync, link, copy, share, x, flask, search, file
-    case plus, grid, key, chart, gauge, ask, overlay, chat
+    case plus, grid, key, chart, gauge, mic, ask, overlay, chat
 }
 
 /// The HTML uses one 24 × 24 stroked SVG alphabet throughout. Drawing those paths directly keeps
@@ -1100,6 +1425,15 @@ struct NoopCanonicalGlyph: View {
             path.move(to: CGPoint(x: 4.6, y: 17.4))
             addCircularArc(&path, from: CGPoint(x: 4.6, y: 17.4), to: CGPoint(x: 19.4, y: 17.4), radius: 8, largeArc: true, sweep: true)
             path.move(to: CGPoint(x: 12, y: 12.4)); path.addLine(to: CGPoint(x: 15.4, y: 9))
+        case .mic:
+            path.addRoundedRect(
+                in: CGRect(x: 9.2, y: 4, width: 5.6, height: 10),
+                cornerSize: CGSize(width: 2.8, height: 2.8)
+            )
+            path.move(to: CGPoint(x: 5.8, y: 11.6))
+            addCircularArc(&path, from: CGPoint(x: 5.8, y: 11.6), to: CGPoint(x: 18.2, y: 11.6), radius: 6.2, largeArc: false, sweep: true)
+            path.move(to: CGPoint(x: 12, y: 17.8)); path.addLine(to: CGPoint(x: 12, y: 20.2))
+            path.move(to: CGPoint(x: 9.2, y: 20.2)); path.addLine(to: CGPoint(x: 14.8, y: 20.2))
         case .ask:
             path.addEllipse(in: CGRect(x: 4.4, y: 4.4, width: 12.4, height: 12.4))
             path.move(to: CGPoint(x: 15.2, y: 15.2)); path.addLine(to: CGPoint(x: 20, y: 20))
@@ -1490,7 +1824,7 @@ private struct NoopNightJournalSheet: View {
                                     .foregroundStyle(Color(hex: 0x7F8A85))
                             }
                             Spacer(minLength: 4)
-                            NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.faint)
+                            NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                         }
                         .padding(.horizontal, 2)
                         .padding(.bottom, 16)

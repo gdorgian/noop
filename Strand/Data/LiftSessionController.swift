@@ -28,6 +28,9 @@ final class LiftSessionController: ObservableObject {
     /// Ticks every second while a session runs, so views can redraw clocks off one shared timer
     /// rather than each starting their own.
     @Published private(set) var now = Int(Date().timeIntervalSince1970)
+    /// Paused holds both the working clock and the rest countdown. It lives beside the engine so
+    /// every presentation (screen, in-app bar and Live Activity) reads the same held instant.
+    @Published private(set) var isPaused = false
     /// True while the full sheet is presented; false when minimised to the bottom bar.
     @Published var isPresented = false
 
@@ -36,10 +39,14 @@ final class LiftSessionController: ObservableObject {
     @Published private(set) var savedSessions = 0
 
     var isActive: Bool { engine != nil && engine?.isFinished == false }
+    /// Holds the in-flight snapshot unchanged until every store write succeeds.
+    @Published private(set) var saveInProgress = false
 
     /// Rest period the five-second warning has already fired for. Lives HERE, not in a view, so
     /// re-opening the sheet mid-rest cannot re-fire it.
     private var warnedFor: Int?
+    private var pausedAt: Int?
+    private var totalPausedSec = 0
 
     /// Slots the user marked as a warm-up BEFORE performing them. You know a set is a warm-up on the
     /// way in, not afterwards, but an unperformed set has no record to carry the flag — and inventing
@@ -101,17 +108,24 @@ final class LiftSessionController: ObservableObject {
 
     // MARK: - Lifecycle
 
-    func start(plan: [LiftPlanItem], programId: String?, programName: String?) {
+    @discardableResult
+    func start(plan: [LiftPlanItem], programId: String?, programName: String?) -> Bool {
+        // A second Start must never overwrite a workout (including one awaiting a failed save).
+        guard engine == nil else { return false }
         let stamp = Int(Date().timeIntervalSince1970)
         engine = LiftSessionEngine(plan: plan, startTs: stamp)
         self.programId = programId
         self.programName = programName
         warnedFor = nil
+        isPaused = false
+        pausedAt = nil
+        totalPausedSec = 0
         now = stamp
         isPresented = true
         claimStrap()
         startTicking()
         persist()
+        return true
     }
 
     /// Rehydrate an interrupted session found on disk. Does NOT present the sheet: the session comes
@@ -125,7 +139,10 @@ final class LiftSessionController: ObservableObject {
         // to prevent, whether it is lost to a blur or to a relaunch.
         pendingValues = LiftSessionPersistence.pendingValues(from: snapshot)
         pendingWarmups = LiftSessionPersistence.pendingWarmups(from: snapshot)
-        now = Int(Date().timeIntervalSince1970)
+        isPaused = snapshot.isPaused ?? false
+        pausedAt = isPaused ? (snapshot.pausedAt ?? snapshot.stageStartedAt) : nil
+        totalPausedSec = max(0, snapshot.totalPausedSec ?? 0)
+        now = isPaused ? (pausedAt ?? snapshot.stageStartedAt) : Int(Date().timeIntervalSince1970)
         // Suppress the warning for a rest that is ALREADY inside its final seconds. Without this,
         // reopening a session mid-rest greets the user with three buzzes for a rest they have been
         // watching count down all along.
@@ -142,8 +159,20 @@ final class LiftSessionController: ObservableObject {
 
     /// Give up the session without saving.
     func discard() {
+        guard !saveInProgress else { return }
         teardown()
         LiftSessionPersistence.clear()
+    }
+
+    @discardableResult
+    func beginSaving() -> Bool {
+        guard engine != nil, !saveInProgress else { return false }
+        saveInProgress = true
+        return true
+    }
+
+    func saveFailed() {
+        saveInProgress = false
     }
 
     /// Called once the session has been written to the store.
@@ -154,10 +183,14 @@ final class LiftSessionController: ObservableObject {
     }
 
     private func teardown() {
+        saveInProgress = false
         engine = nil
         programId = nil
         programName = nil
         warnedFor = nil
+        isPaused = false
+        pausedAt = nil
+        totalPausedSec = 0
         pendingWarmups = []
         pendingValues = [:]
         isPresented = false
@@ -178,6 +211,7 @@ final class LiftSessionController: ObservableObject {
             .autoconnect()
             .sink { [weak self] instant in
                 guard let self else { return }
+                guard !self.isPaused else { return }
                 self.now = Int(instant.timeIntervalSince1970)
                 self.fireRestWarningIfDue()
             }
@@ -187,7 +221,7 @@ final class LiftSessionController: ObservableObject {
 
     /// The one action. `fromStrap` earns a single confirming buzz.
     func advance(fromStrap: Bool = false) {
-        guard engine != nil else { return }
+        guard engine != nil, !isPaused, !saveInProgress else { return }
         // BUZZ FIRST, before any state work. The confirmation is a latency signal — its whole job is
         // to say "that registered" — so it must not queue behind a JSON encode and a defaults write.
         if fromStrap { buzz(LiftSessionController.advanceConfirmBuzzes) }
@@ -209,6 +243,8 @@ final class LiftSessionController: ObservableObject {
 
     struct Presentation: Equatable {
         var isResting: Bool
+        var isPaused: Bool
+        var isReady: Bool
         /// The exercise being worked or rested from; the program's name when neither applies.
         var exercise: String
         /// "Set 2", "Resting after set 2", "Ready for the next set", "3 of 19 sets done".
@@ -220,6 +256,10 @@ final class LiftSessionController: ObservableObject {
         var stageStartedAt: Date
         /// When the running rest is due to end. Nil while working.
         var restEndsAt: Date?
+        /// Static value used while paused; nil while a widget timer can tick from the dates above.
+        var heldClockSeconds: Int?
+        /// The one session clock shown at the top of lift-live.
+        var sessionElapsedSeconds: Int
     }
 
     func presentation(system: UnitSystem) -> Presentation? {
@@ -228,33 +268,70 @@ final class LiftSessionController: ObservableObject {
         let planned = engine.plannedWorkingSets
         let started = Date(timeIntervalSince1970: TimeInterval(engine.stageStartedAt))
         let fallback = String(localized: "\(done) of \(planned) sets done")
+        let elapsed = sessionElapsedSeconds
 
         guard let slot = engine.currentSlot, let item = engine.planItem(for: slot) else {
-            return Presentation(isResting: false,
+            return Presentation(isResting: false, isPaused: isPaused, isReady: false,
                                 exercise: programName ?? String(localized: "Session"),
                                 status: fallback, detail: nil,
                                 setsDone: done, setsPlanned: planned,
-                                stageStartedAt: started, restEndsAt: nil)
+                                stageStartedAt: started, restEndsAt: nil,
+                                heldClockSeconds: isPaused ? 0 : nil,
+                                sessionElapsedSeconds: elapsed)
         }
 
         let detail = setNumbers(for: slot, system: system)
         switch engine.stage {
         case .resting(_, let endsAt):
             let ready = endsAt <= now
+            let restingStatus = ready ? String(localized: "Ready for the next set")
+                                      : String(localized: "Resting after set \(slot.setIndex)")
             return Presentation(
-                isResting: true, exercise: item.exercise,
-                status: ready ? String(localized: "Ready for the next set")
-                              : String(localized: "Resting after set \(slot.setIndex)"),
+                isResting: true, isPaused: isPaused, isReady: ready, exercise: item.exercise,
+                status: isPaused ? String(localized: "Paused · set \(slot.setIndex)") : restingStatus,
                 detail: detail, setsDone: done, setsPlanned: planned,
                 stageStartedAt: started,
-                restEndsAt: Date(timeIntervalSince1970: TimeInterval(endsAt)))
+                restEndsAt: Date(timeIntervalSince1970: TimeInterval(endsAt)),
+                heldClockSeconds: isPaused ? max(0, endsAt - now) : nil,
+                sessionElapsedSeconds: elapsed)
         default:
             return Presentation(
-                isResting: false, exercise: item.exercise,
-                status: String(localized: "Set \(slot.setIndex)"),
+                isResting: false, isPaused: isPaused, isReady: false, exercise: item.exercise,
+                status: isPaused ? String(localized: "Paused · set \(slot.setIndex)")
+                                 : String(localized: "Set \(slot.setIndex)"),
                 detail: detail, setsDone: done, setsPlanned: planned,
-                stageStartedAt: started, restEndsAt: nil)
+                stageStartedAt: started, restEndsAt: nil,
+                heldClockSeconds: isPaused ? max(0, now - engine.stageStartedAt) : nil,
+                sessionElapsedSeconds: elapsed)
         }
+    }
+
+    /// Elapsed session time with every completed pause removed. While paused it reads from the held
+    /// instant, so it freezes in the same tick as the set/rest clock.
+    var sessionElapsedSeconds: Int {
+        guard let engine else { return 0 }
+        let instant = isPaused ? (pausedAt ?? now) : now
+        return max(0, instant - engine.startTs - totalPausedSec)
+    }
+
+    func togglePause() {
+        guard engine != nil, !saveInProgress else { return }
+        let actualNow = Int(Date().timeIntervalSince1970)
+        if isPaused {
+            let heldAt = pausedAt ?? actualNow
+            let duration = max(0, actualNow - heldAt)
+            engine?.shiftLiveStage(by: duration)
+            totalPausedSec += duration
+            pausedAt = nil
+            isPaused = false
+            now = actualNow
+        } else {
+            pausedAt = actualNow
+            now = actualNow
+            isPaused = true
+        }
+        warnedFor = nil
+        persist()
     }
 
     /// Reps x weight for a slot, as "8 x 30 kg": what the set counts as — typed numbers, else the grey
@@ -299,6 +376,7 @@ final class LiftSessionController: ObservableObject {
     /// Mark a slot as a warm-up (or not). Applies immediately when the set already exists, and is
     /// remembered for when it does not yet.
     func setWarmup(_ slot: LiftSlot, _ isWarmup: Bool) {
+        guard !saveInProgress else { return }
         if isWarmup { pendingWarmups.insert(slot) } else { pendingWarmups.remove(slot) }
         if let row = engine?.recordedSet(for: slot) {
             engine?.updateSet(slot, weightKg: row.weightKg, reps: row.reps,
@@ -334,7 +412,7 @@ final class LiftSessionController: ObservableObject {
 
     /// Begin a specific set — the out-of-order path, for when a machine is occupied.
     func start(_ slot: LiftSlot, fromStrap: Bool = false) {
-        guard engine != nil else { return }
+        guard engine != nil, !isPaused, !saveInProgress else { return }
         if fromStrap { buzz(LiftSessionController.advanceConfirmBuzzes) }
         let stamp = Int(Date().timeIntervalSince1970)
         engine?.start(slot, now: stamp)
@@ -349,6 +427,7 @@ final class LiftSessionController: ObservableObject {
     /// is what tells the caller whether the program behind the session needs rewriting.
     @discardableResult
     func addSet(toExercise index: Int) -> Bool {
+        guard !saveInProgress else { return false }
         guard engine?.addSet(toExercise: index) == true else { return false }
         persist()
         return true
@@ -358,6 +437,7 @@ final class LiftSessionController: ObservableObject {
     /// for what "can" means — a completed set is never removed this way.
     @discardableResult
     func removeSet(fromExercise index: Int) -> Bool {
+        guard !saveInProgress else { return false }
         guard let engine, engine.canRemoveSet(fromExercise: index) else { return false }
         let dropped = LiftSlot(exerciseIndex: index, setIndex: engine.plan[index].targetSets)
         self.engine?.removeSet(fromExercise: index)
@@ -377,6 +457,7 @@ final class LiftSessionController: ObservableObject {
     /// to type into whichever row they are looking at, and being mid-set somewhere else is not a
     /// reason to refuse.
     func updateSet(_ slot: LiftSlot, weightKg: Double?, reps: Int?, rpe: Double?, isWarmup: Bool) {
+        guard !saveInProgress else { return }
         if engine?.recordedSet(for: slot) != nil {
             engine?.updateSet(slot, weightKg: weightKg, reps: reps, rpe: rpe, isWarmup: isWarmup)
         } else if engine?.planItem(for: slot) != nil {
@@ -398,11 +479,13 @@ final class LiftSessionController: ObservableObject {
     }
 
     func undo() {
+        guard !saveInProgress else { return }
         engine?.undo()
         persist()
     }
 
     func finish() {
+        guard !saveInProgress else { return }
         engine?.finish(now: Int(Date().timeIntervalSince1970))
         persist()
     }
@@ -491,6 +574,7 @@ final class LiftSessionController: ObservableObject {
     // MARK: - The rest warning
 
     private func fireRestWarningIfDue() {
+        guard !isPaused else { return }
         guard let engine, case .resting(_, let endsAt) = engine.stage else { return }
         guard warnedFor != endsAt else { return }
         guard endsAt - now <= LiftSessionController.restWarningLeadSec else { return }
@@ -507,6 +591,9 @@ final class LiftSessionController: ObservableObject {
                                             programId: programId,
                                             programName: programName,
                                             pendingValues: pendingValues,
-                                            pendingWarmups: pendingWarmups))
+                                            pendingWarmups: pendingWarmups,
+                                            isPaused: isPaused,
+                                            pausedAt: pausedAt,
+                                            totalPausedSec: totalPausedSec))
     }
 }
