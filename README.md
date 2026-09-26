@@ -34,6 +34,8 @@ your day and your night, one place to record any workout, a record of the things
 optional coach adapted from [DX's fork](https://github.com/DX23876/noop) that only ever talks to the
 provider you choose, about the parts of your record you allow.
 
+<a id="the-app"></a>
+
 <p align="center">
   <img src="docs/assets/aura-11.7/today.png" width="205" alt="Noop Aura Today screen with the breathing orb">
   <img src="docs/assets/aura-11.7/trends.png" width="205" alt="Noop Aura Trends screen with the animated Body Age graphic">
