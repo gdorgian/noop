@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bandIn{from{opacity:0;transform:scaleX(.55)}to{opacity:1;transform:scaleX(1)}}
+@keyframes miniMorph{0%,100%{border-radius:63% 37% 45% 55%/52% 61% 39% 48%;transform:rotate(0deg) scale(1)}33%{border-radius:40% 60% 62% 38%/58% 42% 58% 42%;transform:rotate(6deg) scale(1.03)}66%{border-radius:55% 45% 38% 62%/41% 60% 40% 59%;transform:rotate(-5deg) scale(.98)}}
+@keyframes miniSpin{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.scr{animation:fadeUp .3s cubic-bezier(.22,.61,.36,1) both}
+.band{animation:bandIn .62s cubic-bezier(.22,.61,.36,1) both;transform-origin:left center}
+.hb::-webkit-scrollbar{width:0;height:0}
+*{-webkit-tap-highlight-color:transparent}
+@media (prefers-reduced-motion:reduce){.scr,.band{animation:none}}
+</style>
+</helmet>
+
+<div style="display:flex;gap:60px;align-items:flex-start;padding:52px 48px 100px">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:16px">
+  <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">ACT 6</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">Your ages — working prototype</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">how old is the body, honestly</span>
+  </div>
+  </sc-if>
+
+  <div style="border-radius:48px;overflow:hidden;flex:none">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+    <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:480px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,204,128,.15),rgba(46,204,128,0) 70%);filter:blur(18px);pointer-events:none"></div>
+
+      <div class="hb" onPointerDown="{{ swipeStart }}" onPointerUp="{{ swipeEnd }}" style="position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain">
+
+        <sc-if value="{{ isAges }}" hint-placeholder-val="{{ true }}">
+        <div class="scr" style="padding-bottom:118px">
+          <div style="padding:56px 18px 6px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goBack }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Trends</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:12px">
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0 4px">
+              <div style="display:flex;flex-direction:column;gap:4px;width:88px">
+                <span style="{{ diffStyle }}">{{ diffAbs }}</span>
+                <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:#7F8A85;font-weight:600;line-height:1.4">years {{ dirWord }}</span>
+              </div>
+              <div style="position:relative;width:132px;height:132px;flex:none;display:flex;align-items:center;justify-content:center">
+                <div style="position:absolute;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(46,204,128,.30),rgba(46,204,128,0) 62%);filter:blur(10px);pointer-events:none"></div>
+                <div style="position:absolute;width:126px;height:126px;border-radius:63% 37% 45% 55%/52% 61% 39% 48%;background:radial-gradient(circle at 50% 50%,#080B0A 0%,#080B0A 30%,rgba(46,204,128,.10) 39%,rgba(46,204,128,.34) 53%,rgba(48,206,132,.80) 70%,rgba(158,240,204,.42) 85%,rgba(46,204,128,.10) 95%,rgba(46,204,128,0) 100%);filter:blur(3px);animation:miniMorph 24s ease-in-out infinite;pointer-events:none"></div>
+                <div style="{{ miniWash }}"></div>
+                <div style="position:absolute;left:50%;top:50%;width:126px;height:126px;transform:translate(-50%,-50%);animation:miniSpin 60s linear infinite;pointer-events:none">
+                  <sc-for list="{{ miniSpecks }}" as="p" hint-placeholder-count="20">
+                    <div style="{{ p.s }}"></div>
+                  </sc-for>
+                </div>
+                <span style="position:relative;font-family:'Outfit',sans-serif;font-size:38px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 18px rgba(0,0,0,.6)">{{ bodyAge }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px;width:88px;align-items:flex-end;text-align:right">
+                <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;letter-spacing:-.03em;line-height:1;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ paceVal }}</span>
+                <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:#7F8A85;font-weight:600;line-height:1.4">pace of aging</span>
+              </div>
+            </div>
+
+            <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em;line-height:1.22;text-wrap:pretty">{{ lead }}</span>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:18px 18px 20px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Body age</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                <sc-if value="{{ confOn }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ confBox }}">
+                    <span style="{{ confDot }}"></span>
+                    <span style="{{ confLabelStyle }}">{{ confLabel }}</span>
+                  </div>
+                </sc-if>
+                  <span style="font-size:11px;color:#7F8A85">updated weekly</span>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="font-family:'Outfit',sans-serif;font-size:76px;font-weight:200;letter-spacing:-.05em;line-height:.9;font-variant-numeric:tabular-nums">{{ bodyAge }}</span>
+                <div style="display:flex;flex-direction:column;gap:3px;padding-bottom:5px">
+                  <span style="font-size:13px;color:#939C97">years</span>
+                  <span style="{{ deltaStyle }}">{{ delta }}</span>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:9px;padding-top:2px">
+                <div style="position:relative;height:62px">
+                  <div style="position:absolute;left:0;right:0;top:27px;height:4px;border-radius:2px;background:rgba(255,255,255,.13)"></div>
+                  <div class="band" style="{{ bandFill }}"></div>
+                  <div style="{{ bandCapLo }}"></div>
+                  <div style="{{ bandCapHi }}"></div>
+                  <div style="{{ bandDot }}"></div>
+                  <div style="{{ chronoTick }}"></div>
+                  <span style="{{ chronoLabel }}">you are {{ chronoAge }}</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:11px;color:#6C7570;font-variant-numeric:tabular-nums">{{ bandLo }}</span>
+                  <span style="font-size:11px;color:#8B958F">± 5 year band</span>
+                  <span style="font-size:11px;color:#6C7570;font-variant-numeric:tabular-nums">{{ bandHi }}</span>
+                </div>
+              </div>
+
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">The band is part of the number. Anywhere inside it is the same reading — {{ bandSentence }}</span>
+            </div>
+
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 2px 0">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">What's moving it</span>
+              <span style="font-size:11px;color:#7F8A85">signed, per factor</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:15px 16px 16px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8FEFC0;font-weight:600">← takes years off</span>
+                <span style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#F3C888;font-weight:600">adds years →</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ drivers }}" as="d" hint-placeholder-count="5">
+                  <div onClick="{{ d.open }}" style="{{ d.row }}">
+                    <span style="width:98px;flex:none;font-size:12.5px;line-height:1.28;color:#C6CEC9">{{ d.label }}</span>
+                    <div style="flex:1;position:relative;height:20px">
+                      <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.16)"></div>
+                      <div style="{{ d.bar }}"></div>
+                    </div>
+                    <span style="{{ d.val }}">{{ d.effect }}</span>
+                  </div>
+                </sc-for>
+              </div>
+
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">Each factor is measured against the norm for someone your age. They do not add up to the number above — the model is not a sum.</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:13px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Body age over time</span>
+                <span style="{{ histChip }}">{{ histDelta }}</span>
+              </div>
+              <svg viewBox="0 0 300 104" style="width:100%;height:104px;overflow:visible">
+                <path d="{{ histBand }}" fill="rgba(46,204,128,.10)"></path>
+                <polyline points="{{ histLine }}" fill="none" stroke="#2ECC80" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                <circle cx="{{ histDotX }}" cy="{{ histDotY }}" r="3.4" fill="#0A0C0B" stroke="#2ECC80" stroke-width="1.9"></circle>
+              </svg>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <sc-for list="{{ histAxis }}" as="a" hint-placeholder-count="4">
+                  <span style="font-size:10.5px;color:#7F8A85">{{ a.label }}</span>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">Ten weeks. The shaded ribbon is the same ± 5 years, carried at every point — which is why a single week's wobble means nothing. Next update Saturday.</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:13px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">A different question</span>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+                <div style="border:.5px solid rgba(139,153,214,.22);background:rgba(139,153,214,.07);border-radius:18px;padding:13px 13px 14px;display:flex;flex-direction:column;gap:5px">
+                  <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#A9B4E0;font-weight:600">Fitness age</span>
+                  <div style="display:flex;align-items:baseline;gap:5px">
+                    <span style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums">31</span>
+                    <span style="font-size:11px;color:#8B958F">± 5 yr</span>
+                  </div>
+                </div>
+                <div style="border:.5px solid rgba(139,153,214,.22);background:rgba(139,153,214,.07);border-radius:18px;padding:13px 13px 14px;display:flex;flex-direction:column;gap:5px">
+                  <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#A9B4E0;font-weight:600">VO₂ max</span>
+                  <div style="display:flex;align-items:baseline;gap:5px">
+                    <span style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums">47.2</span>
+                    <span style="font-size:11px;color:#8B958F">ml/kg/min</span>
+                  </div>
+                </div>
+              </div>
+              <span style="font-size:11.5px;line-height:1.6;color:#8B958F;text-wrap:pretty">Fitness Age compares one thing — how much oxygen you can use — against norms for your sex and age. <strong style="font-weight:600;color:#C6CEC9">It is not a biological age.</strong> It reads none of the sleep or variability signals above, so it can sit years away from Body Age without either being wrong.</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:3px;padding:8px 2px 0">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Health domains</span>
+              <span style="font-size:11.5px;color:#7F8A85">{{ evidence }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:15px">
+              <sc-if value="{{ hasDomains }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:15px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:10px;color:#7F8A85">0</span>
+                  <span style="font-size:10px;color:#7F8A85">50</span>
+                  <span style="font-size:10px;color:#7F8A85">100</span>
+                </div>
+                <sc-for list="{{ domains }}" as="d" hint-placeholder-count="5">
+                  <div style="display:flex;flex-direction:column;gap:7px">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                      <span style="font-size:13px;color:#EDF1EF">{{ d.label }}</span>
+                      <div style="display:flex;align-items:baseline;gap:9px">
+                        <span style="font-size:11px;color:#7F8A85">{{ d.weight }} of score</span>
+                        <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:300;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums;color:#EDF1EF;min-width:26px;text-align:right">{{ d.score }}</span>
+                      </div>
+                    </div>
+                    <div style="{{ d.track }}">
+                      <div style="{{ d.fill }}"></div>
+                    </div>
+                  </div>
+                </sc-for>
+                <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">A domain is where you stand out of 100, from a second scorer that knows nothing about the drivers above. Nothing here is signed, and the thicker the bar, the more it counts.</span>
+              </div>
+              </sc-if>
+              <sc-if value="{{ noDomains }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:200;color:#7F8A85;line-height:1">—</span>
+                <span style="font-size:13px;line-height:1.6;color:#939C97;text-wrap:pretty">Not enough instruments to score the five domains yet. They appear when at least twelve of the twenty-eight are reading.</span>
+              </div>
+              </sc-if>
+            </div>
+
+            <div style="{{ readCard }}">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8FEFC0;font-weight:600">The read</span>
+              <span style="font-size:13.5px;line-height:1.65;color:#D2E2D8;text-wrap:pretty">{{ readBody }}</span>
+            </div>
+
+            <div onClick="{{ goMethod }}" style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;align-items:center;gap:13px;cursor:pointer">
+              <span style="{{ icoInfo }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:13.5px;color:#EDF1EF">How this is figured</span>
+                <span style="font-size:11.5px;color:#7F8A85">six inputs, one model, and what it cannot see</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <span style="font-size:11px;line-height:1.6;color:#7F8A85;padding:2px 2px 0;text-wrap:pretty">Estimates from a wrist sensor, not a diagnosis. Body Age is a statistical comparison against population data — it is not a prediction about you, and no part of this screen is a medical device.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isBuilding }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:118px">
+          <div style="padding:56px 18px 6px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goBack }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Trends</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:12px">
+            <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em;line-height:1.22;text-wrap:pretty">Body Age needs three more nights before it will say anything.</span>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:13px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Body age</span>
+                <span style="font-size:11px;color:#7F8A85">first estimate Sat 30 Aug</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:10px">
+                <span style="font-family:'Outfit',sans-serif;font-size:70px;font-weight:200;letter-spacing:-.05em;line-height:.9;color:#3E4643">—</span>
+                <span style="font-size:13px;line-height:1.5;color:#8B958F;padding-bottom:8px">± 5 yr<br>not yet available</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:11.5px;color:#939C97">2 of 4 requirements met</span>
+                  <span style="font-size:11.5px;color:#7F8A85">1 optional</span>
+                </div>
+                <div style="display:flex;gap:4px">
+                  <div style="flex:1;height:4px;border-radius:2px;background:#2ECC80"></div>
+                  <div style="flex:1;height:4px;border-radius:2px;background:#2ECC80"></div>
+                  <div style="flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.13)"></div>
+                  <div style="flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.13)"></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:6px 16px">
+              <sc-for list="{{ checklist }}" as="c" hint-placeholder-count="6">
+                <div style="{{ c.row }}">
+                  <span style="{{ c.mark }}"></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:13.5px;color:#EDF1EF">{{ c.label }}</span>
+                    <span style="font-size:11.5px;line-height:1.45;color:#7F8A85">{{ c.detail }}</span>
+                  </div>
+                  <span style="{{ c.word }}">{{ c.status }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;align-items:center;gap:13px">
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:13.5px;color:#EDF1EF">Fitness Age</span>
+                <span style="font-size:11.5px;color:#7F8A85">needs one effort hard enough to read</span>
+              </div>
+              <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:200;color:#3E4643;line-height:1">—</span>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#8B958F;padding:4px 2px 0;text-wrap:pretty">Noop will not estimate an age from a partial week. Four nights is enough to draw something plausible and not enough to draw something true, so this screen stays empty until it isn't.</span>
+            <span style="font-size:11px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Estimates from a wrist sensor, not a diagnosis. No part of this screen is a medical device.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isDriver }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:118px">
+          <div style="padding:56px 18px 6px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goAges }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Your ages</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:12px">
+            <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em;line-height:1.22;text-wrap:pretty">{{ dLead }}</span>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ dLabel }}</span>
+                <span style="font-size:11px;color:#7F8A85">{{ dRank }}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="{{ dBigStyle }}">{{ dEffect }}</span>
+                <span style="font-size:13px;color:#939C97;padding-bottom:4px">{{ dWord }} Body Age</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px">
+                <div style="position:relative;height:22px">
+                  <span style="{{ dCurLabel }}">{{ dCur }}</span>
+                  <span style="{{ dCurMark }}"></span>
+                </div>
+                <div style="display:flex;gap:3px">
+                  <sc-for list="{{ dSegs }}" as="s" hint-placeholder-count="10">
+                    <div style="{{ s.s }}"></div>
+                  </sc-for>
+                </div>
+                <div style="position:relative;height:22px">
+                  <span style="{{ dAvgMark }}"></span>
+                  <span style="{{ dAvgLabel }}">{{ dAvg }}</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ dMin }}</span>
+                  <span style="font-size:10.5px;color:#8B958F">{{ dScaleNote }}</span>
+                  <span style="font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ dMax }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Ten weeks</span>
+                <span style="font-size:11px;color:#7F8A85">{{ dTrendNote }}</span>
+              </div>
+              <svg viewBox="0 0 300 84" style="width:100%;height:84px;overflow:visible">
+                <polyline points="{{ dTrendLine }}" fill="none" stroke="{{ dColor }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                <circle cx="{{ dTrendDotX }}" cy="{{ dTrendDotY }}" r="3.2" fill="#0A0C0B" stroke="{{ dColor }}" stroke-width="1.9"></circle>
+              </svg>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:9px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">What would move it</span>
+              <span style="font-size:13.5px;line-height:1.65;color:#C6CEC9;text-wrap:pretty">{{ dMove }}</span>
+            </div>
+
+            <span style="font-size:11px;line-height:1.6;color:#7F8A85;padding:2px 2px 0;text-wrap:pretty">{{ dCaveat }}</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isMethod }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:118px">
+          <div style="padding:56px 18px 6px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goAges }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Your ages</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:12px">
+            <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em;line-height:1.22;text-wrap:pretty">It is a model, and you should know what it is made of.</span>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:6px 16px">
+              <sc-for list="{{ inputs }}" as="i" hint-placeholder-count="6">
+                <div style="{{ i.row }}">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13.5px;color:#EDF1EF">{{ i.label }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85">{{ i.cover }}</span>
+                  </div>
+                  <span style="{{ i.chip }}">{{ i.state }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Confidence</span>
+              <div style="display:grid;grid-template-columns:repeat(14,1fr);gap:4px">
+                <sc-for list="{{ instruments }}" as="n" hint-placeholder-count="28">
+                  <div style="{{ n.s }}"></div>
+                </sc-for>
+              </div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:12.5px;color:#C6CEC9">{{ evidence }}</span>
+                <span style="font-size:11px;color:#7F8A85">28 possible</span>
+              </div>
+              <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;text-wrap:pretty">{{ confidenceNote }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Why ± 5 years</span>
+              <span style="font-size:13.5px;line-height:1.65;color:#C6CEC9;text-wrap:pretty">The model was fitted on a population, and on that population it lands within about five years of the truth. Your own five years are not noise to be averaged away — they are the honest width of the answer, which is why the band is drawn every time the number is.</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:11px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">What it is not</span>
+              <sc-for list="{{ nots }}" as="n" hint-placeholder-count="3">
+                <div style="display:flex;gap:10px;align-items:flex-start">
+                  <span style="width:5px;height:5px;flex:none;margin-top:7px;border-radius:50%;background:#57605C"></span>
+                  <span style="font-size:13px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ n.t }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <span style="font-size:11px;line-height:1.6;color:#7F8A85;padding:2px 2px 0;text-wrap:pretty">Everything on this screen was computed on this phone. Nothing was sent anywhere to produce it.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isHealth }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:118px">
+          <div style="padding:56px 18px 6px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goBack }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">You</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:12px">
+            <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em;line-height:1.22;text-wrap:pretty">What was measured last night, and nothing estimated from it.</span>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px 16px 6px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Overnight vitals</span>
+              <sc-for list="{{ vitals }}" as="v" hint-placeholder-count="5">
+                <div style="{{ v.row }}">
+                  <span style="flex:1;font-size:13.5px;color:#EDF1EF">{{ v.label }}</span>
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+                    <div style="display:flex;align-items:baseline;gap:4px">
+                      <span style="{{ v.numStyle }}">{{ v.value }}</span>
+                      <span style="font-size:11px;color:#7F8A85">{{ v.unit }}</span>
+                    </div>
+                    <span style="font-size:11px;color:#7F8A85">{{ v.base }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px 16px 6px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Body composition</span>
+              <div style="display:flex;align-items:center;gap:12px;min-height:56px;border-bottom:.5px solid rgba(255,255,255,.06);margin-top:6px;padding:8px 0">
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:13.5px;color:#EDF1EF">Weight</span>
+                  <span style="{{ wtSubStyle }}">{{ wtSub }}</span>
+                </div>
+                <sc-if value="{{ wtSparkOn }}" hint-placeholder-val="{{ false }}">
+                  <svg viewBox="0 0 76 26" style="width:76px;height:26px;flex:none;overflow:visible">
+                    <polyline points="{{ wtSpark }}" fill="none" stroke="{{ wtStroke }}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                    <circle cx="{{ wtDotX }}" cy="{{ wtDotY }}" r="2.4" fill="{{ wtStroke }}"></circle>
+                  </svg>
+                </sc-if>
+                <div style="display:flex;align-items:baseline;gap:4px">
+                  <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:300;letter-spacing:-.02em;font-variant-numeric:tabular-nums">{{ wtNow }}</span>
+                  <span style="font-size:11px;color:#7F8A85">kg</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;min-height:56px">
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:13.5px;color:#EDF1EF">Body fat</span>
+                  <span style="font-size:11.5px;color:#7F8A85">never entered — the strap cannot measure it</span>
+                </div>
+                <span style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:200;color:#3E4643;line-height:1">—</span>
+              </div>
+            </div>
+
+            <div onClick="{{ goAges }}" style="background:linear-gradient(158deg,rgba(46,204,128,.16),rgba(46,204,128,.03));border:.5px solid rgba(46,204,128,.3);border-radius:24px;padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer">
+              <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8FEFC0;font-weight:600">Estimated</span>
+                <span style="font-size:15px;color:#EDF1EF">Your ages</span>
+                <span style="font-size:11.5px;line-height:1.5;color:#B4C9BE;text-wrap:pretty">Body Age {{ bodyAge }} · Fitness Age 31 · five domains — all of it lives in one place now</span>
+              </div>
+              <span style="width:9px;height:9px;flex:none;border-top:1.7px solid #8FEFC0;border-right:1.7px solid #8FEFC0;transform:rotate(45deg)"></span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+              <sc-for list="{{ healthLinks }}" as="l" hint-placeholder-count="2">
+                <div onClick="{{ l.go }}" style="{{ l.row }}">
+                  <span style="{{ l.icon }}"></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13.5px;color:#EDF1EF">{{ l.k }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85">{{ l.sub }}</span>
+                  </div>
+                  <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+                </div>
+              </sc-for>
+            </div>
+
+            <span style="font-size:11px;line-height:1.6;color:#7F8A85;padding:2px 2px 0;text-wrap:pretty">Measured values, as recorded. Where a value is absent it is shown absent — nothing on this screen is filled in with a plausible number.</span>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none;z-index:6">
+        <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5);pointer-events:auto">
+          <div onClick="{{ tabToday }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoToday }}"></span>
+          </div>
+          <sc-if value="{{ onTrendsBranch }}" hint-placeholder-val="{{ true }}">
+            <div onClick="{{ goBack }}" style="{{ parentPill }}">
+              <span style="{{ icoParentOn }}"></span>
+              <span style="{{ parentPillLabel }}">Trends</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ onHealthBranch }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ tabTrends }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="{{ icoTrends }}"></span>
+            </div>
+          </sc-if>
+          <div onClick="{{ tabLog }}" style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(23,162,230,.4)">
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;color:#04121A;line-height:1;margin-top:-2px">+</span>
+          </div>
+          <div onClick="{{ tabRest }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoRest }}"></span>
+          </div>
+          <sc-if value="{{ onHealthBranch }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ goBack }}" style="{{ parentPill }}">
+              <span style="{{ icoParentOn }}"></span>
+              <span style="{{ parentPillLabel }}">You</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ onTrendsBranch }}" hint-placeholder-val="{{ true }}">
+            <div onClick="{{ tabYou }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="{{ icoYou }}"></span>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </x-import>
+  </div>
+</div>
+
+<sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+<div style="width:430px;flex:none;padding-top:34px;display:flex;flex-direction:column;gap:30px">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:33px;line-height:1.16;letter-spacing:-.028em;color:#17150F;text-wrap:pretty">Three ages, kept apart on purpose.</h1>
+    <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;text-wrap:pretty">Body Age answers <em style="font-family:'Instrument Serif',serif;font-style:italic">how is my body doing against the clock</em>. Fitness Age answers <em style="font-family:'Instrument Serif',serif;font-style:italic">how much oxygen can I use</em>. The domains answer <em style="font-family:'Instrument Serif',serif;font-style:italic">where do I stand today</em>. Merging them into one hero number would be the easy design and the dishonest one, so the screen stacks them in descending authority instead — and every one of them carries its error where it is read.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:7px">
+    <sc-for list="{{ chips }}" as="c" hint-placeholder-count="5">
+      <span onClick="{{ c.go }}" style="{{ c.s }}">{{ c.k }}</span>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0">
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T1 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The band is the number</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Reference apps put the age in an orb and hide the error bar. Here the ± 5 years is the hero graphic: a lit span on a real age scale, with your actual age marked as a tick beside it. Younger or older is readable from <strong style="font-weight:600;color:#17150F">position</strong>, before any colour or copy — and it makes a one-week wobble visibly meaningless.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T2 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Component one — a signed contribution</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Bars leave a centre line. Left in cyan takes years off, right in amber adds them, and the signed value is stated in text so colour is never the only carrier. Length is relative to the largest driver, never to the age itself. Tap any row for its own screen.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T3 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Component two — a weighted standing</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Deliberately the opposite shape: no centre line, no sign, left-anchored fills on a shared 0–100 ruler, in periwinkle rather than the signed pair. Weight is carried by <strong style="font-weight:600;color:#17150F">bar thickness</strong> and stated as “28% of score”, so the heaviest domain reads first. Nobody should mistake one of these for a driver.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T4 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Uncertainty travels into the history</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">The ten-week series is drawn inside a ribbon of the same ± 5 years. The line moves; the ribbon dwarfs it. That is the correct impression, and it costs nothing to draw.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T5 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The first week is the product</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">The not-ready state keeps the same hero frame and puts an em dash where the number goes — so the shape of the answer is learned before the answer arrives. Four statuses, each a word plus a distinct mark: Ready, Building, Needed, Optional. It says the date the first estimate lands.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T6 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Fitness Age is demoted, not hidden</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Two small tiles in periwinkle under the heading “A different question”, with the caveat set as body copy directly beneath rather than behind an info tap. Different hue, smaller numbers, subordinate position — three signals that it is not the headline.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#C4657A;letter-spacing:.06em;padding-top:3px">W3 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The weight trend, inline on the Weight row</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Direction and rate on the row itself, gated twice — the <strong style="font-weight:600;color:#17150F">0.5 kg</strong> noise threshold and the <strong style="font-weight:600;color:#17150F">six-week window</strong>. Together they mean most wearers see no direction at all for six weeks, so <em style="font-family:'Instrument Serif',serif;font-style:italic">learning</em> is the design's normal state and says what it is waiting for rather than drawing a flat line. <strong style="font-weight:600;color:#17150F">steady</strong> is the other quiet case: the window is long enough, the movement is not. No goal line, no target, no <em style="font-family:'Instrument Serif',serif;font-style:italic">to go</em> figure, no projection — and the sparkline only appears once the window gate is passed, because a six-week line invites exactly the reading the gate exists to prevent. On <em style="font-family:'Instrument Serif',serif;font-style:italic">weightTrend</em>.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11);border-bottom:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em;padding-top:3px">Q8 · CALL</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Health hub vs Your ages — my answer</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty"><strong style="font-weight:600;color:#17150F">Your ages owns every estimate. The Health hub keeps only what was measured.</strong> That line is worth more than tidiness: the app already promises the wearer will always know whether they are reading a measurement or a generated sentence, and this makes the same cut for measurement versus estimate. The hub becomes vitals and composition — recorded facts, no error bars — and hands off to Your ages in a single card that shows both numbers so nobody has to hunt. Folding the ages back into the hub would put a ± 5 year model next to a resting heart rate of 52 as if they were the same kind of claim.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;padding:2px 0 0">
+    <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:rgba(23,21,15,.5);letter-spacing:.06em">STILL OPEN</span>
+    <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">The other eight areas in the second brief — Coach and its setup first — are not in this act. Say the word and I will take Svea next, since it is the one screen that has to prove a generated sentence can never be mistaken for a measured one.</span>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ages&quot;,&quot;building&quot;,&quot;driver&quot;,&quot;method&quot;,&quot;health&quot;],&quot;default&quot;:&quot;ages&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;schedule&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;day&quot;,&quot;night&quot;],&quot;default&quot;:&quot;day&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;bodyAge&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:34,&quot;min&quot;:22,&quot;max&quot;:62,&quot;unit&quot;:&quot;yr&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Body Age&quot;},&quot;pace&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:0.8,&quot;min&quot;:-0.4,&quot;max&quot;:2.4,&quot;step&quot;:0.1,&quot;unit&quot;:&quot;×&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Body Age&quot;},&quot;confidence&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;high&quot;,&quot;moderate&quot;,&quot;low&quot;],&quot;default&quot;:&quot;moderate&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Body Age&quot;},&quot;weightTrend&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;learning&quot;,&quot;steady&quot;,&quot;down&quot;,&quot;up&quot;],&quot;default&quot;:&quot;learning&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Body composition&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+class Component extends DCLogic {
+  state = { sx: null, sy: null, screen: null, driver: 1 };
+
+  componentDidUpdate(prev) {
+    const p = this.props;
+    if ((prev.screen !== p.screen || prev.navSeq !== p.navSeq) && p.screen) this.setState({ screen: p.screen });
+  }
+
+  renderVals() {
+    const A = '#2ECC80', LAV = '#8B99D6', WARM = '#F2B45C';
+    const NIGHT = (this.props.schedule || 'day') === 'night';
+    const CY = '#8FEFC0', AM = '#F3C888';
+    const self = this;
+
+    const GLYPH = {
+      today: 'M12 3v2M12 19v2M4.2 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z',
+      trends: 'M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9',
+      moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+      you: 'M12 4.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM5.5 19.5c0-3.3 2.9-5.3 6.5-5.3s6.5 2 6.5 5.3',
+      info: 'M12 4.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2zM12 10.6v5.2M12 8.1v.1',
+      drop: 'M12 3.6s5.4 5.6 5.4 9.4A5.4 5.4 0 0 1 12 18.4a5.4 5.4 0 0 1-5.4-5.4C6.6 9.2 12 3.6 12 3.6z',
+      heart: 'M12 20s-7-4.6-7-9.4A3.8 3.8 0 0 1 12 8a3.8 3.8 0 0 1 7 2.6C19 15.4 12 20 12 20z'
+    };
+    const mask = function (d) {
+      return 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+    };
+    const ico = function (key, size, color) {
+      const u = mask(GLYPH[key]);
+      return {
+        width: size, height: size, flex: 'none', display: 'block', background: color,
+        WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+      };
+    };
+    const hair = function (i) { return { borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.06)' }; };
+
+    const screen = this.state.screen || this.props.screen || 'ages';
+    const go = function (s) { return function () { self.setState({ screen: s }); }; };
+    const conf = this.props.confidence || 'moderate';
+    const instrumentCount = conf === 'high' ? 22 : conf === 'low' ? 6 : 14;
+
+    // ── the confidence ladder, 60-parity Part 5 §C ¶1 / 20-primitives §15:
+    //    two rungs in this screen's own hue, ramped through the tinted-card range.
+    //    Solid is plain — no chip — because most numbers are solid most of the time.
+    const CONF = (function () {
+      const rung = conf === 'low' ? 'calibrating' : conf === 'high' ? 'solid' : 'building';
+      const cal = rung === 'calibrating';
+      const H = '46,204,128';
+      return {
+        on: cal || rung === 'building',
+        box: {
+          display: 'flex', alignItems: 'center', gap: 6, flex: 'none',
+          padding: '4px 9px 4px 8px', borderRadius: 10,
+          background: 'rgba(' + H + (cal ? ',.07)' : ',.12)'),
+          border: '.5px solid rgba(' + H + (cal ? ',.22)' : ',.3)')
+        },
+        dot: { width: 5, height: 5, borderRadius: '50%', flex: 'none', background: 'rgba(' + H + (cal ? ',.42)' : ',.75)') },
+        labelStyle: { fontSize: 10, letterSpacing: '.05em', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: cal ? '#8B958F' : '#9EF0CC' },
+        label: cal ? '6 of 28 instruments' : 'Building \u00b7 14 of 28 instruments'
+      };
+    })();
+
+
+    const bodyAge = Math.round(Number(this.props.bodyAge != null ? this.props.bodyAge : 34));
+    const chrono = 40;
+    const diff = chrono - bodyAge;
+    const dir = diff >= 1 ? 'younger' : diff <= -1 ? 'older' : 'same';
+    const n = Math.abs(diff);
+    const yrs = n === 1 ? '1 year' : n + ' years';
+    const delta = dir === 'same' ? 'About your age' : yrs + ' ' + dir + ' than your age';
+    const lead = dir === 'younger'
+      ? 'Your body is running about ' + yrs + ' behind your birthday, and it has been for two months.'
+      : dir === 'older'
+        ? 'Your body is running about ' + yrs + ' ahead of your birthday, and three things are doing it.'
+        : 'Your body is reading close to the age on your passport, which is exactly average.';
+
+    // ── pace sets the temperature, exactly as it does on Trends ──
+    const pace = Number(this.props.pace != null ? this.props.pace : 0.8);
+    const heat = Math.max(0, Math.min(1, (pace - 1) / 1.1));
+    const lerp6 = function (a, b, t) { return Math.round(a + (b - a) * t); };
+    const hot6 = heat < 0.55
+      ? [lerp6(46, 242, heat / 0.55), lerp6(204, 180, heat / 0.55), lerp6(128, 92, heat / 0.55)]
+      : [lerp6(242, 198, (heat - 0.55) / 0.45), lerp6(180, 104, (heat - 0.55) / 0.45), lerp6(92, 72, (heat - 0.55) / 0.45)];
+    const hotRGB6 = hot6[0] + ',' + hot6[1] + ',' + hot6[2];
+    const miniWash = heat < 0.02 ? { display: 'none' } : {
+      position: 'absolute', width: 126, height: 126, pointerEvents: 'none',
+      borderRadius: '63% 37% 45% 55%/52% 61% 39% 48%', filter: 'blur(3px)',
+      animation: 'miniMorph 24s ease-in-out infinite',
+      background: 'radial-gradient(circle at 50% 50%,rgba(8,11,10,0) 30%,rgba(' + hotRGB6 + ',' + (heat * 0.34).toFixed(2) +
+        ') 44%,rgba(' + hotRGB6 + ',' + (heat * 0.92).toFixed(2) + ') 70%,rgba(' + hotRGB6 + ',' + (heat * 0.4).toFixed(2) +
+        ') 86%,rgba(' + hotRGB6 + ',0) 100%)'
+    };
+
+    // ── the mini aura that carries over from Trends ──────────────
+    const mHash = function (k) { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+    const miniSpecks = [];
+    for (let i = 0; i < 30; i++) {
+      const ang = i * 2.39996 + mHash(i) * 1.1;
+      const rad = 0.58 + mHash(i + 90) * 0.44;
+      const sz = 1 + mHash(i + 31) * 1.8;
+      miniSpecks.push({ s: {
+        position: 'absolute',
+        left: (50 + Math.cos(ang) * rad * 47).toFixed(2) + '%',
+        top: (50 + Math.sin(ang) * rad * 47).toFixed(2) + '%',
+        width: Number(sz.toFixed(1)), height: Number(sz.toFixed(1)), borderRadius: '50%',
+        background: 'rgba(216,255,236,' + (0.22 + mHash(i + 11) * 0.45).toFixed(2) + ')',
+        boxShadow: '0 0 ' + (sz * 2.6).toFixed(1) + 'px rgba(104,230,164,.8)',
+        transform: 'translate(-50%,-50%)'
+      } });
+    }
+
+    // ── the band, drawn on a real age scale ──────────────────────
+    const lo = bodyAge - 5, hi = bodyAge + 5;
+    const sMin = Math.min(lo, chrono) - 3, sMax = Math.max(hi, chrono) + 3;
+    const pct = function (v) { return ((v - sMin) / (sMax - sMin)) * 100; };
+    const cap = function (left) {
+      return { position: 'absolute', left: 'calc(' + left + '% - 1px)', top: 21, width: 2, height: 16, borderRadius: 1, background: 'rgba(150,240,200,.75)' };
+    };
+    const bandSentence = dir === 'same'
+      ? 'and yours sits across your own age.'
+      : 'and yours runs from ' + lo + ' to ' + hi + '.';
+
+    // ── drivers: signed contributions ────────────────────────────
+    const DRV = [
+      { label: 'Cardio fitness', eff: -2.9, unit: '', min: 30, max: 55, cur: 47.2, avg: 45.1, curL: '47.2 now', avgL: '45.1 six-month', good: 'high',
+        scale: 'ml/kg/min, estimated',
+        lead: 'Your capacity is the single largest thing holding the number down.',
+        move: 'One weekly effort above 85% of your maximum heart rate moves this more than anything else on the screen. Long steady work moves it too, just slower.',
+        caveat: 'Estimated from heart rate against pace, not from a lab test. The error on the estimate is about 3 ml/kg/min.' },
+      { label: 'Sleep regularity', eff: -2.4, unit: '%', min: 40, max: 100, cur: 85, avg: 78, curL: '85% now', avgL: '78% six-month', good: 'high',
+        scale: 'consistency of sleep timing',
+        lead: 'Your sleep timing is the steadiest it has been all year, and the model is paying you for it.',
+        move: NIGHT
+          ? 'Hold your anchor on the two sleeps that still slide — the first rest day after a night run, and the changeover. The model reads a four-hour slide as a fresh time zone, and it costs more than a short night does.'
+          : 'Bed inside the same hour on the two nights you still drift — Friday and Saturday. Regularity counts for more here than duration does.',
+        caveat: NIGHT
+          ? 'On a rotating roster regularity is measured against your own anchor, not a clock hour. It is scored separately from how long you slept.'
+          : 'Regularity is how consistent your timing is, not how long you slept. The two are scored separately.' },
+      { label: 'Resting heart rate', eff: -1.6, unit: ' bpm', min: 42, max: 78, cur: 52, avg: 55, curL: '52 now', avgL: '55 six-month', good: 'low',
+        scale: 'lower is better here',
+        lead: 'Fifty-two beats at rest is well under the norm for forty.',
+        move: 'This one follows the others. It fell three beats while sleep regularity rose, and it will not move on its own.',
+        caveat: 'Taken from the lowest sustained stretch of the night, which makes it sensitive to a warm room or a late meal.' },
+      { label: 'Daily movement', eff: 0.9, unit: 'k', min: 2, max: 14, cur: 6.4, avg: 6.9, curL: '6.4k now', avgL: '6.9k six-month', good: 'high',
+        scale: 'thousand steps a day',
+        lead: 'Six and a half thousand steps a day is the one factor adding years.',
+        move: 'The model reads total daily steps, not workouts. Two thousand more a day — roughly twenty minutes of walking — would take this factor to neutral.',
+        caveat: 'Steps come from the strap only. Anything you did without wearing it is not counted, and is not guessed at.' },
+      { label: 'Variability vs your age', eff: 0.4, unit: ' ms', min: 30, max: 110, cur: 68, avg: 66, curL: '68 ms now', avgL: '66 ms six-month', good: 'high',
+        scale: 'nocturnal HRV against the norm for 40',
+        lead: 'Sixty-eight milliseconds is normal, and just below the median for your age.',
+        move: 'Your own journal points at two things: alcohol and late meals. Both show up in this line within a night.',
+        caveat: 'HRV is compared with a population norm for your age band. Individual variation is wide, so a small gap here means very little.' }
+    ];
+    const maxEff = 2.9;
+    const fmtEff = function (v) { return (v < 0 ? '−' : '+') + Math.abs(v).toFixed(1) + ' yr'; };
+    const drivers = DRV.map(function (d, i) {
+      const prot = d.eff < 0;
+      const w = 6 + (Math.abs(d.eff) / maxEff) * 42;
+      const c = prot ? CY : AM;
+      return {
+        label: d.label, effect: fmtEff(d.eff),
+        open: function () { self.setState({ screen: 'driver', driver: i }); },
+        row: Object.assign({ display: 'flex', alignItems: 'center', gap: 11, minHeight: 40, cursor: 'pointer' }, hair(i)),
+        bar: Object.assign(
+          { position: 'absolute', top: 5, height: 10, borderRadius: 3, background: c },
+          prot ? { right: '50%', width: w + '%' } : { left: '50%', width: w + '%' }
+        ),
+        val: { width: 58, flex: 'none', textAlign: 'right', fontFamily: "'Outfit',sans-serif", fontSize: 14.5, fontWeight: 400, letterSpacing: '-.01em', fontVariantNumeric: 'tabular-nums', color: c }
+      };
+    });
+
+    // ── history with the ±5 ribbon ───────────────────────────────
+    const hist = [];
+    for (let i = 0; i < 10; i++) {
+      const t = i / 9;
+      hist.push(bodyAge + 3.1 * (1 - t) + Math.sin(i * 1.71) * 0.34 + Math.sin(i * 0.63) * 0.22);
+    }
+    hist[9] = bodyAge;
+    const hMin = Math.min.apply(null, hist) - 6.4, hMax = Math.max.apply(null, hist) + 6.4;
+    const hx = function (i) { return (i / 9) * 300; };
+    const hy = function (v) { return ((hMax - v) / (hMax - hMin)) * 104; };
+    const pts = function (off) {
+      return hist.map(function (v, i) { return hx(i).toFixed(1) + ',' + hy(v + off).toFixed(1); });
+    };
+    const dates = ['14 Jun', '21 Jun', '28 Jun', '5 Jul', '12 Jul', '19 Jul', '26 Jul', '2 Aug', '9 Aug', '16 Aug'];
+    const hd = hist[9] - hist[0];
+
+    // ── domains: weighted 0–100 standings ────────────────────────
+    const DOM = [
+      { label: 'Cardiovascular', score: 78, weight: '28%', h: 11 },
+      { label: 'Activity', score: 64, weight: '24%', h: 9 },
+      { label: 'Body composition', score: 71, weight: '18%', h: 7 },
+      { label: 'Recovery', score: 82, weight: '15%', h: 5.5 },
+      { label: 'Lifestyle', score: 55, weight: '15%', h: 5.5 }
+    ];
+    const domains = DOM.map(function (d) {
+      return {
+        label: d.label, score: d.score, weight: d.weight,
+        track: { position: 'relative', height: d.h, borderRadius: d.h / 2, background: 'rgba(255,255,255,.09)', overflow: 'hidden' },
+        fill: { position: 'absolute', left: 0, top: 0, bottom: 0, width: d.score + '%', borderRadius: d.h / 2, background: LAV }
+      };
+    });
+
+    // ── not-ready checklist ──────────────────────────────────────
+    const markFor = function (s) {
+      const base = { width: 15, height: 15, flex: 'none', borderRadius: '50%', boxSizing: 'border-box' };
+      if (s === 'Ready') return Object.assign({}, base, { background: A, border: '1.5px solid ' + A, boxShadow: 'inset 0 0 0 2.5px #141817' });
+      if (s === 'Building') return Object.assign({}, base, { border: '1.5px solid ' + LAV, background: 'linear-gradient(90deg,' + LAV + ' 50%,transparent 50%)' });
+      if (s === 'Needed') return Object.assign({}, base, { border: '1.5px solid ' + WARM, background: 'transparent' });
+      return { width: 15, height: 15, flex: 'none', borderTop: '1.5px solid #57605C', marginTop: 7 };
+    };
+    const wordFor = function (s) {
+      const c = s === 'Ready' ? A : s === 'Building' ? LAV : s === 'Needed' ? WARM : '#6C7570';
+      return { flex: 'none', fontSize: 10, fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase', color: c };
+    };
+    const checklist = [
+      { label: 'Nights of sleep', status: 'Building', detail: '4 of the last 7 nights · needs 7' },
+      { label: 'Nocturnal variability', status: 'Building', detail: '5 of 14 nights · needs 14' },
+      { label: 'Resting heart rate baseline', status: 'Ready', detail: '14 nights, holding steady' },
+      { label: 'Step history', status: 'Ready', detail: '9 days recorded' },
+      { label: 'Cardio fitness estimate', status: 'Needed', detail: 'no walk or run long enough to read yet' },
+      { label: 'Body composition', status: 'Optional', detail: 'sharpens the domain breakdown, never the age' }
+    ].map(function (c, i) {
+      return {
+        label: c.label, status: c.status, detail: c.detail,
+        row: Object.assign({ display: 'flex', alignItems: 'flex-start', gap: 13, padding: '15px 0', minHeight: 34 }, hair(i)),
+        mark: markFor(c.status), word: wordFor(c.status)
+      };
+    });
+
+    // ── driver detail ────────────────────────────────────────────
+    const di = Math.min(this.state.driver || 0, DRV.length - 1);
+    const D = DRV[di];
+    const dProt = D.eff < 0;
+    const dColor = dProt ? CY : AM;
+    const dPos = function (v) { return Math.max(4, Math.min(96, ((v - D.min) / (D.max - D.min)) * 100)); };
+    const dSegs = [];
+    for (let s = 0; s < 10; s++) {
+      const t = D.good === 'high' ? s / 9 : 1 - s / 9;
+      dSegs.push({ s: { flex: 1, height: 12, borderRadius: 2, background: t > 0.62 ? 'rgba(46,204,128,' + (0.28 + t * 0.5) + ')' : t > 0.35 ? 'rgba(255,255,255,.13)' : 'rgba(242,180,92,' + (0.5 - t * 0.5) + ')' } });
+    }
+    const dTrend = [];
+    for (let i = 0; i < 10; i++) {
+      const t = i / 9;
+      dTrend.push(D.avg + (D.cur - D.avg) * t + Math.sin(i * 1.6) * (D.max - D.min) * 0.012);
+    }
+    dTrend[9] = D.cur;
+    const tMin = Math.min.apply(null, dTrend), tMax = Math.max.apply(null, dTrend);
+    const tPad = (tMax - tMin) * 0.5 + 0.3;
+    const ty = function (v) { return ((tMax + tPad - v) / (tMax - tMin + tPad * 2)) * 84; };
+    const dTrendPts = dTrend.map(function (v, i) { return ((i / 9) * 300).toFixed(1) + ',' + ty(v).toFixed(1); });
+    const markLabel = function (leftPct, color, above) {
+      return {
+        position: 'absolute', left: leftPct + '%', transform: 'translateX(-50%)',
+        top: above ? 0 : 6, fontSize: 11, fontWeight: 600, color: color, whiteSpace: 'nowrap',
+        fontVariantNumeric: 'tabular-nums'
+      };
+    };
+
+    // ── method ───────────────────────────────────────────────────
+    const inputs = [
+      { label: 'Resting heart rate', cover: '14 of 14 nights', state: 'Reading' },
+      { label: 'Cardio fitness', cover: 'estimated 6 days ago', state: 'Reading' },
+      { label: 'Sleep duration', cover: '13 of 14 nights', state: 'Reading' },
+      { label: 'Sleep regularity', cover: '13 of 14 nights', state: 'Reading' },
+      { label: 'Nocturnal variability', cover: '14 of 14 nights', state: 'Reading' },
+      { label: 'Daily steps', cover: '11 of 14 days · 3 days unworn', state: 'Partial' }
+    ].map(function (r, i) {
+      const partial = r.state !== 'Reading';
+      return {
+        label: r.label, cover: r.cover, state: r.state,
+        row: Object.assign({ display: 'flex', alignItems: 'center', gap: 12, minHeight: 58 }, hair(i)),
+        chip: {
+          flex: 'none', fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase',
+          padding: '4px 8px', borderRadius: 7,
+          color: partial ? AM : CY, background: partial ? 'rgba(242,180,92,.12)' : 'rgba(46,204,128,.12)'
+        }
+      };
+    });
+    const instruments = [];
+    for (let i = 0; i < 28; i++) {
+      instruments.push({ s: { height: 16, borderRadius: 3, background: i < instrumentCount ? A : 'rgba(255,255,255,.09)' } });
+    }
+    const nots = [
+      { t: 'Not a prediction about you. It is a comparison with a population, and populations do not have birthdays.' },
+      { t: 'Not a diagnosis, and not a screen for anything. A number that looks fine does not rule anything out.' },
+      { t: 'Not blood work. Six wrist signals cannot see your cholesterol, and this model does not pretend to.' }
+    ];
+
+    // ── health hub ───────────────────────────────────────────────
+    const num = { fontFamily: "'Outfit',sans-serif", fontSize: 20, fontWeight: 300, letterSpacing: '-.02em', fontVariantNumeric: 'tabular-nums', color: '#EDF1EF' };
+    // ── THE WEIGHT TREND, wave 3d. Gated twice, by 70-copy.md: |change| must clear the
+    //    0.5 kg noise threshold AND the window must be longer than six weeks. Both gates mean
+    //    MOST WEARERS SEE NO DIRECTION FOR SIX WEEKS — that is this design's normal state, not
+    //    its empty one, so 'learning' says what it is waiting for rather than drawing a flat line.
+    //    No goal line, no target, no "to go", no projection. The figure IS the series' last
+    //    reading, so the number and the sparkline cannot disagree.
+    const WT = (function () {
+      const c = self.props.weightTrend || 'learning';
+      const NOISE = 0.5, GATE_WEEKS = 6;
+      const SER = {
+        learning: [74.6, 74.4, 74.9, 74.3, 74.5, 74.2],
+        steady: [74.4, 74.6, 74.1, 74.5, 74.3, 74.6, 74.2, 74.5, 74.3, 74.4, 74.2, 74.2],
+        down: [77.1, 76.8, 76.9, 76.4, 76.1, 76.2, 75.7, 75.4, 75.5, 75.0, 74.6, 74.2],
+        up: [72.1, 72.4, 72.3, 72.8, 73.0, 72.9, 73.3, 73.6, 73.5, 73.9, 74.0, 74.2]
+      }[c];
+      const weeks = SER.length;
+      const chg = SER[SER.length - 1] - SER[0];
+      const passes = weeks > GATE_WEEKS && Math.abs(chg) > NOISE;
+      const perMonth = Math.abs(chg) / weeks * 4.345;
+      const rate = perMonth.toFixed(1) + ' kg a month';
+      const lo = Math.min.apply(null, SER), hi = Math.max.apply(null, SER), span = (hi - lo) || 1;
+      const pts = SER.map(function (v, i) {
+        return [(i / (SER.length - 1) * 76).toFixed(1), (23 - (v - lo) / span * 20).toFixed(1)];
+      });
+      return {
+        now: SER[SER.length - 1].toFixed(1),
+        sparkOn: weeks > GATE_WEEKS,
+        spark: pts.map(function (p) { return p.join(','); }).join(' '),
+        dotX: pts[pts.length - 1][0], dotY: pts[pts.length - 1][1],
+        stroke: passes ? '#8FEFC0' : 'rgba(255,255,255,.22)',
+        muted: !passes,
+        sub: weeks <= GATE_WEEKS
+          ? 'Six readings so far. Noop calls a direction after six weeks, not before.'
+          : passes
+            ? (chg < 0 ? 'Down ' : 'Up ') + rate + ' over ' + weeks + ' weeks'
+            : 'Steady \u2014 ' + weeks + ' weeks of readings, and none of the movement clears half a kilo'
+      };
+    })();
+
+    const vitals = [
+      { label: 'Resting heart rate', value: '52', unit: 'bpm', base: '14-night avg 54' },
+      { label: 'Variability', value: '68', unit: 'ms', base: '14-night avg 66' },
+      { label: 'Breathing rate', value: '14.2', unit: 'rpm', base: '14-night avg 14.4' },
+      { label: 'Blood oxygen', value: '97', unit: '%', base: 'within your usual range' },
+      { label: 'Skin temperature', value: '−0.2', unit: '°C', base: 'against your own baseline' }
+    ].map(function (v, i) {
+      return {
+        label: v.label, value: v.value, unit: v.unit, base: v.base, numStyle: num,
+        row: Object.assign({ display: 'flex', alignItems: 'center', gap: 12, minHeight: 62 }, hair(i))
+      };
+    });
+    const healthLinks = [
+      { k: 'Biomarkers', sub: '2 of 7 markers outside the lab band · drawn 14 Aug', g: 'drop', to: 'labs' },
+      { k: 'Health monitor', sub: 'nothing flagged in 30 days', g: 'heart' }
+    ].map(function (l, i) {
+      return {
+        k: l.k, sub: l.sub, icon: ico(l.g, 19, l.to ? '#F2B45C' : A),
+        go: l.to ? function () { if (self.props.onNav) self.props.onNav('labs', l.to); } : function () {},
+        row: Object.assign({ display: 'flex', alignItems: 'center', gap: 13, minHeight: 60, cursor: 'pointer' }, hair(i))
+      };
+    });
+
+    const chipS = function (on) {
+      return {
+        cursor: 'pointer', fontSize: 12, fontWeight: 500, padding: '7px 12px', borderRadius: 9,
+        background: on ? '#17150F' : 'rgba(23,21,15,.06)', color: on ? '#fff' : '#4A463D',
+        border: '1px solid ' + (on ? '#17150F' : 'rgba(23,21,15,.12)')
+      };
+    };
+    const chips = [
+      { k: 'Your ages', s: 'ages' }, { k: 'First week', s: 'building' },
+      { k: 'A driver', s: 'driver' }, { k: 'How it is figured', s: 'method' }, { k: 'Health hub', s: 'health' }
+    ].map(function (c) { return { k: c.k, go: go(c.s), s: chipS(screen === c.s) }; });
+
+    const nav = this.props.onNav;
+    const tab = function (a, s) { return function () { if (nav) nav(a, s); }; };
+    const onHealth = screen === 'health';
+
+    return {
+      swipeStart: (e) => this.setState({ sx: e.clientX, sy: e.clientY }),
+      swipeEnd: (e) => {
+        const st = this.state;
+        if (st.sx == null) return;
+        const dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+        this.setState({ sx: null, sy: null });
+        if (dx <= 78 || Math.abs(dy) >= 58) return;
+        if (st.logs) { this.setState({ logs: false }); return; }
+        const cur = st.screen || this.props.screen || "ages";
+        // building and health leave the act, and the swipe matches their visible chevron
+        // exactly: building was entered from Trends, health from You. Sending either to
+        // `ages` would put them somewhere they were never standing.
+        if (cur === 'building') { if (nav) nav('picture', 'trends'); return; }
+        if (cur === 'health') { if (nav) nav('plumbing', 'you'); return; }
+        const to = ({"driver":"ages","method":"ages"})[cur];
+        if (to) this.setState({ screen: to });
+      },
+      confOn: CONF.on, confBox: CONF.box, confDot: CONF.dot, confLabelStyle: CONF.labelStyle, confLabel: CONF.label,
+      isDark: true, notes: this.props.showNotes !== false,
+      miniSpecks, miniWash, diffAbs: n, dirWord: dir === 'same' ? 'either way' : dir,
+      paceVal: pace.toFixed(1) + '×',
+      diffStyle: {
+        fontFamily: "'Outfit',sans-serif", fontSize: 23, fontWeight: 300, letterSpacing: '-.03em',
+        lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+        color: heat < 0.02 ? '#8FEFC0' : (heat < 0.55 ? '#F3C888' : '#E9A288')
+      },
+      isAges: screen === 'ages', isBuilding: screen === 'building', isDriver: screen === 'driver',
+      isMethod: screen === 'method', isHealth: onHealth,
+      goAges: go('ages'), goMethod: go('method'),
+      goBack: onHealth ? tab('plumbing', 'you') : tab('picture', 'trends'),
+      tabToday: tab('day', 'today'), tabRest: tab('night', 'rest'), tabYou: tab('plumbing', 'you'),
+      tabLog: tab('day', 'log'),
+      tabTrends: tab('picture', 'trends'),
+      parentLabel: onHealth ? 'You' : 'Trends',
+      onHealthBranch: onHealth, onTrendsBranch: !onHealth,
+      icoTrends: ico('trends', 19, '#7F8A85'),
+      parentPill: {
+        flex: 1.7, height: 46, borderRadius: 20, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+        background: onHealth ? '#F2B45C' : '#2ECC80'
+      },
+      parentPillLabel: { fontSize: 12.5, fontWeight: 600, color: onHealth ? '#1E1405' : '#04140C' },
+      icoParentOn: ico(onHealth ? 'you' : 'trends', 19, onHealth ? '#1E1405' : '#04140C'),
+      icoToday: ico('today', 19, '#7F8A85'), icoRest: ico('moon', 19, '#7F8A85'),
+      icoYou: ico('you', 19, onHealth ? '#7F8A85' : '#7F8A85'), icoInfo: ico('info', 20, A),
+      chips,
+
+      lead, bodyAge, chronoAge: chrono, delta, bandSentence, bandLo: lo, bandHi: hi,
+      deltaStyle: {
+        fontSize: 13.5, fontWeight: 500,
+        color: dir === 'younger' ? CY : dir === 'older' ? AM : '#939C97'
+      },
+      bandFill: {
+        position: 'absolute', left: pct(lo) + '%', width: (pct(hi) - pct(lo)) + '%',
+        top: 25, height: 8, borderRadius: 4,
+        background: 'linear-gradient(90deg,rgba(46,204,128,.35),rgba(46,204,128,.6))'
+      },
+      bandCapLo: cap(pct(lo)), bandCapHi: cap(pct(hi)),
+      bandDot: {
+        position: 'absolute', left: 'calc(' + pct(bodyAge) + '% - 7px)', top: 22,
+        width: 14, height: 14, borderRadius: '50%', background: '#EDF1EF',
+        boxShadow: '0 0 0 3px #141817, 0 0 12px rgba(150,240,200,.6)'
+      },
+      chronoTick: {
+        position: 'absolute', left: 'calc(' + pct(chrono) + '% - .5px)', top: 16,
+        width: 1, height: 24, background: 'rgba(237,241,239,.45)'
+      },
+      chronoLabel: {
+        position: 'absolute', left: Math.max(12, Math.min(88, pct(chrono))) + '%',
+        transform: 'translateX(-50%)', top: 0, fontSize: 10, letterSpacing: '.04em',
+        color: '#939C97', whiteSpace: 'nowrap'
+      },
+
+      drivers,
+
+      histLine: pts(0).join(' '),
+      histBand: 'M' + pts(5).join(' L') + ' L' + pts(-5).slice().reverse().join(' L') + ' Z',
+      histDotX: hx(9).toFixed(1), histDotY: hy(hist[9]).toFixed(1),
+      histDelta: (hd < 0 ? '−' : '+') + Math.abs(hd).toFixed(1) + ' yr since 14 Jun',
+      histChip: {
+        fontSize: 11, fontWeight: 600, padding: '4px 9px', borderRadius: 8,
+        color: hd < 0 ? CY : AM, background: hd < 0 ? 'rgba(46,204,128,.13)' : 'rgba(242,180,92,.13)'
+      },
+      histAxis: [dates[0], dates[3], dates[6], dates[9]].map(function (l) { return { label: l }; }),
+
+      evidence: instrumentCount + ' of 28 instruments · ' + conf + ' confidence',
+      hasDomains: conf !== 'low', noDomains: conf === 'low', domains,
+      confidenceNote: conf === 'low'
+        ? 'Six instruments is too few to score the domains, so they are not shown. Wearing the strap overnight for another week brings most of the rest online.'
+        : conf === 'high'
+          ? 'Twenty-two of twenty-eight are reading, which is as good as this gets without blood work. The six missing all need a lab result.'
+          : 'Fourteen reading, fourteen dark. Entering recent blood work would light six of them; the rest need longer wear.',
+
+      readCard: {
+        borderRadius: 24, padding: '18px 18px 17px', display: 'flex', flexDirection: 'column', gap: 9,
+        background: 'linear-gradient(158deg,rgba(46,204,128,.16),rgba(46,204,128,.03))',
+        border: '.5px solid rgba(46,204,128,.3)'
+      },
+      readBody: dir === 'older'
+        ? 'Two factors are doing almost all of it: movement and sleep regularity. Neither is a fitness problem — they are a scheduling problem, and the model responds to schedule faster than it responds to training.'
+        : 'Fitness and sleep regularity are carrying this, and they are carrying it together — the regularity came first and the resting pulse followed. The one factor working against you is the simplest to fix: it is steps, not training.',
+
+      dLead: D.lead, dLabel: D.label, dEffect: fmtEff(D.eff), dColor: dColor,
+      dWord: dProt ? 'off' : 'onto',
+      dRank: (di + 1) + (di === 0 ? 'st' : di === 1 ? 'nd' : di === 2 ? 'rd' : 'th') + ' largest of 5',
+      dBigStyle: { fontFamily: "'Outfit',sans-serif", fontSize: 52, fontWeight: 200, letterSpacing: '-.045em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: dColor },
+      dSegs, dMin: D.min + (D.unit || ''), dMax: D.max + (D.unit || ''), dScaleNote: D.scale,
+      dCur: D.curL, dAvg: D.avgL,
+      dCurLabel: markLabel(dPos(D.cur), '#EDF1EF', true),
+      dCurMark: { position: 'absolute', left: 'calc(' + dPos(D.cur) + '% - 5px)', bottom: 0, width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '6px solid #EDF1EF' },
+      dAvgMark: { position: 'absolute', left: 'calc(' + dPos(D.avg) + '% - 5px)', top: 0, width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderBottom: '6px solid #8B958F' },
+      dAvgLabel: markLabel(dPos(D.avg), '#8B958F', false),
+      dTrendLine: dTrendPts.join(' '), dTrendDotX: '300', dTrendDotY: ty(D.cur).toFixed(1),
+      dTrendNote: (D.cur > D.avg ? 'up' : 'down') + ' from the six-month average',
+      dMove: D.move, dCaveat: D.caveat,
+
+      wtNow: WT.now, wtSub: WT.sub, wtSparkOn: WT.sparkOn, wtSpark: WT.spark,
+      wtStroke: WT.stroke, wtDotX: WT.dotX, wtDotY: WT.dotY,
+      wtSubStyle: { fontSize: 11.5, lineHeight: 1.5, textWrap: 'pretty', color: WT.muted ? '#7F8A85' : '#8FEFC0' },
+
+      checklist, inputs, instruments, nots, vitals, healthLinks
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+@keyframes hx36{
+0%{transform:translate(-50%,-50%) scale(1.2);opacity:1}
+25%{transform:translate(-50%,calc(-50% + 36px)) scale(.88);opacity:.6}
+50%{transform:translate(-50%,-50%) scale(.58);opacity:.28}
+75%{transform:translate(-50%,calc(-50% - 36px)) scale(.88);opacity:.6}
+100%{transform:translate(-50%,-50%) scale(1.2);opacity:1}}
+@keyframes hx46{
+0%{transform:translate(-50%,-50%) scale(1.25);opacity:1}
+25%{transform:translate(-50%,calc(-50% + 46px)) scale(.9);opacity:.55}
+50%{transform:translate(-50%,-50%) scale(.5);opacity:.2}
+75%{transform:translate(-50%,calc(-50% - 46px)) scale(.9);opacity:.55}
+100%{transform:translate(-50%,-50%) scale(1.25);opacity:1}}
+@keyframes hxV30{
+0%{transform:translate(-50%,-50%) scale(1.2);opacity:1}
+25%{transform:translate(calc(-50% + 30px),-50%) scale(.88);opacity:.6}
+50%{transform:translate(-50%,-50%) scale(.58);opacity:.28}
+75%{transform:translate(calc(-50% - 30px),-50%) scale(.88);opacity:.6}
+100%{transform:translate(-50%,-50%) scale(1.2);opacity:1}}
+@keyframes hxRung{
+0%{transform:translate(-50%,-50%) scaleY(.03);opacity:.2}
+25%{transform:translate(-50%,-50%) scaleY(1);opacity:.95}
+50%{transform:translate(-50%,-50%) scaleY(.03);opacity:.2}
+75%{transform:translate(-50%,-50%) scaleY(1);opacity:.95}
+100%{transform:translate(-50%,-50%) scaleY(.03);opacity:.2}}
+@keyframes hxRungH{
+0%{transform:translate(-50%,-50%) scaleX(.03);opacity:.2}
+25%{transform:translate(-50%,-50%) scaleX(1);opacity:.95}
+50%{transform:translate(-50%,-50%) scaleX(.03);opacity:.2}
+75%{transform:translate(-50%,-50%) scaleX(1);opacity:.95}
+100%{transform:translate(-50%,-50%) scaleX(.03);opacity:.2}}
+@keyframes hxDust{0%,100%{opacity:.12;transform:translate(-50%,-50%) translateY(6px)}50%{opacity:.6;transform:translate(-50%,-50%) translateY(-6px)}}
+@keyframes hxGlow{0%,100%{opacity:.65}50%{opacity:1}}
+@keyframes hxSweep{0%,72%,100%{filter:brightness(1)}84%{filter:brightness(2.9) saturate(1.2)}}
+@keyframes hxRungFlash{0%,74%,100%{box-shadow:none}86%{box-shadow:0 0 14px rgba(46,204,128,.85)}}
+@keyframes hxRungFlashW{0%,74%,100%{box-shadow:0 0 6px rgba(242,180,92,.35)}86%{box-shadow:0 0 20px rgba(242,180,92,.95)}}
+@keyframes hxDrift{0%,100%{transform:translateX(-7px)}50%{transform:translateX(7px)}}
+@media (prefers-reduced-motion:reduce){[data-hx] *{animation:none !important}}
+</style>
+</helmet>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+    <rect width="120" height="120" fill="#0A0C0B"></rect>
+    <g stroke="#2ECC80" stroke-width="3" fill="none" stroke-linecap="round">
+      <path d="M36 34 C60 46 60 74 36 86"></path>
+      <path d="M84 34 C60 46 60 74 84 86"></path>
+    </g>
+    <g stroke="#F2B45C" stroke-width="3" stroke-linecap="round">
+      <path d="M45 44 H75"></path>
+      <path d="M45 76 H75"></path>
+    </g>
+    <circle cx="60" cy="60" r="4" fill="#E8FFF4"></circle>
+  </svg>
+</template>
+
+<section style="display:flex;flex-direction:column;gap:26px;padding:52px 48px 110px">
+
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">TURN 1</span>
+    <span style="font:600 13px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">Biomarkers hero — a helix instead of the radar</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">three treatments, same palette, all CSS · <a href="#1a">1a</a> <a href="#1b">1b</a> <a href="#1c">1c</a></span>
+  </div>
+
+  <div style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+
+    <div id="1a" style="display:flex;flex-direction:column;gap:12px;width:402px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 6px;background:#17150F;color:#fff;border-radius:5px">1a</span>
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Ribbon helix, rungs are the markers</span>
+      </div>
+      <span style="font-size:12px;line-height:1.6;color:#6B6558;text-wrap:pretty">Seven base pairs, seven markers. A rung goes amber when that marker sits outside the lab's band — the animation still carries the reading, so it earns its 210px.</span>
+
+      <div data-hx style="border-radius:34px;background:#0A0C0B;border:.5px solid rgba(255,255,255,.07);overflow:hidden;padding:20px 0 16px;color:#EDF1EF">
+        <div style="padding:0 20px;display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+          <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8B958F;font-weight:600">Biomarkers</span>
+          <span style="font-size:10.5px;color:#7F8A85">drawn 14 August · Karolinska</span>
+        </div>
+
+        <div style="position:relative;height:210px;margin:6px 0 0">
+          <div style="{{ heroGlow }}"></div>
+          <div style="position:absolute;left:0;right:0;top:0;bottom:0;overflow:hidden">
+            <sc-for list="{{ aDust }}" as="d" hint-placeholder-count="16">
+              <div style="{{ d.s }}"></div>
+            </sc-for>
+          </div>
+          <div style="position:absolute;left:20px;right:20px;top:0;bottom:0;animation:hxDrift 17s ease-in-out infinite">
+            <sc-for list="{{ aRungs }}" as="r" hint-placeholder-count="7">
+              <div style="{{ r.s }}"></div>
+            </sc-for>
+            <sc-for list="{{ aNodes }}" as="n" hint-placeholder-count="96">
+              <div style="{{ n.s }}"></div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="padding:0 20px;display:flex;align-items:flex-end;justify-content:space-between;gap:14px">
+          <div style="flex:none;display:flex;flex-direction:column;gap:2px">
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <span style="font-family:'Outfit',sans-serif;font-size:38px;font-weight:200;letter-spacing:-.045em;line-height:1;font-variant-numeric:tabular-nums">{{ inBand }}</span>
+              <span style="font-size:12px;color:#7F8A85;white-space:nowrap">of {{ total }} in band</span>
+            </div>
+            <span style="font-size:10.5px;color:#7F8A85;white-space:nowrap">{{ outLine }}</span>
+          </div>
+          <span style="flex:1;min-width:0;font-size:10.5px;color:#7F8A85;text-align:right;line-height:1.5">each rung is one marker</span>
+        </div>
+
+        <div style="margin:14px 16px 0;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 14px">
+          <sc-for list="{{ rows }}" as="m" hint-placeholder-count="3">
+            <div style="{{ m.row }}">
+              <span style="{{ m.pip }}"></span>
+              <span style="flex:1;font-size:13px;color:#EDF1EF">{{ m.k }}</span>
+              <span style="{{ m.num }}">{{ m.v }}</span>
+              <span style="font-size:11px;color:#7F8A85">{{ m.u }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div id="1b" style="display:flex;flex-direction:column;gap:12px;width:402px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 6px;background:#17150F;color:#fff;border-radius:5px">1b</span>
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Particle helix, atmosphere only</span>
+      </div>
+      <span style="font-size:12px;line-height:1.6;color:#6B6558;text-wrap:pretty">Closest to your second reference: a dust helix behind the numeral, no claim made. Two amber nodes are the only signal — the count does the talking.</span>
+
+      <div data-hx style="border-radius:34px;background:#0A0C0B;border:.5px solid rgba(255,255,255,.07);overflow:hidden;padding:20px 0 16px;color:#EDF1EF">
+        <div style="padding:0 20px;display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+          <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8B958F;font-weight:600">Biomarkers</span>
+          <span style="font-size:10.5px;color:#7F8A85">drawn 14 August · Karolinska</span>
+        </div>
+
+        <div style="position:relative;height:248px;display:flex;align-items:center;justify-content:center">
+          <div style="{{ heroGlow }}"></div>
+          <div style="position:absolute;left:-10px;right:-10px;top:0;bottom:0;overflow:hidden">
+            <sc-for list="{{ bDust }}" as="d" hint-placeholder-count="20">
+              <div style="{{ d.s }}"></div>
+            </sc-for>
+            <sc-for list="{{ bNodes }}" as="n" hint-placeholder-count="120">
+              <div style="{{ n.s }}"></div>
+            </sc-for>
+          </div>
+          <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <span style="font-family:'Outfit',sans-serif;font-size:46px;font-weight:200;letter-spacing:-.05em;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 26px rgba(0,0,0,.85)">{{ inBand }}</span>
+            <span style="font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#93A0A6;font-weight:600;white-space:nowrap;text-shadow:0 2px 14px rgba(0,0,0,.85)">of {{ total }} in band</span>
+          </div>
+          <span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:10.5px;color:#7F8A85;white-space:nowrap">{{ outLine }}</span>
+        </div>
+
+        <div style="margin:8px 16px 0;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 14px">
+          <sc-for list="{{ rows }}" as="m" hint-placeholder-count="3">
+            <div style="{{ m.row }}">
+              <span style="{{ m.pip }}"></span>
+              <span style="flex:1;font-size:13px;color:#EDF1EF">{{ m.k }}</span>
+              <span style="{{ m.num }}">{{ m.v }}</span>
+              <span style="font-size:11px;color:#7F8A85">{{ m.u }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div id="1c" style="display:flex;flex-direction:column;gap:12px;width:402px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 6px;background:#17150F;color:#fff;border-radius:5px">1c</span>
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Helix as the list itself</span>
+      </div>
+      <span style="font-size:12px;line-height:1.6;color:#6B6558;text-wrap:pretty">The helix turns vertically and each rung reaches out to its own row — the hero and the marker list become one thing, so no space is spent twice.</span>
+
+      <div data-hx style="border-radius:34px;background:#0A0C0B;border:.5px solid rgba(255,255,255,.07);overflow:hidden;padding:20px 0 16px;color:#EDF1EF">
+        <div style="padding:0 20px;display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+          <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8B958F;font-weight:600">Biomarkers</span>
+          <span style="font-size:10.5px;color:#7F8A85">drawn 14 August</span>
+        </div>
+
+        <div style="position:relative;height:320px;margin:10px 0 0">
+          <div style="{{ heroGlowV }}"></div>
+          <div style="position:absolute;left:0;right:0;top:14px;bottom:14px">
+            <sc-for list="{{ cRungs }}" as="r" hint-placeholder-count="7">
+              <div style="{{ r.s }}"></div>
+            </sc-for>
+            <sc-for list="{{ cNodes }}" as="n" hint-placeholder-count="88">
+              <div style="{{ n.s }}"></div>
+            </sc-for>
+            <sc-for list="{{ cLabels }}" as="l" hint-placeholder-count="7">
+              <div style="{{ l.wrap }}">
+                <span style="{{ l.tick }}"></span>
+                <span style="flex:1;font-size:12.5px;color:#EDF1EF;white-space:nowrap">{{ l.k }}</span>
+                <span style="{{ l.num }}">{{ l.v }}</span>
+                <span style="font-size:10.5px;color:#7F8A85;white-space:nowrap">{{ l.u }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="padding:6px 20px 0;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+          <div style="flex:none;display:flex;align-items:baseline;gap:6px">
+            <span style="font-family:'Outfit',sans-serif;font-size:32px;font-weight:200;letter-spacing:-.045em;line-height:1;font-variant-numeric:tabular-nums">{{ inBand }}</span>
+            <span style="font-size:12px;color:#7F8A85;white-space:nowrap">of {{ total }} in band</span>
+          </div>
+          <span style="flex:1;min-width:0;font-size:10.5px;color:#7F8A85;text-align:right;line-height:1.5">{{ outLine }}</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="max-width:820px;display:flex;flex-direction:column;gap:8px;padding-top:6px">
+    <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">ONE HONEST CAVEAT</span>
+    <span style="font-size:12.5px;line-height:1.65;color:#6B6558;text-wrap:pretty">A double helix says genome. These numbers are blood chemistry — nothing here was sequenced. <a href="#1a">1a</a> and <a href="#1c">1c</a> earn the motif by making the rungs mean something; <a href="#1b">1b</a> is decoration, which is fine if we accept it reads as “DNA app”. Your references are neon; Noop is amber and green on near-black, so the glow is dialled to the app's own light.</span>
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;outCount&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:2,&quot;min&quot;:0,&quot;max&quot;:3,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Data&quot;,&quot;unit&quot;:&quot; markers out of band&quot;},&quot;speed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:9,&quot;min&quot;:4,&quot;max&quot;:18,&quot;step&quot;:1,&quot;unit&quot;:&quot;s / turn&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;dense&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Motion&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const P = this.props;
+    const WARM = '#F2B45C', WARM_L = '#F6DCB4', GREEN = '#2ECC80';
+    const out = Math.max(0, Math.min(3, P.outCount == null ? 2 : P.outCount));
+    const dur = P.speed == null ? 9 : P.speed;
+    const dense = P.dense == null ? true : P.dense;
+    const hash = function (n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+    const MK = [
+      { k: 'Ferritin', v: '62', u: 'µg/L' }, { k: 'Vitamin D', v: '78', u: 'nmol/L' },
+      { k: 'ApoB', v: '0.78', u: 'g/L' }, { k: 'hs-CRP', v: '0.6', u: 'mg/L' },
+      { k: 'HbA1c', v: '33', u: 'mmol/mol' }, { k: 'TSH', v: '2.1', u: 'mIU/L' },
+      { k: 'ALT', v: '41', u: 'U/L' }
+    ];
+    const OUTV = ['28', '44', '1.14'];
+    const marks = MK.map(function (m, i) {
+      const o = i < out;
+      return { k: m.k, u: m.u, v: o ? OUTV[i] : m.v, out: o };
+    });
+    const inBand = marks.filter(function (m) { return !m.out; }).length;
+    const outLine = out === 0 ? 'every marker inside the lab’s band'
+      : out === 1 ? 'one marker outside the lab’s band' : out + ' markers outside the lab’s band';
+
+    const glowCol = out > 0 ? '242,180,92' : '46,204,128';
+    const heroGlow = {
+      position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)',
+      width: 340, height: 210, borderRadius: '50%', pointerEvents: 'none', filter: 'blur(24px)',
+      animation: 'hxGlow 9s ease-in-out infinite',
+      background: 'radial-gradient(ellipse,rgba(' + glowCol + ',.17),rgba(' + glowCol + ',0) 65%)'
+    };
+    const heroGlowV = Object.assign({}, heroGlow, { width: 200, height: 320 });
+
+    const node = function (o) {
+      const anims = [o.anim + ' ' + dur + 's linear infinite'];
+      const delays = [o.delay.toFixed(2) + 's'];
+      if (o.sweep != null) { anims.push('hxSweep 3.6s ease-out infinite'); delays.push(o.sweep.toFixed(2) + 's'); }
+      return { s: {
+        position: 'absolute', left: o.left, top: o.top,
+        width: o.sz, height: o.sz, borderRadius: '50%', background: o.bg,
+        boxShadow: '0 0 ' + (o.sz * (o.halo || 2.6)).toFixed(1) + 'px rgba(' + o.glow + ',' + (o.ga || 0.65) + ')',
+        animation: anims.join(','), animationDelay: delays.join(','), pointerEvents: 'none'
+      } };
+    };
+
+    // ── 1a · horizontal ribbon, rungs are markers ────────────────
+    const aTurns = 2.4, aN = dense ? 58 : 38, aNodes = [], aRungs = [], aDust = [];
+    const sweepOf = function (f) { return -(f * 2.9); };   // one bright wave running the length
+    for (let i = 0; i < aN; i++) {
+      const f = i / (aN - 1), base = -(f * aTurns * dur), sz = 2.2 + hash(i) * 1.4;
+      for (let s = 0; s < 2; s++) {
+        const d0 = base - s * dur / 2;
+        // the trail: two lagging ghosts per node, so each strand reads as a ribbon in motion
+        for (let e = 2; e >= 1; e--) {
+          aNodes.push(node({ left: (f * 100).toFixed(2) + '%', top: '50%',
+            sz: Number((sz * (1 - e * 0.22)).toFixed(1)),
+            bg: 'rgba(140,239,192,' + (0.3 - e * 0.09).toFixed(2) + ')', glow: '46,204,128', ga: 0.22,
+            anim: 'hx36', delay: d0 + e * 0.045 * dur }));
+        }
+        aNodes.push(node({ left: (f * 100).toFixed(2) + '%', top: '50%', sz: Number(sz.toFixed(1)),
+          bg: 'rgba(206,255,231,.9)', glow: '46,204,128', halo: 3.2, ga: 0.7,
+          anim: 'hx36', delay: d0, sweep: sweepOf(f) }));
+      }
+    }
+    marks.forEach(function (m, k) {
+      const f = 0.06 + k * 0.147, base = -(f * aTurns * dur);
+      aRungs.push({ s: {
+        position: 'absolute', left: (f * 100).toFixed(2) + '%', top: '50%',
+        width: m.out ? 2.4 : 1.4, height: 72, borderRadius: 2, transformOrigin: 'center',
+        background: m.out
+          ? 'linear-gradient(180deg,rgba(242,180,92,.12),rgba(242,180,92,.95),rgba(242,180,92,.12))'
+          : 'linear-gradient(180deg,rgba(46,204,128,.06),rgba(46,204,128,.5),rgba(46,204,128,.06))',
+        animation: 'hxRung ' + dur + 's linear infinite,' + (m.out ? 'hxRungFlashW' : 'hxRungFlash') + ' 3.6s ease-out infinite',
+        animationDelay: base.toFixed(2) + 's,' + sweepOf(f).toFixed(2) + 's',
+        pointerEvents: 'none'
+      } });
+      for (let s = 0; s < 2; s++) {
+        aNodes.push(node({ left: (f * 100).toFixed(2) + '%', top: '50%', sz: m.out ? 6.6 : 5.4,
+          bg: m.out ? WARM_L : '#E8FFF4', glow: m.out ? '242,180,92' : '46,204,128',
+          halo: m.out ? 4.2 : 3.4, ga: 0.85,
+          anim: 'hx36', delay: base - s * dur / 2, sweep: sweepOf(f) }));
+      }
+    });
+    for (let i = 0; i < 16; i++) {
+      const sz = 1 + hash(i + 77) * 2;
+      aDust.push({ s: {
+        position: 'absolute', left: (hash(i + 12) * 100).toFixed(1) + '%', top: (6 + hash(i + 64) * 88).toFixed(1) + '%',
+        width: Number(sz.toFixed(1)), height: Number(sz.toFixed(1)), borderRadius: '50%',
+        background: 'rgba(216,255,236,.45)', boxShadow: '0 0 ' + (sz * 3).toFixed(1) + 'px rgba(46,204,128,.5)',
+        animation: 'hxDust ' + (9 + hash(i + 5) * 8).toFixed(1) + 's ease-in-out infinite',
+        animationDelay: (-hash(i + 2) * 13).toFixed(1) + 's', pointerEvents: 'none'
+      } });
+    }
+
+    // ── 1b · dense particle helix ────────────────────────────────
+    const bTurns = 2.7, bN = dense ? 62 : 38, bNodes = [], bDust = [];
+    const amberAt = [Math.round(bN * 0.32), Math.round(bN * 0.67)];
+    for (let i = 0; i < bN; i++) {
+      const f = i / (bN - 1), base = -(f * bTurns * dur);
+      const amber = out > 0 && amberAt.indexOf(i) >= 0;
+      const sz = amber ? 6.2 : 1.5 + hash(i + 9) * 2.3;
+      for (let s = 0; s < 2; s++) {
+        bNodes.push(node({ left: (f * 100).toFixed(2) + '%', top: '50%', sz: Number(sz.toFixed(1)),
+          bg: amber ? WARM_L : 'rgba(180,255,218,.8)', glow: amber ? '242,180,92' : '46,204,128',
+          anim: 'hx46', delay: base - s * dur / 2 }));
+      }
+    }
+    for (let i = 0; i < 22; i++) {
+      const sz = 1 + hash(i + 41) * 2.2;
+      bDust.push({ s: {
+        position: 'absolute', left: (hash(i + 31) * 100).toFixed(1) + '%', top: (8 + hash(i + 57) * 84).toFixed(1) + '%',
+        width: Number(sz.toFixed(1)), height: Number(sz.toFixed(1)), borderRadius: '50%',
+        background: 'rgba(216,255,236,.5)', boxShadow: '0 0 ' + (sz * 3).toFixed(1) + 'px rgba(46,204,128,.55)',
+        animation: 'hxDust ' + (8 + hash(i) * 9).toFixed(1) + 's ease-in-out infinite',
+        animationDelay: (-hash(i + 3) * 14).toFixed(1) + 's', pointerEvents: 'none'
+      } });
+    }
+
+    // ── 1c · vertical helix, rungs reach their rows ──────────────
+    const cTurns = 1.7, CX = 74, cNodes = [], cRungs = [], cLabels = [];
+    for (let i = 0; i < 42; i++) {
+      const f = i / 41, base = -(f * cTurns * dur), sz = 2.4 + hash(i + 13) * 1.2;
+      for (let s = 0; s < 2; s++) {
+        cNodes.push(node({ left: CX, top: (f * 100).toFixed(2) + '%', sz: Number(sz.toFixed(1)),
+          bg: 'rgba(196,255,226,.82)', glow: '46,204,128', anim: 'hxV30', delay: base - s * dur / 2 }));
+      }
+    }
+    marks.forEach(function (m, k) {
+      const f = 0.05 + k * 0.15, base = -(f * cTurns * dur);
+      cRungs.push({ s: {
+        position: 'absolute', left: CX, top: (f * 100).toFixed(2) + '%',
+        width: 60, height: m.out ? 2.4 : 1.4, borderRadius: 2, transformOrigin: 'center',
+        background: m.out
+          ? 'linear-gradient(90deg,rgba(242,180,92,.12),rgba(242,180,92,.9),rgba(242,180,92,.12))'
+          : 'linear-gradient(90deg,rgba(46,204,128,.06),rgba(46,204,128,.46),rgba(46,204,128,.06))',
+        animation: 'hxRungH ' + dur + 's linear infinite', animationDelay: base.toFixed(2) + 's',
+        pointerEvents: 'none'
+      } });
+      for (let s = 0; s < 2; s++) {
+        cNodes.push(node({ left: CX, top: (f * 100).toFixed(2) + '%', sz: m.out ? 6.4 : 5.4,
+          bg: m.out ? WARM_L : '#DFFFEE', glow: m.out ? '242,180,92' : '46,204,128',
+          anim: 'hxV30', delay: base - s * dur / 2 }));
+      }
+      cLabels.push({
+        k: m.k, v: m.v, u: m.u,
+        wrap: { position: 'absolute', left: 140, right: 18, top: (f * 100).toFixed(2) + '%',
+          transform: 'translateY(-50%)', display: 'flex', alignItems: 'baseline', gap: 8 },
+        tick: { width: 14, height: 1, flex: 'none', background: m.out ? 'rgba(242,180,92,.55)' : 'rgba(255,255,255,.14)' },
+        num: { fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 300, letterSpacing: '-.02em',
+          fontVariantNumeric: 'tabular-nums', color: m.out ? WARM_L : '#EDF1EF' }
+      });
+    });
+
+    // shared context rows under 1a / 1b
+    const rows = marks.slice(0, 3).map(function (m, i) {
+      return {
+        k: m.k, v: m.v, u: m.u,
+        row: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 2px',
+          borderTop: i ? '.5px solid rgba(255,255,255,.06)' : 'none' },
+        pip: { width: 8, height: 8, flex: 'none', borderRadius: '50%', background: m.out ? WARM : GREEN,
+          boxShadow: '0 0 10px ' + (m.out ? 'rgba(242,180,92,.6)' : 'rgba(46,204,128,.5)') },
+        num: { fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 300, letterSpacing: '-.02em',
+          fontVariantNumeric: 'tabular-nums', color: '#EDF1EF' }
+      };
+    });
+
+    return { aNodes: aNodes, aRungs: aRungs, aDust: aDust, bNodes: bNodes, bDust: bDust,
+      cNodes: cNodes, cRungs: cRungs, cLabels: cLabels, rows: rows,
+      heroGlow: heroGlow, heroGlowV: heroGlowV,
+      inBand: inBand, total: marks.length, outLine: outLine };
+  }
+}
+</script>
+</body>
+</html>

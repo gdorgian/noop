@@ -1,0 +1,234 @@
+NOOP AURA — THE FIVE DECISIONS, AND SIX QUESTIONS BACK
+From design · 2026-09-17
+Replies to: "What the merge brought in, and what it needs from you" (2026-09-16)
+
+
+Your five are answered below and settled — build against them. Six questions
+come back the other way, and two of them gate work I would otherwise have to
+guess at. No screens are drawn yet; this is decisions, scope and order.
+
+The full plan — the surface inventory, the state matrices, the four waves and
+what goes stale when each one lands — is "Noop Aura 11.7 Plan", 82 screens
+across ten acts. This note is the part you need to act on.
+
+Thank you for catching the Palette resolution. Forty screens of silent colour
+drift would have cost us a week in the wrong place.
+
+
+════════════════════════════════════════════════════════════════════════
+THE FIVE ANSWERS
+════════════════════════════════════════════════════════════════════════
+
+1.  THE STEP POSITION — keep it, rewrite the reason.
+    Your middle road. The position is defensible on display and misleading on
+    use, and it is also already contradicted on screen: ages/health lists
+    "Step history · Ready · 9 days recorded" in its inputs card, and the copy
+    law carries a steps noise threshold of 700. New string, you/position,
+    third denial — title unchanged:
+
+      No step count
+      Ten thousand is a marketing figure from 1965. Your steps feed the
+      spend estimate and nothing else: no tally on a screen, no target
+      to hit.
+
+    What it commits us to: no step figure displayed anywhere — no card, no
+    widget, no chart axis, no sentence, and not in Svea's prose. No step
+    target, ever. stepsEstimate as an energy source is now blessed, and the
+    energy card names steps as its source when that is what it read. That is
+    the input being named, not a count being shown.
+
+    This is not a reversal, so it does not spend the screen's closing promise.
+
+    Three files render those five strings: Act 5, the What We Will Not Ask
+    screen, and onboard's inline panel. One string, three places.
+
+
+2.  MOMENTUM — twelve of eighteen survive, and the section is renamed.
+
+    KEEP (12)   statusOverride · calibrating · planDeviation · recoveryRead
+                restDayNeeded · trainingSuggestion · sleepCatchUp · hrvTrend
+                bedtimeTarget · strapBattery · healthAlert · milestone
+
+    CUT (6)     weeklyTrainingGoal · streak · stepGoal · stepsBelowUsual
+                weightMilestone · cyclePhase
+
+    Reasons, shortest first: streak is in the copy law's banned vocabulary
+    alongside score, badge and achievement — not a judgement call. stepGoal
+    and stepsBelowUsual die on "no step target"; stepsBelowUsual needs a count
+    to mean anything and a count is the one thing we will not show.
+    weightMilestone is a crossed target by another name, against "no weight
+    goal". cyclePhase stays dark per the not-in-this-release list.
+    weeklyTrainingGoal is a goal mechanic — no published position covers it,
+    which is exactly what the positions exist for.
+
+    milestone survives NARROWED to records: a longest, a fastest, a first.
+    Never a count of consecutive days, which is a streak wearing a different
+    word. healthAlert survives with the most care of the twelve — the only
+    kind that may use amber, the only one that may never imply a diagnosis,
+    and it must route somewhere.
+
+    The section is not called Momentum. In Aura it is "What changed", which is
+    what the twelve surviving kinds all are. The engine keeps its name; the
+    heading is ours.
+
+
+3.  STRENGTH — its own act, reached through Act 3. The tab bar stays at five.
+
+    Your question has two halves with different answers.
+
+    ACT: its own. Act 10 · The lift, eight screens. Act 3 is one decision a
+    day and all seven of its screens are the shape of a single cardio session.
+    Strength brings a persistent library, a vocabulary Act 3 has no word for
+    (program, set, rep, load, RPE, nineteen muscles), and a live screen with
+    completely different ergonomics. Eight inside seven makes Act 3 a drawer
+    with two subjects and no argument.
+
+    TAB: no — and this is already settled law. Nav addendum Change 1: the
+    effort is one decision a day, not a place to browse, and a sixth tab would
+    say otherwise. That argument is stronger for lifting, not weaker.
+
+    Acts are not tabs in this shell and never have been — nine acts hang off
+    five tabs today. Act 10 hangs off the same tab Act 3 does, four doors:
+
+      effort/session ....... Swap → a lift        → lift/library (or live)
+      the + log sheet ...... Start a lift          → lift/library
+      today's session card . when it is a lift     → lift/live or lift/detail
+      plumbing/history ..... a lift row with an id → lift/detail
+
+    ONE LIVE BAR, TWO CONTENTS. A lift session uses the bar from Change 2+3,
+    with its middle slot reading the current exercise and set instead of
+    elapsed time and heart rate. Do not build a second bar — two bars means
+    two owners and eventually two running sessions. See question 4.
+
+
+4.  VOICE — the persona gives up the word.
+
+    svea/setup's "How it talks" section has a row labelled Voice with
+    Plain · Quiet · Direct. Those are registers. A voice named Plain was
+    always slightly wrong, and now it is in the way.
+
+      · the persona row becomes MANNER — same options, same note, same
+        behaviour, and "How it talks" still reads correctly above it
+      · the mic in the composer is VOICE — control label Voice, action
+        "Hold to speak"
+
+    Rejected: calling the input Dictation. Accurate, and Apple's word, which
+    is the problem — system jargon in an app whose copy law is plain
+    second-person English, and it frames the feature as a property of a text
+    field rather than a way to talk to Svea.
+
+    Two places name the persona row: Act 7's setup, and settings → Svea.
+
+
+5.  ICONS — three, conditional on source art.
+
+      Titanium   the shipping machined face, default        exists
+      Blued      the existing blued-titanium alternate      exists
+      Aura       the orb on near-black — what the new
+                 name refers to                             new
+
+    The alternate-icon feature survives: it works today, so removing it costs
+    a real capability to save a file. Two material cuts of one object is a
+    material variant; adding Aura makes the set a choice — the object, the
+    object treated, and the signal. Three also fits the Appearance row as a
+    three-up segmented control, which is the control that row already wants.
+
+    CONDITIONAL, and this is question 5. I can draw Aura to spec. I cannot
+    re-render machined or blued titanium — those are material renders, and a
+    flat imitation beside the real one would be obvious. If the source art
+    exists, three. If not, TWO — Titanium as it is, plus Aura — and Blued
+    retires rather than shipping as a worse copy of itself.
+
+    Consequence: App icon comes off the not-in-this-release Later list. The
+    other five Appearance treatments stay on it. And the device label becomes
+    "Noop Aura" — nine characters with the space, fits at every icon size.
+
+
+════════════════════════════════════════════════════════════════════════
+SIX QUESTIONS BACK
+════════════════════════════════════════════════════════════════════════
+
+Ordered by what they block. 3 and 4 gate wave 2 drawings — I would rather ask
+now than draw against a guess. We have been here: the lab review strips were
+drawn against rects the parser had already discarded.
+
+1.  ENERGY — is there a coverage floor?
+    Below some completeness figure the day's total stops being a reading. If
+    the engine has a floor, the card uses it. If it does not, I will specify
+    one and it becomes product logic rather than a design opinion.
+    → blocks: the energy card's partial-coverage state (wave 3)
+
+2.  HEVY IMPORT — what does the importer actually produce, sessions or sets?
+    And does a candidate keep a reference to its source row in the file?
+    review can only show what was read if the parse kept it. If the answer is
+    whole sessions with no per-set provenance, lift/review stops being a
+    check-each-row screen and becomes summary-and-commit — cheaper to draw,
+    but only if I know before I draw it.
+    → blocks: lift/review (wave 2)
+
+3.  THE SESSION OWNER — can the shell's owner hold a LIFT session?
+    One bar needs one owner. The owner from Change 2+3 was scoped to a cardio
+    session's clock, workout, pause state and samples; a lift session is an
+    exercise index, a set index, a rest timer and a partially-entered set. If
+    that is a field, we are fine. If it is a refactor, say so now — it is the
+    largest schedule risk in the plan and the bar's design changes with it.
+    → blocks: lift/live and the bar (wave 2). Answer this one first.
+
+4.  ICON SOURCE ART — does it exist for the two titanium faces?
+    Three icons if yes, two if no. Nothing else depends on it.
+    → blocks: the icon set (wave 4)
+
+5.  THE MOMENTUM FILTER — where does it live?
+    A named list, not a switch in a card factory. A cut kind should be
+    impossible to reintroduce by a merge that adds a case; otherwise the next
+    upstream merge re-enables six kinds quietly and nobody sees it until a
+    wearer does. Also: a cut kind must not count — not toward the section's
+    badge, not toward its empty state. Six filtered cards must not render as
+    "six things happened" with nothing under it.
+    → blocks: nothing, but it decides whether decision 2 holds past the next
+      merge. If any surviving kind computes off a cut one — planDeviation off
+      weeklyTrainingGoal is the likely pair — then the cut is a filter at
+      render, not a deletion. Tell me and the plan says so.
+
+6.  UNITS — does a measure preference already exist to read?
+    The lift screens display kg and lb and I have them following
+    plumbing/record's existing measure preference rather than adding a
+    setting. Confirm that preference is readable from a screen that is not
+    record.
+    → blocks: nothing. Cheap to answer.
+
+
+════════════════════════════════════════════════════════════════════════
+WHAT YOU CAN START ON TODAY
+════════════════════════════════════════════════════════════════════════
+
+Wave 1 is strings and small surfaces, and none of it waits on a drawing:
+
+  · the step reason, three files (decision 1)
+  · Voice → Manner, two places (decision 4)
+  · "What changed" as the Trends section heading (decision 2)
+  · widgets' "Three, and each answers one question" → eight, and the
+    settings row's figure
+
+Three existing screens change and all three are strings — you/position,
+svea/setup, plumbing/widgets. No layout in any of them moves. Everything else
+in the plan is additive.
+
+Drawings arrive per wave, each with its own pack, in this order: the two
+launch screens (terms gate and What's New) → Act 10 · The lift, live screen
+first → the merged engines' faces (energy, What changed, weight trend, raw
+capture) → Svea's four, the eight widget families with the Lift Live Activity,
+and the icons.
+
+Two asks on sequencing, both yours originally and both agreed: the launch
+screens go first because they are small and currently the worst first
+impression in the product, and the lift starts now even though it lands last.
+
+
+────────────────────────────────────────────────────────────────────────
+One warning, on the piece with the most room to go wrong. In your data model
+every program target is optional, and a program line that is nothing but an
+exercise name is the normal case, not an edge case. lift/live is being drawn
+around that line, with all six targets set as the decorated variant. A screen
+designed target-first renders six em-dashes for most real users — so please do
+not start the live screen off the model before the drawing lands.

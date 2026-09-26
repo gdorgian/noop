@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="{{ sheet }}">
+
+<div style="display:flex;flex-direction:column;gap:18px;max-width:880px;padding-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">WAVE 5B</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">The accessory families</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">the five that do not reduce, and the mark that stands in</span>
+  </div>
+
+  <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:38px;line-height:1.12;letter-spacing:-.03em;color:#17150F;text-wrap:pretty">On the Lock Screen the set loses its colour. All three rules go with it.</h1>
+
+  <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;max-width:750px;text-wrap:pretty">Accessory widgets render <strong style="font-weight:600;color:#17150F">monochrome</strong>. Not dimmer — colourless. Everything in <a href="./Noop Widgets - the Aura set.dc.html">the eight</a> that carries meaning in hue stops carrying it here: amber no longer means needs attention, periwinkle no longer marks a sentence a model wrote, and blue no longer means live. Three of the eight reduce cleanly because their meaning was always in a figure. These five did not, and the answer is not a smaller version of each — it is deciding, placement by placement, which of them has something honest to say in the space and which does not.</p>
+
+  <div style="display:flex;flex-wrap:wrap;gap:9px">
+    <sc-for list="{{ rules }}" as="r" hint-placeholder-count="4">
+      <span style="padding:8px 13px;border-radius:10px;background:rgba(23,21,15,.06);font-size:12px;font-weight:600;color:#4A463D">{{ r.k }}</span>
+    </sc-for>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 28px;padding:16px 0 4px;border-top:1px solid rgba(23,21,15,.11)">
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">WHAT COLOUR HAS TO BECOME</span>
+      <span style="{{ body }}">Words, in every case, or nothing. Stress cannot lean on its strip, so it says the state. The coach brief cannot lean on periwinkle, so it is <em style="font-family:'Instrument Serif',serif;font-style:italic">labelled</em> — and a label that has to be read is a reason to leave prose out of the small placements altogether. Nothing here gets an alpha value doing a job a word should do: on somebody's photograph, a 40% tint is not a meaning, it is a legibility problem.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">TEN PLACEMENTS FILLED, FIVE DECLINED</span>
+      <span style="{{ body }}">Five families × three placements is fifteen. Ten are drawn. Five are refused in writing, with the reason, because a refused placement is a decision somebody has to be able to look up — otherwise it comes back as a bug report. A circular that shows only the mark is not a widget, it is a shortcut wearing one, and the Lock Screen already has a way to launch an app.</span>
+    </div>
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ixNew }}">A0</span>
+    <span style="{{ nm }}">The accessory mark</span>
+    <span style="{{ meta }}">closed ring · no core · monochrome only</span>
+    <span style="{{ body }}">A closed ring at the stroke the family already uses, and <strong style="font-weight:600;color:#17150F">no core</strong>. The core is the first thing to go at this size — 18% of a 16 pt glyph is under 3 pt of ink, which in a vibrant render is a grey speck that reads as dirt on the screen.</span>
+    <span style="{{ body }}">This breaks a rule <a href="./Noop Icon Set.dc.html">the icon set</a> states out loud — <em style="font-family:'Instrument Serif',serif;font-style:italic">open ring reads, closed ring acts</em> — so the rule is scoped rather than quietly bent. It governs the app icon set, where Breathe sits beside the instrument in Appearance and the difference has to survive 29 pt. Nothing here sits beside Breathe. With nothing to be confused with, the distinction has no work to do, and closing the ring buys back the legibility the core cost.</span>
+    <span style="{{ body }}">It is a <strong style="font-weight:600;color:#17150F">label glyph</strong> and never a content slot. It leads the inline line and labels the circular. It never appears alone.</span>
+  </div>
+  <div style="{{ tiles }}">
+    <div style="{{ stack }}">
+      <div style="{{ padSm }}">
+        <div style="display:flex;align-items:flex-end;gap:26px">
+          <sc-for list="{{ marks }}" as="m" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+              <div style="{{ m.ring }}"></div>
+              <span style="{{ mlab }}">{{ m.k }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <span style="{{ cap }}">THE MARK · 16, 24 AND 40 PT</span>
+    </div>
+    <div style="{{ stack }}">
+      <div style="{{ padSm }}">
+        <div style="display:flex;align-items:flex-end;gap:26px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="{{ cmpOpen }}"><div style="{{ cmpRing }}"></div><div style="{{ cmpCore }}"></div></div>
+            <span style="{{ mlab }}">app icon</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="{{ mark40 }}"></div>
+            <span style="{{ mlab }}">accessory</span>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">THE DIVERGENCE, AT ONE SIZE</span>
+      <span style="{{ tnote }}">Open with a core against closed without one. Side by side it is a different mark, which is why it is named differently and kept out of the icon set's five.</span>
+    </div>
+  </div>
+</div>
+
+<sc-for list="{{ fams }}" as="f" hint-placeholder-count="5">
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ f.ixS }}">{{ f.ix }}</span>
+    <span style="{{ nm }}">{{ f.k }}</span>
+    <span style="{{ meta }}">{{ f.meta }}</span>
+    <span style="{{ body }}">{{ f.why }}</span>
+    <span style="{{ body }}">{{ f.how }}</span>
+    <sc-if value="{{ f.hasRefusal }}" hint-placeholder-val="{{ true }}">
+      <div style="{{ refuse }}">
+        <span style="font:600 9px ui-monospace,Menlo,monospace;letter-spacing:.1em;color:#B4543A">DECLINED · {{ f.refusedWhat }}</span>
+        <span style="font-size:12px;line-height:1.55;color:#6B6558;text-wrap:pretty">{{ f.refusedWhy }}</span>
+      </div>
+    </sc-if>
+  </div>
+  <div style="{{ tiles }}">
+
+    <sc-if value="{{ f.hasCirc }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ stack }}">
+      <div style="{{ padSm }}">
+        <div style="{{ circ }}">
+          <span style="{{ f.circMark }}"></span>
+          <span style="{{ circBig }}">{{ f.circV }}</span>
+          <span style="{{ circSub }}">{{ f.circSub }}</span>
+        </div>
+      </div>
+      <span style="{{ cap }}">CIRCULAR · 76 PT</span>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ f.hasRect }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ stack }}">
+      <div style="{{ padSm }}">
+        <div style="{{ rect }}">
+          <span style="{{ rectKick }}">{{ f.rectKick }}</span>
+          <span style="{{ f.rectBigS }}">{{ f.rectBig }}</span>
+          <span style="{{ rectSub }}">{{ f.rectSub }}</span>
+        </div>
+      </div>
+      <span style="{{ cap }}">RECTANGULAR · 160 × 72 PT</span>
+      <span style="{{ tnote }}">{{ f.rectNote }}</span>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ f.hasInline }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ stack }}">
+      <div style="{{ padSm }}">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+          <span style="{{ clockFake }}">9:41</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="{{ inlineMark }}"></span>
+            <span style="{{ inlineT }}">{{ f.inline }}</span>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">INLINE · ABOVE THE CLOCK</span>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+</sc-for>
+
+<div style="display:flex;gap:34px;align-items:flex-start;padding:28px 0 0;border-top:1px solid rgba(23,21,15,.11);max-width:1180px">
+  <div style="{{ col }}">
+    <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">FOR THE BUILD</span>
+    <span style="{{ nm }}">Five things to hold to</span>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:12px">
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">The mark is closed and coreless, and only here.</strong> It is not a sixth app icon and it does not go in the Appearance picker. The icon set's open-ring-with-core mark stays exactly as make_icon.py draws it.</span>
+    <span style="{{ body }}">Build the ring at the family's own <strong style="font-weight:600;color:#17150F">0.135 stroke</strong> so it sits in the same family as the app icon, with a floor of 1.5 pt. Below about 14 pt of glyph the ring stops being a ring and the placement should use text alone.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">A declined placement is not an unimplemented one.</strong> Five are refused on this sheet with reasons. Do not register them — a family that offers a placement it cannot fill honestly is worse than one that offers fewer.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">Nothing here relies on hue.</strong> The renderer will take it away. Where the eight used colour to mean something, these say it. If a state cannot be said in the words the space allows, the placement is declined rather than approximated.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">Empty faces follow the eight, not this sheet.</strong> Every rule about the empty state is already drawn in the Aura set and holds unchanged: state what was last seen and when, and never a dash pair where a figure would be.</span>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;wallpaper&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Photo&quot;,&quot;Warm&quot;,&quot;Dark&quot;],&quot;default&quot;:&quot;Photo&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Sheet&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const W = 'rgba(255,255,255,'; // vibrant monochrome: white at opacities, nothing else
+    const WP = {
+      Warm: 'linear-gradient(152deg,#2C332E 0%,#16120E 58%,#1E2622 100%)',
+      Dark: 'linear-gradient(152deg,#15191A 0%,#0A0C0B 60%,#101416 100%)',
+      Photo: 'linear-gradient(163deg,#6B5C48 0%,#3A4A52 44%,#1A1D22 100%)'
+    };
+    const wp = WP[this.props.wallpaper] || WP.Photo;
+
+    // The mark: CLOSED ring, NO core, at the family's own 0.135 stroke with a 1.5 pt floor.
+    // Scoped divergence from the icon set — see A0 on the sheet.
+    const mark = function (size, op) {
+      return {
+        width: size, height: size, flex: 'none', borderRadius: '50%', boxSizing: 'border-box',
+        border: Math.max(1.5, size * 0.135) + 'px solid ' + W + (op === undefined ? 1 : op) + ')'
+      };
+    };
+
+    // the app-icon mark, for the side-by-side only: open ring, 302° of ink, core at centre
+    const ARC = (function () {
+      const rc = 39 - 13.5 / 2, a = 29 * Math.PI / 180;
+      const dx = rc * Math.sin(a), y = (50 - rc * Math.cos(a)).toFixed(3);
+      const d = 'M' + (50 + dx).toFixed(3) + ' ' + y + 'A' + rc + ' ' + rc +
+        ' 0 1 1 ' + (50 - dx).toFixed(3) + ' ' + y;
+      return 'url("data:image/svg+xml;utf8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="' + d +
+        '" fill="none" stroke="#000" stroke-width="13.5" stroke-linecap="round"/></svg>') + '")';
+    })();
+
+    const FAM = [
+      { k: 'Glanceable', ix: 'A1', meta: 'two facts, sequenced · rectangular and inline',
+        why: 'Its whole shape is an argument about order: the night first because it is settled, the day second because it is still moving. A rectangular keeps that, because two lines are two lines.',
+        how: 'The figure holds the line and the day goes underneath as one clause. No sleep-need arithmetic \u2014 "met" is the answer and the number behind it is in the app.',
+        rectKick: 'Last night', rectBig: '7h 12m', rectSub: 'need met \u00b7 Rest 62, steady',
+        rectNote: 'The only place in the accessory set where two facts share a tile, and they share it vertically.',
+        inline: 'Slept 7h 12m \u00b7 Rest 62',
+        refusedWhat: 'CIRCULAR',
+        refusedWhy: 'Two facts do not fit one circle, and picking one of them silently changes what this family is. Ranking the night above the day is the design; a circular would ship half of it without saying so.' },
+
+      { k: 'The coach brief', ix: 'A2', meta: 'rectangular only \u00b7 the only labelled family',
+        why: 'The one family carrying a sentence a model wrote. Act 7\u2019s rule is that generated prose is always marked as generated \u2014 and its marking was periwinkle, which the monochrome renderer removes.',
+        how: 'So the label becomes a word. SVEA WROTE THIS, above two lines of brief. It costs a line of the four available and it is not optional: an unmarked generated sentence on a Lock Screen is the app\u2019s worst failure mode.',
+        rectKick: 'Svea wrote this', rectBig: 'Push today', rectSub: 'You slept long and your pulse settled overnight.',
+        rectNote: 'Four lines of space, one spent on the label. That is the trade and it is worth it.',
+        refusedWhat: 'CIRCULAR AND INLINE',
+        refusedWhy: 'Prose that might be wrong needs its caveat next to it, and neither placement has room for both. An inline brief would be a generated claim in the wearer\u2019s status line with nothing saying who wrote it.' },
+
+      { k: 'Resting pulse', ix: 'A3', meta: 'all three \u00b7 the only family that fills the set',
+        why: 'A figure whose meaning is the comparison, so the week travels with it wherever it can. Where it cannot, the figure still stands alone honestly \u2014 a resting pulse is a real number even without its range.',
+        how: 'Circular takes the figure and the mark as its label. Rectangular adds the week. Inline says both in six words.',
+        circV: '52', circSub: 'bpm',
+        rectKick: 'Resting pulse', rectBig: '52 bpm', rectSub: 'week 50\u201355 \u00b7 measured this morning',
+        rectNote: 'The range is the point. Without it a single resting figure invites a comparison the wearer cannot make.',
+        inline: 'Resting 52 bpm \u00b7 week 50\u201355',
+        hasCirc: true },
+
+      { k: 'Stress', ix: 'A4', meta: 'rectangular and inline \u00b7 a word, not a level',
+        why: 'The home-screen widget carries a word over a coloured strip. The strip is the part that does not survive: five segments in one white at one opacity is a row of identical marks.',
+        how: 'So the word does all of it, and the time it was taken comes with it \u2014 a stress reading without its hour is a claim about now that the last check-in cannot support.',
+        rectKick: 'Stress \u00b7 14:20', rectBig: 'Settled', rectSub: 'third check-in today, all settled',
+        rectNote: 'No strip. Five white segments at one opacity say nothing that the word has not already said.',
+        inline: 'Stress settled \u00b7 14:20',
+        refusedWhat: 'CIRCULAR',
+        refusedWhy: 'The state is a word and the circular holds about four glyphs. Settled, Elevated and Climbing do not fit, and abbreviating a state the wearer has to trust is how a widget starts lying politely.' },
+
+      { k: 'Lift session', ix: 'A5', meta: 'rectangular and inline \u00b7 progress, not a program',
+        why: 'On the home screen it lists the next three exercises. That list is the family, and a list is the first thing an accessory space takes away.',
+        how: 'What is left is what a wearer glancing down actually wants: which session, and how far in. The next exercise gets the second line when the session is running, and the program name when it is not.',
+        rectKick: 'Upper A', rectBig: '3 of 19 sets', rectSub: 'next: incline dumbbell press',
+        rectNote: 'The exercise name takes the ellipsis here too, exactly as it does in the live activity. Never the counter.',
+        inline: 'Upper A \u00b7 3 of 19 sets',
+        refusedWhat: 'CIRCULAR',
+        refusedWhy: 'Three of nineteen in a 76 pt circle is either two tiny figures or a ring that looks like a closed ring \u2014 which is now the app\u2019s own accessory mark. A progress ring that reads as the logo is worse than no placement.' }
+    ];
+
+    const fams = FAM.map(function (f) {
+      const hasCirc = !!f.hasCirc;
+      return {
+        k: f.k, ix: f.ix, meta: f.meta, why: f.why, how: f.how,
+        ixS: { font: '600 9.5px ui-monospace,Menlo,monospace', color: '#B4543A', letterSpacing: '.06em' },
+        hasCirc: hasCirc, hasRect: true, hasInline: !!f.inline,
+        hasRefusal: !!f.refusedWhat,
+        refusedWhat: f.refusedWhat || '', refusedWhy: f.refusedWhy || '',
+        circV: f.circV || '', circSub: f.circSub || '', circMark: mark(13, .75),
+        rectKick: f.rectKick, rectBig: f.rectBig, rectSub: f.rectSub, rectNote: f.rectNote,
+        // the brief's headline is prose, so it sets at prose weight rather than figure weight
+        rectBigS: {
+          fontFamily: "'Outfit',sans-serif", fontWeight: f.k === 'The coach brief' ? 400 : 300,
+          fontSize: f.k === 'The coach brief' ? 17 : 21, letterSpacing: '-.025em',
+          lineHeight: 1.12, color: '#fff', fontVariantNumeric: 'tabular-nums',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+        },
+        inline: f.inline || ''
+      };
+    });
+
+    return {
+      sheet: { display: 'flex', flexDirection: 'column', gap: 0, padding: '52px 48px 110px', '--wp': wp },
+      rules: [
+        { k: 'Monochrome: every colour rule becomes a word or goes' },
+        { k: 'The mark is closed and coreless \u2014 here and nowhere else' },
+        { k: 'A declined placement is written down, not skipped' },
+        { k: 'Ten of fifteen filled, and that is the finished answer' }
+      ],
+      marks: [16, 24, 40].map(function (s) {
+        return { k: s + ' pt', ring: mark(s) };
+      }),
+      mark40: mark(40),
+      cmpOpen: { width: 40, height: 40, flex: 'none', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      cmpRing: {
+        position: 'absolute', width: 40, height: 40, background: '#fff',
+        WebkitMaskImage: ARC, maskImage: ARC, WebkitMaskSize: '100% 100%', maskSize: '100% 100%',
+        WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat'
+      },
+      cmpCore: { position: 'absolute', width: 7.2, height: 7.2, borderRadius: '50%', background: '#fff' },
+      fams: fams,
+
+      row: { display: 'flex', gap: 34, alignItems: 'flex-start', padding: '30px 0', borderTop: '1px solid rgba(23,21,15,.11)' },
+      col: { width: 268, flex: 'none', display: 'flex', flexDirection: 'column', gap: 7 },
+      tiles: { display: 'flex', gap: 22, alignItems: 'flex-start', flexWrap: 'wrap', maxWidth: 840 },
+      stack: { display: 'flex', flexDirection: 'column', gap: 9, maxWidth: 300 },
+      padSm: { padding: '22px 20px', borderRadius: 30, background: 'var(--wp,linear-gradient(163deg,#6B5C48 0%,#3A4A52 44%,#1A1D22 100%))', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 116 },
+      refuse: { marginTop: 4, padding: '11px 13px', borderRadius: 14, background: 'rgba(180,84,58,.07)', border: '.5px solid rgba(180,84,58,.22)', display: 'flex', flexDirection: 'column', gap: 5 },
+
+      // circular gets a container; rectangular and inline are text on the wallpaper, as the
+      // renderer actually draws them
+      circ: { width: 76, height: 76, flex: 'none', boxSizing: 'border-box', borderRadius: '50%', background: 'rgba(255,255,255,.17)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 },
+      circBig: { fontFamily: "'Outfit',sans-serif", fontWeight: 300, fontSize: 26, letterSpacing: '-.03em', lineHeight: 1, color: '#fff', fontVariantNumeric: 'tabular-nums', marginTop: 3 },
+      circSub: { fontSize: 9.5, fontWeight: 600, color: 'rgba(255,255,255,.7)' },
+
+      rect: { width: 160, height: 72, flex: 'none', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 3, justifyContent: 'center', overflow: 'hidden' },
+      rectKick: { fontSize: 9.5, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,.72)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      rectSub: { fontSize: 11, lineHeight: 1.35, color: 'rgba(255,255,255,.78)', overflow: 'hidden' },
+
+      clockFake: { fontFamily: "'Outfit',sans-serif", fontWeight: 200, fontSize: 44, letterSpacing: '-.04em', lineHeight: 1, color: 'rgba(255,255,255,.9)' },
+      inlineMark: mark(13, .9),
+      inlineT: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,.9)', whiteSpace: 'nowrap' },
+      mlab: { font: '600 9px ui-monospace,Menlo,monospace', color: 'rgba(255,255,255,.55)', letterSpacing: '.06em' },
+
+      cap: { font: '600 9.5px ui-monospace,Menlo,monospace', letterSpacing: '.06em', color: 'rgba(23,21,15,.5)' },
+      tnote: { fontSize: 11.5, lineHeight: 1.5, color: '#6B6558', maxWidth: 300, textWrap: 'pretty' },
+      ix: { font: '600 9.5px ui-monospace,Menlo,monospace', color: '#17a2e6', letterSpacing: '.06em' },
+      ixNew: { font: '600 9.5px ui-monospace,Menlo,monospace', color: '#B4543A', letterSpacing: '.06em' },
+      nm: { fontFamily: "'Outfit',sans-serif", fontWeight: 500, fontSize: 17, color: '#17150F', letterSpacing: '-.015em' },
+      meta: { font: '600 10px ui-monospace,Menlo,monospace', color: 'rgba(23,21,15,.5)', paddingBottom: 3 },
+      body: { fontSize: 12.5, lineHeight: 1.62, color: '#6B6558', textWrap: 'pretty' }
+    };
+  }
+}
+</script>
+</body>
+</html>

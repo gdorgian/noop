@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#0A0C0B"/><circle cx="50" cy="50" r="30" fill="none" stroke="#9FE2FB" stroke-width="2" opacity=".45"/><circle cx="50" cy="50" r="19" fill="url(#g)"/><defs><radialGradient id="g" cx="38%" cy="32%"><stop offset="0" stop-color="#9FE2FB"/><stop offset=".55" stop-color="#2FB2F0"/><stop offset="1" stop-color="#0A5F92"/></radialGradient></defs></svg></template>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F5;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#0B6FA8;text-decoration:none}a:hover{color:#084F78}
+@keyframes auraBreathe{0%,100%{transform:scale(.92);opacity:.5}50%{transform:scale(1.06);opacity:.85}}
+</style>
+</helmet>
+
+<div style="max-width:1300px;margin:0 auto;padding:52px 40px 110px;display:flex;flex-direction:column;gap:14px">
+
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;color:#0B5E8C;background:#EEF4F8;border:.5px solid #C2DAE8;border-radius:3px;padding:3px 7px">Before launch &middot; item 3</span>
+    <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;color:#5E6663">Act 2 &middot; the fifth screen</span>
+  </div>
+  <h1 style="margin:0;font-family:'Outfit',sans-serif;font-size:44px;font-weight:300;letter-spacing:-.032em;line-height:1.04;color:#111413">Breathe</h1>
+  <p style="margin:0;max-width:38em;font-size:14.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">The one thing Noop does that a phone cannot. The engine, the eighteen-protocol catalog and the haptics are written and switched off; the orb on <code style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#0B5E8C;background:#EEF4F8;padding:1px 4px;border-radius:2px">today</code> paces nothing, buzzes nothing and measures nothing. <strong style="font-weight:600">The orb becomes the door.</strong></p>
+  <p style="margin:0;max-width:38em;font-size:13px;line-height:1.6;color:#5E6663;text-wrap:pretty">Scoped as the player <em>plus</em> the resonance sweep, because the sweep is the feature and not a later mode. It is the only piece in the pack that is an <strong style="font-weight:600">activity</strong> rather than a display, and the loop between the cue, the body and the graphic is the whole of it.</p>
+
+  <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:12px">
+    <div style="flex:1;min-width:300px;background:#fff;border:1px solid #E4E8E6;border-left:3px solid #17A2E6;border-radius:12px;padding:15px 17px;display:flex;flex-direction:column;gap:7px">
+      <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#0B5E8C">The hue, settled</span>
+      <p style="margin:0;font-size:12.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">No new token. Breathe&rsquo;s hue <strong style="font-weight:600">is the orb</strong> &mdash; the app&rsquo;s one permitted gradient, used here at full size on the one screen where the orb is the subject rather than a card. Everything else on the screen is neutral so the orb is the brightest thing in the room.</p>
+    </div>
+    <div style="flex:1;min-width:300px;background:#fff;border:1px solid #E4E8E6;border-left:3px solid #B4543A;border-radius:12px;padding:15px 17px;display:flex;flex-direction:column;gap:7px">
+      <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#B4543A">The line the copy cannot cross</span>
+      <p style="margin:0;font-size:12.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">Never therapy, never treatment, never a claim about anxiety, blood pressure or recovery. <strong style="font-weight:600">It is a pace that suits this person&rsquo;s physiology</strong> &mdash; that is the whole promise, and it is enough.</p>
+    </div>
+  </div>
+
+  <div style="height:1px;background:#D6DAD8;margin:28px 0 8px"></div>
+
+  <div style="display:flex;align-items:baseline;gap:12px">
+    <span style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:300;color:#B7BFBB;letter-spacing:-.02em">01</span>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <h2 style="margin:0;font-family:'Outfit',sans-serif;font-size:26px;font-weight:400;letter-spacing:-.022em;color:#111413">Working prototype</h2>
+      <span style="font-size:12.5px;color:#5E6663">Tap through it. The pacer runs, the trace is live, and the sweep actually sweeps.</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:30px;flex-wrap:wrap;margin-top:22px">
+
+    <div style="flex:none;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:5px;flex-wrap:wrap;width:402px">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+          <div onClick="{{ t.go }}" style="{{ t.style }}">{{ t.k }}</div>
+        </sc-for>
+      </div>
+      <div style="border-radius:48px;overflow:hidden;box-shadow:0 14px 40px rgba(17,20,19,.16)">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ yes }}" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+
+          <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;overflow-y:auto">
+            <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px;flex:none">
+              <span style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-top:1.6px solid #C6CEC9;border-left:1.6px solid #C6CEC9;transform:rotate(-45deg);margin-left:-2px"></span></span>
+              <span style="font-size:13.5px;color:#939C97">Today</span>
+            </div>
+
+            <div style="position:relative;height:300px;flex:none;display:flex;align-items:center;justify-content:center">
+              <span style="position:absolute;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(47,178,240,.20),rgba(47,178,240,0) 66%);animation:auraBreathe 10s ease-in-out infinite"></span>
+              <span style="position:absolute;width:214px;height:214px;border-radius:50%;border:1px solid rgba(159,226,251,.28);animation:auraBreathe 10s ease-in-out infinite"></span>
+              <span style="position:absolute;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#9FE2FB,#2FB2F0 55%,#0A5F92);box-shadow:0 18px 52px rgba(11,111,168,.55)"></span>
+              <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none">
+                <span style="font-family:'Outfit',sans-serif;font-size:38px;font-weight:200;letter-spacing:-.03em;line-height:1;color:#F6FDFF;text-shadow:0 2px 16px rgba(4,30,48,.55);font-variant-numeric:tabular-nums">{{ paceNum }}</span>
+                <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:rgba(246,253,255,.72)">{{ paceLabel }}</span>
+              </div>
+            </div>
+
+            <div style="padding:0 20px 26px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;flex-direction:column;gap:6px;padding:0 2px">
+                <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.025em">{{ homeTitle }}</span>
+                <span style="font-size:13px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ homeLine }}</span>
+              </div>
+
+              <div onClick="{{ goPlayer }}" style="height:54px;border-radius:18px;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none">
+                <span style="font-size:15px;font-weight:600;color:#04121A">Start &middot; {{ protoName }}</span>
+              </div>
+
+              <div onClick="{{ goCatalog }}" style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;align-items:center;gap:12px;cursor:pointer">
+                <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:13.5px;font-weight:600">{{ protoName }}</span>
+                  <span style="font-size:11.5px;color:#7F8A85">{{ protoMeta }}</span>
+                </div>
+                <span style="font-size:12px;color:#7F8A85">Change</span>
+                <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+              </div>
+
+              <div onClick="{{ goSweep }}" style="{{ sweepCardStyle }}">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                  <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#7FC9EE">{{ sweepEyebrow }}</span>
+                  <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #7FC9EE;border-right:1.6px solid #7FC9EE;transform:rotate(45deg)"></span>
+                </div>
+                <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.02em">{{ sweepTitle }}</span>
+                <span style="font-size:12.5px;line-height:1.55;color:#B7C3C9;text-wrap:pretty">{{ sweepLine }}</span>
+              </div>
+
+              <sc-if value="{{ hasFound }}" hint-placeholder-val="{{ false }}">
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+                  <sc-for list="{{ afterRows }}" as="a" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:{{ a.border }}">
+                      <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:13px;color:#EDF1EF">{{ a.k }}</span>
+                        <span style="font-size:11.5px;color:#7F8A85">{{ a.sub }}</span>
+                      </div>
+                      <span style="font-size:12px;color:#7FC9EE;font-variant-numeric:tabular-nums;flex:none">{{ a.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:2px 2px 0;text-wrap:pretty">A pace that suits your physiology. Nothing here treats anything, and the strap does the counting so you can shut your eyes.</span>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isCatalog }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;overflow-y:auto">
+            <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px;flex:none">
+              <div onClick="{{ goHome }}" style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="width:8px;height:8px;border-top:1.6px solid #C6CEC9;border-left:1.6px solid #C6CEC9;transform:rotate(-45deg);margin-left:-2px"></span></div>
+              <span style="font-size:13.5px;color:#939C97">Breathe</span>
+            </div>
+            <div style="padding:8px 20px 26px;display:flex;flex-direction:column;gap:13px">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Eighteen ways to breathe</span>
+                <span style="font-size:13px;line-height:1.6;color:#939C97;text-wrap:pretty">All of them already in the catalog. Grouped by what they are for, because eighteen in one list is a menu nobody reads.</span>
+              </div>
+              <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570;padding:6px 2px 0">{{ g.k }}</span>
+                  <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+                    <sc-for list="{{ g.items }}" as="p" hint-placeholder-count="4">
+                      <div onClick="{{ p.pick }}" style="{{ p.row }}">
+                        <div style="flex:1;display:flex;flex-direction:column;gap:3px;min-width:0">
+                          <span style="{{ p.nameStyle }}">{{ p.n }}</span>
+                          <span style="font-size:11.5px;color:#7F8A85">{{ p.d }}</span>
+                        </div>
+                        <span style="{{ p.patStyle }}">{{ p.pat }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ g.warn }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:11.5px;line-height:1.6;color:#C8934B;padding:0 2px;text-wrap:pretty">{{ g.warnText }}</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isPlayer }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column">
+            <div style="padding:56px 18px 0;display:flex;align-items:center;gap:12px;flex:none">
+              <div onClick="{{ goHome }}" style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="font-size:15px;color:#C6CEC9;line-height:1;margin-top:-2px">&times;</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:13px;font-weight:600;color:#EDF1EF">{{ protoName }}</span>
+                <span style="font-size:11px;color:#6C7570;font-variant-numeric:tabular-nums">{{ elapsed }} of {{ protoLen }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;flex:none;padding:6px 10px;border-radius:12px;background:rgba(23,162,230,.1);border:.5px solid rgba(23,162,230,.24)">
+                <span style="{{ buzzDot }}"></span>
+                <span style="font-size:10.5px;font-weight:600;color:#7FC9EE">Buzzing the cue</span>
+              </div>
+            </div>
+
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:0 20px">
+              <div style="position:relative;width:300px;height:300px;display:flex;align-items:center;justify-content:center">
+                <span style="position:absolute;width:296px;height:296px;border-radius:50%;border:1px solid rgba(255,255,255,.05)"></span>
+                <span style="{{ pacerGlow }}"></span>
+                <span style="{{ pacerRing }}"></span>
+                <span style="{{ pacerOrb }}"></span>
+                <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none">
+                  <span style="font-family:'Outfit',sans-serif;font-size:27px;font-weight:300;letter-spacing:-.02em;color:#F6FDFF;text-shadow:0 2px 16px rgba(4,30,48,.55)">{{ phaseWord }}</span>
+                  <span style="font-family:'Outfit',sans-serif;font-size:15px;font-weight:300;color:rgba(246,253,255,.75);font-variant-numeric:tabular-nums">{{ phaseCount }}</span>
+                </div>
+              </div>
+
+              <div style="width:100%;display:flex;flex-direction:column;gap:9px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                  <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570">Your heart, against the pace</span>
+                  <div style="display:flex;align-items:baseline;gap:4px">
+                    <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:300;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ swing }}</span>
+                    <span style="font-size:11px;color:#7F8A85">bpm swing</span>
+                  </div>
+                </div>
+                <div style="height:96px;border-radius:20px;background:#141817;border:.5px solid rgba(255,255,255,.06);padding:10px 12px;box-sizing:border-box;position:relative;overflow:hidden">
+                  <svg viewBox="0 0 340 76" preserveAspectRatio="none" style="width:100%;height:100%;display:block">
+                    <path d="{{ paceBand }}" fill="rgba(23,162,230,.10)"></path>
+                    <polyline points="{{ paceLine }}" fill="none" stroke="rgba(159,226,251,.34)" stroke-width="1.2" stroke-dasharray="3 4"></polyline>
+                    <polyline points="{{ hrLine }}" fill="none" stroke="#9FE2FB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                  </svg>
+                </div>
+                <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">The dashed line is the pace you are following. The bright one is your heart answering it &mdash; the bigger the swing, the better this pace fits you.</span>
+              </div>
+            </div>
+
+            <div style="padding:0 20px 30px;display:flex;flex-direction:column;gap:10px;flex:none">
+              <div onClick="{{ goHome }}" style="height:52px;border-radius:18px;border:.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-size:14.5px;font-weight:500;color:#C6CEC9">End the session</span>
+              </div>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isSweep }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column">
+            <div style="padding:56px 18px 0;display:flex;align-items:center;gap:12px;flex:none">
+              <div onClick="{{ goHome }}" style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="font-size:15px;color:#C6CEC9;line-height:1;margin-top:-2px">&times;</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:13px;font-weight:600;color:#EDF1EF">Finding your pace</span>
+                <span style="font-size:11px;color:#6C7570;font-variant-numeric:tabular-nums">{{ sweepStepLabel }}</span>
+              </div>
+            </div>
+
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:0 20px">
+              <div style="position:relative;width:250px;height:250px;display:flex;align-items:center;justify-content:center">
+                <span style="{{ sweepGlow }}"></span>
+                <span style="{{ sweepRing }}"></span>
+                <span style="{{ sweepOrb }}"></span>
+                <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none">
+                  <span style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:200;letter-spacing:-.03em;color:#F6FDFF;font-variant-numeric:tabular-nums">{{ sweepRate }}</span>
+                  <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:rgba(246,253,255,.7)">breaths / min</span>
+                </div>
+              </div>
+
+              <span style="font-family:'Instrument Serif',serif;font-size:17px;line-height:1.45;color:#C6CEC9;text-align:center;text-wrap:pretty">{{ sweepCue }}</span>
+
+              <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570">How hard your heart swung at each</span>
+                <div style="display:flex;align-items:flex-end;gap:8px;height:132px">
+                  <sc-for list="{{ candidates }}" as="c" hint-placeholder-count="5">
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;justify-content:flex-end;height:100%">
+                      <span style="{{ c.figStyle }}">{{ c.fig }}</span>
+                      <div style="{{ c.bar }}"></div>
+                      <span style="{{ c.lblStyle }}">{{ c.k }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+
+            <div style="padding:0 20px 30px;display:flex;flex-direction:column;gap:9px;flex:none">
+              <div onClick="{{ goHome }}" style="height:52px;border-radius:18px;border:.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-size:14.5px;font-weight:500;color:#C6CEC9">Stop &mdash; keep what it has</span>
+              </div>
+              <span style="font-size:11px;line-height:1.55;color:#7F8A85;text-align:center;text-wrap:pretty">Ten minutes, five paces, ninety seconds each. Stopping early keeps every pace it finished.</span>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isFound }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;overflow-y:auto">
+            <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px;flex:none">
+              <div onClick="{{ goHome }}" style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="width:8px;height:8px;border-top:1.6px solid #C6CEC9;border-left:1.6px solid #C6CEC9;transform:rotate(-45deg);margin-left:-2px"></span></div>
+              <span style="font-size:13.5px;color:#939C97">Breathe</span>
+            </div>
+
+            <div style="padding:16px 20px 0;display:flex;flex-direction:column;align-items:center;gap:8px;flex:none">
+              <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#7FC9EE">Your pace</span>
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-family:'Outfit',sans-serif;font-size:76px;font-weight:200;letter-spacing:-.045em;line-height:.95;color:#EDF1EF;font-variant-numeric:tabular-nums">5.5</span>
+                <span style="font-size:14px;color:#939C97">breaths / min</span>
+              </div>
+              <span style="font-size:13px;line-height:1.55;color:#939C97;text-align:center;text-wrap:pretty">Five and a half seconds in, five and a half out. Your heart swung 31 % harder here than at any other pace it tried.</span>
+            </div>
+
+            <div style="padding:22px 20px 26px;display:flex;flex-direction:column;gap:12px">
+              <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 12px;display:flex;flex-direction:column;gap:12px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570">The curve it found</span>
+                <svg viewBox="0 0 320 128" style="width:100%;height:128px;display:block">
+                  <path d="M14 106 C58 100 78 58 112 40 C132 29 150 26 168 34 C196 46 214 84 258 98 L306 106" fill="none" stroke="rgba(159,226,251,.3)" stroke-width="1.6"></path>
+                  <line x1="168" y1="34" x2="168" y2="112" stroke="rgba(159,226,251,.35)" stroke-width="1" stroke-dasharray="3 4"></line>
+                  <circle cx="14" cy="106" r="4" fill="#3E6B80"></circle>
+                  <circle cx="112" cy="40" r="4" fill="#3E6B80"></circle>
+                  <circle cx="168" cy="34" r="6.5" fill="#9FE2FB"></circle>
+                  <circle cx="258" cy="98" r="4" fill="#3E6B80"></circle>
+                  <circle cx="306" cy="106" r="4" fill="#3E6B80"></circle>
+                  <text x="168" y="126" font-family="'Instrument Sans',sans-serif" font-size="10" fill="#9FE2FB" text-anchor="middle">5.5</text>
+                  <text x="14" y="126" font-family="'Instrument Sans',sans-serif" font-size="10" fill="#7F8A85" text-anchor="middle">6.5</text>
+                  <text x="306" y="126" font-family="'Instrument Sans',sans-serif" font-size="10" fill="#7F8A85" text-anchor="middle">4.5</text>
+                </svg>
+              </div>
+
+              <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+                <sc-for list="{{ afterRows }}" as="a" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:{{ a.border }}">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                      <span style="font-size:13px;color:#EDF1EF">{{ a.k }}</span>
+                      <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ a.sub }}</span>
+                    </div>
+                    <span style="font-size:12px;color:#7FC9EE;font-variant-numeric:tabular-nums;flex:none">{{ a.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div onClick="{{ goPlayer }}" style="height:54px;border-radius:18px;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-size:15px;font-weight:600;color:#04121A">Breathe at 5.5</span>
+              </div>
+              <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Worth testing again after a few months, or if your resting pulse moves. It is a pace that suits your physiology, not a treatment for anything.</span>
+            </div>
+          </div>
+          </sc-if>
+
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div style="flex:1;min-width:340px;display:flex;flex-direction:column;gap:16px;padding-top:38px">
+
+      <div style="background:#fff;border:1px solid #E4E8E6;border-radius:12px;overflow:hidden">
+        <div style="padding:10px 14px;background:#F0F3F2;border-bottom:1px solid #E4E8E6">
+          <span style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#5E6663">Four states, and what the screen is in each</span>
+        </div>
+        <sc-for list="{{ states }}" as="s" hint-placeholder-count="4">
+          <div style="display:flex;gap:12px;padding:11px 14px;border-bottom:1px solid #F0F3F2">
+            <span style="width:104px;flex:none;font-size:11.5px;font-weight:600;color:#111413">{{ s.k }}</span>
+            <span style="flex:1;font-size:11.5px;line-height:1.55;color:#2A302E;text-wrap:pretty">{{ s.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="background:#fff;border:1px solid #E4E8E6;border-radius:12px;overflow:hidden">
+        <div style="padding:10px 14px;background:#F0F3F2;border-bottom:1px solid #E4E8E6">
+          <span style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#5E6663">Routes</span>
+        </div>
+        <sc-for list="{{ routes }}" as="r" hint-placeholder-count="5">
+          <div style="display:flex;gap:10px;padding:9px 14px;border-bottom:1px solid #F0F3F2">
+            <span style="flex:1;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#0B5E8C">{{ r.a }}</span>
+            <span style="flex:1;font-size:11px;color:#2A302E">{{ r.b }}</span>
+            <span style="flex:1;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#0B5E8C">{{ r.c }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="background:#fff;border:1px solid #E4E8E6;border-radius:12px;overflow:hidden">
+        <div style="padding:10px 14px;background:#F0F3F2;border-bottom:1px solid #E4E8E6">
+          <span style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#5E6663">Metrics &mdash; the player</span>
+        </div>
+        <sc-for list="{{ metrics }}" as="m" hint-placeholder-count="8">
+          <div style="display:flex;gap:12px;padding:9px 14px;border-bottom:1px solid #F0F3F2">
+            <span style="width:104px;flex:none;font-size:11.5px;color:#5E6663">{{ m.k }}</span>
+            <span style="flex:1;font-size:11.5px;line-height:1.5;color:#111413;text-wrap:pretty">{{ m.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="background:#FFFBF3;border:1px solid #EBD3A8;border-radius:12px;padding:15px 17px;display:flex;flex-direction:column;gap:9px">
+        <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#8A5B12">The two things that make this the flagship</span>
+        <p style="margin:0;font-size:12.5px;line-height:1.6;color:#4A3A1E;text-wrap:pretty"><strong style="font-weight:600">The strap buzzes the cue.</strong> Not a chime, not a flashing ring &mdash; a wrist tap on each transition, so the session works with the eyes shut and the phone face down. That is the sentence a phone app cannot say, and it should be visible in the header while it is happening.</p>
+        <p style="margin:0;font-size:12.5px;line-height:1.6;color:#4A3A1E;text-wrap:pretty"><strong style="font-weight:600">The trace is live and it is the point.</strong> The dashed pacer and the bright heart line on one axis is the loop between cue, body and graphic. If the trace is faked, smoothed into a sine, or drawn after the fact, the feature is a timer with a gradient.</p>
+      </div>
+
+      <div style="background:#fff;border:1px solid #E4E8E6;border-left:3px solid #B4543A;border-radius:12px;padding:15px 17px;display:flex;flex-direction:column;gap:9px">
+        <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#B4543A">Never</span>
+        <p style="margin:0;font-size:12.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">No therapy or treatment framing, anywhere, in any state &mdash; not for anxiety, blood pressure, recovery or sleep. No streak, no badge, no minutes-per-week goal: <em>What Noop will not ask you</em> covers this screen too. And the four intense protocols carry a plain seated-only line rather than a modal warning, because a modal on a breathing screen is the wrong register.</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1300,&quot;height&quot;:1120}}">
+const PROTOS = {
+  calm: [
+    { n: 'Coherent 6-6', d: 'Six seconds in, six out. The default until a sweep says otherwise.', pat: '6 · 6', cyc: 12 },
+    { n: 'Box', d: 'Equal four counts. The one on today’s orb.', pat: '4 · 4 · 4 · 4', cyc: 16 },
+    { n: '4-7-8', d: 'Long hold, longer out. For getting to sleep.', pat: '4 · 7 · 8', cyc: 19 },
+    { n: 'Diaphragmatic', d: 'Slow and low, no counting to speak of.', pat: '5 · 5', cyc: 10 },
+    { n: 'Extended exhale', d: 'Twice as long out as in.', pat: '4 · 8', cyc: 12 }
+  ],
+  focus: [
+    { n: 'Alternate Nostril', d: 'Alternating sides, hands involved.', pat: '4 · 4 · 4', cyc: 12 },
+    { n: 'Buteyko', d: 'Reduced volume, light air hunger.', pat: '3 · 3 · 6', cyc: 12 },
+    { n: 'Resonance', d: 'Whatever your sweep found. Locked to you.', pat: '5.5 · 5.5', cyc: 11 },
+    { n: 'Ujjayi', d: 'Narrowed throat, audible and even.', pat: '5 · 5', cyc: 10 }
+  ],
+  energise: [
+    { n: 'Bhastrika', d: 'Forceful and fast, in and out.', pat: '1 · 1', cyc: 2 },
+    { n: 'Kapalabhati', d: 'Sharp exhales, passive inhales.', pat: '0.5 · 1', cyc: 1.5 },
+    { n: 'Breath of fire', d: 'Rapid and even through the nose.', pat: '1 · 1', cyc: 2 },
+    { n: 'Wim Hof rounds', d: 'Thirty deep breaths, then a hold.', pat: '30 + hold', cyc: 3 },
+    { n: 'Holotropic', d: 'Sustained fast breathing, long session.', pat: 'free', cyc: 3 }
+  ],
+  measure: [
+    { n: 'Find your pace', d: 'The resonance sweep. Ten minutes, once.', pat: 'sweep', cyc: 11 },
+    { n: 'CO₂ tolerance', d: 'One comfortable hold, timed.', pat: 'hold', cyc: 10 },
+    { n: 'BOLT score', d: 'Breath-hold time after a normal exhale.', pat: 'hold', cyc: 10 },
+    { n: 'Resting check', d: 'Two minutes of nothing, for a baseline.', pat: '—', cyc: 10 }
+  ]
+};
+
+class Component extends DCLogic {
+  state = { screen: 'home', proto: PROTOS.calm[0], found: false, t: 0, samples: [], sweepT: 0 };
+
+  componentDidMount() {
+    this.iv = setInterval(() => {
+      const S = this.state;
+      if (S.screen === 'player') {
+        const t = S.t + 0.14;
+        const cyc = S.proto.cyc;
+        const hr = 64 + 7.5 * Math.sin(2 * Math.PI * (t - cyc * 0.16) / cyc) + (Math.random() - 0.5) * 0.9;
+        const samples = S.samples.concat([hr]).slice(-96);
+        this.setState({ t, samples });
+      } else if (S.screen === 'sweep') {
+        const sweepT = S.sweepT + 0.14;
+        if (sweepT > 30) { this.setState({ screen: 'found', found: true, sweepT: 0 }); return; }
+        this.setState({ sweepT, t: S.t + 0.14 });
+      }
+    }, 140);
+  }
+  componentWillUnmount() { clearInterval(this.iv); }
+
+  go = (s) => () => {
+    if (s === 'player') this.setState({ screen: 'player', t: 0, samples: [] });
+    else if (s === 'sweep') this.setState({ screen: 'sweep', sweepT: 0, t: 0 });
+    else this.setState({ screen: s });
+  };
+  pick = (p) => () => this.setState({ proto: p, screen: 'home' });
+
+  renderVals() {
+    const S = this.state;
+    const hair = '.5px solid rgba(255,255,255,.06)';
+    const cyc = S.proto.cyc;
+    const u = (S.t % cyc) / cyc;
+    const breath = 0.5 - 0.5 * Math.cos(2 * Math.PI * u);
+    const scale = 0.62 + 0.38 * breath;
+
+    const inLen = cyc / 2;
+    const phaseWord = u < 0.5 ? 'Breathe in' : 'Breathe out';
+    const secsLeft = Math.max(1, Math.ceil((u < 0.5 ? (0.5 - u) : (1 - u)) * cyc));
+
+    const RATES = [6.5, 6.0, 5.5, 5.0, 4.5];
+    const SWINGS = [0.52, 0.74, 1.0, 0.68, 0.44];
+    const step = Math.min(4, Math.floor(S.sweepT / 6));
+    const stepU = (S.sweepT % 6) / 6;
+
+    const sw = S.samples.length > 8 ? (Math.max.apply(null, S.samples.slice(-40)) - Math.min.apply(null, S.samples.slice(-40))) : 0;
+
+    const hrLine = S.samples.map((v, i) => {
+      const x = (i / 95) * 340;
+      const y = 68 - ((v - 54) / 24) * 60;
+      return x.toFixed(1) + ',' + Math.max(6, Math.min(70, y)).toFixed(1);
+    }).join(' ');
+
+    const paceLine = S.samples.map((v, i) => {
+      const tt = S.t - (S.samples.length - 1 - i) * 0.14;
+      const b = 0.5 - 0.5 * Math.cos(2 * Math.PI * ((tt % cyc) / cyc));
+      const x = (i / 95) * 340;
+      const y = 62 - b * 46;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+
+    const paceBand = S.samples.length > 2
+      ? 'M0,72 L' + S.samples.map((v, i) => {
+          const tt = S.t - (S.samples.length - 1 - i) * 0.14;
+          const b = 0.5 - 0.5 * Math.cos(2 * Math.PI * ((tt % cyc) / cyc));
+          return ((i / 95) * 340).toFixed(1) + ',' + (62 - b * 46).toFixed(1);
+        }).join(' L') + ' L340,72 Z'
+      : 'M0,72 L340,72 Z';
+
+    const orbBase = 'position:absolute;border-radius:50%;pointer-events:none;';
+    const mm = Math.floor(S.t / 60), ss = Math.floor(S.t % 60);
+
+    const groups = [
+      { k: 'To settle', items: PROTOS.calm, warn: false, warnText: '' },
+      { k: 'To steady', items: PROTOS.focus, warn: false, warnText: '' },
+      { k: 'To lift', items: PROTOS.energise, warn: true, warnText: 'These four are forceful. Sitting or lying only, never while driving, and stop at the first sign of light-headedness.' },
+      { k: 'To measure', items: PROTOS.measure, warn: false, warnText: '' }
+    ].map(g => ({
+      ...g,
+      items: g.items.map(p => ({
+        ...p,
+        pick: this.pick(p),
+        row: 'display:flex;align-items:center;gap:12px;padding:13px 0;cursor:pointer;border-bottom:' + (g.items.indexOf(p) === g.items.length - 1 ? 'none' : hair),
+        nameStyle: 'font-size:13.5px;font-weight:600;color:' + (p.n === S.proto.n ? '#7FC9EE' : '#EDF1EF'),
+        patStyle: 'font-size:11px;color:' + (p.n === S.proto.n ? '#7FC9EE' : '#7F8A85') + ';font-variant-numeric:tabular-nums;flex:none;font-family:ui-monospace,Menlo,monospace'
+      }))
+    }));
+
+    const tabs = [
+      { k: 'Home', s: 'home' }, { k: 'Catalog', s: 'catalog' }, { k: 'Player', s: 'player' },
+      { k: 'The sweep', s: 'sweep' }, { k: 'Found', s: 'found' }
+    ].map(t => ({
+      k: t.k, go: this.go(t.s),
+      style: 'font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:6px 11px;border-radius:6px;cursor:pointer;user-select:none;'
+        + (S.screen === t.s ? 'background:#111413;color:#fff;' : 'background:#fff;border:1px solid #E4E8E6;color:#5E6663;')
+    }));
+
+    return {
+      yes: true, tabs,
+      isHome: S.screen === 'home', isCatalog: S.screen === 'catalog', isPlayer: S.screen === 'player',
+      isSweep: S.screen === 'sweep', isFound: S.screen === 'found',
+      goHome: this.go('home'), goCatalog: this.go('catalog'), goPlayer: this.go('player'), goSweep: this.go('sweep'),
+      hasFound: S.found,
+      groups,
+
+      paceNum: S.found ? '5.5' : '6.0',
+      paceLabel: S.found ? 'your pace' : 'generic pace',
+      homeTitle: S.found ? 'Five and a half a minute' : 'A pace, until you find yours',
+      homeLine: S.found
+        ? 'Locked from your sweep on 12 August. Every protocol that can run at your pace now does.'
+        : 'Breathe works today at six a minute, which suits most people. Ten minutes of measuring finds the one that suits you.',
+      protoName: S.proto.n, protoMeta: S.proto.pat + ' · ' + (S.proto.cyc).toFixed(0) + 's a breath',
+      protoLen: '6:00',
+
+      sweepCardStyle: 'background:rgba(23,162,230,.07);border:.5px solid rgba(23,162,230,.2);border-radius:22px;padding:15px 16px;display:flex;flex-direction:column;gap:7px;cursor:pointer',
+      sweepEyebrow: S.found ? 'Swept 12 August' : 'Ten minutes, once',
+      sweepTitle: S.found ? 'Test it again' : 'Find your pace',
+      sweepLine: S.found
+        ? 'Your resting pulse has moved 3 bpm since. Worth re-testing, not urgent.'
+        : 'There is one pace where your heart swings hardest with each breath. The strap can find it in about ten minutes.',
+
+      afterRows: [
+        { k: 'Breathe', sub: 'Every paced protocol runs at 5.5 unless you pick otherwise', v: '5.5', border: hair },
+        { k: 'The orb on today', sub: 'Paces at your rate instead of a generic six', v: 'follows', border: hair },
+        { k: 'Wind-down buzz', sub: 'The bedtime nudge uses your pace for its two minutes', v: 'follows', border: 'none' }
+      ],
+
+      elapsed: String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0'),
+      phaseWord, phaseCount: String(secsLeft),
+      buzzDot: 'width:7px;height:7px;border-radius:50%;background:#7FC9EE;opacity:' + (breath > 0.9 || breath < 0.1 ? 1 : 0.35) + ';transition:opacity 120ms linear',
+      pacerOrb: orbBase + 'width:150px;height:150px;background:radial-gradient(circle at 38% 32%,#9FE2FB,#2FB2F0 55%,#0A5F92);box-shadow:0 18px 52px rgba(11,111,168,.55);transform:scale(' + scale.toFixed(3) + ')',
+      pacerRing: orbBase + 'width:230px;height:230px;border:1px solid rgba(159,226,251,' + (0.16 + 0.3 * breath).toFixed(2) + ');transform:scale(' + (0.72 + 0.28 * breath).toFixed(3) + ')',
+      pacerGlow: orbBase + 'width:290px;height:290px;background:radial-gradient(circle,rgba(47,178,240,' + (0.10 + 0.16 * breath).toFixed(2) + '),rgba(47,178,240,0) 66%)',
+      swing: sw.toFixed(1),
+      hrLine, paceLine, paceBand,
+
+      sweepRate: RATES[step].toFixed(1),
+      sweepStepLabel: 'Pace ' + (step + 1) + ' of 5 · ' + Math.max(1, Math.ceil((1 - stepU) * 90)) + 's left',
+      sweepCue: u < 0.5 ? 'In, slowly' : 'And out',
+      sweepOrb: orbBase + 'width:120px;height:120px;background:radial-gradient(circle at 38% 32%,#9FE2FB,#2FB2F0 55%,#0A5F92);box-shadow:0 14px 40px rgba(11,111,168,.5);transform:scale(' + (0.66 + 0.34 * breath).toFixed(3) + ')',
+      sweepRing: orbBase + 'width:196px;height:196px;border:1px solid rgba(159,226,251,' + (0.14 + 0.26 * breath).toFixed(2) + ');transform:scale(' + (0.74 + 0.26 * breath).toFixed(3) + ')',
+      sweepGlow: orbBase + 'width:240px;height:240px;background:radial-gradient(circle,rgba(47,178,240,' + (0.09 + 0.14 * breath).toFixed(2) + '),rgba(47,178,240,0) 66%)',
+      candidates: RATES.map((r, i) => {
+        const done = i < step;
+        const live = i === step;
+        const h = done ? SWINGS[i] : live ? SWINGS[i] * Math.min(1, stepU * 1.15) : 0;
+        const best = done && SWINGS[i] === 1;
+        return {
+          k: r.toFixed(1),
+          fig: done || (live && stepU > 0.25) ? (h * 9.4).toFixed(1) : '',
+          figStyle: 'font-size:10.5px;font-variant-numeric:tabular-nums;color:' + (best ? '#9FE2FB' : '#7F8A85'),
+          bar: 'width:100%;border-radius:8px 8px 3px 3px;height:' + Math.max(3, h * 78).toFixed(0) + 'px;'
+            + 'background:' + (best ? 'linear-gradient(180deg,#9FE2FB,#2FB2F0)' : live ? 'rgba(159,226,251,.55)' : done ? 'rgba(159,226,251,.28)' : 'rgba(255,255,255,.07)') + ';'
+            + 'transition:height 200ms linear',
+          lblStyle: 'font-size:10.5px;font-variant-numeric:tabular-nums;font-weight:' + (live || best ? '600' : '400') + ';color:' + (best ? '#9FE2FB' : live ? '#EDF1EF' : '#7F8A85')
+        };
+      }),
+
+      states: [
+        { k: 'Never swept', v: 'Breathe works at a generic six a minute and says so. The sweep card is the second thing on the screen, phrased as an offer with a cost — ten minutes, once — not as a setup step.' },
+        { k: 'Sweeping', v: 'The activity. One pace at a time, the response building as it happens, and every finished pace kept if you stop early. This is the state that has to be designed rather than laid out.' },
+        { k: 'Found', v: 'A locked pace, how clearly it won, and the three places elsewhere in the app that now follow it. The hand-off is the part to get right: what changed, in one card.' },
+        { k: 'Worth re-testing', v: 'Same screen as Found, with the sweep card reading Test it again and one line on what moved. Never a nag, never a badge, never a red dot.' }
+      ],
+      routes: [
+        { a: 'today', b: 'the orb', c: 'breathe' },
+        { a: 'breathe', b: 'Start', c: 'breathe/player' },
+        { a: 'breathe', b: 'the protocol row', c: 'breathe/catalog' },
+        { a: 'breathe', b: 'Find your pace', c: 'breathe/sweep' },
+        { a: 'breathe/sweep', b: 'ends, or Stop', c: 'breathe/found' }
+      ],
+      metrics: [
+        { k: 'Orb', v: '150 pt at rest, scaling 0.62 → 1.00 across the breath. The existing orbStops, unchanged. tick, linear — an eased breath cue paces nothing.' },
+        { k: 'Ring', v: '230 pt, 1 pt stroke, auraLight 16 → 46 %, scaling with the orb one beat behind it.' },
+        { k: 'Phase word', v: 'Outfit 27 / 300. The count under it at 15 / 300, tabular. Both change on the transition, not a frame early.' },
+        { k: 'Trace card', v: '96 pt tall, radius 20, card fill. 96 samples at 140 ms — about thirteen seconds of history.' },
+        { k: 'Pacer', v: 'Dashed 1.2 pt, auraLight 34 %, with a 10 % fill beneath it. It is the reference, so it never outweighs the heart line.' },
+        { k: 'Heart line', v: '2 pt solid auraLight, round caps. Never smoothed into a sine — the noise is the evidence it is real.' },
+        { k: 'Swing figure', v: 'Outfit 20 / 300, tabular, peak-to-trough of the last forty samples in bpm. The one number the session is judged by.' },
+        { k: 'Sweep bars', v: 'Five, flex-even, 78 pt at full. Winner in the orb gradient; finished at 28 %; live at 55 %; untried at white 7 %.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

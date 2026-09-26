@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+.dv-turn{padding:40px 44px 34px;border-bottom:1px solid rgba(23,21,15,.09);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 22px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F}
+.dv-opts{display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:12px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(23,21,15,.09);color:#17150F;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:9px;font:400 11.5px/1.45 'Instrument Sans',system-ui,sans-serif;color:rgba(23,21,15,.55);max-width:402px}
+.dv-opt:target .dv-oid{background:#B4543A;color:#fff}
+.dv-next{margin:26px 0 0;font:12px/1.7 'Instrument Sans',system-ui,sans-serif;color:rgba(23,21,15,.5)}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+@keyframes breatheSoft{0%,100%{transform:scale(1);opacity:.72}50%{transform:scale(1.11);opacity:.42}}
+@keyframes drift{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes heartbeat{0%{transform:scale(1)}9%{transform:scale(1.085)}18%{transform:scale(1.01)}27%{transform:scale(1.05)}42%{transform:scale(1)}100%{transform:scale(1)}}
+@keyframes heartglow{0%{transform:scale(1);opacity:.52}9%{transform:scale(1.1);opacity:.8}18%{transform:scale(1.02);opacity:.56}27%{transform:scale(1.07);opacity:.7}42%{transform:scale(1);opacity:.52}100%{transform:scale(1);opacity:.52}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+.scr{animation:fadeUp .32s cubic-bezier(.22,.61,.36,1) both}
+.hb::-webkit-scrollbar{width:0;height:0}
+</style>
+</helmet>
+
+<header style="padding:54px 44px 42px;border-bottom:1px solid rgba(23,21,15,.09)">
+  <div style="display:flex;align-items:center;gap:13px;margin-bottom:26px">
+    <span style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#8FD2BC,#3F8D77 62%,#2A6354);box-shadow:0 2px 10px rgba(63,141,119,.4)"></span>
+    <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:32px;letter-spacing:-.035em;color:#17150F">Noop</span>
+    <span style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#A09A8B;font-weight:600;margin-left:4px">Design language · v1</span>
+  </div>
+  <p style="margin:0 0 34px;max-width:660px;font-size:17px;line-height:1.62;color:#4A463D;text-wrap:pretty">You said Whoop is <em style="font-family:'Instrument Serif',serif;font-style:italic;font-size:19px">too complicated</em>. So the home screen has no score on it. Your body gets one colour, one sentence, and one instruction — everything numeric lives one tap deeper, where you actually went looking for it.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:30px;max-width:1000px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:#A09A8B;font-weight:600">The rule</span>
+      <span style="font-size:13.5px;line-height:1.6;color:#4A463D">One number per screen, maximum. If a second number wants in, it has to earn a screen of its own.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:#A09A8B;font-weight:600">Colour is meaning</span>
+      <span style="font-size:13.5px;line-height:1.6;color:#4A463D">Not traffic lights — a temperature. Cool sage is restored, warm clay is depleted. Nothing goes red at a health-anxious person.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:#A09A8B;font-weight:600">Voice</span>
+      <span style="font-size:13.5px;line-height:1.6;color:#4A463D">Svea tells you what to do in one line, then offers the receipt. Never “HRV 45% over baseline” as an opener.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:#A09A8B;font-weight:600">Kept from your app</span>
+      <span style="font-size:13.5px;line-height:1.6;color:#4A463D">Charge · Effort · Rest as the three pillars, session accept/change, Svea. Dropped: three rings side by side, source badges, “Synthesis”.</span>
+    </div>
+  </div>
+</header>
+
+<section class="dv-turn" id="t2">
+  <div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Aura in the dark, with the reference vocabulary folded in</span></div>
+  <div class="dv-opts">
+    <div class="dv-opt" id="2a">
+      <div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a><span><strong style="color:#17150F;font-weight:600">Aura · dark</strong> — tick gauge around the orb, dot-column variability, sleep bars with a personal average, a strain slider, and a crosshair trend chart. All seven screens, all tappable.</span></div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative">
+          <div style="position:absolute;top:-140px;left:50%;transform:translateX(-50%);width:460px;height:400px;border-radius:50%;background:{{ dk.ambient }};filter:blur(18px);pointer-events:none"></div>
+
+          <div style="position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain" class="hb">
+            <div style="padding:58px 20px 18px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;color:#939C97">{{ dk.greet }}</span>
+                <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15;color:#EDF1EF">{{ dk.headline }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex:none;padding-top:2px">
+                <div onClick="{{ dk.goBand }}" style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer">
+                  <span style="width:13px;height:7px;border-radius:2px;border:1.2px solid #17A2E6;padding:1px;display:flex"><span style="width:62%;background:#17A2E6;border-radius:1px"></span></span>
+                  <span style="font-size:8.5px;font-weight:600;color:#939C97;font-variant-numeric:tabular-nums">62</span>
+                </div>
+                <div onClick="{{ dk.goProfile }}" style="width:38px;height:38px;border-radius:50%;background:linear-gradient(150deg,#3A4340,#242B29);border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#C6CEC9;cursor:pointer">G</div>
+              </div>
+            </div>
+
+            <sc-if value="{{ dk.isToday }}" hint-placeholder-val="{{ true }}">
+              <div class="scr" style="padding:0 20px">
+                <div style="position:relative;height:272px;display:flex;align-items:center;justify-content:center">
+                  <div style="position:absolute;width:270px;height:270px">
+                    <sc-for list="{{ dk.ticks }}" as="k" hint-placeholder-count="41">
+                      <div style="{{ k.s }}"></div>
+                    </sc-for>
+                    <div style="{{ dk.markerStyle }}"></div>
+                  </div>
+                  <div style="position:absolute;width:214px;height:214px;border-radius:50%;background:{{ dk.glow }};filter:blur(6px);animation:breatheSoft 6s ease-in-out infinite"></div>
+                  <div style="position:absolute;width:134px;height:134px;border-radius:50%;background:{{ dk.orb }};box-shadow:{{ dk.orbShadow }};animation:breathe 6s ease-in-out infinite"></div>
+                  <div style="position:absolute;width:134px;height:134px;border-radius:50%;background:conic-gradient(from 200deg,rgba(255,255,255,0),rgba(255,255,255,.4),rgba(255,255,255,0) 58%);animation:drift 24s linear infinite;mix-blend-mode:overlay"></div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin:-6px 0 22px">
+                  <span style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:300;letter-spacing:-.03em;line-height:1.05">{{ dk.stateLabel }}</span>
+                  <span style="font-size:14.5px;line-height:1.5;color:#939C97;text-align:center;max-width:290px;text-wrap:pretty">{{ dk.stateCoach }}</span>
+                </div>
+
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                  <sc-for list="{{ dk.pillars }}" as="p" hint-placeholder-count="3">
+                    <div onClick="{{ p.go }}" style="flex:1;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:13px 12px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer">
+                      <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ p.k }}</span>
+                      <div style="display:flex;align-items:baseline;gap:3px">
+                        <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:400;letter-spacing:-.025em;color:#EDF1EF">{{ p.v }}</span>
+                        <span style="font-size:11px;color:#6C7570">{{ p.u }}</span>
+                      </div>
+                      <div style="height:7px;border-radius:5px;background:repeating-linear-gradient(115deg,rgba(255,255,255,.07) 0 3px,transparent 3px 6px);overflow:hidden">
+                        <div style="{{ p.bar }}"></div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="background:linear-gradient(158deg,#18211E,#121615);border:.5px solid rgba(23,162,230,.2);border-radius:24px;padding:18px 18px 16px;margin-bottom:12px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                    <span style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#8FDCFA,#0B6FA8);box-shadow:0 0 12px rgba(23,162,230,.5)"></span>
+                    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7F8A85;font-weight:600">Svea · today’s call</span>
+                  </div>
+                  <span style="display:block;font-size:19px;line-height:1.36;font-weight:500;letter-spacing:-.012em;margin-bottom:6px;text-wrap:pretty">{{ dk.sessionTitle }}</span>
+                  <span style="display:block;font-size:13.5px;line-height:1.55;color:#8B958F;margin-bottom:16px;text-wrap:pretty">{{ dk.sessionWhy }}</span>
+                  <sc-if value="{{ dk.sessionOpen }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;gap:8px">
+                      <div onClick="{{ dk.accept }}" style="flex:1;height:46px;border-radius:14px;background:#17A2E6;color:#08120F;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:600;cursor:pointer">Accept</div>
+                      <div onClick="{{ dk.swap }}" style="height:46px;padding:0 17px;border-radius:14px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;cursor:pointer">Swap</div>
+                      <div onClick="{{ dk.rest }}" style="height:46px;padding:0 17px;border-radius:14px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;cursor:pointer">Rest</div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ dk.sessionDone }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;align-items:center;justify-content:space-between;height:46px;padding:0 6px 0 16px;border-radius:14px;background:rgba(23,162,230,.14)">
+                      <span style="font-size:13.5px;font-weight:500;color:#17A2E6">{{ dk.sessionState }}</span>
+                      <div onClick="{{ dk.reopen }}" style="height:34px;padding:0 13px;border-radius:10px;background:rgba(255,255,255,.08);display:flex;align-items:center;font-size:12.5px;font-weight:500;cursor:pointer">Change</div>
+                    </div>
+                  </sc-if>
+                </div>
+
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:6px 16px;margin-bottom:12px">
+                  <sc-for list="{{ dk.signals }}" as="s" hint-placeholder-count="4">
+                    <div onClick="{{ s.go }}" style="{{ s.row }}">
+                      <span style="{{ s.icon }}"></span>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:11.5px;color:#7F8A85">{{ s.name }}</span>
+                        <div style="display:flex;align-items:baseline;gap:3px">
+                          <span style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:400;letter-spacing:-.02em">{{ s.v }}</span>
+                          <span style="font-size:11px;color:#6C7570">{{ s.u }}</span>
+                        </div>
+                      </div>
+                      <svg viewBox="0 0 56 22" style="width:56px;height:22px;flex:none;overflow:visible">
+                        <polyline points="{{ s.spark }}" fill="none" stroke="{{ s.c }}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                      </svg>
+                      <span style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:13px;color:#939C97;flex:none">›</span>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="display:flex;align-items:flex-start;gap:11px;background:#17A2E6;border-radius:22px;padding:15px 17px">
+                  <span style="width:19px;height:19px;border-radius:50%;border:1.4px solid rgba(8,18,15,.55);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#08120F;flex:none;margin-top:1px">i</span>
+                  <span style="font-size:14px;line-height:1.45;color:#08120F;font-weight:500;text-wrap:pretty">{{ dk.banner }}</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ dk.isRest }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px">
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                  <div style="flex:1;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 15px;display:flex;flex-direction:column;gap:6px">
+                    <span style="font-size:11.5px;color:#7F8A85">Avg sleep</span>
+                    <div style="display:flex;align-items:baseline;gap:4px">
+                      <span style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:300;letter-spacing:-.035em">6.8</span>
+                      <span style="font-size:13px;color:#6C7570">h</span>
+                    </div>
+                  </div>
+                  <div style="flex:1;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 15px;display:flex;flex-direction:column;gap:6px">
+                    <span style="font-size:11.5px;color:#7F8A85">Deep sleep</span>
+                    <div style="display:flex;align-items:baseline;gap:4px">
+                      <span style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:300;letter-spacing:-.035em;color:#8B99D6">1.6</span>
+                      <span style="font-size:13px;color:#6C7570">h</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:18px 18px 14px;margin-bottom:12px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+                    <div style="display:flex;align-items:center;gap:9px">
+                      <span style="width:28px;height:28px;border-radius:50%;background:rgba(139,153,214,.16);display:flex;align-items:center;justify-content:center;font-size:13px">☾</span>
+                      <span style="font-size:14.5px;font-weight:600">This week</span>
+                    </div>
+                    <span style="font-size:11.5px;color:#7F8A85">Tap a night</span>
+                  </div>
+                  <div style="position:relative;height:158px;display:flex;align-items:flex-end;gap:7px">
+                    <div style="{{ dk.avgLine }}"></div>
+                    <sc-for list="{{ dk.nights }}" as="n" hint-placeholder-count="7">
+                      <div onClick="{{ n.pick }}" style="flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:7px;cursor:pointer;position:relative;z-index:1">
+                        <span style="{{ n.valStyle }}">{{ n.val }}</span>
+                        <div style="{{ n.bar }}"></div>
+                        <span style="{{ n.dayStyle }}">{{ n.day }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:18px;margin-bottom:12px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px">
+                    <span style="font-size:14.5px;font-weight:600">{{ dk.nightLabel }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ dk.nightWindow }}</span>
+                  </div>
+                  <div style="display:flex;align-items:flex-end;gap:2px;height:84px;margin-bottom:9px">
+                    <sc-for list="{{ dk.hypno }}" as="b" hint-placeholder-count="34">
+                      <div style="{{ b.s }}"></div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;margin-bottom:18px">
+                    <span style="font-size:10.5px;color:#7F8A85">11pm</span>
+                    <span style="font-size:10.5px;color:#7F8A85">2am</span>
+                    <span style="font-size:10.5px;color:#7F8A85">4am</span>
+                    <span style="font-size:10.5px;color:#7F8A85">6am</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:14px">
+                    <sc-for list="{{ dk.stages }}" as="s" hint-placeholder-count="4">
+                      <div style="display:flex;flex-direction:column;gap:7px">
+                        <div style="display:flex;align-items:baseline;justify-content:space-between">
+                          <span style="font-size:13.5px;font-weight:500">{{ s.name }}</span>
+                          <span style="font-size:13px;color:#8B958F;font-variant-numeric:tabular-nums">{{ s.time }}</span>
+                        </div>
+                        <div style="height:7px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden">
+                          <div style="{{ s.bar }}"></div>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="display:flex;align-items:flex-start;gap:11px;background:rgba(139,153,214,.12);border:.5px solid rgba(139,153,214,.22);border-radius:22px;padding:16px 17px">
+                  <span style="width:19px;height:19px;border-radius:50%;border:1.4px solid rgba(139,153,214,.7);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#A9B4E0;flex:none;margin-top:1px">i</span>
+                  <span style="font-size:14px;line-height:1.5;color:#D5DAE8;text-wrap:pretty">{{ dk.restNote }}</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ dk.isCharge }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px">
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:19px 18px 16px;margin-bottom:12px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px">
+                    <div style="display:flex;align-items:baseline;gap:6px">
+                      <span style="font-family:'Outfit',sans-serif;font-size:46px;font-weight:200;letter-spacing:-.04em;line-height:1">56</span>
+                      <span style="font-size:16px;color:#7F8A85">ms</span>
+                    </div>
+                    <div style="display:flex;align-items:baseline;gap:11px">
+                      <span style="font-size:12px;color:#7F8A85">62 <span style="color:#7F8A85">max</span></span>
+                      <span style="font-size:12px;color:#7F8A85">41 <span style="color:#7F8A85">min</span></span>
+                    </div>
+                  </div>
+                  <span style="display:block;font-size:11.5px;color:#7F8A85;margin-bottom:16px">Variability through the day</span>
+                  <div style="display:flex;align-items:flex-start;gap:3px;height:96px;margin-bottom:11px">
+                    <sc-for list="{{ dk.hrvCols }}" as="c" hint-placeholder-count="22">
+                      <div style="{{ c.col }}">
+                        <sc-for list="{{ c.dots }}" as="d" hint-placeholder-count="4">
+                          <div style="{{ d.s }}"></div>
+                        </sc-for>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;justify-content:space-between">
+                    <span style="font-size:10.5px;color:#7F8A85">12am</span>
+                    <span style="font-size:10.5px;color:#7F8A85">6am</span>
+                    <span style="font-size:10.5px;color:#7F8A85">12pm</span>
+                    <span style="font-size:10.5px;color:#7F8A85">6pm</span>
+                  </div>
+                </div>
+
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                  <div style="flex:1;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;flex-direction:column;gap:7px">
+                    <span style="font-size:11.5px;color:#7F8A85">Stress today</span>
+                    <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em;color:#17A2E6">Low</span>
+                  </div>
+                  <div style="flex:1;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;flex-direction:column;gap:7px">
+                    <span style="font-size:11.5px;color:#7F8A85">Your normal</span>
+                    <div style="display:flex;align-items:baseline;gap:4px">
+                      <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em">48</span>
+                      <span style="font-size:12.5px;color:#6C7570">ms</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:12px">
+                  <sc-for list="{{ dk.drivers }}" as="d" hint-placeholder-count="4">
+                    <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 17px">
+                      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+                        <span style="font-size:13.5px;font-weight:500">{{ d.name }}</span>
+                        <div style="display:flex;align-items:baseline;gap:4px">
+                          <span style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:400;letter-spacing:-.025em">{{ d.value }}</span>
+                          <span style="font-size:11.5px;color:#6C7570">{{ d.unit }}</span>
+                        </div>
+                      </div>
+                      <div style="position:relative;height:24px;margin-bottom:10px">
+                        <div style="position:absolute;top:10px;left:0;right:0;height:4px;border-radius:3px;background:linear-gradient(90deg,rgba(224,112,92,.35),rgba(242,180,92,.35) 45%,rgba(23,162,230,.4))"></div>
+                        <div style="{{ d.base }}"></div>
+                        <div style="{{ d.dot }}"></div>
+                      </div>
+                      <span style="font-size:13px;line-height:1.5;color:#8B958F;text-wrap:pretty">{{ d.plain }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="display:flex;align-items:flex-start;gap:11px;background:#17A2E6;border-radius:22px;padding:15px 17px">
+                  <span style="width:19px;height:19px;border-radius:50%;border:1.4px solid rgba(8,18,15,.55);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#08120F;flex:none;margin-top:1px">i</span>
+                  <span style="font-size:14px;line-height:1.45;color:#08120F;font-weight:500;text-wrap:pretty">Your variability is 17% above your own 30-day normal — the strongest it’s been this month.</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ dk.isEffort }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px">
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:20px 18px 20px;margin-bottom:12px">
+                  <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+                    <span style="font-family:'Outfit',sans-serif;font-size:54px;font-weight:200;letter-spacing:-.045em;line-height:.94">6.2</span>
+                    <span style="font-size:14.5px;color:#7F8A85">of a 12 target</span>
+                  </div>
+                  <span style="display:block;font-size:13px;color:#8B958F;margin-bottom:24px">Effort so far today</span>
+                  <div style="position:relative;height:8px;border-radius:6px;background:linear-gradient(90deg,#0B6FA8,#17A2E6 34%,#F2B45C 68%,#F0742C);margin-bottom:16px">
+                    <sc-for list="{{ dk.effortStops }}" as="s" hint-placeholder-count="3">
+                      <div style="{{ s.dot }}"></div>
+                    </sc-for>
+                    <div style="position:absolute;top:50%;left:52%;transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;background:#EDF1EF;box-shadow:0 0 0 4px rgba(10,12,11,.9),0 4px 12px rgba(0,0,0,.5)"></div>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;margin-bottom:20px">
+                    <sc-for list="{{ dk.effortStops }}" as="s" hint-placeholder-count="3">
+                      <span style="{{ s.label }}">{{ s.name }}</span>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;align-items:flex-start;gap:10px;padding:14px 15px;border-radius:16px;background:rgba(255,255,255,.05)">
+                    <span style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#8FDCFA,#0B6FA8);flex:none;margin-top:1px"></span>
+                    <span style="font-size:13.5px;line-height:1.5;color:#C3CBC7;text-wrap:pretty">Moderate is where you want to land. A 35-minute easy walk closes the gap without touching tomorrow.</span>
+                  </div>
+                </div>
+
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:18px;margin-bottom:12px">
+                  <span style="display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600;margin-bottom:15px">Logged today</span>
+                  <div style="display:flex;flex-direction:column;gap:15px">
+                    <sc-for list="{{ dk.activities }}" as="a" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:12px">
+                        <span style="{{ a.dot }}"></span>
+                        <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                          <span style="font-size:14px;font-weight:500">{{ a.name }}</span>
+                          <span style="font-size:11.5px;color:#7F8A85">{{ a.meta }}</span>
+                        </div>
+                        <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.02em">{{ a.load }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:18px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
+                    <span style="font-size:14.5px;font-weight:600">Load this week</span>
+                    <span style="font-size:11.5px;color:#17A2E6;font-weight:600">Balanced</span>
+                  </div>
+                  <div style="display:flex;align-items:flex-end;gap:7px;height:104px">
+                    <sc-for list="{{ dk.week }}" as="w" hint-placeholder-count="7">
+                      <div style="flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px">
+                        <div style="{{ w.bar }}"></div>
+                        <span style="{{ w.label }}">{{ w.day }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ dk.isTrends }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px">
+                <div style="display:flex;gap:6px;margin-bottom:14px">
+                  <sc-for list="{{ dk.ranges }}" as="r" hint-placeholder-count="3">
+                    <div onClick="{{ r.pick }}" style="{{ r.s }}">{{ r.label }}</div>
+                  </sc-for>
+                </div>
+
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:19px 18px 15px;margin-bottom:12px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px">
+                    <span style="font-size:14.5px;font-weight:600">Charge</span>
+                    <span style="font-size:11.5px;color:#7F8A85">Band is your own normal</span>
+                  </div>
+                  <div style="position:relative;height:140px">
+                    <svg viewBox="0 0 320 132" preserveAspectRatio="none" style="width:100%;height:132px;display:block;overflow:visible">
+                      <path d="M0 40 L320 40" stroke="rgba(255,255,255,.05)" stroke-width="1"></path>
+                      <path d="M0 86 L320 86" stroke="rgba(255,255,255,.05)" stroke-width="1"></path>
+                      <path d="{{ dk.bandPath }}" fill="rgba(23,162,230,.1)" stroke="none"></path>
+                      <polyline points="{{ dk.line }}" fill="none" stroke="#17A2E6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                      <line x1="{{ dk.ptX }}" y1="0" x2="{{ dk.ptX }}" y2="132" stroke="rgba(255,255,255,.28)" stroke-width="1" stroke-dasharray="3 4"></line>
+                      <circle cx="{{ dk.ptX }}" cy="{{ dk.ptY }}" r="5" fill="#17A2E6" stroke="#0A0C0B" stroke-width="3"></circle>
+                    </svg>
+                    <div style="{{ dk.bubble }}">
+                      <span style="font-family:'Outfit',sans-serif;font-size:15px;font-weight:500;letter-spacing:-.01em">{{ dk.ptVal }}</span>
+                      <span style="font-size:10.5px;color:#7F8A85">{{ dk.ptDay }}</span>
+                    </div>
+                    <div style="position:absolute;inset:0;display:flex">
+                      <sc-for list="{{ dk.hits }}" as="h" hint-placeholder-count="14">
+                        <div onClick="{{ h.pick }}" style="flex:1;height:100%;cursor:pointer"></div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;margin-top:10px">
+                    <sc-for list="{{ dk.axis }}" as="a" hint-placeholder-count="4">
+                      <span style="font-size:10.5px;color:#7F8A85">{{ a.label }}</span>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:19px 18px 16px;margin-bottom:12px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
+                    <span style="font-size:14.5px;font-weight:600">Rest debt</span>
+                    <span style="font-size:11.5px;color:#8B99D6;font-weight:600">Clear for 2 days</span>
+                  </div>
+                  <div style="display:flex;align-items:flex-end;gap:4px;height:82px">
+                    <sc-for list="{{ dk.debt }}" as="d" hint-placeholder-count="14">
+                      <div style="{{ d.s }}"></div>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="background:linear-gradient(158deg,#18211E,#121615);border:.5px solid rgba(23,162,230,.2);border-radius:24px;padding:19px 18px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+                    <span style="width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#8FDCFA,#0B6FA8)"></span>
+                    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7F8A85;font-weight:600">The read</span>
+                  </div>
+                  <span style="display:block;font-size:16px;line-height:1.5;color:#DDE3E0;text-wrap:pretty">{{ dk.read }}</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ dk.isBand }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px">
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:26px;padding:26px 20px 22px;margin-bottom:12px;display:flex;flex-direction:column;align-items:center">
+                  <div style="position:relative;width:172px;height:172px;display:flex;align-items:center;justify-content:center;margin-bottom:20px">
+                    <div style="position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 180deg,#0B6FA8 0deg,#17A2E6 223deg,rgba(255,255,255,.07) 223deg 360deg)"></div>
+                    <div style="position:absolute;inset:11px;border-radius:50%;background:#141817"></div>
+                    <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:2px">
+                      <div style="display:flex;align-items:baseline;gap:3px">
+                        <span style="font-family:'Outfit',sans-serif;font-size:48px;font-weight:200;letter-spacing:-.04em;line-height:1">62</span>
+                        <span style="font-size:17px;color:#7F8A85">%</span>
+                      </div>
+                      <span style="font-size:11.5px;color:#7F8A85">about 2 days left</span>
+                    </div>
+                  </div>
+                  <span style="font-size:14px;color:#8B958F;text-align:center;text-wrap:pretty">Charging takes about 90 minutes. Wear it while you charge — the band keeps recording.</span>
+                </div>
+
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                  <sc-for list="{{ dk.bandTiles }}" as="t" hint-placeholder-count="2">
+                    <div style="flex:1;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;flex-direction:column;gap:11px">
+                      <div style="display:flex;align-items:center;justify-content:space-between">
+                        <span style="{{ t.icon }}"></span>
+                        <span style="font-size:10.5px;font-weight:600;color:#7F8A85;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.06)">{{ t.tag }}</span>
+                      </div>
+                      <div style="display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:13.5px;font-weight:500">{{ t.k }}</span>
+                        <span style="font-size:11.5px;color:#7F8A85">{{ t.v }}</span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:4px 17px;margin-bottom:12px">
+                  <sc-for list="{{ dk.bandRows }}" as="r" hint-placeholder-count="4">
+                    <div style="{{ r.row }}">
+                      <span style="font-size:14px;color:#8B958F">{{ r.k }}</span>
+                      <span style="font-size:14px;font-weight:500">{{ r.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div onClick="{{ dk.goToday }}" style="height:52px;border-radius:17px;background:#17A2E6;color:#08120F;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;cursor:pointer">Sync now</div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ dk.isProfile }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px">
+                <div style="display:flex;align-items:center;gap:15px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:18px;margin-bottom:12px">
+                  <span style="width:60px;height:60px;border-radius:50%;background:linear-gradient(150deg,#3A4340,#242B29);border:.5px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:600;color:#C6CEC9">G</span>
+                  <div style="display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:18px;font-weight:600;letter-spacing:-.015em">Gabriel D.</span>
+                    <span style="font-size:12.5px;color:#7F8A85">Member since Mar 2025 · 34, male</span>
+                  </div>
+                </div>
+
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+                  <sc-for list="{{ dk.tiles }}" as="t" hint-placeholder-count="4">
+                    <div style="{{ t.card }}">
+                      <div style="display:flex;align-items:center;justify-content:space-between">
+                        <span style="{{ t.icon }}"></span>
+                        <span style="font-size:10.5px;font-weight:600;color:#7F8A85;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.06)">{{ t.tag }}</span>
+                      </div>
+                      <div style="display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:13.5px;font-weight:500">{{ t.k }}</span>
+                        <span style="font-size:11.5px;color:#7F8A85">{{ t.v }}</span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:17px 18px 14px;margin-bottom:12px">
+                  <span style="display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600;margin-bottom:13px">How much Noop says</span>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <sc-for list="{{ dk.verbosity }}" as="v" hint-placeholder-count="3">
+                      <div onClick="{{ v.pick }}" style="{{ v.s }}">
+                        <span style="{{ v.radio }}"></span>
+                        <div style="display:flex;flex-direction:column;gap:2px">
+                          <span style="font-size:14px;font-weight:500">{{ v.k }}</span>
+                          <span style="font-size:11.5px;color:#7F8A85">{{ v.sub }}</span>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:4px 17px">
+                  <sc-for list="{{ dk.settings }}" as="r" hint-placeholder-count="3">
+                    <div style="{{ r.row }}">
+                      <div style="display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:14.5px;font-weight:500">{{ r.k }}</span>
+                        <span style="font-size:11.5px;color:#7F8A85">{{ r.sub }}</span>
+                      </div>
+                      <span style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:13px;color:#939C97;flex:none">›</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="height:106px"></div>
+          </div>
+
+          <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none">
+            <div style="display:flex;align-items:center;gap:2px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5);pointer-events:auto">
+              <sc-for list="{{ dk.tabs }}" as="tb" hint-placeholder-count="5">
+                <div onClick="{{ tb.pick }}" style="{{ tb.s }}">
+                  <span style="{{ tb.icon }}"></span>
+                  <sc-if value="{{ tb.on }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:12.5px;font-weight:600;color:#08120F;white-space:nowrap">{{ tb.label }}</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      </div>
+    </div>
+  </div>
+  <p class="dv-next">Try next: “make the orb react when I tap a pillar” · “swap the tick gauge for a ring like Whoop’s” · “show me the onboarding in this language”</p>
+</section>
+
+<section class="dv-turn" id="t1">
+  <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Three answers to “a body state, not a number”</span></div>
+  <div class="dv-opts">
+
+    <div class="dv-opt" id="1a">
+      <div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a><span><strong style="color:#17150F;font-weight:600">Aura</strong> — the whole app, working. Body state is a breathing orb; five tabs; band and profile live in the header. Tap anything.</span></div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#F2EFE9;font-family:'Instrument Sans',system-ui,sans-serif;color:#17150F">
+
+          <div style="flex:1;overflow-y:auto;overscroll-behavior:contain" class="hb">
+            <div style="padding:60px 20px 20px;display:flex;align-items:center;justify-content:space-between">
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:19px;font-weight:600;letter-spacing:-.02em">{{ headerTitle }}</span>
+                <span style="font-size:12px;color:#A09A8B;letter-spacing:.01em">{{ headerSub }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div onClick="{{ goBand }}" style="height:32px;display:flex;align-items:center;gap:6px;padding:0 11px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgba(23,21,15,.06);cursor:pointer">
+                  <span style="width:7px;height:7px;border-radius:2px;background:#4E9C86"></span>
+                  <span style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums">62%</span>
+                </div>
+                <div onClick="{{ goProfile }}" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(150deg,#D9CFC0,#B9AC98);box-shadow:0 1px 2px rgba(23,21,15,.1);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#5C574B">G</div>
+              </div>
+            </div>
+
+            <sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+              <div class="scr" style="padding:0 20px 8px">
+                <div style="position:relative;height:266px;display:flex;align-items:center;justify-content:center;margin:2px 0 0">
+                  <div style="position:absolute;width:250px;height:250px;border-radius:50%;background:{{ auraFar }};animation:breatheSoft 7.5s ease-in-out infinite;filter:blur(3px)"></div>
+                  <div style="position:absolute;width:196px;height:196px;border-radius:50%;background:{{ auraMid }};animation:breathe 7.5s ease-in-out infinite"></div>
+                  <div style="position:absolute;width:196px;height:196px;border-radius:50%;background:conic-gradient(from 210deg,rgba(255,255,255,0),rgba(255,255,255,.55),rgba(255,255,255,0) 62%);animation:drift 26s linear infinite;mix-blend-mode:soft-light"></div>
+                  <div style="position:absolute;width:132px;height:132px;border-radius:50%;background:{{ auraCore }};box-shadow:{{ auraShadow }};animation:breathe 7.5s ease-in-out infinite"></div>
+                  <span style="position:absolute;bottom:6px;font-size:10px;letter-spacing:.19em;text-transform:uppercase;color:#A09A8B;font-weight:600">Body state</span>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:9px;padding:2px 8px 22px">
+                  <span style="font-family:'Instrument Serif',serif;font-size:39px;line-height:1.02;letter-spacing:-.015em;color:#17150F;text-align:center">{{ stateLabel }}</span>
+                  <span style="font-size:14.5px;line-height:1.5;color:#5C574B;text-align:center;max-width:280px;text-wrap:pretty">{{ stateCoach }}</span>
+                </div>
+
+                <div style="display:flex;gap:9px;margin-bottom:14px">
+                  <div onClick="{{ goSleep }}" style="flex:1;background:#fff;border-radius:19px;padding:13px 12px 14px;display:flex;flex-direction:column;gap:7px;box-shadow:0 1px 2px rgba(23,21,15,.05);cursor:pointer">
+                    <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#A09A8B;font-weight:600">Rest</span>
+                    <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:400;letter-spacing:-.02em">7h 12m</span>
+                    <span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:#5E6B8F;font-weight:500"><span style="width:6px;height:6px;border-radius:50%;background:#5E6B8F"></span>Full night</span>
+                  </div>
+                  <div onClick="{{ goBody }}" style="flex:1;background:#fff;border-radius:19px;padding:13px 12px 14px;display:flex;flex-direction:column;gap:7px;box-shadow:0 1px 2px rgba(23,21,15,.05);cursor:pointer">
+                    <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#A09A8B;font-weight:600">Charge</span>
+                    <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:400;letter-spacing:-.02em">Settled</span>
+                    <span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:#4E9C86;font-weight:500"><span style="width:6px;height:6px;border-radius:50%;background:#4E9C86"></span>Above normal</span>
+                  </div>
+                  <div onClick="{{ goEffort }}" style="flex:1;background:#fff;border-radius:19px;padding:13px 12px 14px;display:flex;flex-direction:column;gap:7px;box-shadow:0 1px 2px rgba(23,21,15,.05);cursor:pointer">
+                    <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#A09A8B;font-weight:600">Effort</span>
+                    <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:400;letter-spacing:-.02em">Light</span>
+                    <span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:#C2662A;font-weight:500"><span style="width:6px;height:6px;border-radius:50%;background:#C2662A"></span>Room to go</span>
+                  </div>
+                </div>
+
+                <div style="background:#17150F;border-radius:24px;padding:19px 19px 17px;margin-bottom:12px;color:#F2EFE9">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+                    <span style="width:20px;height:20px;border-radius:50%;background:linear-gradient(140deg,#8FD2BC,#3F8D77)"></span>
+                    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,239,233,.5);font-weight:600">Svea · today’s call</span>
+                  </div>
+                  <span style="display:block;font-size:19px;line-height:1.36;font-weight:500;letter-spacing:-.012em;margin-bottom:6px;text-wrap:pretty">{{ sessionTitle }}</span>
+                  <span style="display:block;font-size:13.5px;line-height:1.55;color:rgba(242,239,233,.62);margin-bottom:16px;text-wrap:pretty">{{ sessionWhy }}</span>
+                  <sc-if value="{{ sessionOpen }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;gap:8px">
+                      <div onClick="{{ acceptSession }}" style="flex:1;height:46px;border-radius:14px;background:#F2EFE9;color:#17150F;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;cursor:pointer">Accept</div>
+                      <div onClick="{{ swapSession }}" style="height:46px;padding:0 17px;border-radius:14px;background:rgba(242,239,233,.13);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;cursor:pointer">Swap</div>
+                      <div onClick="{{ restSession }}" style="height:46px;padding:0 17px;border-radius:14px;background:rgba(242,239,233,.13);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;cursor:pointer">Rest</div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ sessionDone }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;align-items:center;justify-content:space-between;height:46px;padding:0 6px 0 16px;border-radius:14px;background:rgba(143,210,188,.16)">
+                      <span style="font-size:13.5px;font-weight:500;color:#8FD2BC">{{ sessionState }}</span>
+                      <div onClick="{{ reopenSession }}" style="height:34px;padding:0 13px;border-radius:10px;background:rgba(242,239,233,.12);display:flex;align-items:center;font-size:12.5px;font-weight:500;cursor:pointer">Change</div>
+                    </div>
+                  </sc-if>
+                </div>
+
+                <div onClick="{{ toggleWhy }}" style="background:#fff;border-radius:20px;padding:16px 17px;box-shadow:0 1px 2px rgba(23,21,15,.05);cursor:pointer;margin-bottom:12px">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <span style="font-size:14px;font-weight:500">Why Noop says that</span>
+                    <span style="font-size:12px;color:#A09A8B;font-weight:600">{{ whyChevron }}</span>
+                  </div>
+                  <sc-if value="{{ whyOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;flex-direction:column;gap:11px;margin-top:15px;padding-top:15px;border-top:1px solid rgba(23,21,15,.07)">
+                      <sc-for list="{{ whyRows }}" as="row" hint-placeholder-count="3">
+                        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:14px">
+                          <span style="font-size:13px;line-height:1.5;color:#5C574B;text-wrap:pretty">{{ row.text }}</span>
+                          <span style="font-size:12.5px;font-weight:600;color:#4E9C86;white-space:nowrap;font-variant-numeric:tabular-nums">{{ row.tag }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+
+                <div onClick="{{ goCoach }}" style="display:flex;align-items:center;gap:13px;background:#fff;border-radius:20px;padding:14px 17px 14px 14px;box-shadow:0 1px 2px rgba(23,21,15,.05);cursor:pointer">
+                  <span style="width:38px;height:38px;border-radius:50%;background:linear-gradient(140deg,#8FD2BC,#3F8D77)"></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+                    <span style="font-size:14.5px;font-weight:600;letter-spacing:-.01em">Ask Svea</span>
+                    <span style="font-size:12px;color:#A09A8B">“Should I still lift if I slept badly?”</span>
+                  </div>
+                  <span style="font-size:15px;color:#C6C0B2">›</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isSleep }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px 8px">
+                <div style="display:flex;gap:3px;padding:3px;background:rgba(23,21,15,.05);border-radius:13px;margin-bottom:20px">
+                  <sc-for list="{{ sleepTabs }}" as="t" hint-placeholder-count="3">
+                    <div onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:24px">
+                  <span style="font-family:'Outfit',sans-serif;font-size:66px;font-weight:200;letter-spacing:-.04em;line-height:1">{{ sleepBig }}</span>
+                  <span style="font-family:'Instrument Serif',serif;font-style:italic;font-size:19px;color:#5E6B8F">{{ sleepVerdict }}</span>
+                </div>
+                <div style="background:#fff;border-radius:22px;padding:17px 17px 15px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:15px">
+                    <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#A09A8B;font-weight:600">Through the night</span>
+                    <span style="font-size:11.5px;color:#A09A8B;font-variant-numeric:tabular-nums">23:14 – 06:41</span>
+                  </div>
+                  <div style="display:flex;align-items:flex-end;gap:2px;height:92px">
+                    <sc-for list="{{ hypno }}" as="b" hint-placeholder-count="34">
+                      <div style="{{ b.style }}"></div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;margin-top:9px">
+                    <span style="font-size:10.5px;color:#C6C0B2">11pm</span>
+                    <span style="font-size:10.5px;color:#C6C0B2">2am</span>
+                    <span style="font-size:10.5px;color:#C6C0B2">4am</span>
+                    <span style="font-size:10.5px;color:#C6C0B2">6am</span>
+                  </div>
+                </div>
+                <div style="background:#fff;border-radius:22px;padding:17px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px;display:flex;flex-direction:column;gap:15px">
+                  <sc-for list="{{ stages }}" as="s" hint-placeholder-count="4">
+                    <div style="display:flex;flex-direction:column;gap:7px">
+                      <div style="display:flex;align-items:baseline;justify-content:space-between">
+                        <span style="font-size:13.5px;font-weight:500">{{ s.name }}</span>
+                        <span style="font-size:13px;color:#5C574B;font-variant-numeric:tabular-nums">{{ s.time }}</span>
+                      </div>
+                      <div style="height:7px;border-radius:4px;background:rgba(23,21,15,.06);overflow:hidden">
+                        <div style="{{ s.style }}"></div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="background:#EDEAE2;border-radius:22px;padding:17px 18px;display:flex;flex-direction:column;gap:7px">
+                  <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#A09A8B;font-weight:600">What it means</span>
+                  <span style="font-size:14.5px;line-height:1.55;color:#3D3930;text-wrap:pretty">{{ sleepMeans }}</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isBody }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px 8px">
+                <div style="display:flex;align-items:center;gap:14px;background:#fff;border-radius:22px;padding:18px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px">
+                  <div style="position:relative;width:76px;height:76px;flex:none;display:flex;align-items:center;justify-content:center">
+                    <div style="position:absolute;inset:0;border-radius:50%;background:{{ auraFar }}"></div>
+                    <div style="position:absolute;width:44px;height:44px;border-radius:50%;background:{{ auraCore }}"></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1">{{ stateLabel }}</span>
+                    <span style="font-size:12.5px;line-height:1.45;color:#A09A8B;text-wrap:pretty">Four signals, each against your own 30-day normal.</span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:12px">
+                  <sc-for list="{{ drivers }}" as="d" hint-placeholder-count="4">
+                    <div style="background:#fff;border-radius:22px;padding:16px 17px;box-shadow:0 1px 2px rgba(23,21,15,.05)">
+                      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+                        <span style="font-size:13.5px;font-weight:500">{{ d.name }}</span>
+                        <span style="display:flex;align-items:baseline;gap:4px"><span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em">{{ d.value }}</span><span style="font-size:11.5px;color:#A09A8B">{{ d.unit }}</span></span>
+                      </div>
+                      <div style="position:relative;height:26px;margin-bottom:10px">
+                        <div style="position:absolute;top:11px;left:0;right:0;height:4px;border-radius:3px;background:linear-gradient(90deg,rgba(180,84,58,.2),rgba(201,154,63,.2) 42%,rgba(78,156,134,.25))"></div>
+                        <div style="{{ d.baseStyle }}"></div>
+                        <div style="{{ d.dotStyle }}"></div>
+                      </div>
+                      <span style="font-size:13px;line-height:1.5;color:#5C574B;text-wrap:pretty">{{ d.plain }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="background:#EDEAE2;border-radius:22px;padding:17px 18px;display:flex;flex-direction:column;gap:7px">
+                  <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#A09A8B;font-weight:600">In plain terms</span>
+                  <span style="font-size:14.5px;line-height:1.55;color:#3D3930;text-wrap:pretty">Nothing here is a warning. These four move around every day — Noop only speaks up when several drift the same way for three days running.</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isEffort }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px 8px">
+                <div style="background:#fff;border-radius:24px;padding:20px 19px 18px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px">
+                  <span style="display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#A09A8B;font-weight:600;margin-bottom:14px">Today against target</span>
+                  <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:18px">
+                    <span style="font-family:'Outfit',sans-serif;font-size:60px;font-weight:200;letter-spacing:-.045em;line-height:.92">6.2</span>
+                    <span style="font-size:15px;color:#A09A8B;padding-bottom:7px">of a 12 target</span>
+                  </div>
+                  <div style="position:relative;height:12px;border-radius:8px;background:rgba(23,21,15,.06);overflow:hidden;margin-bottom:9px">
+                    <div style="position:absolute;inset:0;width:52%;border-radius:8px;background:linear-gradient(90deg,#DFA96B,#C2662A)"></div>
+                    <div style="position:absolute;top:0;bottom:0;left:calc(100% - 2px);width:2px;background:#17150F"></div>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;margin-bottom:16px">
+                    <span style="font-size:11px;color:#C6C0B2">Easy</span>
+                    <span style="font-size:11px;color:#C6C0B2">Moderate</span>
+                    <span style="font-size:11px;color:#C6C0B2">All out</span>
+                  </div>
+                  <div style="display:flex;align-items:flex-start;gap:10px;padding:14px 15px;border-radius:16px;background:#F6F3ED">
+                    <span style="width:18px;height:18px;border-radius:50%;background:linear-gradient(140deg,#8FD2BC,#3F8D77);flex:none;margin-top:1px"></span>
+                    <span style="font-size:13.5px;line-height:1.5;color:#3D3930;text-wrap:pretty">You’re under target. A 35-minute easy walk closes it without touching tomorrow.</span>
+                  </div>
+                </div>
+                <div style="background:#fff;border-radius:22px;padding:17px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px">
+                  <span style="display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#A09A8B;font-weight:600;margin-bottom:14px">Logged today</span>
+                  <div style="display:flex;flex-direction:column;gap:14px">
+                    <sc-for list="{{ activities }}" as="a" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:12px">
+                        <span style="{{ a.dot }}"></span>
+                        <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                          <span style="font-size:14px;font-weight:500">{{ a.name }}</span>
+                          <span style="font-size:11.5px;color:#A09A8B">{{ a.meta }}</span>
+                        </div>
+                        <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.02em">{{ a.load }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="background:#fff;border-radius:22px;padding:17px;box-shadow:0 1px 2px rgba(23,21,15,.05)">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px">
+                    <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#A09A8B;font-weight:600">Load this week</span>
+                    <span style="font-size:11.5px;color:#4E9C86;font-weight:600">Balanced</span>
+                  </div>
+                  <div style="display:flex;align-items:flex-end;gap:7px;height:96px">
+                    <sc-for list="{{ weekLoad }}" as="w" hint-placeholder-count="7">
+                      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end">
+                        <div style="{{ w.style }}"></div>
+                        <span style="{{ w.labelStyle }}">{{ w.day }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isTrends }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px 8px">
+                <div style="display:flex;gap:3px;padding:3px;background:rgba(23,21,15,.05);border-radius:13px;margin-bottom:18px">
+                  <sc-for list="{{ trendTabs }}" as="t" hint-placeholder-count="3">
+                    <div onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</div>
+                  </sc-for>
+                </div>
+                <div style="background:#fff;border-radius:24px;padding:19px 19px 15px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+                    <span style="font-size:13.5px;font-weight:600">Charge</span>
+                    <span style="font-size:11.5px;color:#A09A8B">{{ trendRangeLabel }}</span>
+                  </div>
+                  <span style="display:block;font-size:12.5px;color:#A09A8B;margin-bottom:16px">Band is your own normal range</span>
+                  <div style="position:relative;height:132px">
+                    <svg viewBox="0 0 320 132" preserveAspectRatio="none" style="width:100%;height:100%;display:block;overflow:visible">
+                      <path d="M0 44 L320 44" stroke="rgba(23,21,15,.07)" stroke-width="1"></path>
+                      <path d="M0 88 L320 88" stroke="rgba(23,21,15,.07)" stroke-width="1"></path>
+                      <path d="{{ bandPath }}" fill="rgba(78,156,134,.12)" stroke="none"></path>
+                      <polyline points="{{ chargeLine }}" fill="none" stroke="#3F8D77" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                      <circle cx="{{ lastX }}" cy="{{ lastY }}" r="4.6" fill="#3F8D77" stroke="#fff" stroke-width="2.4"></circle>
+                    </svg>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;margin-top:11px">
+                    <sc-for list="{{ trendAxis }}" as="x" hint-placeholder-count="4">
+                      <span style="font-size:10.5px;color:#C6C0B2">{{ x.label }}</span>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="background:#fff;border-radius:24px;padding:19px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px">
+                    <span style="font-size:13.5px;font-weight:600">Rest debt</span>
+                    <span style="font-size:11.5px;color:#5E6B8F;font-weight:600">{{ debtTag }}</span>
+                  </div>
+                  <div style="display:flex;align-items:flex-end;gap:4px;height:88px">
+                    <sc-for list="{{ debtBars }}" as="d" hint-placeholder-count="14">
+                      <div style="{{ d.style }}"></div>
+                    </sc-for>
+                  </div>
+                  <div style="height:1px;background:rgba(23,21,15,.08);margin-top:8px"></div>
+                </div>
+                <div style="background:#17150F;border-radius:24px;padding:19px;color:#F2EFE9">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+                    <span style="width:18px;height:18px;border-radius:50%;background:linear-gradient(140deg,#8FD2BC,#3F8D77)"></span>
+                    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,239,233,.5);font-weight:600">The read</span>
+                  </div>
+                  <span style="display:block;font-size:16px;line-height:1.48;text-wrap:pretty">{{ trendRead }}</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isBand }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px 8px">
+                <div style="background:#fff;border-radius:26px;padding:24px 20px 20px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px;display:flex;flex-direction:column;align-items:center">
+                  <div style="width:118px;height:118px;border-radius:32px;background:linear-gradient(155deg,#2B2A26,#17150F);display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 10px 26px rgba(23,21,15,.22)">
+                    <span style="width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 36% 30%,#8FD2BC,#3F8D77 60%,#255145);box-shadow:0 0 22px rgba(143,210,188,.5)"></span>
+                  </div>
+                  <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:5px">
+                    <span style="font-family:'Outfit',sans-serif;font-size:54px;font-weight:200;letter-spacing:-.04em;line-height:1">62</span>
+                    <span style="font-size:19px;color:#A09A8B">%</span>
+                  </div>
+                  <span style="font-size:13.5px;color:#5C574B;margin-bottom:18px">About 2 days left · charges in 90 min</span>
+                  <div style="width:100%;height:9px;border-radius:6px;background:rgba(23,21,15,.07);overflow:hidden">
+                    <div style="width:62%;height:100%;border-radius:6px;background:linear-gradient(90deg,#8FD2BC,#3F8D77)"></div>
+                  </div>
+                </div>
+                <div style="background:#fff;border-radius:22px;padding:5px 17px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px">
+                  <sc-for list="{{ bandRows }}" as="r" hint-placeholder-count="4">
+                    <div style="{{ r.rowStyle }}">
+                      <span style="font-size:14px;color:#5C574B">{{ r.k }}</span>
+                      <span style="font-size:14px;font-weight:500">{{ r.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div onClick="{{ goToday }}" style="height:52px;border-radius:17px;background:#17150F;color:#F2EFE9;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;cursor:pointer">Sync now</div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="padding:0 20px 8px">
+                <div style="display:flex;align-items:center;gap:15px;background:#fff;border-radius:24px;padding:18px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px">
+                  <span style="width:62px;height:62px;border-radius:50%;background:linear-gradient(150deg,#D9CFC0,#B9AC98);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#5C574B">G</span>
+                  <div style="display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:18px;font-weight:600;letter-spacing:-.015em">Gabriel D.</span>
+                    <span style="font-size:12.5px;color:#A09A8B">Member since Mar 2025 · 34, male</span>
+                  </div>
+                </div>
+                <div style="background:#fff;border-radius:22px;padding:5px 17px;box-shadow:0 1px 2px rgba(23,21,15,.05);margin-bottom:12px">
+                  <sc-for list="{{ profileRows }}" as="r" hint-placeholder-count="5">
+                    <div style="{{ r.rowStyle }}">
+                      <div style="display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:14.5px;font-weight:500">{{ r.k }}</span>
+                        <span style="font-size:11.5px;color:#A09A8B">{{ r.sub }}</span>
+                      </div>
+                      <span style="font-size:15px;color:#C6C0B2">›</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="background:#EDEAE2;border-radius:22px;padding:17px 18px;display:flex;flex-direction:column;gap:12px">
+                  <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#A09A8B;font-weight:600">How much Noop says</span>
+                  <sc-for list="{{ verbosity }}" as="v" hint-placeholder-count="3">
+                    <div onClick="{{ v.pick }}" style="{{ v.style }}">
+                      <span style="{{ v.radio }}"></span>
+                      <div style="display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:14px;font-weight:500">{{ v.k }}</span>
+                        <span style="font-size:11.5px;color:#A09A8B">{{ v.sub }}</span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="height:98px"></div>
+          </div>
+
+          <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none">
+            <div style="display:flex;gap:2px;padding:6px;border-radius:24px;background:rgba(255,255,255,.82);backdrop-filter:blur(20px);box-shadow:0 6px 22px rgba(23,21,15,.11),0 0 0 .5px rgba(23,21,15,.05);pointer-events:auto">
+              <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="5">
+                <div onClick="{{ tb.pick }}" style="{{ tb.style }}">
+                  <span style="{{ tb.iconStyle }}"></span>
+                  <span style="{{ tb.labelStyle }}">{{ tb.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div class="dv-opt" id="1b">
+      <div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a><span><strong style="color:#17150F;font-weight:600">Silhouette</strong> — state read off the body itself. Tap a lit zone to hear what it’s doing. Warm-dark, like your Edge screens.</span></div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="height:100%;background:#100F0C;font-family:'Instrument Sans',system-ui,sans-serif;color:#F2EFE9;position:relative;overflow:hidden">
+          <div style="position:absolute;top:-90px;left:50%;transform:translateX(-50%);width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(78,156,134,.22),transparent 68%);filter:blur(10px)"></div>
+          <div style="position:relative;padding:62px 22px 0">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px">
+              <span style="font-size:20px;font-weight:600;letter-spacing:-.02em">Body</span>
+              <span style="font-size:12px;color:rgba(242,239,233,.42);letter-spacing:.02em">Sat 16 Aug · 07:20</span>
+            </div>
+            <div style="display:flex;gap:24px;align-items:flex-start">
+              <div style="position:relative;width:126px;height:340px;flex:none">
+                <div style="position:absolute;left:47px;top:0;width:32px;height:32px;border-radius:50%;background:rgba(242,239,233,.1);border:1px solid rgba(242,239,233,.14)"></div>
+                <div style="position:absolute;left:56px;top:33px;width:14px;height:14px;background:rgba(242,239,233,.1)"></div>
+                <div style="position:absolute;left:38px;top:46px;width:50px;height:104px;border-radius:22px 22px 15px 15px;background:rgba(242,239,233,.09);border:1px solid rgba(242,239,233,.13)"></div>
+                <div style="position:absolute;left:41px;top:148px;width:44px;height:66px;border-radius:14px 14px 18px 18px;background:rgba(242,239,233,.07);border:1px solid rgba(242,239,233,.11)"></div>
+                <div style="position:absolute;left:14px;top:56px;width:20px;height:96px;border-radius:12px;background:rgba(242,239,233,.06);border:1px solid rgba(242,239,233,.1)"></div>
+                <div style="position:absolute;right:14px;top:56px;width:20px;height:96px;border-radius:12px;background:rgba(242,239,233,.06);border:1px solid rgba(242,239,233,.1)"></div>
+                <div style="position:absolute;left:36px;top:212px;width:22px;height:124px;border-radius:12px;background:rgba(242,239,233,.06);border:1px solid rgba(242,239,233,.1)"></div>
+                <div style="position:absolute;left:68px;top:212px;width:22px;height:124px;border-radius:12px;background:rgba(242,239,233,.06);border:1px solid rgba(242,239,233,.1)"></div>
+                <sc-for list="{{ zones }}" as="z" hint-placeholder-count="3">
+                  <div onClick="{{ z.pick }}" style="{{ z.style }}"></div>
+                </sc-for>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:9px;padding-top:6px">
+                <sc-for list="{{ zoneList }}" as="z" hint-placeholder-count="3">
+                  <div onClick="{{ z.pick }}" style="{{ z.cardStyle }}">
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <span style="{{ z.dot }}"></span>
+                      <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:rgba(242,239,233,.45);font-weight:600">{{ z.name }}</span>
+                    </div>
+                    <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em">{{ z.value }}</span>
+                    <span style="font-size:11.5px;color:rgba(242,239,233,.5)">{{ z.sub }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;padding:26px 22px 42px;background:linear-gradient(180deg,rgba(16,15,12,0),rgba(16,15,12,.96) 26%)">
+            <span style="display:block;font-family:'Instrument Serif',serif;font-size:31px;line-height:1.14;letter-spacing:-.01em;margin-bottom:9px;text-wrap:pretty">{{ zoneHeadline }}</span>
+            <span style="display:block;font-size:14px;line-height:1.55;color:rgba(242,239,233,.6);margin-bottom:20px;text-wrap:pretty">{{ zoneBody }}</span>
+            <div style="display:flex;gap:9px">
+              <div style="flex:1;height:50px;border-radius:16px;background:#F2EFE9;color:#17150F;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:600;cursor:pointer">{{ zoneCta }}</div>
+              <div style="width:50px;height:50px;border-radius:16px;background:rgba(242,239,233,.1);display:flex;align-items:center;justify-content:center;font-size:17px;color:rgba(242,239,233,.75);cursor:pointer">›</div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div class="dv-opt" id="1c">
+      <div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a><span><strong style="color:#17150F;font-weight:600">Horizon</strong> — no orb, no body. The day is a strip of weather you read left to right. Tap a moment to see what happened.</span></div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height:100%;background:#F4F1EA;font-family:'Instrument Sans',system-ui,sans-serif;color:#17150F;position:relative;overflow:hidden">
+          <div style="padding:62px 24px 0">
+            <span style="display:block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#A09A8B;font-weight:600;margin-bottom:22px">Saturday · your day so far</span>
+            <span style="display:block;font-family:'Instrument Serif',serif;font-size:44px;line-height:1.05;letter-spacing:-.02em;margin-bottom:12px;text-wrap:pretty">{{ hzHeadline }}</span>
+            <span style="display:block;font-size:15px;line-height:1.55;color:#5C574B;max-width:300px;margin-bottom:30px;text-wrap:pretty">{{ hzBody }}</span>
+          </div>
+          <div style="position:relative;height:216px;margin-bottom:6px">
+            <div style="position:absolute;inset:0;background:linear-gradient(180deg,#22303A 0%,#3E5560 26%,#8E8E7C 52%,#D9C9A6 72%,#F2E3C4 88%,#F4F1EA 100%)"></div>
+            <div style="position:absolute;left:0;right:0;bottom:0;height:74px;background:linear-gradient(180deg,rgba(244,241,234,0),#F4F1EA 72%)"></div>
+            <svg viewBox="0 0 402 216" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+              <polyline points="{{ hzLine }}" fill="none" stroke="rgba(255,255,255,.82)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+            </svg>
+            <sc-for list="{{ hzMarks }}" as="m" hint-placeholder-count="5">
+              <div onClick="{{ m.pick }}" style="{{ m.style }}"></div>
+            </sc-for>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:0 24px;margin-bottom:26px">
+            <sc-for list="{{ hzMarks }}" as="m" hint-placeholder-count="5">
+              <span style="{{ m.labelStyle }}">{{ m.label }}</span>
+            </sc-for>
+          </div>
+          <div style="padding:0 24px">
+            <div style="background:#fff;border-radius:24px;padding:19px;box-shadow:0 1px 3px rgba(23,21,15,.07)">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:13px">
+                <span style="{{ hzDot }}"></span>
+                <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#A09A8B;font-weight:600">{{ hzMarkLabel }}</span>
+              </div>
+              <span style="display:block;font-size:19px;font-weight:500;letter-spacing:-.015em;line-height:1.35;margin-bottom:8px;text-wrap:pretty">{{ hzMarkTitle }}</span>
+              <span style="display:block;font-size:13.5px;line-height:1.55;color:#5C574B;text-wrap:pretty">{{ hzMarkBody }}</span>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+  </div>
+  <p class="dv-next">Try next: “take <a class="dv-oid" href="#1a">1a</a> but dark like <a class="dv-oid" href="#1b">1b</a>” · “build out the rest of <a class="dv-oid" href="#1c">1c</a>’s screens” · “the orb should react when I tap the Rest card”</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;bodyState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;restored&quot;,&quot;ready&quot;,&quot;strained&quot;,&quot;depleted&quot;],&quot;default&quot;:&quot;restored&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Body state&quot;,&quot;label&quot;:&quot;Today's body state&quot;}}">
+const STATES = {
+  restored: {
+    label: 'Well restored',
+    coach: 'Your body has room today. Good day to ask something of it.',
+    far: 'radial-gradient(circle at 50% 46%, rgba(143,210,188,.5), rgba(143,210,188,0) 68%)',
+    mid: 'radial-gradient(circle at 42% 36%, #C9E9DC, #8FD2BC 58%, #63B49B)',
+    core: 'radial-gradient(circle at 38% 32%, #A8DEC9, #4E9C86 62%, #357966)',
+    shadow: '0 14px 40px rgba(63,141,119,.34), inset 0 -6px 18px rgba(31,86,72,.3)',
+    session: 'Strength, moderate — go for a real set',
+    why: 'Heart rhythm is well above your normal, you slept a full night, and yesterday was easy.'
+  },
+  ready: {
+    label: 'Steady',
+    coach: 'Nothing’s off. Train as planned, just don’t chase a record.',
+    far: 'radial-gradient(circle at 50% 46%, rgba(223,169,107,.42), rgba(223,169,107,0) 68%)',
+    mid: 'radial-gradient(circle at 42% 36%, #F2DDBE, #DFC08C 58%, #C9A45F)',
+    core: 'radial-gradient(circle at 38% 32%, #F0D6A8, #C99A3F 62%, #A67C2C)',
+    shadow: '0 14px 40px rgba(201,154,63,.3), inset 0 -6px 18px rgba(126,92,26,.28)',
+    session: 'Zone 2, 45 minutes — keep it conversational',
+    why: 'Everything sits inside your normal range. No reason to hold back, no reason to push.'
+  },
+  strained: {
+    label: 'Running warm',
+    coach: 'Keep it light today. One easy session, then leave it alone.',
+    far: 'radial-gradient(circle at 50% 46%, rgba(194,102,42,.4), rgba(194,102,42,0) 68%)',
+    mid: 'radial-gradient(circle at 42% 36%, #F0CDAE, #DFA96B 58%, #C2803F)',
+    core: 'radial-gradient(circle at 38% 32%, #E8B489, #C2662A 62%, #9E4E1E)',
+    shadow: '0 14px 40px rgba(194,102,42,.3), inset 0 -6px 18px rgba(120,58,18,.3)',
+    session: 'Easy walk or mobility — nothing above a chat pace',
+    why: 'Three harder days in a row and a short night. Not a problem yet, just a full cup.'
+  },
+  depleted: {
+    label: 'Needs a day',
+    coach: 'Take the day off. This is the cheapest fix you’ll get.',
+    far: 'radial-gradient(circle at 50% 46%, rgba(168,80,60,.38), rgba(168,80,60,0) 68%)',
+    mid: 'radial-gradient(circle at 42% 36%, #E5C2B6, #C99283 58%, #AE6E5C)',
+    core: 'radial-gradient(circle at 38% 32%, #DDA898, #A8503C 62%, #8A3B2B)',
+    shadow: '0 14px 40px rgba(168,80,60,.3), inset 0 -6px 18px rgba(94,38,26,.3)',
+    session: 'Rest day — walk if you want, that’s all',
+    why: 'Heart rhythm is well below your normal and you’re two short nights in. Rest is the session.'
+  }
+};
+
+const ICONS = {
+  today: 'M12 3v2M12 19v2M4.2 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z',
+  sleep: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+  body: 'M12 3.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 8v6M8 10.5h8M9.5 20l1.2-6M14.5 20l-1.2-6',
+  effort: 'M13 3 5 14h5l-1 7 8-11h-5l1-7z',
+  trends: 'M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9'
+};
+
+const DKSTATE = {
+  restored: { accent: '#17A2E6', frac: .84, orb: 'radial-gradient(circle at 38% 32%,#9FE2FB,#2FB2F0 55%,#0A5F92)', glow: 'radial-gradient(circle,rgba(23,162,230,.44),rgba(23,162,230,0) 68%)', shadow: '0 18px 52px rgba(11,111,168,.55), inset 0 -8px 24px rgba(4,42,66,.5)', ambient: 'radial-gradient(circle,rgba(23,162,230,.16),transparent 70%)' },
+  ready: { accent: '#F2B45C', frac: .6, orb: 'radial-gradient(circle at 38% 32%,#F8E0B4,#E9B96A 55%,#A97B2C)', glow: 'radial-gradient(circle,rgba(242,180,92,.36),rgba(242,180,92,0) 68%)', shadow: '0 18px 52px rgba(169,123,44,.42), inset 0 -8px 24px rgba(78,54,14,.45)', ambient: 'radial-gradient(circle,rgba(242,180,92,.13),transparent 70%)' },
+  strained: { accent: '#F0742C', frac: .38, orb: 'radial-gradient(circle at 38% 32%,#F6CCA8,#EE9457 55%,#B2551F)', glow: 'radial-gradient(circle,rgba(240,116,44,.34),rgba(240,116,44,0) 68%)', shadow: '0 18px 52px rgba(178,85,31,.42), inset 0 -8px 24px rgba(84,36,10,.45)', ambient: 'radial-gradient(circle,rgba(240,116,44,.12),transparent 70%)' },
+  depleted: { accent: '#E0705C', frac: .16, orb: 'radial-gradient(circle at 38% 32%,#F1BDAF,#DD7A63 55%,#93372A)', glow: 'radial-gradient(circle,rgba(224,112,92,.32),rgba(224,112,92,0) 68%)', shadow: '0 18px 52px rgba(147,55,42,.42), inset 0 -8px 24px rgba(70,22,16,.45)', ambient: 'radial-gradient(circle,rgba(224,112,92,.12),transparent 70%)' }
+};
+
+const GLYPH = {
+  heart: 'M12 20s-7-4.6-7-9.4A3.8 3.8 0 0 1 12 8a3.8 3.8 0 0 1 7 2.6C19 15.4 12 20 12 20z',
+  wave: 'M2 12h3.2l2.2-6 3 12 2.8-8 1.8 2H22',
+  lungs: 'M12 4v8M8.6 20c-2 0-3.6-1.4-3.6-3.4 0-2.7.9-5.1 2.5-6.7.8-.9 2.1-.3 2.1.9v6.9c0 1.3-.5 2.3-1 2.3zM15.4 20c2 0 3.6-1.4 3.6-3.4 0-2.7-.9-5.1-2.5-6.7-.8-.9-2.1-.3-2.1.9v6.9c0 1.3.5 2.3 1 2.3z',
+  temp: 'M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z',
+  sync: 'M20 11a8 8 0 0 0-13.9-4.6M4 13a8 8 0 0 0 13.9 4.6M4 5.5v4h4M20 18.5v-4h-4',
+  chip: 'M8 4h8a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4zM10 10h4v4h-4z',
+  target: 'M12 3v18M3 12h18M12 7.6a4.4 4.4 0 1 0 0 8.8 4.4 4.4 0 0 0 0-8.8z',
+  bell: 'M18 15.2V11a6 6 0 1 0-12 0v4.2L4.4 17.6h15.2L18 15.2zM10 20.4a2 2 0 0 0 4 0',
+  ruler: 'M3 8.5h18v7H3zM7.5 8.5v3M12 8.5v4M16.5 8.5v3',
+  download: 'M12 4v10m0 0 3.6-3.6M12 14l-3.6-3.6M4 19h16'
+};
+
+const mask = function (d) {
+  return 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+};
+const glyphStyle = function (key, size, color) {
+  const u = mask(GLYPH[key] || ICONS[key]);
+  return {
+    width: size, height: size, flex: 'none', display: 'block', background: color,
+    WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+  };
+};
+const spark = function (vals) {
+  const mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals), rg = (mx - mn) || 1;
+  return vals.map(function (v, i) {
+    return (i / (vals.length - 1) * 56).toFixed(1) + ',' + (20 - ((v - mn) / rg) * 18).toFixed(1);
+  }).join(' ');
+};
+
+class Component extends DCLogic {
+  state = {
+    tab: 'today', session: 'open', why: false,
+    sleepRange: 'night', trend: '14d', verbosity: 'plain',
+    zone: 'heart', mark: 2
+  };
+
+  set(patch) { this.setState(patch); }
+
+  seg(list, active, onPick) {
+    return list.map(function (o) {
+      const on = o.k === active;
+      return {
+        label: o.label, k: o.k,
+        pick: function () { onPick(o.k); },
+        style: {
+          flex: 1, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: 10, cursor: 'pointer', fontSize: 12.5, fontWeight: on ? 600 : 500,
+          color: on ? '#17150F' : '#8A8579', background: on ? '#fff' : 'transparent',
+          boxShadow: on ? '0 1px 2px rgba(23,21,15,.09)' : 'none',
+          transition: 'background .18s, color .18s'
+        }
+      };
+    });
+  }
+
+  darkVals() {
+    const self = this;
+    const S = this.state;
+    const tab = S.dkTab || 'today';
+    const key = this.props.bodyState || 'restored';
+    const st = STATES[key] || STATES.restored;
+    const dk = DKSTATE[key] || DKSTATE.restored;
+    const A = dk.accent;
+    const go = function (k) { return function () { self.setState({ dkTab: k }); }; };
+    const card = { boxSizing: 'border-box', background: '#141817', border: '.5px solid rgba(255,255,255,.06)', borderRadius: 22, padding: '15px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 14, minHeight: 96 };
+
+    const HEAD = {
+      today: ['Hi, Gabriel', 'Here’s your morning read'],
+      rest: ['Last night', 'You slept 7h 12m'],
+      charge: ['Right now', 'Your body is settled'],
+      effort: ['Saturday', 'Effort so far today'],
+      trends: ['Your own normal', 'Where you’re trending'],
+      band: ['Your band', 'Synced 4 minutes ago'],
+      profile: ['Account', 'Gabriel D.']
+    };
+
+    // Tick gauge
+    const N = 41, SPAN = 250, START = -125;
+    const activeIdx = Math.round(dk.frac * (N - 1));
+    const ticks = [];
+    for (let i = 0; i < N; i++) {
+      const a = START + (i / (N - 1)) * SPAN;
+      const on = i <= activeIdx;
+      const major = i % 5 === 0;
+      ticks.push({
+        s: {
+          position: 'absolute', left: '50%', top: '50%', width: 2, height: major ? 15 : 9, borderRadius: 2,
+          background: on ? A : 'rgba(255,255,255,.13)',
+          opacity: on ? (0.32 + 0.68 * (i / Math.max(1, activeIdx))) : 1,
+          transform: 'translate(-50%,-50%) rotate(' + a.toFixed(2) + 'deg) translateY(-124px)'
+        }
+      });
+    }
+    const markerA = START + dk.frac * SPAN;
+    const markerStyle = {
+      position: 'absolute', left: '50%', top: '50%', width: 0, height: 0,
+      borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '9px solid #EDF1EF',
+      filter: 'drop-shadow(0 0 6px rgba(0,0,0,.5))',
+      transform: 'translate(-50%,-50%) rotate(' + markerA.toFixed(2) + 'deg) translateY(-113px)'
+    };
+
+    const pillars = [
+      { k: 'Rest', v: '7h 12m', u: '', pct: 96, c: '#8B99D6', to: 'rest' },
+      { k: 'Charge', v: '56', u: 'ms', pct: 78, c: A, to: 'charge' },
+      { k: 'Effort', v: '6.2', u: '/12', pct: 52, c: '#F2B45C', to: 'effort' }
+    ].map(function (p) {
+      return { k: p.k, v: p.v, u: p.u, go: go(p.to), bar: { width: p.pct + '%', height: '100%', borderRadius: 5, background: p.c } };
+    });
+
+    const signals = [
+      { name: 'Heart rate', v: '58', u: 'bpm', g: 'heart', c: A, d: [62, 60, 59, 61, 58, 57, 58, 58] },
+      { name: 'Variability', v: '56', u: 'ms', g: 'wave', c: A, d: [44, 48, 46, 51, 49, 54, 53, 56] },
+      { name: 'Breathing', v: '14.2', u: '/min', g: 'lungs', c: '#8B99D6', d: [14, 14.4, 14.1, 13.9, 14.3, 14.2, 14, 14.2] },
+      { name: 'Skin temp', v: '−0.2', u: '°C', g: 'temp', c: '#F2B45C', d: [.3, .1, -.1, 0, -.3, -.2, -.1, -.2] }
+    ].map(function (s, i, arr) {
+      return {
+        name: s.name, v: s.v, u: s.u, c: s.c, spark: spark(s.d), go: go('charge'),
+        icon: glyphStyle(s.g, 21, s.c),
+        row: { display: 'flex', alignItems: 'center', gap: 12, minHeight: 62, cursor: 'pointer', borderBottom: i === arr.length - 1 ? 'none' : '.5px solid rgba(255,255,255,.06)' }
+      };
+    });
+
+    // Rest
+    const NIGHTS = [
+      { day: 'S', v: 5.5, note: 'Late night, short.' }, { day: 'M', v: 7.3, note: 'Best night of the week.' },
+      { day: 'T', v: 5.5, note: 'Woke twice after midnight.' }, { day: 'W', v: 6.1, note: 'Fine, a little short.' },
+      { day: 'T', v: 7.0, note: 'Solid and unbroken.' }, { day: 'F', v: 6.6, note: 'Late to bed, slept through.' },
+      { day: 'S', v: 7.2, note: 'Full night, deep came early.' }
+    ];
+    const nIdx = S.dkNight === undefined ? 6 : S.dkNight;
+    const avg = 6.46;
+    const nights = NIGHTS.map(function (n, i) {
+      const on = i === nIdx;
+      return {
+        day: n.day, val: on ? n.v.toFixed(1) + 'h' : '', pick: function () { self.setState({ dkNight: i }); },
+        bar: {
+          width: '100%', height: Math.round((n.v / 8.4) * 112) + 'px', borderRadius: 8,
+          background: on ? 'linear-gradient(180deg,#A9B6E8,#6E7DB8)' : 'rgba(255,255,255,.08)',
+          boxShadow: on ? '0 6px 18px rgba(110,125,184,.35)' : 'none', transition: 'background .2s'
+        },
+        valStyle: { height: 18, display: 'flex', alignItems: 'center', padding: on ? '0 7px' : 0, borderRadius: 9, fontSize: 11, fontWeight: 600, color: '#EDF1EF', background: on ? 'rgba(110,125,184,.9)' : 'transparent', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+        dayStyle: { fontSize: 11.5, fontWeight: on ? 600 : 500, color: on ? '#EDF1EF' : '#7F8A85' }
+      };
+    });
+    const avgLine = { position: 'absolute', left: 0, right: 0, bottom: (21 + (avg / 8.4) * 112) + 'px', borderTop: '1px dashed rgba(23,162,230,.45)', pointerEvents: 'none' };
+
+    const hypStages = [1, 1, 2, 3, 3, 3, 2, 2, 3, 3, 2, 1, 0, 1, 2, 3, 3, 2, 2, 1, 1, 2, 2, 3, 2, 1, 0, 1, 1, 2, 2, 1, 1, 0];
+    const hC = ['rgba(255,255,255,.12)', '#48527D', '#6E7DB8', '#9AA7E0'], hH = [20, 40, 60, 82];
+    const hypno = hypStages.map(function (s) { return { s: { flex: 1, minWidth: 3, height: hH[s], borderRadius: 3, background: hC[s] } }; });
+    const stages = [
+      { name: 'Deep', time: '1h 34m', pct: 61, c: '#9AA7E0' }, { name: 'REM', time: '1h 48m', pct: 70, c: '#6E7DB8' },
+      { name: 'Light', time: '3h 42m', pct: 88, c: '#48527D' }, { name: 'Awake', time: '8m', pct: 7, c: 'rgba(255,255,255,.18)' }
+    ].map(function (s) { return { name: s.name, time: s.time, bar: { width: s.pct + '%', height: '100%', borderRadius: 4, background: s.c } }; });
+
+    // Charge — dot columns
+    const HRV = [3, 4, 4, 5, 6, 6, 5, 4, 3, 3, 4, 5, 4, 3, 2, 3, 4, 5, 5, 4, 3, 4];
+    const OFF = [3, 2, 2, 1, 0, 0, 1, 2, 3, 3, 2, 1, 2, 3, 4, 3, 2, 1, 1, 2, 3, 2];
+    const hrvCols = HRV.map(function (n, i) {
+      const dots = [];
+      for (let j = 0; j < n; j++) dots.push({ s: { height: 7, borderRadius: 4, background: A, opacity: 0.38 + 0.62 * (n / 6) } });
+      return { col: { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, marginTop: OFF[i] * 8 + 'px' }, dots };
+    });
+    const drivers = [
+      { name: 'Heart rhythm', value: '56', unit: 'ms', pos: 74, base: 48, plain: 'Comfortably above your normal — the clearest sign you’ve recovered.' },
+      { name: 'Resting heart rate', value: '58', unit: 'bpm', pos: 68, base: 56, plain: 'Two beats slower than usual. A good sign, nothing to read into.' },
+      { name: 'Breathing rate', value: '14.2', unit: '/min', pos: 55, base: 52, plain: 'Right where it always is. This one only matters when it jumps.' },
+      { name: 'Skin temperature', value: '−0.2', unit: '°C', pos: 58, base: 54, plain: 'Slightly cool, which is normal after a proper night’s sleep.' }
+    ].map(function (d) {
+      return {
+        name: d.name, value: d.value, unit: d.unit, plain: d.plain,
+        base: { position: 'absolute', top: 4, left: d.base + '%', width: 2, height: 16, borderRadius: 2, background: 'rgba(255,255,255,.35)' },
+        dot: { position: 'absolute', top: 5, left: 'calc(' + d.pos + '% - 7px)', width: 14, height: 14, borderRadius: '50%', background: A, boxShadow: '0 0 0 4px rgba(23,162,230,.18)' }
+      };
+    });
+
+    // Effort
+    const effortStops = [{ n: 'Minimal', p: 8, on: false }, { n: 'Moderate', p: 52, on: true }, { n: 'All out', p: 92, on: false }].map(function (s) {
+      return {
+        name: s.n,
+        dot: { position: 'absolute', top: '50%', left: s.p + '%', transform: 'translate(-50%,-50%)', width: 12, height: 12, borderRadius: '50%', background: 'rgba(10,12,11,.5)', border: '2px solid rgba(255,255,255,.7)', opacity: s.on ? 0 : 1 },
+        label: { fontSize: 11.5, fontWeight: s.on ? 600 : 500, color: s.on ? '#EDF1EF' : '#7F8A85' }
+      };
+    });
+    const activities = [
+      { name: 'Morning walk', meta: '32 min · easy', load: '2.1', c: A },
+      { name: 'Everything else', meta: 'Moving around the day', load: '3.4', c: 'rgba(255,255,255,.28)' },
+      { name: 'Stairs, twice', meta: '6 min · brief and sharp', load: '0.7', c: '#F2B45C' }
+    ].map(function (a) { return { name: a.name, meta: a.meta, load: a.load, dot: { width: 10, height: 10, borderRadius: '50%', background: a.c, flex: 'none' } }; });
+    const wv = [8.4, 14.2, 6.1, 15.8, 11.2, 4.6, 6.2];
+    const week = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(function (d, i) {
+      const on = i === 6;
+      return {
+        day: d,
+        bar: { width: '100%', height: Math.round((wv[i] / 18) * 78) + 'px', borderRadius: 7, background: on ? 'linear-gradient(180deg,#F2B45C,#F0742C)' : 'rgba(255,255,255,.09)' },
+        label: { fontSize: 11, fontWeight: on ? 600 : 500, color: on ? '#EDF1EF' : '#7F8A85' }
+      };
+    });
+
+    // Trends
+    const RANGE = S.dkRange || '14d';
+    const SER = {
+      '14d': [62, 71, 58, 49, 66, 74, 81, 77, 64, 55, 68, 79, 84, 88],
+      '30d': [48, 55, 61, 52, 44, 58, 66, 71, 63, 57, 49, 62, 70, 78, 74, 66, 59, 68, 75, 82, 88],
+      '90d': [40, 46, 52, 49, 58, 63, 57, 51, 62, 70, 66, 59, 68, 74, 71, 65, 72, 79, 84, 88]
+    };
+    const DAYS = {
+      '14d': ['3 Aug', '4 Aug', '5 Aug', '6 Aug', '7 Aug', '8 Aug', '9 Aug', '10 Aug', '11 Aug', '12 Aug', '13 Aug', '14 Aug', '15 Aug', 'Today'],
+      '30d': ['Wk 1', 'Wk 1', 'Wk 1', 'Wk 1', 'Wk 2', 'Wk 2', 'Wk 2', 'Wk 2', 'Wk 3', 'Wk 3', 'Wk 3', 'Wk 3', 'Wk 3', 'Wk 4', 'Wk 4', 'Wk 4', 'Wk 4', 'Wk 5', 'Wk 5', 'Wk 5', 'Today'],
+      '90d': ['May', 'May', 'May', 'Jun', 'Jun', 'Jun', 'Jun', 'Jun', 'Jul', 'Jul', 'Jul', 'Jul', 'Jul', 'Aug', 'Aug', 'Aug', 'Aug', 'Aug', 'Aug', 'Today']
+    };
+    const AX = { '14d': ['3 Aug', '7 Aug', '11 Aug', 'Today'], '30d': ['18 Jul', '26 Jul', '4 Aug', 'Today'], '90d': ['19 May', '18 Jun', '18 Jul', 'Today'] };
+    const READ = {
+      '14d': 'Two weeks of steady climbing, and the last three days are your best of the month. You’ve earned a hard session — take it today, not Monday.',
+      '30d': 'The dip mid-month was three short nights, not training. Once sleep came back, so did everything else.',
+      '90d': 'Up 18 points since May with fewer swings. Whatever you changed in June, keep doing it.'
+    };
+    const sr = SER[RANGE];
+    const px = function (v, i) { return [(i / (sr.length - 1)) * 320, 124 - ((v - 30) / 62) * 112]; };
+    const line = sr.map(function (v, i) { const p = px(v, i); return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+    let up = '', dn = '';
+    sr.forEach(function (v, i) { const x = (i / (sr.length - 1)) * 320; up += (i ? ' L' : 'M') + x.toFixed(1) + ',' + (124 - ((v + 9 - 30) / 62) * 112).toFixed(1); });
+    for (let i = sr.length - 1; i >= 0; i--) { const x = (i / (sr.length - 1)) * 320; dn += ' L' + x.toFixed(1) + ',' + (124 - ((sr[i] - 9 - 30) / 62) * 112).toFixed(1); }
+    const ptI = S.dkPt === undefined || S.dkPt === null || S.dkPt >= sr.length ? sr.length - 1 : S.dkPt;
+    const pt = px(sr[ptI], ptI);
+    const hits = sr.map(function (v, i) { return { pick: function () { self.setState({ dkPt: i }); } }; });
+    const ranges = [{ k: '14d', l: '14 days' }, { k: '30d', l: '30 days' }, { k: '90d', l: '3 months' }].map(function (r) {
+      const on = r.k === RANGE;
+      return {
+        label: r.l, pick: function () { self.setState({ dkRange: r.k, dkPt: null }); },
+        s: { flex: 1, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 13, cursor: 'pointer', fontSize: 12.5, fontWeight: on ? 600 : 500, color: on ? '#08120F' : '#939C97', background: on ? A : 'rgba(255,255,255,.06)', border: on ? 'none' : '.5px solid rgba(255,255,255,.07)', transition: 'background .18s,color .18s' }
+      };
+    });
+    const dv = [0.4, 1.1, 0.2, 1.8, 2.4, 1.2, 0.6, 0, 0.9, 1.6, 0.8, 0.3, 0, 0];
+    const debt = dv.map(function (v) {
+      return { s: { flex: 1, height: Math.max(4, Math.round((v / 2.6) * 72)) + 'px', borderRadius: 4, background: v > 1.5 ? '#8B99D6' : v > 0.5 ? 'rgba(139,153,214,.5)' : 'rgba(139,153,214,.18)' } };
+    });
+
+    const tiles = [
+      { k: 'Your baselines', v: 'Recalculated monthly', tag: 'Auto', g: 'target', c: A },
+      { k: 'Notifications', v: 'Morning only', tag: '1/day', g: 'bell', c: '#F2B45C' },
+      { k: 'Units', v: 'Metric · 24-hour', tag: 'EU', g: 'ruler', c: '#8B99D6' },
+      { k: 'Export data', v: 'CSV or Apple Health', tag: 'Any time', g: 'download', c: '#939C97' }
+    ].map(function (t) {
+      return { k: t.k, v: t.v, tag: t.tag, icon: glyphStyle(t.g, 21, t.c), card: Object.assign({}, card, { width: 'calc(50% - 4px)', cursor: 'pointer' }) };
+    });
+    const bandTiles = [
+      { k: 'Last sync', v: '4 minutes ago', tag: 'Live', g: 'sync', c: A },
+      { k: 'On-band storage', v: '2 days buffered', tag: 'Safe', g: 'chip', c: '#8B99D6' }
+    ].map(function (t) { return { k: t.k, v: t.v, tag: t.tag, icon: glyphStyle(t.g, 21, t.c), card: card }; });
+
+    const rowStyle = function (i, n, min) {
+      return { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: min, borderBottom: i === n - 1 ? 'none' : '.5px solid rgba(255,255,255,.06)', cursor: 'pointer' };
+    };
+    const bandRows = [
+      { k: 'Worn since', v: '6 days straight' }, { k: 'Battery mode', v: 'Standard' },
+      { k: 'Strap', v: 'Graphite knit' }, { k: 'Firmware', v: 'Up to date' }
+    ].map(function (r, i, a) { return { k: r.k, v: r.v, row: rowStyle(i, a.length, 52) }; });
+    const settings = [
+      { k: 'What Noop tracks', sub: 'Rest, charge, effort, stress' },
+      { k: 'Privacy', sub: 'Nothing leaves the band unencrypted' },
+      { k: 'Sign out', sub: 'gabriel@noop.app' }
+    ].map(function (r, i, a) { return { k: r.k, sub: r.sub, row: rowStyle(i, a.length, 62) }; });
+    const verbosity = [
+      { k: 'plain', kk: 'One line a day', sub: 'A verdict and an instruction. Nothing else.' },
+      { k: 'some', kk: 'Add the reason', sub: 'The verdict, plus what drove it.' },
+      { k: 'all', kk: 'Show me everything', sub: 'Every number, every baseline, on tap.' }
+    ].map(function (v) {
+      const on = (S.dkVerbosity || 'plain') === v.k;
+      return {
+        k: v.kk, sub: v.sub, pick: function () { self.setState({ dkVerbosity: v.k }); },
+        s: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 13px', borderRadius: 16, cursor: 'pointer', background: on ? 'rgba(255,255,255,.06)' : 'transparent' },
+        radio: { width: 18, height: 18, borderRadius: '50%', flex: 'none', marginTop: 1, background: on ? A : 'transparent', boxShadow: on ? 'inset 0 0 0 4px #141817, 0 0 0 1.5px ' + A : 'inset 0 0 0 1.5px rgba(255,255,255,.22)' }
+      };
+    });
+
+    const TAB = [{ k: 'today', i: 'today', l: 'Today' }, { k: 'rest', i: 'sleep', l: 'Rest' }, { k: 'charge', i: 'body', l: 'Charge' }, { k: 'effort', i: 'effort', l: 'Effort' }, { k: 'trends', i: 'trends', l: 'Trends' }];
+    const tabs = TAB.map(function (d) {
+      const on = d.k === tab;
+      return {
+        label: d.l, on: on, pick: go(d.k),
+        s: { flex: on ? '1.7 1 0' : '1 1 0', height: 46, borderRadius: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: on ? A : 'transparent', transition: 'background .2s' },
+        icon: glyphStyle(d.i, 19, on ? '#08120F' : '#7F8A85')
+      };
+    });
+
+    const sess = S.dkSession || 'open';
+    return {
+      ambient: dk.ambient, glow: dk.glow, orb: dk.orb, orbShadow: dk.shadow,
+      greet: HEAD[tab][0], headline: HEAD[tab][1],
+      isToday: tab === 'today', isRest: tab === 'rest', isCharge: tab === 'charge',
+      isEffort: tab === 'effort', isTrends: tab === 'trends', isBand: tab === 'band', isProfile: tab === 'profile',
+      tabs, ticks, markerStyle, pillars, signals,
+      goBand: go('band'), goProfile: go('profile'), goToday: go('today'),
+      stateLabel: st.label, stateCoach: st.coach,
+      sessionTitle: st.session, sessionWhy: st.why,
+      sessionOpen: sess === 'open', sessionDone: sess !== 'open',
+      sessionState: sess === 'accepted' ? 'Locked in for today' : sess === 'swapped' ? 'Swapped — Svea is picking another' : 'Rest day it is',
+      accept: function () { self.setState({ dkSession: 'accepted' }); },
+      swap: function () { self.setState({ dkSession: 'swapped' }); },
+      rest: function () { self.setState({ dkSession: 'rest' }); },
+      reopen: function () { self.setState({ dkSession: 'open' }); },
+      banner: 'Your variability is 17% above your own 30-day normal — the strongest it’s been this month.',
+      nights, avgLine, hypno, stages,
+      nightLabel: NIGHTS[nIdx].day === 'S' && nIdx === 6 ? 'Last night' : 'That night',
+      nightWindow: '23:14 – 06:41',
+      restNote: NIGHTS[nIdx].note + ' The dashed line is your own normal, 6h 28m — you’re above it four nights out of seven.',
+      hrvCols, drivers,
+      effortStops, activities, week,
+      ranges, line, bandPath: up + dn + ' Z',
+      ptX: pt[0].toFixed(1), ptY: pt[1].toFixed(1), ptVal: sr[ptI], ptDay: DAYS[RANGE][ptI],
+      bubble: { position: 'absolute', left: Math.min(90, Math.max(10, pt[0] / 320 * 100)).toFixed(2) + '%', top: (pt[1] < 58 ? pt[1] + 16 : pt[1] - 52) + 'px', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, padding: '6px 11px', borderRadius: 12, background: '#1E2422', border: '.5px solid rgba(255,255,255,.12)', boxShadow: '0 6px 18px rgba(0,0,0,.5)', whiteSpace: 'nowrap', pointerEvents: 'none' },
+      hits, axis: AX[RANGE].map(function (l) { return { label: l }; }), debt, read: READ[RANGE],
+      bandTiles, bandRows, tiles, settings, verbosity
+    };
+  }
+
+  renderVals() {
+    const self = this;
+    const st = STATES[this.props.bodyState || 'restored'] || STATES.restored;
+    const t = this.state.tab;
+    const go = function (k) { return function () { self.set({ tab: k }); }; };
+
+    const TITLES = {
+      today: ['Saturday', '16 August · 07:20'],
+      sleep: ['Rest', 'Last night, 23:14 – 06:41'],
+      body: ['Charge', 'What your signals are doing'],
+      effort: ['Effort', 'Saturday so far'],
+      trends: ['Trends', 'You against your own normal'],
+      band: ['Your band', 'Connected · synced 4 min ago'],
+      profile: ['You', 'Account and how Noop talks']
+    };
+
+    const tabDefs = [
+      { k: 'today', label: 'Today' }, { k: 'sleep', label: 'Rest' },
+      { k: 'body', label: 'Charge' }, { k: 'effort', label: 'Effort' },
+      { k: 'trends', label: 'Trends' }
+    ];
+    const tabs = tabDefs.map(function (d) {
+      const on = d.k === t;
+      return {
+        label: d.label, pick: go(d.k),
+        style: {
+          flex: 1, height: 54, borderRadius: 18, cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+          background: on ? '#17150F' : 'transparent', transition: 'background .2s'
+        },
+        iconStyle: {
+          width: 19, height: 19, display: 'block',
+          background: on ? '#F2EFE9' : '#A09A8B',
+          WebkitMaskImage: 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + ICONS[d.k] + '"/></svg>') + '")',
+          maskImage: 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + ICONS[d.k] + '"/></svg>') + '")',
+          WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+          WebkitMaskSize: 'contain', maskSize: 'contain'
+        },
+        labelStyle: { fontSize: 10, fontWeight: on ? 600 : 500, letterSpacing: '.01em', color: on ? '#F2EFE9' : '#A09A8B' }
+      };
+    });
+
+    // ── Rest
+    const hypStages = [1, 1, 2, 3, 3, 3, 2, 2, 3, 3, 2, 1, 0, 1, 2, 3, 3, 2, 2, 1, 1, 2, 2, 3, 2, 1, 0, 1, 1, 2, 2, 1, 1, 0];
+    const hCol = ['rgba(23,21,15,.14)', '#9DA9C6', '#7D8CAF', '#4C5B84'];
+    const hH = [22, 44, 66, 90];
+    const hypno = hypStages.map(function (s) {
+      return { style: { flex: 1, height: hH[s], borderRadius: 3, background: hCol[s], minWidth: 3 } };
+    });
+    const stages = [
+      { name: 'Deep', time: '1h 34m', pct: 61, c: '#4C5B84' },
+      { name: 'REM', time: '1h 48m', pct: 70, c: '#7D8CAF' },
+      { name: 'Light', time: '3h 42m', pct: 88, c: '#9DA9C6' },
+      { name: 'Awake', time: '8m', pct: 7, c: 'rgba(23,21,15,.22)' }
+    ].map(function (s) {
+      return { name: s.name, time: s.time, style: { width: s.pct + '%', height: '100%', borderRadius: 4, background: s.c } };
+    });
+    const SLEEP = {
+      night: { big: '7h 12m', verdict: '96% of what you needed', means: 'A full night, and the deep sleep landed early where it does the most good. This is why today feels the way it does.' },
+      week: { big: '6h 48m', verdict: 'average, 4 full nights', means: 'Two short nights midweek, both after late sessions. Your body caught most of it back on Friday.' },
+      month: { big: '6h 51m', verdict: 'average, trending up', means: 'You’re sleeping 22 minutes more than last month. Keep the wake time where it is — that’s doing the work.' }
+    };
+    const sl = SLEEP[this.state.sleepRange];
+
+    // ── Charge drivers
+    const drivers = [
+      { name: 'Heart rhythm', value: '56', unit: 'ms', pos: 74, base: 48, plain: 'Comfortably above your normal — the clearest sign you’ve recovered.' },
+      { name: 'Resting heart rate', value: '58', unit: 'bpm', pos: 68, base: 56, plain: 'Two beats slower than usual. Nothing to read into, it’s a good sign.' },
+      { name: 'Breathing rate', value: '14.2', unit: '/min', pos: 55, base: 52, plain: 'Right where it always is. This one only matters when it jumps.' },
+      { name: 'Skin temperature', value: '−0.2', unit: '°C', pos: 58, base: 54, plain: 'Slightly cool, which is normal after a proper night’s sleep.' }
+    ].map(function (d) {
+      return {
+        name: d.name, value: d.value, unit: d.unit, plain: d.plain,
+        baseStyle: { position: 'absolute', top: 5, left: d.base + '%', width: 2, height: 16, borderRadius: 2, background: 'rgba(23,21,15,.28)' },
+        dotStyle: { position: 'absolute', top: 6, left: 'calc(' + d.pos + '% - 7px)', width: 14, height: 14, borderRadius: '50%', background: '#3F8D77', boxShadow: '0 0 0 3px rgba(63,141,119,.18)' }
+      };
+    });
+
+    // ── Effort
+    const activities = [
+      { name: 'Morning walk', meta: '32 min · easy', load: '2.1', c: '#4E9C86' },
+      { name: 'Everything else', meta: 'Moving around the day', load: '3.4', c: '#C6C0B2' },
+      { name: 'Stairs, twice', meta: '6 min · brief and sharp', load: '0.7', c: '#DFA96B' }
+    ].map(function (a) {
+      return { name: a.name, meta: a.meta, load: a.load, dot: { width: 10, height: 10, borderRadius: '50%', background: a.c, flex: 'none' } };
+    });
+    const weekVals = [8.4, 14.2, 6.1, 15.8, 11.2, 4.6, 6.2];
+    const weekLoad = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(function (d, i) {
+      const isToday = i === 6;
+      return {
+        day: d,
+        style: {
+          width: '100%', height: Math.round((weekVals[i] / 18) * 72) + 'px', borderRadius: 7,
+          background: isToday ? 'linear-gradient(180deg,#DFA96B,#C2662A)' : 'rgba(23,21,15,.11)'
+        },
+        labelStyle: { fontSize: 11, fontWeight: isToday ? 600 : 500, color: isToday ? '#17150F' : '#C6C0B2' }
+      };
+    });
+
+    // ── Trends
+    const SERIES = {
+      '14d': [62, 71, 58, 49, 66, 74, 81, 77, 64, 55, 68, 79, 84, 88],
+      '30d': [48, 55, 61, 52, 44, 58, 66, 71, 63, 57, 49, 62, 70, 78, 74, 66, 59, 68, 75, 82, 88],
+      '90d': [40, 46, 52, 49, 58, 63, 57, 51, 62, 70, 66, 59, 68, 74, 71, 65, 72, 79, 84, 88]
+    };
+    const s = SERIES[this.state.trend];
+    const toXY = function (v, i) {
+      const x = (i / (s.length - 1)) * 320;
+      const y = 124 - ((v - 30) / 62) * 112;
+      return [x, y];
+    };
+    const chargeLine = s.map(function (v, i) { const p = toXY(v, i); return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+    const last = toXY(s[s.length - 1], s.length - 1);
+    let up = '', down = '';
+    s.forEach(function (v, i) {
+      const x = (i / (s.length - 1)) * 320;
+      up += (i ? ' L' : 'M') + x.toFixed(1) + ',' + (124 - ((v + 9 - 30) / 62) * 112).toFixed(1);
+    });
+    for (let i = s.length - 1; i >= 0; i--) {
+      const x = (i / (s.length - 1)) * 320;
+      down += ' L' + x.toFixed(1) + ',' + (124 - ((s[i] - 9 - 30) / 62) * 112).toFixed(1);
+    }
+    const AXIS = {
+      '14d': ['2 Aug', '6 Aug', '11 Aug', 'Today'],
+      '30d': ['18 Jul', '26 Jul', '4 Aug', 'Today'],
+      '90d': ['19 May', '18 Jun', '18 Jul', 'Today']
+    };
+    const debtVals = [0.4, 1.1, 0.2, 1.8, 2.4, 1.2, 0.6, 0, 0.9, 1.6, 0.8, 0.3, 0, 0];
+    const debtBars = debtVals.map(function (v) {
+      return {
+        style: {
+          flex: 1, height: Math.max(4, Math.round((v / 2.6) * 74)) + 'px', borderRadius: 4,
+          background: v > 1.5 ? '#5E6B8F' : v > 0.5 ? 'rgba(94,107,143,.55)' : 'rgba(94,107,143,.22)'
+        }
+      };
+    });
+    const READS = {
+      '14d': 'Two weeks of steady climbing, and the last three days are your best of the month. You’ve earned a hard session — take it today, not Monday.',
+      '30d': 'The dip mid-month was three short nights, not training. Once sleep came back so did everything else.',
+      '90d': 'Up 18 points since May with fewer swings. Whatever you changed in June, keep doing it.'
+    };
+
+    // ── 1b silhouette
+    const ZONES = {
+      heart: {
+        name: 'Heart', value: '58 bpm', sub: '2 below your normal', c: '#4E9C86',
+        headline: 'Your heart is calm.', body: 'Resting rate is two beats under normal and rhythm is well above it. This is the pattern that shows up on your good days.',
+        cta: 'See the week', box: { left: 44, top: 74, w: 34, h: 34, r: '50%' }
+      },
+      head: {
+        name: 'Stress', value: 'Low', sub: 'settled since 05:40', c: '#8FD2BC',
+        headline: 'Your head is quiet.', body: 'No stress load worth naming since you woke. If you have something hard to do today, do it in the next four hours.',
+        cta: 'Start a breath', box: { left: 47, top: 0, w: 32, h: 32, r: '50%' }
+      },
+      legs: {
+        name: 'Legs', value: 'Fresh', sub: 'light 2 days running', c: '#DFA96B',
+        headline: 'Your legs are fresh.', body: 'Two easy days in a row means the load is low, not the capacity. They can take a real session.',
+        cta: 'Plan a session', box: { left: 36, top: 212, w: 54, h: 124, r: 12 }
+      }
+    };
+    const zk = this.state.zone;
+    const zKeys = ['head', 'heart', 'legs'];
+    const zones = zKeys.map(function (k) {
+      const z = ZONES[k], on = k === zk;
+      return {
+        pick: function () { self.set({ zone: k }); },
+        style: {
+          position: 'absolute', left: z.box.left, top: z.box.top, width: z.box.w, height: z.box.h,
+          borderRadius: z.box.r, cursor: 'pointer',
+          background: on ? 'radial-gradient(circle,' + z.c + '55,' + z.c + '18 70%)' : 'transparent',
+          boxShadow: on ? '0 0 0 1.5px ' + z.c + ', 0 0 26px ' + z.c + '66' : 'none',
+          transition: 'box-shadow .25s, background .25s'
+        }
+      };
+    });
+    const zoneList = zKeys.map(function (k) {
+      const z = ZONES[k], on = k === zk;
+      return {
+        name: z.name, value: z.value, sub: z.sub,
+        pick: function () { self.set({ zone: k }); },
+        cardStyle: {
+          display: 'flex', flexDirection: 'column', gap: 5, padding: '13px 14px 14px', borderRadius: 18, cursor: 'pointer',
+          background: on ? 'rgba(242,239,233,.1)' : 'rgba(242,239,233,.045)',
+          boxShadow: on ? 'inset 0 0 0 1px rgba(242,239,233,.2)' : 'inset 0 0 0 1px rgba(242,239,233,.07)',
+          transition: 'background .2s'
+        },
+        dot: { width: 7, height: 7, borderRadius: '50%', background: z.c, boxShadow: on ? '0 0 8px ' + z.c : 'none' }
+      };
+    });
+
+    // ── 1c horizon
+    const MARKS = [
+      { k: 0, label: '23:14', pos: 4, top: 30, c: '#4C5B84', name: 'Fell asleep', title: 'Down in nine minutes.', body: 'Quickest all week. Deep sleep started before midnight, which is where it counts.' },
+      { k: 1, label: '03:20', pos: 27, top: 16, c: '#6E7DA8', name: 'Deepest point', title: 'The lowest your heart went all night.', body: '52 bpm. Nothing woke you between 1am and 5am — that unbroken stretch is the whole reason today looks good.' },
+      { k: 2, label: '06:41', pos: 50, top: 44, c: '#C99A3F', name: 'Woke up', title: 'You woke on your own.', body: 'No alarm, at the top of a light phase. That’s the difference between groggy and clear.' },
+      { k: 3, label: '07:52', pos: 72, top: 62, c: '#4E9C86', name: 'Morning walk', title: '32 minutes, easy pace.', body: 'Barely touched your effort budget and it lifted your rhythm for the rest of the morning. Cheap win.' },
+      { k: 4, label: 'Now', pos: 93, top: 78, c: '#C2662A', name: 'Right now', title: 'You’re holding at fresh.', body: 'Six of a twelve target used. There’s a real session in you if you want one — the window closes around 6pm.' }
+    ];
+    const mk = MARKS[this.state.mark] || MARKS[2];
+    const hzMarks = MARKS.map(function (m) {
+      const on = m.k === self.state.mark;
+      return {
+        label: m.label,
+        pick: function () { self.set({ mark: m.k }); },
+        style: {
+          position: 'absolute', left: m.pos + '%', top: m.top + '%', width: on ? 17 : 11, height: on ? 17 : 11,
+          transform: 'translate(-50%,-50%)', borderRadius: '50%', cursor: 'pointer',
+          background: on ? '#fff' : 'rgba(255,255,255,.55)',
+          boxShadow: on ? '0 0 0 4px ' + m.c + ', 0 4px 14px rgba(0,0,0,.3)' : '0 1px 4px rgba(0,0,0,.25)',
+          transition: 'all .22s cubic-bezier(.22,.61,.36,1)'
+        },
+        labelStyle: { fontSize: 10.5, fontWeight: on ? 600 : 500, color: on ? '#17150F' : '#A09A8B', fontVariantNumeric: 'tabular-nums' }
+      };
+    });
+    const hzLine = MARKS.map(function (m) { return (m.pos / 100 * 402).toFixed(0) + ',' + (m.top / 100 * 216).toFixed(0); }).join(' ');
+
+    const HZ = {
+      headline: 'Slept clean, woke on your own.',
+      body: 'Nothing about today needs managing. Your only open question is whether you use it.'
+    };
+
+    return {
+      dk: this.darkVals(),
+      headerTitle: TITLES[t][0], headerSub: TITLES[t][1],
+      isToday: t === 'today', isSleep: t === 'sleep', isBody: t === 'body',
+      isEffort: t === 'effort', isTrends: t === 'trends', isBand: t === 'band', isProfile: t === 'profile',
+      tabs,
+      goSleep: go('sleep'), goBody: go('body'), goEffort: go('effort'),
+      goBand: go('band'), goProfile: go('profile'), goToday: go('today'), goCoach: go('body'),
+
+      stateLabel: st.label, stateCoach: st.coach,
+      auraFar: st.far, auraMid: st.mid, auraCore: st.core, auraShadow: st.shadow,
+
+      sessionTitle: st.session,
+      sessionWhy: st.why,
+      sessionOpen: this.state.session === 'open',
+      sessionDone: this.state.session !== 'open',
+      sessionState: this.state.session === 'accepted' ? 'Locked in for today' : this.state.session === 'swapped' ? 'Swapped — Svea is picking another' : 'Rest day it is',
+      acceptSession: function () { self.set({ session: 'accepted' }); },
+      swapSession: function () { self.set({ session: 'swapped' }); },
+      restSession: function () { self.set({ session: 'rest' }); },
+      reopenSession: function () { self.set({ session: 'open' }); },
+
+      whyOpen: this.state.why,
+      whyChevron: this.state.why ? '−' : '+',
+      toggleWhy: function () { self.set({ why: !self.state.why }); },
+      whyRows: [
+        { text: 'Heart rhythm sits above your 30-day normal', tag: '56 vs 48ms' },
+        { text: 'You slept nearly all of what you needed', tag: '7h 12m' },
+        { text: 'Yesterday asked very little of you', tag: 'Light day' }
+      ],
+
+      sleepTabs: this.seg([{ k: 'night', label: 'Last night' }, { k: 'week', label: 'Week' }, { k: 'month', label: 'Month' }],
+        this.state.sleepRange, function (k) { self.set({ sleepRange: k }); }),
+      sleepBig: sl.big, sleepVerdict: sl.verdict, sleepMeans: sl.means,
+      hypno, stages,
+
+      drivers,
+      activities, weekLoad,
+
+      trendTabs: this.seg([{ k: '14d', label: '14 days' }, { k: '30d', label: '30 days' }, { k: '90d', label: '3 months' }],
+        this.state.trend, function (k) { self.set({ trend: k }); }),
+      trendRangeLabel: this.state.trend === '14d' ? 'Last 14 days' : this.state.trend === '30d' ? 'Last 30 days' : 'Last 3 months',
+      chargeLine, bandPath: up + down + ' Z',
+      lastX: last[0].toFixed(1), lastY: last[1].toFixed(1),
+      trendAxis: AXIS[this.state.trend].map(function (l) { return { label: l }; }),
+      debtBars, debtTag: 'Clear for 2 days',
+      trendRead: READS[this.state.trend],
+
+      bandRows: [
+        { k: 'Worn since', v: '6 days straight' }, { k: 'Battery mode', v: 'Standard' },
+        { k: 'Strap', v: 'Sand knit' }, { k: 'Firmware', v: 'Up to date' }
+      ].map(function (r, i, arr) {
+        return { k: r.k, v: r.v, rowStyle: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52, borderBottom: i === arr.length - 1 ? 'none' : '1px solid rgba(23,21,15,.06)' } };
+      }),
+
+      profileRows: [
+        { k: 'Your baselines', sub: 'Recalculated every 30 days' },
+        { k: 'What Noop tracks', sub: 'Rest, charge, effort, stress' },
+        { k: 'Notifications', sub: 'Morning only' },
+        { k: 'Units', sub: 'Metric · 24-hour' },
+        { k: 'Export your data', sub: 'CSV or Apple Health' }
+      ].map(function (r, i, arr) {
+        return { k: r.k, sub: r.sub, rowStyle: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 60, borderBottom: i === arr.length - 1 ? 'none' : '1px solid rgba(23,21,15,.06)', cursor: 'pointer' } };
+      }),
+
+      verbosity: [
+        { k: 'plain', kk: 'One line a day', sub: 'A verdict and an instruction. Nothing else.' },
+        { k: 'some', kk: 'Add the reason', sub: 'The verdict, plus what drove it.' },
+        { k: 'all', kk: 'Show me everything', sub: 'Every number, every baseline, on tap.' }
+      ].map(function (v) {
+        const on = v.k === self.state.verbosity;
+        return {
+          k: v.kk, sub: v.sub,
+          pick: function () { self.set({ verbosity: v.k }); },
+          style: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '13px 14px', borderRadius: 16, cursor: 'pointer', background: on ? '#fff' : 'transparent', boxShadow: on ? '0 1px 2px rgba(23,21,15,.07)' : 'none' },
+          radio: { width: 18, height: 18, borderRadius: '50%', flex: 'none', marginTop: 1, background: on ? '#17150F' : 'transparent', boxShadow: on ? 'inset 0 0 0 4px #F2EFE9, 0 0 0 1.5px #17150F' : 'inset 0 0 0 1.5px rgba(23,21,15,.22)' }
+        };
+      }),
+
+      zones, zoneList,
+      zoneHeadline: ZONES[zk].headline, zoneBody: ZONES[zk].body, zoneCta: ZONES[zk].cta,
+
+      hzHeadline: HZ.headline, hzBody: HZ.body,
+      hzMarks, hzLine,
+      hzMarkLabel: mk.name, hzMarkTitle: mk.title, hzMarkBody: mk.body,
+      hzDot: { width: 8, height: 8, borderRadius: '50%', background: mk.c }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

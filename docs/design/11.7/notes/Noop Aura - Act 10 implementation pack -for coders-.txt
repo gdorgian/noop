@@ -1,0 +1,462 @@
+NOOP AURA — ACT 10 · THE LIFT
+IMPLEMENTATION PACK
+From design · 2026-09-18 · for the branch integration/noop-aura-upstream-11.7
+
+Read with:
+  spec/00-RULES.md    wins on anything visual
+  spec/70-copy.md     wins on sentences
+  spec/32-nav-addendum.md   Change 2+3 (session ownership and the live bar)
+  spec/90-aura-11.7.md §12  the wave 2 record; wins over §3.1 where they differ
+
+The drawing:
+  Noop Act 10 - The Lift.dc.html   eight screens, every state, the bar variant
+
+Target 402 × 874 pt. 1 prototype CSS pixel = 1 point. No conversion.
+
+
+────────────────────────────────────────────────────────────────────────
+0 · HOW TO READ THIS
+────────────────────────────────────────────────────────────────────────
+
+Provenance tags, as in the foundations pack:
+
+  [static]   fixed by design, a literal. Type it exactly, never compute it.
+  [bound]    comes from real data. The prototype's value is a stand-in.
+  [formula]  derived; the formula is given.
+  [proto]    prototype scaffolding. Do not build.
+
+DO NOT RETYPE STRINGS FROM THIS FILE. Every static string exists once, in
+the act file. Open Noop Act 10 - The Lift.dc.html, find the screen's sc-if
+block (isLive, isLibrary, isProgram, isDetail, isEdit, isImport, isReview,
+isMuscles) and lift the strings in visual order. Concatenations live in
+renderVals() and are [formula]. Do not transcribe from a screenshot:
+apostrophes are U+2019, prose dashes are em dashes with no spaces, minus is
+U+2212.
+
+Wave 2 is a RE-SKIN OVER LIVE BEHAVIOUR, not a new subsystem. All eight
+screens already run unstyled, so every screen here can be checked against a
+real session from day one.
+
+
+────────────────────────────────────────────────────────────────────────
+1 · ROUTES — DO THIS FIRST, IT IS THE ONLY BLOCKING ITEM
+────────────────────────────────────────────────────────────────────────
+
+NoopRoute is one flat enum and every raw value must be unique. live, detail
+and import are taken by Acts 3 and 5; review by Act 8. Act 10 takes prefixed
+ids:
+
+  | Screen                  | Route id       | Existing view                        |
+  | ----------------------- | -------------- | ------------------------------------ |
+  | the working screen      | lift-live      | Strand/Screens/LiftSessionView       |
+  | programs                | lift-library   | Strand/Screens/LiftLogView           |
+  | the editor              | lift-program   | Strand/Screens/LiftLogView           |
+  | a finished session      | lift-detail    | LiftSessionDetailSheet               |
+  | correcting one          | lift-edit      | LiftSessionEditSheet                 |
+  | Hevy in                 | lift-import    | LiftProgramImportSheet               |
+  | what was read           | lift-review    | (new face on the importer's result)  |
+  | muscles                 | lift-muscles   | (new; reads TrainingMuscleProjection)|
+
+The raw value is the SwiftUI view identity that drives the act transitions
+and it is the --noop-route launch argument. Send the eight arguments back
+when they land.
+
+TAB: every Act 10 route maps to TODAY. Acts are not tabs; nine acts already
+hang off five. The tab bar stays at five and no tab tint changes.
+
+THE FOUR DOORS IN
+
+  | From                  | Tap                        | To                          |
+  | --------------------- | -------------------------- | --------------------------- |
+  | effort/session        | Swap → a lift              | lift-library (or lift-live) |
+  | the + log sheet       | Start a lift               | lift-library                |
+  | today's session card  | when today's is a lift     | lift-live or lift-detail    |
+  | plumbing/history      | a lift row with an identity | lift-detail                |
+
+History rows written before session identities exist do not open and keep no
+chevron (Change 4). ONLY ROWS THAT NAVIGATE GET A CHEVRON — this is a general
+rule and it bit the archived-program screen in review: in read-only, the
+program lines carry no chevron and no drag grip, and the sub-line states what
+the screen is rather than offering actions it does not have.
+
+BACK MAP
+
+  lift-live       no back affordance. Pause and Finish are the only ways out.
+  lift-library    → effort/session
+  lift-program    → lift-library
+  lift-detail     → today on arrival from a finished session; → plumbing/history
+                    on arrival from a history row
+  lift-edit       → lift-detail (Cancel)
+  lift-import     → lift-library
+  lift-review     → lift-import
+  lift-muscles    → lift-detail
+
+
+────────────────────────────────────────────────────────────────────────
+2 · SESSION OWNERSHIP — THE PRECONDITION
+────────────────────────────────────────────────────────────────────────
+
+Change 2+3 moved the session out of the Act 3 screen and into one owner above
+the tab bar. A LIFT SESSION USES THAT SAME OWNER. It holds:
+
+  [bound] exercise index · set index · a partially entered set · the set clock
+  · the rest clock and its target · pause state · the finished-set list
+
+One owner, one running session, and the invariant that makes the collision
+refusal true: NOOP HOLDS ONE SESSION AT A TIME. Do not add a second owner and
+do not build a second bar — two bars means two owners and eventually two
+running sessions.
+
+A running session claims the strap's double-tap to advance to the next set.
+lift-live teaches it (§3.1, the dashed hint).
+
+
+────────────────────────────────────────────────────────────────────────
+3 · THE SCREENS
+────────────────────────────────────────────────────────────────────────
+
+Shared metrics, all [static]:
+  screen header        padding 56 / 18 / 8 / 18, header row HStack spacing 12
+  sheet header         padding 58 / 18 / 8 / 18 (program, edit, import, review)
+  screen content       horizontal 20, top 8
+  card fill            #141817, border 0.5 pt rgba(255,255,255,.06), radius 20–22
+  tinted card          fill rgba(23,162,230,.08), border rgba(23,162,230,.26)
+  bottom inset         116, and 168 while the lift bar is up
+  back button          34 × 34 circle, chevron 9 × 9 at 1.6 pt
+  every corner         .continuous. Every border 0.5 pt with strokeBorder.
+  every figure that changes in place  .monospacedDigit()
+
+Ink ramp, in this act: #EDF1EF primary · #C6CEC9 secondary · #B7C3C9 body on
+tint · #939C97 quiet · #7F8A85 quieter · #6C7570 captions. #57605C IS RETIRED FOR
+TYPE as of 20 September — 3.0:1 on the base surface — and survives only as the row
+chevron’s stroke. Captions that used it now use #7F8A85. Accents: aura #17A2E6 and #8FD3F5 · lavender #8B99D6 / #A9B4E0 ·
+green #6FBF7F · amber #F3C888. AMBER MEANS SOMETHING NEEDS YOU AND NOTHING
+ELSE — there is no amber in this act except the Finish control.
+
+3.1 · lift-live — THE WORKING SCREEN
+
+Used mid-set, one-handed, possibly sweating. Every control ≥ 44 pt; the number
+keyboard is one tap from the pad; the rest clock is readable at arm's length.
+
+Six states: running · resting · warmup · bare · last · paused.
+
+BARE IS THE DEFAULT CASE, NOT THE EDGE CASE. A program line that is nothing
+but an exercise name is normal, so:
+
+  · no prefilled numbers, and NO EM-DASH PLACEHOLDERS for unset targets. An
+    unset target is not rendered at all.
+  · the fields read — until touched, and the kicker reads "No targets on this
+    line" with the sentence that follows it in the act file.
+  · a line with targets gets the decorated variant, and its PROGRESSION REASON
+    renders beside the exercise in the tinted card. That sentence is [bound]
+    and it is the only thing that makes a prefilled weight legible. If the
+    line has no reason, the card is not rendered.
+
+Composition, top to bottom:
+
+  1. header — [formula] session clock left (h:mm:ss over 1 h, else m:ss),
+     label "in the session" / "rest left" / "paused"; right, [bound] program
+     name over [formula] "Exercise N of M".
+  2. exercise — [bound] name, Outfit 29 / 300 / −.03em; [bound] equipment line
+     at 12 pt #7F8A85.
+  3. the reason card, or the no-targets card. Radius 18.
+  4. THE SET LIST. One row per set, min-height 46:
+       mark 17 × 17 — a check at 80 % in #6FBF7F when done, a filled aura dot
+         with a 4 pt halo when current, a hairline ring when still to come
+       index — [formula] set number, or "W" for a warm-up, or 3a / 3b / 3c for
+         a drop cluster
+       value — [bound] the set in its measurement mode (§4)
+       chip  — "warm-up" (neutral) or "drop" (lavender). No chip otherwise.
+       trailing — [bound] the rest actually taken, hairline, or nothing
+  5. THE PAD (hidden while resting). Two steppers — weight and reps, 44 × 48
+     buttons, field 48 pt tall on a tinted fill — then the primary:
+     56 pt, radius 18, aura fill, ink #04121A. Warm-up state adds
+     "not counted in anything this session states" beside the pad title.
+  6. THE DOUBLE-TAP HINT, dashed border, only while running.
+  7. THE REST CARD (resting only). Countdown Outfit 76 / 200, tabular; the
+     target rest named; [formula] next set preview; a 44 pt "Skip the rest of
+     it". NEUTRAL FILL, NOT AMBER — rest is not a thing to act on.
+  8. next exercise row (hidden while resting and on the last set).
+  9. Pause 48 pt and Finish 48 pt, side by side. Finish is the only warm
+     control in the act.
+
+DROP SETS EXPAND. Segments are ordinary set rows linked by cluster and parent
+ids, so one planned line becomes three rows mid-session and the list grows.
+State "last" is drawn on exactly that case, with the cluster note in lavender.
+
+PAUSE holds the partially entered set. Leaving the screen does not end the
+session — that is what §2 is for.
+
+WARM-UPS ARE A FLAG, NOT A CONVENTION. Excluded from every figure the session
+states, everywhere, and said out loud wherever the count changes.
+
+3.2 · lift-library — PROGRAMS
+
+States: populated · empty · archived shown · collision.
+
+  · program card: [bound] name, [formula] "N lines · last done X", an optional
+    "next up" chip, then two controls — a 44 pt Start (filled aura on the next
+    program, neutral on the others) and a 44 pt Open.
+  · two doors, as rows: "Write a program" and "Bring sessions in from Hevy".
+  · ARCHIVED programs are shown at 38 % and read-only, never hidden — they
+    still own their sessions. Disclosure row, then the rows, then one line
+    saying restore makes them editable.
+  · EMPTY is one sentence in the card at body size. No illustration. The two
+    door rows are the screen's content and stay.
+
+COLLISION — THE REFUSAL. Starting a lift while a cardio session runs is
+REFUSED, not end-and-start:
+
+  · a dialog, because it interrupts a choice already made
+  · three parts (rule 9): what is happening · that nothing has been ended or
+    lost · what to do instead
+  · NOT RED. NO End button. NEITHER ACTION STYLED AS THE SAFE ONE — no filled
+    primary, no default.
+  · actions: "Go to it" → the running session's live screen · "Not now"
+
+3.3 · lift-program — THE EDITOR
+
+States: editing · new · readonly.
+
+  · line rows: drag grip, [bound] exercise name, and the target summary —
+    [formula] "4 × 8 · 80 kg · rest 2:30 · RPE 8" — or the words for a line
+    with none, in quiet ink. Not blanks, not em dashes.
+  · the expanded line shows all six optional targets as rows with a value or
+    "not set", each with a clear control when set.
+  · SIX MEASUREMENT MODES block — see §4. It is part of the screen, not
+    documentation.
+  · READONLY: no grips, no chevrons, no Done, rows not tappable, the editor
+    card not rendered, and the sub-line states what the screen is. A row that
+    does nothing carries no affordance that says otherwise.
+
+3.4 · lift-detail — A FINISHED SESSION, READ-ONLY
+
+States: ordinary · noProgram · noRpe · pre-identity (no chevron from history).
+
+  · four figure tiles, 2 × 2: [bound] working sets (warm-ups out), [formula]
+    total lifted, [bound] heaviest completed set, [bound] session RPE.
+  · noRpe: the RPE tile renders "—" and a sentence underneath says nobody
+    rated it and Noop will not estimate one. NEVER 0 (rule 11).
+  · noProgram is an ordinary Tuesday, not an error. Different title and a line
+    that says logging without a program is a normal way to lift.
+  · the exercise list: per exercise, [bound] name, [formula] working-set count,
+    the sets as pills in their measurement mode, and a note where something
+    needs saying (warm-ups folded, no targets on the line, a cluster expanded).
+  · a row into lift-muscles, and Act 3's cost card verbatim in structure:
+    minutes on tonight's sleep need, when you are recovered, load on the week.
+    A lift is priced in the same currency as a ride.
+  · ONE LINE OF CATALOGUE CREDIT is owed here — the licence requires it. Send
+    the exact attribution string; it is set at real length in the drawing.
+  · NO EXERCISE MEDIA. None ships, the licence does not cover it, and the
+    screen is built around the text instructions. Do not design in a demo loop.
+
+3.5 · lift-edit — CORRECTING IT AFTERWARDS
+
+States: editing · a set deleted · committed.
+
+  · editable set rows; a deleted row stays visible, struck through, at 50 %,
+    with "Undo" until you save.
+  · the total above RESTATES as you go — [formula] "14 → 13 working sets ·
+    4,540 kg" — in aura, so the figure and the rows can never disagree.
+  · "Add a set you forgot" row at the foot.
+  · COMMITTED is green in place for 2 s, then back (00-RULES §12). No toast,
+    no alert.
+  · the boundary, stated on the screen: what you logged is editable; what the
+    strap measured during the session is not touched by this screen. Noop
+    keeps one record — there is no second, truer copy.
+
+3.6 · lift-import — HEVY IN
+
+States: idle · reading · failed · nothing found.
+
+  · two doors: a file (the CSV Hevy exports) and the key (read-only,
+    revocable, kept on the phone, nothing written back).
+  · THE WORD IS "ADDS". Nowhere on this screen or lift-review may the words
+    sync, update or replace appear. Import adds; running it twice does not
+    double anything; the file is never modified.
+  · reading renders the card at final size with real counts and a bar. NO
+    SPINNER ON A CARD, and no "Loading…".
+  · failed and nothing-found are three-part refusals — what happened, why it
+    stopped, what you can do instead — and NOT RED.
+  · two sentences the screen owes, both [static] and both in the act file:
+    warm-ups fold away and are out of every stated figure, and names are
+    matched to the catalogue where they match and kept exactly as written
+    where they do not.
+
+3.7 · lift-review — WHAT WAS READ
+
+SUMMARY-AND-COMMIT, not check-each-row, because the importer produces whole
+sessions with no per-set provenance. The screen says that out loud rather than
+faking checkboxes: Noop cannot show you a line and honestly claim it is the
+line it read.
+
+States: summary · partial · nothing read · committed.
+
+  · four figures as rows — noun left, [bound] count right in Outfit 20:
+    sessions read and their span · exercises matched to the catalogue · names
+    kept as written · warm-up sets folded away.
+  · the newest five sessions as read-only rows, each carrying "from the file".
+  · commit: 54 pt aura primary, [formula] "Add N sessions", and "Not now".
+  · PARTIAL names every skipped session and its reason, with counts, and the
+    line that a skipped session is left in the file rather than half-added.
+  · NOTHING READ is a refusal, not an empty list: nothing was written, nothing
+    changed, the file is as it was handed over.
+  · COMMITTED states that everything reading your history has them now.
+
+3.8 · lift-muscles — CREDITED SETS
+
+States: read · calibrating · absent.
+
+THE UNIT IS CREDITED SETS, from TrainingMuscleProjection: a working set counts
+1.0 to the exercise's primary muscle and 0.5 to each secondary; STABILISERS
+COUNT ZERO and are carried as descriptive metadata; warm-ups count nothing.
+The screen states that arithmetic at the top, in words. Do not add tonnage or
+reps as a second unit.
+
+THE TREE IS 7 REGIONS AND 33 MUSCLES.
+
+  · GROUP HEADERS COME FROM THE REGION DERIVATION (TrainingBodyRegion), NOT
+    FROM THE PARENT CHAIN. back, core, legs and shoulders are referenced as
+    parents but are not muscles; a naive parent walk orphans four. DO NOT add
+    them as entries to make the walk work — that puts four things in the list
+    no exercise can credit.
+  · sub-muscles (upper/lower traps, upper/lower abs, inner/outer quadriceps)
+    indent 12 pt under their parent and DO NOT double-count into the region
+    total.
+  · per muscle: name, a 5 pt bar, [bound] credited sets to one decimal with
+    the trailing .0 dropped, or "—" at zero.
+  · WORK IS DRAWN IN AURA BLUE. RECOVERY READS IN LAVENDER. Never amber: a
+    worked muscle is not a warning, and nothing on this screen goes red.
+  · CALIBRATING withholds every figure and shows the SESSION COUNT in its
+    place, with the reason (00-RULES §13). ABSENT is one sentence — no
+    empty-state illustration, no "connect a strap" button.
+  · the mapping's provenance is stated once, here, as three chips and a
+    sentence: [bound] reviewed · sourceFallback · userConfirmed. It is not a
+    per-row chip anywhere else in the act, because it only changes what a
+    number means on this screen.
+
+NO WEEKLY SET TARGET. No muscle-volume goal. There is nothing on this screen
+to hit.
+
+
+────────────────────────────────────────────────────────────────────────
+4 · SETS, UNITS AND THE SIX MEASUREMENT MODES
+────────────────────────────────────────────────────────────────────────
+
+WEIGHTS ARE HELD IN KILOGRAMS and displayed in plumbing/record's existing
+measure preference. THE LIFT DOES NOT GET A SECOND UNIT SWITCH anywhere.
+
+A set row is ONE CONTROL THAT CHANGES SHAPE, not six controls:
+
+  | Mode                  | Catalogue | Renders as     |
+  | --------------------- | --------- | -------------- |
+  | weight × reps         | 881       | 80 kg × 8      |
+  | bodyweight reps       | 284       | × 12           |
+  | duration              | 102       | 0:45           |
+  | weighted bodyweight   | 36        | +10 kg × 8     |
+  | assisted bodyweight   | 15        | U+2212 20 kg × 8 |
+  | reps only             | 6         | × 20           |
+
+Unilateral work (158 exercises) carries separate left and right reps — the row
+grows; it does not truncate to one figure.
+
+PER SET the model may also carry: warm-up flag, an intensifier (drop set,
+rest-pause, AMRAP, failure), target and actual duration, distance, an effort
+rating, completed or not. PER EXERCISE: rest timer, separate warm-up rest
+timer, superset partner, equipment snapshot, a free-text note, and the
+progression reason. EVERY ONE OF THESE IS OPTIONAL AND ABSENT IS THE COMMON
+CASE — render nothing for an unset field rather than a placeholder.
+
+
+────────────────────────────────────────────────────────────────────────
+5 · THE LIVE BAR — ONE BAR, TWO CONTENTS
+────────────────────────────────────────────────────────────────────────
+
+Same bar as Change 2+3. Same four slots in the same order. The middle two
+change.
+
+  | Property     | Value                                                    |
+  | ------------ | -------------------------------------------------------- |
+  | Height       | [static] 46 pt, radius 20 continuous                     |
+  | Position     | above the tab bar, 6 pt gap, 14 pt page gutter            |
+  | Bottom inset | 116 → 168 while it is up, every scroll view in the app    |
+  | Slot 1       | 8 pt dot, pulsing 1.1 s — the only motion in the bar      |
+  | Slot 2       | [bound] THE CURRENT EXERCISE (was the workout name)       |
+  | Slot 3       | [formula] THE SET OR REST CLOCK (was elapsed session time)|
+  | Slot 4       | [formula] "Set 3/4", or "rest" (was the heart rate)       |
+  | Tap          | → lift-live                                               |
+
+  WORKING   fill rgba(23,162,230,.14), border rgba(23,162,230,.4), dot #17A2E6
+  RESTING   fill rgba(255,255,255,.07), border rgba(255,255,255,.17),
+            clock #8FD3F5 counting down
+  PAUSED    fill rgba(255,255,255,.06), the word "Paused" in slot 3, dot still
+
+Not dismissible. No close button. It does not hide on scroll. It leaves when
+the session ends, and on end lift-detail is pushed full-screen.
+
+THE LOCK SCREEN ACTIVITY HAS TO MOVE. LiftLiveActivity.swift is green while a
+set is worked and amber through the rest. In this palette green means DONE AND
+WRITTEN and amber means SOMETHING NEEDS YOU; a set in progress is neither, and
+rest is not a thing to act on. Both surfaces read AURA BLUE WHILE WORKING AND
+NEUTRAL WHILE RESTING. Four slots, one order, two tints. If you disagree, say
+so before the widget sheet is drawn in wave 4 — but the two cannot diverge.
+
+
+────────────────────────────────────────────────────────────────────────
+6 · ALSO IN THIS PASS — ACT 7 AND ACT 5, MANNER
+────────────────────────────────────────────────────────────────────────
+
+Manner is at FOUR options in both places: Plain · Quiet · Direct · Off. One
+axis, four stops — plain writes a paragraph, quiet writes a line, direct drops
+the reasoning, off does not write first.
+
+OFF'S NOTE, [static], now drawn in Act 7 setup (lift it from the act file):
+Svea does not speak first; no morning brief, nothing scheduled in the
+background, nothing leaves the phone unless you ask, and she still answers
+when asked.
+
+With Off selected, drawn in Act 7:
+  · the brief becomes the single "nothing was fetched" line
+  · its kicker reads "Not briefed · off" (was "Today's brief · 07:12")
+  · the chip reads "nothing fetched" (was "written")
+  · the whole proactive block dims to 0.48 AND STOPS TAKING TOUCHES, so Off
+    visibly owns it rather than leaving a live control that does nothing
+
+ACT 5's row renames to Manner with all four options and a detail line naming
+plain, quiet and off. NoopAct5You.swift matches this control by its display
+title (title == "Svea's voice"), so MOVE THE TITLE MATCH IN THE SAME PASS or
+the binding breaks silently. LEAVE noop.html.svea-voice alone — migrating a
+storage key for a label change costs someone their setting. And the Off brief
+copy should read as a manner ("your manner is set to off"), not as though she
+had been switched off.
+
+The master switch (coach.featureEnabled) stays where it is. If we ever want
+"she is not here", it is its own row, not a fifth chip.
+
+
+────────────────────────────────────────────────────────────────────────
+7 · YOUR CHECKLIST
+────────────────────────────────────────────────────────────────────────
+
+  [ ] 1. The eight prefixed route ids, and the --noop-route arguments back.
+  [ ] 2. The shell's session owner holds a lift session (§2). Do not ship the
+         bar without it.
+  [ ] 3. The bar's lift variant, and LiftLiveActivity.swift moved to
+         blue-and-neutral.
+  [ ] 4. The catalogue attribution string, verbatim, for lift-detail.
+  [ ] 5. Act 5's Manner rename with the title match moved in the same pass.
+  [ ] 6. TERMS.md bundled and loading on iOS, and its header taken to 2.0 —
+         the gate compares 2.0 and the document says 1.1. Design owes the
+         disabled-Accept state with the four attestations; it rides in with
+         the body, so ship them together.
+  [ ] 7. day/release bound to AppChangelog. Two rendering calls, decided:
+         the bolded lead-in becomes the item's own line in title weight with
+         the body underneath (not inline bold, no markdown), and issue
+         numbers and @handles are KEPT as a muted trailing line per item —
+         not inline, not behind a disclosure.
+  [ ] 8. The momentum filter as a named list, not a switch in a card factory,
+         so a cut kind cannot return with the next merge and never counts
+         toward the section's badge or its empty state.
+
+Anything in this pack that disagrees with 00-RULES.md is a bug in this pack.
+Tell me and I will fix it.

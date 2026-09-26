@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#F4F6F5"/><path d="M22 74 C46 74 44 26 78 26" fill="none" stroke="#17A2E6" stroke-width="5" stroke-linecap="round"/><circle cx="78" cy="26" r="7" fill="#E0A33C"/></svg></template>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F5;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#0B6FA8;text-decoration:none}a:hover{color:#084F78}
+@keyframes hbeat{0%,100%{transform:scale(1)}12%{transform:scale(1.05)}24%{transform:scale(1)}}
+</style>
+</helmet>
+
+<div style="max-width:1280px;margin:0 auto;padding:52px 40px 110px;display:flex;flex-direction:column;gap:14px">
+
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;color:#8A5B12;background:#FDF4E6;border:.5px solid #EBD3A8;border-radius:3px;padding:3px 7px">Addendum &middot; motion pass</span>
+    <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;color:#5E6663">§00-RULES §10, extended</span>
+  </div>
+  <h1 style="margin:0;font-family:'Outfit',sans-serif;font-size:44px;font-weight:300;letter-spacing:-.032em;line-height:1.04;color:#111413">Six curves, and every<br>new transition on one of them</h1>
+  <p style="margin:0;max-width:37em;font-size:14.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">§10 says six curves cover the app and then names two. Here are all six, and then the nine transitions the addendum introduces &mdash; each assigned a curve, a duration, an <strong style="font-weight:600">order of events</strong>, and a Reduce Motion answer. <strong style="font-weight:600">Press Play on anything.</strong> The demos run the real values.</p>
+  <p style="margin:0;max-width:37em;font-size:13px;line-height:1.6;color:#5E6663;text-wrap:pretty">Nothing here is a new curve. All six exist in <code style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#0B5E8C;background:#EEF4F8;padding:1px 4px;border-radius:2px">NoopSpecMotion</code> or are the plain easing the platform gives you; four of them just had no name to be referred to by, which is why they get missed.</p>
+
+  <div style="height:1px;background:#D6DAD8;margin:26px 0 6px"></div>
+
+  <div style="display:flex;align-items:baseline;gap:12px">
+    <span style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:300;color:#B7BFBB;letter-spacing:-.02em">01</span>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <h2 style="margin:0;font-family:'Outfit',sans-serif;font-size:26px;font-weight:400;letter-spacing:-.022em;color:#111413">The six</h2>
+      <span style="font-size:12.5px;color:#5E6663">Play them together &mdash; the differences are only legible side by side</span>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;margin-top:-30px">
+    <div onClick="{{ playCurves }}" style="{{ curveBtn }}">{{ curveBtnLabel }}</div>
+  </div>
+
+  <div style="background:#fff;border:1px solid #E4E8E6;border-radius:12px;overflow:hidden;margin-top:14px">
+    <div style="display:flex;gap:12px;padding:9px 16px;background:#F0F3F2;border-bottom:1px solid #E4E8E6">
+      <span style="width:74px;flex:none;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#5E6663">Name</span>
+      <span style="width:236px;flex:none;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#5E6663">Value</span>
+      <span style="width:210px;flex:none;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#5E6663">Motion</span>
+      <span style="flex:1;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#5E6663">What it is for</span>
+    </div>
+    <sc-for list="{{ curves }}" as="c" hint-placeholder-count="6">
+      <div style="display:flex;gap:12px;align-items:center;padding:13px 16px;border-bottom:1px solid #F0F3F2">
+        <span style="width:74px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;font-weight:600;color:#0B5E8C">{{ c.n }}</span>
+        <div style="width:236px;flex:none;display:flex;flex-direction:column;gap:3px">
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#2A302E">{{ c.v }}</span>
+          <span style="font-size:11px;color:#8A918E">{{ c.d }}</span>
+        </div>
+        <div style="width:210px;flex:none;height:26px;border-radius:13px;background:#F4F6F5;border:1px solid #E9EDEB;position:relative;overflow:hidden">
+          <span style="{{ c.dot }}"></span>
+        </div>
+        <span style="flex:1;font-size:12px;line-height:1.5;color:#2A302E;text-wrap:pretty">{{ c.u }}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="background:#FFFBF3;border:1px solid #EBD3A8;border-radius:12px;padding:15px 17px;max-width:52em;display:flex;flex-direction:column;gap:7px;margin-top:4px">
+    <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#8A5B12">Why <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px;text-transform:none;letter-spacing:0">tick</code> is one of the six</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.6;color:#4A3A1E;text-wrap:pretty">Because the live bar has a clock in it, and easing a clock is a bug. Anything that represents elapsed time or accumulated quantity moves linearly or it lies: an eased second-hand runs fast in the middle. The list is short and absolute &mdash; the elapsed numeral, the import progress fill, the charge drain, the breathing pacer.</p>
+  </div>
+
+  <div style="height:1px;background:#D6DAD8;margin:34px 0 6px"></div>
+
+  <div style="display:flex;align-items:baseline;gap:12px">
+    <span style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:300;color:#B7BFBB;letter-spacing:-.02em">02</span>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <h2 style="margin:0;font-family:'Outfit',sans-serif;font-size:26px;font-weight:400;letter-spacing:-.022em;color:#111413">The nine transitions</h2>
+      <span style="font-size:12.5px;color:#5E6663">Five are drawn running below; the other four are one line each</span>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:26px;margin-top:24px">
+
+    <div style="flex:none;width:402px;display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:12.5px;font-weight:600;color:#111413">1 &middot; The + door</span>
+          <span style="font-size:11px;color:#8A918E">sheet down, <em>then</em> arrival &mdash; never together</span>
+        </div>
+        <div onClick="{{ playSheet }}" style="{{ btn }}">Play</div>
+      </div>
+      <div style="width:402px;height:330px;background:#0A0C0B;border-radius:22px;overflow:hidden;position:relative;border:1px solid #D6DAD8;font-family:'Instrument Sans',system-ui,sans-serif">
+        <div style="{{ sheetDestStyle }}">
+          <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#C8934B;font-weight:600">Today&rsquo;s session</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:27px;font-weight:300;letter-spacing:-.03em;color:#EDF1EF;margin-top:8px">Easy 40 min</span>
+          <span style="font-size:12.5px;line-height:1.5;color:#939C97;margin-top:6px;text-wrap:pretty">Zone 2. What today can take without borrowing from tomorrow.</span>
+          <span style="font-size:11px;color:#7F8A85;margin-top:auto">effort/session &middot; a tab root, not a push</span>
+        </div>
+        <div style="{{ sheetStyle }}">
+          <div style="width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);margin:0 auto 16px"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:0 4px 14px;border-bottom:.5px solid rgba(255,255,255,.08)">
+            <span style="flex:1;font-size:14.5px;font-weight:600;color:#EDF1EF">Start a session</span>
+            <span style="width:8px;height:8px;border-top:1.6px solid #F2B45C;border-right:1.6px solid #F2B45C;transform:rotate(45deg)"></span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;padding-top:14px">
+            <div style="height:52px;border-radius:16px;background:#141817;border:.5px solid rgba(255,255,255,.06)"></div>
+            <div style="height:52px;border-radius:16px;background:#141817;border:.5px solid rgba(255,255,255,.06)"></div>
+            <div style="height:52px;border-radius:16px;background:#141817;border:.5px solid rgba(255,255,255,.06)"></div>
+            <div style="height:52px;border-radius:16px;background:#141817;border:.5px solid rgba(255,255,255,.06)"></div>
+            <div style="height:52px;border-radius:16px;background:#141817;border:.5px solid rgba(255,255,255,.06)"></div>
+            <div style="height:52px;border-radius:16px;background:#141817;border:.5px solid rgba(255,255,255,.06)"></div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E4E8E6;border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ sheetSteps }}" as="s" hint-placeholder-count="4">
+          <div style="display:flex;gap:9px;align-items:baseline">
+            <span style="width:52px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#B4543A">{{ s.t }}</span>
+            <span style="flex:1;font-size:11.5px;line-height:1.5;color:#2A302E;text-wrap:pretty">{{ s.d }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="flex:none;width:402px;display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:12.5px;font-weight:600;color:#111413">2 &middot; The live bar arrives</span>
+          <span style="font-size:11px;color:#8A918E">bar and bottom inset on one curve</span>
+        </div>
+        <div onClick="{{ playBar }}" style="{{ btn }}">Play</div>
+      </div>
+      <div style="width:402px;height:330px;background:#0A0C0B;border-radius:22px;overflow:hidden;position:relative;border:1px solid #D6DAD8;font-family:'Instrument Sans',system-ui,sans-serif">
+        <div style="{{ barContentStyle }}">
+          <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">The day so far</span>
+            <span style="font-size:12.5px;color:#939C97">Content ends above the bar &mdash; it never scrolls under it.</span>
+          </div>
+          <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;align-items:center;gap:12px">
+            <span style="width:30px;height:30px;border-radius:50%;background:rgba(23,162,230,.14);flex:none"></span>
+            <span style="flex:1;font-size:13.5px;color:#EDF1EF">Heart</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:24px;font-weight:300;color:#EDF1EF;animation:hbeat 1.05s ease-in-out infinite;display:inline-block">64</span>
+          </div>
+          <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Stress</span>
+            <span style="font-size:12.5px;color:#939C97">The last card must still clear the bar.</span>
+          </div>
+        </div>
+        <div style="{{ liveBarStyle }}">
+          <span style="width:7px;height:7px;border-radius:50%;background:#F2B45C;flex:none"></span>
+          <span style="flex:1;font-size:13px;font-weight:600;color:#EDF1EF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Easy 40 min</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:400;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ clock }}</span>
+          <span style="font-size:12px;color:#F2B45C;font-variant-numeric:tabular-nums;flex:none">{{ barRight }}</span>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:rgba(10,12,11,.92);border-top:.5px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-around">
+          <span style="width:20px;height:20px;border-radius:6px;background:rgba(23,162,230,.5)"></span>
+          <span style="width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.13)"></span>
+          <span style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.16)"></span>
+          <span style="width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.13)"></span>
+          <span style="width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.13)"></span>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E4E8E6;border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ barSteps }}" as="s" hint-placeholder-count="3">
+          <div style="display:flex;gap:9px;align-items:baseline">
+            <span style="width:52px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#B4543A">{{ s.t }}</span>
+            <span style="flex:1;font-size:11.5px;line-height:1.5;color:#2A302E;text-wrap:pretty">{{ s.d }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="flex:none;width:402px;display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:12.5px;font-weight:600;color:#111413">3 &middot; The landing</span>
+          <span style="font-size:11px;color:#8A918E">the bar leaves <em>underneath</em> the cover</span>
+        </div>
+        <div onClick="{{ playLand }}" style="{{ btn }}">Play</div>
+      </div>
+      <div style="width:402px;height:330px;background:#0A0C0B;border-radius:22px;overflow:hidden;position:relative;border:1px solid #D6DAD8;font-family:'Instrument Sans',system-ui,sans-serif">
+        <div style="position:absolute;inset:0;padding:18px;display:flex;flex-direction:column;gap:9px">
+          <div style="background:rgba(242,180,92,.07);border:.5px solid rgba(242,180,92,.2);border-radius:22px;padding:15px 16px;display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#C8934B;font-weight:600">Running</span>
+            <span style="font-size:12.5px;color:#939C97">effort/live, the moment before it ends</span>
+          </div>
+        </div>
+        <div style="{{ landBarStyle }}">
+          <span style="width:7px;height:7px;border-radius:50%;background:#F2B45C;flex:none"></span>
+          <span style="flex:1;font-size:13px;font-weight:600;color:#EDF1EF">Easy 40 min</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:16px;color:#EDF1EF;font-variant-numeric:tabular-nums">40:00</span>
+        </div>
+        <div style="{{ landCoverStyle }}">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-top:1.6px solid #C6CEC9;border-left:1.6px solid #C6CEC9;transform:rotate(-45deg);margin-left:-2px"></span></span>
+            <span style="font-size:13.5px;color:#939C97">Today</span>
+          </div>
+          <span style="font-family:'Outfit',sans-serif;font-size:28px;font-weight:300;letter-spacing:-.03em;color:#EDF1EF;margin-top:14px">Easy 40 min</span>
+          <span style="font-size:12.5px;line-height:1.55;color:#939C97;margin-top:7px;text-wrap:pretty">40:12 &middot; zone 2 for 31 of it. Cost you 14 points of tomorrow.</span>
+          <span style="font-size:11px;color:#7F8A85;margin-top:auto">effort/detail, full-screen &middot; back reads Today for this arrival only</span>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E4E8E6;border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ landSteps }}" as="s" hint-placeholder-count="4">
+          <div style="display:flex;gap:9px;align-items:baseline">
+            <span style="width:52px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#B4543A">{{ s.t }}</span>
+            <span style="flex:1;font-size:11.5px;line-height:1.5;color:#2A302E;text-wrap:pretty">{{ s.d }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="flex:none;width:402px;display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:12.5px;font-weight:600;color:#111413">4 &middot; Paused</span>
+          <span style="font-size:11px;color:#8A918E">the clock stops; it does not dim</span>
+        </div>
+        <div onClick="{{ togglePause }}" style="{{ btn }}">{{ pauseLabel }}</div>
+      </div>
+      <div style="width:402px;height:150px;background:#0A0C0B;border-radius:22px;overflow:hidden;position:relative;border:1px solid #D6DAD8;display:flex;align-items:center;justify-content:center;font-family:'Instrument Sans',system-ui,sans-serif">
+        <div style="width:362px;height:46px;border-radius:16px;background:rgba(20,24,23,.96);border:.5px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:11px;padding:0 15px;box-sizing:border-box">
+          <span style="{{ pauseDotStyle }}"></span>
+          <span style="flex:1;font-size:13px;font-weight:600;color:#EDF1EF">Easy 40 min</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:400;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ pauseClock }}</span>
+          <div style="width:62px;flex:none;position:relative;height:18px">
+            <span style="{{ bpmStyle }}">128 bpm</span>
+            <span style="{{ pausedWordStyle }}">Paused</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E4E8E6;border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ pauseSteps }}" as="s" hint-placeholder-count="3">
+          <div style="display:flex;gap:9px;align-items:baseline">
+            <span style="width:52px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#B4543A">{{ s.t }}</span>
+            <span style="flex:1;font-size:11.5px;line-height:1.5;color:#2A302E;text-wrap:pretty">{{ s.d }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="flex:none;width:402px;display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:12.5px;font-weight:600;color:#111413">5 &middot; The card&rsquo;s three states</span>
+          <span style="font-size:11px;color:#8A918E">one card, never absent &mdash; <code style="font-family:ui-monospace,Menlo,monospace;font-size:10.5px">swap</code></span>
+        </div>
+        <div onClick="{{ cycleCard }}" style="{{ btn }}">{{ cardBtnLabel }}</div>
+      </div>
+      <div style="width:402px;height:150px;background:#0A0C0B;border-radius:22px;overflow:hidden;position:relative;border:1px solid #D6DAD8;display:flex;align-items:center;padding:0 18px;box-sizing:border-box;font-family:'Instrument Sans',system-ui,sans-serif">
+        <div style="width:100%;background:rgba(23,162,230,.07);border:.5px solid rgba(23,162,230,.18);border-radius:22px;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Today&rsquo;s session</span>
+            <span style="width:8px;height:8px;border-top:1.6px solid #17A2E6;border-right:1.6px solid #17A2E6;transform:rotate(45deg)"></span>
+          </div>
+          <div style="{{ cardFadeStyle }}">
+            <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:300;letter-spacing:-.028em;line-height:1;color:#EDF1EF">{{ cardTitle }}</span>
+            <span style="font-size:12.5px;line-height:1.5;color:#939C97;text-wrap:pretty">{{ cardLine }}</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E4E8E6;border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ cardSteps }}" as="s" hint-placeholder-count="3">
+          <div style="display:flex;gap:9px;align-items:baseline">
+            <span style="width:52px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#B4543A">{{ s.t }}</span>
+            <span style="flex:1;font-size:11.5px;line-height:1.5;color:#2A302E;text-wrap:pretty">{{ s.d }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="height:1px;background:#D6DAD8;margin:34px 0 6px"></div>
+
+  <div style="display:flex;align-items:baseline;gap:12px">
+    <span style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:300;color:#B7BFBB;letter-spacing:-.02em">03</span>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <h2 style="margin:0;font-family:'Outfit',sans-serif;font-size:26px;font-weight:400;letter-spacing:-.022em;color:#111413">The whole table</h2>
+      <span style="font-size:12.5px;color:#5E6663">Every transition the addendum introduces, and its Reduce Motion answer</span>
+    </div>
+  </div>
+
+  <div style="background:#fff;border:1px solid #E4E8E6;border-radius:12px;overflow:hidden;margin-top:18px">
+    <div style="display:flex;gap:12px;padding:9px 16px;background:#F0F3F2;border-bottom:1px solid #E4E8E6">
+      <span style="width:180px;flex:none;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#5E6663">Transition</span>
+      <span style="width:96px;flex:none;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#5E6663">Curve</span>
+      <span style="width:70px;flex:none;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#5E6663">Duration</span>
+      <span style="flex:1;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#5E6663">What moves, in what order</span>
+      <span style="width:150px;flex:none;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#5E6663">Reduce Motion</span>
+    </div>
+    <sc-for list="{{ table }}" as="t" hint-placeholder-count="9">
+      <div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid #F0F3F2">
+        <div style="width:180px;flex:none;display:flex;flex-direction:column;gap:3px">
+          <span style="font-size:12px;font-weight:600;color:#111413;text-wrap:pretty">{{ t.n }}</span>
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#8A918E">{{ t.r }}</span>
+        </div>
+        <span style="width:96px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#0B5E8C">{{ t.c }}</span>
+        <span style="width:70px;flex:none;font-size:11.5px;color:#2A302E;font-variant-numeric:tabular-nums">{{ t.d }}</span>
+        <span style="flex:1;font-size:11.5px;line-height:1.5;color:#2A302E;text-wrap:pretty">{{ t.w }}</span>
+        <span style="width:150px;flex:none;font-size:11px;line-height:1.5;color:#5E6663;text-wrap:pretty">{{ t.m }}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:26px">
+    <div style="flex:1;min-width:330px;background:#fff;border:1px solid #E4E8E6;border-left:3px solid #B4543A;border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#B4543A">Must not animate</span>
+      <sc-for list="{{ never }}" as="n" hint-placeholder-count="5">
+        <div style="display:flex;gap:9px;align-items:baseline">
+          <span style="width:5px;height:5px;flex:none;border-radius:50%;background:#B4543A;margin-top:6px"></span>
+          <span style="flex:1;font-size:12px;line-height:1.55;color:#2A302E;text-wrap:pretty">{{ n }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:1;min-width:330px;background:#fff;border:1px solid #E4E8E6;border-left:3px solid #E0A33C;border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#8A5B12">The one that will get argued about</span>
+      <p style="margin:0;font-size:12.5px;line-height:1.6;color:#2A302E;text-wrap:pretty"><strong style="font-weight:600">Today&rsquo;s session card has a chevron and does not push.</strong> Both doors into Act 3 are tab-level arrivals &mdash; the addendum is explicit, and <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#0B5E8C">effort/session</code> has no back map entry. So the card cannot use the push curve, or back will lie from four of five tabs.</p>
+      <p style="margin:0;font-size:12.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">It crossfades on <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#0B5E8C">swap</code>, and <strong style="font-weight:600">the tab bar&rsquo;s tint travels to Act 3&rsquo;s amber over the same 200 ms.</strong> That tint move is what makes a crossfade read as <em>you changed place</em> rather than as a dropped frame. Ship the crossfade without it and this feels broken &mdash; it is one property, and it is not optional.</p>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:1400}}">
+class Component extends DCLogic {
+  state = { curves: false, sheet: 0, bar: 0, land: 0, paused: false, card: 0, fading: false, clock: '00:00' };
+
+  componentDidMount() {
+    this._t = { curves: [], sheet: [], bar: [], land: [], card: [] };
+    this.tick = setInterval(() => {
+      if (this.state.bar !== 2) return;
+      const [m, s] = this.state.clock.split(':').map(Number);
+      const n = m * 60 + s + 1;
+      this.setState({ clock: String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0') });
+    }, 1000);
+  }
+  componentWillUnmount() {
+    clearInterval(this.tick);
+    Object.keys(this._t).forEach(k => this._t[k].forEach(clearTimeout));
+  }
+
+  seq(key, steps) {
+    this._t[key].forEach(clearTimeout);
+    this._t[key] = steps.map(([ms, fn]) => setTimeout(fn, ms));
+  }
+
+  playCurves = () => {
+    this.setState({ curves: false });
+    this.seq('curves', [[140, () => this.setState({ curves: true })], [1800, () => this.setState({ curves: false })]]);
+  };
+  playSheet = () => {
+    this.setState({ sheet: 0 });
+    this.seq('sheet', [[140, () => this.setState({ sheet: 1 })], [440, () => this.setState({ sheet: 2 })], [2900, () => this.setState({ sheet: 0 })]]);
+  };
+  playBar = () => {
+    this.setState({ bar: 0, clock: '00:00' });
+    this.seq('bar', [[140, () => this.setState({ bar: 2 })], [6200, () => this.setState({ bar: 0 })]]);
+  };
+  playLand = () => {
+    this.setState({ land: 0 });
+    this.seq('land', [[140, () => this.setState({ land: 1 })], [3000, () => this.setState({ land: 0 })]]);
+  };
+  togglePause = () => this.setState(s => ({ paused: !s.paused }));
+  cycleCard = () => {
+    this.setState({ fading: true });
+    this.seq('card', [[110, () => this.setState(s => ({ card: (s.card + 1) % 3, fading: false }))]]);
+  };
+
+  renderVals() {
+    const S = this.state;
+    const enter = 'cubic-bezier(.22,.61,.36,1)';
+    const cover = 'cubic-bezier(.32,.72,0,1)';
+    const settle = 'cubic-bezier(.2,.8,.2,1)';
+    const over = 'cubic-bezier(.34,1.25,.64,1)';
+    const btn = 'font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#8A5B12;background:#FDF4E6;border:.5px solid #EBD3A8;border-radius:5px;padding:5px 11px;cursor:pointer;user-select:none;flex:none';
+
+    const dot = (ease, dur) => 'position:absolute;top:5px;left:5px;width:16px;height:16px;border-radius:50%;background:#17A2E6;'
+      + 'transform:translateX(' + (S.curves ? '184px' : '0px') + ');'
+      + 'transition:transform ' + dur + 'ms ' + ease;
+
+    const cards = [
+      { t: 'Easy 40 min', l: 'Zone 2. What today can take without borrowing from tomorrow.', b: 'Rest day' },
+      { t: 'Rest', l: 'Nothing today. Tomorrow is the earliest this pays off.', b: 'After a session' },
+      { t: 'Easy 40 min', l: 'Done at 14:38. Cost you 14 points of tomorrow.', b: 'Recommended' }
+    ];
+
+    return {
+      btn,
+      curveBtn: 'font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#111413;border-radius:6px;padding:8px 15px;cursor:pointer;user-select:none',
+      curveBtnLabel: S.curves ? 'Running' : 'Play all six',
+      playCurves: this.playCurves, playSheet: this.playSheet, playBar: this.playBar,
+      playLand: this.playLand, togglePause: this.togglePause, cycleCard: this.cycleCard,
+
+      curves: [
+        { n: 'enter', v: 'cubic-bezier(.22,.61,.36,1)', d: '300 ms · 9 pt rise + fade', u: 'Every pushed screen. Already in §10.', dot: dot(enter, 300) },
+        { n: 'cover', v: 'cubic-bezier(.32,.72,0,1)', d: '340 in · 300 out', u: 'Full-screen covers and sheets — anything arriving from the bottom edge over what stays.', dot: dot(cover, 340) },
+        { n: 'swap', v: 'ease-in-out', d: '220 ms crossfade', u: 'Content changing inside a container that stays. The session card’s three states, the paused word, the tab tint.', dot: dot('ease-in-out', 220) },
+        { n: 'settle', v: 'cubic-bezier(.2,.8,.2,1)', d: '260 ms', u: 'Things arriving into the chrome rather than over it: the live bar, and the bottom inset growing with it.', dot: dot(settle, 260) },
+        { n: 'overshoot', v: 'cubic-bezier(.34,1.25,.64,1)', d: '240 ms', u: 'Anything that snaps into a detent. The toggle knob; §10 already has it.', dot: dot(over, 240) },
+        { n: 'tick', v: 'linear', d: 'continuous', u: 'Elapsed time and accumulated quantity. Never eased — see below.', dot: dot('linear', 900) }
+      ],
+
+      sheetStyle: 'position:absolute;left:0;right:0;bottom:0;padding:14px 18px 24px;background:#141817;border-top:.5px solid rgba(255,255,255,.08);'
+        + 'border-radius:26px 26px 0 0;box-sizing:border-box;'
+        + 'transform:translateY(' + (S.sheet === 0 ? '0%' : '102%') + ');'
+        + 'transition:transform 280ms ' + cover,
+      sheetDestStyle: 'position:absolute;inset:0;padding:26px 20px 60px;display:flex;flex-direction:column;background:#0A0C0B;box-sizing:border-box;'
+        + 'opacity:' + (S.sheet === 2 ? 1 : 0) + ';transition:opacity 200ms ease-in-out',
+      sheetSteps: [
+        { t: '0 ms', d: 'Tap. The row highlights and the sheet starts down on cover, 280 ms.' },
+        { t: '280 ms', d: 'Sheet is gone. Nothing has arrived yet — this 60 ms of nothing is deliberate.' },
+        { t: '340 ms', d: 'effort/session crossfades in as a tab root on swap, 200 ms. No rise: it did not come from anywhere.' },
+        { t: 'never', d: 'A push. There is no back map entry and swipe-back does nothing, same as any home screen.' }
+      ],
+
+      barContentStyle: 'position:absolute;left:0;right:0;top:0;padding:18px 18px 0;display:flex;flex-direction:column;gap:9px;box-sizing:border-box;'
+        + 'bottom:' + (S.bar === 2 ? '98px' : '46px') + ';transition:bottom 260ms ' + settle,
+      liveBarStyle: 'position:absolute;left:20px;right:20px;height:46px;border-radius:16px;background:rgba(20,24,23,.96);border:.5px solid rgba(255,255,255,.08);'
+        + 'display:flex;align-items:center;gap:11px;padding:0 15px;box-sizing:border-box;cursor:pointer;'
+        + 'bottom:' + (S.bar === 2 ? '52px' : '-8px') + ';opacity:' + (S.bar === 2 ? 1 : 0) + ';'
+        + 'transition:bottom 260ms ' + settle + ',opacity 200ms ease-out',
+      clock: S.clock,
+      barRight: '128 bpm',
+      barSteps: [
+        { t: '0 ms', d: 'Session starts. The bar rises from below the tab bar to 52 pt above the bottom — 6 pt clear of it.' },
+        { t: '0–260', d: 'The bottom inset grows by 52 on the same curve, in the same frames. Two properties, one animation: if the inset lags, the last card jumps.' },
+        { t: 'after', d: 'The clock ticks on tick, linear. The bar does not hide on scroll and has no close button.' }
+      ],
+
+      landBarStyle: 'position:absolute;left:20px;right:20px;bottom:16px;height:46px;border-radius:16px;background:rgba(20,24,23,.96);border:.5px solid rgba(255,255,255,.08);'
+        + 'display:flex;align-items:center;gap:11px;padding:0 15px;box-sizing:border-box;'
+        + 'opacity:' + (S.land === 1 ? 0 : 1) + ';transition:opacity 1ms linear ' + (S.land === 1 ? '200ms' : '0ms'),
+      landCoverStyle: 'position:absolute;inset:0;padding:22px 20px 26px;display:flex;flex-direction:column;background:#0A0C0B;box-sizing:border-box;'
+        + 'transform:translateY(' + (S.land === 1 ? '0%' : '100%') + ');transition:transform 340ms ' + cover,
+      landSteps: [
+        { t: '0 ms', d: 'The session ends. effort/detail covers from the bottom edge on cover, 340 ms, full-screen.' },
+        { t: '200 ms', d: 'The bar is removed while it is already hidden behind the cover. The user never sees it go.' },
+        { t: '200 ms', d: 'The bottom inset shrinks in the same covered frames. Free, because nothing visible is affected.' },
+        { t: 'back', d: 'Dismisses down, 300 ms. Reads Today for this arrival only; from anywhere else, detail → session stands.' }
+      ],
+
+      pauseClock: S.paused ? '14:38' : '14:41',
+      pauseDotStyle: 'width:7px;height:7px;border-radius:50%;flex:none;background:' + (S.paused ? '#7F8A85' : '#F2B45C') + ';transition:background 220ms ease-in-out',
+      bpmStyle: 'position:absolute;right:0;top:0;font-size:12px;color:#F2B45C;font-variant-numeric:tabular-nums;white-space:nowrap;'
+        + 'opacity:' + (S.paused ? 0 : 1) + ';transition:opacity 220ms ease-in-out',
+      pausedWordStyle: 'position:absolute;right:0;top:0;font-size:12px;color:#C6CEC9;white-space:nowrap;'
+        + 'opacity:' + (S.paused ? 1 : 0) + ';transition:opacity 220ms ease-in-out',
+      pauseLabel: S.paused ? 'Resume' : 'Pause',
+      pauseSteps: [
+        { t: '220 ms', d: 'The heart rate crossfades to the word Paused in place, on swap. The dot desaturates on the same curve.' },
+        { t: '0 ms', d: 'The elapsed numeral simply stops. It keeps full contrast — a dimmed clock reads as a disconnected strap.' },
+        { t: 'never', d: 'A pulsing or breathing bar. Paused is the absence of motion; animating it says the opposite.' }
+      ],
+
+      cardTitle: cards[S.card].t,
+      cardLine: cards[S.card].l,
+      cardBtnLabel: cards[S.card].b,
+      cardFadeStyle: 'display:flex;flex-direction:column;gap:7px;opacity:' + (S.fading ? 0 : 1) + ';transition:opacity 110ms ease-in-out',
+      cardSteps: [
+        { t: '220 ms', d: 'Title and line crossfade on swap. The card, its tint, its eyebrow and its chevron never move.' },
+        { t: '220 ms', d: 'Height animates on the same curve when the line rewraps. Never a jump, never a separate duration.' },
+        { t: 'never', d: 'The card leaving. There is no fourth state — an empty slot where a card was yesterday reads as a bug.' }
+      ],
+
+      table: [
+        { n: 'today card → the effort', r: 'today → effort/session', c: 'swap', d: '200 ms', w: 'Crossfade, no rise. The tab bar tint travels to amber over the same 200 ms — that is the only signal that a tab changed.', m: 'Crossfade only, tint still moves.' },
+        { n: '+ → Start a session', r: 'log sheet → effort/session', c: 'cover, then swap', d: '280 + 200', w: 'Sheet down first, 60 ms of nothing, then the arrival. Overlapping them shows a push behind a dismissing sheet.', m: 'Sheet fades 200; arrival 200. Order unchanged.' },
+        { n: 'The live bar arrives', r: 'any screen', c: 'settle', d: '260 ms', w: 'Bar rises to 52 pt; bottom inset grows 52 in the same frames. One animation, two properties.', m: 'Bar fades in 200; inset changes with it, no rise.' },
+        { n: 'The live bar leaves', r: 'session ends', c: '— none —', d: '0 ms', w: 'It is removed behind the incoming cover at 200 ms. Never animated out on its own.', m: 'Same. Nothing to reduce.' },
+        { n: 'The landing', r: '→ effort/detail full-screen', c: 'cover', d: '340 in / 300 out', w: 'Covers from the bottom edge. Back dismisses down and reads Today for this arrival only.', m: 'Fade 200 in place, no travel.' },
+        { n: 'Paused', r: 'the bar', c: 'swap', d: '220 ms', w: 'bpm crossfades to the word Paused; the dot desaturates. The numeral stops at full contrast.', m: 'Instant swap, no crossfade.' },
+        { n: 'The card’s three states', r: 'today', c: 'swap', d: '220 ms', w: 'Title and line crossfade; height follows on the same curve. Container never moves.', m: 'Instant, 200 ms opacity only.' },
+        { n: 'A logged session opens', r: 'history → effort/detail', c: 'enter', d: '300 ms', w: 'Ordinary push, 9 pt rise + fade. Rows without an identity do not respond at all — no press state, no chevron.', m: 'Plain 200 ms fade, no rise.' },
+        { n: 'Health hub', r: 'ages → ages/health', c: 'enter', d: '300 ms', w: 'Ordinary push. Nothing special; listed so nobody invents something.', m: 'Plain 200 ms fade, no rise.' }
+      ],
+
+      never: [
+        'The rest-day card. It is a different render on load, not a transition from the recommended state — nobody watches it change.',
+        'The tab bar’s five icons. Only the tint moves; the glyphs do not scale, bounce or rotate.',
+        'The live bar’s departure. Covered, not animated. See row four.',
+        'The elapsed numeral on arrival. No count-up from zero — it is already correct when the bar appears.',
+        'Skeleton shimmer anywhere, and specifically not on the lab strips when they land. Crops fade in at 160 ms, staggered 24 ms per row, and that is the whole treatment.'
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

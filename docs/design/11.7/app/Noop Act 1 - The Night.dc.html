@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+<template id="__bundler_thumbnail" data-bg-color="#0A0C0B">
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="800" fill="#0A0C0B"/>
+<defs><radialGradient id="o" cx="36%" cy="30%"><stop offset="0" stop-color="#8FD3F5"/><stop offset=".62" stop-color="#17a2e6"/><stop offset="1" stop-color="#0E6E9C"/></radialGradient></defs>
+<circle cx="600" cy="400" r="150" fill="none" stroke="rgba(139,153,214,.45)" stroke-width="3"/>
+<circle cx="600" cy="400" r="112" fill="url(#o)"/>
+</svg>
+</template>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sheetUp{from{transform:translateY(102%)}to{transform:translateY(0)}}
+@keyframes glowPulse{0%,100%{opacity:.55}50%{opacity:.9}}
+@keyframes nightPulse{0%,100%{opacity:.7}50%{opacity:1}}
+@keyframes nightSpin{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.scr{animation:fadeUp .3s cubic-bezier(.22,.61,.36,1) both}
+.hb::-webkit-scrollbar{width:0;height:0}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="display:flex;gap:60px;align-items:flex-start;padding:52px 48px 100px">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:16px">
+  <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">ACT 1</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">The night — working prototype</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">tap through it</span>
+  </div>
+  </sc-if>
+
+  <div style="border-radius:48px;overflow:hidden;flex:none">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+    <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:470px;height:430px;border-radius:50%;background:radial-gradient(circle,rgba(139,153,214,.20),rgba(139,153,214,0) 70%);filter:blur(18px);pointer-events:none;animation:glowPulse 9s ease-in-out infinite"></div>
+
+      <div class="hb" onPointerDown="{{ swipeStart }}" onPointerUp="{{ swipeEnd }}" style="position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain">
+
+        <sc-if value="{{ isRest }}" hint-placeholder-val="{{ true }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:58px 20px 20px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span style="font-size:13.5px;color:#939C97">{{ t.last }}</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">Rest</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex:none;padding-top:2px">
+<div onClick="{{ goStrapPage }}" style="{{ battChip }}">
+                <div style="display:flex;align-items:center;gap:1px;flex:none">
+                  <div style="{{ battBody }}"><div style="{{ battFill }}"></div></div>
+                  <span style="{{ battNub }}"></span>
+                </div>
+                <span style="{{ battLabel }}">{{ battPct }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px">
+
+            <div onClick="{{ goWhy }}" style="position:relative;display:flex;flex-direction:column;gap:2px;cursor:pointer;margin-top:-14px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8B958F;font-weight:600">Against your need</span>
+                <span style="font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ night.win }}</span>
+              </div>
+
+              <div style="position:relative;height:250px;display:flex;align-items:center;justify-content:center">
+                <div style="position:absolute;width:290px;height:290px;border-radius:50%;background:radial-gradient(circle,rgba(93,107,196,.42),rgba(93,107,196,0) 62%);filter:blur(18px);animation:nightPulse 9s ease-in-out infinite;pointer-events:none"></div>
+                <div style="position:absolute;width:196px;height:196px;border-radius:50%;background:radial-gradient(circle,rgba(79,184,232,.16),rgba(79,184,232,0) 66%);filter:blur(10px);pointer-events:none"></div>
+                <div style="position:absolute;left:50%;top:50%;width:250px;height:250px;transform:translate(-50%,-50%);animation:nightSpin 90s linear infinite;pointer-events:none">
+                  <sc-for list="{{ nightSpecks }}" as="p" hint-placeholder-count="30">
+                    <div style="{{ p.s }}"></div>
+                  </sc-for>
+                </div>
+                <svg viewBox="0 0 232 232" style="position:absolute;width:232px;height:232px;overflow:visible;pointer-events:none">
+                  <path d="{{ ringTrack }}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="17" stroke-linecap="round"></path>
+                  <g style="filter:blur(9px);opacity:.95">
+                    <sc-for list="{{ nightArcs }}" as="a" hint-placeholder-count="34">
+                      <path d="{{ a.d }}" fill="none" stroke="{{ a.c }}" stroke-width="{{ a.w }}" stroke-linecap="round"></path>
+                    </sc-for>
+                  </g>
+                  <g>
+                    <sc-for list="{{ nightArcs }}" as="a" hint-placeholder-count="34">
+                      <path d="{{ a.d }}" fill="none" stroke="{{ a.c }}" stroke-width="{{ a.w }}" stroke-linecap="round"></path>
+                    </sc-for>
+                  </g>
+                  <circle cx="{{ wakeX }}" cy="{{ wakeY }}" r="3.2" fill="#EDF1EF"></circle>
+                </svg>
+                <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+                  <span style="font-family:'Outfit',sans-serif;font-size:46px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 24px rgba(0,0,0,.6)">{{ night.hours }}</span>
+                  <span style="font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#93A0A6;font-weight:600;padding-top:8px">asleep</span>
+                  <span style="{{ night.tagStyle }}">{{ night.delta }}</span>
+                </div>
+                <span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:10.5px;color:#7F8A85;white-space:nowrap">the ring closes at your need · {{ needLabel }}</span>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:10px;margin-top:6px;padding:14px 16px;border-radius:20px;background:#141817;border:.5px solid rgba(255,255,255,.06)">
+                <span style="flex:1;font-size:12.5px;color:#C6CEC9">{{ ringRead }}</span>
+                <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #9AA7E0;border-right:1.6px solid #9AA7E0;transform:rotate(45deg)"></span>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 13px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:14px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ t.seven }}</span>
+                <div style="display:flex;align-items:center;gap:8px;flex:none">
+                <sc-if value="{{ confOn }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ confBox }}">
+                    <span style="{{ confDot }}"></span>
+                    <span style="{{ confLabelStyle }}">{{ confLabel }}</span>
+                  </div>
+                </sc-if>
+                  <span style="font-size:10.5px;color:#7F8A85">dashes — your own need, 7h 05m</span>
+                </div>
+              </div>
+              <div style="position:relative;display:flex;align-items:flex-end;gap:6px;height:132px">
+                <sc-for list="{{ nights }}" as="n" hint-placeholder-count="7">
+                  <div onClick="{{ n.pick }}" style="flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;cursor:pointer">
+                    <span style="{{ n.valStyle }}">{{ n.val }}</span>
+                    <div style="{{ n.bar }}"></div>
+                    <span style="{{ n.dayStyle }}">{{ n.day }}</span>
+                  </div>
+                </sc-for>
+                <div style="{{ needLine }}"></div>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:17px 17px 15px;display:flex;flex-direction:column;gap:13px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">The shape of it</span>
+                <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ night.win }}</span>
+              </div>
+              <span style="font-size:14px;line-height:1.5;color:#EDF1EF;text-wrap:pretty">{{ night.verdict }}</span>
+              <div onClick="{{ toggleHypno }}" style="display:flex;flex-direction:column;gap:9px;cursor:pointer">
+                <div style="display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden">
+                  <sc-for list="{{ stripSegs }}" as="g" hint-placeholder-count="4">
+                    <div style="{{ g.s }}"></div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:11.5px;color:#6C7570">Deep 1h 34m · REM 1h 48m · Light 3h 42m</span>
+                  <span style="font-size:11.5px;color:#8B99D6;font-weight:600">{{ hypnoLabel }}</span>
+                </div>
+              </div>
+              <sc-if value="{{ hypnoOpen }}" hint-placeholder-val="{{ false }}">
+                <div class="scr" style="display:flex;flex-direction:column;gap:12px;padding-top:2px">
+                  <div style="display:flex;align-items:flex-end;gap:2px;height:84px">
+                    <sc-for list="{{ hypno }}" as="h" hint-placeholder-count="34">
+                      <div style="{{ h.s }}"></div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">
+                    <sc-for list="{{ hypAxis }}" as="a" hint-placeholder-count="4">
+                      <span>{{ a.label }}</span>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <sc-for list="{{ stages }}" as="s" hint-placeholder-count="4">
+                      <div onClick="{{ s.pick }}" style="{{ s.row }}">
+                        <span style="{{ s.swatch }}"></span>
+                        <span style="{{ s.nameStyle }}">{{ s.name }}</span>
+                        <div style="flex:1;height:6px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden">
+                          <div style="{{ s.bar }}"></div>
+                        </div>
+                        <span style="{{ s.timeStyle }}">{{ s.time }}</span>
+                      </div>
+                    </sc-for>
+                    <span style="font-size:10.5px;color:#7F8A85;padding:2px 0 0 4px">{{ stageHint }}</span>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <div onClick="{{ goWhy }}" style="display:flex;align-items:center;gap:13px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px;cursor:pointer">
+              <span style="{{ icoWhy }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:14.5px;font-weight:600;color:#EDF1EF">{{ t.why }}</span>
+                <sc-if value="{{ isDayWorker }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-size:12px;line-height:1.5;color:#939C97;text-wrap:pretty">You were in bed 26 minutes early — that's most of it. The room ran warm after 3am.</span>
+                </sc-if>
+                <sc-if value="{{ isNightWorker }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:12px;line-height:1.5;color:#939C97;text-wrap:pretty">Asleep 22 minutes faster than usual — that's most of it. The room warmed up after 1pm.</span>
+                </sc-if>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <div onClick="{{ goDebt }}" style="display:flex;align-items:center;gap:13px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px;cursor:pointer">
+              <span style="{{ icoDebt }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:14.5px;font-weight:600;color:#EDF1EF">Sleep debt</span>
+                <span style="font-size:12px;line-height:1.5;color:#939C97;text-wrap:pretty">1h 20m behind over a fortnight. Two ordinary nights clears it.</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <sc-if value="{{ logged }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:18px;background:rgba(23,162,230,.09);border:.5px solid rgba(23,162,230,.22)">
+                <span style="width:16px;height:16px;flex:none;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center"><span style="width:6px;height:3px;border-left:1.4px solid #04121A;border-bottom:1.4px solid #04121A;transform:rotate(-45deg);margin-top:-1px"></span></span>
+                <span style="flex:1;font-size:12.5px;color:#C6CEC9">{{ loggedLine }}</span>
+                <span onClick="{{ openJournal }}" style="font-size:12px;font-weight:600;color:#17A2E6;cursor:pointer">Edit</span>
+              </div>
+            </sc-if>
+
+            <div onClick="{{ goTonight }}" style="margin-top:4px;border-radius:24px;padding:19px 18px 17px;background:linear-gradient(158deg,rgba(23,162,230,.17),rgba(23,162,230,.03));border:.5px solid rgba(23,162,230,.3);cursor:pointer;display:flex;flex-direction:column;gap:11px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#17A2E6;font-weight:600">{{ t.tonight }}</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:27px;font-weight:300;letter-spacing:-.025em;line-height:1.1">Lights out by {{ bedTime }}</span>
+              <span style="font-size:13px;line-height:1.5;color:#B7C3C9;text-wrap:pretty">{{ tonightTeaser }}</span>
+              <div style="display:flex;align-items:center;gap:7px;align-self:flex-start;margin-top:2px;padding:9px 14px;border-radius:14px;background:#17A2E6">
+                <span style="font-size:13px;font-weight:600;color:#04121A">Decide it</span>
+                <span style="width:7px;height:7px;border-top:1.6px solid #04121A;border-right:1.6px solid #04121A;transform:rotate(45deg)"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isTonight }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:124px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goRest }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">{{ t.tonight }}</span>
+          </div>
+
+          <div style="padding:14px 20px 26px;display:flex;flex-direction:column;align-items:center;gap:9px">
+            <span style="font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">Lights out by</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:82px;font-weight:200;letter-spacing:-.045em;line-height:.94;font-variant-numeric:tabular-nums;color:#EDF1EF">{{ bedTime }}</span>
+            <span style="font-size:14px;color:#939C97;text-align:center;font-variant-numeric:tabular-nums">{{ bedLength }} before your {{ t.alarm }} alarm</span>
+          </div>
+
+          <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ stops }}" as="s" hint-placeholder-count="5">
+                <div onClick="{{ s.pick }}" style="{{ s.box }}">
+                  <span style="{{ s.timeStyle }}">{{ s.time }}</span>
+                  <span style="{{ s.lenStyle }}">{{ s.len }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-family:'Instrument Serif',serif;font-size:16.5px;line-height:1.45;color:#C6CEC9;padding:2px 2px 6px;text-wrap:pretty">{{ stopNote }}</span>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+              <sc-for list="{{ reasons }}" as="r" hint-placeholder-count="3">
+                <div style="{{ r.row }}">
+                  <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+                    <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">{{ r.k }}</span>
+                    <span style="font-size:12px;line-height:1.5;color:#939C97;text-wrap:pretty">{{ r.sub }}</span>
+                  </div>
+                  <span style="{{ r.figStyle }}">{{ r.fig }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+              <div onClick="{{ goAlarm }}" style="display:flex;align-items:center;gap:13px;min-height:74px;border-bottom:.5px solid rgba(255,255,255,.06);cursor:pointer">
+                <span style="{{ icoAlarm }}"></span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                  <span style="{{ wakeRowStyle }}">Wake me by {{ t.alarm }}</span>
+                  <span style="font-size:11.5px;line-height:1.45;color:#6C7570;text-wrap:pretty">{{ wakeRowSub }}</span>
+                </div>
+                <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:13px;min-height:74px;border-bottom:.5px solid rgba(255,255,255,.06)">
+                <span style="{{ icoBand }}"></span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:13.5px;font-weight:600">Armed on the strap</span>
+                  <span style="font-size:11.5px;line-height:1.45;color:#6C7570;text-wrap:pretty">Fires with your phone off, silent, or in another room</span>
+                </div>
+                <div onClick="{{ toggleSmart }}" style="{{ smartTrack }}"><span style="{{ smartKnob }}"></span></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:13px;min-height:64px">
+                <span style="{{ icoBell }}"></span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:13.5px;font-weight:600">Buzz me to wind down at {{ windTime }}</span>
+                  <span style="font-size:11.5px;color:#6C7570">One buzz on the wrist. No notification.</span>
+                </div>
+                <div onClick="{{ toggleWind }}" style="{{ windTrack }}"><span style="{{ windKnob }}"></span></div>
+              </div>
+            </div>
+
+            <sc-if value="{{ notCommitted }}" hint-placeholder-val="{{ true }}">
+              <div onClick="{{ commit }}" style="margin-top:4px;height:54px;border-radius:18px;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-size:15px;font-weight:600;color:#04121A">Set tonight</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ committed }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="margin-top:4px;display:flex;align-items:center;gap:12px;height:54px;padding:0 18px;border-radius:18px;background:rgba(23,162,230,.1);border:.5px solid rgba(23,162,230,.28)">
+                <span style="width:18px;height:18px;flex:none;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center"><span style="width:7px;height:3.5px;border-left:1.5px solid #04121A;border-bottom:1.5px solid #04121A;transform:rotate(-45deg);margin-top:-1px"></span></span>
+                <span style="flex:1;font-size:13.5px;color:#C6CEC9">{{ commitLine }}</span>
+                <span onClick="{{ uncommit }}" style="font-size:12.5px;font-weight:600;color:#17A2E6;cursor:pointer">Change</span>
+              </div>
+            </sc-if>
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;text-align:center;padding:2px 12px 0;text-wrap:pretty">{{ t.rhythm }} Nothing here is a target — miss it and the next read simply says you missed it.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAlarm }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:124px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goTonight }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">{{ t.tonight }}</span>
+          </div>
+
+          <div style="padding:14px 20px 24px;display:flex;flex-direction:column;align-items:center;gap:8px">
+            <span style="font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">Wake me by</span>
+            <div style="display:flex;align-items:center;gap:16px">
+              <div onClick="{{ alarmEarlier }}" style="width:40px;height:40px;flex:none;border-radius:50%;border:.5px solid rgba(139,153,214,.34);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="width:13px;height:1.6px;background:#C9CEE8;display:block"></span>
+              </div>
+              <span style="font-family:'Outfit',sans-serif;font-size:82px;font-weight:200;letter-spacing:-.045em;line-height:.94;font-variant-numeric:tabular-nums">{{ t.alarm }}</span>
+              <div onClick="{{ alarmLater }}" style="width:40px;height:40px;flex:none;border-radius:50%;border:.5px solid rgba(139,153,214,.34);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative">
+                <span style="width:13px;height:1.6px;background:#C9CEE8;display:block"></span>
+                <span style="position:absolute;width:1.6px;height:13px;background:#C9CEE8;display:block"></span>
+              </div>
+            </div>
+            <span style="font-size:14px;color:#939C97;font-variant-numeric:tabular-nums">{{ alarmFrom }}</span>
+          </div>
+
+          <div style="padding:0 20px 26px;display:flex;flex-direction:column;gap:11px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570;padding:0 2px">How early it may wake you</span>
+            <div style="display:flex;gap:0;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:14px;padding:3px">
+              <sc-for list="{{ alarmWindows }}" as="w" hint-placeholder-count="4">
+                <div onClick="{{ w.pick }}" style="{{ w.seg }}">
+                  <span style="{{ w.kStyle }}">{{ w.k }}</span>
+                  <span style="{{ w.subStyle }}">{{ w.sub }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;padding:0 2px;text-wrap:pretty">Fifteen minutes is enough to find light sleep on most nights. Exact means exact &mdash; it wakes you at {{ t.alarm }} whatever stage you are in.</span>
+
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570;padding:10px 2px 0">Which days</span>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ alarmDays }}" as="d" hint-placeholder-count="7">
+                <div onClick="{{ d.pick }}" style="{{ d.box }}">{{ d.k }}</div>
+              </sc-for>
+            </div>
+
+            <div style="background:rgba(139,153,214,.08);border:.5px solid rgba(139,153,214,.22);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:9px;margin-top:6px">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">It runs on the strap, not the phone</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#C9CEE8;text-wrap:pretty">Noop hands the window to the band before you sleep. It buzzes your wrist even if your phone is off, flat, silenced or in another room. Costs about 2 % of the band&rsquo;s battery a night.</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 6px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">When it will not fire</span>
+              <sc-for list="{{ alarmFails }}" as="fl" hint-placeholder-count="3">
+                <div style="display:flex;gap:11px;align-items:baseline;padding:8px 0;border-bottom:{{ fl.border }}">
+                  <span style="width:5px;height:5px;flex:none;border-radius:50%;background:#C8934B;margin-top:6px"></span>
+                  <span style="flex:1;font-size:12.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">{{ fl.t }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div onClick="{{ armAlarm }}" style="{{ armStyle }}">
+              <span style="font-size:15px;font-weight:600;color:{{ armInk }}">{{ armLabel }}</span>
+            </div>
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;text-align:center;padding:2px 12px 0;text-wrap:pretty">Nothing here is a target. Miss it and the next read simply says you missed it.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isWhy }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goRest }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">{{ t.why }}</span>
+          </div>
+
+          <div style="padding:10px 22px 0;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 36% 32%,#9FE2FB,#2FB2F0 58%,#0A5F92);box-shadow:0 0 12px rgba(23,162,230,.5)"></span>
+              <span style="font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#6C7570;font-weight:600">Svea</span>
+            </div>
+            <sc-if value="{{ isDayWorker }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:16px">
+                <span style="font-family:'Instrument Serif',serif;font-size:29px;line-height:1.22;letter-spacing:-.01em;color:#EDF1EF;text-wrap:pretty">You slept well, and you nearly slept better.</span>
+                <span style="font-size:14.5px;line-height:1.68;color:#B7C3C9;text-wrap:pretty">Getting into bed at 23:14 did most of the work — that's 26 minutes earlier than your usual, and your deep sleep arrived in the first ninety minutes instead of after two hours.</span>
+                <span style="font-size:14.5px;line-height:1.68;color:#B7C3C9;text-wrap:pretty">One thing cost you: after 3am your skin ran <em style="font-family:'Instrument Serif',serif;font-size:16px;font-style:italic">0.4°C warmer</em> than a normal night and you surfaced twice, briefly. On past nights that pattern has been the room, not you.</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isNightWorker }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:16px">
+                <span style="font-family:'Instrument Serif',serif;font-size:29px;line-height:1.22;letter-spacing:-.01em;color:#EDF1EF;text-wrap:pretty">You slept well, for a day sleep.</span>
+                <span style="font-size:14.5px;line-height:1.68;color:#B7C3C9;text-wrap:pretty">You were asleep by 08:10 — twenty-two minutes faster than you usually manage after a shift — and your deep sleep arrived in the first ninety minutes instead of after two hours.</span>
+                <span style="font-size:14.5px;line-height:1.68;color:#B7C3C9;text-wrap:pretty">One thing cost you: from about 1pm your skin ran <em style="font-family:'Instrument Serif',serif;font-size:16px;font-style:italic">0.4°C warmer</em> than a normal sleep and you surfaced twice, briefly. On past day sleeps that pattern has been the afternoon getting into the room, not you.</span>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="padding:20px 20px 0;display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#6C7570;font-weight:600;padding-left:2px">What the night was made of</span>
+            <sc-for list="{{ causes }}" as="c" hint-placeholder-count="4">
+              <div onClick="{{ c.pick }}" style="{{ c.card }}">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <span style="{{ c.dot }}"></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">{{ c.k }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85">{{ c.meta }}</span>
+                  </div>
+                  <span style="{{ c.tag }}">{{ c.effect }}</span>
+                </div>
+                <sc-if value="{{ c.open }}" hint-placeholder-val="{{ false }}">
+                  <div class="scr" style="display:flex;flex-direction:column;gap:11px;padding-top:12px">
+                    <span style="font-size:13px;line-height:1.62;color:#B7C3C9;text-wrap:pretty">{{ c.detail }}</span>
+                    <sc-if value="{{ c.hasChart }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;flex-direction:column;gap:6px">
+                        <svg viewBox="0 0 280 46" preserveAspectRatio="none" style="width:100%;height:46px;display:block;overflow:visible">
+                          <path d="M0 30 L280 30" stroke="rgba(255,255,255,.08)" stroke-width="1" stroke-dasharray="3 4"></path>
+                          <polyline points="{{ tempLine }}" fill="none" stroke="#F2B45C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                          <circle cx="176" cy="9" r="3.6" fill="#F2B45C" stroke="#141817" stroke-width="2.4"></circle>
+                        </svg>
+                        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">
+                          <sc-for list="{{ tempAxis }}" as="a" hint-placeholder-count="4">
+                            <span>{{ a.label }}</span>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="padding:18px 22px 0;display:flex;flex-direction:column;gap:14px">
+            <span style="font-size:11.5px;line-height:1.65;color:#7F8A85;text-wrap:pretty">The strap can't measure your bedroom. Room temperature here is inferred from skin temperature — treat it as a good guess, not a reading.</span>
+            <span style="font-size:11.5px;line-height:1.65;color:#7F8A85;text-wrap:pretty">{{ t.rhythm }}</span>
+            <div onClick="{{ goTonight }}" style="display:flex;align-items:center;gap:9px;align-self:flex-start;padding:12px 17px;border-radius:16px;background:rgba(23,162,230,.12);border:.5px solid rgba(23,162,230,.3);cursor:pointer">
+              <span style="font-size:13.5px;font-weight:600;color:#17A2E6">Take this into tonight</span>
+              <span style="width:7px;height:7px;border-top:1.6px solid #17A2E6;border-right:1.6px solid #17A2E6;transform:rotate(45deg)"></span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isDebt }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goRest }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Sleep debt</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ ranges }}" as="r" hint-placeholder-count="3">
+                <div onClick="{{ r.pick }}" style="{{ r.s }}">{{ r.label }}</div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;align-items:baseline;gap:10px">
+                <span style="font-family:'Outfit',sans-serif;font-size:52px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums">1h 20m</span>
+                <span style="font-size:13px;color:#939C97">behind</span>
+              </div>
+              <span style="font-size:13.5px;line-height:1.55;color:#939C97">against your own need of 7h 05m a night</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 13px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Running balance · {{ rangeLabel }}</span>
+              <div style="position:relative;height:118px">
+                <svg viewBox="0 0 318 118" preserveAspectRatio="none" style="width:100%;height:118px;display:block;overflow:visible">
+                  <path d="M0 118 L318 118" stroke="rgba(255,255,255,.1)" stroke-width="1"></path>
+                  <path d="{{ debtArea }}" fill="rgba(139,153,214,.14)" stroke="none"></path>
+                  <polyline points="{{ debtLine }}" fill="none" stroke="#8B99D6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                  <line x1="{{ ptX }}" y1="0" x2="{{ ptX }}" y2="118" stroke="rgba(255,255,255,.24)" stroke-width="1" stroke-dasharray="3 4"></line>
+                  <circle cx="{{ ptX }}" cy="{{ ptY }}" r="5" fill="#8B99D6" stroke="#141817" stroke-width="3"></circle>
+                </svg>
+                <div style="{{ bubble }}">
+                  <span style="font-size:10.5px;color:#939C97">{{ ptDay }}</span>
+                  <span style="font-size:12.5px;font-weight:600;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ ptVal }}</span>
+                </div>
+                <div style="position:absolute;inset:0;display:flex">
+                  <sc-for list="{{ hits }}" as="h" hint-placeholder-count="14">
+                    <div onClick="{{ h.pick }}" style="flex:1;height:100%;cursor:pointer"></div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#7F8A85">
+                <sc-for list="{{ axis }}" as="a" hint-placeholder-count="4">
+                  <span>{{ a.label }}</span>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+                <div style="width:calc(50% - 4px);box-sizing:border-box;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:18px;padding:14px 15px;display:flex;flex-direction:column;gap:6px">
+                  <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ s.k }}</span>
+                  <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.02em;font-variant-numeric:tabular-nums">{{ s.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+              <div style="padding:13px 0 4px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">What moves it, for you</span>
+              </div>
+              <sc-for list="{{ correlates }}" as="c" hint-placeholder-count="4">
+                <div style="{{ c.row }}">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13.5px;color:#EDF1EF">{{ c.k }}</span>
+                    <span style="font-size:11px;color:#7F8A85">{{ c.n }}</span>
+                  </div>
+                  <span style="{{ c.vStyle }}">{{ c.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <span style="font-size:14px;line-height:1.65;color:#B7C3C9;padding:0 2px;text-wrap:pretty">{{ debtRead }}</span>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none;z-index:6">
+        <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5);pointer-events:auto">
+          <div onClick="{{ tabToday }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoToday }}"></span>
+          </div>
+          <div onClick="{{ tabTrends }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoTrends }}"></span>
+          </div>
+          <div onClick="{{ openJournal }}" style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(23,162,230,.4)">
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;color:#04121A;line-height:1;margin-top:-2px">+</span>
+          </div>
+          <div onClick="{{ goRest }}" style="flex:1.7;height:46px;border-radius:20px;background:rgba(139,153,214,.9);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer">
+            <span style="{{ icoRestOn }}"></span>
+            <span style="font-size:12.5px;font-weight:600;color:#0D1120">Rest</span>
+          </div>
+          <div onClick="{{ tabYou }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoYou }}"></span>
+          </div>
+        </div>
+      </div>
+
+      <sc-if value="{{ journalOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:flex-end">
+        <div onClick="{{ closeJournal }}" style="position:absolute;inset:0;background:rgba(4,6,6,.62);backdrop-filter:blur(3px)"></div>
+        <div style="position:relative;background:#141817;border-top:.5px solid rgba(255,255,255,.1);border-radius:30px 30px 0 0;padding:12px 20px 30px;display:flex;flex-direction:column;gap:18px;animation:sheetUp .3s cubic-bezier(.22,.61,.36,1) both;box-shadow:0 -20px 50px rgba(0,0,0,.5)">
+          <span style="width:38px;height:4px;border-radius:3px;background:rgba(255,255,255,.2);align-self:center"></span>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em">Log the day</span>
+            <span style="font-size:12.5px;color:#7F8A85">Ten seconds. Skip anything.</span>
+          </div>
+
+          <div onClick="{{ goSession }}" style="display:flex;align-items:center;gap:12px;padding:0 2px 16px;cursor:pointer;border-bottom:.5px solid rgba(255,255,255,.08)">
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:14px;font-weight:600;color:#EDF1EF">Start a session</span>
+              <span style="font-size:11.5px;color:#7F8A85">Today&rsquo;s recommendation, from wherever you are</span>
+            </div>
+            <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <span style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">How was it</span>
+            <div style="display:flex;gap:7px">
+              <sc-for list="{{ moods }}" as="m" hint-placeholder-count="5">
+                <div onClick="{{ m.pick }}" style="{{ m.box }}">
+                  <span style="{{ m.dot }}"></span>
+                  <span style="{{ m.label }}">{{ m.name }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="{{ icoGlass }}"></span>
+              <span style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">Drinks</span>
+            </div>
+            <div style="display:flex;gap:7px">
+              <sc-for list="{{ drinks }}" as="d" hint-placeholder-count="4">
+                <div onClick="{{ d.pick }}" style="{{ d.box }}">{{ d.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-wrap:wrap;gap:7px">
+            <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
+              <div onClick="{{ c.pick }}" style="{{ c.box }}">
+                <span style="{{ c.icon }}"></span>
+                <span style="{{ c.label }}">{{ c.name }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px;padding-top:2px">
+            <div onClick="{{ saveJournal }}" style="height:54px;border-radius:18px;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-size:15px;font-weight:600;color:#04121A">Save</span>
+            </div>
+            <div onClick="{{ closeJournal }}" style="height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-size:13.5px;color:#7F8A85">Nothing to log tonight</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+  </x-import>
+  </div>
+</div>
+
+<sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+<div style="width:430px;flex:none;padding-top:34px;display:flex;flex-direction:column;gap:30px">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:33px;line-height:1.16;letter-spacing:-.028em;color:#17150F;text-wrap:pretty">Act 1 is the only one that changes tomorrow.</h1>
+    <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;text-wrap:pretty">Four screens, built on four of the ten templates. Two of them — <strong style="font-weight:600;color:#17150F">Tonight</strong> and <strong style="font-weight:600;color:#17150F">Why last night</strong> — don't exist in Noop today, and they're the pair that turns a sleep report into a sleep decision.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0">
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#A09A8B;letter-spacing:.06em;padding-top:3px">T2</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Rest — last night</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Seven sleeps against your own need, not a score. Tap any bar. The stage strip expands into the hypnogram, and tapping <strong style="font-weight:600;color:#17150F">Deep</strong> or <strong style="font-weight:600;color:#17150F">REM</strong> picks that stage out of the whole night — the four stages no longer have to be told apart by colour alone.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T10 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Tonight</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">One recommendation the size of the screen, five bedtimes you can actually pick between, and the two facts that moved it. The only screen in the app that asks for a commitment.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T6 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Why last night</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">A cause, not a score. Prose first; the four things the night was made of underneath, each one openable. Two of them say “this didn't matter” — that's the point.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T5</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Journal — the + button</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Mood is the first question, drinks the second, everything else a chip. No form, no free text, closes itself. This is the input the whole act reasons about.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11);border-bottom:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#A09A8B;letter-spacing:.06em;padding-top:3px">T3</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Sleep debt</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">The dossier template, first instance. Running balance instead of a deficit alarm, four stats, and your own correlates — this one template now covers the other thirty-one metric screens.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Not everyone sleeps at night</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">Flip <span style="color:#EDF1EF">schedule</span> to night shift and the act re-anchors: last <em style="font-family:'Instrument Serif',serif;font-style:italic">sleep</em> rather than last night, an 08:10 bed time against a 15:25 alarm, and a cause list where the enemy is the afternoon heat and a 04:40 coffee. Nothing in the act is anchored to darkness — it is anchored to your own ninety-sleep pattern.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Rules this act had to obey</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">No score anywhere in the act. Debt is a <span style="color:#EDF1EF">balance you pay back</span>, never a deficit to fear. Warm amber is the strongest colour used and it appears once, on room temperature. Every screen ends in a verb — <span style="color:#EDF1EF">decide it, take this into tonight, save</span> — and the estimate that can't be measured says so out loud.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#A09A8B;font-weight:600">Next — Act 2, the day</span>
+    <p style="margin:0;font-size:13px;line-height:1.7;color:#6B6558;text-wrap:pretty">The day so far · Vitals · Stress · Live heart rate · Quick actions. Five screens, two templates — the dossier is already built here, so the new work is the live face.</p>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;confidence&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;solid&quot;,&quot;building&quot;,&quot;calibrating&quot;],&quot;default&quot;:&quot;solid&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;schedule&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;day&quot;,&quot;night&quot;],&quot;default&quot;:&quot;day&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;rest&quot;,&quot;tonight&quot;,&quot;why&quot;,&quot;debt&quot;,&quot;alarm&quot;],&quot;default&quot;:&quot;rest&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;openJournal&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+const GLYPH = {
+  today: 'M12 3v2M12 19v2M4.2 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z',
+  trends: 'M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9',
+  moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+  you: 'M12 4.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM5.5 19.5c0-3.3 2.9-5.3 6.5-5.3s6.5 2 6.5 5.3',
+  read: 'M5 4.5h6a2 2 0 0 1 2 2V20a1.6 1.6 0 0 0-1.6-1.6H5zM19 4.5h-4.4a2 2 0 0 0-2 2V20a1.6 1.6 0 0 1 1.6-1.6H19z',
+  scale: 'M12 4.5v15M4.5 19.5h15M7 8.5l-3 5.5h6zM17 8.5l-3 5.5h6zM7 8.5 12 7l5 1.5',
+  alarm: 'M12 8.6V13l3 1.7M12 5.2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM5.4 3.4 3.2 5.2M18.6 3.4l2.2 1.8',
+  bell: 'M18 15.2V11a6 6 0 1 0-12 0v4.2L4.4 17.6h15.2L18 15.2zM10 20.4a2 2 0 0 0 4 0',
+  glass: 'M7 4.5h10l-1.4 7.1A3.9 3.9 0 0 1 12 14a3.9 3.9 0 0 1-3.6-2.4L7 4.5zM12 14v5.5M9 19.5h6',
+  cup: 'M4.5 8h11v5a5.5 5.5 0 0 1-11 0V8zM15.5 9H18a2.4 2.4 0 0 1 0 4.8h-2.5M4 20h13',
+  plate: 'M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8zM12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z',
+  screen: 'M4 5.5h16v9.5H4zM9.5 19.5h5M12 15v4.5',
+  spark: 'M12 3.5 13.6 9l5.4 1.6L13.6 12l-1.6 5.5L10.4 12 5 10.6 10.4 9z',
+  band: 'M8.6 3.5h6.8a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H8.6a3 3 0 0 1-3-3v-11a3 3 0 0 1 3-3zM9.8 8.8h4.4M9.8 12.2h4.4'
+};
+const mask = function (d) {
+  return 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+};
+const ico = function (key, size, color) {
+  const u = mask(GLYPH[key]);
+  return {
+    width: size, height: size, flex: 'none', display: 'block', background: color,
+    WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+  };
+};
+
+const NEED = 7.083;
+const NIGHTS = [
+  { d: 'S', v: 5.5, hours: '5h 30m', win: '01:12 – 06:42', verdict: 'Late night. Short, but you slept through it.', delta: '1h 35m short', ok: false },
+  { d: 'M', v: 7.3, hours: '7h 18m', win: '23:02 – 06:20', verdict: 'The best night of the week — and the earliest bedtime.', delta: '13m over', ok: true },
+  { d: 'T', v: 5.5, hours: '5h 30m', win: '23:48 – 05:18', verdict: 'Woke twice after midnight and gave up early.', delta: '1h 35m short', ok: false },
+  { d: 'W', v: 6.1, hours: '6h 06m', win: '23:36 – 05:42', verdict: 'Fine. A little short, nothing more to say.', delta: '59m short', ok: false },
+  { d: 'T', v: 7.0, hours: '7h 00m', win: '23:20 – 06:20', verdict: 'Solid and unbroken.', delta: '5m short — even', ok: true },
+  { d: 'F', v: 6.6, hours: '6h 36m', win: '00:04 – 06:40', verdict: 'Late to bed, then slept the whole way through.', delta: '29m short', ok: false },
+  { d: 'S', v: 7.2, hours: '7h 12m', win: '23:14 – 06:41', verdict: 'Full night, and deep sleep came early.', delta: '7m over', ok: true }
+];
+const STOPS = [
+  { t: '22:30', len: '7h 55m', note: 'An hour of debt gone by morning. Ambitious for a Saturday, but it works.' },
+  { t: '22:50', len: '7h 35m', note: 'Clears half an hour of debt. A stretch, and worth it if the evening allows.' },
+  { t: '23:10', len: '7h 15m', note: 'Clears twenty minutes of debt and still leaves you an evening. This is the one.' },
+  { t: '23:30', len: '6h 55m', note: 'Holds you exactly level — nothing paid back, nothing added.' },
+  { t: '23:50', len: '6h 35m', note: 'Adds half an hour to what you already owe. Fine once, not twice.' }
+];
+const CAUSES = [
+  { k: 'In bed at 23:14', meta: '26 minutes earlier than your usual', effect: 'most of it', good: true, detail: 'Across ninety nights, your bedtime explains more of your sleep than anything else you do — more than training, more than caffeine. Twenty-six minutes early bought you roughly forty minutes of sleep, because you also fell asleep faster.' },
+  { k: 'The room ran warm', meta: 'Skin temp +0.4°C after 3am, two brief wakes', effect: 'cost ~18m deep', good: false, chart: true, detail: 'Your skin held warmer than a normal night from about 3am, and both wakes sit inside that window. The pattern looks like the room rather than you — nothing else in the night moved.' },
+  { k: 'No alcohol', meta: 'Nothing logged yesterday', effect: 'nothing to account for', good: true, detail: 'On nights you drink, you lose about fifty minutes and most of it comes out of deep sleep in the first half. None of that is in this night.' },
+  { k: 'Last coffee 11:40', meta: 'Eleven hours before lights out', effect: 'clear', good: true, detail: 'Caffeine only shows up in your nights when it lands after 2pm. This was long clear of that.' }
+];
+const DEBT = {
+  '14d': {
+    bal: [35, 23, 68, 48, 54, 109, 91, 69, 81, 72, 107, 78, 83, 80],
+    days: ['3 Aug', '4 Aug', '5 Aug', '6 Aug', '7 Aug', '8 Aug', '9 Aug', '10 Aug', '11 Aug', '12 Aug', '13 Aug', '14 Aug', '15 Aug', 'Last night'],
+    axis: ['3 Aug', '7 Aug', '11 Aug', 'Last night'], label: '14 nights',
+    stats: [{ k: 'Your need', v: '7h 05m' }, { k: 'Clear nights', v: '4 of 14' }, { k: 'Paid back', v: '51m' }, { k: 'Worst night', v: '1h 35m' }],
+    read: 'You have been between one and two hours behind all fortnight, and never worse than that. Two ordinary nights clears it — there is no catching up to do.'
+  },
+  '30d': {
+    bal: [95, 120, 86, 64, 40, 72, 108, 131, 96, 70, 55, 88, 120, 74, 49, 66, 102, 84, 60, 95, 80],
+    days: ['18 Jul', '19 Jul', '21 Jul', '22 Jul', '23 Jul', '25 Jul', '26 Jul', '27 Jul', '29 Jul', '30 Jul', '31 Jul', '1 Aug', '2 Aug', '4 Aug', '5 Aug', '7 Aug', '8 Aug', '10 Aug', '12 Aug', '14 Aug', 'Last night'],
+    axis: ['18 Jul', '26 Jul', '4 Aug', 'Last night'], label: '30 nights',
+    stats: [{ k: 'Your need', v: '7h 05m' }, { k: 'Clear nights', v: '11 of 30' }, { k: 'Paid back', v: '3h 12m' }, { k: 'Worst night', v: '2h 10m' }],
+    read: 'The spike mid-month was one week of late nights, and you paid it back without doing anything special. This is a balance, not a wound.'
+  },
+  '90d': {
+    bal: [180, 150, 120, 96, 140, 168, 120, 88, 60, 95, 130, 102, 74, 110, 140, 96, 70, 105, 88, 80],
+    days: ['19 May', '26 May', '2 Jun', '9 Jun', '13 Jun', '18 Jun', '23 Jun', '28 Jun', '3 Jul', '8 Jul', '13 Jul', '18 Jul', '22 Jul', '26 Jul', '30 Jul', '3 Aug', '6 Aug', '9 Aug', '13 Aug', 'Last night'],
+    axis: ['19 May', '18 Jun', '18 Jul', 'Last night'], label: '3 months',
+    stats: [{ k: 'Your need', v: '7h 02m' }, { k: 'Clear nights', v: '38 of 90' }, { k: 'Paid back', v: '9h 40m' }, { k: 'Worst night', v: '3h 05m' }],
+    read: 'Three months ago you were routinely three hours behind. You are not any more, and that happened without a single early alarm.'
+  }
+};
+const CORR = [
+  { k: 'Nights you drink', v: '−52 min', n: '9 nights logged', warm: true },
+  { k: 'Screens in bed', v: '−21 min', n: '17 nights logged', warm: true },
+  { k: 'After a hard session', v: '+14 min', n: '21 nights', warm: false },
+  { k: 'Weekends', v: '+34 min', n: '8 nights', warm: false }
+];
+const MOODS = ['Rough', 'Off', 'Fine', 'Good', 'Great'];
+const DRINKS = ['None', '1', '2', '3+'];
+const CHIPS = [
+  { k: 'caffeine', name: 'Coffee after 2pm', g: 'cup' },
+  { k: 'meal', name: 'Big meal late', g: 'plate' },
+  { k: 'screens', name: 'Screens in bed', g: 'screen' },
+  { k: 'stress', name: 'Hard day', g: 'spark' }
+];
+
+const WIN_N = ['09:52 – 15:22', '07:40 – 15:00', '09:52 – 15:22', '09:16 – 15:22', '08:22 – 15:22', '08:46 – 15:22', '08:10 – 15:22'];
+const STOPS_N = [
+  { t: '07:30', len: '7h 55m', note: 'An hour of debt gone before the street wakes up. Ambitious straight off a shift, but it works.' },
+  { t: '07:50', len: '7h 35m', note: 'Clears half an hour of debt. Worth it on the days you get home clean.' },
+  { t: '08:10', len: '7h 15m', note: 'Clears twenty minutes of debt and still leaves you a wind-down. This is the one.' },
+  { t: '08:30', len: '6h 55m', note: 'Holds you exactly level — nothing paid back, nothing added.' },
+  { t: '08:50', len: '6h 35m', note: 'Adds half an hour to what you already owe. Fine once, not twice.' }
+];
+const CAUSES_N = [
+  { k: 'Asleep by 08:10', meta: '22 minutes faster than your usual', effect: 'most of it', good: true, detail: 'Across ninety sleeps, how fast you get to bed after a shift explains more of your sleep than anything else you do. Twenty-two minutes bought you roughly forty minutes of sleep, because you also fell asleep quicker.' },
+  { k: 'The room warmed up', meta: 'Skin temp +0.4°C after 13:00, two brief wakes', effect: 'cost ~18m deep', good: false, chart: true, detail: 'Your skin held warmer from about 1pm, and both wakes sit inside that window. Blackout curtains fix the light; they do not fix the heat.' },
+  { k: 'No alcohol', meta: 'Nothing logged after the shift', effect: 'nothing to account for', good: true, detail: 'On sleeps after a drink you lose about fifty minutes, and most of it comes out of deep sleep in the first half. None of that is in this one.' },
+  { k: 'Last coffee 04:40', meta: 'Three and a half hours before bed', effect: 'borderline', good: false, detail: 'This one is close. Caffeine inside four hours of your bed time shows up in your sleeps as a shallower first block — worth pulling earlier in the shift.' }
+];
+const TERMS = {
+  day: {
+    last: 'Last night', lastShort: 'Last night', seven: 'Your last seven', tonight: 'Tonight',
+    alarm: '06:25', wake: 'Wake me between 06:10 and 06:40', why: 'Why last night', logTime: '22:41',
+    axis: ['23:14', '01:30', '04:00', '06:41'], tempAxis: ['23:14', '01:30', '03:20 — warmest', '06:41'],
+    rhythm: 'Built from your own ninety-sleep pattern, not the clock.'
+  },
+  night: {
+    last: 'Last sleep', lastShort: 'Last sleep', seven: 'Your last seven sleeps', tonight: 'Before you sleep',
+    alarm: '15:25', wake: 'Wake me between 15:10 and 15:40', why: 'Why that sleep', logTime: '06:50',
+    axis: ['08:10', '10:30', '13:00', '15:22'], tempAxis: ['08:10', '10:30', '13:00 — warmest', '15:22'],
+    rhythm: 'You work nights, so none of this is anchored to darkness — it follows your own pattern.'
+  }
+};
+
+const A = '#17A2E6';
+const SLP = '#8B99D6';
+const WARM = '#F2B45C';
+
+const fmt = function (min) {
+  const h = Math.floor(min / 60), m = min % 60;
+  return h ? h + 'h ' + (m < 10 ? '0' : '') + m + 'm' : m + 'm';
+};
+
+class Component extends DCLogic {
+  state = { sx: null, sy: null,
+    screen: null, journal: null, night: 6, hypno: false, bed: 2,
+    smart: true, wind: true, committed: false, logged: false,
+    alarmMin: null, alarmWin: 1, alarmOn: [true, true, true, true, true, false, false],
+    mood: 3, drink: 0, chips: { screens: true }, range: '14d', pt: null, cause: 1, stage: null
+  };
+
+  toggleTrack(on) {
+    return {
+      width: 46, height: 28, flex: 'none', borderRadius: 14, cursor: 'pointer',
+      position: 'relative', boxSizing: 'border-box',
+      background: on ? A : 'rgba(255,255,255,.09)',
+      boxShadow: on ? 'inset 0 0 0 .5px rgba(255,255,255,.14)' : 'inset 0 0 0 .5px rgba(255,255,255,.16)',
+      transition: 'background .22s cubic-bezier(.4,0,.2,1)',
+      WebkitTapHighlightColor: 'transparent'
+    };
+  }
+  knob(on) {
+    return {
+      position: 'absolute', top: 2, left: 2, width: 24, height: 24, borderRadius: '50%',
+      background: '#EDF1EF', display: 'block',
+      boxShadow: '0 1px 3px rgba(0,0,0,.45), 0 0 0 .5px rgba(0,0,0,.10)',
+      transform: on ? 'translateX(18px)' : 'translateX(0)',
+      transition: 'transform .24s cubic-bezier(.34,1.25,.64,1)'
+    };
+  }
+  rowStyle(i, n, min) {
+    return {
+      display: 'flex', alignItems: 'center', gap: 12, minHeight: min,
+      borderBottom: i === n - 1 ? 'none' : '.5px solid rgba(255,255,255,.06)'
+    };
+  }
+
+  componentDidUpdate(prev) {
+    const p = this.props;
+    if ((prev.screen !== p.screen || prev.navSeq !== p.navSeq) && p.screen) this.setState({ screen: p.screen });
+  }
+
+  renderVals() {
+    const self = this;
+    const S = this.state;
+    const screen = S.screen || this.props.screen || 'rest';
+    const journalOpen = S.journal === null ? !!this.props.openJournal : S.journal;
+    const NIGHTSHIFT = (this.props.schedule || 'day') === 'night';
+    const T = NIGHTSHIFT ? TERMS.night : TERMS.day;
+    const go = function (k) { return function () { self.setState({ screen: k }); }; };
+
+    // ── Rest: seven nights
+    const nIdx = S.night;
+    const night = NIGHTS[nIdx];
+    const nights = NIGHTS.map(function (n, i) {
+      const on = i === nIdx;
+      return {
+        day: n.d, val: on ? n.v.toFixed(1) + 'h' : '',
+        pick: function () { self.setState({ night: i }); },
+        bar: {
+          width: '100%', height: Math.round((n.v / 8.4) * 92) + 'px', borderRadius: 8,
+          background: on ? 'linear-gradient(180deg,#A9B6E8,#6E7DB8)' : 'rgba(255,255,255,.08)',
+          boxShadow: on ? '0 6px 18px rgba(110,125,184,.35)' : 'none', transition: 'background .2s'
+        },
+        valStyle: {
+          height: 18, display: 'flex', alignItems: 'center', padding: on ? '0 7px' : 0,
+          borderRadius: 9, fontSize: 11, fontWeight: 600, color: '#EDF1EF',
+          background: on ? 'rgba(110,125,184,.9)' : 'transparent',
+          fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'
+        },
+        dayStyle: { fontSize: 11.5, fontWeight: on ? 600 : 500, color: on ? '#EDF1EF' : '#7F8A85' }
+      };
+    });
+    const needLine = {
+      position: 'absolute', left: 0, right: 0, bottom: (22 + (NEED / 8.4) * 92) + 'px',
+      borderTop: '1px dashed rgba(139,153,214,.55)', pointerEvents: 'none'
+    };
+    const hypStages = [1, 1, 2, 3, 3, 3, 2, 2, 3, 3, 2, 1, 0, 1, 2, 3, 3, 2, 2, 1, 1, 2, 2, 3, 2, 1, 0, 1, 1, 2, 2, 1, 1, 0];
+    const hC = ['rgba(255,255,255,.22)', '#9AA7E0', '#4FB8E8', '#5D6BC4'], hH = [20, 40, 60, 82];
+    const stageSel = S.stage;
+    const hypno = hypStages.map(function (s) {
+      const dim = stageSel !== null && stageSel !== s;
+      return {
+        s: {
+          flex: 1, minWidth: 3, height: hH[s], borderRadius: 3,
+          background: dim ? 'rgba(255,255,255,.07)' : hC[s],
+          boxShadow: stageSel === s ? '0 0 10px ' + hC[s] : 'none',
+          transition: 'background .18s'
+        }
+      };
+    });
+    const stages = [
+      { name: 'Deep', time: '1h 34m', pct: 61, k: 3 },
+      { name: 'REM', time: '1h 48m', pct: 70, k: 2 },
+      { name: 'Light', time: '3h 42m', pct: 88, k: 1 },
+      { name: 'Awake', time: '8m', pct: 7, k: 0 }
+    ].map(function (s) {
+      const on = stageSel === s.k;
+      const dim = stageSel !== null && !on;
+      return {
+        name: s.name, time: s.time,
+        pick: function () { self.setState({ stage: on ? null : s.k }); },
+        row: {
+          display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '5px 6px',
+          borderRadius: 10, background: on ? 'rgba(255,255,255,.06)' : 'transparent',
+          opacity: dim ? .45 : 1, transition: 'background .18s,opacity .18s'
+        },
+        swatch: {
+          width: 10, height: 10, flex: 'none', borderRadius: 3, display: 'block', background: hC[s.k],
+          boxShadow: on ? '0 0 0 3px rgba(255,255,255,.1)' : 'none'
+        },
+        nameStyle: { width: 40, fontSize: 12, fontWeight: on ? 600 : 400, color: on ? '#EDF1EF' : '#939C97' },
+        timeStyle: { width: 52, textAlign: 'right', fontSize: 12, color: '#EDF1EF', fontVariantNumeric: 'tabular-nums' },
+        bar: { width: s.pct + '%', height: '100%', borderRadius: 4, background: hC[s.k], opacity: dim ? .5 : 1 }
+      };
+    });
+    // ── the night ring: the hypnogram bent into a circle that closes at your need ──
+    const rCX = 116, rCY = 116, rR = 96, rA0 = 138, rSweep = 264;
+    const polar = function (deg, r) {
+      const t = (deg * Math.PI) / 180;
+      return [rCX + Math.cos(t) * r, rCY + Math.sin(t) * r];
+    };
+    const arcD = function (a0, a1, r) {
+      const p0 = polar(a0, r), p1 = polar(a1, r);
+      return 'M' + p0[0].toFixed(2) + ' ' + p0[1].toFixed(2) + ' A' + r + ' ' + r + ' 0 ' +
+        (a1 - a0 > 180 ? 1 : 0) + ' 1 ' + p1[0].toFixed(2) + ' ' + p1[1].toFixed(2);
+    };
+    const usedSweep = rSweep * Math.min(1, night.v / NEED);
+    const segW = usedSweep / hypStages.length;
+    const nightArcs = hypStages.map(function (s, i) {
+      const dim = stageSel !== null && stageSel !== s;
+      const a0 = rA0 + i * segW, a1 = a0 + segW;
+      return {
+        d: arcD(a0 + 0.3, a1 - 0.3, rR),
+        c: dim ? 'rgba(255,255,255,.08)' : hC[s],
+        w: s === 3 ? 18 : s === 2 ? 14 : s === 1 ? 10 : 5
+      };
+    });
+    const wakeXY = polar(rA0 + usedSweep, rR);
+    const nSpecks = [];
+    const nHash = function (n) { const x = Math.sin(n * 91.7 + 74.3) * 21374.1234; return x - Math.floor(x); };
+    for (let i = 0; i < 42; i++) {
+      const ang = i * 2.39996 + nHash(i) * 1.3;
+      const rad = 0.78 + nHash(i + 60) * 0.3;
+      const sz = 1.1 + nHash(i + 21) * 2.2;
+      nSpecks.push({ s: {
+        position: 'absolute',
+        left: (50 + Math.cos(ang) * rad * 47).toFixed(2) + '%',
+        top: (50 + Math.sin(ang) * rad * 47).toFixed(2) + '%',
+        width: Number(sz.toFixed(1)), height: Number(sz.toFixed(1)), borderRadius: '50%',
+        background: 'rgba(214,222,255,' + (0.16 + nHash(i + 5) * 0.4).toFixed(2) + ')',
+        boxShadow: '0 0 ' + (sz * 2.6).toFixed(1) + 'px rgba(122,138,220,.7)',
+        transform: 'translate(-50%,-50%)'
+      } });
+    }
+    const shortBy = NEED - night.v;
+    const ringRead = shortBy > 0.12
+      ? 'The ring stops short by ' + Math.round(shortBy * 60) + ' minutes — see why last night went that way'
+      : 'A closed ring. See what the night was made of';
+
+    const stripSegs = [{ f: 22, k: 3 }, { f: 25, k: 2 }, { f: 51, k: 1 }, { f: 2, k: 0 }].map(function (g) {
+      const dim = stageSel !== null && stageSel !== g.k;
+      return { s: { flex: g.f, background: dim ? 'rgba(255,255,255,.09)' : hC[g.k], transition: 'background .18s' } };
+    });
+
+    // ── Tonight
+    const SP = NIGHTSHIFT ? STOPS_N : STOPS;
+    const bed = SP[S.bed];
+    const bedMin = parseInt(bed.t.slice(0, 2), 10) * 60 + parseInt(bed.t.slice(3), 10) - 40;
+    const windTime = (Math.floor(bedMin / 60) < 10 ? '0' : '') + Math.floor(bedMin / 60) + ':' + (bedMin % 60 < 10 ? '0' : '') + (bedMin % 60);
+    const stops = SP.map(function (s, i) {
+      const on = i === S.bed;
+      return {
+        time: s.t, len: s.len, pick: function () { self.setState({ bed: i, committed: false }); },
+        box: {
+          flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '11px 4px 10px', borderRadius: 15,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer',
+          background: on ? 'rgba(23,162,230,.16)' : 'rgba(255,255,255,.045)',
+          border: on ? '.5px solid rgba(23,162,230,.55)' : '.5px solid rgba(255,255,255,.06)',
+          transition: 'background .18s ease, border-color .18s ease, color .18s ease'
+        },
+        timeStyle: { fontSize: 13.5, fontWeight: 600, color: on ? '#EDF1EF' : '#939C97', fontVariantNumeric: 'tabular-nums' },
+        lenStyle: { fontSize: 10, color: on ? A : '#7F8A85', fontVariantNumeric: 'tabular-nums' }
+      };
+    });
+    const reasons = [
+      { k: 'Sleep debt · 1h 20m', sub: 'Pulls tonight twenty minutes earlier than your usual', fig: '−20m', good: true },
+      { k: 'Yesterday · easy', sub: 'A walk and nothing else. Nothing extra to pay back.', fig: '0', good: null },
+      { k: 'Your own need · 7h 05m', sub: 'Measured across your last ninety nights, not a population average', fig: '90n', good: null }
+    ].map(function (r, i, arr) {
+      return {
+        k: r.k, sub: r.sub, fig: r.fig, row: self.rowStyle(i, arr.length, 68),
+        figStyle: {
+          fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: '-.02em',
+          color: r.good ? A : '#7F8A85', fontVariantNumeric: 'tabular-nums', flex: 'none'
+        }
+      };
+    });
+
+    // ── Why last night
+    const causes = (NIGHTSHIFT ? CAUSES_N : CAUSES).map(function (c, i) {
+      const on = i === S.cause;
+      return {
+        k: c.k, meta: c.meta, effect: c.effect, detail: c.detail, open: on, hasChart: !!c.chart,
+        pick: function () { self.setState({ cause: on ? -1 : i }); },
+        card: {
+          background: on ? 'rgba(255,255,255,.055)' : '#141817', borderRadius: 18, padding: '15px 16px',
+          border: on ? '.5px solid rgba(255,255,255,.13)' : '.5px solid rgba(255,255,255,.06)',
+          cursor: 'pointer', display: 'flex', flexDirection: 'column', transition: 'background .18s ease, border-color .18s ease, color .18s ease'
+        },
+        dot: {
+          width: 9, height: 9, flex: 'none', borderRadius: '50%',
+          background: c.good ? A : WARM,
+          boxShadow: '0 0 0 4px ' + (c.good ? 'rgba(23,162,230,.14)' : 'rgba(242,180,92,.14)')
+        },
+        tag: {
+          fontSize: 11.5, fontWeight: 600, flex: 'none', padding: '5px 9px', borderRadius: 8,
+          color: c.good ? '#8FD3F5' : '#F3C888',
+          background: c.good ? 'rgba(23,162,230,.12)' : 'rgba(242,180,92,.12)'
+        }
+      };
+    });
+    const tv = [0, -1, -2, -1, 0, 1, 0, 2, 6, 10, 12, 9, 5, 2, 1];
+    const tempLine = tv.map(function (v, i) {
+      return (i / (tv.length - 1) * 280).toFixed(1) + ',' + (30 - v * 1.75).toFixed(1);
+    }).join(' ');
+
+    // ── Sleep debt
+    const R = DEBT[S.range];
+    const bal = R.bal;
+    const mxv = Math.max.apply(null, bal) * 1.18;
+    const pts = bal.map(function (v, i) {
+      return [(i / (bal.length - 1)) * 318, 118 - (v / mxv) * 104];
+    });
+    const debtLine = pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+    const debtArea = 'M0,118 L' + pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' L') + ' L318,118 Z';
+    const ptI = S.pt === null || S.pt >= bal.length ? bal.length - 1 : S.pt;
+    const hits = bal.map(function (v, i) { return { pick: function () { self.setState({ pt: i }); } }; });
+    const ranges = [{ k: '14d', l: '14 nights' }, { k: '30d', l: '30 nights' }, { k: '90d', l: '3 months' }].map(function (r) {
+      const on = r.k === S.range;
+      return {
+        label: r.l, pick: function () { self.setState({ range: r.k, pt: null }); },
+        s: {
+          flex: 1, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: 13, cursor: 'pointer', fontSize: 12.5, fontWeight: on ? 600 : 500,
+          color: on ? '#0D1120' : '#939C97', background: on ? SLP : 'rgba(255,255,255,.06)',
+          border: on ? 'none' : '.5px solid rgba(255,255,255,.07)', transition: 'background .18s,color .18s'
+        }
+      };
+    });
+    const correlates = CORR.map(function (c, i, arr) {
+      return {
+        k: c.k, n: c.n, v: c.v, row: self.rowStyle(i, arr.length, 58),
+        vStyle: {
+          fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: '-.02em',
+          color: c.warm ? WARM : A, fontVariantNumeric: 'tabular-nums', flex: 'none'
+        }
+      };
+    });
+
+    // ── Journal
+    const moods = MOODS.map(function (m, i) {
+      const on = i === S.mood;
+      return {
+        name: m, pick: function () { self.setState({ mood: i }); },
+        box: {
+          flex: 1, minWidth: 0, boxSizing: 'border-box', height: 74, borderRadius: 16, cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+          background: on ? 'rgba(23,162,230,.14)' : 'rgba(255,255,255,.045)',
+          border: on ? '.5px solid rgba(23,162,230,.5)' : '.5px solid rgba(255,255,255,.06)',
+          transition: 'background .18s ease, border-color .18s ease, color .18s ease'
+        },
+        dot: {
+          width: 14 + i * 2.5, height: 14 + i * 2.5, borderRadius: '50%',
+          background: on ? A : 'rgba(255,255,255,.16)', display: 'block',
+          transition: 'background .18s ease'
+        },
+        label: { fontSize: 10.5, fontWeight: on ? 600 : 500, color: on ? '#EDF1EF' : '#7F8A85', transition: 'color .18s ease' }
+      };
+    });
+    const drinks = DRINKS.map(function (d, i) {
+      const on = i === S.drink;
+      return {
+        label: d, pick: function () { self.setState({ drink: i }); },
+        box: {
+          flex: 1, height: 48, boxSizing: 'border-box', borderRadius: 15, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 13.5, fontWeight: on ? 600 : 500, color: on ? '#04121A' : '#939C97',
+          background: on ? (i === 0 ? A : WARM) : 'rgba(255,255,255,.045)',
+          border: on ? 'none' : '.5px solid rgba(255,255,255,.06)',
+          transition: 'background .18s ease, border-color .18s ease, color .18s ease'
+        }
+      };
+    });
+    const chips = CHIPS.map(function (c) {
+      const on = !!S.chips[c.k];
+      return {
+        name: c.name, pick: function () {
+          const next = Object.assign({}, self.state.chips);
+          next[c.k] = !next[c.k];
+          self.setState({ chips: next });
+        },
+        box: {
+          display: 'flex', alignItems: 'center', gap: 9, height: 48, padding: '0 15px', borderRadius: 15,
+          cursor: 'pointer', boxSizing: 'border-box',
+          background: on ? 'rgba(242,180,92,.13)' : 'rgba(255,255,255,.045)',
+          border: on ? '.5px solid rgba(242,180,92,.45)' : '.5px solid rgba(255,255,255,.06)',
+          transition: 'background .18s ease, border-color .18s ease',
+          WebkitTapHighlightColor: 'transparent'
+        },
+        icon: ico(c.g, 17, on ? WARM : '#7F8A85'),
+        label: { fontSize: 13, fontWeight: 500, color: on ? '#EDF1EF' : '#939C97', transition: 'color .18s ease' }
+      };
+    });
+    const nChips = CHIPS.filter(function (c) { return S.chips[c.k]; }).length;
+    const loggedLine = 'Logged ' + T.logTime + ' — ' + MOODS[S.mood].toLowerCase() + ' day, ' +
+      (S.drink === 0 ? 'no drinks' : DRINKS[S.drink] + ' drink' + (S.drink > 1 ? 's' : '')) +
+      (nChips ? ', ' + nChips + ' note' + (nChips > 1 ? 's' : '') : '');
+
+    // ── the smart alarm: one settable time that every other sentence reads
+    const aBase = (function () { const p = T.alarm.split(':'); return Number(p[0]) * 60 + Number(p[1]); })();
+    const aMin = S.alarmMin == null ? aBase : S.alarmMin;
+    const clock = function (m) {
+      const mm = ((m % 1440) + 1440) % 1440;
+      return String(Math.floor(mm / 60)).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0');
+    };
+    const aStr = clock(aMin);
+    const WINS = [0, 15, 30, 45];
+    const aWin = WINS[S.alarmWin];
+    const DAYK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    const ALARM = {
+      alarmFrom: aWin === 0
+        ? 'Exactly ' + aStr + ', whatever stage you are in'
+        : 'From ' + clock(aMin - aWin) + ', at whichever moment you are closest to light sleep',
+      alarmEarlier: function () { self.setState({ alarmMin: aMin - 5 }); },
+      alarmLater: function () { self.setState({ alarmMin: aMin + 5 }); },
+      alarmWindows: [
+        { k: 'Exact', sub: aStr, i: 0 },
+        { k: '15 min', sub: 'from ' + clock(aMin - 15), i: 1 },
+        { k: '30 min', sub: 'from ' + clock(aMin - 30), i: 2 },
+        { k: '45 min', sub: 'from ' + clock(aMin - 45), i: 3 }
+      ].map(function (w) {
+        const on = w.i === S.alarmWin;
+        return {
+          k: w.k, sub: w.sub,
+          pick: function () { self.setState({ alarmWin: w.i }); },
+          seg: 'flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0;border-radius:11px;cursor:pointer;'
+            + (on ? 'background:rgba(139,153,214,.2);' : ''),
+          kStyle: 'font-size:12.5px;font-weight:600;color:' + (on ? '#C9CEE8' : '#939C97'),
+          subStyle: 'font-size:10px;font-variant-numeric:tabular-nums;color:' + (on ? '#8B99D6' : '#7F8A85')
+        };
+      }),
+      alarmDays: DAYK.map(function (k, i) {
+        const on = S.alarmOn[i];
+        return {
+          k: k,
+          pick: function () {
+            const next = S.alarmOn.slice(); next[i] = !next[i]; self.setState({ alarmOn: next });
+          },
+          box: 'flex:1;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;cursor:pointer;'
+            + (on ? 'background:rgba(139,153,214,.18);border:.5px solid rgba(139,153,214,.3);color:#C9CEE8;'
+                  : 'background:#141817;border:.5px solid rgba(255,255,255,.06);color:#7F8A85;')
+        };
+      }),
+      alarmFails: [
+        { t: 'The band is not on your wrist when you fall asleep. It cannot buzz an empty strap, and it will not fall back to your phone.', border: '.5px solid rgba(255,255,255,.06)' },
+        { t: 'The band is below 5 %. It keeps the window armed but drops the buzz — you get one line about it on tomorrow morning\u2019s read.', border: '.5px solid rgba(255,255,255,.06)' },
+        { t: 'You never opened Noop before bed. The window is handed over at your bedtime anchor, so an alarm set three days ago and never re-armed does not fire.', border: 'none' }
+      ],
+      armAlarm: function () { self.setState({ smart: true, screen: 'tonight' }); },
+      armLabel: S.smart ? 'Armed \u00b7 back to tonight' : 'Arm it for tonight',
+      armInk: S.smart ? '#C9CEE8' : '#12142B',
+      armStyle: 'height:54px;border-radius:18px;margin-top:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;'
+        + (S.smart ? 'border:.5px solid rgba(139,153,214,.36);' : 'background:#8B99D6;'),
+      icoBand: ico('band', 21, SLP),
+      wakeRowStyle: 'font-size:13.5px;font-weight:600;color:' + (S.smart ? '#EDF1EF' : 'rgba(237,241,239,.38)'),
+      wakeRowSub: S.smart
+        ? (aWin === 0 ? 'Exactly ' + aStr + ', whatever stage you are in' : 'From ' + clock(aMin - aWin) + ', at whichever moment you are closest to light sleep')
+        : 'Not armed'
+    };
+
+    // ── the confidence ladder, 60-parity Part 5 §C ¶1 / 20-primitives §15:
+    //    two rungs in this screen's own hue, ramped through the tinted-card range.
+    //    Solid is plain — no chip — because most numbers are solid most of the time.
+    const CONF = (function () {
+      const rung = self.props.confidence || 'solid';
+      const cal = rung === 'calibrating';
+      const H = '139,153,214';
+      return {
+        on: cal || rung === 'building',
+        box: {
+          display: 'flex', alignItems: 'center', gap: 6, flex: 'none',
+          padding: '4px 9px 4px 8px', borderRadius: 10,
+          background: 'rgba(' + H + (cal ? ',.07)' : ',.12)'),
+          border: '.5px solid rgba(' + H + (cal ? ',.22)' : ',.3)')
+        },
+        dot: { width: 5, height: 5, borderRadius: '50%', flex: 'none', background: 'rgba(' + H + (cal ? ',.42)' : ',.75)') },
+        labelStyle: { fontSize: 10, letterSpacing: '.05em', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: cal ? '#8B958F' : '#C9D0EE' },
+        label: cal ? '21 of 90 nights' : 'Building \u00b7 62 nights'
+      };
+    })();
+
+    const __nav = this.props.onNav;
+    const __go = function (a, s) { return function () { if (__nav) __nav(a, s); }; };
+    return {
+      tabToday: __go('day', 'today'), tabTrends: __go('picture', 'trends'), tabRest: __go('night', 'rest'), tabYou: __go('plumbing', 'you'),
+      goStrapPage: __go('plumbing', 'strap'),
+      battPct: '52%',
+      battChip: { display: 'flex', alignItems: 'center', gap: 7, height: 30, padding: '0 11px', borderRadius: 15, cursor: 'pointer', flex: 'none', background: 'rgba(255,255,255,.06)', border: '.5px solid rgba(255,255,255,.1)' },
+      battBody: { position: 'relative', width: 21, height: 11, borderRadius: 3.4, boxSizing: 'border-box', border: '1px solid rgba(237,241,239,.4)', flex: 'none' },
+      battFill: { position: 'absolute', left: 1.2, top: 1.2, bottom: 1.2, width: 'calc((100% - 2.4px) * 0.52)', borderRadius: 2.2, background: '#8FD3F5' },
+      battNub: { width: 1.6, height: 4.4, borderRadius: '0 1.5px 1.5px 0', marginLeft: 1, flex: 'none', background: 'rgba(237,241,239,.4)' },
+      battLabel: { fontSize: 12, fontWeight: 600, letterSpacing: '-.01em', fontVariantNumeric: 'tabular-nums', color: '#C6CEC9' },
+      swipeStart: (e) => this.setState({ sx: e.clientX, sy: e.clientY }),
+      swipeEnd: (e) => {
+        const st = this.state;
+        if (st.sx == null) return;
+        const dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+        this.setState({ sx: null, sy: null });
+        if (dx <= 78 || Math.abs(dy) >= 58) return;
+        if (st.logs) { this.setState({ logs: false }); return; }
+        const cur = st.screen || this.props.screen || "rest";
+        const to = ({"tonight":"rest","why":"rest","debt":"rest","alarm":"tonight"})[cur];
+        if (to) this.setState({ screen: to });
+      },
+      confOn: CONF.on, confBox: CONF.box, confDot: CONF.dot, confLabelStyle: CONF.labelStyle, confLabel: CONF.label,
+      isDark: true, notes: this.props.showNotes !== false,
+      t: Object.assign({}, T, { alarm: aStr }), isDayWorker: !NIGHTSHIFT, isNightWorker: NIGHTSHIFT,
+      hypAxis: T.axis.map(function (l) { return { label: l }; }),
+      tempAxis: T.tempAxis.map(function (l) { return { label: l }; }),
+      stripSegs: stripSegs,
+      stageHint: stageSel === null ? 'Tap a stage to pick it out of the night' : 'Showing ' + ['awake', 'light', 'REM', 'deep'][stageSel] + ' only — tap again to show all',
+      isRest: screen === 'rest', isTonight: screen === 'tonight', isWhy: screen === 'why', isDebt: screen === 'debt',
+      isAlarm: screen === 'alarm',
+      goRest: go('rest'), goTonight: go('tonight'), goWhy: go('why'), goDebt: go('debt'), goAlarm: go('alarm'),
+      goSession: __go('effort', 'session'),
+      ...ALARM,
+
+      night: {
+        hours: night.hours, win: NIGHTSHIFT ? WIN_N[nIdx] : night.win, verdict: night.verdict, delta: night.delta,
+        tagStyle: {
+          fontSize: 11.5, fontWeight: 600, padding: '6px 10px', borderRadius: 9, flex: 'none',
+          color: night.ok ? '#8FD3F5' : '#C6CEC9',
+          background: night.ok ? 'rgba(23,162,230,.13)' : 'rgba(255,255,255,.07)'
+        }
+      },
+      nights, needLine, hypno, stages,
+      nightArcs, nightSpecks: nSpecks, ringTrack: arcD(rA0, rA0 + rSweep, rR),
+      wakeX: wakeXY[0].toFixed(2), wakeY: wakeXY[1].toFixed(2),
+      needLabel: '7h 05m', ringRead,
+      hypnoOpen: S.hypno, hypnoLabel: S.hypno ? 'Hide the night' : 'See the whole night',
+      toggleHypno: function () { self.setState({ hypno: !self.state.hypno }); },
+      icoWhy: ico('read', 21, SLP), icoDebt: ico('scale', 21, SLP),
+      icoGlass: ico('glass', 15, '#6C7570'),
+      logged: S.logged, loggedLine: loggedLine,
+
+      bedTime: bed.t, bedLength: bed.len, stopNote: bed.note, stops, reasons,
+      tonightTeaser: SP[2].t === bed.t ? 'Clears twenty minutes of debt before your ' + T.alarm + ' alarm.' : bed.len + ' before your ' + T.alarm + ' alarm.',
+      icoAlarm: ico('alarm', 21, SLP), icoBell: ico('bell', 21, SLP),
+      smartTrack: this.toggleTrack(S.smart), smartKnob: this.knob(S.smart),
+      windTrack: this.toggleTrack(S.wind), windKnob: this.knob(S.wind),
+      windTime: windTime,
+      toggleSmart: function () { self.setState({ smart: !self.state.smart }); },
+      toggleWind: function () { self.setState({ wind: !self.state.wind }); },
+      committed: S.committed, notCommitted: !S.committed,
+      commitLine: 'Set — lights out ' + bed.t + (S.wind ? ', buzz at ' + windTime : ', no wind-down buzz'),
+      commit: function () { self.setState({ committed: true }); },
+      uncommit: function () { self.setState({ committed: false }); },
+
+      causes, tempLine,
+
+      ranges, rangeLabel: R.label, stats: R.stats, debtRead: R.read,
+      axis: R.axis.map(function (l) { return { label: l === 'Last night' ? T.lastShort : l }; }),
+      debtLine, debtArea, hits, correlates,
+      ptX: pts[ptI][0].toFixed(1), ptY: pts[ptI][1].toFixed(1),
+      ptDay: R.days[ptI] === 'Last night' ? T.lastShort : R.days[ptI], ptVal: fmt(bal[ptI]) + ' behind',
+      bubble: {
+        position: 'absolute', left: Math.min(84, Math.max(16, pts[ptI][0] / 318 * 100)) + '%', top: Math.max(0, pts[ptI][1] - 48) + 'px',
+        transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+        padding: '6px 10px', borderRadius: 11, background: 'rgba(30,36,44,.94)',
+        border: '.5px solid rgba(255,255,255,.1)', pointerEvents: 'none', whiteSpace: 'nowrap'
+      },
+
+      moods, drinks, chips,
+      journalOpen: journalOpen,
+      openJournal: function () { self.setState({ journal: true }); },
+      closeJournal: function () { self.setState({ journal: false }); },
+      saveJournal: function () { self.setState({ journal: false, logged: true }); },
+
+      icoToday: ico('today', 19, '#7F8A85'), icoTrends: ico('trends', 19, '#7F8A85'),
+      icoRestOn: ico('moon', 19, '#0D1120'), icoYou: ico('you', 19, '#7F8A85')
+    };
+  }
+}
+</script>
+</body>
+</html>

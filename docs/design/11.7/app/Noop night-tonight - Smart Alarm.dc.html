@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#F4F6F5"/><circle cx="50" cy="54" r="26" fill="none" stroke="#17A2E6" stroke-width="5"/><path d="M50 40v14l10 6" fill="none" stroke="#17A2E6" stroke-width="5" stroke-linecap="round"/><path d="M30 22l8 8M70 22l-8 8" stroke="#17A2E6" stroke-width="5" stroke-linecap="round"/></svg></template>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F5;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#0B6FA8;text-decoration:none}a:hover{color:#084F78}
+</style>
+</helmet>
+
+<div style="max-width:1300px;margin:0 auto;padding:52px 40px 110px;display:flex;flex-direction:column;gap:14px">
+
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;color:#0B5E8C;background:#EEF4F8;border:.5px solid #C2DAE8;border-radius:3px;padding:3px 7px">Before launch &middot; item 4</span>
+    <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;color:#5E6663">Act 1 &middot; <code style="font-family:ui-monospace,Menlo,monospace;font-size:10.5px;text-transform:none;letter-spacing:0">night/tonight</code></span>
+  </div>
+  <h1 style="margin:0;font-family:'Outfit',sans-serif;font-size:44px;font-weight:300;letter-spacing:-.032em;line-height:1.04;color:#111413">Smart Alarm</h1>
+  <p style="margin:0;max-width:38em;font-size:14.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">Smaller than it looked. <code style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#0B5E8C;background:#EEF4F8;padding:1px 4px;border-radius:2px">night/tonight</code> already has the smart-wake row and its toggle. Two things are missing, and both are the difference between a switch and an alarm you can rely on.</p>
+
+  <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px">
+    <div style="flex:1;min-width:300px;background:#fff;border:1px solid #E4E8E6;border-left:3px solid #B4543A;border-radius:12px;padding:15px 17px;display:flex;flex-direction:column;gap:7px">
+      <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#B4543A">1 &middot; There is no way to set the time</span>
+      <p style="margin:0;font-size:12.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">The row reads <em>Wake me between 06:10 and 06:40</em> and Act 1 says <em>&ldquo;before your 06:25 alarm&rdquo;</em> in four places &mdash; but 06:25 comes from nowhere the user can reach. A person who wakes to a wrist buzz today would lose their alarm and could not set a new one.</p>
+    </div>
+    <div style="flex:1;min-width:300px;background:#fff;border:1px solid #E4E8E6;border-left:3px solid #B4543A;border-radius:12px;padding:15px 17px;display:flex;flex-direction:column;gap:7px">
+      <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#B4543A">2 &middot; The best thing about it is unsaid</span>
+      <p style="margin:0;font-size:12.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">It arms the strap&rsquo;s <strong style="font-weight:600">own firmware alarm</strong>. It fires with the phone off, asleep, silenced or in another room. That is a sentence a phone alarm cannot say, and the screen never says it &mdash; so it also never says when it <em>will not</em> fire.</p>
+    </div>
+  </div>
+
+  <div style="height:1px;background:#D6DAD8;margin:28px 0 8px"></div>
+
+  <div style="display:flex;gap:30px;flex-wrap:wrap">
+
+    <div style="flex:none;display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <span style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:300;color:#B7BFBB">A</span>
+        <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#111413">The card on <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px;text-transform:none;letter-spacing:0;color:#0B5E8C">tonight</code>, revised</span>
+      </div>
+      <div style="width:402px;background:#0A0C0B;border-radius:26px;border:1px solid #D6DAD8;padding:20px;box-sizing:border-box;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;box-shadow:0 10px 30px rgba(17,20,19,.1)">
+        <div style="position:relative">
+          <div style="position:absolute;left:-8px;right:-8px;top:-8px;height:96px;border:1.5px dashed #E0A33C;border-radius:22px;pointer-events:none"></div>
+          <div style="position:absolute;top:-24px;right:-4px;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#E0A33C">New row</div>
+          <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+
+            <div style="display:flex;align-items:center;gap:13px;min-height:74px;border-bottom:.5px solid rgba(255,255,255,.06);cursor:pointer">
+              <svg viewBox="0 0 24 24" style="width:21px;height:21px;flex:none;display:block"><circle cx="12" cy="13" r="8" fill="none" stroke="#8B99D6" stroke-width="1.6"></circle><path d="M12 9.5V13l2.5 1.6M7 4.5 5 6.5M17 4.5l2 2" fill="none" stroke="#8B99D6" stroke-width="1.6" stroke-linecap="round"></path></svg>
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;font-weight:600">Wake me by 06:25</span>
+                <span style="font-size:11.5px;line-height:1.45;color:#6C7570;text-wrap:pretty">From 06:10, at whichever moment you are closest to light sleep</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:13px;min-height:74px;border-bottom:.5px solid rgba(255,255,255,.06)">
+              <svg viewBox="0 0 24 24" style="width:21px;height:21px;flex:none;display:block"><rect x="7" y="3.5" width="10" height="17" rx="3.4" fill="none" stroke="#8B99D6" stroke-width="1.6"></rect><path d="M10 8.6h4M10 12h4" stroke="#8B99D6" stroke-width="1.6" stroke-linecap="round"></path></svg>
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;font-weight:600">Armed on the strap</span>
+                <span style="font-size:11.5px;line-height:1.45;color:#6C7570;text-wrap:pretty">Fires with your phone off, silent, or in another room</span>
+              </div>
+              <div style="width:46px;height:28px;flex:none;border-radius:14px;background:#8B99D6;position:relative"><span style="position:absolute;top:2px;left:20px;width:24px;height:24px;border-radius:50%;background:#fff"></span></div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:13px;min-height:64px;opacity:.5">
+              <svg viewBox="0 0 24 24" style="width:21px;height:21px;flex:none;display:block"><path d="M12 4a5.5 5.5 0 0 0-5.5 5.5c0 4-1.8 5.4-1.8 5.4h14.6s-1.8-1.4-1.8-5.4A5.5 5.5 0 0 0 12 4zM10 18.5a2 2 0 0 0 4 0" fill="none" stroke="#8B99D6" stroke-width="1.6" stroke-linecap="round"></path></svg>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:13.5px;font-weight:600">Buzz me to wind down at 22:41</span>
+                <span style="font-size:11.5px;color:#6C7570">One buzz on the wrist. No notification.</span>
+              </div>
+              <div style="width:46px;height:28px;flex:none;border-radius:14px;background:rgba(255,255,255,.13);position:relative"><span style="position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#8B958F"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E4E8E6;border-radius:10px;padding:13px 15px;display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#5E6663">Why two rows and not one</span>
+        <p style="margin:0;font-size:12px;line-height:1.6;color:#2A302E;text-wrap:pretty">A row carrying both a chevron and a toggle is ambiguous every time. So <strong style="font-weight:600">setting and arming are separate rows</strong>: the first opens the screen, the second is the switch. When the switch is off, the first row&rsquo;s time drops to 38 % and the sub reads <em>Not armed</em> &mdash; the setting survives, the alarm does not.</p>
+      </div>
+    </div>
+
+    <div style="flex:none;display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <span style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:300;color:#B7BFBB">B</span>
+        <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#111413">The screen &mdash; <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px;text-transform:none;letter-spacing:0;color:#0B5E8C">night/alarm</code></span>
+      </div>
+      <div style="border-radius:48px;overflow:hidden;box-shadow:0 14px 40px rgba(17,20,19,.16)">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ yes }}" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;overflow-y:auto">
+
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px;flex:none">
+            <span style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-top:1.6px solid #C6CEC9;border-left:1.6px solid #C6CEC9;transform:rotate(-45deg);margin-left:-2px"></span></span>
+            <span style="font-size:13.5px;color:#939C97">Tonight</span>
+          </div>
+
+          <div style="padding:14px 20px 24px;display:flex;flex-direction:column;align-items:center;gap:8px;flex:none">
+            <span style="font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">Wake me by</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:82px;font-weight:200;letter-spacing:-.045em;line-height:.94;font-variant-numeric:tabular-nums">06:25</span>
+            <span style="font-size:14px;color:#939C97;font-variant-numeric:tabular-nums">7h 11m from your 23:14 bedtime</span>
+          </div>
+
+          <div style="padding:0 20px 26px;display:flex;flex-direction:column;gap:11px">
+
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570;padding:0 2px">How early it may wake you</span>
+            <div style="display:flex;gap:0;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:14px;padding:3px">
+              <sc-for list="{{ windows }}" as="w" hint-placeholder-count="4">
+                <div style="{{ w.seg }}">
+                  <span style="{{ w.kStyle }}">{{ w.k }}</span>
+                  <span style="{{ w.subStyle }}">{{ w.sub }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;padding:0 2px;text-wrap:pretty">Fifteen minutes is enough to find light sleep on most nights. Exact means exact &mdash; it wakes you at 06:25 whatever stage you are in.</span>
+
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570;padding:10px 2px 0">Which days</span>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ days }}" as="d" hint-placeholder-count="7">
+                <div style="{{ d.box }}">{{ d.k }}</div>
+              </sc-for>
+            </div>
+
+            <div style="background:rgba(139,153,214,.08);border:.5px solid rgba(139,153,214,.22);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:9px;margin-top:6px">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">It runs on the strap, not the phone</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#C9CEE8;text-wrap:pretty">Noop hands the window to the band before you sleep. It buzzes your wrist even if your phone is off, flat, silenced or in another room. Costs about 2 % of the band&rsquo;s battery a night.</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 6px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">When it will not fire</span>
+              <sc-for list="{{ fails }}" as="f" hint-placeholder-count="3">
+                <div style="display:flex;gap:11px;align-items:baseline;padding:8px 0;border-bottom:{{ f.border }}">
+                  <span style="width:5px;height:5px;flex:none;border-radius:50%;background:#C8934B;margin-top:6px"></span>
+                  <span style="flex:1;font-size:12.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">{{ f.t }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="height:54px;border-radius:18px;background:#8B99D6;display:flex;align-items:center;justify-content:center;margin-top:4px">
+              <span style="font-size:15px;font-weight:600;color:#12142B">Arm it for tonight</span>
+            </div>
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;text-align:center;padding:2px 12px 0;text-wrap:pretty">Nothing here is a target. Miss it and the next read simply says you missed it.</span>
+          </div>
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div style="flex:1;min-width:330px;display:flex;flex-direction:column;gap:16px;padding-top:38px">
+
+      <div style="background:#fff;border:1px solid #E4E8E6;border-radius:12px;overflow:hidden">
+        <div style="padding:10px 14px;background:#F0F3F2;border-bottom:1px solid #E4E8E6">
+          <span style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#5E6663">Spec</span>
+        </div>
+        <sc-for list="{{ spec }}" as="r" hint-placeholder-count="8">
+          <div style="display:flex;gap:14px;padding:9px 14px;border-bottom:1px solid #F0F3F2">
+            <span style="width:96px;flex:none;font-size:11.5px;color:#5E6663">{{ r.k }}</span>
+            <span style="flex:1;font-size:11.5px;line-height:1.5;color:#111413;text-wrap:pretty">{{ r.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="background:#FFFBF3;border:1px solid #EBD3A8;border-radius:12px;padding:15px 17px;display:flex;flex-direction:column;gap:9px">
+        <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#8A5B12">The implementation trap</span>
+        <p style="margin:0;font-size:12.5px;line-height:1.6;color:#4A3A1E;text-wrap:pretty"><strong style="font-weight:600">06:25 is currently a literal in four places.</strong> Act 1&rsquo;s <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">TERMS.alarm</code> feeds the tonight teaser, the bedtime sub-line, the <em>Lights out by</em> length and the night-shift variant at 15:25. Making the time settable means all four read one value &mdash; and the night-shift schedule has to follow it, which is the same promise step 2 of onboarding makes.</p>
+      </div>
+
+      <div style="background:#fff;border:1px solid #E4E8E6;border-left:3px solid #6B77B8;border-radius:12px;padding:15px 17px;display:flex;flex-direction:column;gap:9px">
+        <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#4A56A0">Why the failures get a card</span>
+        <p style="margin:0;font-size:12.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">An alarm is the one feature where a silent failure costs someone their morning. The app already has the convention &mdash; <em>every switch here says what it costs you in battery</em> &mdash; and this is the same instinct pointed at reliability. Three plain lines, before arming, not a warning after the fact.</p>
+      </div>
+
+      <div style="background:#fff;border:1px solid #E4E8E6;border-left:3px solid #B4543A;border-radius:12px;padding:15px 17px;display:flex;flex-direction:column;gap:9px">
+        <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#B4543A">Never</span>
+        <p style="margin:0;font-size:12.5px;line-height:1.6;color:#2A302E;text-wrap:pretty">No snooze count, no wake-up score, no <em>you woke in deep sleep</em> verdict the morning after. The alarm&rsquo;s job ends when you are awake. And no phone-side fallback alarm that fires alongside it &mdash; two alarms for one wake is how people stop trusting both.</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1300,&quot;height&quot;:1160}}">
+class Component extends DCLogic {
+  renderVals() {
+    const hair = '.5px solid rgba(255,255,255,.06)';
+    const seg = (on) => 'flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0;border-radius:11px;'
+      + (on ? 'background:rgba(139,153,214,.2);' : '');
+    return {
+      yes: true,
+      windows: [
+        { k: 'Exact', sub: '06:25', on: false },
+        { k: '15 min', sub: 'from 06:10', on: true },
+        { k: '30 min', sub: 'from 05:55', on: false },
+        { k: '45 min', sub: 'from 05:40', on: false }
+      ].map(w => ({
+        k: w.k, sub: w.sub, seg: seg(w.on),
+        kStyle: 'font-size:12.5px;font-weight:600;color:' + (w.on ? '#C9CEE8' : '#939C97'),
+        subStyle: 'font-size:10px;font-variant-numeric:tabular-nums;color:' + (w.on ? '#8B99D6' : '#7F8A85')
+      })),
+      days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((k, i) => ({
+        k,
+        box: 'flex:1;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;'
+          + (i < 5
+            ? 'background:rgba(139,153,214,.18);border:.5px solid rgba(139,153,214,.3);color:#C9CEE8;'
+            : 'background:#141817;border:.5px solid rgba(255,255,255,.06);color:#7F8A85;')
+      })),
+      fails: [
+        { t: 'The band is not on your wrist when you fall asleep. It cannot buzz an empty strap, and it will not fall back to your phone.', border: hair },
+        { t: 'The band is below 5 %. It keeps the window armed but drops the buzz — you get one line about it on tomorrow morning’s read.', border: hair },
+        { t: 'You never opened Noop before bed. The window is handed over at your bedtime anchor, so an alarm set three days ago and never re-armed does not fire.', border: 'none' }
+      ],
+      spec: [
+        { k: 'Route', v: 'night/tonight → Wake me by → night/alarm. Ordinary push, enter curve. Back map: alarm → tonight.' },
+        { k: 'Hue', v: 'Act 1’s lavender (rest), not aura blue. The alarm belongs to the night, and blue is the day’s hue — the bedtime screen’s own accent stays blue for the anchor.' },
+        { k: 'Hero', v: 'Outfit 82 / 200 / -.045em, tabular. Deliberately the same type as Lights out by on tonight — the two times are a pair and should look like one.' },
+        { k: 'Window', v: 'Four segments in one control, radius 14 on card fill, padding 3. Each segment carries its resulting earliest time, so the choice is concrete rather than abstract.' },
+        { k: 'Days', v: 'Seven boxes, flex-even, 42 pt tall, radius 13. Selected in tint(rest) 18 % with a 30 % border. Weekdays are the default.' },
+        { k: 'Firmware card', v: 'tint(rest) 8 % + border 22 %, radius 22. Carries the battery cost, because that is this app’s convention for anything that runs on the band.' },
+        { k: 'Failure card', v: 'card fill, radius 22. Three fixed lines, amber dots at 5 pt. Amber is right here — this is attention — and nothing else on this screen uses it.' },
+        { k: 'Primary', v: '54 pt, radius 18, solid rest lavender, label on #12142B. Reads Arm it for tonight, not Save — the action is arming a band, not storing a preference.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

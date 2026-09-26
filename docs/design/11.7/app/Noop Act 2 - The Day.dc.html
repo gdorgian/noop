@@ -1,0 +1,2619 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+<template id="__bundler_thumbnail" data-bg-color="#0A0C0B">
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="800" fill="#0A0C0B"/>
+<defs><radialGradient id="o" cx="36%" cy="30%"><stop offset="0" stop-color="#8FD3F5"/><stop offset=".62" stop-color="#17a2e6"/><stop offset="1" stop-color="#0E6E9C"/></radialGradient></defs>
+<circle cx="600" cy="400" r="150" fill="none" stroke="rgba(23,162,230,.5)" stroke-width="3"/>
+<circle cx="600" cy="400" r="112" fill="url(#o)"/>
+</svg>
+</template>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sheetUp{from{transform:translateY(102%)}to{transform:translateY(0)}}
+@keyframes boxOrb{0%{transform:scale(.82)}25%{transform:scale(1.16)}50%{transform:scale(1.16)}75%{transform:scale(.82)}100%{transform:scale(.82)}}
+@keyframes boxGlow{0%{transform:scale(.86);opacity:.32}25%{transform:scale(1.24);opacity:.8}50%{transform:scale(1.24);opacity:.8}75%{transform:scale(.86);opacity:.32}100%{transform:scale(.86);opacity:.32}}
+@keyframes boxRing{0%{transform:scale(.8);opacity:.55}25%{transform:scale(1.32);opacity:.12}50%{transform:scale(1.32);opacity:.12}75%{transform:scale(.8);opacity:.55}100%{transform:scale(.8);opacity:.55}}
+@keyframes drift{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes auraBreathe{0%,100%{transform:scale(.92);opacity:.5}50%{transform:scale(1.06);opacity:.85}}
+@keyframes heartbeat{0%{transform:scale(1)}9%{transform:scale(1.05)}18%{transform:scale(1.01)}27%{transform:scale(1.035)}42%{transform:scale(1)}100%{transform:scale(1)}}
+@keyframes heartglow{0%{opacity:.45}9%{opacity:.8}18%{opacity:.55}27%{opacity:.72}42%{opacity:.45}100%{opacity:.45}}
+.scr{animation:fadeUp .3s cubic-bezier(.22,.61,.36,1) both}
+.hb::-webkit-scrollbar{width:0;height:0}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="display:flex;gap:60px;align-items:flex-start;padding:52px 48px 100px">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:16px">
+  <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">ACT 2</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">The day — working prototype</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">the orb paces you and your pulse answers</span>
+  </div>
+  </sc-if>
+
+  <div style="border-radius:48px;overflow:hidden;flex:none">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+    <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-150px;left:50%;transform:translateX(-50%);width:470px;height:410px;border-radius:50%;background:radial-gradient(circle,rgba(23,162,230,.17),rgba(23,162,230,0) 70%);filter:blur(18px);pointer-events:none"></div>
+
+      <div class="hb" onPointerDown="{{ swipeStart }}" onPointerUp="{{ swipeEnd }}" style="position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain">
+
+        <sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:58px 20px 4px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+              <span style="font-size:13.5px;color:#939C97">{{ greetLine }}</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">{{ headLine }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px;flex:none;padding-top:4px">
+              <div onClick="{{ goStrapPage }}" style="{{ battChip }}">
+                <div style="display:flex;align-items:center;gap:1px;flex:none">
+                  <div style="{{ battBody }}"><div style="{{ battFill }}"></div></div>
+                  <span style="{{ battNub }}"></span>
+                </div>
+                <span style="{{ battLabel }}">{{ battPct }}</span>
+              </div>
+              <div onClick="{{ toggleDays }}" style="{{ dayChip }}">
+                <span style="{{ icoCal }}"></span>
+                <span style="{{ dayChipLabel }}">{{ dayLabel }}</span>
+              </div>
+              <div onClick="{{ goInbox }}" style="position:relative;width:32px;height:32px;flex:none;border-radius:11px;background:#141817;border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="{{ icoBell }}"></span>
+                <sc-if value="{{ unreadAny }}" hint-placeholder-val="{{ true }}">
+                  <span style="position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;box-sizing:border-box;padding:0 4px;border-radius:8px;background:#17A2E6;border:1.5px solid #0B0D0C;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;color:#03212F;font-variant-numeric:tabular-nums">{{ unread }}</span>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+
+          <sc-if value="{{ dayOpen }}" hint-placeholder-val="{{ false }}">
+          <div class="hb" style="padding:12px 20px 2px;display:flex;gap:6px;overflow-x:auto">
+            <sc-for list="{{ dayCells }}" as="d" hint-placeholder-count="8">
+              <div onClick="{{ d.pick }}" style="{{ d.box }}">
+                <span style="{{ d.wStyle }}">{{ d.w }}</span>
+                <span style="{{ d.nStyle }}">{{ d.n }}</span>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ pastDay }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:12px 20px 0">
+            <div onClick="{{ backToToday }}" style="display:flex;align-items:center;gap:10px;padding:12px 15px;border-radius:16px;background:rgba(139,153,214,.09);border:.5px solid rgba(139,153,214,.24);cursor:pointer">
+              <span style="{{ icoClock }}"></span>
+              <span style="flex:1;font-size:12.5px;line-height:1.5;color:#C9D0EE;text-wrap:pretty">{{ pastNote }}</span>
+              <span style="font-size:12px;font-weight:600;color:#8B99D6;flex:none">Today</span>
+            </div>
+          </div>
+          </sc-if>
+
+          <div onClick="{{ goCharge }}" style="position:relative;height:318px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <div style="position:absolute;width:306px;height:306px">
+              <sc-for list="{{ ticks }}" as="k" hint-placeholder-count="41">
+                <div style="{{ k.s }}"></div>
+              </sc-for>
+              <div style="{{ markerStyle }}"></div>
+            </div>
+            <div style="position:absolute;width:268px;height:268px;border-radius:50%;background:radial-gradient(circle,rgba(23,162,230,.4),rgba(23,162,230,0) 68%);filter:blur(6px);animation:boxGlow 16s ease-in-out infinite"></div>
+            <div style="position:absolute;width:224px;height:224px;border-radius:50%;border:1px solid rgba(159,226,251,.5);animation:boxRing 16s ease-in-out infinite"></div>
+            <div style="position:absolute;width:176px;height:176px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#9FE2FB,#2FB2F0 55%,#0A5F92);box-shadow:0 18px 52px rgba(11,111,168,.55),inset 0 -8px 24px rgba(4,42,66,.5);animation:boxOrb 16s ease-in-out infinite"></div>
+            <div style="{{ chargeGlow }}"></div>
+            <div style="{{ chargeCore }}"></div>
+            <div style="position:absolute;width:176px;height:176px;border-radius:50%;background:conic-gradient(from 200deg,rgba(255,255,255,0),rgba(255,255,255,.32),rgba(255,255,255,0) 58%);animation:drift 24s linear infinite;mix-blend-mode:overlay"></div>
+            <div onClick="{{ goBreathe }}" style="position:absolute;width:176px;height:176px;border-radius:50%;cursor:pointer;z-index:3"></div>
+            <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none">
+              <span style="font-family:'Outfit',sans-serif;font-size:52px;font-weight:200;line-height:1;letter-spacing:-.03em;color:#F6FDFF;text-shadow:0 2px 16px rgba(4,30,48,.55);font-variant-numeric:tabular-nums">{{ bpm }}</span>
+              <span style="font-size:12.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:rgba(246,253,255,.86);text-shadow:0 1px 8px rgba(4,30,48,.5)">{{ phase }}</span>
+            </div>
+          </div>
+
+          <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px;margin-top:4px">
+            <div onClick="{{ goCharge }}" style="display:flex;flex-direction:column;gap:6px;padding:0 2px 8px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.02em">{{ stateLabel }}</span>
+                <span style="width:7px;height:7px;flex:none;border-top:1.6px solid #6C7570;border-right:1.6px solid #6C7570;transform:rotate(45deg)"></span>
+              </div>
+              <span style="font-size:13.5px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ stateLine }}</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:20px;background:rgba(139,153,214,.09);border:.5px solid rgba(139,153,214,.2)">
+              <span style="{{ icoMoon }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:13px;color:#C6CEC9">{{ t.lastSleep }}</span>
+                <span style="font-size:11.5px;color:#7F8A85">{{ t.lastSleepNote }}</span>
+              </div>
+            </div>
+
+            <div onClick="{{ goSvea }}" style="display:flex;align-items:center;gap:13px;border-radius:20px;padding:14px 16px;background:linear-gradient(158deg,rgba(139,153,214,.16),rgba(139,153,214,.03));border:.5px solid rgba(139,153,214,.3);cursor:pointer">
+              <div style="position:relative;width:32px;height:32px;flex:none;display:flex;align-items:center;justify-content:center">
+                <span style="position:absolute;inset:-6px;border-radius:50%;background:radial-gradient(circle,rgba(139,153,214,.45),rgba(139,153,214,0) 66%);filter:blur(4px)"></span>
+                <span style="position:absolute;width:28px;height:28px;border-radius:58% 42% 46% 54%/49% 55% 45% 51%;background:radial-gradient(circle at 44% 38%,#DDE3F6,#8B99D6 58%,#4A56A8);box-shadow:0 0 12px rgba(139,153,214,.5)"></span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:14.5px;font-weight:600;color:#EDF1EF">Svea has read your morning</span>
+                <span style="font-size:12px;line-height:1.5;color:#B7C3C9;text-wrap:pretty">Written at 07:12 from five measured signals — with one proposal you can turn down</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #A9B4E0;border-right:1.6px solid #A9B4E0;transform:rotate(45deg)"></span>
+            </div>
+
+            <div onClick="{{ goDay }}" style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 13px;cursor:pointer;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">The day so far</span>
+                <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ t.daySpan }}</span>
+              </div>
+              <svg viewBox="0 0 300 54" preserveAspectRatio="none" style="width:100%;height:54px;display:block;overflow:visible">
+                <path d="{{ dayArea }}" fill="rgba(23,162,230,.13)" stroke="none"></path>
+                <polyline points="{{ dayLine }}" fill="none" stroke="#17A2E6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              </svg>
+              <span style="font-size:12.5px;line-height:1.5;color:#939C97;text-wrap:pretty">{{ t.dayRead }}</span>
+            </div>
+
+            <div onClick="{{ goEnergy }}" style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 14px;cursor:pointer;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">What today has cost</span>
+                <sc-if value="{{ enConfOn }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ enConfBox }}">
+                    <span style="{{ enConfDot }}"></span>
+                    <span style="{{ enConfLabelStyle }}">{{ enConfLabel }}</span>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div style="display:flex;align-items:baseline;gap:7px">
+                  <span style="{{ enHeroStyle }}">{{ enHero }}</span>
+                  <span style="font-size:12.5px;color:#7F8A85">{{ enUnit }}</span>
+                </div>
+                <span style="font-size:11.5px;color:#7F8A85;text-wrap:pretty">{{ enHeroNote }}</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;gap:2px;height:6px">
+                  <sc-for list="{{ enSegs }}" as="s" hint-placeholder-count="2">
+                    <div style="{{ s.bar }}"></div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:12px">
+                  <sc-for list="{{ enLegend }}" as="l" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span style="{{ l.dot }}"></span>
+                      <span style="font-size:11px;color:#939C97;font-variant-numeric:tabular-nums">{{ l.label }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <span style="{{ enProjStyle }}">{{ enProjLine }}</span>
+              <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;text-wrap:pretty">{{ enCovLine }}</span>
+            </div>
+
+            <div onClick="{{ goSession }}" style="display:flex;align-items:center;gap:13px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px;cursor:pointer">
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px;min-width:0">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#C8934B;font-weight:600">Today&rsquo;s session</span>
+                <span style="font-size:14.5px;font-weight:600;color:#EDF1EF">{{ sessionTitle }}</span>
+                <span style="font-size:12px;line-height:1.5;color:#939C97;text-wrap:pretty">{{ sessionLine }}</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <div onClick="{{ goHeart }}" style="display:flex;align-items:center;gap:13px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px;cursor:pointer">
+              <div style="position:relative;width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center">
+                <span style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(23,162,230,.34),rgba(23,162,230,0) 70%);animation:heartglow 1.05s ease-in-out infinite"></span>
+                <span style="{{ icoHeart }}"></span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:14.5px;font-weight:600;color:#EDF1EF">Heart</span>
+                <span style="font-size:12px;line-height:1.5;color:#939C97">Live now · {{ heartRowSub }}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:3px;flex:none">
+                <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.025em;color:#EDF1EF;font-variant-numeric:tabular-nums;animation:heartbeat 1.05s ease-in-out infinite;display:inline-block">{{ bpm }}</span>
+                <span style="font-size:10.5px;color:#6C7570">bpm</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="2">
+              <div onClick="{{ r.go }}" style="display:flex;align-items:center;gap:13px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px;cursor:pointer">
+                <span style="{{ r.icon }}"></span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:14.5px;font-weight:600;color:#EDF1EF">{{ r.k }}</span>
+                  <span style="font-size:12px;line-height:1.5;color:#939C97;text-wrap:pretty">{{ r.sub }}</span>
+                </div>
+                <span style="{{ r.figStyle }}">{{ r.fig }}</span>
+                <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ hasLogs }}" hint-placeholder-val="{{ false }}">
+              <div class="scr" style="display:flex;flex-direction:column;gap:9px;padding:14px 16px;border-radius:20px;background:rgba(23,162,230,.07);border:.5px solid rgba(23,162,230,.18)">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Logged today</span>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  <sc-for list="{{ loggedChips }}" as="c" hint-placeholder-count="2">
+                    <span style="{{ c.s }}">{{ c.label }}</span>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isInbox }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goToday }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Today</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Updates</span>
+              <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ inboxSub }}</span>
+            </div>
+
+            <sc-if value="{{ inboxEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:9px">
+                <span style="font-size:14px;font-weight:600;color:#C6CEC9">Nothing waiting</span>
+                <span style="font-size:12px;line-height:1.6;color:#7F8A85;text-align:center;text-wrap:pretty">Proposals, notices and anything you put away land here. Nothing is repeated, and a run of the same finding counts once.</span>
+              </div>
+            </sc-if>
+
+            <sc-for list="{{ inboxGroups }}" as="g" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:6px 2px 0">
+                  <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ g.k }}</span>
+                  <span style="font-size:11px;color:#7F8A85">{{ g.note }}</span>
+                </div>
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:2px 16px">
+                  <sc-for list="{{ g.items }}" as="i" hint-placeholder-count="2">
+                    <div style="{{ i.row }}">
+                      <span style="{{ i.dot }}"></span>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:5px;min-width:0">
+                        <div style="display:flex;align-items:baseline;gap:10px">
+                          <span style="{{ i.kStyle }}">{{ i.k }}</span>
+                          <span style="font-size:10.5px;color:#7F8A85;flex:none;margin-left:auto;font-variant-numeric:tabular-nums">{{ i.when }}</span>
+                        </div>
+                        <span style="font-size:12px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ i.sub }}</span>
+                        <sc-if value="{{ i.hasBtns }}" hint-placeholder-val="{{ false }}">
+                          <div style="display:flex;gap:7px;padding-top:4px">
+                            <sc-for list="{{ i.btns }}" as="b" hint-placeholder-count="3">
+                              <div onClick="{{ b.tap }}" style="{{ b.box }}"><span style="{{ b.label }}">{{ b.k }}</span></div>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ i.hasRes }}" hint-placeholder-val="{{ false }}">
+                          <span style="{{ i.resStyle }}">{{ i.res }}</span>
+                        </sc-if>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:2px 2px 20px;text-wrap:pretty">A proposal waits here until you answer it, and answering it here is the same as answering it on the card. Nothing in this list is a notification — the bell only fills, it never buzzes.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isRelease }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;padding-top:46px">
+          <div style="flex:1;display:flex;flex-direction:column;background:#141817;border-top:.5px solid rgba(255,255,255,.1);border-radius:30px 30px 0 0;box-shadow:0 -16px 48px rgba(0,0,0,.55)">
+            <span style="width:38px;height:4px;border-radius:3px;background:rgba(255,255,255,.16);align-self:center;margin:11px 0 0"></span>
+
+            <div style="padding:18px 22px 0;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="{{ relChip }}">{{ relKick }}</span>
+                <span style="font-size:11.5px;color:#7F8A85">{{ relWhen }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <span style="font-family:'Outfit',sans-serif;font-size:27px;font-weight:300;letter-spacing:-.03em;line-height:1.16;text-wrap:pretty">{{ relTitle }}</span>
+                <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ relLead }}</span>
+              </div>
+            </div>
+
+            <div style="padding:20px 22px 0;display:flex;flex-direction:column;gap:2px">
+              <sc-for list="{{ relItems }}" as="r" hint-placeholder-count="4">
+                <div style="{{ r.row }}">
+                  <span style="{{ r.wrap }}"><span style="{{ r.icon }}"></span></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:5px;min-width:0">
+                    <span style="font-size:14px;font-weight:600;color:#EDF1EF">{{ r.k }}</span>
+                    <span style="font-size:12.5px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ r.sub }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="padding:24px 22px 0;display:flex;flex-direction:column;gap:11px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Every version</span>
+              <sc-for list="{{ relLog }}" as="v" hint-placeholder-count="3">
+                <div style="{{ v.row }}">
+                  <div style="display:flex;align-items:baseline;gap:9px">
+                    <span style="font:600 12.5px ui-monospace,Menlo,monospace;color:#C6CEC9;flex:none">{{ v.n }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85">{{ v.d }}</span>
+                    <sc-if value="{{ v.here }}" hint-placeholder-val="{{ false }}">
+                      <span style="{{ v.hereChip }}">installed</span>
+                    </sc-if>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <sc-for list="{{ v.lines }}" as="l" hint-placeholder-count="3">
+                      <span style="{{ l }}"></span>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+              <span style="font-size:11.5px;line-height:1.65;color:#7F8A85;text-wrap:pretty">The versions and their dates are real. The entries under each are not written into the prototype — they come from the release feed, and that list is not mine to write.</span>
+            </div>
+
+            <div style="position:sticky;bottom:0;margin-top:24px;padding:18px 22px 26px;background:linear-gradient(to top,#141817 62%,rgba(20,24,23,0));display:flex;flex-direction:column;gap:6px">
+              <div onClick="{{ goToday }}" style="{{ relBtn }}">
+                <span style="font-size:15px;font-weight:600;color:#04121A">{{ relBtnText }}</span>
+              </div>
+              <span style="font-size:11px;line-height:1.6;color:#7F8A85;text-align:center;text-wrap:pretty">{{ relFoot }}</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isCharge }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goToday }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Today</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;flex-direction:column;gap:13px">
+              <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#8B958F">Charge left</span>
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="{{ heroNum }}">{{ chargeNow }}</span>
+                    <span style="font-size:13px;color:#7F8A85;font-variant-numeric:tabular-nums">of {{ wakeNum }}</span>
+                  </div>
+                </div>
+                <span style="{{ heroChip }}">{{ stateLabel }}</span>
+              </div>
+              <div style="{{ barTrack }}">
+                <div style="{{ barGhost }}"></div>
+                <div style="{{ barFill }}"></div>
+              </div>
+              <span style="font-size:13px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ chargeLine }}</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 4px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Why you woke with {{ wakeNum }}</span>
+                <sc-if value="{{ confOn }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ confBox }}">
+                    <span style="{{ confDot }}"></span>
+                    <span style="{{ confLabelStyle }}">{{ confLabel }}</span>
+                  </div>
+                </sc-if>
+              </div>
+              <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+                <sc-for list="{{ drivers }}" as="d" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:{{ d.border }}">
+                    <span style="{{ d.mark }}"></span>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:3px;min-width:0">
+                      <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">{{ d.k }}</span>
+                      <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ d.sub }}</span>
+                    </div>
+                    <span style="{{ d.figStyle }}">{{ d.fig }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11px;line-height:1.6;color:#7F8A85;padding:0 4px;text-wrap:pretty">Four things set your morning number. Nothing else does, and the arithmetic is shown so you can disagree with it.</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600;padding:0 4px">Where it went</span>
+              <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+                <sc-for list="{{ spendRows }}" as="r" hint-placeholder-count="4">
+                  <div style="{{ r.row }}">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                      <span style="{{ r.kStyle }}">{{ r.k }}</span>
+                      <span style="font-size:11.5px;line-height:1.45;color:#7F8A85;text-wrap:pretty">{{ r.s }}</span>
+                    </div>
+                    <span style="{{ r.wasS }}">{{ r.was }}</span>
+                    <span style="{{ r.costS }}">{{ r.cost }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <sc-if value="{{ driftCard }}" hint-placeholder-val="{{ false }}">
+              <div style="{{ driftCardStyle }}">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span style="{{ driftIcon }}"></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:14px;font-weight:600;color:#EDF1EF">{{ driftTitle }}</span>
+                    <span style="{{ driftSubStyle }}">{{ driftSub }}</span>
+                  </div>
+                  <span style="{{ driftFigStyle }}">{{ driftFig }}</span>
+                </div>
+                <sc-if value="{{ driftTiles }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:7px">
+                    <sc-for list="{{ signals }}" as="s" hint-placeholder-count="4">
+                      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:14px;background:rgba(0,0,0,.22)">
+                        <span style="{{ s.arrow }}"></span>
+                        <span style="{{ s.figStyle }}">{{ s.fig }}</span>
+                        <span style="font-size:9px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;color:#7F8A85;text-align:center">{{ s.k }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <span style="{{ driftBodyStyle }}">{{ driftBody }}</span>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ driftQuiet }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:flex-start;gap:11px;padding:0 4px">
+                <svg viewBox="0 0 18 18" style="width:15px;height:15px;flex:none;display:block;margin-top:1px"><circle cx="9" cy="9" r="7.2" fill="none" stroke="rgba(159,226,251,.5)" stroke-width="1.3"></circle><path d="M5.6 9.2 8 11.6 12.4 6.6" fill="none" stroke="#9FE2FB" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                <span style="flex:1;font-size:12.5px;line-height:1.55;color:#939C97;text-wrap:pretty">Nothing is drifting. Four signals checked against your normal.</span>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ driftRuled }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 6px;display:flex;flex-direction:column;gap:11px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                  <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">What it ruled out first</span>
+                  <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#7FC9EE;background:rgba(23,162,230,.12);border-radius:5px;padding:4px 8px">Good baseline</span>
+                </div>
+                <span style="font-size:12px;line-height:1.55;color:#939C97;text-wrap:pretty">Five things move these same four signals the same way. None of them are in yesterday.</span>
+                <div style="display:flex;flex-direction:column;gap:0">
+                  <sc-for list="{{ ruled }}" as="r" hint-placeholder-count="5">
+                    <div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:{{ r.border }}">
+                      <svg viewBox="0 0 18 18" style="width:15px;height:15px;flex:none;display:block"><circle cx="9" cy="9" r="7.2" fill="none" stroke="rgba(159,226,251,.5)" stroke-width="1.3"></circle><path d="M5.6 9.2 8 11.6 12.4 6.6" fill="none" stroke="#9FE2FB" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                      <span style="flex:1;font-size:12.5px;color:#C6CEC9">{{ r.k }}</span>
+                      <span style="font-size:11.5px;color:#7F8A85;flex:none">{{ r.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ hasRecharge }}" hint-placeholder-val="{{ true }}">
+            <div style="background:rgba(139,153,214,.09);border:.5px solid rgba(139,153,214,.24);border-radius:22px;padding:16px;display:flex;align-items:center;gap:13px">
+              <span style="{{ icoMoon }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">Tonight puts it back</span>
+                <span style="font-size:12px;line-height:1.5;color:#C9D0EE;text-wrap:pretty">{{ rechargeLine }}</span>
+              </div>
+            </div>
+            </sc-if>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Charge is spent, not scored. It starts where your night left it and everything you do takes a piece — so a low evening is not a failure, it is the day showing up in the number.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isHeart }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goToday }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Heart</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:14px">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="position:relative;display:flex;align-items:baseline;gap:7px">
+                  <span style="position:absolute;left:-24px;top:-14px;width:120px;height:90px;border-radius:50%;background:radial-gradient(circle,rgba(23,162,230,.28),rgba(23,162,230,0) 70%);animation:heartglow 1.05s ease-in-out infinite;pointer-events:none"></span>
+                  <span style="position:relative;font-family:'Outfit',sans-serif;font-size:64px;font-weight:200;letter-spacing:-.045em;line-height:1;font-variant-numeric:tabular-nums;animation:heartbeat 1.05s ease-in-out infinite;display:inline-block">{{ bpm }}</span>
+                  <span style="position:relative;font-size:13px;color:#939C97">bpm, live</span>
+                </div>
+                <span style="font-size:13px;color:#7F8A85">{{ zoneNow }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none">
+                <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">Beat to beat</span>
+                <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;font-variant-numeric:tabular-nums">42 ms</span>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 13px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Today · {{ t.daySpan }}</span>
+                <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">52 low · 68 avg · 96 high</span>
+              </div>
+              <svg viewBox="0 0 300 84" preserveAspectRatio="none" style="width:100%;height:84px;display:block;overflow:visible">
+                <path d="M0 62 L300 62" stroke="rgba(255,255,255,.06)" stroke-width="1" stroke-dasharray="3 5"></path>
+                <path d="{{ heartArea }}" fill="rgba(23,162,230,.12)" stroke="none"></path>
+                <polyline points="{{ heartLine }}" fill="none" stroke="#17A2E6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              </svg>
+              <span style="font-size:11px;color:#7F8A85">Dashes are your own resting line, {{ t.restingHr }} bpm</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:13px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Where the day was spent</span>
+              <div style="display:flex;gap:3px;height:12px;border-radius:6px;overflow:hidden">
+                <sc-for list="{{ zoneBar }}" as="z" hint-placeholder-count="5">
+                  <div style="{{ z.s }}"></div>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <sc-for list="{{ zones }}" as="z" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:center;gap:11px">
+                    <span style="{{ z.swatch }}"></span>
+                    <span style="flex:1;font-size:13px;color:#C6CEC9">{{ z.name }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ z.range }}</span>
+                    <span style="width:62px;text-align:right;font-size:12.5px;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ z.time }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="{{ spotCard }}">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                  <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">{{ spotTitle }}</span>
+                  <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ spotSub }}</span>
+                </div>
+                <sc-if value="{{ spotBtn }}" hint-placeholder-val="{{ true }}">
+                  <div onClick="{{ spotTap }}" style="{{ spotBtnStyle }}"><span style="{{ spotBtnLabel }}">{{ spotBtnText }}</span></div>
+                </sc-if>
+              </div>
+
+              <sc-if value="{{ spotRun }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:11px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                    <span style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:200;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;color:#9FE2FB">{{ spotClock }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ spotBeats }}</span>
+                  </div>
+                  <div style="height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden">
+                    <div style="{{ spotBar }}"></div>
+                  </div>
+                  <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">Rest your arm and breathe normally. Moving does not spoil it — it just makes the minute longer.</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ spotDone }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;align-items:flex-end;gap:16px">
+                    <div style="display:flex;flex-direction:column;gap:2px">
+                      <span style="font-family:'Outfit',sans-serif;font-size:38px;font-weight:200;letter-spacing:-.035em;line-height:1;font-variant-numeric:tabular-nums">{{ spotVal }}</span>
+                      <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">Just now</span>
+                    </div>
+                    <span style="width:.5px;height:34px;background:rgba(255,255,255,.1);flex:none"></span>
+                    <div style="display:flex;flex-direction:column;gap:2px">
+                      <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em;line-height:1;color:#939C97;font-variant-numeric:tabular-nums">56 ms</span>
+                      <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">Last night</span>
+                    </div>
+                  </div>
+                  <span style="font-size:12px;line-height:1.55;color:#8B958F;text-wrap:pretty">A minute sitting up and a whole night lying down were not taken under the same conditions. Read this one against your other daytime readings, not against the night.</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ spotFail }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <span style="font-size:13px;font-weight:600;color:#EDF1EF">Not enough clean beats</span>
+                  <span style="font-size:12px;line-height:1.55;color:#8B958F;text-wrap:pretty">Twenty-three seconds of the minute were too noisy to use, which is not enough to compute variability honestly. Nothing was saved. Sit down, rest the arm, and it usually takes on the second go.</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+              <sc-for list="{{ heartRows }}" as="h" hint-placeholder-count="4">
+                <div style="{{ h.row }}">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13.5px;color:#EDF1EF">{{ h.k }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85">{{ h.sub }}</span>
+                  </div>
+                  <span style="{{ h.vStyle }}">{{ h.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <span style="font-size:12px;line-height:1.65;color:#7F8A85;padding:0 2px;text-wrap:pretty">Wrist optical readings lag a sharp change by a few seconds and lose accuracy in cold hands. Beat-to-beat is the honest one — it is what everything else here is built from.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isDay }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goToday }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">The day so far</span>
+          </div>
+
+          <div style="padding:10px 20px 0;display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="font-family:'Outfit',sans-serif;font-size:52px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums">{{ scrubHr }}</span>
+                <span style="font-size:13px;color:#939C97">bpm at {{ scrubTime }}</span>
+              </div>
+              <span style="font-size:13.5px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ scrubNote }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 12px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Drag along the day</span>
+              <div style="position:relative;height:150px">
+                <svg viewBox="0 0 318 150" preserveAspectRatio="none" style="width:100%;height:150px;display:block;overflow:visible">
+                  <path d="M0 112 L318 112" stroke="rgba(255,255,255,.06)" stroke-width="1" stroke-dasharray="3 5"></path>
+                  <path d="{{ hrArea }}" fill="rgba(23,162,230,.12)" stroke="none"></path>
+                  <polyline points="{{ hrLine }}" fill="none" stroke="#17A2E6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                  <line x1="{{ hrX }}" y1="0" x2="{{ hrX }}" y2="150" stroke="rgba(255,255,255,.26)" stroke-width="1" stroke-dasharray="3 4"></line>
+                  <circle cx="{{ hrX }}" cy="{{ hrY }}" r="5" fill="#17A2E6" stroke="#141817" stroke-width="3"></circle>
+                </svg>
+                <div style="position:absolute;inset:0;display:flex">
+                  <sc-for list="{{ hrHits }}" as="h" hint-placeholder-count="24">
+                    <div onClick="{{ h.pick }}" style="flex:1;height:100%;cursor:pointer"></div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">
+                <sc-for list="{{ dayAxis }}" as="a" hint-placeholder-count="4">
+                  <span>{{ a.label }}</span>
+                </sc-for>
+              </div>
+              <span style="font-size:11px;color:#7F8A85;padding-top:2px">Dashes are your own resting line, {{ t.restingHr }} bpm</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+              <div style="padding:13px 0 4px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">What happened</span>
+              </div>
+              <sc-for list="{{ marks }}" as="m" hint-placeholder-count="6">
+                <div onClick="{{ m.pick }}" style="{{ m.row }}">
+                  <span style="{{ m.dot }}"></span>
+                  <span style="width:46px;font-size:12.5px;color:#939C97;font-variant-numeric:tabular-nums">{{ m.time }}</span>
+                  <span style="flex:1;font-size:13.5px;color:#EDF1EF">{{ m.label }}</span>
+                  <span style="font-size:12.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ m.hr }} bpm</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <span style="font-size:12px;line-height:1.65;color:#7F8A85;padding:0 2px;text-wrap:pretty">No score on this screen on purpose. It is the shape of your day, and the only question it answers is “is that normal for me”.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isEnergy }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" data-screen-label="day/energy" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goToday }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">What today has cost</span>
+          </div>
+
+          <div style="padding:10px 20px 0;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+                <span style="{{ enBigStyle }}">{{ enHero }}</span>
+                <span style="font-size:13px;color:#939C97">{{ enUnit }}</span>
+                <sc-if value="{{ enConfOn }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ enConfBox }}">
+                    <span style="{{ enConfDot }}"></span>
+                    <span style="{{ enConfLabelStyle }}">{{ enConfLabel }}</span>
+                  </div>
+                </sc-if>
+              </div>
+              <span style="font-size:13.5px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ enLead }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 12px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Hour by hour</span>
+                <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ enChartMax }}</span>
+              </div>
+              <div style="display:flex;align-items:flex-end;gap:2px;height:132px">
+                <sc-for list="{{ enHours }}" as="h" hint-placeholder-count="24">
+                  <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:1px;height:100%">
+                    <div style="{{ h.active }}"></div>
+                    <div style="{{ h.basal }}"></div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">
+                <span>00</span><span>06</span><span>12</span><span>18</span><span>24</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:12px;padding-top:2px">
+                <sc-for list="{{ enLegend }}" as="l" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="{{ l.dot }}"></span>
+                    <span style="font-size:11px;color:#939C97;font-variant-numeric:tabular-nums">{{ l.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11px;line-height:1.6;color:#7F8A85;text-wrap:pretty">{{ enChartFoot }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+              <div style="padding:13px 0 6px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">What it read</span>
+              </div>
+              <sc-for list="{{ enRows }}" as="r" hint-placeholder-count="4">
+                <div style="{{ r.row }}">
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:13px;color:#EDF1EF">{{ r.k }}</span>
+                    <span style="{{ r.noteStyle }}">{{ r.note }}</span>
+                  </div>
+                  <span style="{{ r.vStyle }}">{{ r.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px;padding:15px 16px;border-radius:22px;background:rgba(23,162,230,.07);border:.5px solid rgba(23,162,230,.18)">
+              <span style="font-size:13px;font-weight:600;color:#EDF1EF">Spend only</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#B7C3C9;text-wrap:pretty">Noop estimates what the day cost because that changes a training decision. It will never set a number for you to eat against — there is no target here, no deficit, and nothing remaining.</span>
+            </div>
+
+            <span style="font-size:12px;line-height:1.65;color:#7F8A85;padding:0 2px;text-wrap:pretty">{{ enFoot }}</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isVitals }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goToday }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Vitals</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;gap:11px">
+              <span style="{{ vitalsDot }}"></span>
+              <span style="font-size:13.5px;color:#C6CEC9">{{ vitalsSummary }}</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ vitals }}" as="v" hint-placeholder-count="5">
+                <div style="{{ v.card }}">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                    <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">{{ v.name }}</span>
+                    <span style="font-size:11px;color:#7F8A85">{{ v.window }}</span>
+                  </div>
+
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                    <div style="display:flex;align-items:baseline;gap:7px">
+                      <span style="{{ v.big }}">{{ v.value }}</span>
+                      <span style="font-size:11.5px;color:#6C7570">{{ v.unit }}</span>
+                    </div>
+                    <span style="{{ v.chip }}">{{ v.delta }}</span>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="position:relative;height:22px">
+                      <div style="position:absolute;top:9px;left:0;right:0;height:4px;border-radius:3px;background:rgba(255,255,255,.06)"></div>
+                      <div style="{{ v.band }}"></div>
+                      <div style="{{ v.baseTick }}"></div>
+                      <div style="{{ v.dot }}"></div>
+                    </div>
+                    <div style="position:relative;height:13px">
+                      <span style="position:absolute;left:0;font-size:10px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ v.lo }}</span>
+                      <span style="{{ v.baseLabel }}">{{ v.base }}</span>
+                      <span style="position:absolute;right:0;font-size:10px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ v.hi }}</span>
+                    </div>
+                  </div>
+
+                  <span style="font-size:12px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ v.plain }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:16px;display:flex;align-items:center;gap:14px">
+              <span style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:300;letter-spacing:-.03em;color:#17A2E6">31</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;font-weight:600">Fitness age</span>
+                <span style="font-size:12px;line-height:1.5;color:#939C97;text-wrap:pretty">Four years under your own. An estimate from resting heart rate and recovery — treat it as a direction, not a fact.</span>
+              </div>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">The shaded stretch is your own normal zone, the pale line inside it is your baseline. If the dot sits in the shade, there is nothing to read.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isStress }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goToday }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Stress</span>
+          </div>
+
+          <div style="padding:10px 20px 0;display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="{{ stressBig }}">{{ stressLabel }}</span>
+              <span style="font-size:13.5px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ stressRead }}</span>
+            </div>
+
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ stressLevels }}" as="l" hint-placeholder-count="4">
+                <div onClick="{{ l.pick }}" style="{{ l.box }}">
+                  <span style="{{ l.swatch }}"></span>
+                  <span style="{{ l.label }}">{{ l.name }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 13px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Across the day · at or above this step</span>
+                <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ t.daySpan }}</span>
+              </div>
+              <div style="display:flex;align-items:flex-end;gap:3px;height:76px">
+                <sc-for list="{{ stressBars }}" as="b" hint-placeholder-count="22">
+                  <div style="{{ b.s }}"></div>
+                </sc-for>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">
+                <sc-for list="{{ dayAxis }}" as="a" hint-placeholder-count="4">
+                  <span>{{ a.label }}</span>
+                </sc-for>
+              </div>
+            </div>
+
+            <div onClick="{{ goBreathe }}" style="{{ breatheCard }}">
+              <span style="{{ breatheKicker }}">The one control you have</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:300;letter-spacing:-.02em;line-height:1.15">Breathe with the orb</span>
+              <span style="font-size:12.5px;line-height:1.5;color:#B7C3C9;text-wrap:pretty">Your home screen is already pacing it — four in, four held, four out, four held. Watch the pulse inside the orb come down as you go.</span>
+            </div>
+
+            <span style="font-size:12px;line-height:1.65;color:#7F8A85;padding:0 2px;text-wrap:pretty">Four steps and a cool ramp, deliberately not a traffic light. Stress is information about the last hour, not a verdict on you.</span>
+          </div>
+        </div>
+        </sc-if>
+
+
+        <sc-if value="{{ isBreathe }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+            <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px;flex:none">
+              <div onClick="{{ goToday }}" style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="width:8px;height:8px;border-top:1.6px solid #C6CEC9;border-left:1.6px solid #C6CEC9;transform:rotate(-45deg);margin-left:-2px"></span></div>
+              <span style="font-size:13.5px;color:#939C97">Today</span>
+            </div>
+
+          <div style="position:relative;height:292px;flex:none;display:flex;align-items:center;justify-content:center">
+            <span style="position:absolute;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(47,178,240,.20),rgba(47,178,240,0) 66%);animation:auraBreathe 10s ease-in-out infinite"></span>
+            <span style="position:absolute;width:214px;height:214px;border-radius:50%;border:1px solid rgba(159,226,251,.28);animation:auraBreathe 10s ease-in-out infinite"></span>
+            <span style="position:absolute;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#9FE2FB,#2FB2F0 55%,#0A5F92);box-shadow:0 18px 52px rgba(11,111,168,.55)"></span>
+            <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none">
+              <span style="font-family:'Outfit',sans-serif;font-size:38px;font-weight:200;letter-spacing:-.03em;line-height:1;color:#F6FDFF;text-shadow:0 2px 16px rgba(4,30,48,.55);font-variant-numeric:tabular-nums">{{ bPaceNum }}</span>
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:rgba(246,253,255,.72)">{{ bPaceLabel }}</span>
+            </div>
+          </div>
+
+          <div style="padding:0 20px 26px;display:flex;flex-direction:column;gap:11px">
+            <div style="display:flex;flex-direction:column;gap:6px;padding:0 2px">
+              <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.025em">{{ bHomeTitle }}</span>
+              <span style="font-size:13px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ bHomeLine }}</span>
+            </div>
+
+            <div onClick="{{ goBPlayer }}" style="height:54px;border-radius:18px;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none">
+              <span style="font-size:15px;font-weight:600;color:#04121A">Start &middot; {{ bProtoName }}</span>
+            </div>
+
+            <div onClick="{{ goBCatalog }}" style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;align-items:center;gap:12px;cursor:pointer">
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;font-weight:600">{{ bProtoName }}</span>
+                <span style="font-size:11.5px;color:#7F8A85">{{ bProtoMeta }}</span>
+              </div>
+              <span style="font-size:12px;color:#7F8A85">Change</span>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <div onClick="{{ goBSweep }}" style="background:rgba(23,162,230,.07);border:.5px solid rgba(23,162,230,.2);border-radius:22px;padding:15px 16px;display:flex;flex-direction:column;gap:7px;cursor:pointer">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#7FC9EE">{{ bSweepEyebrow }}</span>
+                <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #7FC9EE;border-right:1.6px solid #7FC9EE;transform:rotate(45deg)"></span>
+              </div>
+              <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.02em">{{ bSweepTitle }}</span>
+              <span style="font-size:12.5px;line-height:1.55;color:#B7C3C9;text-wrap:pretty">{{ bSweepLine }}</span>
+            </div>
+
+            <sc-if value="{{ bHasFound }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+                <sc-for list="{{ bAfterRows }}" as="a" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:{{ a.border }}">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                      <span style="font-size:13px;color:#EDF1EF">{{ a.k }}</span>
+                      <span style="font-size:11.5px;color:#7F8A85">{{ a.sub }}</span>
+                    </div>
+                    <span style="font-size:12px;color:#7FC9EE;font-variant-numeric:tabular-nums;flex:none">{{ a.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:2px 2px 0;text-wrap:pretty">A pace that suits your physiology. Nothing here treats anything, and the strap does the counting so you can shut your eyes.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isBCatalog }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+            <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px;flex:none">
+              <div onClick="{{ goBreathe }}" style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="width:8px;height:8px;border-top:1.6px solid #C6CEC9;border-left:1.6px solid #C6CEC9;transform:rotate(-45deg);margin-left:-2px"></span></div>
+              <span style="font-size:13.5px;color:#939C97">Breathe</span>
+            </div>
+          <div style="padding:8px 20px 26px;display:flex;flex-direction:column;gap:13px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Eighteen ways to breathe</span>
+              <span style="font-size:13px;line-height:1.6;color:#939C97;text-wrap:pretty">All of them already in the catalog. Grouped by what they are for, because eighteen in one list is a menu nobody reads.</span>
+            </div>
+            <sc-for list="{{ bGroups }}" as="g" hint-placeholder-count="4">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570;padding:6px 2px 0">{{ g.k }}</span>
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+                  <sc-for list="{{ g.items }}" as="p" hint-placeholder-count="4">
+                    <div onClick="{{ p.pick }}" style="{{ p.row }}">
+                      <div style="flex:1;display:flex;flex-direction:column;gap:3px;min-width:0">
+                        <span style="{{ p.nameStyle }}">{{ p.n }}</span>
+                        <span style="font-size:11.5px;color:#7F8A85">{{ p.d }}</span>
+                      </div>
+                      <span style="{{ p.patStyle }}">{{ p.pat }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ g.warn }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:11.5px;line-height:1.6;color:#C8934B;padding:0 2px;text-wrap:pretty">{{ g.warnText }}</span>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isBPlayer }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="height:100%;display:flex;flex-direction:column">
+          <div style="padding:56px 18px 0;display:flex;align-items:center;gap:12px;flex:none">
+            <div onClick="{{ goBreathe }}" style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="font-size:15px;color:#C6CEC9;line-height:1;margin-top:-2px">&times;</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:13px;font-weight:600;color:#EDF1EF">{{ bProtoName }}</span>
+              <span style="font-size:11px;color:#6C7570;font-variant-numeric:tabular-nums">{{ bElapsed }} of {{ bProtoLen }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex:none;padding:6px 10px;border-radius:12px;background:rgba(23,162,230,.1);border:.5px solid rgba(23,162,230,.24)">
+              <span style="{{ bBuzzDot }}"></span>
+              <span style="font-size:10.5px;font-weight:600;color:#7FC9EE">Buzzing the cue</span>
+            </div>
+          </div>
+
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:0 20px">
+            <div style="position:relative;width:300px;height:300px;display:flex;align-items:center;justify-content:center;flex:none">
+              <span style="position:absolute;width:296px;height:296px;border-radius:50%;border:1px solid rgba(255,255,255,.05)"></span>
+              <span style="{{ bPacerGlow }}"></span>
+              <span style="{{ bPacerRing }}"></span>
+              <span style="{{ bPacerOrb }}"></span>
+              <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none">
+                <span style="font-family:'Outfit',sans-serif;font-size:27px;font-weight:300;letter-spacing:-.02em;color:#F6FDFF;text-shadow:0 2px 16px rgba(4,30,48,.55)">{{ bPhaseWord }}</span>
+                <span style="font-family:'Outfit',sans-serif;font-size:15px;font-weight:300;color:rgba(246,253,255,.75);font-variant-numeric:tabular-nums">{{ bPhaseCount }}</span>
+              </div>
+            </div>
+
+            <div style="width:100%;display:flex;flex-direction:column;gap:9px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570">Your heart, against the pace</span>
+                <div style="display:flex;align-items:baseline;gap:4px">
+                  <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:300;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ bSwing }}</span>
+                  <span style="font-size:11px;color:#7F8A85">bpm swing</span>
+                </div>
+              </div>
+              <div style="height:96px;border-radius:20px;background:#141817;border:.5px solid rgba(255,255,255,.06);padding:10px 12px;box-sizing:border-box;position:relative;overflow:hidden">
+                <svg viewBox="0 0 340 76" preserveAspectRatio="none" style="width:100%;height:100%;display:block">
+                  <path d="{{ bPaceBand }}" fill="rgba(23,162,230,.10)"></path>
+                  <polyline points="{{ bPaceLine }}" fill="none" stroke="rgba(159,226,251,.34)" stroke-width="1.2" stroke-dasharray="3 4"></polyline>
+                  <polyline points="{{ bHrLine }}" fill="none" stroke="#9FE2FB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                </svg>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">The dashed line is the pace you are following. The bright one is your heart answering it &mdash; the bigger the swing, the better this pace fits you.</span>
+            </div>
+          </div>
+
+          <div style="padding:0 20px 30px;display:flex;flex-direction:column;gap:10px;flex:none">
+            <div onClick="{{ goBreathe }}" style="height:52px;border-radius:18px;border:.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-size:14.5px;font-weight:500;color:#C6CEC9">End the session</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isBSweep }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="height:100%;display:flex;flex-direction:column">
+          <div style="padding:56px 18px 0;display:flex;align-items:center;gap:12px;flex:none">
+            <div onClick="{{ goBreathe }}" style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="font-size:15px;color:#C6CEC9;line-height:1;margin-top:-2px">&times;</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:13px;font-weight:600;color:#EDF1EF">Finding your pace</span>
+              <span style="font-size:11px;color:#6C7570;font-variant-numeric:tabular-nums">{{ bSweepStepLabel }}</span>
+            </div>
+          </div>
+
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:0 20px">
+            <div style="position:relative;width:250px;height:250px;display:flex;align-items:center;justify-content:center;flex:none">
+              <span style="{{ bSweepGlow }}"></span>
+              <span style="{{ bSweepRing }}"></span>
+              <span style="{{ bSweepOrb }}"></span>
+              <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none">
+                <span style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:200;letter-spacing:-.03em;color:#F6FDFF;font-variant-numeric:tabular-nums">{{ bSweepRate }}</span>
+                <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:rgba(246,253,255,.7)">breaths / min</span>
+              </div>
+            </div>
+
+            <span style="font-family:'Instrument Serif',serif;font-size:17px;line-height:1.45;color:#C6CEC9;text-align:center;text-wrap:pretty">{{ bSweepCue }}</span>
+
+            <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570">How hard your heart swung at each</span>
+              <div style="display:flex;align-items:flex-end;gap:8px;height:132px">
+                <sc-for list="{{ bCandidates }}" as="c" hint-placeholder-count="5">
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;justify-content:flex-end;height:100%">
+                    <span style="{{ c.figStyle }}">{{ c.fig }}</span>
+                    <div style="{{ c.bar }}"></div>
+                    <span style="{{ c.lblStyle }}">{{ c.k }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:0 20px 30px;display:flex;flex-direction:column;gap:9px;flex:none">
+            <div onClick="{{ goBFound }}" style="height:52px;border-radius:18px;border:.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-size:14.5px;font-weight:500;color:#C6CEC9">Stop &mdash; keep what it has</span>
+            </div>
+            <span style="font-size:11px;line-height:1.55;color:#7F8A85;text-align:center;text-wrap:pretty">Ten minutes, five paces, ninety seconds each. Stopping early keeps every pace it finished.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isBFound }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+            <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px;flex:none">
+              <div onClick="{{ goBreathe }}" style="width:34px;height:34px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="width:8px;height:8px;border-top:1.6px solid #C6CEC9;border-left:1.6px solid #C6CEC9;transform:rotate(-45deg);margin-left:-2px"></span></div>
+              <span style="font-size:13.5px;color:#939C97">Breathe</span>
+            </div>
+
+          <div style="padding:16px 20px 0;display:flex;flex-direction:column;align-items:center;gap:8px;flex:none">
+            <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#7FC9EE">Your pace</span>
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font-family:'Outfit',sans-serif;font-size:76px;font-weight:200;letter-spacing:-.045em;line-height:.95;color:#EDF1EF;font-variant-numeric:tabular-nums">5.5</span>
+              <span style="font-size:14px;color:#939C97">breaths / min</span>
+            </div>
+            <span style="font-size:13px;line-height:1.55;color:#939C97;text-align:center;text-wrap:pretty">Five and a half seconds in, five and a half out. Your heart swung 31 % harder here than at any other pace it tried.</span>
+          </div>
+
+          <div style="padding:22px 20px 26px;display:flex;flex-direction:column;gap:12px">
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 12px;display:flex;flex-direction:column;gap:12px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#6C7570">The curve it found</span>
+              <svg viewBox="0 0 320 128" style="width:100%;height:128px;display:block">
+                <path d="M14 106 C58 100 78 58 112 40 C132 29 150 26 168 34 C196 46 214 84 258 98 L306 106" fill="none" stroke="rgba(159,226,251,.3)" stroke-width="1.6"></path>
+                <line x1="168" y1="34" x2="168" y2="112" stroke="rgba(159,226,251,.35)" stroke-width="1" stroke-dasharray="3 4"></line>
+                <circle cx="14" cy="106" r="4" fill="#3E6B80"></circle>
+                <circle cx="112" cy="40" r="4" fill="#3E6B80"></circle>
+                <circle cx="168" cy="34" r="6.5" fill="#9FE2FB"></circle>
+                <circle cx="258" cy="98" r="4" fill="#3E6B80"></circle>
+                <circle cx="306" cy="106" r="4" fill="#3E6B80"></circle>
+                <text x="168" y="126" font-family="'Instrument Sans',sans-serif" font-size="10" fill="#9FE2FB" text-anchor="middle">5.5</text>
+                <text x="14" y="126" font-family="'Instrument Sans',sans-serif" font-size="10" fill="#7F8A85" text-anchor="middle">6.5</text>
+                <text x="306" y="126" font-family="'Instrument Sans',sans-serif" font-size="10" fill="#7F8A85" text-anchor="middle">4.5</text>
+              </svg>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+              <sc-for list="{{ bAfterRows }}" as="a" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:{{ a.border }}">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13px;color:#EDF1EF">{{ a.k }}</span>
+                    <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ a.sub }}</span>
+                  </div>
+                  <span style="font-size:12px;color:#7FC9EE;font-variant-numeric:tabular-nums;flex:none">{{ a.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div onClick="{{ goBPlayer }}" style="height:54px;border-radius:18px;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-size:15px;font-weight:600;color:#04121A">Breathe at 5.5</span>
+            </div>
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Worth testing again after a few months, or if your resting pulse moves. It is a pace that suits your physiology, not a treatment for anything.</span>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none;z-index:6">
+        <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5);pointer-events:auto">
+          <div onClick="{{ goToday }}" style="flex:1.7;height:46px;border-radius:20px;background:#17A2E6;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer">
+            <span style="{{ icoTodayOn }}"></span>
+            <span style="font-size:12.5px;font-weight:600;color:#04121A">Today</span>
+          </div>
+          <div onClick="{{ tabTrends }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoTrends }}"></span>
+          </div>
+          <div onClick="{{ openLog }}" style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(23,162,230,.4)">
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;color:#04121A;line-height:1;margin-top:-2px">+</span>
+          </div>
+          <div onClick="{{ tabRest }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoRest }}"></span>
+          </div>
+          <div onClick="{{ tabYou }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoYou }}"></span>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ logOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:flex-end">
+        <div onClick="{{ closeLog }}" style="position:absolute;inset:0;background:rgba(4,6,6,.62);backdrop-filter:blur(3px)"></div>
+        <div style="position:relative;background:#141817;border-top:.5px solid rgba(255,255,255,.1);border-radius:30px 30px 0 0;padding:12px 20px 30px;display:flex;flex-direction:column;gap:16px;animation:sheetUp .3s cubic-bezier(.22,.61,.36,1) both;box-shadow:0 -20px 50px rgba(0,0,0,.5)">
+          <span style="width:38px;height:4px;border-radius:3px;background:rgba(255,255,255,.2);align-self:center"></span>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em">Log it</span>
+            <span style="font-size:12.5px;color:#7F8A85">One tap each. Tap twice for two.</span>
+          </div>
+
+          <div onClick="{{ goSession }}" style="display:flex;align-items:center;gap:12px;padding:2px 2px 14px;cursor:pointer;border-bottom:.5px solid rgba(255,255,255,.08)">
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:14px;font-weight:600;color:#EDF1EF">Start a session</span>
+              <span style="font-size:11.5px;color:#7F8A85">Today&rsquo;s recommendation, from wherever you are</span>
+            </div>
+            <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+          </div>
+
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ logTiles }}" as="l" hint-placeholder-count="6">
+              <div onClick="{{ l.add }}" style="{{ l.box }}">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <span style="{{ l.icon }}"></span>
+                  <span style="{{ l.count }}">{{ l.n }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <span style="{{ l.label }}">{{ l.k }}</span>
+                  <span style="font-size:10.5px;color:#6C7570">{{ l.sub }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;text-wrap:pretty">Everything logged here turns up in tonight's read — that is the only reason the app asks.</span>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div onClick="{{ closeLog }}" style="height:54px;border-radius:18px;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-size:15px;font-weight:600;color:#04121A">Done</span>
+            </div>
+            <div onClick="{{ clearLog }}" style="height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-size:13px;color:#7F8A85">Clear today</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+  </x-import>
+  </div>
+</div>
+
+<sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+<div style="width:430px;flex:none;padding-top:34px;display:flex;flex-direction:column;gap:30px">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:33px;line-height:1.16;letter-spacing:-.028em;color:#17150F;text-wrap:pretty">The orb paces you. Your pulse, inside it, answers.</h1>
+    <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;text-wrap:pretty">Nothing in the orb but one number and one word. Your live heart rate sits dead centre — no unit, nothing beside it — and the instruction reads underneath: <strong style="font-weight:600;color:#17150F">breathe in, hold, breathe out, hold</strong>. The number rises on the inhale and falls on the exhale exactly as the physiology says it should. No title, no counter, no session to start.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0">
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#C4657A;letter-spacing:.06em;padding-top:3px">W3 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">What today has cost — a card, and <strong style="font-weight:600;color:#17150F">day/energy</strong> behind it</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Spend only, and the card says four things in reading order: what it measured, the split, where the day is heading <em style="font-family:'Instrument Serif',serif;font-style:italic">as a range</em>, and how much of the day it saw — in words, never as a percentage chip. Five designed readings off the engine's enums, on <em style="font-family:'Instrument Serif',serif;font-style:italic">energyCase</em>, not twenty combinations. The thin-number answer here is the <strong style="font-weight:600;color:#17150F">interval</strong>, not withholding: the band widens as coverage falls, so <strong style="font-weight:600;color:#17150F">steps</strong> shows a range where a measured day shows a figure, and only <strong style="font-weight:600;color:#17150F">cold</strong> has no measured spend at all — there the one figure Noop can always stand behind is stated flat, with the chip carrying the reason. On day/energy the coverage gap is a <strong style="font-weight:600;color:#17150F">hairline column</strong>, the same idea as the gauge's ghost ticks: a gap is not a zero. A past day loses the projection entirely, because a forecast for yesterday is not a forecast.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">W1b · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">What's new, in Noop's language instead of the merge's</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty"><strong style="font-weight:600;color:#17150F">day/release</strong>, the sheet a version bump presents once. Four readings, written as facts about the app rather than features: the lift, what the day cost, what changed, speaking to Svea. Two states — <strong style="font-weight:600;color:#17150F">bump</strong> carries the New chip and <em style="font-family:'Instrument Serif',serif;font-style:italic">Start using it</em>; <strong style="font-weight:600;color:#17150F">bell</strong> drops both, because a thing you chose to open is not news. Two doors: the bell's Worth knowing row, and Settings → About. The per-version list is set at length and deliberately unwritten — the release feed owns those strings.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T1 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Today</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Orb, body state, last night in one line, the day's shape, then Heart · Vitals · Stress. The Heart card carries the live number itself, so the pulse is on the home screen without a screen of its own. The <strong style="font-weight:600;color:#17150F">Charge gauge</strong> around the orb now behaves like a battery: the ghost ticks are the headroom you woke with and the lit arc is what is left. No numbers under the orb — the figure is in the sentence, and tapping the orb opens <strong style="font-weight:600;color:#17150F">Where it went</strong>, which prices every drain: hours awake, the intervals, the stressed minutes, the steps over normal. The instruction inside the orb is still one word, <em style="font-family:'Instrument Serif',serif;font-style:italic">in · hold · out · hold</em>, in step with the orb's own swell.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T3 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Heart</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Replaces the full-screen live face: live bpm and beat-to-beat at the top, today's curve, where the day was spent by zone, then resting rate, variability and recovery. A room, not a wall.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T3</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Vitals — and what out of zone looks like</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Every signal carries its own <strong style="font-weight:600;color:#17150F">normal zone</strong> as shaded track, its <strong style="font-weight:600;color:#17150F">baseline</strong> as a pale tick, the range ends in figures, and the difference as a chip. Breathing rate is deliberately outside its zone here: the figure, the chip, the dot and the card edge all turn <strong style="font-weight:600;color:#17150F">amber</strong> — one colour, four places, no alarm. The count at the top and the Vitals row on Today change with it.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11);border-bottom:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T5 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The + button is for logging</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Coffee, water, a meal, a drink, intimacy, a nap — one tap each, counts on the tile, and it all lands in tonight's read. Starting a workout belongs to Act 3, not here.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Is Today finished?</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">One thing is still missing, and it belongs to Act 3: <span style="color:#EDF1EF">today's session</span> — the one line that says whether to train and how hard, with accept or swap. That is the last card Today needs. Everything else it could hold — streaks, rings, a score — it is better without.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Night shift, same act</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">Flip <span style="color:#EDF1EF">schedule</span> and “the day so far” becomes the span from your 15:22 waking to now, the greeting stops saying morning, and the timeline shows a shift rather than a commute. The word <em style="font-family:'Instrument Serif',serif;font-style:italic">day</em> means your day, wherever it lands on a clock.</p>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;demoSeed&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Evidence&quot;},&quot;chargeVerdict&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string | null&quot;},&quot;chargeNote&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string | null&quot;},&quot;rechargeTo&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;number | null&quot;},&quot;confidence&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;solid&quot;,&quot;building&quot;,&quot;calibrating&quot;],&quot;default&quot;:&quot;solid&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;doneName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;doneMins&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:42,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;schedule&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;day&quot;,&quot;night&quot;],&quot;default&quot;:&quot;day&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;today&quot;,&quot;inbox&quot;,&quot;charge&quot;,&quot;heart&quot;,&quot;day&quot;,&quot;energy&quot;,&quot;vitals&quot;,&quot;stress&quot;,&quot;breathe&quot;,&quot;bcatalog&quot;,&quot;bplayer&quot;,&quot;bsweep&quot;,&quot;bfound&quot;,&quot;release&quot;],&quot;default&quot;:&quot;today&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;energyCase&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;measured&quot;,&quot;learning&quot;,&quot;partial&quot;,&quot;steps&quot;,&quot;cold&quot;],&quot;default&quot;:&quot;measured&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Body state&quot;},&quot;charge&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:92,&quot;min&quot;:40,&quot;max&quot;:100,&quot;step&quot;:1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Body state&quot;},&quot;hour&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:15.6,&quot;min&quot;:7,&quot;max&quot;:23,&quot;step&quot;:0.2,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Body state&quot;},&quot;signal&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;silent&quot;,&quot;quiet&quot;,&quot;mild&quot;,&quot;raised&quot;,&quot;damped&quot;],&quot;default&quot;:&quot;raised&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Body state&quot;},&quot;spotCase&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;clean&quot;,&quot;noisy&quot;],&quot;default&quot;:&quot;clean&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Body state&quot;},&quot;inbox&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;empty&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Body state&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;release&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;bump&quot;,&quot;bell&quot;],&quot;default&quot;:&quot;bump&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+const GLYPH = {
+  today: 'M12 3v2M12 19v2M4.2 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z',
+  trends: 'M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9',
+  moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+  you: 'M12 4.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM5.5 19.5c0-3.3 2.9-5.3 6.5-5.3s6.5 2 6.5 5.3',
+  heart: 'M12 20s-7-4.6-7-9.4A3.8 3.8 0 0 1 12 8a3.8 3.8 0 0 1 7 2.6C19 15.4 12 20 12 20z',
+  lungs: 'M12 4v8M8.6 20c-2 0-3.6-1.4-3.6-3.4 0-2.7.9-5.1 2.5-6.7.8-.9 2.1-.3 2.1.9v6.9c0 1.3-.5 2.3-1 2.3zM15.4 20c2 0 3.6-1.4 3.6-3.4 0-2.7-.9-5.1-2.5-6.7-.8-.9-2.1-.3-2.1.9v6.9c0 1.3.5 2.3 1 2.3z',
+  spark: 'M12 3.5 13.6 9l5.4 1.6L13.6 12l-1.6 5.5L10.4 12 5 10.6 10.4 9z',
+  calendar: 'M5 7.5h14V20H5zM5 11h14M8.6 4.5v4M15.4 4.5v4',
+  bell: 'M12 4a5 5 0 0 0-5 5v3.5L5.5 16h13L17 12.5V9a5 5 0 0 0-5-5zM10 19a2 2 0 0 0 4 0',
+  clock2: 'M12 7.6v4.9l3 2M12 4.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2z',
+  cup: 'M4.5 8h11v5a5.5 5.5 0 0 1-11 0V8zM15.5 9H18a2.4 2.4 0 0 1 0 4.8h-2.5M4 20h13',
+  drop: 'M12 3.6c3.2 3.7 5 6.3 5 8.7a5 5 0 0 1-10 0c0-2.4 1.8-5 5-8.7z',
+  plate: 'M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8zM12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z',
+  glass: 'M7 4.5h10l-1.4 7.1A3.9 3.9 0 0 1 12 14a3.9 3.9 0 0 1-3.6-2.4L7 4.5zM12 14v5.5M9 19.5h6',
+  bed: 'M3 19v-6h13a4 4 0 0 1 4 4v2M3 13V7M7.5 11.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4M3 19h17',
+  pill: 'M9.5 4.5h5a3.5 3.5 0 0 1 3.5 3.5v8a3.5 3.5 0 0 1-3.5 3.5h-5A3.5 3.5 0 0 1 6 16V8a3.5 3.5 0 0 1 3.5-3.5zM6 12h12',
+  // a barbell straight on: three strokes, 12 viewBox units apart, nothing that can merge at 19px
+  lift: 'M6 8.6v6.8M18 8.6v6.8M6 12h12',
+  // the spend reading is a gauge, not a flame. A flame is the calorie-burn idiom of the apps this
+  // one is positioned against, and every teardrop variant collided with `drop`, which means water
+  // here. Borrowed from Act 5's set, where it already means a measured quantity.
+  gauge: 'M4.6 17.4a8 8 0 1 1 14.8 0M12 12.4l3.4-3.4',
+  mic: 'M12 4a2.8 2.8 0 0 0-2.8 2.8v4.4a2.8 2.8 0 0 0 5.6 0V6.8A2.8 2.8 0 0 0 12 4zM5.8 11.6a6.2 6.2 0 0 0 12.4 0M12 17.8v2.4M9.2 20.2h5.6'
+};
+const mask = function (d) {
+  return 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+};
+const ico = function (key, size, color) {
+  const u = mask(GLYPH[key]);
+  return {
+    width: size, height: size, flex: 'none', display: 'block', background: color,
+    WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+  };
+};
+
+const A = '#17A2E6';
+const COOL = '#4FB8E8';
+const LAV = '#8B99D6';
+const WARM = '#F2B45C';
+const HOT = '#F0742C';
+const PHASES = ['In', 'Hold', 'Out', 'Hold'];
+
+const HR = [58, 60, 62, 74, 88, 96, 92, 78, 72, 70, 74, 80, 76, 72, 70, 68, 72, 78, 74, 70, 68, 66, 70, 72];
+const STRESS = [0, 0, 1, 1, 2, 2, 1, 1, 0, 1, 1, 2, 3, 2, 1, 1, 0, 1, 2, 1, 1, 1];
+
+const TERMS = {
+  day: {
+    greet: 'Hi, Gabriel', headline: 'Take four breaths first',
+    stateLabel: 'Well restored', stateCoach: 'Your body has room today. Good day to ask something of it.',
+    lastSleep: 'Last night · 7h 12m, 7m over your need',
+    lastSleepNote: 'Deep came early. Nothing to fix.',
+    daySpan: '06:41 → 14:20', restingHr: '58',
+    dayRead: 'Quiet since the walk. You are sitting eight beats above your resting line, which is normal for the early afternoon.',
+    axis: ['06:41', '09:00', '11:30', '14:20'],
+    marks: [
+      { time: '06:41', label: 'Woke', hr: 58, i: 0 },
+      { time: '07:20', label: 'Coffee', hr: 62, i: 2 },
+      { time: '08:10', label: 'Walk, 32 min', hr: 96, i: 5 },
+      { time: '09:30', label: 'Standup', hr: 78, i: 7 },
+      { time: '12:05', label: 'Lunch', hr: 80, i: 11 },
+      { time: '14:20', label: 'Now', hr: 72, i: 23 }
+    ]
+  },
+  night: {
+    greet: 'Evening, Gabriel', headline: 'Take four breaths first',
+    stateLabel: 'Well restored', stateCoach: 'You slept properly through the afternoon. A good shift to push on.',
+    lastSleep: 'Last sleep · 7h 12m, 7m over your need',
+    lastSleepNote: 'Deep came early, before the heat. Nothing to fix.',
+    daySpan: '15:22 → 22:40', restingHr: '58',
+    dayRead: 'Quiet since the walk before your shift. You are eight beats above your resting line, which is normal for this point of a night.',
+    axis: ['15:22', '17:30', '20:00', '22:40'],
+    marks: [
+      { time: '15:22', label: 'Woke', hr: 58, i: 0 },
+      { time: '16:10', label: 'Coffee', hr: 62, i: 2 },
+      { time: '17:00', label: 'Walk, 32 min', hr: 96, i: 5 },
+      { time: '18:00', label: 'Shift started', hr: 78, i: 7 },
+      { time: '20:30', label: 'Ward round', hr: 80, i: 11 },
+      { time: '22:40', label: 'Now', hr: 72, i: 23 }
+    ]
+  }
+};
+
+// value, own baseline, own normal band, and the scale the band is drawn on
+const VITALS = [
+  { name: 'Resting heart rate', v: 58, base: 60, lo: 54, hi: 64, min: 46, max: 74, unit: 'bpm', dp: 0, dir: -1, window: 'overnight average', plain: 'Two beats slower than your baseline — a good sign, nothing to read into.' },
+  { name: 'Heart rhythm', v: 56, base: 48, lo: 42, hi: 60, min: 28, max: 76, unit: 'ms', dp: 0, dir: 1, window: 'overnight variability', plain: 'Near the top of your zone. The clearest sign you have recovered.' },
+  { name: 'Breathing rate', v: 16.1, base: 14.3, lo: 13.4, hi: 15.2, min: 11, max: 18, unit: '/min', dp: 1, dir: 0, window: 'overnight average', plain: 'Almost two breaths a minute above your normal, and outside your zone for the first time in three weeks. Usually altitude, a warm room, a drink, or something your body is fighting off. Worth watching for a night, not worth worrying about tonight.' },
+  { name: 'Blood oxygen', v: 97, base: 97, lo: 95.5, hi: 99, min: 92, max: 100, unit: '%', dp: 0, dir: 0, window: 'overnight low', plain: 'Normal. Wrist readings are approximate, so only sustained changes get flagged.' },
+  { name: 'Skin temperature', v: -0.2, base: 0, lo: -0.4, hi: 0.4, min: -1.2, max: 1.2, unit: '°C', dp: 1, dir: 0, window: 'deviation from your normal', plain: 'Slightly cool, which is what a proper sleep looks like.' }
+];
+
+const SLEVELS = [
+  { name: 'Settled', c: COOL, read: 'Nothing is asking anything of you. Your rhythm has been steady for the last two hours.' },
+  { name: 'Engaged', c: LAV, read: 'Working, not straining. This is where most of a good day sits — no action needed.' },
+  { name: 'Pushed', c: WARM, read: 'An hour of real load. Worth a wind-down before it becomes the evening you take home.' },
+  { name: 'Overloaded', c: HOT, read: 'Your body has been braced for a while. Four rounds of breathing is the cheapest thing you can do about it.' }
+];
+
+const ZONES = [
+  { name: 'Resting', range: 'under 62', time: '9h 12m', f: 52, c: '#3E6C86' },
+  { name: 'Easy', range: '62–96', time: '3h 04m', f: 26, c: COOL },
+  { name: 'Steady', range: '96–128', time: '38m', f: 12, c: A },
+  { name: 'Hard', range: '128–152', time: '6m', f: 7, c: WARM },
+  { name: 'All out', range: '152+', time: '—', f: 3, c: HOT }
+];
+
+const LOGS = [
+  { k: 'Coffee', sub: 'caffeine clock starts', g: 'cup' },
+  { k: 'Water', sub: 'a glass', g: 'drop' },
+  { k: 'Meal', sub: 'anything substantial', g: 'plate' },
+  { k: 'Alcohol', sub: 'one drink', g: 'glass' },
+  { k: 'Intimacy', sub: 'private, on device', g: 'heart' },
+  { k: 'Nap', sub: 'twenty minutes or more', g: 'bed' }
+];
+
+const fmtV = function (v, dp) { return dp ? v.toFixed(1) : String(Math.round(v)); };
+
+// ── Breathe: the eighteen-protocol catalog, grouped by what it is for
+const PROTOS = {
+  calm: [
+    { n: 'Coherent 6-6', d: 'Six seconds in, six out. The default until a sweep says otherwise.', pat: '6 · 6', cyc: 12 },
+    { n: 'Box', d: 'Equal four counts. The one on today\u2019s orb.', pat: '4 · 4 · 4 · 4', cyc: 16 },
+    { n: '4-7-8', d: 'Long hold, longer out. For getting to sleep.', pat: '4 · 7 · 8', cyc: 19 },
+    { n: 'Diaphragmatic', d: 'Slow and low, no counting to speak of.', pat: '5 · 5', cyc: 10 },
+    { n: 'Extended exhale', d: 'Twice as long out as in.', pat: '4 · 8', cyc: 12 }
+  ],
+  focus: [
+    { n: 'Alternate Nostril', d: 'Alternating sides, hands involved.', pat: '4 · 4 · 4', cyc: 12 },
+    { n: 'Buteyko', d: 'Reduced volume, light air hunger.', pat: '3 · 3 · 6', cyc: 12 },
+    { n: 'Resonance', d: 'Whatever your sweep found. Locked to you.', pat: '5.5 · 5.5', cyc: 11 },
+    { n: 'Ujjayi', d: 'Narrowed throat, audible and even.', pat: '5 · 5', cyc: 10 }
+  ],
+  energise: [
+    { n: 'Bhastrika', d: 'Forceful and fast, in and out.', pat: '1 · 1', cyc: 2 },
+    { n: 'Kapalabhati', d: 'Sharp exhales, passive inhales.', pat: '0.5 · 1', cyc: 1.5 },
+    { n: 'Breath of fire', d: 'Rapid and even through the nose.', pat: '1 · 1', cyc: 2 },
+    { n: 'Wim Hof rounds', d: 'Thirty deep breaths, then a hold.', pat: '30 + hold', cyc: 3 },
+    { n: 'Holotropic', d: 'Sustained fast breathing, long session.', pat: 'free', cyc: 3 }
+  ],
+  measure: [
+    { n: 'Find your pace', d: 'The resonance sweep. Ten minutes, once.', pat: 'sweep', cyc: 11 },
+    { n: 'CO\u2082 tolerance', d: 'One comfortable hold, timed.', pat: 'hold', cyc: 10 },
+    { n: 'BOLT score', d: 'Breath-hold time after a normal exhale.', pat: 'hold', cyc: 10 },
+    { n: 'Resting check', d: 'Two minutes of nothing, for a baseline.', pat: '\u2014', cyc: 10 }
+  ]
+};
+const BRATES = [6.5, 6.0, 5.5, 5.0, 4.5];
+const BSWINGS = [0.52, 0.74, 1.0, 0.68, 0.44];
+
+class Component extends DCLogic {
+  state = { sx: null, sy: null, screen: null, log: false, tick: 0, hrPt: 23, stress: 0, counts: {}, dayOff: 0, dayOpen: false, drain: 0,
+    bproto: null, bfound: false, bt: 0, bsamples: [], bsweepT: 0,
+    spot: 'idle', spotLeft: 60, decided: {}, restored: false, seen: false };
+
+  componentDidMount() {
+    const self = this;
+    this.timer = setInterval(function () { self.setState({ tick: self.state.tick + 1 }); }, 1000);
+    // ── the breathe pacer: 140 ms, so the trace is sampled rather than drawn after the fact
+    this.btimer = setInterval(function () {
+      const S = self.state;
+      const scr = S.screen || self.props.screen || 'today';
+      if (scr === 'bplayer') {
+        const proto = S.bproto || PROTOS.calm[0];
+        const bt = S.bt + 0.14;
+        const cyc = proto.cyc;
+        const hr = 64 + 7.5 * Math.sin(2 * Math.PI * (bt - cyc * 0.16) / cyc) + (Math.random() - 0.5) * 0.9;
+        self.setState({ bt: bt, bsamples: S.bsamples.concat([hr]).slice(-96) });
+      } else if (scr === 'bsweep') {
+        const sweepT = S.bsweepT + 0.14;
+        if (sweepT > 30) { self.setState({ screen: 'bfound', bfound: true, bsweepT: 0 }); return; }
+        self.setState({ bsweepT: sweepT, bt: S.bt + 0.14 });
+      }
+    }, 140);
+    // the gauge falls from what you woke with to what is left, once, on arrival
+    const t0 = Date.now();
+    this.drainT = setInterval(function () {
+      const p = Math.min(1, (Date.now() - t0) / 1150);
+      self.setState({ drain: p });
+      if (p >= 1) clearInterval(self.drainT);
+    }, 40);
+  }
+  componentWillUnmount() { clearInterval(this.timer); clearInterval(this.drainT); clearInterval(this.btimer); clearInterval(this.spotT); }
+
+  // ── the spot reading: a bounded minute, counted down honestly, ending in a value or in nothing
+  startSpot() {
+    const self = this;
+    clearInterval(this.spotT);
+    this.setState({ spot: 'run', spotLeft: 60 });
+    this.spotT = setInterval(function () {
+      const n = self.state.spotLeft - 1;
+      if (n <= 0) {
+        clearInterval(self.spotT); self.spotT = null;
+        self.setState({ spot: (self.props.spotCase || 'clean') === 'noisy' ? 'fail' : 'done', spotLeft: 0 });
+      } else self.setState({ spotLeft: n });
+    }, 130);
+  }
+
+  componentDidUpdate(prev) {
+    const p = this.props;
+    if ((prev.screen !== p.screen || prev.navSeq !== p.navSeq) && p.screen) this.setState({ screen: p.screen });
+    // the + from an act with no sheet of its own lands here: today, with the log sheet up
+    if (prev.sheetSeq !== p.sheetSeq && p.sheet === 'log') this.setState({ screen: 'today', log: true });
+  }
+
+  renderVals() {
+    const self = this;
+    const S = this.state;
+    const screen = S.screen || this.props.screen || 'today';
+    const NIGHTSHIFT = (this.props.schedule || 'day') === 'night';
+    const T = NIGHTSHIFT ? TERMS.night : TERMS.day;
+    const go = function (k) { return function () { self.setState(function (s) { return { screen: k, log: false, bt0: s.tick }; }); }; };
+
+    // ── box-breathing clock, in step with the 16s CSS loop
+    const bt = S.tick - (S.bt0 || 0);
+    const t = bt % 16;
+    const phaseI = Math.floor(t / 4);
+    // real respiratory sinus arrhythmia: pulse lifts on the inhale, settles on the exhale,
+    // and the whole baseline drifts down as the rounds go by
+    const settle = Math.min(7, Math.floor(bt / 16) * 1.5);
+    const swing = [3, 1, -3, -1][phaseI];
+    const bpm = Math.round(70 - settle + swing);
+
+    // ── Charge is a battery: full when you wake, spent by the day, and the
+    //    gauge, the orb and the words all follow the level down together
+    const wake = Math.round(Number(this.props.charge != null ? this.props.charge : 92));
+    const hourNow = Number(this.props.hour != null ? this.props.hour : 15.6);
+    const WAKE_H = 6.67;
+    const awake = Math.max(0, hourNow - WAKE_H);
+    const hm = Math.floor(awake) + 'h ' + String(Math.round((awake % 1) * 60)).padStart(2, '0') + 'm';
+    const SPEND = [
+      { k: 'Just being awake', s: 'baseline burn across ' + hm, at: WAKE_H, cost: Math.round(awake * 1.15) },
+      { k: 'The intervals', s: '6 × 3 min hard at 07:40', at: 7.9, cost: 14 },
+      { k: 'Two hard meetings', s: '38 stressed minutes before lunch', at: 11.6, cost: 7 },
+      { k: 'On your feet', s: '11.4k steps, 3k over your normal', at: 14.2, cost: 5 }
+    ].filter(function (x) { return x.at <= hourNow && x.cost > 0; });
+    // ── the drift signal is a drain in the ledger, never a banner
+    const SIG = this.props.signal || 'raised';
+    const SIGCOST = { raised: 12, mild: 4, damped: 4 }[SIG] || 0;
+    if (SIGCOST) SPEND.unshift({
+      k: SIG === 'damped' ? 'Pulled back — three drinks' : 'Something is off',
+      s: SIG === 'raised' ? 'Three of four signals moved together'
+        : SIG === 'mild' ? 'Skin temperature only' : 'Scored as the drinks, not as illness',
+      at: WAKE_H, cost: SIGCOST, amber: SIG === 'raised', was: SIG === 'damped' ? 18 : 0
+    });
+    const spent = SPEND.reduce(function (a, x) { return a + x.cost; }, 0);
+    const charge = Math.max(4, Math.min(100, wake - spent));
+    const dEase = 1 - Math.pow(1 - Math.max(0, Math.min(1, S.drain)), 3);
+    const shown = Math.round(wake + (charge - wake) * dEase);
+    const FRAC = Math.max(0.04, Math.min(1, shown / 100));
+    const WFRAC = Math.max(0.04, Math.min(1, wake / 100));
+    const cHeat = Math.max(0, Math.min(1, (58 - shown) / 40));
+    const cLerp = function (a, b, t) { return Math.round(a + (b - a) * t); };
+    // the level walks the aura down its own palette: blue → blush → amber → hot
+    const RAMP = [[47, 178, 240], [224, 138, 155], [242, 180, 92], [240, 116, 44]];
+    const RSTOP = [0, 0.5, 0.78, 1];
+    let warm = RAMP[0];
+    for (let ri = 1; ri < RAMP.length; ri++) {
+      if (cHeat <= RSTOP[ri] || ri === RAMP.length - 1) {
+        const rt = Math.max(0, Math.min(1, (cHeat - RSTOP[ri - 1]) / (RSTOP[ri] - RSTOP[ri - 1])));
+        warm = [cLerp(RAMP[ri - 1][0], RAMP[ri][0], rt), cLerp(RAMP[ri - 1][1], RAMP[ri][1], rt), cLerp(RAMP[ri - 1][2], RAMP[ri][2], rt)];
+        break;
+      }
+    }
+    const wRGB = warm[0] + ',' + warm[1] + ',' + warm[2];
+    const tickColor = cHeat < 0.03 ? A : 'rgb(' + wRGB + ')';
+    const chargeCore = cHeat < 0.03 ? { display: 'none' } : {
+      position: 'absolute', width: 176, height: 176, borderRadius: '50%', pointerEvents: 'none',
+      opacity: Math.min(1, cHeat * 1.15), animation: 'boxOrb 16s ease-in-out infinite',
+      background: 'radial-gradient(circle at 38% 32%,rgba(' + wRGB + ',.98),rgba(' + wRGB + ',.86) 55%,rgba(' +
+        Math.round(warm[0] * 0.5) + ',' + Math.round(warm[1] * 0.42) + ',' + Math.round(warm[2] * 0.34) + ',.98))',
+      boxShadow: '0 18px 52px rgba(' + wRGB + ',.42)'
+    };
+    const chargeGlow = cHeat < 0.03 ? { display: 'none' } : {
+      position: 'absolute', width: 268, height: 268, borderRadius: '50%', pointerEvents: 'none',
+      filter: 'blur(6px)', animation: 'boxGlow 16s ease-in-out infinite',
+      background: 'radial-gradient(circle,rgba(' + wRGB + ',' + (0.42 * cHeat + 0.1).toFixed(2) + '),rgba(' + wRGB + ',0) 68%)'
+    };
+    // ── The Charge words ─────────────────────────────────────────────────────────
+    // The design layer owns the SLOT, its type and its absent state. It does not own the
+    // verdict. There is no approved derivation from a charge number to a word, to a
+    // comparison against a personal norm, or to advice about an evening — so none is
+    // computed here. Removed on 7 September: the 70/50/30 buckets, "Normal for this hour",
+    // "Lower than most days at this hour", "Keep tonight easy", "go to bed early" and
+    // "Nothing tonight but sleep". Gone for good: "the evening you had planned" — Noop
+    // reads no calendar (80-not-in-this-release.md), so nothing could ever earn it back.
+    //
+    //   chargeVerdict  a short restatement of the level, or null
+    //   chargeNote     one or two evidence-backed sentences, or null
+    //   rechargeTo     the morning level a night in bed is modelled to reach, or null
+    //
+    // All three are bound. Null means the element is omitted, not softened. The arithmetic
+    // half of the sentence always renders, because the app holds both numbers itself.
+    // ── The demo seed ───────────────────────────────────────────────────────────
+    // ONE SCENARIO, AND EVERY STRING IN IT MUST BE TRUE AT THE CHARGE THE SCENARIO PRODUCES.
+    //
+    // Two versions of this were wrong in the same way. The first was a bucket formula. The second
+    // pinned to the prop defaults (wake 92, hour 15.6) but kept copy authored for a charge near
+    // 92 — and those inputs produce `charge = 44`, so the pin froze the lie in place as the
+    // DEFAULT view: "Plenty left" in the away-from-healthy mauve, and a recharge card claiming a
+    // single night is worth +44.
+    //
+    // The pin stays on the INPUTS, because the inputs are what name the scenario. What changed is
+    // the copy: it is now written against `charge = 44 of 92 at 15.6 h`, which is what the
+    // prototype actually renders. Move either slider and the seed drops out to the omitted state.
+    const SEED_WAKE = 92, SEED_HOUR = 15.6;
+    const DEMO = this.props.demoSeed !== false
+      && wake === SEED_WAKE && Math.abs(hourNow - SEED_HOUR) < 0.001;
+    const SEED = {
+      // A restatement of the level, so it cannot disagree with the level colour. Not a judgement:
+      // "Plenty left" over a mauve gauge is two elements saying opposite things.
+      verdict: 'Just under half left',
+      // Comparative, so it needs a norm — which is why it is gated rather than always rendered.
+      note: 'A normal day of yours has less left than this by mid-afternoon.',
+      // A model output. 86, not 88: 88 was authored for a charge near 92, and at 44 it claimed a
+      // night was worth +44. Nothing here should be reconstructible as charge + n.
+      rechargeTo: 86
+    };
+    const stateBody = this.props.chargeNote != null ? this.props.chargeNote : (DEMO ? SEED.note : null);
+    const stateLabel = this.props.chargeVerdict != null ? this.props.chargeVerdict
+      : (DEMO ? SEED.verdict : charge + ' left');
+    const rechargeTo = this.props.rechargeTo != null ? this.props.rechargeTo : (DEMO ? SEED.rechargeTo : null);
+    const chargeSentence = 'You woke with ' + wake + ' and you have ' + charge + ' left.'
+      + (stateBody ? ' ' + stateBody : '');
+
+    const N = 41, SPAN = 250, START = -125;
+    const activeIdx = Math.round(FRAC * (N - 1));
+    const wakeIdx = Math.round(WFRAC * (N - 1));
+    const ticks = [];
+    for (let i = 0; i < N; i++) {
+      const ang = START + (i / (N - 1)) * SPAN;
+      const on = i <= activeIdx;
+      const ghost = !on && i <= wakeIdx;
+      const major = i % 5 === 0;
+      ticks.push({
+        s: {
+          position: 'absolute', left: '50%', top: '50%', width: 2, height: major ? 15 : 9, borderRadius: 2,
+          background: on ? tickColor : ghost ? 'rgba(159,226,251,.38)' : 'rgba(255,255,255,.13)',
+          transition: 'background .28s ease, opacity .28s ease',
+          opacity: on ? (0.32 + 0.68 * (i / Math.max(1, activeIdx))) : 1,
+          transform: 'translate(-50%,-50%) rotate(' + ang.toFixed(2) + 'deg) translateY(-142px)'
+        }
+      });
+    }
+    const markerStyle = {
+      position: 'absolute', left: '50%', top: '50%', width: 0, height: 0,
+      borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '9px solid #EDF1EF',
+      filter: 'drop-shadow(0 0 6px rgba(0,0,0,.5))',
+      transform: 'translate(-50%,-50%) rotate(' + (START + FRAC * SPAN).toFixed(2) + 'deg) translateY(-131px)'
+    };
+
+    // ── the day so far
+    const dayXY = HR.map(function (v, i) {
+      return [(i / (HR.length - 1)) * 318, 140 - ((v - 50) / 54) * 118];
+    });
+    const hrLine = dayXY.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+    const hrArea = 'M0,150 L' + dayXY.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' L') + ' L318,150 Z';
+    const mini = function (w, h, pad) {
+      const pts = HR.map(function (v, i) { return [(i / (HR.length - 1)) * w, h - ((v - 50) / 54) * pad]; });
+      return {
+        line: pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '),
+        area: 'M0,' + h + ' L' + pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' L') + ' L' + w + ',' + h + ' Z'
+      };
+    };
+    const m1 = mini(300, 54, 44);
+    const m2 = mini(300, 84, 70);
+    const pI = S.hrPt;
+    const hrHits = HR.map(function (v, i) { return { pick: function () { self.setState({ hrPt: i }); } }; });
+    const nearest = T.marks.reduce(function (best, m) {
+      return Math.abs(m.i - pI) < Math.abs(best.i - pI) ? m : best;
+    }, T.marks[0]);
+    const scrubNote = pI === HR.length - 1
+      ? T.dayRead
+      : 'Closest to ' + nearest.label.toLowerCase() + ' at ' + nearest.time + '. ' + (HR[pI] > 84 ? 'The one real climb of the day.' : 'Inside your ordinary range for this hour.');
+    const marks = T.marks.map(function (m, i, arr) {
+      const on = Math.abs(m.i - pI) <= 1;
+      return {
+        time: m.time, label: m.label, hr: m.hr,
+        pick: function () { self.setState({ hrPt: m.i }); },
+        row: {
+          display: 'flex', alignItems: 'center', gap: 11, minHeight: 50, cursor: 'pointer',
+          borderBottom: i === arr.length - 1 ? 'none' : '.5px solid rgba(255,255,255,.06)',
+          opacity: on ? 1 : .78, transition: 'opacity .18s ease'
+        },
+        dot: {
+          width: 8, height: 8, flex: 'none', borderRadius: '50%', display: 'block',
+          background: on ? A : 'rgba(255,255,255,.22)',
+          boxShadow: on ? '0 0 0 4px rgba(23,162,230,.16)' : 'none',
+          transition: 'background .18s ease, box-shadow .18s ease'
+        }
+      };
+    });
+
+    // ── vitals, drawn against your own baseline and band
+    const vitals = VITALS.map(function (d) {
+      const pct = function (x) { return ((x - d.min) / (d.max - d.min)) * 100; };
+      const diff = d.v - d.base;
+      const out = d.v < d.lo || d.v > d.hi;
+      const near = Math.abs(diff) < (d.hi - d.lo) * 0.12;
+      const sign = diff > 0 ? '+' : '−';
+      const delta = near ? 'at your baseline' : sign + fmtV(Math.abs(diff), d.dp) + ' ' + d.unit + ' vs baseline';
+      const good = !out && (d.dir === 0 || (d.dir > 0 ? diff >= 0 : diff <= 0));
+      return {
+        name: d.name, value: fmtV(d.v, d.dp), unit: d.unit, plain: d.plain, window: d.window,
+        lo: fmtV(d.lo, d.dp), hi: fmtV(d.hi, d.dp), base: 'your normal ' + fmtV(d.base, d.dp),
+        delta: delta, out: out,
+        card: {
+          background: out ? 'rgba(242,180,92,.05)' : '#141817',
+          border: out ? '.5px solid rgba(242,180,92,.26)' : '.5px solid rgba(255,255,255,.06)',
+          borderRadius: 20, padding: '15px 16px 14px',
+          display: 'flex', flexDirection: 'column', gap: 12
+        },
+        big: {
+          fontFamily: "'Outfit',sans-serif", fontSize: 25, fontWeight: 300, letterSpacing: '-.028em',
+          lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: out ? '#F3C888' : '#EDF1EF'
+        },
+        chip: {
+          fontSize: 11, fontWeight: 600, padding: '5px 9px', borderRadius: 8, flex: 'none',
+          color: out ? '#F3C888' : good ? '#8FD3F5' : '#C6CEC9',
+          background: out ? 'rgba(242,180,92,.13)' : good ? 'rgba(23,162,230,.13)' : 'rgba(255,255,255,.06)'
+        },
+        band: {
+          position: 'absolute', top: 9, left: pct(d.lo) + '%', width: (pct(d.hi) - pct(d.lo)) + '%',
+          height: 4, borderRadius: 3, background: 'rgba(23,162,230,.3)'
+        },
+        baseTick: {
+          position: 'absolute', top: 3, left: 'calc(' + pct(d.base) + '% - 1px)', width: 2, height: 16,
+          borderRadius: 2, background: 'rgba(237,241,239,.55)'
+        },
+        dot: {
+          position: 'absolute', top: 4, left: 'calc(' + pct(d.v) + '% - 7px)', width: 14, height: 14,
+          borderRadius: '50%', background: out ? WARM : A,
+          boxShadow: '0 0 0 4px ' + (out ? 'rgba(242,180,92,.16)' : 'rgba(23,162,230,.16)') + ', 0 2px 6px rgba(0,0,0,.4)'
+        },
+        baseLabel: {
+          position: 'absolute', left: pct(d.base) + '%', transform: 'translateX(-50%)',
+          fontSize: 10, color: 'rgba(237,241,239,.5)', whiteSpace: 'nowrap'
+        }
+      };
+    });
+
+    // ── stress
+    const sl = SLEVELS[S.stress];
+    const stressLevels = SLEVELS.map(function (l, i) {
+      const on = i === S.stress;
+      return {
+        name: l.name, pick: function () { self.setState({ stress: i }); },
+        box: {
+          flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '11px 6px', borderRadius: 15, cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+          background: on ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.03)',
+          border: on ? '.5px solid rgba(255,255,255,.16)' : '.5px solid rgba(255,255,255,.05)',
+          transition: 'background .18s ease, border-color .18s ease, color .18s ease'
+        },
+        swatch: { width: 10, height: 10, borderRadius: 3, display: 'block', background: l.c, opacity: on ? 1 : .5, transition: 'opacity .18s ease' },
+        label: { fontSize: 10.5, fontWeight: on ? 600 : 500, color: on ? '#EDF1EF' : '#7F8A85', transition: 'color .18s ease' }
+      };
+    });
+    const stressBars = STRESS.map(function (v) {
+      return {
+        s: {
+          flex: 1, height: (22 + v * 18) + 'px', borderRadius: 4,
+          background: SLEVELS[v].c, opacity: v >= S.stress ? .95 : .3, transition: 'opacity .2s'
+        }
+      };
+    });
+
+    // ── heart
+    const zones = ZONES.map(function (z) {
+      return {
+        name: z.name, range: z.range, time: z.time,
+        swatch: { width: 10, height: 10, borderRadius: 3, display: 'block', background: z.c, flex: 'none' }
+      };
+    });
+    const zoneBar = ZONES.map(function (z) { return { s: { flex: z.f, background: z.c } }; });
+    const heartRows = [
+      { k: 'Resting heart rate', sub: 'two beats under your baseline', v: '58', warm: false },
+      { k: 'Variability', sub: 'near the top of your zone', v: '56 ms', warm: false },
+      { k: 'Recovery after the walk', sub: 'down 24 beats in the first minute', v: '−24', warm: false },
+      { k: 'Highest today', sub: 'at 08:26, on the hill', v: '96', warm: true }
+    ].map(function (r, i, arr) {
+      return {
+        k: r.k, sub: r.sub, v: r.v,
+        row: {
+          display: 'flex', alignItems: 'center', gap: 12, minHeight: 58,
+          borderBottom: i === arr.length - 1 ? 'none' : '.5px solid rgba(255,255,255,.06)'
+        },
+        vStyle: {
+          fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 400, letterSpacing: '-.02em',
+          color: r.warm ? WARM : A, fontVariantNumeric: 'tabular-nums', flex: 'none'
+        }
+      };
+    });
+
+    const nOut = vitals.filter(function (v) { return v.out; }).length;
+    const WORDS = ['none', 'one', 'two', 'three', 'four', 'five'];
+    const vitalsSummary = nOut === 0
+      ? 'Five in your normal zone, none outside it'
+      : WORDS[5 - nOut][0].toUpperCase() + WORDS[5 - nOut].slice(1) + ' in your normal zone, ' + WORDS[nOut] + ' outside it';
+    const vitalsDot = {
+      width: 9, height: 9, borderRadius: '50%', flex: 'none',
+      background: nOut ? WARM : A,
+      boxShadow: '0 0 0 4px ' + (nOut ? 'rgba(242,180,92,.16)' : 'rgba(23,162,230,.16)')
+    };
+
+    const rows = [
+      { k: 'Vitals', sub: 'Five signals, each against your own zone', fig: nOut ? WORDS[nOut] + ' to watch' : 'all in zone', to: 'vitals', g: 'lungs', warm: nOut > 0 },
+      { k: 'Stress', sub: 'Four steps, not a traffic light', fig: sl.name.toLowerCase(), to: 'stress', g: 'spark', warm: S.stress >= 2 }
+    ].map(function (r) {
+      return {
+        k: r.k, sub: r.sub, fig: r.fig, go: go(r.to), icon: ico(r.g, 21, r.warm ? WARM : A),
+        figStyle: { fontSize: 11.5, fontWeight: 600, flex: 'none', color: r.warm ? '#F3C888' : '#8FD3F5' }
+      };
+    });
+
+    // ── the + sheet: logging
+    const counts = S.counts;
+    const logTiles = LOGS.map(function (l) {
+      const n = counts[l.k] || 0;
+      return {
+        k: l.k, sub: l.sub, n: n ? String(n) : '',
+        add: function () {
+          const next = Object.assign({}, self.state.counts);
+          next[l.k] = (next[l.k] || 0) + 1;
+          self.setState({ counts: next });
+        },
+        box: {
+          width: 'calc(50% - 4px)', boxSizing: 'border-box', height: 100, borderRadius: 20, cursor: 'pointer',
+          padding: 15, display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+          background: n ? 'rgba(23,162,230,.12)' : 'rgba(255,255,255,.05)',
+          border: n ? '.5px solid rgba(23,162,230,.4)' : '.5px solid rgba(255,255,255,.07)',
+          transition: 'background .18s ease, border-color .18s ease, color .18s ease'
+        },
+        icon: ico(l.g, 22, n ? A : '#7F8A85'),
+        count: {
+          minWidth: 22, height: 22, borderRadius: 11, display: n ? 'flex' : 'none',
+          alignItems: 'center', justifyContent: 'center', padding: '0 7px',
+          background: A, color: '#04121A', fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums'
+        },
+        label: { fontSize: 13.5, fontWeight: 600, color: n ? '#EDF1EF' : '#C6CEC9' }
+      };
+    });
+    const loggedChips = LOGS.filter(function (l) { return counts[l.k]; }).map(function (l) {
+      const n = counts[l.k];
+      return {
+        label: l.k + (n > 1 ? ' ×' + n : ''),
+        s: {
+          padding: '6px 11px', borderRadius: 9, fontSize: 11.5, fontWeight: 600,
+          color: '#8FD3F5', background: 'rgba(23,162,230,.12)', border: '.5px solid rgba(23,162,230,.22)'
+        }
+      };
+    });
+
+    // ── Breathe, derived: the pacer, the live trace and the sweep
+    const BRE = (function () {
+      const hair = '.5px solid rgba(255,255,255,.06)';
+      const proto = S.bproto || PROTOS.calm[0];
+      const cyc = proto.cyc;
+      const u = (S.bt % cyc) / cyc;
+      const breath = 0.5 - 0.5 * Math.cos(2 * Math.PI * u);
+      const scale = 0.62 + 0.38 * breath;
+      const secsLeft = Math.max(1, Math.ceil((u < 0.5 ? (0.5 - u) : (1 - u)) * cyc));
+      const step = Math.min(4, Math.floor(S.bsweepT / 6));
+      const stepU = (S.bsweepT % 6) / 6;
+      const sw = S.bsamples.length > 8
+        ? (Math.max.apply(null, S.bsamples.slice(-40)) - Math.min.apply(null, S.bsamples.slice(-40))) : 0;
+      const orbBase = 'position:absolute;border-radius:50%;pointer-events:none;';
+      const mm = Math.floor(S.bt / 60), ss = Math.floor(S.bt % 60);
+      const pad = function (n) { return (n < 10 ? '0' : '') + n; };
+      const paceAt = function (i) {
+        const tt = S.bt - (S.bsamples.length - 1 - i) * 0.14;
+        return 0.5 - 0.5 * Math.cos(2 * Math.PI * ((tt % cyc) / cyc));
+      };
+      return {
+        bHasFound: S.bfound,
+        bPaceNum: S.bfound ? '5.5' : '6.0',
+        bPaceLabel: S.bfound ? 'your pace' : 'generic pace',
+        bHomeTitle: S.bfound ? 'Five and a half a minute' : 'A pace, until you find yours',
+        bHomeLine: S.bfound
+          ? 'Locked from your sweep on 12 August. Every protocol that can run at your pace now does.'
+          : 'Breathe works today at six a minute, which suits most people. Ten minutes of measuring finds the one that suits you.',
+        bProtoName: proto.n,
+        bProtoMeta: proto.pat + ' · ' + proto.cyc.toFixed(0) + 's a breath',
+        bProtoLen: '6:00',
+        bSweepEyebrow: S.bfound ? 'Swept 12 August' : 'Ten minutes, once',
+        bSweepTitle: S.bfound ? 'Test it again' : 'Find your pace',
+        bSweepLine: S.bfound
+          ? 'Your resting pulse has moved 3 bpm since. Worth re-testing, not urgent.'
+          : 'There is one pace where your heart swings hardest with each breath. The strap can find it in about ten minutes.',
+        bAfterRows: [
+          { k: 'Breathe', sub: 'Every paced protocol runs at 5.5 unless you pick otherwise', v: '5.5', border: hair },
+          { k: 'The orb on today', sub: 'Paces at your rate instead of a generic six', v: 'follows', border: hair },
+          { k: 'Wind-down buzz', sub: 'The bedtime nudge uses your pace for its two minutes', v: 'follows', border: 'none' }
+        ],
+        bElapsed: pad(mm) + ':' + pad(ss),
+        bPhaseWord: u < 0.5 ? 'Breathe in' : 'Breathe out',
+        bPhaseCount: String(secsLeft),
+        bBuzzDot: 'width:7px;height:7px;border-radius:50%;background:#7FC9EE;opacity:'
+          + (breath > 0.9 || breath < 0.1 ? 1 : 0.35) + ';transition:opacity 120ms linear',
+        bPacerOrb: orbBase + 'width:150px;height:150px;background:radial-gradient(circle at 38% 32%,#9FE2FB,#2FB2F0 55%,#0A5F92);box-shadow:0 18px 52px rgba(11,111,168,.55);transform:scale(' + scale.toFixed(3) + ')',
+        bPacerRing: orbBase + 'width:230px;height:230px;border:1px solid rgba(159,226,251,' + (0.16 + 0.3 * breath).toFixed(2) + ');transform:scale(' + (0.72 + 0.28 * breath).toFixed(3) + ')',
+        bPacerGlow: orbBase + 'width:290px;height:290px;background:radial-gradient(circle,rgba(47,178,240,' + (0.10 + 0.16 * breath).toFixed(2) + '),rgba(47,178,240,0) 66%)',
+        bSwing: sw.toFixed(1),
+        bHrLine: S.bsamples.map(function (v, i) {
+          const x = (i / 95) * 340;
+          const y = 68 - ((v - 54) / 24) * 60;
+          return x.toFixed(1) + ',' + Math.max(6, Math.min(70, y)).toFixed(1);
+        }).join(' '),
+        bPaceLine: S.bsamples.map(function (v, i) {
+          return ((i / 95) * 340).toFixed(1) + ',' + (62 - paceAt(i) * 46).toFixed(1);
+        }).join(' '),
+        bPaceBand: S.bsamples.length > 2
+          ? 'M0,72 L' + S.bsamples.map(function (v, i) {
+              return ((i / 95) * 340).toFixed(1) + ',' + (62 - paceAt(i) * 46).toFixed(1);
+            }).join(' L') + ' L340,72 Z'
+          : 'M0,72 L340,72 Z',
+        bSweepRate: BRATES[step].toFixed(1),
+        bSweepStepLabel: 'Pace ' + (step + 1) + ' of 5 · ' + Math.max(1, Math.ceil((1 - stepU) * 90)) + 's left',
+        bSweepCue: u < 0.5 ? 'In, slowly' : 'And out',
+        bSweepOrb: orbBase + 'width:120px;height:120px;background:radial-gradient(circle at 38% 32%,#9FE2FB,#2FB2F0 55%,#0A5F92);box-shadow:0 14px 40px rgba(11,111,168,.5);transform:scale(' + (0.66 + 0.34 * breath).toFixed(3) + ')',
+        bSweepRing: orbBase + 'width:196px;height:196px;border:1px solid rgba(159,226,251,' + (0.14 + 0.26 * breath).toFixed(2) + ');transform:scale(' + (0.74 + 0.26 * breath).toFixed(3) + ')',
+        bSweepGlow: orbBase + 'width:240px;height:240px;background:radial-gradient(circle,rgba(47,178,240,' + (0.09 + 0.14 * breath).toFixed(2) + '),rgba(47,178,240,0) 66%)',
+        bCandidates: BRATES.map(function (r, i) {
+          const done = i < step, live = i === step;
+          const h = done ? BSWINGS[i] : live ? BSWINGS[i] * Math.min(1, stepU * 1.15) : 0;
+          const best = done && BSWINGS[i] === 1;
+          return {
+            k: r.toFixed(1),
+            fig: done || (live && stepU > 0.25) ? (h * 9.4).toFixed(1) : '',
+            figStyle: 'font-size:10.5px;font-variant-numeric:tabular-nums;color:' + (best ? '#9FE2FB' : '#7F8A85'),
+            bar: 'width:100%;border-radius:8px 8px 3px 3px;height:' + Math.max(3, h * 78).toFixed(0) + 'px;background:'
+              + (best ? 'linear-gradient(180deg,#9FE2FB,#2FB2F0)' : live ? 'rgba(159,226,251,.55)' : done ? 'rgba(159,226,251,.28)' : 'rgba(255,255,255,.07)')
+              + ';transition:height 200ms linear',
+            lblStyle: 'font-size:10.5px;font-variant-numeric:tabular-nums;font-weight:' + (live || best ? '600' : '400')
+              + ';color:' + (best ? '#9FE2FB' : live ? '#EDF1EF' : '#7F8A85')
+          };
+        }),
+        bGroups: [
+          { k: 'To settle', items: PROTOS.calm, warn: false, warnText: '' },
+          { k: 'To steady', items: PROTOS.focus, warn: false, warnText: '' },
+          { k: 'To lift', items: PROTOS.energise, warn: true, warnText: 'These four are forceful. Sitting or lying only, never while driving, and stop at the first sign of light-headedness.' },
+          { k: 'To measure', items: PROTOS.measure, warn: false, warnText: '' }
+        ].map(function (g) {
+          return {
+            k: g.k, warn: g.warn, warnText: g.warnText,
+            items: g.items.map(function (p, i) {
+              const on = p.n === proto.n;
+              return {
+                n: p.n, d: p.d, pat: p.pat,
+                pick: function () { self.setState({ bproto: p, screen: 'breathe' }); },
+                row: 'display:flex;align-items:center;gap:12px;padding:13px 0;cursor:pointer;border-bottom:'
+                  + (i === g.items.length - 1 ? 'none' : hair),
+                nameStyle: 'font-size:13.5px;font-weight:600;color:' + (on ? '#7FC9EE' : '#EDF1EF'),
+                patStyle: 'font-size:11px;color:' + (on ? '#7FC9EE' : '#7F8A85')
+                  + ';font-variant-numeric:tabular-nums;flex:none;font-family:ui-monospace,Menlo,monospace'
+              };
+            })
+          };
+        })
+      };
+    })();
+
+    // ── why you woke where you did: four contributions that sum to the wake number
+    const hairD = '.5px solid rgba(255,255,255,.06)';
+    const DRV = [
+      { k: 'Slept 7h 12m', sub: '7m over your own need, measured across ninety nights', fig: '+' + (wake - 9), c: '#9FE2FB' },
+      { k: 'Deep came early', sub: 'Two thirds of it before 02:00, which is where it counts', fig: '+18', c: '#9FE2FB' },
+      { k: 'Sleep debt · 1h 20m', sub: 'Carried in from the two short nights before', fig: '−9', c: '#C6CEC9' },
+      { k: 'Yesterday · easy', sub: 'A walk and nothing else. Nothing to pay back.', fig: '0', c: '#7F8A85' }
+    ].map(function (d, i) {
+      return {
+        k: d.k, sub: d.sub, fig: d.fig,
+        mark: 'width:8px;height:8px;flex:none;border-radius:50%;background:' + d.c,
+        figStyle: 'font-size:13px;font-variant-numeric:tabular-nums;flex:none;font-family:\'Outfit\',sans-serif;font-weight:400;color:' + d.c,
+        border: i === 3 ? 'none' : hairD
+      };
+    });
+    const arrowS = function (up, c) {
+      return 'width:0;height:0;flex:none;border-left:5px solid transparent;border-right:5px solid transparent;'
+        + (up ? 'border-bottom:7px solid ' + c : 'border-top:7px solid ' + c);
+    };
+    const SIGNALS = [
+      { k: 'Resting pulse', fig: '+6', up: true, on: true },
+      { k: 'Skin temp', fig: '+0.7', up: true, on: true },
+      { k: 'Variability', fig: '−24', up: false, on: true },
+      { k: 'Breathing', fig: '—', up: true, on: false }
+    ].map(function (s) {
+      return {
+        k: s.k, fig: s.fig,
+        arrow: arrowS(s.up, s.on ? '#F2B45C' : 'rgba(255,255,255,.14)'),
+        figStyle: 'font-size:13px;font-family:\'Outfit\',sans-serif;font-weight:400;font-variant-numeric:tabular-nums;color:' + (s.on ? '#EDF1EF' : '#7F8A85')
+      };
+    });
+    const RULED = [
+      { k: 'Alcohol', v: 'none logged' },
+      { k: 'A hard or late session', v: 'none' },
+      { k: 'Sauna or a hot bath', v: 'none' },
+      { k: 'Travel or altitude', v: 'none' },
+      { k: 'A late meal', v: 'none' }
+    ].map(function (r, i) { return { k: r.k, v: r.v, border: i === 4 ? 'none' : hairD }; });
+    const iconCircle = function (bar, bg) {
+      return 'width:28px;height:28px;flex:none;border-radius:50%;background:linear-gradient(' + bar + ',' + bar
+        + ') center/2px 11px no-repeat,' + bg;
+    };
+    const DRIFT = (function () {
+      const base = { driftCard: false, driftQuiet: false, driftRuled: SIG !== 'silent' && SIG !== 'quiet', driftTiles: false,
+        driftCardStyle: '', driftIcon: '', driftTitle: '', driftSub: '', driftSubStyle: '', driftFig: '', driftFigStyle: 'display:none',
+        driftBody: '', driftBodyStyle: 'font-size:12.5px;line-height:1.6;text-wrap:pretty' };
+      if (SIG === 'silent') return base;
+      if (SIG === 'quiet') return Object.assign(base, { driftQuiet: true });
+      if (SIG === 'mild') return Object.assign(base, {
+        driftCard: true,
+        driftCardStyle: 'background:rgba(23,162,230,.07);border:.5px solid rgba(23,162,230,.2);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:11px',
+        driftIcon: iconCircle('#7FC9EE', 'rgba(23,162,230,.14)'),
+        driftTitle: 'One thing is drifting',
+        driftSub: 'Skin temperature only', driftSubStyle: 'font-size:11.5px;color:#7FC9EE',
+        driftFig: '−4', driftFigStyle: 'font-size:14px;font-family:\'Outfit\',sans-serif;font-weight:400;color:#7FC9EE;font-variant-numeric:tabular-nums;flex:none',
+        driftBody: 'Your temperature has run warm for two nights. Nothing else has moved. Worth a normal day and an early night.',
+        driftBodyStyle: 'font-size:12.5px;line-height:1.6;color:#B7C3C9;text-wrap:pretty'
+      });
+      if (SIG === 'damped') return Object.assign(base, {
+        driftCard: true,
+        driftCardStyle: 'background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:11px',
+        driftIcon: iconCircle('#B7C0E8', 'rgba(139,153,214,.16)'),
+        driftTitle: 'Pulled back — you logged three drinks',
+        driftSub: 'Same pattern, known cause', driftSubStyle: 'font-size:11.5px;color:#B7C0E8',
+        driftFig: '−4', driftFigStyle: 'font-size:14px;font-family:\'Outfit\',sans-serif;font-weight:400;color:#B7C0E8;font-variant-numeric:tabular-nums;flex:none',
+        driftBody: 'Three signals moved the way illness moves them — and the way three drinks moves them. Scored as the drinks, at −4 instead of −18.',
+        driftBodyStyle: 'font-size:12.5px;line-height:1.6;color:#C6CEC9;text-wrap:pretty'
+      });
+      return Object.assign(base, {
+        driftCard: true, driftTiles: true,
+        driftCardStyle: 'background:rgba(242,180,92,.07);border:.5px solid rgba(242,180,92,.24);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:12px',
+        driftIcon: iconCircle('#F2B45C', 'rgba(242,180,92,.14)'),
+        driftTitle: 'Something is off today',
+        driftSub: 'Three of four signals moved together', driftSubStyle: 'font-size:11.5px;color:#C8934B',
+        driftBody: 'Your pulse, temperature and variability are all further from your normal than they have been in a month. Take today easy and go to bed early.',
+        driftBodyStyle: 'font-size:12.5px;line-height:1.6;color:#E4D3B8;text-wrap:pretty'
+      });
+    })();
+
+    // ── the confidence ladder, 60-parity Part 5 §C ¶1 / 20-primitives §15:
+    //    two rungs in this screen's own hue, ramped through the tinted-card range.
+    //    Solid is plain — no chip — because most numbers are solid most of the time.
+    const CONF = (function () {
+      const rung = self.props.confidence || 'solid';
+      const cal = rung === 'calibrating';
+      const H = '23,162,230';
+      return {
+        on: cal || rung === 'building',
+        box: {
+          display: 'flex', alignItems: 'center', gap: 6, flex: 'none',
+          padding: '4px 9px 4px 8px', borderRadius: 10,
+          background: 'rgba(' + H + (cal ? ',.07)' : ',.12)'),
+          border: '.5px solid rgba(' + H + (cal ? ',.22)' : ',.3)')
+        },
+        dot: { width: 5, height: 5, borderRadius: '50%', flex: 'none', background: 'rgba(' + H + (cal ? ',.42)' : ',.75)') },
+        labelStyle: { fontSize: 10, letterSpacing: '.05em', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: cal ? '#8B958F' : '#9FE2FB' },
+        label: cal ? '2 of 4 days' : 'Building \u00b7 11 days'
+      };
+    })();
+
+    // ── ENERGY, wave 3a/3b. Spend only: no target, no deficit, nothing remaining.
+    //    FIVE designed readings off the engine's enums, not twenty combinations. The thin-number
+    //    answer here is rule 7's INTERVAL, not rule 13's withholding: a thin day states its own
+    //    thinness by widening the band (0.10 + 0.20 x (1 - coverage)), so steps-only shows a RANGE
+    //    where a measured day shows a figure. Only the cold start has no measured spend at all, and
+    //    there the one figure Noop can always stand behind — estimatedBMR24h — is stated flat.
+    const EN = (function () {
+      const eCase = self.props.energyCase || 'measured';
+      const hNow = Math.max(7, Math.min(23, self.props.hour || 15.6));
+      const kc = function (n) { return Math.round(n / 10) * 10 + ''; };
+      const th = function (n) { return kc(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+      const r50 = function (n) { return (Math.round(n / 50) * 50 + '').replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+      const BASAL_H = 69;                     // estimatedBMR24h 1,656 over 24 h
+      const ACT = [0, 0, 0, 0, 0, 0, 10, 45, 30, 20, 25, 18, 30, 22, 18, 120, 60, 25, 30, 22, 15, 10, 5, 0];
+      // An unmeasured hour contributes NOTHING to the figure. It is drawn as a hairline at its
+      // modelled basal to show the size of the hole — which is what "a gap is not a zero" means.
+      // Every case that claims a gap in words has one in the hours array; nothing claims one it
+      // does not draw.
+      const GAP = eCase === 'measured' || eCase === 'learning' ? [11]   // strap off 11:00 - 12:00
+        : eCase === 'partial' ? [9, 10, 11, 12, 13]                     // strap off 09:20 - 13:40
+        : [];
+      const seen = function (h) { return h <= hNow && GAP.indexOf(h) < 0; };
+      const partOf = function (h) { return h < Math.floor(hNow) ? 1 : h === Math.floor(hNow) ? hNow - h : 0; };
+      let actSoFar = 0, basalSoFar = 0, measuredH = 0;
+      for (let h = 0; h < 24; h++) {
+        const part = partOf(h);
+        if (!part || !seen(h)) continue;
+        measuredH += part;
+        basalSoFar += BASAL_H * part;
+        actSoFar += ACT[h] * part;
+      }
+      const grp = function (n) { return (n + '').replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+      const basalR = Math.round(basalSoFar / 10) * 10;
+      const activeR = Math.round(actSoFar / 10) * 10;
+      const totalR = basalR + activeR;
+      const elapsedH = hNow;
+      const missedH = elapsedH - measuredH;
+      // Coverage is measured, not asserted: the band and the percentage come off the same figure.
+      const cov = eCase === 'steps' ? 0.34 : eCase === 'cold' ? 0 : measuredH / elapsedH;
+      const covPct = Math.round(cov * 100) + '%';
+      const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+        'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen',
+        'eighteen', 'nineteen', 'twenty', 'twenty-one', 'twenty-two', 'twenty-three', 'twenty-four'];
+      const hrs = function (n) { const r = Math.round(n); return WORDS[r] || (r + ''); };
+      const Hrs = function (n) { const w = hrs(n); return w.charAt(0).toUpperCase() + w.slice(1); };
+      const band = 0.10 + 0.20 * (1 - cov);
+      const dayEnd = BASAL_H * 24 + ACT.reduce(function (s, v) { return s + v; }, 0);
+      const measuredTotal = basalR + activeR;
+      const H = '23,162,230';
+      const chip = function (rung, label) {
+        const c = rung === 'calibrating';
+        return {
+          on: rung !== 'solid',
+          box: { display: 'flex', alignItems: 'center', gap: 6, flex: 'none', padding: '4px 9px 4px 8px',
+            borderRadius: 10, background: 'rgba(' + H + (c ? ',.07)' : ',.12)'),
+            border: '.5px solid rgba(' + H + (c ? ',.22)' : ',.3)') },
+          dot: { width: 5, height: 5, borderRadius: '50%', flex: 'none', background: 'rgba(' + H + (c ? ',.42)' : ',.75)') },
+          labelStyle: { fontSize: 10, letterSpacing: '.05em', fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+            color: c ? '#8B958F' : '#9FE2FB' },
+          label: label
+        };
+      };
+      const seg = function (w, bg) { return { bar: { width: w + '%', borderRadius: 3, background: bg } }; };
+      const dot = function (bg) { return { width: 7, height: 7, flex: 'none', borderRadius: 2, background: bg }; };
+      const MEAS = '#17A2E6', MEAS_SOFT = 'rgba(23,162,230,.42)', ACTC = '#9FE2FB', ACT_SOFT = 'rgba(159,226,251,.46)';
+      const hourRow = function (h) {
+        const part = h < Math.floor(hNow) ? 1 : h === Math.floor(hNow) ? hNow - h : 0;
+        const scale = 132 / 230;
+        if (!part) return { basal: { height: 0 }, active: { height: 0 } };
+        const modelled = eCase === 'cold' || eCase === 'steps' || !seen(h);
+        const bh = BASAL_H * part * scale;
+        const ah = (eCase === 'cold' || !seen(h) ? 0 : ACT[h] * part * scale);
+        return {
+          basal: { height: Math.max(2, bh), borderRadius: '0 0 2px 2px',
+            background: modelled ? 'rgba(255,255,255,.08)' : MEAS },
+          active: { height: ah, borderRadius: '2px 2px 0 0',
+            background: eCase === 'steps' ? ACT_SOFT : ACTC }
+        };
+      };
+      const hours = [];
+      for (let h = 0; h < 24; h++) hours.push(hourRow(h));
+      const base = {
+        unit: 'kcal', hours: hours, chartMax: '230 kcal an hour',
+        rows: [], foot: 'A figure Noop stands behind for the hours it saw, and silence for the ones it did not. No score on this screen, and nothing on it is a thing to hit.'
+      };
+      const srcRow = function (v, note) { return { k: 'Read from', v: v, note: note }; };
+      const covRow = function (v, note) { return { k: 'How much of the day it saw', v: v, note: note }; };
+      const unattrRow = function (v, note) { return { k: 'Unattributed heart rate', v: v, note: note }; };
+      const uncRow = function (v, note) { return { k: 'The forecast\u2019s width', v: v, note: note }; };
+
+      if (eCase === 'measured' || eCase === 'learning') {
+        const fc = eCase === 'measured';
+        return Object.assign(base, {
+          hero: grp(totalR), heroNote: 'spent in the hours it measured, basal and active together',
+          lead: 'Measured from the strap, which you have worn for all but one hour of the day so far.',
+          segs: [seg(basalR / totalR * 100, MEAS), seg(activeR / totalR * 100, ACTC)],
+          legend: [{ dot: dot(MEAS), label: 'basal ' + grp(basalR) }, { dot: dot(ACTC), label: 'active ' + grp(activeR) }],
+          projLine: fc
+            ? 'Heading for ' + r50(dayEnd * (1 - band)) + ' to ' + r50(dayEnd * (1 + band)) + ' by midnight, if the rest of the evening looks like the rest of your week.'
+            : 'No projection yet. Noop has four days of your spend and wants a fortnight before it guesses at your evening.',
+          projTone: fc ? '#B7C3C9' : '#939C97',
+          covLine: Hrs(measuredH) + ' of the ' + hrs(elapsedH) + ' hours since midnight were measured. The one it missed is drawn, and counted as nothing.',
+          conf: fc ? chip('solid', '') : chip('building', '4 of 14 days'),
+          chartFoot: 'Solid columns were measured. The hour with no strap is a hairline at its modelled basal \u2014 the size of the hole, not a contribution to the figure. A gap is not a zero, and it is not a number either.',
+          rows: [
+            srcRow('The strap', 'by worn time, with Apple Health as the fallback'),
+            covRow(covPct, 'stated in hours on the card; the percentage lives here'),
+            unattrRow('1 h 10 m', 'elevated and not matched to a session, so it is counted as active and named here'),
+            uncRow(fc ? '\u00b1' + Math.round(band * 100) + '%' : '\u2014', fc ? 'widens as coverage falls' : 'no forecast yet, so there is no width to state')
+          ]
+        });
+      }
+      if (eCase === 'partial') {
+        return Object.assign(base, {
+          hero: grp(totalR), heroNote: 'spent in the ' + hrs(measuredH) + ' hours it saw \u2014 the gap is not in this figure',
+          lead: 'The strap was off between 09:20 and 13:40. The figure covers the hours either side of it. The middle is drawn at its modelled basal so you can see how big it was, and none of that modelled basal is counted.',
+          segs: [seg(basalR / totalR * 100, MEAS), seg(activeR / totalR * 100, ACTC)],
+          legend: [{ dot: dot(MEAS), label: 'basal ' + grp(basalR) }, { dot: dot(ACTC), label: 'active ' + grp(activeR) }],
+          projLine: 'Heading for ' + r50(dayEnd * (1 - band)) + ' to ' + r50(dayEnd * (1 + band)) + ' by midnight \u2014 a wider range than usual, because it saw less of today.',
+          projTone: '#B7C3C9',
+          covLine: Hrs(measuredH) + ' of the ' + hrs(elapsedH) + ' hours since midnight were measured. The ' + hrs(missedH) + ' it missed are left out of the figure rather than filled in.',
+          conf: chip('building', hrs(measuredH) + ' of ' + hrs(elapsedH) + ' hours'),
+          chartFoot: 'The hairline columns are the hours the strap was off, drawn at their modelled basal. They are headroom Noop cannot account for \u2014 not hours you spent nothing, and not hours it has quietly added in.',
+          rows: [
+            srcRow('The strap, in two stretches', 'nothing bridges the gap between them'),
+            covRow(covPct, 'and the band widens as it falls'),
+            unattrRow('24 m', 'all of it before the strap came off'),
+            uncRow('\u00b1' + Math.round(band * 100) + '%', 'wider today than on a full day, by the coverage term')
+          ]
+        });
+      }
+      if (eCase === 'steps') {
+        const lo = totalR * (1 - band), hi = totalR * (1 + band);
+        return Object.assign(base, {
+          hero: r50(lo) + '\u2013' + r50(hi), heroNote: 'a range, because steps are all it had to go on',
+          lead: 'No strap today, so the day is modelled from your phone\u2019s step data. That is a shape of a day rather than a measurement of one, and it is stated as a range.',
+          segs: [seg(basalR / totalR * 100, MEAS_SOFT), seg(activeR / totalR * 100, ACT_SOFT)],
+          legend: [{ dot: dot(MEAS_SOFT), label: 'basal, modelled' }, { dot: dot(ACT_SOFT), label: 'active, from steps' }],
+          projLine: 'Heading for ' + r50(dayEnd * (1 - band)) + ' to ' + r50(dayEnd * (1 + band)) + ' by midnight, on the same steps.',
+          projTone: '#B7C3C9',
+          covLine: 'Your phone counted the walking. Noop will not show you that count, and it is not a target \u2014 it is only an input to this estimate.',
+          conf: chip('calibrating', 'steps only'),
+          chartFoot: 'Every column is modelled, which is why none of them is solid. The shape is right; the height is the part with the range on it.',
+          rows: [
+            srcRow('Your phone\u2019s step data', 'named as a source. The count itself is never displayed'),
+            covRow('A third of the day', 'walking only \u2014 nothing sedentary, nothing nocturnal'),
+            unattrRow('\u2014', 'no heart rate was recorded today, so there is none to attribute'),
+            uncRow('\u00b1' + Math.round(band * 100) + '%', 'the widest band Noop will publish; below this it stops being a reading')
+          ]
+        });
+      }
+      return Object.assign(base, {
+        hero: 'about ' + th(BASAL_H * 24), heroNote: 'modelled for a full day at rest, from your profile',
+        lead: 'Nothing has measured today yet. What is here is the one figure Noop can always stand behind: what a body your height, weight, age and sex spends doing nothing at all.',
+        segs: [seg(100, 'rgba(255,255,255,.08)')],
+        legend: [{ dot: dot('rgba(255,255,255,.12)'), label: 'modelled basal, nothing measured' }],
+        projLine: 'No projection. There is nothing measured to project from, and Noop would rather say so than draw a line through one number.',
+        projTone: '#939C97',
+        covLine: 'Wear the strap for a day and this becomes a reading rather than a model. Nothing here is waiting on a setting.',
+        conf: chip('calibrating', 'no measured day yet'),
+        chartFoot: 'Hairline basal the whole way across and not one active column, because no hour of today was measured. Drawing peaks here would be an invention.',
+        rows: [
+          srcRow('Your profile only', 'height, weight, age, sex. Nothing else is read'),
+          covRow('None of it', 'which is why the figure is a model and says so'),
+          unattrRow('\u2014', 'there is no heart rate recorded today'),
+          uncRow('\u2014', 'no forecast is offered at all, rather than one with a width nobody could use')
+        ]
+      });
+    })();
+
+    const DONE = (this.props.doneName || '').trim();
+    const DONE_MIN = (this.props.doneMins || 0) >= 2 ? this.props.doneMins : 42;
+    const __nav = this.props.onNav;
+    const __go = function (a, s) { return function () { if (__nav) __nav(a, s); }; };
+
+    // ── the strap battery: an aura-toned chip that sits with the day chip ──
+    const me = this;
+    const bPct = 52;
+    const bLow = bPct <= 20, bTint = bPct <= 10 ? HOT : bLow ? WARM : '#8FD3F5';
+    const battChip = {
+      display: 'flex', alignItems: 'center', gap: 7, height: 30, padding: '0 11px', borderRadius: 15, cursor: 'pointer', flex: 'none',
+      background: bLow ? 'rgba(242,180,92,.12)' : 'rgba(255,255,255,.06)',
+      border: '.5px solid ' + (bLow ? 'rgba(242,180,92,.34)' : 'rgba(255,255,255,.1)')
+    };
+    const battBody = {
+      position: 'relative', width: 21, height: 11, borderRadius: 3.4, boxSizing: 'border-box',
+      border: '1px solid ' + (bLow ? bTint : 'rgba(237,241,239,.4)'), flex: 'none'
+    };
+    const battFill = {
+      position: 'absolute', left: 1.2, top: 1.2, bottom: 1.2, borderRadius: 2.2,
+      width: 'calc((100% - 2.4px) * ' + (bPct / 100) + ')', background: bTint,
+      transition: 'width .4s ease, background .3s ease'
+    };
+    const battNub = { width: 1.6, height: 4.4, borderRadius: '0 1.5px 1.5px 0', marginLeft: 1, flex: 'none', background: bLow ? bTint : 'rgba(237,241,239,.4)' };
+    const battLabel = { fontSize: 12, fontWeight: 600, letterSpacing: '-.01em', fontVariantNumeric: 'tabular-nums', color: bLow ? bTint : '#C6CEC9' };
+
+    // ── the day navigator ────────────────────────────────────────
+    const DAYS = [
+      { w: 'Sun', n: 16, long: 'Sunday 16 August', head: 'Two sessions, then nothing' },
+      { w: 'Mon', n: 17, long: 'Monday 17 August', head: 'The intervals cost you' },
+      { w: 'Tue', n: 18, long: 'Tuesday 18 August', head: 'Short night, easy day' },
+      { w: 'Wed', n: 19, long: 'Wednesday 19 August', head: 'Back to your own normal' },
+      { w: 'Thu', n: 20, long: 'Thursday 20 August', head: 'A quiet day, mostly' },
+      { w: 'Fri', n: 21, long: 'Friday 21 August', head: 'You went to bed on time' },
+      { w: 'Sat', n: 22, long: 'Saturday 22 August', head: T.headline }
+    ];
+    const off = this.state.dayOff;
+    const D = DAYS[DAYS.length - 1 - off] || DAYS[DAYS.length - 1];
+    const dayCells = DAYS.map(function (d, i) {
+      const o = DAYS.length - 1 - i;
+      const on = o === off;
+      return {
+        w: d.w, n: d.n,
+        pick: function () { me.setState({ dayOff: o, dayOpen: false }); },
+        box: {
+          flex: 'none', width: 46, padding: '9px 0 10px', borderRadius: 15, cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+          background: on ? 'rgba(23,162,230,.18)' : 'rgba(255,255,255,.05)',
+          border: '.5px solid ' + (on ? 'rgba(23,162,230,.42)' : 'rgba(255,255,255,.07)'),
+          transition: 'background .18s ease, border-color .18s ease'
+        },
+        wStyle: { fontSize: 9.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: on ? '#9FE2FB' : '#7F8A85' },
+        nStyle: { fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 400, lineHeight: 1, color: on ? '#EDF1EF' : '#C6CEC9', fontVariantNumeric: 'tabular-nums' }
+      };
+    });
+
+    // ── a reading, now ───────────────────────────────────────────
+    const SP = S.spot;
+    const spLeft = S.spotLeft;
+    const spBtnBox = function (hue) {
+      return 'flex:none;height:32px;padding:0 14px;border-radius:11px;background:rgba(' + hue + ',.16);border:.5px solid rgba(' + hue + ',.4);display:flex;align-items:center;cursor:pointer';
+    };
+    const SPOT = {
+      spotCard: 'background:' + (SP === 'run' ? 'rgba(23,162,230,.07)' : '#141817')
+        + ';border:.5px solid ' + (SP === 'run' ? 'rgba(23,162,230,.24)' : 'rgba(255,255,255,.06)')
+        + ';border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:13px',
+      spotTitle: SP === 'run' ? 'Reading — hold still' : 'A reading, now',
+      spotSub: SP === 'run' ? 'Counting clean beats. Stop any time; nothing is kept from a part-reading.'
+        : SP === 'done' ? 'Sixty seconds of held-still beats, computed the same way as the overnight figure.'
+        : SP === 'fail' ? 'Sixty seconds of held-still beats. This one did not take.'
+        : 'About a minute, sitting still. Same maths as the overnight figure, so the two can sit side by side.',
+      spotBtn: true,
+      spotTap: SP === 'run'
+        ? function () { clearInterval(self.spotT); self.spotT = null; self.setState({ spot: 'idle', spotLeft: 60 }); }
+        : function () { self.startSpot(); },
+      spotBtnText: SP === 'run' ? 'Stop' : SP === 'idle' ? 'Start' : SP === 'fail' ? 'Try again' : 'Again',
+      spotBtnStyle: SP === 'run' ? spBtnBox('255,255,255') : spBtnBox('23,162,230'),
+      spotBtnLabel: 'font-size:12px;font-weight:600;color:' + (SP === 'run' ? '#C6CEC9' : '#9FE2FB'),
+      spotRun: SP === 'run', spotDone: SP === 'done', spotFail: SP === 'fail',
+      spotClock: '0:' + (spLeft < 10 ? '0' : '') + spLeft,
+      spotBeats: Math.round((60 - spLeft) * 1.07) + ' clean beats',
+      spotBar: 'height:100%;width:' + Math.round((60 - spLeft) / 60 * 100) + '%;background:#17A2E6;border-radius:2px;transition:width .13s linear',
+      spotVal: '48 ms'
+    };
+
+    // ── the updates inbox ────────────────────────────────────────
+    const DEC = S.decided;
+    const btn = function (k, hue, fn) {
+      return {
+        k: k, tap: fn,
+        box: 'height:29px;padding:0 12px;border-radius:10px;cursor:pointer;display:flex;align-items:center;background:rgba(' + hue + ',.14);border:.5px solid rgba(' + hue + ',.34)',
+        label: 'font-size:11.5px;font-weight:600;color:' + (hue === '23,162,230' ? '#9FE2FB' : hue === '139,153,214' ? '#C9D0EE' : '#C6CEC9')
+      };
+    };
+    const decide = function (id, word) {
+      return function () {
+        self.setState(function (st) {
+          const d = Object.assign({}, st.decided); d[id] = word; return { decided: d, seen: true };
+        });
+      };
+    };
+    const mkProp = function (id, k, sub, accept) {
+      const done = DEC[id];
+      return {
+        row: 'display:flex;gap:11px;width:100%;padding:14px 0;border-top:none',
+        dot: 'width:6px;height:6px;flex:none;border-radius:50%;margin-top:6px;background:' + (done ? 'transparent' : '#17A2E6'),
+        kStyle: 'font-size:13.5px;font-weight:600;color:#EDF1EF;flex:1;min-width:0', k: k, sub: sub, when: 'Svea · 07:12',
+        hasBtns: !done, hasRes: !!done,
+        btns: [btn('Accept', '23,162,230', decide(id, 'accept')), btn('Change', '139,153,214', decide(id, 'change')), btn('Decline', '255,255,255', decide(id, 'decline'))],
+        res: done === 'accept' ? accept : done === 'change' ? 'Opened for editing — nothing changes until you save it.' : 'Declined. Svea will not raise it again this week.',
+        resStyle: 'font-size:11.5px;line-height:1.5;color:' + (done === 'accept' ? '#8FE3B4' : '#7F8A85') + ';text-wrap:pretty;padding-top:2px'
+      };
+    };
+    const plain = function (k, sub, when, first) {
+      return {
+        row: 'display:flex;gap:11px;width:100%;padding:14px 0;border-top:' + (first ? 'none' : '.5px solid rgba(255,255,255,.06)'),
+        dot: 'width:6px;height:6px;flex:none;border-radius:50%;margin-top:6px;background:transparent',
+        kStyle: 'font-size:13.5px;color:#EDF1EF;flex:1;min-width:0', k: k, sub: sub, when: when,
+        hasBtns: false, hasRes: false, btns: [], res: '', resStyle: ''
+      };
+    };
+    const PROPS_ROWS = [
+      mkProp('anchor', 'Move your anchor to 22:40',
+        'Twenty minutes earlier for the next four nights. It costs you the end of one episode and buys back about 25 minutes of the debt.',
+        'Accepted. Tonight\u2019s anchor reads 22:40, and the bedtime nudge moves with it.'),
+      mkProp('thursday', 'Make Thursday easy instead of hard',
+        'Two hard days back to back is what put you here last month. Zone 2 for forty minutes keeps the week\u2019s load and drops the cost.',
+        'Accepted. Thursday now reads Easy 40 min in the effort.')
+    ];
+    const pending = PROPS_ROWS.filter(function (r) { return r.hasBtns; }).length;
+    const restored = S.restored;
+    const IN_EMPTY = (this.props.inbox || 'full') === 'empty';
+    const INBOX_GROUPS = IN_EMPTY ? [] : [
+      { k: 'Needs a decision', note: pending === 0 ? 'all answered' : pending + ' waiting', items: PROPS_ROWS.map(function (r, i) {
+        return Object.assign({}, r, { row: 'display:flex;gap:11px;width:100%;padding:14px 0;border-top:' + (i === 0 ? 'none' : '.5px solid rgba(255,255,255,.06)') });
+      }) },
+      { k: 'Worth knowing', note: 'nothing to answer', items: [
+        // the second door into the What's new sheet — the first is Settings → About
+        Object.assign(plain('Noop Aura 11.7 is installed', 'Strength sessions, what the day cost, what changed, and speaking to Svea. Four readings worth a minute.', 'Today · 08:02', true), {
+          hasBtns: true,
+          btns: [btn('Read it', '23,162,230', function () { self.setState({ screen: 'release' }); })]
+        }),
+        plain('Six days under your resting line', 'Your pulse has sat two beats under your own baseline all week. Usually fitness, sometimes the start of a cold — it is neither yet.', 'Today · 06:40', true),
+        plain('Your pace is a month old', 'You swept on 12 August at 5.5 a minute. Your resting pulse has moved three beats since, which is enough to move the pace.', 'Yesterday', false)
+      ] },
+      { k: 'Put away', note: 'kept for seven days', items: [
+        restored ? plain('Back on Today', 'Something is off is on the home screen again, priced in the ledger where it was.', 'Just now', true)
+          : Object.assign(plain('You swiped away Something is off', 'It is still in the charge ledger, priced at 12. Putting it back only restores the card on Today.', 'Today · 07:20', true), {
+            hasBtns: true,
+            btns: [btn('Put it back', '23,162,230', function () { self.setState({ restored: true, seen: true }); })]
+          }),
+        plain('Backup ran at 03:10', '41 nights, 2.1 MB, to the folder you chose. The next one is due Sunday.', 'Today · 03:10', false)
+      ] }
+    ];
+    const unreadN = IN_EMPTY ? 0 : pending + (restored ? 0 : 1);
+
+    return {
+      goStrapPage: __go('plumbing', 'strap'),
+      ...SPOT,
+      // ── What's new: presented once after a version bump, and readable from the bell after that.
+      // The four readings are Noop's own; the per-version list is the release feed's and is set at
+      // length rather than written.
+      isRelease: screen === 'release', goRelease: go('release'),
+      relChip: {
+        fontSize: 9.5, letterSpacing: '.11em', textTransform: 'uppercase', fontWeight: 600,
+        padding: '4px 8px', borderRadius: 7, flex: 'none',
+        color: self.props.release === 'bell' ? '#C6CEC9' : '#9FE2FB',
+        background: self.props.release === 'bell' ? 'rgba(255,255,255,.07)' : 'rgba(23,162,230,.14)'
+      },
+      relKick: self.props.release === 'bell' ? 'Version notes' : 'New',
+      relWhen: '11.7 · 17 September',
+      relTitle: self.props.release === 'bell'
+        ? 'What 11.7 brought.'
+        : 'Noop is Noop Aura now.',
+      relLead: self.props.release === 'bell'
+        ? 'The four readings from this version, and every version before it.'
+        : 'The name changed because the app did. Four things are worth a minute; the rest is in the list below.',
+      relItems: [
+        ['lift', 'The lift', 'Strength has its own place now: your programs, a screen built for the set you are in, and what each session actually loaded. Every target is optional — a line can be nothing but an exercise name.'],
+        ['gauge', 'What the day cost', 'Today carries an estimate of what you spent, as a range rather than a figure. It will never set a number for you to eat against.'],
+        ['trends', 'What changed', 'Trends opens with what moved since you last looked. Twelve kinds of finding, and nothing in the list needs answering.'],
+        ['mic', 'Speak to Svea', 'Hold the mic in a conversation and talk instead of typing. Voice is how you say it; Manner is still how she writes back.']
+      ].map(function (r, n) {
+        return {
+          k: r[1], sub: r[2], icon: ico(r[0], 19, A),
+          wrap: {
+            width: 34, height: 34, flex: 'none', borderRadius: 12, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', background: 'rgba(23,162,230,.1)',
+            border: '.5px solid rgba(23,162,230,.18)'
+          },
+          row: {
+            display: 'flex', gap: 12, alignItems: 'flex-start', padding: '15px 0',
+            borderTop: n === 0 ? 'none' : '.5px solid rgba(255,255,255,.06)'
+          }
+        };
+      }),
+      relLog: [
+        ['11.7', '17 September', 1, [.94, .88, .72, .9, .64]],
+        ['11.6', '2 September', 0, [.91, .85, .68]],
+        ['11.5', '19 August', 0, [.93, .8, .88, .6]],
+        ['11.4', '4 August', 0, [.87, .92, .7]]
+      ].map(function (v) {
+        return {
+          n: v[0], d: v[1], here: !!v[2],
+          hereChip: {
+            fontSize: 9, letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: 600,
+            padding: '3px 6px', borderRadius: 5, flex: 'none',
+            color: '#9FE2FB', background: 'rgba(23,162,230,.14)'
+          },
+          row: {
+            display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px',
+            borderRadius: 18, background: 'rgba(255,255,255,.028)',
+            border: '.5px solid rgba(255,255,255,.055)'
+          },
+          lines: v[3].map(function (w) {
+            return {
+              display: 'block', height: 7, borderRadius: 4,
+              width: (w * 100).toFixed(0) + '%', background: 'rgba(255,255,255,.055)'
+            };
+          })
+        };
+      }),
+      relBtn: {
+        height: 58, borderRadius: 19, background: A, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 26px rgba(23,162,230,.28)'
+      },
+      relBtnText: self.props.release === 'bell' ? 'Done' : 'Start using it',
+      relFoot: self.props.release === 'bell'
+        ? 'Kept in the bell for as long as the version is installed.'
+        : 'Shown once. After this it lives in the bell, without the New on it.',
+
+      isInbox: screen === 'inbox', goInbox: go('inbox'),
+      inboxGroups: INBOX_GROUPS, inboxEmpty: IN_EMPTY,
+      inboxSub: IN_EMPTY
+        ? 'Everything is answered. This is where proposals, notices and anything you put away collect.'
+        : pending + ' to answer, and ' + (restored ? 'two' : 'three') + ' things to know. A proposal stays here until you say yes or no to it.',
+      unread: String(unreadN), unreadAny: unreadN > 0,
+      icoBell: ico('bell', 15, '#C6CEC9'),
+      battChip, battBody, battFill, battNub, battLabel, battPct: bPct + '%',
+      icoCal: ico('calendar', 15, '#8B958F'), icoClock: ico('clock2', 17, '#8B99D6'),
+      dayOpen: this.state.dayOpen,
+      toggleDays: function () { me.setState(function (s) { return { dayOpen: !s.dayOpen }; }); },
+      dayLabel: off === 0 ? 'Today' : off === 1 ? 'Yesterday' : D.w + ' ' + D.n,
+      dayChip: {
+        display: 'flex', alignItems: 'center', gap: 6, height: 30, padding: '0 11px', borderRadius: 15, cursor: 'pointer',
+        background: this.state.dayOpen || off > 0 ? 'rgba(23,162,230,.14)' : 'rgba(255,255,255,.06)',
+        border: '.5px solid ' + (this.state.dayOpen || off > 0 ? 'rgba(23,162,230,.34)' : 'rgba(255,255,255,.1)'),
+        transition: 'background .18s ease, border-color .18s ease'
+      },
+      dayChipLabel: { fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', color: this.state.dayOpen || off > 0 ? '#9FE2FB' : '#C6CEC9' },
+      dayCells,
+      pastDay: off > 0,
+      pastNote: 'Looking back at ' + D.long + '. Nothing here is live.',
+      backToToday: function () { me.setState({ dayOff: 0, dayOpen: false }); },
+      greetLine: off === 0 ? T.greet : D.long,
+      headLine: off === 0 ? T.headline : D.head,
+      tabToday: __go('day', 'today'), tabTrends: __go('picture', 'trends'), tabRest: __go('night', 'rest'), tabYou: __go('plumbing', 'you'),
+      goSvea: __go('svea', 'coach'),
+      swipeStart: (e) => this.setState({ sx: e.clientX, sy: e.clientY }),
+      swipeEnd: (e) => {
+        const st = this.state;
+        if (st.sx == null) return;
+        const dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+        this.setState({ sx: null, sy: null });
+        if (dx <= 78 || Math.abs(dy) >= 58) return;
+        if (st.logs) { this.setState({ logs: false }); return; }
+        const cur = st.screen || this.props.screen || "today";
+        // Swipe-back is the visible chevron and nothing else. heart's header says Today, so the
+        // swipe goes to today — not to vitals, which is only one of the doors into it.
+        const to = ({"day":"today","vitals":"today","stress":"today","charge":"today","heart":"today","inbox":"today",
+          "breathe":"today","bcatalog":"breathe","bplayer":"breathe","bsweep":"breathe","bfound":"breathe"})[cur];
+        if (to) this.setState({ screen: to });
+      },
+      confOn: CONF.on, confBox: CONF.box, confDot: CONF.dot, confLabelStyle: CONF.labelStyle, confLabel: CONF.label,
+      isDark: true, notes: this.props.showNotes !== false, t: T,
+      isEnergy: screen === 'energy', goEnergy: go('energy'),
+      enHero: EN.hero, enUnit: EN.unit, enHeroNote: EN.heroNote, enLead: EN.lead,
+      enHeroStyle: { fontFamily: "'Outfit',sans-serif", fontSize: 40, fontWeight: 200, letterSpacing: '-.035em',
+        lineHeight: 1, color: '#EDF1EF', fontVariantNumeric: 'tabular-nums' },
+      enBigStyle: { fontFamily: "'Outfit',sans-serif", fontSize: 50, fontWeight: 200, letterSpacing: '-.04em',
+        lineHeight: 1, color: '#EDF1EF', fontVariantNumeric: 'tabular-nums' },
+      enSegs: EN.segs, enLegend: EN.legend,
+      enProjLine: (this.state.dayOff || 0) > 0
+        ? 'A forecast for a day that is over is not a forecast, so there is none here.'
+        : EN.projLine,
+      enProjStyle: { fontSize: 12.5, lineHeight: 1.6, textWrap: 'pretty',
+        color: (this.state.dayOff || 0) > 0 ? '#939C97' : EN.projTone },
+      enCovLine: EN.covLine,
+      enConfOn: EN.conf.on, enConfBox: EN.conf.box, enConfDot: EN.conf.dot,
+      enConfLabelStyle: EN.conf.labelStyle, enConfLabel: EN.conf.label,
+      enHours: EN.hours, enChartMax: EN.chartMax, enChartFoot: EN.chartFoot, enFoot: EN.foot,
+      enRows: EN.rows.map(function (r, i) {
+        return {
+          k: r.k, v: r.v, note: r.note,
+          row: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0',
+            borderTop: i === 0 ? 'none' : hairD },
+          noteStyle: { fontSize: 11, lineHeight: 1.5, color: '#7F8A85', textWrap: 'pretty' },
+          vStyle: { flex: 'none', fontSize: 13, fontWeight: 600, color: '#EDF1EF', fontVariantNumeric: 'tabular-nums' }
+        };
+      }),
+      isToday: screen === 'today', isDay: screen === 'day', isVitals: screen === 'vitals',
+      isStress: screen === 'stress', isHeart: screen === 'heart', isCharge: screen === 'charge',
+      goToday: go('today'), goDay: go('day'), goHeart: go('heart'), goCharge: go('charge'),
+      isBreathe: screen === 'breathe', isBCatalog: screen === 'bcatalog', isBPlayer: screen === 'bplayer',
+      isBSweep: screen === 'bsweep', isBFound: screen === 'bfound',
+      showTabs: screen !== 'bplayer' && screen !== 'bsweep' && screen !== 'release',
+      goBreathe: function (e) { if (e && e.stopPropagation) e.stopPropagation(); go('breathe')(); },
+      goBCatalog: go('bcatalog'), goBFound: go('bfound'),
+      goBPlayer: function () { self.setState({ screen: 'bplayer', log: false, bt: 0, bsamples: [] }); },
+      goBSweep: function () { self.setState({ screen: 'bsweep', log: false, bsweepT: 0, bt: 0 }); },
+      // third state: a session that has been done is reported back here, priced in charge
+      goSession: DONE ? __go('effort', 'detail') : __go('effort', 'session'),
+      sessionTitle: DONE || (charge < 34 ? 'Rest' : 'Easy 40 min'),
+      sessionLine: DONE
+        ? DONE_MIN + ' min \u00b7 ' + Math.round(DONE_MIN * 0.43)
+          + ' of today\u2019s charge, and ' + Math.round(DONE_MIN * 0.29) + ' minutes on tonight\u2019s need.'
+        : charge < 34
+        ? 'Nothing today. Tomorrow is the earliest this pays off.'
+        : 'Zone 2. What today can take without borrowing from tomorrow.',
+      ...BRE, ...DRIFT, drivers: DRV, signals: SIGNALS, ruled: RULED,
+      wakeNum: wake,
+      heroNum: {
+        fontFamily: "'Outfit',sans-serif", fontSize: 52, fontWeight: 200, lineHeight: 1,
+        letterSpacing: '-.03em', color: tickColor, fontVariantNumeric: 'tabular-nums'
+      },
+      heroChip: {
+        fontSize: 11.5, fontWeight: 600, padding: '6px 11px', borderRadius: 10, flex: 'none',
+        color: tickColor, background: 'rgba(' + wRGB + ',.12)', border: '.5px solid rgba(' + wRGB + ',.3)'
+      },
+      barTrack: { position: 'relative', height: 12, borderRadius: 6, background: 'rgba(255,255,255,.06)', overflow: 'hidden' },
+      barGhost: { position: 'absolute', left: 0, top: 0, bottom: 0, width: (WFRAC * 100).toFixed(1) + '%', borderRadius: 6, background: 'rgba(159,226,251,.16)' },
+      barFill: { position: 'absolute', left: 0, top: 0, bottom: 0, width: (FRAC * 100).toFixed(1) + '%', borderRadius: 6, background: tickColor, transition: 'width .5s ease' },
+      chargeLine: chargeSentence,
+      // A model output, never charge + n. With no forecast the card is omitted rather than
+      // filled with arithmetic dressed as a projection.
+      hasRecharge: rechargeTo != null,
+      rechargeLine: rechargeTo != null
+        ? '7h 05m in bed gets you back to about ' + rechargeTo + ' by morning. Sleep is the only thing that does it.'
+        : null,
+
+      phase: PHASES[phaseI], bpm: bpm,
+      ticks, markerStyle, readiness: charge,
+      chargeCore, chargeGlow, stateLabel,
+      chargeNow: shown,
+      spendRows: SPEND.map(function (x, i) {
+        return {
+          k: x.k, s: x.s, cost: '−' + x.cost,
+          kStyle: 'font-size:13.5px;color:' + (x.amber ? '#F2B45C' : '#EDF1EF') + (x.amber ? ';font-weight:600' : ''),
+          was: x.was ? '−' + x.was : '',
+          wasS: x.was ? 'font-family:\'Outfit\',sans-serif;font-size:14px;color:#7F8A85;text-decoration:line-through;font-variant-numeric:tabular-nums;flex:none' : 'display:none',
+          row: {
+            display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0',
+            borderTop: i ? '.5px solid rgba(255,255,255,.07)' : 'none'
+          },
+          costS: {
+            fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: '-.02em',
+            color: tickColor, fontVariantNumeric: 'tabular-nums', flex: 'none'
+          }
+        };
+      }),
+      stateLine: chargeSentence,
+      heartRowSub: bpm < 66 ? 'settling with the exhale' : bpm > 72 ? 'lifting with the inhale' : 'resting',
+      zoneNow: bpm < 62 ? 'Resting · under your own resting line' : 'Easy · sitting just above resting',
+
+      dayLine: m1.line, dayArea: m1.area, heartLine: m2.line, heartArea: m2.area,
+      hrLine, hrArea, hrHits, marks,
+      hrX: dayXY[pI][0].toFixed(1), hrY: dayXY[pI][1].toFixed(1),
+      scrubHr: HR[pI], scrubTime: pI === HR.length - 1 ? T.marks[T.marks.length - 1].time : nearest.time,
+      scrubNote: scrubNote,
+      dayAxis: T.axis.map(function (l) { return { label: l }; }),
+
+      vitals, zones, zoneBar, heartRows, vitalsSummary, vitalsDot,
+
+      stressLabel: sl.name, stressRead: sl.read, stressLevels, stressBars,
+      stressBig: {
+        fontFamily: "'Outfit',sans-serif", fontSize: 44, fontWeight: 200, letterSpacing: '-.035em',
+        lineHeight: 1, color: sl.c
+      },
+      breatheCard: {
+        borderRadius: 22, padding: '18px 18px 16px', cursor: 'pointer',
+        display: 'flex', flexDirection: 'column', gap: 10,
+        background: 'linear-gradient(158deg,' + (S.stress >= 2 ? 'rgba(242,180,92,.16)' : 'rgba(23,162,230,.17)') + ',rgba(23,162,230,.03))',
+        border: '.5px solid ' + (S.stress >= 2 ? 'rgba(242,180,92,.34)' : 'rgba(23,162,230,.3)'),
+        transition: 'background .22s ease, border-color .22s ease'
+      },
+      breatheKicker: {
+        fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600,
+        color: S.stress >= 2 ? WARM : A
+      },
+
+      rows, logTiles, loggedChips, hasLogs: loggedChips.length > 0,
+      logOpen: S.log,
+      openLog: function () { self.setState({ log: true }); },
+      closeLog: function () { self.setState({ log: false }); },
+      clearLog: function () { self.setState({ counts: {}, log: false }); },
+
+      icoMoon: ico('moon', 19, LAV), icoHeart: ico('heart', 21, A),
+      icoTodayOn: ico('today', 19, '#04121A'), icoTrends: ico('trends', 19, '#7F8A85'),
+      icoRest: ico('moon', 19, '#7F8A85'), icoYou: ico('you', 19, '#7F8A85')
+    };
+  }
+}
+</script>
+</body>
+</html>

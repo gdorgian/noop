@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#6B77B8;text-decoration:none}a:hover{color:#4A56A0}
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sheetUp{from{transform:translateY(102%)}to{transform:translateY(0)}}
+@keyframes scrimIn{from{opacity:0}to{opacity:1}}
+@keyframes rawPulse{0%,100%{opacity:1}50%{opacity:.34}}
+.scr{animation:fadeUp .3s cubic-bezier(.22,.61,.36,1) both}
+.hb::-webkit-scrollbar{width:0;height:0}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="display:flex;gap:60px;align-items:flex-start;padding:52px 48px 100px">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:16px">
+  <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">ACT 9</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">The instrument &mdash; working prototype</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">ask the data a question you did not think of in advance</span>
+  </div>
+  </sc-if>
+
+  <div style="border-radius:48px;overflow:hidden;flex:none">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+    <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-150px;left:50%;transform:translateX(-50%);width:470px;height:410px;border-radius:50%;background:radial-gradient(circle,rgba(139,153,214,.16),rgba(139,153,214,0) 70%);filter:blur(18px);pointer-events:none"></div>
+
+      <div class="hb" onPointerDown="{{ swipeStart }}" onPointerUp="{{ swipeEnd }}" style="position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain">
+
+        <sc-if value="{{ isIndex }}" hint-placeholder-val="{{ true }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ toTrends }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Trends</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Ask it something</span>
+            <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">Every signal Noop keeps, with the one number that says whether it has moved. Open any of them to see what it moves with.</span>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:0;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.07);border-radius:15px;padding:3px">
+              <sc-for list="{{ ranges }}" as="g" hint-placeholder-count="4">
+                <div onClick="{{ g.pick }}" style="{{ g.seg }}">{{ g.k }}</div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:7px;padding:0 3px">
+              <span style="font-family:'Outfit',sans-serif;font-size:17px;font-weight:300;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ nights }}</span>
+              <span style="font-size:12px;color:#7F8A85">{{ nightsNote }}</span>
+            </div>
+          </div>
+
+          <div style="padding:12px 20px 0;display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ chips }}" as="c" hint-placeholder-count="6">
+              <div onClick="{{ c.pick }}" style="{{ c.box }}"><span style="{{ c.label }}">{{ c.k }}</span></div>
+            </sc-for>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:16px">
+            <sc-for list="{{ groups }}" as="G" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:0 3px">
+                  <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ G.label }}</span>
+                  <span style="font-size:10.5px;color:#7F8A85">{{ G.count }}</span>
+                </div>
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:2px 15px">
+                  <sc-for list="{{ G.rows }}" as="r" hint-placeholder-count="5">
+                    <div onClick="{{ r.open }}" style="{{ r.row }}">
+                      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                        <span style="font-size:13.5px;color:#EDF1EF">{{ r.name }}</span>
+                        <div style="display:flex;align-items:baseline;gap:5px">
+                          <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:300;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:#EDF1EF">{{ r.val }}</span>
+                          <span style="font-size:11px;color:#6C7570">{{ r.unit }}</span>
+                        </div>
+                      </div>
+                      <div style="flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+                        <span style="{{ r.chip }}">{{ r.delta }}</span>
+                        <svg viewBox="0 0 86 26" style="width:86px;height:26px;overflow:visible">
+                          <polyline points="{{ r.spark }}" fill="none" stroke="{{ r.stroke }}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                          <circle cx="{{ r.dotX }}" cy="{{ r.dotY }}" r="2.4" fill="{{ r.stroke }}"></circle>
+                        </svg>
+                      </div>
+                      <span style="width:7px;height:7px;flex:none;border-top:1.5px solid #57605C;border-right:1.5px solid #57605C;transform:rotate(45deg)"></span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="padding:16px 20px 0;display:flex;flex-direction:column;gap:9px">
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+              <sc-for list="{{ doors }}" as="d" hint-placeholder-count="2">
+                <div onClick="{{ d.go }}" style="{{ d.row }}">
+                  <span style="{{ d.icon }}"></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13.5px;color:#EDF1EF">{{ d.k }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85">{{ d.sub }}</span>
+                  </div>
+                  <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Everything here is an association in your own data. Noop will not tell you one thing caused another, and it will not draw a line it cannot defend at the length you asked for.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isRaw }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" data-screen-label="instrument/raw" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goIndex }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Ask it something</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Raw capture</span>
+            <span style="font-size:12.5px;line-height:1.6;color:#939C97;text-wrap:pretty">Accelerometer, gyroscope and magnetometer at 50 Hz, written straight to this phone. Nothing is uploaded, nothing is analysed, and nothing here feeds any other screen.</span>
+          </div>
+
+          <div style="padding:16px 20px 0;display:flex;flex-direction:column;gap:12px">
+            <div style="{{ rawArmCard }}">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="{{ rawArmDot }}"></span>
+                <span style="{{ rawArmLabel }}">{{ rawArmState }}</span>
+              </div>
+              <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:14px">
+                <span style="{{ rawArmClock }}">{{ rawArmTime }}</span>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+                  <span style="font:600 15px ui-monospace,Menlo,monospace;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ rawArmSize }}</span>
+                  <span style="font-size:10.5px;color:#7F8A85">{{ rawArmRate }}</span>
+                </div>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#B7C3C9;text-wrap:pretty">{{ rawArmNote }}</span>
+              <div onClick="{{ rawToggle }}" style="{{ rawBtn }}">
+                <span style="{{ rawBtnInk }}">{{ rawBtnText }}</span>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#6C7570;font-weight:600">What it will record</span>
+              <sc-for list="{{ rawSpec }}" as="s" hint-placeholder-count="4">
+                <div style="display:flex;align-items:baseline;gap:12px">
+                  <span style="flex:1;font-size:12.5px;color:#C6CEC9">{{ s.k }}</span>
+                  <span style="font:600 12px ui-monospace,Menlo,monospace;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ s.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:6px 4px 0">
+              <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#6C7570;font-weight:600">Captures on this phone</span>
+              <span style="font:600 10.5px ui-monospace,Menlo,monospace;color:#7F8A85">{{ rawTotal }}</span>
+            </div>
+
+            <sc-if value="{{ rawHasList }}" hint-placeholder-val="{{ true }}">
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:2px 15px">
+              <sc-for list="{{ rawList }}" as="c" hint-placeholder-count="4">
+                <div onClick="{{ c.open }}" style="{{ c.row }}">
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                    <span style="font:600 12.5px ui-monospace,Menlo,monospace;color:#EDF1EF">{{ c.id }}</span>
+                    <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ c.when }}</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+                    <span style="font:600 12.5px ui-monospace,Menlo,monospace;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ c.dur }}</span>
+                    <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ c.size }}</span>
+                  </div>
+                  <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+                </div>
+              </sc-for>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ rawEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:18px 16px;display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:13px;color:#EDF1EF">No captures yet</span>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">Arm one above. Nothing is running in the background and nothing will start on its own.</span>
+            </div>
+            </sc-if>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Captures are files, not a feature. They stay until you delete them, they are included in a backup, and no screen in Noop reads them.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isCapture }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" data-screen-label="instrument/capture" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goRaw }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Raw capture</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:5px">
+            <span style="font:600 19px ui-monospace,Menlo,monospace;color:#EDF1EF;letter-spacing:-.01em">{{ capId }}</span>
+            <span style="font-size:12.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ capWhen }}</span>
+          </div>
+
+          <div style="padding:16px 20px 0;display:flex;flex-direction:column;gap:12px">
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:4px 16px">
+              <sc-for list="{{ capRows }}" as="r" hint-placeholder-count="7">
+                <div style="{{ r.row }}">
+                  <span style="flex:1;font-size:12.5px;color:#C6CEC9">{{ r.k }}</span>
+                  <span style="font:600 12.5px ui-monospace,Menlo,monospace;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ r.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:14px 16px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#6C7570;font-weight:600">Samples per channel</span>
+                <span style="font:600 10.5px ui-monospace,Menlo,monospace;color:#7F8A85">50 Hz</span>
+              </div>
+              <sc-for list="{{ capChans }}" as="c" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:11px">
+                  <span style="width:52px;flex:none;font:600 11.5px ui-monospace,Menlo,monospace;color:#C6CEC9">{{ c.k }}</span>
+                  <div style="flex:1;display:flex;gap:1.5px;height:20px;align-items:flex-end">
+                    <sc-for list="{{ c.bars }}" as="b" hint-placeholder-count="40">
+                      <div style="{{ b.s }}"></div>
+                    </sc-for>
+                  </div>
+                  <span style="flex:none;font:600 11.5px ui-monospace,Menlo,monospace;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ c.n }}</span>
+                </div>
+              </sc-for>
+              <span style="font-size:11px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ capGapNote }}</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div onClick="{{ capExport }}" style="height:52px;border-radius:17px;background:rgba(255,255,255,.07);border:.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-size:14px;font-weight:600;color:#EDF1EF">Export as CSV</span>
+              </div>
+              <div onClick="{{ capDelete }}" style="height:52px;border-radius:17px;border:.5px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-size:14px;color:#C6CEC9">Delete this capture</span>
+              </div>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Export writes a file and hands it to the share sheet. Where it goes after that is your decision, not Noop's — nothing is sent anywhere on its own.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isMetric }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ toIndex }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Every signal</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:8px">
+            <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">{{ mName }}</span>
+            <div style="display:flex;align-items:baseline;gap:9px">
+              <span style="font-family:'Outfit',sans-serif;font-size:52px;font-weight:200;letter-spacing:-.045em;line-height:1;font-variant-numeric:tabular-nums">{{ mVal }}</span>
+              <span style="font-size:13px;color:#939C97">{{ mUnit }}</span>
+            </div>
+            <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ mRead }}</span>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:0;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.07);border-radius:15px;padding:3px">
+              <sc-for list="{{ ranges }}" as="g" hint-placeholder-count="4">
+                <div onClick="{{ g.pick }}" style="{{ g.seg }}">{{ g.k }}</div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:7px;padding:0 3px">
+              <span style="font-family:'Outfit',sans-serif;font-size:17px;font-weight:300;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ mNights }}</span>
+              <span style="font-size:12px;color:#7F8A85">{{ mNightsNote }}</span>
+            </div>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:11px">
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 13px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ mSpan }}</span>
+                <span style="{{ mChip }}">{{ mDelta }}</span>
+              </div>
+              <svg viewBox="0 0 300 122" style="width:100%;height:122px;overflow:visible">
+                <path d="{{ mBand }}" fill="rgba(139,153,214,.13)"></path>
+                <polyline points="{{ mLine }}" fill="none" stroke="#8B99D6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                <sc-if value="{{ mHasFit }}" hint-placeholder-val="{{ false }}">
+                  <line x1="{{ mFitX1 }}" y1="{{ mFitY1 }}" x2="{{ mFitX2 }}" y2="{{ mFitY2 }}" stroke="rgba(237,241,239,.42)" stroke-width="1.2" stroke-dasharray="4 5"></line>
+                </sc-if>
+                <circle cx="{{ mDotX }}" cy="{{ mDotY }}" r="3.6" fill="#8B99D6"></circle>
+              </svg>
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#7F8A85">
+                <sc-for list="{{ mAxis }}" as="a" hint-placeholder-count="4">
+                  <span>{{ a.label }}</span>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ mChartNote }}</span>
+            </div>
+
+            <sc-if value="{{ mThin }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:9px;padding:16px;border-radius:22px;background:rgba(139,153,214,.08);border:.5px solid rgba(139,153,214,.22)">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">Not enough of it yet</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#C9D0EE;text-wrap:pretty">{{ mThinNote }}</span>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ mHasMoves }}" hint-placeholder-val="{{ true }}">
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">What it moves with</span>
+                <span style="font-size:10.5px;color:#7F8A85">strongest first</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <sc-for list="{{ mMoves }}" as="w" hint-placeholder-count="4">
+                  <div onClick="{{ w.open }}" style="display:flex;flex-direction:column;gap:7px;cursor:pointer">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                      <span style="flex:1;font-size:13px;color:#EDF1EF;text-wrap:pretty">{{ w.name }}</span>
+                      <span style="{{ w.lagChip }}">{{ w.lag }}</span>
+                      <span style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:400;color:#B7C0E8;font-variant-numeric:tabular-nums;flex:none">{{ w.r }}</span>
+                    </div>
+                    <div style="height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;display:flex">
+                      <span style="{{ w.bar }}"></span>
+                    </div>
+                    <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ w.line }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            </sc-if>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+              <sc-for list="{{ mLinks }}" as="l" hint-placeholder-count="3">
+                <div onClick="{{ l.go }}" style="{{ l.row }}">
+                  <span style="{{ l.icon }}"></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13.5px;color:#EDF1EF">{{ l.k }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85">{{ l.sub }}</span>
+                  </div>
+                  <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+                </div>
+              </sc-for>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">{{ mFoot }}</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isCompare }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ toIndex }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Every signal</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Two at once</span>
+            <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">Same axis, same window. The shift control asks whether one of them arrives a day late.</span>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;gap:8px">
+              <sc-for list="{{ slots }}" as="s" hint-placeholder-count="2">
+                <div onClick="{{ s.pick }}" style="{{ s.box }}">
+                  <span style="{{ s.tag }}">{{ s.tagText }}</span>
+                  <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                    <span style="font-size:13px;color:#EDF1EF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span>
+                    <span style="font-size:10.5px;color:#7F8A85">{{ s.sub }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;gap:0;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.07);border-radius:15px;padding:3px">
+              <sc-for list="{{ ranges }}" as="g" hint-placeholder-count="4">
+                <div onClick="{{ g.pick }}" style="{{ g.seg }}">{{ g.k }}</div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:7px;padding:0 3px">
+              <span style="font-family:'Outfit',sans-serif;font-size:17px;font-weight:300;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ cNights }}</span>
+              <span style="font-size:12px;color:#7F8A85">{{ cNightsNote }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 13px;display:flex;flex-direction:column;gap:12px">
+              <svg viewBox="0 0 300 130" style="width:100%;height:130px;overflow:visible">
+                <polyline points="{{ cLineA }}" fill="none" stroke="#8B99D6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                <polyline points="{{ cLineB }}" fill="none" stroke="#2ECC80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="{{ cDashB }}"></polyline>
+                <circle cx="{{ cDotAX }}" cy="{{ cDotAY }}" r="3.4" fill="#8B99D6"></circle>
+                <circle cx="{{ cDotBX }}" cy="{{ cDotBY }}" r="3.4" fill="#2ECC80"></circle>
+              </svg>
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#7F8A85">
+                <sc-for list="{{ cAxis }}" as="a" hint-placeholder-count="4">
+                  <span>{{ a.label }}</span>
+                </sc-for>
+              </div>
+              <div style="display:flex;gap:14px;flex-wrap:wrap">
+                <sc-for list="{{ cKey }}" as="k" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:7px">
+                    <span style="{{ k.sw }}"></span>
+                    <span style="font-size:11px;color:#939C97">{{ k.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="{{ cFitCard }}">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="{{ cFitKicker }}">{{ cFitKick }}</span>
+                <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ cFitN }}</span>
+              </div>
+              <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em;line-height:1.1">{{ cFitHead }}</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#C9D0EE;text-wrap:pretty">{{ cFitBody }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Shift by a day</span>
+                <span style="font-size:10.5px;color:#7F8A85">{{ cBestNote }}</span>
+              </div>
+              <div style="display:flex;gap:5px">
+                <sc-for list="{{ cShifts }}" as="s" hint-placeholder-count="5">
+                  <div onClick="{{ s.pick }}" style="{{ s.box }}">
+                    <span style="{{ s.k }}">{{ s.label }}</span>
+                    <span style="{{ s.v }}">{{ s.r }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ cShiftNote }}</span>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Two lines that move together is not one causing the other. The fit is only drawn when it clears the bar, and it is left off when it does not.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isEffects }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ toIndex }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Every signal</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">What actually moves you</span>
+            <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ eIntro }}</span>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:11px">
+            <div style="display:flex;gap:0;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.07);border-radius:15px;padding:3px">
+              <sc-for list="{{ ranges }}" as="g" hint-placeholder-count="4">
+                <div onClick="{{ g.pick }}" style="{{ g.seg }}">{{ g.k }}</div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ eRanked }}" hint-placeholder-val="{{ true }}">
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+              <sc-for list="{{ eRows }}" as="r" hint-placeholder-count="4">
+                <div onClick="{{ r.pick }}" style="{{ r.row }}">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                    <span style="flex:1;font-size:13.5px;font-weight:600;color:#EDF1EF;text-wrap:pretty">{{ r.name }}</span>
+                    <span style="{{ r.valStyle }}">{{ r.val }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:0">
+                    <sc-for list="{{ r.slots }}" as="s" hint-placeholder-count="3">
+                      <div style="{{ s.wrap }}">
+                        <span style="{{ s.dot }}"></span>
+                        <span style="{{ s.lbl }}">{{ s.k }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ r.line }}</span>
+                </div>
+              </sc-for>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ eLearning }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:9px;padding:17px;border-radius:22px;background:rgba(139,153,214,.08);border:.5px solid rgba(139,153,214,.22)">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">Still learning</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#C9D0EE;text-wrap:pretty">{{ eLearnNote }}</span>
+              <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px">
+                <sc-for list="{{ eShort }}" as="s" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:baseline;gap:9px">
+                    <span style="width:5px;height:5px;flex:none;border-radius:50%;background:#8B99D6;margin-top:6px"></span>
+                    <span style="flex:1;font-size:12px;line-height:1.5;color:#C9D0EE;text-wrap:pretty">{{ s }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ eNothing }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:9px;padding:17px;border-radius:22px;background:#141817;border:.5px solid rgba(255,255,255,.08)">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">Nothing here clears the bar</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#939C97;text-wrap:pretty">Six behaviours, {{ eNothingN }} of them with enough days on both sides, and not one of them moves your readiness by more than the day-to-day wobble. That is a real answer, and a slightly uncomfortable one: at this window, what you are doing is not what is deciding your mornings.</span>
+              <span style="font-size:12px;line-height:1.6;color:#7F8A85;text-wrap:pretty">Sleep regularity is doing the work instead. It is on Rhythm, and it is not a behaviour you log — it is one you keep.</span>
+            </div>
+            </sc-if>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:13px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">With and without</span>
+                <span style="font-size:10.5px;color:#7F8A85">{{ pairName }}</span>
+              </div>
+              <sc-if value="{{ pairOk }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:13px">
+                <sc-for list="{{ pairBars }}" as="p" hint-placeholder-count="2">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                      <span style="font-size:12.5px;color:#C6CEC9">{{ p.k }}</span>
+                      <div style="display:flex;align-items:baseline;gap:6px">
+                        <span style="{{ p.valStyle }}">{{ p.val }}</span>
+                        <span style="font-size:11px;color:#6C7570">{{ p.n }}</span>
+                      </div>
+                    </div>
+                    <div style="position:relative;height:8px;border-radius:5px;background:rgba(255,255,255,.06)">
+                      <span style="{{ p.spread }}"></span>
+                      <span style="{{ p.mark }}"></span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:#C6CEC9;text-wrap:pretty">{{ pairRead }}</span>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ pairOverlap }}</span>
+              </sc-if>
+              <sc-if value="{{ pairThin }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:12.5px;line-height:1.6;color:#C9D0EE;text-wrap:pretty">{{ pairThinNote }}</span>
+              </sc-if>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">What one more costs</span>
+                <span style="{{ dChip }}">{{ dState }}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px">
+                <span style="{{ dNumStyle }}">{{ dNum }}</span>
+                <span style="font-size:12px;color:#8B958F;text-wrap:pretty">{{ dUnit }}</span>
+              </div>
+              <div style="height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;display:flex">
+                <span style="{{ dFill }}"></span>
+              </div>
+              <span style="font-size:12px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ dLine }}</span>
+              <div style="display:flex;flex-direction:column;gap:7px;padding-top:2px">
+                <sc-for list="{{ dSteps }}" as="s" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span style="width:52px;flex:none;font-size:11.5px;color:#7F8A85">{{ s.k }}</span>
+                    <div style="flex:1;height:6px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;display:flex">
+                      <span style="{{ s.bar }}"></span>
+                    </div>
+                    <span style="{{ s.valStyle }}">{{ s.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ dFoot }}</span>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Every line on this screen is an association in your own days, written by the engine that found it. None of them is a claim that one thing caused another.</span>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <sc-if value="{{ sheet }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:flex-end">
+        <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(4,6,5,.66);backdrop-filter:blur(3px);animation:scrimIn .22s ease both"></div>
+        <div style="position:relative;max-height:76%;display:flex;flex-direction:column;background:#141817;border-top:.5px solid rgba(255,255,255,.09);border-radius:28px 28px 0 0;animation:sheetUp .3s cubic-bezier(.22,.61,.36,1) both;box-shadow:0 -14px 44px rgba(0,0,0,.6)">
+          <div style="flex:none;padding:12px 18px 10px;display:flex;flex-direction:column;gap:11px">
+            <span style="width:38px;height:4px;border-radius:3px;background:rgba(255,255,255,.16);align-self:center"></span>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:400;letter-spacing:-.025em">{{ sheetTitle }}</span>
+                <span style="font-size:11.5px;color:#7F8A85">{{ sheetSub }}</span>
+              </div>
+              <div onClick="{{ closeSheet }}" style="width:32px;height:32px;flex:none;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="{{ icoClose }}"></span>
+              </div>
+            </div>
+          </div>
+          <div class="hb" style="flex:1;overflow-y:auto;padding:0 18px 28px;display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ sheetRows }}" as="s" hint-placeholder-count="8">
+              <div onClick="{{ s.pick }}" style="{{ s.row }}">
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <span style="{{ s.nameStyle }}">{{ s.name }}</span>
+                  <span style="font-size:10.5px;color:#7F8A85">{{ s.sub }}</span>
+                </div>
+                <span style="{{ s.tick }}"></span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none;z-index:6">
+        <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5);pointer-events:auto">
+          <div onClick="{{ tabToday }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoToday }}"></span>
+          </div>
+          <div onClick="{{ tabTrends }}" style="flex:1.7;height:46px;border-radius:20px;background:rgba(139,153,214,.9);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer">
+            <span style="{{ icoTrendsOn }}"></span>
+            <span style="font-size:12.5px;font-weight:600;color:#0B0E1A">Trends</span>
+          </div>
+          <div onClick="{{ tabLog }}" style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(23,162,230,.4);cursor:pointer">
+            <span style="{{ icoLogged }}"></span>
+          </div>
+          <div onClick="{{ tabRest }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoRest }}"></span>
+          </div>
+          <div onClick="{{ tabYou }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoYou }}"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </x-import>
+  </div>
+</div>
+
+<sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+<div style="width:430px;flex:none;padding-top:34px;display:flex;flex-direction:column;gap:30px">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:33px;line-height:1.16;letter-spacing:-.028em;color:#17150F;text-wrap:pretty">The gap was one gap, so it gets one place.</h1>
+    <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;text-wrap:pretty">Four engines were already written and had never had a screen. A returning user could read the morning, the night and the training decision better than the old app &mdash; and had <strong style="font-weight:600;color:#17150F">no way to ask the data a question they did not think of in advance.</strong> Act 9 is that question, at the foot of Trends, and not a sixth tab.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0">
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#C4657A;letter-spacing:.06em;padding-top:3px">W3 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">instrument/raw and instrument/capture — allowed to look like a tool</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Monospaced figures, no editorial, no orb — and that is the point: nobody mistakes this for a feature. <strong style="font-weight:600;color:#17150F">Armed is unmissable</strong>, because a capture quietly running is a battery complaint that arrives the next day: the card changes ground, the dot pulses, the clock doubles in size, and the screen says out loud that it will not stop on its own or when you leave. The list is files with sizes, not sessions. On capture, the per-channel strip draws the <em style="font-family:'Instrument Serif',serif;font-style:italic">dropped</em> samples as a flat stretch — the same rule as the energy chart, a gap recorded rather than interpolated across. Three states on <em style="font-family:'Instrument Serif',serif;font-style:italic">rawState</em>: idle, armed, and none for the first visit. Arm and Stop work in the prototype.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#6B77B8;letter-spacing:.06em;padding-top:3px">T1 &middot; NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The index, which is the act</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Every signal Noop keeps &mdash; night, day, effort, body, and the things you log &mdash; each with the one number that says whether it moved at the length you asked for. Nothing else in the act has a door until this list exists.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#6B77B8;letter-spacing:.06em;padding-top:3px">T2 &middot; NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">One range control, four screens</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Same position on every screen: under the header, above the first card. A range your data cannot fill is present but dimmed and unpressable. The count of nights actually behind the answer sits under it always &mdash; you asked for 90, there are 84, and the answer is the 84.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#6B77B8;letter-spacing:.06em;padding-top:3px">T3 &middot; NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The dossier, computed rather than written</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Every correlation on the metric screen is a real Pearson coefficient over the aligned days, at the best of three lags, gated at 21 nights and r&nbsp;.22. Blood oxygen has 17 nights, so its dossier says so instead of drawing a fit &mdash; that state is in the data, not a toggle.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#6B77B8;letter-spacing:.06em;padding-top:3px">T4 &middot; NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The lag lives in the row</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Three slots &mdash; same day, next morning, two days &mdash; and the filled one is where the effect actually lands. <em style="font-family:'Instrument Serif',serif;font-style:italic">Your evening drink shows up tomorrow morning, not tonight</em> is more useful than any ordering, and a ranking that hides it has thrown away its own insight.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#6B77B8;letter-spacing:.06em;padding-top:3px">T5 &middot; NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Colour is ownership</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">A borrowed figure is set in body grey. It gains the screen's hue as your own nights accumulate behind it, and is fully hued only when it is fully yours. That is how dose-response can answer on day one without lying &mdash; the treatment says whose number it is before the sentence does.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11);border-bottom:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#6B77B8;letter-spacing:.06em;padding-top:3px">T6 &middot; NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Nothing clears the bar, drawn on purpose</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Set the effects prop to <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">nothing</code> or <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">learning</code> and the screen still reads as an answer. The uncomfortable state is designed rather than hidden, which is the only way the ranking stays trustworthy when it does find something.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">The engines, connected</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">One 258-night dataset with twelve real gaps drives all four screens. <span style="color:#EDF1EF">CorrelationEngine</span> feeds the index, the dossier and the overlay; <span style="color:#EDF1EF">EffectRanker</span> and <span style="color:#EDF1EF">BehaviorInsights</span> share the effects screen; <span style="color:#EDF1EF">DoseResponseEngine</span> blends the published figure with yours by weight. Change the range and every number on the screen is recomputed, not relabelled.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Two doors, no tab</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">In from the foot of <span style="color:#EDF1EF">trends</span>, where you are already standing when you start wondering &mdash; and in from <span style="color:#EDF1EF">Svea</span>, when she answers a question the engines can answer better. The tab bar stays at five: a tab is for a place you stand every day, and nobody interrogates their data daily.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Explicitly out</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty"><span style="color:#EDF1EF">Cycle phase</span> stays dark &mdash; revisit after launch as a context layer, not a screen. And no causal claim anywhere: the engines write their own plain-language lines, so the copy review is on the engine strings, not on the layout.</p>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;index&quot;,&quot;metric&quot;,&quot;compare&quot;,&quot;effects&quot;,&quot;raw&quot;,&quot;capture&quot;],&quot;default&quot;:&quot;index&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;range&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;30&quot;,&quot;90&quot;,&quot;365&quot;,&quot;All&quot;],&quot;default&quot;:&quot;90&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;schedule&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;day&quot;,&quot;night&quot;],&quot;default&quot;:&quot;day&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;effects&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ranked&quot;,&quot;learning&quot;,&quot;nothing&quot;],&quot;default&quot;:&quot;ranked&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States to review&quot;},&quot;dose&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;borrowed&quot;,&quot;blending&quot;,&quot;yours&quot;,&quot;disagrees&quot;],&quot;default&quot;:&quot;auto&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States to review&quot;},&quot;rawState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;armed&quot;,&quot;none&quot;],&quot;default&quot;:&quot;idle&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States to review&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+const GLYPH = {
+  today: 'M12 3v2M12 19v2M4.2 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z',
+  trends: 'M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9',
+  moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+  you: 'M12 4.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM5.5 19.5c0-3.3 2.9-5.3 6.5-5.3s6.5 2 6.5 5.3',
+  spark: 'M12 3.5 13.6 9l5.4 1.6L13.6 12l-1.6 5.5L10.4 12 5 10.6 10.4 9z',
+  close: 'M7 7l10 10M17 7 7 17',
+  bolt: 'M13.2 3 6 13.6h4.6L9.8 21 17.4 10.2h-4.7z',
+  ask: 'M10.6 4.4a6.2 6.2 0 1 0 0 12.4 6.2 6.2 0 0 0 0-12.4zM15.2 15.2 20 20',
+  overlay: 'M3 16.4c3.4 0 4.6-9 8.6-9s4.8 6.4 8.4 6.4M3 8.6c3.4 0 4.6 9 8.6 9',
+  chat: 'M12 4.4c-4.3 0-7.6 2.6-7.6 6 0 2 1.2 3.8 3 4.9L6.6 19l3.7-2a9 9 0 0 0 1.7.2c4.3 0 7.6-2.6 7.6-5.9s-3.3-6-7.6-6z',
+  clock: 'M12 7.6v4.9l3 2M12 4.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2z'
+};
+const mask = function (d) {
+  return 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+};
+const ico = function (key, size, color) {
+  const u = mask(GLYPH[key]);
+  return {
+    width: size, height: size, flex: 'none', display: 'block', background: color,
+    WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+  };
+};
+
+const LAV = '#8B99D6';
+const A = '#2ECC80';
+const WARM = '#F2B45C';
+
+// ─────────────────────────────────────────────────────────────────
+// One dataset. 258 nights of history, twelve of them missing, and
+// every number on all four screens is computed from it — the four
+// engines are real functions over these arrays, not written copy.
+// ─────────────────────────────────────────────────────────────────
+const N = 258;
+const H = function (n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const GAPS = {};
+[3, 17, 34, 52, 61, 79, 96, 112, 130, 151, 177, 203].forEach(function (k) { GAPS[N - 1 - k] = 1; });
+
+const REG = [], LOAD = [];
+const BEH = { drink: [], drinks: [], caff: [], late: [], screen: [], walk: [], hard: [] };
+for (let i = 0; i < N; i++) {
+  const p = i / (N - 1);
+  REG.push(Math.max(0.05, Math.min(1, 0.33 + 0.53 * Math.max(0, (p - 0.22) / 0.78) + (H(i) - 0.5) * 0.16)));
+  const dk = H(i + 11) > 0.74 ? 1 : 0;
+  BEH.drink.push(dk);
+  BEH.drinks.push(dk ? (H(i + 12) > 0.72 ? 3 : H(i + 12) > 0.42 ? 2 : 1) : 0);
+  BEH.caff.push(H(i + 21) > 0.6 ? 1 : 0);
+  BEH.late.push(H(i + 31) > 0.78 ? 1 : 0);
+  BEH.screen.push(H(i + 41) > (0.72 - 0.24 * REG[i]) ? 1 : 0);
+  BEH.walk.push(H(i + 51) > 0.44 ? 1 : 0);
+  BEH.hard.push(H(i + 61) > 0.85 ? 1 : 0);
+  LOAD.push(BEH.hard[i] ? 68 + H(i + 62) * 42 : (H(i + 63) > 0.44 ? 16 + H(i + 64) * 32 : 0));
+}
+const pv = function (arr, i) { return arr[Math.max(0, i - 1)]; };
+const S = {};
+const put = function (k, fn, first) {
+  const a = [];
+  for (let i = 0; i < N; i++) a.push((GAPS[i] || i < (first || 0)) ? null : fn(i));
+  S[k] = a;
+};
+put('sleep', function (i) { return 6.34 + 1.18 * REG[i] - 0.44 * pv(BEH.drink, i) - 0.24 * pv(BEH.late, i) - 0.3 * pv(BEH.screen, i) + (H(i + 70) - 0.5) * 0.52; });
+put('reg', function (i) { return 64 - 46 * REG[i] + (H(i + 80) - 0.5) * 15; });
+put('deep', function (i) { return 19.4 + 6.3 * REG[i] - 2.9 * pv(BEH.drinks, i) - 0.9 * pv(BEH.late, i) + (H(i + 90) - 0.5) * 3.3; });
+put('rem', function (i) { return 20.2 + 3.5 * REG[i] - 1.9 * pv(BEH.drink, i) + (H(i + 100) - 0.5) * 3.7; });
+put('hrv', function (i) { return 33 + 17.2 * REG[i] - 7.2 * pv(BEH.drink, i) - 0.034 * pv(LOAD, i) + (H(i + 110) - 0.5) * 6.6; });
+put('rhr', function (i) { return 62.4 - 5.2 * REG[i] + 2.4 * pv(BEH.drink, i) + 0.014 * pv(LOAD, i) + (H(i + 120) - 0.5) * 2.1; });
+put('breath', function (i) { return 14.6 - 0.56 * REG[i] + 0.42 * pv(BEH.drink, i) + (H(i + 130) - 0.5) * 0.48; });
+put('temp', function (i) { return -0.02 + 0.16 * pv(BEH.drink, i) + (H(i + 140) - 0.5) * 0.2; });
+put('spo2', function (i) { return 96.4 + 0.6 * REG[i] - 0.3 * pv(BEH.drink, i) + (H(i + 150) - 0.5) * 0.66; }, N - 19);
+put('recovery', function (i) { return Math.max(6, Math.min(99, 54 + 31 * REG[i] - 15 * pv(BEH.drink, i) - 0.12 * pv(LOAD, i) + (H(i + 160) - 0.5) * 12)); });
+put('stress', function (i) { return Math.max(0, 74 - 34 * REG[i] + 17 * BEH.late[i] + 0.055 * LOAD[i] + (H(i + 170) - 0.5) * 28); });
+put('steps', function (i) { return 4100 + 5600 * BEH.walk[i] + 1800 * REG[i] + (H(i + 180) - 0.5) * 2300; });
+put('load', function (i) { return LOAD[i]; });
+put('cap', function (i) { return 40.3 + 3.9 * Math.max(0, (i / (N - 1) - 0.3) / 0.7) + (H(i + 190) - 0.5) * 0.5; });
+put('age', function (i) { return 38.6 - 4.4 * Math.max(0, (i / (N - 1) - 0.25) / 0.75) + (H(i + 200) - 0.5) * 0.4; });
+put('weight', function (i) { return 78.4 - 1.8 * Math.max(0, (i / (N - 1) - 0.2) / 0.8) + (H(i + 210) - 0.5) * 0.66; });
+['drink', 'caff', 'late', 'screen', 'walk', 'hard'].forEach(function (k) {
+  put('b_' + k, function (i) { return BEH[k][i]; });
+});
+
+const SIG = [
+  { k: 'rhr', n: 'Resting pulse', g: 'Night', u: 'bpm', dp: 0, better: -1, th: 1.2 },
+  { k: 'hrv', n: 'Variability', g: 'Night', u: 'ms', dp: 0, better: 1, th: 3.2 },
+  { k: 'sleep', n: 'Time asleep', g: 'Night', u: 'hours', dp: 1, better: 1, th: 0.32, hrs: true },
+  { k: 'reg', n: 'Bedtime drift', g: 'Night', u: 'minutes', dp: 0, better: -1, th: 7 },
+  { k: 'deep', n: 'Deep sleep', g: 'Night', u: '% of the night', dp: 1, better: 1, th: 1.4 },
+  { k: 'rem', n: 'REM', g: 'Night', u: '% of the night', dp: 1, better: 1, th: 1.6 },
+  { k: 'breath', n: 'Breathing rate', g: 'Night', u: 'breaths a minute', dp: 1, better: -1, th: 0.32 },
+  { k: 'temp', n: 'Skin temperature', g: 'Night', u: '°C from your own', dp: 2, better: 0, th: 0.09 },
+  { k: 'spo2', n: 'Blood oxygen', g: 'Night', u: '%', dp: 1, better: 1, th: 0.4 },
+  { k: 'recovery', n: 'Readiness', g: 'Day', u: 'out of 100', dp: 0, better: 1, th: 4 },
+  { k: 'stress', n: 'Stress minutes', g: 'Day', u: 'minutes', dp: 0, better: -1, th: 9 },
+  { k: 'steps', n: 'Steps', g: 'Day', u: 'a day', dp: 0, better: 1, th: 700, big: true },
+  { k: 'load', n: 'Training load', g: 'Effort', u: 'a day', dp: 0, better: 0, th: 8 },
+  { k: 'cap', n: 'Capacity', g: 'Body', u: 'ml/kg/min', dp: 1, better: 1, th: 0.5 },
+  { k: 'age', n: 'Body age', g: 'Body', u: 'years', dp: 1, better: -1, th: 0.4 },
+  { k: 'weight', n: 'Weight', g: 'Body', u: 'kg', dp: 1, better: 0, th: 0.5 },
+  { k: 'b_drink', n: 'A drink after 20:00', g: 'Logged', u: 'days a week', dp: 1, better: 0, th: 0.4, beh: true },
+  { k: 'b_caff', n: 'Caffeine after 14:00', g: 'Logged', u: 'days a week', dp: 1, better: 0, th: 0.4, beh: true },
+  { k: 'b_late', n: 'A late meal', g: 'Logged', u: 'days a week', dp: 1, better: 0, th: 0.4, beh: true },
+  { k: 'b_screen', n: 'Screen past midnight', g: 'Logged', u: 'days a week', dp: 1, better: 0, th: 0.4, beh: true },
+  { k: 'b_walk', n: 'A walk over 8k steps', g: 'Logged', u: 'days a week', dp: 1, better: 0, th: 0.4, beh: true },
+  { k: 'b_hard', n: 'A hard session', g: 'Logged', u: 'days a week', dp: 1, better: 0, th: 0.3, beh: true }
+];
+const byKey = {};
+SIG.forEach(function (s) { byKey[s.k] = s; });
+
+const RANGES = [
+  { k: '30', n: 30 }, { k: '90', n: 90 }, { k: '365', n: 365 }, { k: 'All', n: N }
+];
+const AXIS = { '30': ['30d', '20d', '10d', 'now'], '90': ['90d', '60d', '30d', 'now'], '365': ['365d', '240d', '120d', 'now'], 'All': ['Dec', 'Mar', 'Jun', 'now'] };
+
+const tailOf = function (arr, n) { return arr.slice(Math.max(0, arr.length - n)); };
+const firstLast = function (a) {
+  let f = null, l = null;
+  for (let i = 0; i < a.length; i++) if (a[i] != null) { if (f == null) f = a[i]; l = a[i]; }
+  return [f, l];
+};
+const pear = function (a, b, lag) {
+  let n = 0, sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+  for (let i = 0; i < a.length - lag; i++) {
+    const x = a[i], y = b[i + lag];
+    if (x == null || y == null) continue;
+    n++; sa += x; sb += y; saa += x * x; sbb += y * y; sab += x * y;
+  }
+  if (n < 8) return { r: 0, n: n };
+  const cov = sab / n - (sa / n) * (sb / n);
+  const va = saa / n - (sa / n) * (sa / n), vb = sbb / n - (sb / n) * (sb / n);
+  if (va <= 0 || vb <= 0) return { r: 0, n: n };
+  return { r: cov / Math.sqrt(va * vb), n: n };
+};
+const LAGW = ['same night', 'next morning', 'two days on'];
+const bestLag = function (a, b) {
+  let best = { r: 0, n: 0, lag: 0 };
+  for (let L = 0; L < 3; L++) {
+    const p = pear(a, b, L);
+    if (Math.abs(p.r) > Math.abs(best.r)) best = { r: p.r, n: p.n, lag: L };
+  }
+  return best;
+};
+const groupMeans = function (beh, target, lag) {
+  let s1 = 0, n1 = 0, s0 = 0, n0 = 0, v1 = [], v0 = [];
+  for (let i = 0; i < beh.length - lag; i++) {
+    const b = beh[i], t = target[i + lag];
+    if (b == null || t == null) continue;
+    if (b > 0) { s1 += t; n1++; v1.push(t); } else { s0 += t; n0++; v0.push(t); }
+  }
+  const sd = function (v, m) {
+    if (v.length < 2) return 0;
+    let s = 0; v.forEach(function (x) { s += (x - m) * (x - m); });
+    return Math.sqrt(s / (v.length - 1));
+  };
+  const m1 = n1 ? s1 / n1 : 0, m0 = n0 ? s0 / n0 : 0;
+  return { m1: m1, m0: m0, n1: n1, n0: n0, sd1: sd(v1, m1), sd0: sd(v0, m0) };
+};
+const fmt = function (v, s) {
+  if (v == null) return '—';
+  if (s.big) return Math.round(v).toLocaleString('en-US');
+  if (s.hrs) { const m = Math.round(v * 60); return Math.floor(m / 60) + 'h ' + (m % 60 < 10 ? '0' : '') + (m % 60) + 'm'; }
+  return (s.dp ? v.toFixed(s.dp) : Math.round(v).toString());
+};
+const path = function (pts) { return pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '); };
+const scale = function (vals, w, h, pad) {
+  const clean = vals.filter(function (v) { return v != null; });
+  const lo = Math.min.apply(null, clean), hi = Math.max.apply(null, clean);
+  const rng = (hi - lo) || 1;
+  return function (v, i) {
+    return [(i / Math.max(1, vals.length - 1)) * w, h - ((v - lo) / rng) * (h - pad * 2) - pad];
+  };
+};
+const interp = function (a) {
+  const out = a.slice();
+  let last = null;
+  for (let i = 0; i < out.length; i++) {
+    if (out[i] == null) {
+      let j = i; while (j < out.length && out[j] == null) j++;
+      const next = j < out.length ? out[j] : last;
+      out[i] = last == null ? next : (next == null ? last : (last + next) / 2);
+    } else last = out[i];
+  }
+  return out;
+};
+const roll = function (a, w) {
+  const out = [];
+  for (let i = 0; i < a.length; i++) {
+    let lo = Infinity, hi = -Infinity;
+    for (let j = Math.max(0, i - w); j <= Math.min(a.length - 1, i + w); j++) {
+      if (a[j] == null) continue;
+      lo = Math.min(lo, a[j]); hi = Math.max(hi, a[j]);
+    }
+    out.push([lo, hi]);
+  }
+  return out;
+};
+const BEHS = [
+  { k: 'b_drink', n: 'A drink after 20:00', on: 'on the evenings you had one' },
+  { k: 'b_caff', n: 'Caffeine after 14:00', on: 'on the days you had some' },
+  { k: 'b_hard', n: 'A hard session', on: 'on the days you went hard' },
+  { k: 'b_late', n: 'A late meal', on: 'on the nights you ate late' },
+  { k: 'b_screen', n: 'Screen past midnight', on: 'on the nights you were up late on a screen' },
+  { k: 'b_walk', n: 'A walk over 8k steps', on: 'on the days you walked' }
+];
+
+class Component extends DCLogic {
+  state = { sx: null, sy: null, screen: null, range: null, metric: null, a: null, b: null, shift: null, beh: null, sheet: null };
+
+  componentDidUpdate(prev) {
+    const p = this.props;
+    if ((prev.screen !== p.screen || prev.navSeq !== p.navSeq) && p.screen) this.setState({ screen: p.screen });
+  }
+
+  renderVals() {
+    const self = this;
+    const St = this.state;
+    const screen = St.screen || this.props.screen || 'index';
+    const nav = this.props.onNav;
+    const NIGHT = (this.props.schedule || 'day') === 'night';
+    // the one signal whose name is schedule-dependent: on a rotating roster
+    // regularity is measured against your anchor, not a clock hour
+    const nameOf = function (s) { return (NIGHT && s.k === 'reg') ? 'Anchor drift' : s.n; };
+    const go = function (k) { return function () { self.setState({ screen: k, sheet: null }); }; };
+    const goNav = function (a, s) { return function () { if (nav) nav(a, s); }; };
+
+    // ── the range control: one object, four screens ──────────────
+    const rk = St.range || this.props.range || '90';
+    const R = RANGES.filter(function (r) { return r.k === rk; })[0] || RANGES[1];
+    const worn = function (n) { return tailOf(S.hrv, n).filter(function (v) { return v != null; }).length; };
+    const seg = function (on, dim) {
+      return 'flex:1;text-align:center;padding:11px 0;border-radius:12px;font-size:12.5px;font-weight:600;transition:background .18s ease,color .18s ease;'
+        + (on ? 'background:rgba(139,153,214,.2);color:#C6CEE8;cursor:pointer;'
+          : dim ? 'color:rgba(237,241,239,.38);' : 'color:#939C97;cursor:pointer;');
+    };
+    const ranges = RANGES.map(function (r) {
+      const dim = r.n > N;
+      return {
+        k: r.k, seg: seg(r.k === R.k, dim),
+        pick: dim ? undefined : function () { self.setState({ range: r.k }); }
+      };
+    });
+    const nWorn = worn(R.n);
+    const nightsNote = R.n > N
+      ? 'nights on record — there is no more history than this'
+      : (R.n === N ? 'nights actually behind this answer, of ' + N + ' on record'
+        : 'nights actually behind this answer. You asked for ' + R.n + '.');
+
+    // ── the index ────────────────────────────────────────────────
+    const filt = St.filter || 'All';
+    const GROUPS = ['Night', 'Day', 'Effort', 'Body', 'Logged'];
+    const chips = ['All'].concat(GROUPS).map(function (k) {
+      const on = k === filt;
+      return {
+        k: k, pick: function () { self.setState({ filter: k }); },
+        box: {
+          padding: '7px 12px', borderRadius: 11, cursor: 'pointer',
+          background: on ? 'rgba(139,153,214,.2)' : 'rgba(255,255,255,.05)',
+          border: '.5px solid ' + (on ? 'rgba(139,153,214,.42)' : 'rgba(255,255,255,.07)'),
+          transition: 'background .18s ease, border-color .18s ease'
+        },
+        label: { fontSize: 11.5, fontWeight: 500, color: on ? '#C6CEE8' : '#939C97' }
+      };
+    });
+
+    const rowFor = function (s, rowIx) {
+      const t = tailOf(S[s.k], R.n);
+      const clean = t.filter(function (v) { return v != null; });
+      const fl = firstLast(t);
+      const thin = clean.length < 21;
+      let val, delta, chipCol, flat = true, good = false;
+      if (s.beh) {
+        const days = clean.length || 1;
+        const rate = clean.reduce(function (a, b) { return a + b; }, 0) / days * 7;
+        val = rate.toFixed(1);
+        const half = Math.floor(t.length / 2);
+        const early = t.slice(0, half).filter(function (v) { return v != null; });
+        const late = t.slice(half).filter(function (v) { return v != null; });
+        const dr = (late.reduce(function (a, b) { return a + b; }, 0) / (late.length || 1) - early.reduce(function (a, b) { return a + b; }, 0) / (early.length || 1)) * 7;
+        flat = Math.abs(dr) < s.th;
+        delta = flat ? 'about the same' : (dr > 0 ? '+' : '−') + Math.abs(dr).toFixed(1) + ' a week';
+      } else {
+        val = fmt(fl[1], s);
+        const ch = (fl[1] != null && fl[0] != null) ? fl[1] - fl[0] : 0;
+        flat = thin || Math.abs(ch) < s.th;
+        good = s.better === 0 ? false : (s.better < 0 ? ch < 0 : ch > 0);
+        delta = thin ? clean.length + ' nights so far'
+          : flat ? 'no real change'
+            : (ch > 0 ? '+' : '−') + (s.hrs ? Math.round(Math.abs(ch) * 60) + ' min' : (s.big ? Math.round(Math.abs(ch)).toLocaleString('en-US') : Math.abs(ch).toFixed(s.dp)));
+      }
+      const stroke = thin ? '#4A5450' : flat ? '#7F8A85' : (s.better === 0 ? LAV : good ? A : WARM);
+      chipCol = thin
+        ? { color: '#7F8A85', background: 'rgba(255,255,255,.05)' }
+        : flat ? { color: '#C6CEC9', background: 'rgba(255,255,255,.06)' }
+          : s.better === 0 ? { color: '#C6CEE8', background: 'rgba(139,153,214,.16)' }
+            : good ? { color: '#8FEFC0', background: 'rgba(46,204,128,.13)' }
+              : { color: '#F3C888', background: 'rgba(242,180,92,.13)' };
+      const sp = interp(t.length > 46 ? t.filter(function (v, i) { return i % Math.ceil(t.length / 46) === 0; }) : t);
+      const sc = scale(sp, 86, 26, 3);
+      const pts = sp.map(function (v, i) { return sc(v, i); });
+      return {
+        name: nameOf(s), val: val, unit: s.beh ? 'days a week' : s.u, delta: delta,
+        spark: path(pts), dotX: pts[pts.length - 1][0].toFixed(1), dotY: pts[pts.length - 1][1].toFixed(1),
+        stroke: stroke,
+        chip: Object.assign({ fontSize: 10.5, fontWeight: 600, padding: '4px 8px', borderRadius: 7, whiteSpace: 'nowrap' }, chipCol),
+        open: function () { self.setState({ screen: 'metric', metric: s.k }); },
+        row: { display: 'flex', alignItems: 'center', gap: 12, minHeight: 68, cursor: 'pointer', borderTop: rowIx === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)' }
+      };
+    };
+    const groups = GROUPS.filter(function (g) { return filt === 'All' || filt === g; }).map(function (g) {
+      const rows = SIG.filter(function (s) { return s.g === g; });
+      return { label: g === 'Logged' ? 'What you log' : g, count: rows.length + ' signals', rows: rows.map(rowFor) };
+    });
+
+    const doors = [
+      { k: 'Two at once', sub: 'put any two on the same axis', g: 'overlay', to: 'compare' },
+      { k: 'What actually moves you', sub: 'the ranking, the lag, and what one more costs', g: 'bolt', to: 'effects' },
+      { k: 'Raw capture', sub: 'arm the sensors and write the samples to a file', g: 'bolt', to: 'raw' }
+    ].map(function (d, i) {
+      return {
+        k: d.k, sub: d.sub, icon: ico(d.g, 20, LAV), go: go(d.to),
+        row: { display: 'flex', alignItems: 'center', gap: 13, minHeight: 60, cursor: 'pointer', borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.06)' }
+      };
+    });
+
+    // ── the dossier ──────────────────────────────────────────────
+    const mk = St.metric || 'hrv';
+    const M = byKey[mk] || byKey.hrv;
+    const mt = tailOf(S[mk], R.n);
+    // a logged behaviour is 0/1 a day — a square wave is not a reading, so the
+    // dossier plots it as a trailing weekly rate instead. Correlations below
+    // still use the raw daily series, which is the honest input for them.
+    const mSeries = M.beh ? (function () {
+      const out = [];
+      for (let i = 0; i < mt.length; i++) {
+        let s = 0, c = 0;
+        for (let j = Math.max(0, i - 6); j <= i; j++) { if (mt[j] == null) continue; s += mt[j]; c++; }
+        out.push(c ? (s / c) * 7 : null);
+      }
+      return out;
+    })() : mt;
+    const mClean = mSeries.filter(function (v) { return v != null; });
+    const mFl = firstLast(mSeries);
+    const mThin = mClean.length < 21;
+    const mCh = (mFl[1] != null && mFl[0] != null) ? mFl[1] - mFl[0] : 0;
+    const mFlat = mThin || Math.abs(mCh) < M.th;
+    const mGood = M.better === 0 ? false : (M.better < 0 ? mCh < 0 : mCh > 0);
+    const mSamp = interp(mSeries.length > 60 ? mSeries.filter(function (v, i) { return i % Math.ceil(mSeries.length / 60) === 0; }) : mSeries);
+    const msc = scale(mSamp, 300, 122, 8);
+    const mPts = mSamp.map(function (v, i) { return msc(v, i); });
+    const band = roll(mSamp, 3);
+    const bandTop = band.map(function (b, i) { return msc(b[1], i); });
+    const bandBot = band.map(function (b, i) { return msc(b[0], i); }).reverse();
+    // least squares over the sampled window — only drawn when it clears the bar
+    let sx = 0, sy = 0, sxx = 0, sxy = 0;
+    mSamp.forEach(function (v, i) { sx += i; sy += v; sxx += i * i; sxy += i * v; });
+    const nS = mSamp.length;
+    const slope = (nS * sxy - sx * sy) / (nS * sxx - sx * sx || 1);
+    const inter = (sy - slope * sx) / nS;
+    const f1 = msc(inter, 0), f2 = msc(inter + slope * (nS - 1), nS - 1);
+
+    const others = SIG.filter(function (s) { return s.k !== mk; });
+    const moves = others.map(function (s) {
+      const bl = bestLag(tailOf(S[s.k], R.n), mt);
+      return { s: s, r: bl.r, n: bl.n, lag: bl.lag };
+    }).filter(function (x) { return x.n >= 21 && Math.abs(x.r) >= 0.22; })
+      .sort(function (a, b) { return Math.abs(b.r) - Math.abs(a.r); })
+      .slice(0, 4)
+      .map(function (x) {
+        const up = x.r > 0;
+        const dirWord = up ? 'higher' : 'lower';
+        const line = x.s.beh
+          ? 'On the ' + (x.lag === 0 ? 'same day' : x.lag === 1 ? 'morning after' : 'second day after') + ' ' + x.s.n.toLowerCase() + ', your ' + M.n.toLowerCase() + ' runs ' + (up ? 'higher' : 'lower') + ' than on days without it.'
+          : 'A ' + (up ? 'higher' : 'lower') + ' ' + x.s.n.toLowerCase() + ' comes with a ' + dirWord.replace(dirWord, up ? 'higher' : 'lower') + ' ' + M.n.toLowerCase() + ', strongest ' + LAGW[x.lag] + '.';
+        return {
+          name: nameOf(x.s), r: (x.r > 0 ? '+' : '−') + Math.abs(x.r).toFixed(2), line: line,
+          lag: LAGW[x.lag],
+          lagChip: {
+            fontSize: 10, fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase',
+            padding: '3px 7px', borderRadius: 6, flex: 'none', whiteSpace: 'nowrap',
+            color: x.lag === 0 ? '#939C97' : '#B7C0E8',
+            background: x.lag === 0 ? 'rgba(255,255,255,.05)' : 'rgba(139,153,214,.14)'
+          },
+          bar: { width: (Math.min(1, Math.abs(x.r) / 0.8) * 100).toFixed(0) + '%', background: LAV, borderRadius: 3 },
+          open: function () { self.setState({ screen: 'compare', a: mk, b: x.s.k, shift: x.lag }); }
+        };
+      });
+
+    const mLinks = [
+      { k: 'Put it against something', sub: 'two on one axis, with the day-shift', g: 'overlay', go: function () { self.setState({ screen: 'compare', a: mk, b: mk === 'hrv' ? 'reg' : 'hrv' }); } },
+      { k: 'Ask Svea about this', sub: 'she gets this dossier, not just the number', g: 'chat', go: goNav('svea', 'coach') },
+      { k: 'Where it comes from', sub: 'the sensor, the window, and the gaps', g: 'clock', go: goNav('plumbing', 'data') }
+    ].map(function (l, i) {
+      return {
+        k: l.k, sub: l.sub, icon: ico(l.g, 20, LAV), go: l.go,
+        row: { display: 'flex', alignItems: 'center', gap: 13, minHeight: 60, cursor: 'pointer', borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.06)' }
+      };
+    });
+
+    // ── compare ──────────────────────────────────────────────────
+    const ak = St.a || 'hrv', bk = St.b || 'reg';
+    const AS = byKey[ak], BS = byKey[bk];
+    const shift = St.shift == null ? 0 : St.shift;
+    const at = tailOf(S[ak], R.n), bt = tailOf(S[bk], R.n);
+    const samp = function (arr) { return interp(arr.length > 60 ? arr.filter(function (v, i) { return i % Math.ceil(arr.length / 60) === 0; }) : arr); };
+    const aS = samp(at), bS = samp(bt);
+    const asc = scale(aS, 300, 130, 10), bsc = scale(bS, 300, 130, 10);
+    const aPts = aS.map(function (v, i) { return asc(v, i); });
+    const bPts = bS.map(function (v, i) { return bsc(v, i); });
+    const fit = pear(at, bt, shift);
+    const shifts = [0, 1, 2].map(function (L) {
+      const p = pear(at, bt, L);
+      const on = L === shift;
+      return {
+        label: L === 0 ? 'same day' : L === 1 ? '+1 day' : '+2 days',
+        r: (p.r > 0 ? '+' : '−') + Math.abs(p.r).toFixed(2),
+        pick: function () { self.setState({ shift: L }); },
+        box: {
+          flex: 1, padding: '10px 6px', borderRadius: 13, cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+          background: on ? 'rgba(139,153,214,.18)' : 'rgba(255,255,255,.04)',
+          border: '.5px solid ' + (on ? 'rgba(139,153,214,.4)' : 'rgba(255,255,255,.06)')
+        },
+        k: { fontSize: 10.5, color: on ? '#C6CEE8' : '#7F8A85', whiteSpace: 'nowrap' },
+        v: { fontFamily: "'Outfit',sans-serif", fontSize: 16, fontWeight: 400, fontVariantNumeric: 'tabular-nums', color: on ? '#EDF1EF' : '#939C97' }
+      };
+    });
+    let bestL = 0, bestR = 0;
+    [0, 1, 2].forEach(function (L) { const p = pear(at, bt, L); if (Math.abs(p.r) > Math.abs(bestR)) { bestR = p.r; bestL = L; } });
+    const clears = Math.abs(fit.r) >= 0.28 && fit.n >= 21;
+    const strength = Math.abs(fit.r) >= 0.6 ? 'They move together.' : Math.abs(fit.r) >= 0.4 ? 'They move together, loosely.' : Math.abs(fit.r) >= 0.28 ? 'A weak relationship.' : 'No relationship worth drawing.';
+
+    const openSheet = function (slot) { return function () { self.setState({ sheet: slot }); }; };
+    const slots = [
+      { tagText: 'A', name: nameOf(AS), sub: AS.beh ? 'days a week' : AS.u, col: LAV, pick: openSheet('a') },
+      { tagText: 'B', name: nameOf(BS), sub: BS.beh ? 'days a week' : BS.u, col: A, pick: openSheet('b') }
+    ].map(function (s) {
+      return {
+        tagText: s.tagText, name: s.name, sub: s.sub, pick: s.pick,
+        box: {
+          flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+          padding: '12px 13px', borderRadius: 18, background: '#141817', border: '.5px solid rgba(255,255,255,.07)'
+        },
+        tag: {
+          width: 22, height: 22, flex: 'none', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 11, fontWeight: 700, color: '#0B0E1A', background: s.col
+        }
+      };
+    });
+    const sheetSlot = St.sheet;
+    const sheetRows = SIG.map(function (s, si) {
+      const on = sheetSlot === 'a' ? s.k === ak : s.k === bk;
+      return {
+        name: nameOf(s), sub: s.g === 'Logged' ? 'what you log' : s.g.toLowerCase() + ' · ' + s.u,
+        pick: function () {
+          const patch = { sheet: null };
+          patch[sheetSlot] = s.k;
+          self.setState(patch);
+        },
+        row: { display: 'flex', alignItems: 'center', gap: 12, minHeight: 54, cursor: 'pointer', borderTop: si === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)' },
+        nameStyle: { fontSize: 13.5, color: on ? '#C6CEE8' : '#EDF1EF', fontWeight: on ? 600 : 400 },
+        tick: on
+          ? { width: 9, height: 9, flex: 'none', borderRadius: '50%', background: LAV, boxShadow: '0 0 10px rgba(139,153,214,.6)' }
+          : { width: 9, height: 9, flex: 'none', borderRadius: '50%', border: '1.2px solid rgba(255,255,255,.16)', boxSizing: 'border-box' }
+      };
+    });
+
+    // ── effects: EffectRanker + BehaviorInsights + DoseResponse ──
+    const eMode = this.props.effects || 'ranked';
+    const target = tailOf(S.recovery, R.n);
+    const tMean = (function () { const c = target.filter(function (v) { return v != null; }); return c.reduce(function (a, b) { return a + b; }, 0) / (c.length || 1); })();
+    const ranked = BEHS.map(function (b) {
+      const bt2 = tailOf(S[b.k], R.n);
+      let best = { d: 0, lag: 0, g: null };
+      for (let L = 0; L < 3; L++) {
+        const g = groupMeans(bt2, target, L);
+        if (g.n1 < 5 || g.n0 < 5) continue;
+        const d = g.m1 - g.m0;
+        if (Math.abs(d) > Math.abs(best.d)) best = { d: d, lag: L, g: g };
+      }
+      return { b: b, d: best.d, lag: best.lag, g: best.g, pct: tMean ? (best.d / tMean) * 100 : 0 };
+    });
+    const eligible = ranked.filter(function (x) { return x.g; });
+    const cleared = eligible.filter(function (x) { return Math.abs(x.pct) >= 3.5; })
+      .sort(function (a, b) { return Math.abs(b.pct) - Math.abs(a.pct); });
+    const shortOnes = ranked.filter(function (x) { return !x.g; });
+
+    const eRankedOn = eMode === 'ranked' && cleared.length > 0;
+    const eLearningOn = eMode === 'learning' || (eMode === 'ranked' && cleared.length === 0 && shortOnes.length > 2);
+    const eNothingOn = eMode === 'nothing' || (eMode === 'ranked' && cleared.length === 0 && shortOnes.length <= 2);
+
+    const slotDot = function (k, filled, done) {
+      return {
+        k: k,
+        wrap: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 },
+        dot: filled
+          ? { width: 9, height: 9, borderRadius: '50%', background: LAV, boxShadow: '0 0 10px rgba(139,153,214,.6)' }
+          : { width: 7, height: 7, borderRadius: '50%', boxSizing: 'border-box', border: '1.2px solid ' + (done ? 'rgba(255,255,255,.22)' : 'rgba(255,255,255,.13)') },
+        lbl: { fontSize: 9.5, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600, color: filled ? '#B7C0E8' : '#7F8A85' }
+      };
+    };
+    const eRows = (eMode === 'nothing' ? [] : cleared).map(function (x, i) {
+      return {
+        name: x.b.n, val: (x.pct > 0 ? '+' : '−') + Math.abs(x.pct).toFixed(0) + '%',
+        valStyle: {
+          fontFamily: "'Outfit',sans-serif", fontSize: 19, fontWeight: 400, flex: 'none',
+          fontVariantNumeric: 'tabular-nums', color: x.pct > 0 ? '#8FEFC0' : '#B7C0E8'
+        },
+        slots: [slotDot('Same day', x.lag === 0, x.lag > 0), slotDot('Next morning', x.lag === 1, x.lag > 1), slotDot('Two days', x.lag === 2, false)],
+        line: 'Readiness runs ' + Math.abs(x.pct).toFixed(0) + '% ' + (x.pct > 0 ? 'higher' : 'lower') + ' ' + LAGW[x.lag] + ', across ' + x.g.n1 + ' days with and ' + x.g.n0 + ' without.',
+        pick: function () { self.setState({ beh: x.b.k }); },
+        row: {
+          display: 'flex', flexDirection: 'column', gap: 9, padding: '15px 0', cursor: 'pointer',
+          borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)'
+        }
+      };
+    });
+
+    const pk = St.beh || (cleared[0] ? cleared[0].b.k : 'b_drink');
+    const pB = BEHS.filter(function (b) { return b.k === pk; })[0] || BEHS[0];
+    const pRank = ranked.filter(function (x) { return x.b.k === pk; })[0];
+    const pg = pRank && pRank.g ? pRank.g : groupMeans(tailOf(S[pk], R.n), target, 1);
+    const pOk = pg.n1 >= 5 && pg.n0 >= 5;
+    const pLo = Math.min(pg.m1 - pg.sd1, pg.m0 - pg.sd0) - 3;
+    const pHi = Math.max(pg.m1 + pg.sd1, pg.m0 + pg.sd0) + 3;
+    const pctOf = function (v) { return ((v - pLo) / ((pHi - pLo) || 1)) * 100; };
+    const pairBars = [
+      { k: 'With it', m: pg.m1, sd: pg.sd1, n: pg.n1, col: WARM },
+      { k: 'Without it', m: pg.m0, sd: pg.sd0, n: pg.n0, col: A }
+    ].map(function (p) {
+      return {
+        k: p.k, val: Math.round(p.m) + '', n: p.n + ' days',
+        valStyle: { fontFamily: "'Outfit',sans-serif", fontSize: 20, fontWeight: 400, fontVariantNumeric: 'tabular-nums', color: '#EDF1EF' },
+        spread: {
+          position: 'absolute', top: 0, bottom: 0, borderRadius: 5,
+          left: pctOf(p.m - p.sd).toFixed(1) + '%',
+          width: Math.max(2, pctOf(p.m + p.sd) - pctOf(p.m - p.sd)).toFixed(1) + '%',
+          background: 'rgba(' + (p.col === A ? '46,204,128' : '242,180,92') + ',.28)'
+        },
+        mark: {
+          position: 'absolute', top: -3, bottom: -3, width: 2.5, borderRadius: 2,
+          left: 'calc(' + pctOf(p.m).toFixed(1) + '% - 1.2px)', background: p.col
+        }
+      };
+    });
+    const pDiff = pg.m1 - pg.m0;
+    const pOverlapLo = Math.max(pg.m1 - pg.sd1, pg.m0 - pg.sd0);
+    const pOverlapHi = Math.min(pg.m1 + pg.sd1, pg.m0 + pg.sd0);
+    const pairRead = Math.abs(pDiff) < 3
+      ? 'No real difference. ' + pg.n1 + ' days with and ' + pg.n0 + ' without, and the two averages sit inside each other\u2019s ordinary spread.'
+      : 'Readiness averages ' + Math.round(Math.abs(pDiff)) + ' points ' + (pDiff > 0 ? 'higher' : 'lower') + ' ' + LAGW[pRank && pRank.g ? pRank.lag : 1] + ' ' + pB.on + '.';
+    const pairOverlap = pOverlapHi > pOverlapLo
+      ? 'The shaded spans overlap between ' + Math.round(pOverlapLo) + ' and ' + Math.round(pOverlapHi) + ', which is why this is a tendency and not a rule. Plenty of individual days go the other way.'
+      : 'The two spans do not overlap at all across this window, which is as clean as an association in one person\u2019s data gets.';
+
+    // DoseResponseEngine — the published figure, blended with yours by weight
+    const dNights = tailOf(S.deep, R.n).filter(function (v, i) {
+      const dk = tailOf(BEH.drinks, R.n)[Math.max(0, i - 1)];
+      return v != null && dk > 0;
+    }).length;
+    const dz = tailOf(BEH.drinks, R.n), dv = tailOf(S.deep, R.n);
+    let dsx = 0, dsy = 0, dsxx = 0, dsxy = 0, dn = 0;
+    for (let i = 1; i < dv.length; i++) {
+      const x = dz[i - 1], y = dv[i];
+      if (y == null) continue;
+      dn++; dsx += x; dsy += y; dsxx += x * x; dsxy += x * y;
+    }
+    const mine = dn > 2 ? (dn * dsxy - dsx * dsy) / (dn * dsxx - dsx * dsx || 1) : 0;
+    const published = -6;
+    const w = dNights / (dNights + 18);
+    const blended = published * (1 - w) + mine * w;
+    const disagrees = dNights >= 40 && Math.abs(mine - published) > 3;
+    const forced = this.props.dose || 'auto';
+    const dState = forced !== 'auto' ? forced
+      : dNights < 8 ? 'borrowed' : disagrees ? 'disagrees' : dNights < 40 ? 'blending' : 'yours';
+    const dShown = dState === 'borrowed' ? published : dState === 'yours' || dState === 'disagrees' ? mine : blended;
+    const dW = dState === 'borrowed' ? 0.06 : dState === 'blending' ? 0.48 : dState === 'disagrees' ? 0.88 : 1;
+    const dHue = dState === 'borrowed' ? '#C6CEC9' : dState === 'blending' ? '#AFB9E2' : LAV;
+    const dLines = {
+      borrowed: 'Published figure. ' + dNights + ' of your nights so far — not you yet.',
+      blending: dNights + ' of your nights. Half yours, and moving — watch it across weeks, not visits.',
+      yours: dNights + ' of your nights behind it. This is your own number now, not the literature\u2019s.',
+      disagrees: dNights + ' nights, and yours point ' + (Math.abs(mine) < Math.abs(published) ? 'gentler' : 'harder') + ' than the literature\u2019s −6. Both are shown; neither is hidden.'
+    };
+    const dSteps = [1, 2, 3].map(function (k) {
+      const v = dShown * k;
+      return {
+        k: k === 1 ? 'One' : k === 2 ? 'Two' : 'Three',
+        bar: { width: Math.min(100, Math.abs(v) / 20 * 100).toFixed(0) + '%', background: dHue, borderRadius: 4, opacity: dW },
+        v: (v > 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%',
+        valStyle: { width: 52, flex: 'none', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums', color: dHue }
+      };
+    });
+
+    const eIntro = eNothingOn
+      ? 'Six behaviours against your readiness, at three lags each. This window has an answer you may not enjoy.'
+      : eLearningOn
+        ? 'Six behaviours against your readiness. Two of them do not have enough days on both sides yet, and it says which side is short.'
+        : 'Six behaviours against your readiness, at the lag where the effect actually lands — not the day you did the thing.';
+
+    // ── RAW CAPTURE, wave 3e. Deliberately the most utilitarian pair of screens in Noop:
+    //    monospaced figures, no editorial, no orb. An ARMED capture is unmissable, because a
+    //    capture quietly running is a battery complaint that arrives a day later.
+    const RAW = (function () {
+      const st = St.armed != null ? (St.armed ? 'armed' : 'idle') : (self.props.rawState || 'idle');
+      const armed = st === 'armed';
+      const REC = '#E3574E';
+      const list = [
+        { id: 'cap_0f3a91', when: 'Today 14:02', dur: '4:12', size: '3.1 MB' },
+        { id: 'cap_0e77c4', when: 'Yesterday 08:41', dur: '11:50', size: '8.7 MB' },
+        { id: 'cap_0d1b58', when: 'Tue 16 Sep 19:20', dur: '1:04', size: '0.8 MB' },
+        { id: 'cap_0c9042', when: 'Sun 14 Sep 07:55', dur: '22:31', size: '16.4 MB' }
+      ];
+      return {
+        armed: armed, none: st === 'none',
+        card: {
+          display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 16px 14px',
+          borderRadius: 22,
+          background: armed ? 'rgba(227,87,78,.09)' : '#141817',
+          border: armed ? '.5px solid rgba(227,87,78,.42)' : '.5px solid rgba(255,255,255,.06)'
+        },
+        dot: {
+          width: 9, height: 9, flex: 'none', borderRadius: '50%',
+          background: armed ? REC : 'rgba(255,255,255,.2)',
+          animation: armed ? 'rawPulse 1.15s ease-in-out infinite' : 'none'
+        },
+        label: { fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600,
+          color: armed ? '#F2B3AE' : '#7F8A85' },
+        state: armed ? 'Recording' : 'Not recording',
+        clock: {
+          fontFamily: 'ui-monospace,Menlo,monospace', fontWeight: 600,
+          fontSize: armed ? 38 : 26, letterSpacing: '-.02em', lineHeight: 1,
+          color: armed ? '#EDF1EF' : '#3E4643', fontVariantNumeric: 'tabular-nums'
+        },
+        time: armed ? '02:47' : '00:00',
+        size: armed ? '2.1 MB' : '0 MB',
+        rate: armed ? 'growing 12 MB an hour' : 'nothing on disk yet',
+        note: armed
+          ? 'The strap and the phone are both recording at 50 Hz. This will cost you noticeable battery, which is the reason this screen looks like this.'
+          : 'Arming records until you stop it. It does not stop on its own, and it will not stop when you leave this screen.',
+        btn: armed
+          ? { height: 56, borderRadius: 18, background: REC, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer' }
+          : { height: 56, borderRadius: 18, background: 'rgba(255,255,255,.07)',
+              border: '.5px solid rgba(255,255,255,.16)', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer' },
+        btnInk: { fontSize: 15, fontWeight: 600, color: armed ? '#1A0705' : '#EDF1EF' },
+        btnText: armed ? 'Stop recording' : 'Arm capture',
+        spec: [
+          { k: 'Channels', v: 'accel \u00b7 gyro \u00b7 mag' },
+          { k: 'Rate', v: '50 Hz' },
+          { k: 'Written to', v: 'this phone' },
+          { k: 'Leaves the phone', v: 'never' }
+        ],
+        list: st === 'none' ? [] : list,
+        total: st === 'none' ? '0 files' : list.length + ' files \u00b7 29.0 MB'
+      };
+    })();
+
+    const CAP = (function () {
+      const bars = function (gapAt) {
+        const out = [];
+        for (let i = 0; i < 40; i++) {
+          const missing = gapAt != null && i >= gapAt && i < gapAt + 3;
+          out.push({ s: { flex: 1, borderRadius: 1,
+            height: missing ? 3 : 8 + ((i * 7) % 5) * 2.4,
+            background: missing ? 'rgba(255,255,255,.08)' : 'rgba(23,162,230,.55)' } });
+        }
+        return out;
+      };
+      return {
+        id: 'cap_0f3a91', when: 'Today 14:02:09 \u2192 14:06:21 \u00b7 Europe/Stockholm',
+        rows: [
+          { k: 'Duration', v: '4:12.4' },
+          { k: 'Channels', v: '3' },
+          { k: 'Rate', v: '50 Hz' },
+          { k: 'Samples', v: '37 862' },
+          { k: 'Dropped', v: '138' },
+          { k: 'Size on disk', v: '3.1 MB' },
+          { k: 'Source', v: 'strap + phone' }
+        ],
+        chans: [
+          { k: 'accel', n: '12 620', bars: bars(null) },
+          { k: 'gyro', n: '12 620', bars: bars(22) },
+          { k: 'mag', n: '12 622', bars: bars(null) }
+        ],
+        gapNote: 'Gyro lost 138 samples around 14:04 \u2014 drawn as the flat stretch. The file records the gap rather than interpolating across it.'
+      };
+    })();
+
+    return {
+      isDark: true, notes: this.props.showNotes !== false,
+      isRaw: screen === 'raw', isCapture: screen === 'capture',
+      goIndex: go('index'), goRaw: go('raw'),
+      rawArmCard: RAW.card, rawArmDot: RAW.dot, rawArmLabel: RAW.label, rawArmState: RAW.state,
+      rawArmClock: RAW.clock, rawArmTime: RAW.time, rawArmSize: RAW.size, rawArmRate: RAW.rate,
+      rawArmNote: RAW.note, rawBtn: RAW.btn, rawBtnInk: RAW.btnInk, rawBtnText: RAW.btnText,
+      rawToggle: function () { self.setState({ armed: !RAW.armed }); },
+      rawSpec: RAW.spec, rawTotal: RAW.total,
+      rawHasList: RAW.list.length > 0, rawEmpty: RAW.list.length === 0,
+      rawList: RAW.list.map(function (c, i, arr) {
+        return Object.assign({}, c, {
+          open: go('capture'),
+          row: { display: 'flex', alignItems: 'center', gap: 13, minHeight: 58, cursor: 'pointer',
+            borderBottom: i === arr.length - 1 ? 'none' : '.5px solid rgba(255,255,255,.06)' }
+        });
+      }),
+      capId: CAP.id, capWhen: CAP.when, capChans: CAP.chans, capGapNote: CAP.gapNote,
+      capRows: CAP.rows.map(function (r, i, arr) {
+        return { k: r.k, v: r.v,
+          row: { display: 'flex', alignItems: 'center', gap: 12, minHeight: 46,
+            borderBottom: i === arr.length - 1 ? 'none' : '.5px solid rgba(255,255,255,.06)' } };
+      }),
+      capExport: function () {}, capDelete: go('raw'),
+
+      isIndex: screen === 'index', isMetric: screen === 'metric',
+      isCompare: screen === 'compare', isEffects: screen === 'effects',
+      toIndex: go('index'), toTrends: goNav('picture', 'trends'),
+      tabToday: goNav('day', 'today'), tabTrends: goNav('picture', 'trends'),
+      tabRest: goNav('night', 'rest'), tabYou: goNav('plumbing', 'you'),
+      tabLog: goNav('plumbing', 'history'),
+      icoToday: ico('today', 19, '#7F8A85'), icoTrendsOn: ico('trends', 19, '#0B0E1A'),
+      icoRest: ico('moon', 19, '#7F8A85'), icoYou: ico('you', 19, '#7F8A85'),
+      icoLogged: ico('spark', 21, '#04121A'), icoClose: ico('close', 14, '#C6CEC9'),
+
+      ranges: ranges, chips: chips, groups: groups, doors: doors,
+      nights: nWorn, nightsNote: nightsNote,
+
+      mName: nameOf(M), mVal: fmt(mFl[1], M), mUnit: M.beh ? 'days a week' : M.u,
+      mNights: nWorn, mNightsNote: nightsNote, mSpan: R.k === 'All' ? 'All ' + N + ' nights' : 'Last ' + R.k + ' days',
+      mRead: mThin
+        ? 'There are ' + mClean.length + ' nights of this. Noop will keep it on the list and say nothing else about it until there are twenty-one.'
+        : mFlat
+          ? 'Flat across this window, inside the wobble your own days produce. Nothing to read into it.'
+          : (mCh > 0 ? 'Up ' : 'Down ') + (M.hrs ? Math.round(Math.abs(mCh) * 60) + ' minutes' : Math.abs(mCh).toFixed(M.dp) + ' ' + M.u) + ' over ' + nWorn + ' nights' + (M.better === 0 ? '.' : mGood ? ', in the direction you would want.' : ', which is the direction you would not.'),
+      mDelta: mThin ? mClean.length + ' nights' : mFlat ? 'no real change' : (mCh > 0 ? '+' : '−') + (M.hrs ? Math.round(Math.abs(mCh) * 60) + ' min' : Math.abs(mCh).toFixed(M.dp)),
+      mChip: {
+        fontSize: 11, fontWeight: 600, padding: '4px 9px', borderRadius: 8, whiteSpace: 'nowrap',
+        color: mThin || mFlat ? '#C6CEC9' : M.better === 0 ? '#C6CEE8' : mGood ? '#8FEFC0' : '#F3C888',
+        background: mThin || mFlat ? 'rgba(255,255,255,.06)' : M.better === 0 ? 'rgba(139,153,214,.16)' : mGood ? 'rgba(46,204,128,.13)' : 'rgba(242,180,92,.13)'
+      },
+      mLine: path(mPts),
+      mBand: 'M' + path(bandTop.concat(bandBot)).split(' ').join(' L').slice(1) + ' Z',
+      mHasFit: !mThin && !mFlat,
+      mFitX1: f1[0].toFixed(1), mFitY1: f1[1].toFixed(1), mFitX2: f2[0].toFixed(1), mFitY2: f2[1].toFixed(1),
+      mDotX: mPts[mPts.length - 1][0].toFixed(1), mDotY: mPts[mPts.length - 1][1].toFixed(1),
+      mAxis: (AXIS[R.k] || AXIS['90']).map(function (l) { return { label: l }; }),
+      mChartNote: mThin
+        ? 'The band is the day-to-day spread. With this few nights it is most of the picture, which is the honest reading.'
+        : 'The band is the three-day spread around each point. The dashed line is the fit, and it is only drawn when the change clears the noise at this length.',
+      mThin: mThin,
+      mThinNote: 'Blood oxygen started recording nineteen nights ago and two of those were not worn. Noop needs twenty-one to say anything about direction, so it says this instead of drawing you an arrow.',
+      mHasMoves: !mThin && moves.length > 0, mMoves: moves, mLinks: mLinks,
+      mFoot: 'Correlations are computed over the nights where both signals exist, at the best of three lags, and shown only above twenty-one nights and 0.22. Association, not cause.',
+
+      slots: slots, cNights: nWorn, cNightsNote: nightsNote,
+      cLineA: path(aPts), cLineB: path(bPts), cDashB: '5 4',
+      cDotAX: aPts[aPts.length - 1][0].toFixed(1), cDotAY: aPts[aPts.length - 1][1].toFixed(1),
+      cDotBX: bPts[bPts.length - 1][0].toFixed(1), cDotBY: bPts[bPts.length - 1][1].toFixed(1),
+      cAxis: (AXIS[R.k] || AXIS['90']).map(function (l) { return { label: l }; }),
+      cKey: [{ label: AS.n, c: LAV }, { label: BS.n + (shift ? ' · shifted ' + shift + ' day' + (shift > 1 ? 's' : '') : ''), c: A }].map(function (k) {
+        return { label: k.label, sw: { width: 16, height: 3, borderRadius: 2, background: k.c, flex: 'none' } };
+      }),
+      cFitCard: {
+        borderRadius: 24, padding: '17px 18px', display: 'flex', flexDirection: 'column', gap: 9,
+        background: clears ? 'linear-gradient(158deg,rgba(139,153,214,.16),rgba(139,153,214,.03))' : '#141817',
+        border: '.5px solid ' + (clears ? 'rgba(139,153,214,.3)' : 'rgba(255,255,255,.08)')
+      },
+      cFitKicker: { fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600, color: clears ? '#C9D0EE' : '#6C7570' },
+      cFitKick: clears ? 'The fit' : 'No fit drawn',
+      cFitN: fit.n + ' nights with both',
+      cFitHead: (fit.r > 0 ? '+' : '−') + Math.abs(fit.r).toFixed(2),
+      cFitBody: clears
+        ? strength + ' ' + AS.n + ' and ' + BS.n.toLowerCase() + (shift ? ', with ' + BS.n.toLowerCase() + ' read ' + shift + ' day' + (shift > 1 ? 's' : '') + ' later' : '') + '. That is a tendency across ' + fit.n + ' nights, not a rule about any one of them.'
+        : 'At this length and this shift the two do not track each other closely enough to draw a line through. Noop leaves it off rather than drawing something faint and letting you read meaning into it.',
+      cShifts: shifts,
+      cBestNote: 'strongest at ' + (bestL === 0 ? 'same day' : '+' + bestL + ' day' + (bestL > 1 ? 's' : '')),
+      cShiftNote: bestL === 0
+        ? 'Shifting does not improve it: whatever these two share, they share it on the same day.'
+        : 'Reading ' + BS.n.toLowerCase() + ' ' + bestL + ' day' + (bestL > 1 ? 's' : '') + ' later fits better than reading them together — the effect arrives after the day it was caused on, which is exactly what the lag treatment on the effects screen is for.',
+      sheet: !!sheetSlot,
+      sheetTitle: sheetSlot === 'b' ? 'Second signal' : 'First signal',
+      sheetSub: 'Any signal Noop keeps, including the things you log',
+      sheetRows: sheetRows, closeSheet: function () { self.setState({ sheet: null }); },
+
+      eIntro: eIntro, eRanked: eRankedOn, eLearning: eLearningOn, eNothing: eNothingOn,
+      eRows: eRows, eNothingN: eligible.length,
+      eLearnNote: 'A behaviour needs five days with it and five without before Noop will rank it. These are the ones that are short, and which side is short — because "log a few days without it" is something you can act on, and "not enough data" is not.',
+      eShort: (shortOnes.length ? shortOnes : BEHS.map(function (b) {
+        return { b: b, g: groupMeans(tailOf(S[b.k], R.n), target, 1) };
+      }).sort(function (p, q) { return Math.min(p.g.n1, p.g.n0) - Math.min(q.g.n1, q.g.n0); }).slice(0, 2))
+        .map(function (x) {
+          const g = x.g && x.g.n1 != null ? x.g : groupMeans(tailOf(S[x.b.k], R.n), target, 1);
+          const thinSide = g.n1 <= g.n0;
+          return x.b.n + ' — ' + g.n1 + ' days with it, ' + g.n0 + ' without. '
+            + (thinSide ? 'Log ' + Math.max(1, 5 - g.n1) + ' more day' + (Math.max(1, 5 - g.n1) > 1 ? 's' : '') + ' with it.'
+              : 'Give it ' + Math.max(1, 5 - g.n0) + ' more day' + (Math.max(1, 5 - g.n0) > 1 ? 's' : '') + ' off.');
+        }),
+      pairName: pB.n, pairOk: pOk, pairBars: pairBars, pairRead: pairRead, pairOverlap: pairOverlap,
+      pairThin: !pOk,
+      pairThinNote: 'Only ' + pg.n1 + ' days with it and ' + pg.n0 + ' without in this window. Noop needs five on each side before it will put two averages next to each other.',
+
+      dState: dState.charAt(0).toUpperCase() + dState.slice(1),
+      dChip: {
+        fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', fontWeight: 600, padding: '4px 8px', borderRadius: 6,
+        color: dState === 'borrowed' ? '#939C97' : dState === 'disagrees' ? '#E9C48A' : '#B7C0E8',
+        background: dState === 'borrowed' ? 'rgba(255,255,255,.06)' : dState === 'disagrees' ? 'rgba(242,180,92,.14)' : 'rgba(139,153,214,.14)'
+      },
+      dNum: (dShown > 0 ? '+' : '−') + Math.abs(dShown).toFixed(1),
+      dNumStyle: {
+        fontFamily: "'Outfit',sans-serif", fontSize: 34, fontWeight: 200, letterSpacing: '-.03em', lineHeight: 1,
+        fontVariantNumeric: 'tabular-nums', color: dHue
+      },
+      dUnit: '% deep sleep, per drink',
+      dFill: { width: (dW * 100).toFixed(0) + '%', background: LAV, borderRadius: 3 },
+      dLine: dLines[dState] || dLines.blending,
+      dSteps: dSteps,
+      dFoot: 'Colour is ownership: grey while the figure is borrowed from the literature, the screen\u2019s hue once enough of your own nights sit behind it. It never shows a borrowed number as though it were measured.',
+
+      swipeStart: function (e) { self.setState({ sx: e.clientX, sy: e.clientY }); },
+      swipeEnd: function (e) {
+        const st = self.state;
+        if (st.sx == null) return;
+        const dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+        self.setState({ sx: null, sy: null });
+        if (dx <= 78 || Math.abs(dy) >= 58) return;
+        if (st.sheet) { self.setState({ sheet: null }); return; }
+        const cur = st.screen || self.props.screen || 'index';
+        if (cur === 'index') { if (nav) nav('picture', 'trends'); return; }
+        self.setState({ screen: 'index' });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

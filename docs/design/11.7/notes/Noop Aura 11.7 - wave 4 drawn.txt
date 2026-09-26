@@ -1,0 +1,430 @@
+NOOP AURA — WAVE 4 IS DRAWN. THE PLAN IS CLOSED.
+Design note · 2026-09-19
+Against: "Noop Aura 11.7 Plan" (spec/90-aura-11.7.md) §13 · branch
+integration/noop-aura-upstream-11.7
+
+
+WHERE IT STANDS
+
+  Wave 1   the first impression and the paperwork ......... CLOSED
+  Wave 2   Act 10 · The lift ............................... CLOSED
+  Wave 3   the merged engines get faces .................... DRAWN
+  Wave 4   Svea, and the outside of the app ................ DRAWN
+
+  All four waves are off design's desk. What is left in every case is
+  engineering's build of them, plus the one item design is still waiting on:
+  the nine section headings from TERMS.md, verbatim.
+
+
+════════════════════════════════════════════════════════════════════════
+4A · SVEA'S FOUR — all inside Act 7, no new Svea screen
+════════════════════════════════════════════════════════════════════════
+
+Prototype: "Noop Act 7 - Svea.dc.html". Props: screen (six now, chartAsk
+added), micState (idle · recording · transcribing · unclear).
+
+  VOICE INPUT — one composer bar, four states, and the audio never becomes a
+  file. Hold the mic; speech becomes text ON THE PHONE; what goes out is the
+  sentence, after the wearer has read it. Each state carries the line that
+  makes that true rather than a privacy screen one tap away.
+  A hold under 0.7s lands in "I did not catch that", which is where the
+  instruction lives: hold it down while you speak, a tap is too short to hear
+  anything. The release is caught on the window, not on the button — by the
+  time the finger lifts, the button under it is a different element.
+
+  THE DAILY BRIEF — a dateline, then the brief, INSIDE the conversation
+  rather than bolted above it, with an arrival line under it. One case is
+  drawn because one case exists: it lands into an empty thread. Mid-question
+  it waits, and it does not badge itself while waiting. With manner off the
+  dateline is still there and the arrival line says why nothing came.
+
+  ASK ABOUT A CHART — one affordance, one position: the chart card's footer,
+  trailing edge, after the provenance line. On every chart in Acts 2, 4, 6
+  and 9 and nowhere else; drawn once in Act 7's notes column with its
+  placement and stroke, then placed by rule.
+  It attaches the SERIES, not a picture — the values, their dates, the unit —
+  which is why the enable row went on consent and not setup. It is now the
+  EIGHTH GRANT: "Charts you ask about". Every "of 7" in the act is "of 8",
+  and the gate's three facts say eight grants.
+  OFF IS ABSENCE, NOT GREY. The chartAsk screen draws both: the attached-chart
+  answer, and the state where the grant is off and the control is simply not
+  on any chart. Noop does not draw a door it will not open.
+
+  THE PROMPT LIBRARY — the suggestion strip gains one More affordance opening
+  a curated sheet: eleven prompts in four groups, written by Noop, identical
+  for everyone, chosen without reading anything of the wearer's. The sheet
+  says so.
+  A TAP WRITES, IT DOES NOT SEND. The prompt lands in the composer; the
+  wearer still decides. The library is a way to write a question, not a menu
+  of answers. Two of the eleven are answered in the drawing — the lift call
+  and last night's brief.
+
+
+════════════════════════════════════════════════════════════════════════
+4B · THE WIDGET SET — "Noop Widgets — the Aura set"
+════════════════════════════════════════════════════════════════════════
+
+Artefact: "Noop Widgets - the Aura set.dc.html". Eight families, each drawn
+twice — populated, and with nothing to show. Tweaks: wallpaper (warm, dark,
+light) because the set has to hold on any of them.
+
+  DIMENSIONS ARE REAL. 430 pt device scale: small 170 × 170, medium
+  364 × 170. On a 393 pt phone the same widgets are 158 and 338 wide, so no
+  layout is pinned to a width and the one figure per widget shrinks last.
+
+  THE SIX THAT SHIP, redrawn to the rules: glanceable, live heart rate, the
+  coach brief, resting pulse, stress, lift session.
+
+  THE TWO ADDITIONS
+
+    · ENERGY (medium) — wave 3a reduced to what survives at widget size: the
+      cost so far, the basal-against-active split, and where the day is
+      heading AS A RANGE. Spend only: no target, no deficit, nothing
+      remaining. Coverage is words at the foot, never a percentage chip.
+      Its empty face is the cold start, and it is the interesting one: no
+      measured spend exists, so it states the single figure Noop can always
+      stand behind — the modelled basal day — flat, as "about", with the chip
+      carrying the reason and the projection absent because there is nothing
+      to project from.
+    · RINGS (small) — charge, effort and sleep, the only place all three are
+      seen at once. MY RECOMMENDATION: SHIP IT. It is built and registered
+      and it is the cheapest thing in the wave. The empty face resolves the
+      question that was actually open: an axis with nothing logged is drawn
+      HAIRLINE, not at zero, because a closed-to-nothing ring reads as a
+      failure the wearer did not earn. Same rule as the gauge's ghost ticks.
+
+  THE EMPTY FACE IS THE SET'S TEST. Never a zero, never a flat line, never a
+  cheerful prompt — an em dash and the reason for it, and where a gap exists
+  the series stops rather than interpolating across it.
+
+  NOT IN THIS WAVE: the accessory families (Lock Screen circular,
+  rectangular, inline). Three of the eight would reduce cleanly — resting
+  pulse, energy, rings — and five would not. That is a decision worth taking
+  on its own rather than inside this one.
+
+
+════════════════════════════════════════════════════════════════════════
+4C · THE LIFT LIVE ACTIVITY
+════════════════════════════════════════════════════════════════════════
+
+Artefact: "Noop Lift Live Activity.dc.html". Four presentations, four states,
+one state table — drawn the way the build should read it: from one live
+session object, not four that happen to agree.
+
+  PRESENTATIONS: Lock Screen and banner (364 pt, wave 2's card unchanged),
+  Dynamic Island compact (leading ≤ 44 pt, trailing ≤ 56 pt, 37 pt tall),
+  expanded (364 × 172, leading/trailing/bottom), and minimal (~24 pt).
+
+  PAUSED IS THE STATE THE WAVE-2 MATRIX WAS MISSING, and it follows from a
+  decision already taken: if pause stops both clocks, the activity cannot
+  keep counting. It FREEZES at its held value in the app's disabled ink
+  (#7F8A85). It does not hide the clock — hiding it reads as a reset, and a
+  wearer who thinks the set timer reset will redo the set.
+
+  THE INKS, unchanged and opaque: #17A2E6 worked, #C6CEC9 resting. READY
+  keeps the working ink because the next set is the thing to act on.
+  ONE DELIBERATE DIVERGENCE FROM THE BAR: the bar's resting dot is #8FD3F5
+  and the activity's is #C6CEC9. The bar sits on the app's own ground; the
+  activity sits on somebody's photograph and takes the flattest legible
+  neutral in the palette. That is the only divergence in the set.
+
+  THE ACTIVITY CARRIES NO CONTROLS. No pause, no next set, no finish. Pause
+  lives on lift-live, exactly as the bar has none; a Finish button an inch
+  from a Lock Screen swipe is a lost session. A tap opens lift-live, where
+  every one of those decisions is already drawn.
+
+  ALSO HELD: the numbers slot is ABSENT where neither reps nor weight is
+  known — not a pair of dashes, and the status line takes the width. The
+  exercise name takes the ellipsis; the clock and the set counter never do.
+  The minimal slot carries a state and nothing else — four states is already
+  its ceiling, and a two-glyph clock at 24 pt is a smudge that looks like
+  data.
+
+
+════════════════════════════════════════════════════════════════════════
+4D · THE ICON SET — FIVE ICONS
+════════════════════════════════════════════════════════════════════════
+
+Artefact: "Noop Icon Set.dc.html". The row itself is drawn in situ in
+"Noop Act 5 - The Plumbing.dc.html" → settings → Appearance.
+
+  THE RULE HAD TO GROW. The set began as one mark in three materials. Four
+  of the five are now that mark — three varying by material, one by WEIGHT —
+  and the fifth is not it at all, so "one mark, three grounds" is no longer
+  what holds the set together. The larger rule is the real one:
+  EVERY ICON IS SOMETHING THAT ALREADY EXISTS INSIDE THE APP. The arc is the
+  gauge. The orb is the coach. An idea with no home in the product does not
+  qualify, and that is the whole gate.
+
+  THE INSTRUMENT FAMILY — Titanium, Aura, Blued. One mark: the gauge's arc,
+  284° of it so the 76° GAP IS CENTRED ON THE FOOT, and one reading just
+  inside the arc's end. The ground is the only variable across the three.
+  Specified at the 1024 master, 60 pt Home Screen and 29 pt Settings row,
+  with a stroke floor of 2 pt — at 29 pt a hairline arc becomes a grey
+  smudge at the one size everybody sees.
+  The arc's middle is MASKED, not repainted: a second disc painted in the
+  ground colour carries its own gradient highlight, and that seam would ship
+  into the export.
+
+  BREATHE (new) — the today orb with the pacer's ring around it, frozen at
+  the top of an inhale. Breathe is five screens deep (breathe, bcatalog,
+  bplayer, bsweep, bfound), reached by long-pressing that orb, and this is
+  the only icon in the set that opens onto something you DO rather than
+  something you read.
+  THE PACE RING IS CLOSED AND THIN, against the instrument's open and heavy
+  one: a reading is never finished, a breath is a cycle that completes.
+  That difference is the only thing keeping it from reading as a fourth
+  instrument at 29 pt.
+  TWO ORBS WORK because they differ on three axes at once — hue (cyan
+  against periwinkle), shape (a true circle against Svea's blob) and
+  structure (a closed ring against a soft halo). Any one alone would fail.
+
+  CAST IS OUT. It was a formal exercise — the mark poured solid rather than
+  cut — and it looked like one. Its cost is worth recording: Cast was the
+  set's second pale tile, so TITANIUM IS NOW THE ONLY PALE ICON. A wearer on
+  a light wallpaper has exactly one that holds, and it is the default.
+
+  THE MONOGRAM IS OUT. A letterform was the wrong instinct. An N in a ring
+  is what a product reaches for when its mark cannot carry the tile alone;
+  ours can, and the initial inside it was an admission the other four do not
+  make. NO TEXT IN THE TILE, at any size — no letter, no monogram, no
+  wordmark. The label under a Home Screen icon is already the app's name,
+  and printing it twice, or reducing it to an initial, is the tell of an
+  icon that does not trust its mark.
+
+  ORB (new) — Svea on the Home Screen, for the wearer whose Noop is mostly
+  the coach. EXPORTED FROM ACT 7'S ORB, not redrawn: same silhouette, same
+  gradient stops, same bloom. Two orbs that drift apart by a redraw is worse
+  than not shipping the icon. Periwinkle stays periwinkle, as everywhere.
+
+  BLUED is still conditional. It ships only if the 1024 source art turns up;
+  if it does not, BLUED RETIRES and the row is four. A ground rebuilt from a
+  screenshot would be a worse Blued wearing its own name. The sheet's
+  "Blued art exists" tweak draws the row both ways.
+
+  THE SET SPLITS BY GROUND, which is what a picker is actually for:
+  Titanium is pale and wants a dark wallpaper behind it; Aura, Navy, Breathe
+  and the Orb are dark and hold against a pale one.
+
+  TITANIUM STAYS THE DEFAULT — not on contrast. It is the default because it
+  matches the hardware, and a wearer who never opens Appearance should have
+  the icon that looks like the thing on their wrist. FIVE IS THE CEILING —
+  past that the row stops being a choice and becomes a gallery.
+
+  THE APPEARANCE ROW STOPS SAYING LATER. It is now a picker: 46 pt tiles in
+  a 44 pt target, three across wrapping to a second line, the name under
+  each, and the picked one ringed in aura blue rather than ticked — a tick
+  on an icon reads as a badge on the icon. It works in the prototype and
+  writes to the same preference the rest of the group uses. One line under
+  it says iOS owns the alert and the Home Screen may take a moment, so the
+  flash is not a mystery.
+
+  ONE LETTER IS STILL NOT A MARK. See CAST above: nothing in the set carries
+  a character, an initial or the word Noop at any size.
+
+
+════════════════════════════════════════════════════════════════════════
+4E · THE TWO DEFERRED STRINGS — both now true
+════════════════════════════════════════════════════════════════════════
+
+  · PLUMBING/WIDGETS' COUNT SENTENCE. It was "three" and it is now EIGHT, in
+    both places: the Appearance row's subtitle and figure, and the widgets
+    screen's own line. The screen no longer claims a count it does not list —
+    the three faces stay drawn in full and all eight families are named
+    underneath, with energy and rings marked new.
+    FOR THE BUILD: bind the figure to the widget registry, not to a string.
+    Typed, it is wrong the first time a family is added.
+
+  · THE TRENDS SECTION HEADING. Already "What changed" in Act 4's drawing
+    since wave 3c. Nothing owed by design; it is a binding item only.
+
+
+════════════════════════════════════════════════════════════════════════
+STILL OPEN, WITH OWNERS
+════════════════════════════════════════════════════════════════════════
+
+ENGINEERING
+
+  1. THE NINE SECTION HEADINGS FROM TERMS.md, VERBATIM — and whether the
+     reader hands the screen the preamble and closing note separately from
+     the nine. The drawing's headings are stand-ins. This is still the only
+     thing design is waiting on.
+  2. The per-release change list — authored, 278 releases deep in
+     AppChangelog.swift. day/release needs binding, not writing.
+  3. The momentum filter as a named list rather than a switch in a card
+     factory, so a cut kind cannot return on the next merge.
+  4. The widget count, bound to the registry (4e above).
+  5. Blued's 1024 source art: found, or the set is four.
+  6. The orb icon exported from Act 7's orb source, not re-drawn from it.
+
+DESIGN
+
+  Nothing outstanding in the 11.7 plan. The next things worth drawing are
+  the accessory widget families and the light theme — neither is in this
+  plan, and both are decisions before they are drawings.
+
+
+════════════════════════════════════════════════════════════════════════
+THE FILES ADDED OR CHANGED THIS PASS
+════════════════════════════════════════════════════════════════════════
+
+  Noop Act 7 - Svea.dc.html ............ 4a: voice, the dateline, chartAsk,
+                                         the library, the eighth grant
+  Noop Widgets - the Aura set.dc.html .. 4b: eight families, sixteen faces
+  Noop Lift Live Activity.dc.html ...... 4c: four presentations, four states
+  Noop Icon Set.dc.html ................ 4d: five icons — one instrument in
+                                         four surfaces, plus the orb
+  Noop Act 5 - The Plumbing.dc.html .... 4d's row in situ; 4e's count
+  Noop Act 4 - The Bigger Picture ...... 4e: heading already correct
+
+Every static string lives once, in the act or artefact file. Lift them from
+there rather than from this document.
+
+
+════════════════════════════════════════════════════════════════════════
+20 SEPTEMBER — THE LAST TWO ANSWERS, AND WHAT THEY COST
+════════════════════════════════════════════════════════════════════════
+
+THE TERMS
+  Markers moved to 07 and 08. The §7 rewrite replaced the gate's four
+  ticks with the document's own four, which removed design's "I have
+  read these terms" tick — worth noticing, because it was the one tick
+  that was ours and it did not survive contact with the real document.
+  Closing note is in, unnumbered. Rename applied to the terms screen and
+  the first-launch gate only; the rest of the app still says Noop, and
+  that is a question, not an omission.
+
+THE ICONS
+  Two of my five numbers were wrong, and both were mine rather than the
+  script's. The gap is at twelve o'clock, not tilted 23°, and the ink is
+  302° rather than 280.5°. The tilt had a paragraph of reasoning behind
+  it about the mark "not reading as a symmetrical logo." The mark is
+  symmetrical. The reasoning is deleted.
+
+  The lesson is cheap and worth writing down: I measured a PNG when a
+  generator existed. Radius and stroke came out right because they are
+  easy to measure across a midline; the two angular numbers came out
+  wrong because an angular scan of an anti-aliased arc is a guess with
+  decimal places on it. Ask for the constants first.
+
+  Caps are round now, at half the stroke, so the opening draws at 33.9°
+  rather than the 58° between cap centres. Titanium and Aura take the
+  gold's sweep structure in their own inks.
+
+WHAT IS LEFT
+  The live activity's four presentations — Lock Screen, the three
+  Dynamic Island states, and the in-app bar — are the next drawing.
+  Two parked decisions are still parked: the caption contrast pass
+  across all acts, and the five accessory widget families that do not
+  reduce cleanly to the gauge mark.
+
+
+════════════════════════════════════════════════════════════════════════
+20 SEPTEMBER — FOUR DECISIONS BACK, AND WAVE 5 STARTED
+════════════════════════════════════════════════════════════════════════
+
+THE RENAME — TERMS AND GATE ONLY
+  Settled. The app stays Noop; the document and the first-launch gate say
+  Noop Aura. That divergence is now deliberate rather than partial, and
+  the handoff says so to engineering.
+
+THE ACCESSORY MARK — CLOSED RING, NO CORE
+  Settled, and it collides with a rule this set states out loud: "open
+  ring reads, closed ring acts." The collision is fine and needs to be
+  written down rather than quietly allowed.
+
+  The open/closed distinction is what separates the INSTRUMENT from
+  BREATHE inside the app icon set — two tiles a wearer sees side by side
+  in Appearance, where the difference has to survive 29 pt. An accessory
+  complication is monochrome, ~18 pt, and never appears next to Breathe.
+  Nothing is there to confuse it with, so the distinction has no work to
+  do and the core — which is the first thing to go to mush — comes out.
+
+  The rule is therefore scoped, not broken: it governs the app icon set.
+  The accessory mark is a closed ring with no core, and it is not a
+  member of that set. To be drawn with the five accessory families.
+
+NEXT, AND NOW DRAWN — NOOPLiveActivity
+  Note for the record: the live activity still open was the HEART RATE
+  one, not the lift. The lift activity was finished in wave 4C.
+
+  Noop Live Heart Rate Activity.dc.html. Sibling of the lift sheet —
+  same four slots, same inks, no controls — built on one fact the lift
+  activity does not have to deal with: a live activity gets an UPDATE
+  BUDGET, not a stream.
+
+  What follows from that, and what the sheet argues:
+    · No sparkline. Four points a minute drawn as thirty seconds of
+      line is an invention shaped like a measurement.
+    · Every reading carries its age. A bare number is a claim about
+      right now that a budgeted update cannot support.
+    · No reading means NO FIGURE — not greyed, not dashed. Same rule as
+      the lift's numbers slot, and the same reason.
+    · One amber, over the ceiling only, and gated on the wearer having
+      turned the ceiling on. Drawn as a tweak so it can be seen absent.
+    · Minimal has THREE faces, not four: resting and working are the
+      same answer to the only question that slot can ask.
+
+  bpm comes off the activity, per engineering, so this figure and the
+  today orb's are one value read once.
+
+THE CONTRAST PASS
+  Deferred to the end, by decision. Still on the board.
+
+
+════════════════════════════════════════════════════════════════════════
+20 SEPTEMBER — WAVE 5B, AND THE CONTRAST PASS. 11.7 CLOSED.
+════════════════════════════════════════════════════════════════════════
+
+THE ACCESSORY FAMILIES — DRAWN
+  Noop Accessory Widgets.dc.html.
+
+  The brief was "the five that do not reduce to the gauge mark", and the
+  real constraint turned out not to be size. It is that accessory widgets
+  render MONOCHROME. All three of the set's colour rules die at once:
+  amber stops meaning needs-attention, periwinkle stops marking a
+  sentence a model wrote, and blue stops meaning live. Every one of them
+  has to become a word or leave.
+
+  Ten placements of fifteen are filled. Five are REFUSED IN WRITING with
+  the reason, because a refused placement that isn't written down comes
+  back as a bug report:
+    · Glanceable      circular declined — two facts, and ranking the
+                      night above the day IS the design
+    · Coach brief     circular and inline declined — prose that might be
+                      wrong needs its caveat beside it
+    · Stress          circular declined — "Settled" is seven glyphs in a
+                      four-glyph slot, and abbreviating a state the
+                      wearer has to trust is lying politely
+    · Lift session    circular declined — a progress ring at 76 pt now
+                      reads as the app's own accessory mark
+
+  Resting pulse is the only one of the five that fills all three.
+
+  The coach brief's label costs one of its four lines and is not
+  optional. An unmarked generated sentence on a Lock Screen is the worst
+  thing this app could ship.
+
+THE CAPTION CONTRAST PASS — DONE, AND IT WAS WORSE THAN REPORTED
+  #57605C on #0A0C0B is 3.0:1, not "near 4.5". It was carrying 11 px
+  captions in thirty files. Roughly 250 instances now use #7F8A85
+  (5.5:1), which was already the tertiary ink in most of those files —
+  so the pass SHORTENED the ramp rather than adding to it. That is the
+  better outcome: the faintest ink is gone because it never passed.
+
+  Kept deliberately:
+    · The row chevron's 1.5–1.6 pt stroke. A graphical object, fine at
+      3:1. Renamed chevronDim so nobody reaches for it as type again.
+    · Act 9 (scope) — its #57605C sits on white, where it is 6.5:1.
+
+  Four SVG axis labels at 10 px were also carrying it and were missed by
+  the first sweep, because they set fill= rather than color=. Fixed.
+
+  Tokens updated at the source: NoopPalette.swift, 10-tokens.md,
+  12-palette-bindings.md, the build document and the Act 10 coder pack
+  all now say the value is retired for type. Dated handoff folders and
+  export/ are left alone — they are snapshots, not live.
+
+WHAT REMAINS
+  Nothing on design's side of 11.7. Six build-time items sit with
+  engineering, listed in FOR ENGINEERING - Noop Aura 11.7 open items.

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#0B6FA8;text-decoration:none}a:hover{color:#084F78}
+</style>
+</helmet>
+
+<div style="padding:38px 40px 46px;display:flex;flex-direction:column;gap:30px;background:#E9E5DD;box-sizing:border-box;min-width:960px">
+
+  <div style="display:flex;flex-direction:column;gap:9px;max-width:46em">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:600;padding:3px 7px;border-radius:4px;background:#1B1F1E;color:#E9E5DD">D</span>
+      <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">Confidence ladder &#183; recommended</span>
+    </div>
+    <div style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:300;letter-spacing:-.03em;line-height:1.1;color:#151917">A chip in the screen&#8217;s own hue</div>
+    <div style="font-size:14.5px;line-height:1.6;color:#3E4644;text-wrap:pretty">C&#8217;s chip and A&#8217;s words, with the traffic light taken out. <code style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:#DED9CF;padding:1px 5px;border-radius:3px">10-tokens.md</code> reserves amber for <em style="font-family:'Instrument Serif',serif;font-size:16px">needs attention</em> and hot for <em style="font-family:'Instrument Serif',serif;font-size:16px">critical</em> &#8212; a calibrating score needs neither, because there is nothing to act on. So confidence ramps the hue the screen already has, per the rule that a component never picks its own colour: lavender on Rest, aura on Charge, blush on the age screens.</div>
+    <div style="display:flex;gap:22px;margin-top:4px;font-size:12.5px;color:#5E6663">
+      <span><strong style="color:#151917;font-weight:600">Two chips, not three</strong> &#8212; solid is plain, the precedent Act 8 already sets</span>
+      <span><strong style="color:#151917;font-weight:600">Tappable</strong>, and it shrinks to a dot</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap">
+
+    <div style="display:flex;flex-direction:column;gap:11px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="width:9px;height:9px;border-radius:50%;background:#8B99D6;flex:none"></span>
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">Rest &#183; lavender &#183; building</span>
+      </div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ yes }}" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+          <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:470px;height:430px;border-radius:50%;background:radial-gradient(circle,rgba(139,153,214,.20),rgba(139,153,214,0) 68%);pointer-events:none"></div>
+
+          <div style="position:relative;padding:58px 18px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span style="font-size:13.5px;color:#939C97">Last night</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">Rest</span>
+            </div>
+            <span style="width:30px;height:30px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:13px;color:#939C97">&#8942;</span>
+          </div>
+
+          <div style="position:relative;padding:14px 18px 0;display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="display:flex;align-items:center;gap:6px;padding:5px 10px 5px 9px;border-radius:10px;background:rgba(139,153,214,.12);border:.5px solid rgba(139,153,214,.3);cursor:pointer">
+              <span style="width:5px;height:5px;border-radius:50%;background:rgba(201,208,238,.75);flex:none"></span>
+              <span style="font-size:10.5px;letter-spacing:.06em;font-weight:600;color:#C9D0EE;font-variant-numeric:tabular-nums">Building &#183; 14 nights</span>
+            </div>
+            <div style="position:relative;width:168px;height:168px;display:flex;align-items:center;justify-content:center">
+              <svg viewBox="0 0 180 180" style="position:absolute;inset:0;width:168px;height:168px;transform:rotate(-90deg)">
+                <circle cx="90" cy="90" r="76" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="9"></circle>
+                <circle cx="90" cy="90" r="76" fill="none" stroke="#8B99D6" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ dash78 }}"></circle>
+              </svg>
+              <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+                <span style="font-family:'Outfit',sans-serif;font-size:52px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 24px rgba(0,0,0,.6)">78</span>
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600;padding-top:7px">rest</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="position:relative;padding:22px 18px 0;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">Against your need</span>
+              <span style="font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">7h 12m of 7h 05m</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden">
+              <div style="width:78%;height:100%;border-radius:4px;background:linear-gradient(90deg,rgba(139,153,214,.5),#8B99D6)"></div>
+            </div>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0;display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ restStats }}" as="s" hint-placeholder-count="4">
+              <div style="position:relative;width:calc(50% - 4px);box-sizing:border-box;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:13px 15px;display:flex;flex-direction:column;gap:5px">
+                <span style="position:absolute;top:13px;right:13px;width:5px;height:5px;border-radius:50%;background:{{ s.dot }}"></span>
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">{{ s.k }}</span>
+                <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:{{ s.valColor }}">{{ s.v }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">What moves it, for you</span>
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+              <sc-for list="{{ moves }}" as="m" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:{{ m.border }}">
+                  <span style="flex:1;font-size:13px;color:#C6CEC9">{{ m.k }}</span>
+                  <span style="font-size:12.5px;font-weight:500;font-variant-numeric:tabular-nums;color:{{ m.valColor }}">{{ m.v }}</span>
+                  <span style="width:5px;height:5px;border-radius:50%;flex:none;background:{{ m.dot }}"></span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none;z-index:6">
+            <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5)">
+              <div style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center">
+                <span style="{{ icoToday }}"></span>
+              </div>
+              <div style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center">
+                <span style="{{ icoTrends }}"></span>
+              </div>
+              <div style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(23,162,230,.4)">
+                <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;color:#04121A;line-height:1;margin-top:-2px">+</span>
+              </div>
+              <div style="flex:1.7;height:46px;border-radius:20px;background:rgba(139,153,214,.9);display:flex;align-items:center;justify-content:center;gap:7px">
+                <span style="{{ icoRestOn }}"></span>
+                <span style="font-size:12.5px;font-weight:600;color:#0D1120">Rest</span>
+              </div>
+              <div style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center">
+                <span style="{{ icoYou }}"></span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="width:9px;height:9px;border-radius:50%;background:#17A2E6;flex:none"></span>
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">Charge &#183; aura &#183; calibrating</span>
+      </div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ yes }}" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+          <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:470px;height:430px;border-radius:50%;background:radial-gradient(circle,rgba(23,162,230,.17),rgba(23,162,230,0) 68%);pointer-events:none"></div>
+
+          <div style="position:relative;padding:58px 18px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span style="font-size:13.5px;color:#939C97">Today</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">Charge</span>
+            </div>
+            <span style="width:30px;height:30px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:13px;color:#939C97">&#8942;</span>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0;display:flex;flex-direction:column;gap:13px">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-family:'Outfit',sans-serif;font-size:44px;font-weight:200;letter-spacing:-.04em;line-height:1;color:#7F8A85;font-variant-numeric:tabular-nums">&#8212;</span>
+                <span style="font-size:13px;color:#939C97;text-wrap:pretty;max-width:15em;line-height:1.5">Learning what a normal day costs you.</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;flex:none;margin-top:5px;padding:5px 10px 5px 9px;border-radius:10px;background:rgba(23,162,230,.07);border:.5px solid rgba(23,162,230,.22);cursor:pointer">
+                <span style="width:5px;height:5px;border-radius:50%;background:rgba(23,162,230,.42);flex:none"></span>
+                <span style="font-size:10.5px;letter-spacing:.06em;font-weight:600;color:#8B958F;font-variant-numeric:tabular-nums">2 of 4 days</span>
+              </div>
+            </div>
+            <div style="height:12px;border-radius:6px;background:rgba(255,255,255,.06);overflow:hidden;display:flex">
+              <div style="width:34%;height:100%;background:repeating-linear-gradient(90deg,rgba(23,162,230,.3) 0 4px,rgba(23,162,230,.08) 4px 9px)"></div>
+            </div>
+            <span style="font-size:11.5px;color:#7F8A85;text-wrap:pretty;line-height:1.5">Two more days and this becomes a number you can spend against.</span>
+          </div>
+
+          <div style="position:relative;padding:24px 18px 0;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">What is limiting you</span>
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+              <sc-for list="{{ limits }}" as="l" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:11px;padding:13px 0;border-bottom:{{ l.border }}">
+                  <span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ l.dot }}"></span>
+                  <span style="flex:1;font-size:13px;color:#C6CEC9">{{ l.k }}</span>
+                  <span style="font-size:12.5px;color:{{ l.valColor }};font-variant-numeric:tabular-nums;font-weight:500">{{ l.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:11.5px;color:#7F8A85;line-height:1.5;text-wrap:pretty">Amber is the one that wants something from you. The blue chip above is just waiting.</span>
+          </div>
+
+          <div style="position:relative;padding:22px 18px 0;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">Projected for today</span>
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px 16px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <div style="display:flex;align-items:baseline;gap:8px">
+                  <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:200;letter-spacing:-.03em;line-height:1;color:#7F8A85;font-variant-numeric:tabular-nums">&#8212;</span>
+                  <span style="font-size:12px;color:#7F8A85">by bedtime</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:5px;flex:none;padding:4px 9px 4px 8px;border-radius:10px;background:rgba(23,162,230,.07);border:.5px solid rgba(23,162,230,.22)">
+                  <span style="width:5px;height:5px;border-radius:50%;background:rgba(23,162,230,.42);flex:none"></span>
+                  <span style="font-size:10px;letter-spacing:.05em;font-weight:600;color:#8B958F;font-variant-numeric:tabular-nums">2 of 4 days</span>
+                </div>
+              </div>
+              <div style="height:6px;border-radius:3px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.09) 0 4px,rgba(255,255,255,.02) 4px 9px)"></div>
+              <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">A range needs a normal day to compare against, and it does not have one yet. No guess in the meantime.</span>
+            </div>
+          </div>
+
+          <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none;z-index:6">
+            <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5)">
+              <div style="flex:1.7;height:46px;border-radius:20px;background:rgba(23,162,230,.92);display:flex;align-items:center;justify-content:center;gap:7px">
+                <span style="{{ icoTodayOn }}"></span>
+                <span style="font-size:12.5px;font-weight:600;color:#04121A">Today</span>
+              </div>
+              <div style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center">
+                <span style="{{ icoTrends }}"></span>
+              </div>
+              <div style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(23,162,230,.4)">
+                <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;color:#04121A;line-height:1;margin-top:-2px">+</span>
+              </div>
+              <div style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center">
+                <span style="{{ icoMoonOff }}"></span>
+              </div>
+              <div style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center">
+                <span style="{{ icoYou }}"></span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div style="flex:1;min-width:270px;display:flex;flex-direction:column;gap:22px">
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">The ramp, per hue</span>
+        <div style="background:#0A0C0B;border-radius:24px;padding:18px 16px;display:flex;flex-direction:column;gap:18px">
+          <sc-for list="{{ hues }}" as="h" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="width:8px;height:8px;border-radius:50%;flex:none;background:{{ h.hue }}"></span>
+                <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;color:#8B958F">{{ h.name }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;align-items:center;gap:6px;align-self:flex-start;padding:4px 9px 4px 8px;border-radius:10px;background:{{ h.calBg }};border:.5px solid {{ h.calBorder }}">
+                  <span style="width:5px;height:5px;border-radius:50%;flex:none;background:{{ h.calDot }}"></span>
+                  <span style="font-size:10px;letter-spacing:.05em;font-weight:600;color:#8B958F;font-variant-numeric:tabular-nums">{{ h.calLabel }}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;align-self:flex-start;padding:4px 9px 4px 8px;border-radius:10px;background:{{ h.buildBg }};border:.5px solid {{ h.buildBorder }}">
+                  <span style="width:5px;height:5px;border-radius:50%;flex:none;background:{{ h.buildDot }}"></span>
+                  <span style="font-size:10px;letter-spacing:.05em;font-weight:600;color:{{ h.text }};font-variant-numeric:tabular-nums">{{ h.buildLabel }}</span>
+                </div>
+                <span style="font-size:10.5px;color:#7F8A85;padding-left:2px;padding-top:1px">Solid &#183; no chip</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">Kept clear for meaning</span>
+        <div style="background:#0A0C0B;border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:11px">
+          <sc-for list="{{ reserved }}" as="r" hint-placeholder-count="2">
+            <div style="display:flex;align-items:flex-start;gap:10px">
+              <span style="width:9px;height:9px;border-radius:50%;flex:none;margin-top:4px;background:{{ r.hue }}"></span>
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:11.5px;font-weight:600;color:#C6CEC9">{{ r.name }}</span>
+                <span style="font-size:10.5px;line-height:1.45;color:#8B958F;text-wrap:pretty">{{ r.use }}</span>
+              </div>
+            </div>
+          </sc-for>
+          <span style="font-size:10.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty;padding-top:3px;border-top:.5px solid rgba(255,255,255,.06)">Confidence borrows neither. It is a progress state, not a severity one &#8212; the whole reason the ramp stays inside the screen&#8217;s own hue.</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:1060}}">
+const GLYPH = {
+  today: 'M12 3v2M12 19v2M4.2 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z',
+  trends: 'M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9',
+  moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+  you: 'M12 4.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM5.5 19.5c0-3.3 2.9-5.3 6.5-5.3s6.5 2 6.5 5.3'
+};
+const mask = d => 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+// The list-card primitive divides between rows, never after the last one
+// (Noop Act 1 - The Night.dc.html, lines 263–272). A border hard-coded in an
+// <sc-for> row template hits every iteration, so it travels in the row data.
+const rows = list => list.map((r, i) => Object.assign({}, r, {
+  border: i === list.length - 1 ? 'none' : '.5px solid rgba(255,255,255,.06)'
+}));
+
+const ico = (key, size, color) => {
+  const u = mask(GLYPH[key]);
+  return {
+    width: size, height: size, flex: 'none', display: 'block', background: color,
+    WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+  };
+};
+
+class Component extends DCLogic {
+  renderVals() {
+    const C = 2 * Math.PI * 76;
+    const dash = p => (C * p / 100).toFixed(0) + ' ' + (C * (1 - p / 100)).toFixed(0);
+    // The tinted-card rule, 10-tokens.md: hue at 7–12 % over base, 0.5 pt border at 22–34 %.
+    // Calibrating sits at the floor of that range, building at the ceiling.
+    const ramp = (rgb, text, name, calLabel, buildLabel) => ({
+      name, text, hue: 'rgb(' + rgb + ')',
+      calBg: 'rgba(' + rgb + ',.07)', calBorder: 'rgba(' + rgb + ',.22)', calDot: 'rgba(' + rgb + ',.42)',
+      buildBg: 'rgba(' + rgb + ',.12)', buildBorder: 'rgba(' + rgb + ',.3)', buildDot: 'rgba(' + rgb + ',.75)',
+      calLabel, buildLabel
+    });
+    const OFF = '#7F8A85';
+    return {
+      yes: true,
+      dash78: dash(78),
+      icoToday: ico('today', 19, OFF), icoTrends: ico('trends', 19, OFF),
+      icoYou: ico('you', 19, OFF), icoMoonOff: ico('moon', 19, OFF),
+      icoRestOn: ico('moon', 19, '#0D1120'), icoTodayOn: ico('today', 19, '#04121A'),
+      restStats: [
+        { k: 'Time asleep', v: '7h 12m', valColor: '#EDF1EF', dot: 'transparent' },
+        { k: 'Efficiency', v: '91%', valColor: '#EDF1EF', dot: 'transparent' },
+        { k: 'Resting HR', v: '52', valColor: '#EDF1EF', dot: 'rgba(139,153,214,.75)' },
+        { k: 'Variability', v: '—', valColor: '#7F8A85', dot: 'rgba(139,153,214,.42)' }
+      ],
+      moves: rows([
+        { k: 'Bedtime', v: 'strong', valColor: '#C6CEC9', dot: 'transparent' },
+        { k: 'Room temperature', v: 'moderate', valColor: '#C6CEC9', dot: 'rgba(139,153,214,.75)' },
+        { k: 'Late training', v: 'no read yet', valColor: '#7F8A85', dot: 'rgba(139,153,214,.42)' }
+      ]),
+      limits: rows([
+        { k: 'Short sleep', v: '−9', valColor: '#C6CEC9', dot: 'rgba(139,153,214,.8)' },
+        { k: 'Alcohol, last night', v: '−6', valColor: '#F2B45C', dot: '#F2B45C' },
+        { k: 'Yesterday’s session', v: '−4', valColor: '#C6CEC9', dot: 'rgba(23,162,230,.8)' }
+      ]),
+      hues: [
+        ramp('139,153,214', '#C9D0EE', 'Rest · night, sleep', '3 of 4 nights', 'Building · 14 nights'),
+        ramp('23,162,230', '#9FE2FB', 'Aura · the day, live data', '2 of 4 days', 'Building · 11 days'),
+        ramp('224,138,155', '#F6D3DA', 'Blush · you, your body', '12 of 42 nights', 'Building · 60 nights')
+      ],
+      reserved: [
+        { name: 'Effort · amber', hue: '#F2B45C', use: 'Needs attention. Low battery, a failed pairing, stressed minutes, a marker to check. Never decoration.' },
+        { name: 'Hot · orange', hue: '#F0742C', use: 'Critical, nearly out. The end of the charge ramp and the ten-percent battery state.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

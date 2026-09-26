@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="{{ sheet }}">
+
+<div style="display:flex;flex-direction:column;gap:18px;max-width:880px;padding-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">WAVE 5</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">The live heart rate activity</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">NOOPLiveActivity — one reading, four presentations</span>
+  </div>
+
+  <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:38px;line-height:1.12;letter-spacing:-.03em;color:#17150F;text-wrap:pretty">The strap streams. The Lock Screen does not.</h1>
+
+  <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;max-width:750px;text-wrap:pretty">This is the sibling of <a href="./Noop Lift Live Activity.dc.html">the lift activity</a> and it takes the same shape: four slots in the same order, the same two inks, no controls. One fact makes it a different problem. A live activity gets an <strong style="font-weight:600;color:#17150F">update budget</strong>, not a stream, so the figure on the Lock Screen is always a little behind the wrist. Every decision on this sheet follows from that — the reading carries its age, there is no trace, and when the strap stops reporting the number <em style="font-family:'Instrument Serif',serif;font-style:italic">leaves</em> rather than sitting there looking current.</p>
+
+  <div style="display:flex;flex-wrap:wrap;gap:9px">
+    <sc-for list="{{ rules }}" as="r" hint-placeholder-count="4">
+      <span style="padding:8px 13px;border-radius:10px;background:rgba(23,21,15,.06);font-size:12px;font-weight:600;color:#4A463D">{{ r.k }}</span>
+    </sc-for>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 28px;padding:16px 0 4px;border-top:1px solid rgba(23,21,15,.11)">
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em">NO TRACE, AND THAT IS THE WHOLE POINT</span>
+      <span style="{{ body }}">The obvious drawing here is a sparkline, and it is wrong. A trace implies a sample per pixel; this card may get a handful of updates a minute. Drawing thirty seconds of line from four points is an invention, and an invention shaped like a measurement is the one thing this app does not do. So: one figure, one zone, and the age of the reading in plain words. If the wearer wants the curve it is two taps away in the app, where the data actually exists.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">ONE DIVERGENCE FROM THE LIFT ACTIVITY: AMBER</span>
+      <span style="{{ body }}">The lift activity never goes amber, and this one does. Amber means <em style="font-family:'Instrument Serif',serif;font-style:italic">needs attention</em> everywhere in the app, and going over the ceiling you set is the single thing this activity has to say that the wearer asked to be told. It is the only amber on the Lock Screen and it is earned. If the ceiling is off, this state never renders — which is the test that keeps it from becoming decoration.</span>
+    </div>
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">P1</span>
+    <span style="{{ nm }}">Lock Screen and banner</span>
+    <span style="{{ meta }}">364 pt wide · content-sized</span>
+    <span style="{{ body }}">The full card: what is running, the figure, the zone it falls in, and the line that says how old the reading is. The zone strip is five segments because the wearer has five zones — it is a position, not a progress bar, and it never animates.</span>
+    <span style="{{ body }}">Four faces. The fourth is the one that matters: when the strap stops reporting, <strong style="font-weight:600;color:#17150F">the figure is not rendered</strong>. Not greyed, not dashed. The status line takes the full width and says what the last reading was and when.</span>
+  </div>
+  <div style="{{ tiles }}">
+    <sc-for list="{{ lock }}" as="t" hint-placeholder-count="4">
+      <div style="{{ stack }}">
+        <div style="{{ pad }}">
+          <div style="{{ card }}">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="{{ t.dot }}"></span>
+              <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#939C97;font-weight:600">Noop · Live heart rate</span>
+            </div>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:14px">
+              <div style="{{ t.figWrap }}">
+                <span style="{{ t.figS }}">{{ t.bpm }}</span>
+                <span style="{{ t.unitS }}">bpm</span>
+              </div>
+              <span style="{{ t.zoneS }}">{{ t.zone }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;padding-top:1px">
+              <div style="display:flex;gap:4px">
+                <sc-for list="{{ t.seg }}" as="s" hint-placeholder-count="5">
+                  <span style="{{ s }}"></span>
+                </sc-for>
+              </div>
+              <span style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:#C6CEC9;text-wrap:pretty">{{ t.status }}</span>
+            </div>
+          </div>
+        </div>
+        <span style="{{ cap }}">{{ t.cap }}</span>
+        <span style="{{ tnote }}">{{ t.note }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">P2</span>
+    <span style="{{ nm }}">Dynamic Island · compact</span>
+    <span style="{{ meta }}">leading ≤ 44 pt · trailing ≤ 56 pt · 37 pt tall</span>
+    <span style="{{ body }}">A dot and a number. Three glyphs fit at 13.5 pt and a fourth never comes — nobody's heart rate reaches four digits, so the slot cannot be made to truncate.</span>
+    <span style="{{ body }}">With no reading the trailing slot is <strong style="font-weight:600;color:#17150F">empty</strong> and the dot goes hollow. The activity stays visibly present and says nothing, which is exactly what is true. An old number left sitting there would be the only lie this card is capable of telling.</span>
+  </div>
+  <div style="{{ tiles }}">
+    <sc-for list="{{ compact }}" as="t" hint-placeholder-count="4">
+      <div style="{{ stack }}">
+        <div style="{{ padSm }}">
+          <div style="{{ pill }}">
+            <span style="{{ t.dot }}"></span>
+            <div style="width:84px;flex:none"></div>
+            <span style="{{ t.compS }}">{{ t.bpm }}</span>
+          </div>
+        </div>
+        <span style="{{ cap }}">{{ t.cap }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">P3</span>
+    <span style="{{ nm }}">Dynamic Island · expanded</span>
+    <span style="{{ meta }}">364 × 172 pt · leading, trailing, bottom</span>
+    <span style="{{ body }}">The long press. Leading names what is running, trailing holds the zone, and the figure goes in the bottom region at the size it deserves. The centre stays empty — it is the sensor's neighbourhood and anything put there is read at an angle.</span>
+    <span style="{{ body }}">It is the Lock Screen card rearranged, not a second design. Same four slots, same order, same inks, same rule about the missing figure.</span>
+  </div>
+  <div style="{{ tiles }}">
+    <sc-for list="{{ expanded }}" as="t" hint-placeholder-count="4">
+      <div style="{{ stack }}">
+        <div style="{{ padSm }}">
+          <div style="{{ island }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                <span style="{{ t.dot }}"></span>
+                <span style="font-size:11.5px;font-weight:600;color:#C6CEC9;white-space:nowrap">Live heart rate</span>
+              </div>
+              <div style="width:84px;flex:none"></div>
+              <span style="{{ t.zoneS }}">{{ t.zone }}</span>
+            </div>
+            <div style="margin-top:auto;display:flex;flex-direction:column;gap:9px">
+              <div style="{{ t.figWrap }}">
+                <span style="{{ t.figS }}">{{ t.bpm }}</span>
+                <span style="{{ t.unitS }}">bpm</span>
+              </div>
+              <div style="display:flex;gap:4px">
+                <sc-for list="{{ t.seg }}" as="s" hint-placeholder-count="5">
+                  <span style="{{ s }}"></span>
+                </sc-for>
+              </div>
+              <span style="font-size:12px;line-height:1.45;color:#C6CEC9;text-wrap:pretty">{{ t.status }}</span>
+            </div>
+          </div>
+        </div>
+        <span style="{{ cap }}">{{ t.cap }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">P4</span>
+    <span style="{{ nm }}">Dynamic Island · minimal</span>
+    <span style="{{ meta }}">~24 pt of content · three faces, not four</span>
+    <span style="{{ body }}">This slot answers one question — <em style="font-family:'Instrument Serif',serif;font-style:italic">is the strap reading?</em> — so resting and working share a face. They are the same answer, and splitting them would mean two blue dots a wearer has to learn the difference between at 24 pt.</span>
+    <span style="{{ body }}">The one exception is over the ceiling, which gets its own face because it is the only state worth glancing down for. No number goes in here at any state: a three-glyph figure at 24 pt is a smudge, and a smudge shaped like data is worse than an empty slot.</span>
+  </div>
+  <div style="{{ tiles }}">
+    <sc-for list="{{ minimal }}" as="t" hint-placeholder-count="3">
+      <div style="{{ stack }}">
+        <div style="{{ padSm }}">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="width:126px;height:37px;border-radius:19px;background:#000;flex:none"></div>
+            <div style="{{ t.slot }}"><div style="{{ t.inner }}"></div></div>
+          </div>
+        </div>
+        <span style="{{ cap }}">{{ t.cap }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<div style="display:flex;gap:34px;align-items:flex-start;padding:28px 0 0;border-top:1px solid rgba(23,21,15,.11);max-width:1180px">
+  <div style="{{ col }}">
+    <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">FOR THE BUILD</span>
+    <span style="{{ nm }}">Five things to hold to</span>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:12px">
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">The bpm comes off the activity.</strong> Engineering confirmed it, and it is the whole reason these agree: the figure here and the figure on the today orb are one value, read once. Two reads of the same stream drift, and they drift silently until a wearer has both on screen.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">Every reading carries its age.</strong> Seconds while it is fresh, then minutes. Never a bare number — a bare number is a claim about right now that a budgeted update cannot support.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">No reading means no figure.</strong> The element is not rendered; the status line takes the width and says what the last value was and when. Not greyed, not dashed, not held. Same rule as the lift activity's numbers slot, for the same reason.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">Amber only over the ceiling, and only if the ceiling is on.</strong> One attention state, gated on a setting the wearer turned on themselves. If <strong style="font-weight:600;color:#17150F">Buzz if I go over</strong> is off, this face never renders and the card stays blue at 179 bpm.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">No controls.</strong> No stop, no start a session, no mark. Tapping opens the app. The activity is a readout, and the strap keeps reading whether this card exists or not.</span>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;wallpaper&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Warm&quot;,&quot;Dark&quot;,&quot;Light&quot;],&quot;default&quot;:&quot;Warm&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Sheet&quot;},&quot;ceiling&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Session&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const A = '#17A2E6', OFF = '#7F8A85', AMB = '#F2B45C';
+    const WP = {
+      Warm: 'linear-gradient(152deg,#2C332E 0%,#16120E 58%,#1E2622 100%)',
+      Dark: 'linear-gradient(152deg,#15191A 0%,#0A0C0B 60%,#101416 100%)',
+      Light: 'linear-gradient(152deg,#CFC8BA 0%,#A9A294 58%,#BFC6C2 100%)'
+    };
+    const wp = WP[this.props.wallpaper] || WP.Warm;
+    const ceiling = this.props.ceiling !== false;
+
+    // ONE state table, the way the lift sheet does it — every presentation reads from it
+    // because every presentation reads from one activity. zone -1 means no reading at all,
+    // which is a different thing from zone 0.
+    const ST = {
+      resting: { ink: A, bpm: '58', zone: 'Zone 1 · easy', z: 0,
+        status: 'Updated 4 seconds ago', cap: 'RESTING · #17A2E6',
+        note: 'The face it wears most of the day. Low figure, first zone, fresh stamp.' },
+      working: { ink: A, bpm: '148', zone: 'Zone 3 · steady', z: 2,
+        status: 'Updated 2 seconds ago', cap: 'WORKING · #17A2E6',
+        note: 'Same card, bigger number. Nothing about the layout moves with the figure.' },
+      over: { ink: AMB, bpm: '179', zone: 'Over your ceiling', z: 4,
+        status: 'Zone 5 · 162 is the ceiling you set', cap: 'OVER THE CEILING · #F2B45C',
+        note: 'The only amber on the Lock Screen. Renders only if the ceiling is switched on.' },
+      stale: { ink: OFF, bpm: '', zone: 'No reading', z: -1,
+        status: 'Last 148 bpm, six minutes ago. The strap is out of range.',
+        cap: 'NO READING · FIGURE ABSENT',
+        note: 'The figure is not rendered. The line takes the width and says what it knows.' }
+    };
+    const KEYS = ['resting', 'working', 'over', 'stale'].filter(function (k) {
+      return k !== 'over' || ceiling;
+    });
+
+    const dot = function (k) {
+      const s = ST[k];
+      if (k === 'stale') return { width: 7, height: 7, flex: 'none', borderRadius: '50%', border: '1.4px solid ' + OFF, boxSizing: 'border-box' };
+      return {
+        width: 7, height: 7, flex: 'none', borderRadius: '50%', background: s.ink,
+        boxShadow: '0 0 9px ' + (k === 'over' ? 'rgba(242,180,92,.75)' : 'rgba(23,162,230,.7)')
+      };
+    };
+    // the figure LEAVES rather than going stale in place, so its whole wrapper goes
+    const figWrap = function (k) {
+      return ST[k].bpm
+        ? { display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }
+        : { display: 'none' };
+    };
+    const figS = function (k, big) {
+      return {
+        fontFamily: "'Outfit',sans-serif", fontWeight: 200, fontSize: big ? 46 : 40,
+        letterSpacing: '-.035em', lineHeight: .92, color: ST[k].ink,
+        fontVariantNumeric: 'tabular-nums'
+      };
+    };
+    const unitS = function (k) {
+      return { fontSize: 13, fontWeight: 600, color: ST[k].ink, letterSpacing: '.01em' };
+    };
+    const zoneS = function (k) {
+      return {
+        fontSize: 12, fontWeight: 600, flex: 'none', whiteSpace: 'nowrap',
+        color: k === 'stale' ? OFF : (k === 'over' ? AMB : '#C6CEC9')
+      };
+    };
+    // a POSITION, not a progress bar: five zones, the one you are in is lit, and it
+    // never animates between them
+    const seg = function (k) {
+      const s = ST[k], out = [];
+      for (let i = 0; i < 5; i++) {
+        out.push({
+          display: 'block', flex: 1, height: 4, borderRadius: 2,
+          background: i === s.z ? s.ink : 'rgba(255,255,255,.12)'
+        });
+      }
+      return out;
+    };
+    const compS = function (k) {
+      return ST[k].bpm
+        ? {
+            fontFamily: "'Outfit',sans-serif", fontWeight: 400, fontSize: 13.5,
+            letterSpacing: '-.02em', color: ST[k].ink, flex: 'none',
+            fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'
+          }
+        : { display: 'none' };
+    };
+    const mk = function (k, big) {
+      const s = ST[k];
+      return {
+        cap: s.cap, note: s.note, bpm: s.bpm, zone: s.zone, status: s.status,
+        dot: dot(k), figWrap: figWrap(k), figS: figS(k, big), unitS: unitS(k),
+        zoneS: zoneS(k), seg: seg(k), compS: compS(k)
+      };
+    };
+
+    // three faces, not four: resting and working are the same answer to the only
+    // question this slot can ask
+    const MIN = [
+      { k: 'reading', cap: 'READING · RESTING OR WORKING', ink: A, fill: true },
+      { k: 'over', cap: 'OVER THE CEILING', ink: AMB, fill: true },
+      { k: 'stale', cap: 'NO READING', ink: OFF, fill: false }
+    ].filter(function (m) { return m.k !== 'over' || ceiling; });
+
+    return {
+      sheet: { display: 'flex', flexDirection: 'column', gap: 0, padding: '52px 48px 110px', '--wp': wp },
+      rules: [
+        { k: 'Stamp the reading, never imply a stream' },
+        { k: 'No trace — a line it cannot refresh is an invention' },
+        { k: 'The figure leaves rather than going stale' },
+        { k: 'One amber, gated on a setting the wearer turned on' }
+      ],
+
+      lock: KEYS.map(function (k) { return mk(k, true); }),
+      compact: KEYS.map(function (k) { return mk(k, false); }),
+      expanded: KEYS.map(function (k) { return mk(k, false); }),
+      minimal: MIN.map(function (m) {
+        return {
+          cap: m.cap,
+          slot: {
+            width: 26, height: 26, flex: 'none', borderRadius: '50%', boxSizing: 'border-box',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: m.fill ? m.ink : 'transparent',
+            border: m.fill ? 'none' : '2px solid ' + m.ink,
+            opacity: m.fill ? 1 : .75
+          },
+          inner: m.fill ? { display: 'none' } : { width: 9, height: 2.5, borderRadius: 2, background: m.ink }
+        };
+      }),
+
+      row: { display: 'flex', gap: 34, alignItems: 'flex-start', padding: '30px 0', borderTop: '1px solid rgba(23,21,15,.11)' },
+      col: { width: 268, flex: 'none', display: 'flex', flexDirection: 'column', gap: 7 },
+      tiles: { display: 'flex', gap: 22, alignItems: 'flex-start', flexWrap: 'wrap', maxWidth: 840 },
+      stack: { display: 'flex', flexDirection: 'column', gap: 9, maxWidth: 400 },
+      pad: { padding: 18, borderRadius: 34, background: 'var(--wp,linear-gradient(152deg,#2C332E 0%,#16120E 58%,#1E2622 100%))' },
+      padSm: { padding: '20px 18px', borderRadius: 30, background: 'var(--wp,linear-gradient(152deg,#2C332E 0%,#16120E 58%,#1E2622 100%))', display: 'flex', justifyContent: 'center' },
+      card: { width: 364, boxSizing: 'border-box', borderRadius: 22, padding: '15px 16px 16px', background: 'rgba(20,24,23,.9)', border: '.5px solid rgba(255,255,255,.1)', display: 'flex', flexDirection: 'column', gap: 11 },
+      pill: { width: 236, height: 37, boxSizing: 'border-box', borderRadius: 19, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' },
+      island: { width: 364, height: 172, boxSizing: 'border-box', borderRadius: 44, background: '#000', padding: '16px 22px 20px', display: 'flex', flexDirection: 'column', color: '#EDF1EF' },
+
+      cap: { font: '600 9.5px ui-monospace,Menlo,monospace', letterSpacing: '.06em', color: 'rgba(23,21,15,.5)' },
+      tnote: { fontSize: 11.5, lineHeight: 1.5, color: '#6B6558', maxWidth: 364, textWrap: 'pretty' },
+      ix: { font: '600 9.5px ui-monospace,Menlo,monospace', color: '#17a2e6', letterSpacing: '.06em' },
+      nm: { fontFamily: "'Outfit',sans-serif", fontWeight: 500, fontSize: 17, color: '#17150F', letterSpacing: '-.015em' },
+      meta: { font: '600 10px ui-monospace,Menlo,monospace', color: 'rgba(23,21,15,.5)', paddingBottom: 3 },
+      body: { fontSize: 12.5, lineHeight: 1.62, color: '#6B6558', textWrap: 'pretty' }
+    };
+  }
+}
+</script>
+</body>
+</html>

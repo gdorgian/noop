@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#E9E5DD"/><g stroke="#E08A9B" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M30 46v14a5 5 0 0 0 5 5h30a5 5 0 0 0 5-5V46"/><path d="M50 27v27M41 45l9 9 9-9"/></g></svg></template>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#0B6FA8;text-decoration:none}a:hover{color:#084F78}
+</style>
+</helmet>
+
+<div style="padding:38px 40px 46px;display:flex;flex-direction:column;gap:30px;background:#E9E5DD;box-sizing:border-box;min-width:1200px">
+
+  <div style="display:flex;flex-direction:column;gap:9px;max-width:52em">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:600;padding:3px 7px;border-radius:4px;background:#1B1F1E;color:#E9E5DD">Part 1</span>
+      <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">plumbing/data &#183; the blocker</span>
+    </div>
+    <div style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:300;letter-spacing:-.03em;line-height:1.1;color:#151917">Two doors, one surface</div>
+    <div style="font-size:14.5px;line-height:1.6;color:#3E4644;text-wrap:pretty">Import and backup are the same two formats read in opposite directions, so they share <code style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:#DED9CF;padding:1px 5px;border-radius:3px">plumbing/data</code>. Because <code style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:#DED9CF;padding:1px 5px;border-radius:3px">detectAndImport</code> works out what you handed it by JSON key shape and filename, the way in is <strong style="font-weight:600;color:#151917">one drop target</strong> &#8212; not twelve rows. The list of twelve is a reference, and it lives one tap down.</div>
+    <div style="display:flex;gap:22px;margin-top:4px;font-size:12.5px;color:#5E6663;flex-wrap:wrap">
+      <span><strong style="color:#151917;font-weight:600">Blush</strong> &#8212; the hue <code style="font-family:ui-monospace,Menlo,monospace;font-size:12px">plumbing/data</code> already carries</span>
+      <span><strong style="color:#151917;font-weight:600">Amber earns its keep</strong> &#8212; a stale backup and a rejected file are the reserved case</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap">
+
+    <div style="display:flex;flex-direction:column;gap:11px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="width:9px;height:9px;border-radius:50%;background:#E08A9B;flex:none"></span>
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">1 &#183; The door in</span>
+      </div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ yes }}" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+          <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:470px;height:430px;border-radius:50%;background:radial-gradient(circle,rgba(224,138,155,.15),rgba(224,138,155,0) 68%);pointer-events:none"></div>
+
+          <div style="position:relative;padding:58px 18px 0;display:flex;align-items:center;gap:12px">
+            <span style="width:30px;height:30px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center"><span style="{{ icoBack }}"></span></span>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:13.5px;color:#939C97">Your data</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">Bring your history in</span>
+            </div>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0">
+            <div style="border-radius:28px;border:1px dashed rgba(224,138,155,.34);background:rgba(224,138,155,.05);padding:24px 20px 20px;display:flex;flex-direction:column;align-items:center;gap:12px">
+              <span style="width:46px;height:46px;border-radius:50%;flex:none;background:rgba(224,138,155,.13);border:.5px solid rgba(224,138,155,.3);display:flex;align-items:center;justify-content:center"><span style="{{ icoInbox }}"></span></span>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+                <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.02em;text-align:center">Hand it one file</span>
+                <span style="font-size:12.5px;line-height:1.5;color:#939C97;text-align:center;text-wrap:pretty;max-width:19em">A zip, a folder, or a single file. Noop reads it and works out what it is &#8212; you don&#8217;t pick a brand.</span>
+              </div>
+              <div style="width:100%;height:46px;border-radius:16px;background:rgba(224,138,155,.92);display:flex;align-items:center;justify-content:center;margin-top:2px">
+                <span style="font-size:13.5px;font-weight:600;color:#201013">Choose a file or folder</span>
+              </div>
+              <span style="font-size:11px;color:#7F8A85;text-align:center">Sharing to Noop from Files or Mail works too</span>
+            </div>
+          </div>
+
+          <div style="position:relative;padding:18px 18px 0;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">Stored on this phone</span>
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;align-items:flex-end;justify-content:space-between;gap:10px">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;align-items:baseline;gap:7px">
+                  <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:200;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums">1,284</span>
+                  <span style="font-size:12.5px;color:#939C97">days</span>
+                  <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:200;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;padding-left:4px">1,190</span>
+                  <span style="font-size:12.5px;color:#939C97">sleeps</span>
+                </div>
+                <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums">14 Feb 2023 &#8212; today</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="position:relative;padding:18px 18px 0;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">What it can read</span>
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+              <sc-for list="{{ reads }}" as="r" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:11px;padding:13px 0;border-bottom:{{ r.border }}">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13px;color:#C6CEC9">{{ r.k }}</span>
+                    <span style="font-size:11px;color:#7F8A85">{{ r.v }}</span>
+                  </div>
+                  <span style="{{ icoChev }}"></span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">A renamed or re-zipped export still routes correctly &#8212; it is read by content, not by filename.</span>
+          </div>
+
+          <div style="position:relative;padding:16px 18px 0;display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11.5px;line-height:1.55;color:#8B958F;text-wrap:pretty">Your scores stay yours. Noop recomputes Rest, Charge and Effort from the raw heart rate, variability and sleep it finds. A brand&#8217;s own score is kept for reference and never shown as one of yours &#8212; so your numbers here will not match your old app&#8217;s.</span>
+          </div>
+
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="width:9px;height:9px;border-radius:50%;background:#E08A9B;flex:none"></span>
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">2 &#183; Reading</span>
+      </div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ yes }}" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+          <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:470px;height:430px;border-radius:50%;background:radial-gradient(circle,rgba(224,138,155,.15),rgba(224,138,155,0) 68%);pointer-events:none"></div>
+
+          <div style="position:relative;padding:58px 18px 0;display:flex;flex-direction:column;gap:3px">
+            <span style="font-size:13.5px;color:#939C97">Reading</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">Apple Health</span>
+          </div>
+
+          <div style="position:relative;padding:22px 18px 0;display:flex;flex-direction:column;gap:13px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-family:'Outfit',sans-serif;font-size:44px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums">41</span>
+                <span style="font-size:15px;color:#939C97">%</span>
+              </div>
+              <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums;font-family:ui-monospace,Menlo,monospace">export.xml &#183; 2.4 GB</span>
+            </div>
+            <div style="height:12px;border-radius:6px;background:rgba(255,255,255,.06);overflow:hidden">
+              <div style="width:41%;height:100%;border-radius:6px;background:linear-gradient(90deg,rgba(224,138,155,.45),#E08A9B)"></div>
+            </div>
+            <span style="font-size:12.5px;color:#939C97;line-height:1.5;text-wrap:pretty">Streaming it a piece at a time and aggregating as it goes, so a file this size never has to fit in memory.</span>
+          </div>
+
+          <div style="position:relative;padding:22px 18px 0;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">Found so far</span>
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+              <sc-for list="{{ progressRows }}" as="p" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:{{ p.border }}">
+                  <span style="flex:1;font-size:13px;color:#C6CEC9">{{ p.k }}</span>
+                  <span style="font-size:12.5px;font-weight:500;font-variant-numeric:tabular-nums;color:{{ p.valColor }}">{{ p.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0;display:flex;flex-direction:column;gap:10px">
+            <div style="height:46px;border-radius:16px;border:.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center">
+              <span style="font-size:13.5px;font-weight:500;color:#C6CEC9">Stop</span>
+            </div>
+            <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">Stopping keeps what has been written already. Nothing here leaves the phone &#8212; there is no server to send it to.</span>
+          </div>
+
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="width:9px;height:9px;border-radius:50%;background:#E08A9B;flex:none"></span>
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">3 &#183; What was written</span>
+      </div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ yes }}" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+          <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:470px;height:430px;border-radius:50%;background:radial-gradient(circle,rgba(224,138,155,.16),rgba(224,138,155,0) 68%);pointer-events:none"></div>
+
+          <div style="position:relative;padding:58px 18px 0;display:flex;flex-direction:column;gap:3px">
+            <span style="font-size:13.5px;color:#939C97">Imported &#183; WHOOP 5.0 export</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">Seven years, in</span>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;align-items:baseline;gap:8px">
+                  <span style="font-family:'Outfit',sans-serif;font-size:44px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums">2,547</span>
+                  <span style="font-size:14px;color:#939C97">days</span>
+                </div>
+                <span style="font-size:12px;color:#8B958F;font-variant-numeric:tabular-nums">12 Feb 2019 &#8212; 28 Aug 2026</span>
+              </div>
+              <span style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(224,138,155,.13);border:.5px solid rgba(224,138,155,.3);display:flex;align-items:center;justify-content:center;margin-bottom:2px"><span style="{{ icoCheck }}"></span></span>
+            </div>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">By category</span>
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+              <sc-for list="{{ resultRows }}" as="r" hint-placeholder-count="6">
+                <div style="display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:{{ r.border }}">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13px;color:{{ r.keyColor }}">{{ r.k }}</span>
+                    <span style="font-size:11px;color:#7F8A85">{{ r.note }}</span>
+                  </div>
+                  <span style="font-size:12.5px;font-weight:500;font-variant-numeric:tabular-nums;color:{{ r.valColor }}">{{ r.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">Only what the export carried was written. What it did not carry stays blank rather than becoming a zero &#8212; a missing night and a bad night should never look alike.</span>
+          </div>
+
+          <div style="position:relative;padding:18px 18px 0;display:flex;flex-direction:column;gap:10px">
+            <div style="height:46px;border-radius:16px;background:rgba(224,138,155,.92);display:flex;align-items:center;justify-content:center">
+              <span style="font-size:13.5px;font-weight:600;color:#201013">Done</span>
+            </div>
+            <div style="height:46px;border-radius:16px;border:.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center">
+              <span style="font-size:13.5px;font-weight:500;color:#C6CEC9">Import something else</span>
+            </div>
+            <span style="font-size:11.5px;line-height:1.55;color:#8B958F;text-wrap:pretty">Rest and Charge are being recomputed from what came in. Your first fourteen days will carry a <em style="font-family:'Instrument Serif',serif;font-size:14px">building</em> chip while the baselines catch up.</span>
+          </div>
+
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="width:9px;height:9px;border-radius:50%;background:#F2B45C;flex:none"></span>
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">4 &#183; The wrong file</span>
+      </div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ yes }}" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+          <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:470px;height:430px;border-radius:50%;background:radial-gradient(circle,rgba(242,180,92,.13),rgba(242,180,92,0) 68%);pointer-events:none"></div>
+
+          <div style="position:relative;padding:58px 18px 0;display:flex;flex-direction:column;gap:3px">
+            <span style="font-size:13.5px;color:#939C97">Nothing was written</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">This one is the raw log</span>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0">
+            <div style="background:rgba(242,180,92,.08);border:.5px solid rgba(242,180,92,.26);border-radius:24px;padding:16px 17px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="width:30px;height:30px;flex:none;border-radius:50%;background:rgba(242,180,92,.14);display:flex;align-items:center;justify-content:center"><span style="{{ icoAlert }}"></span></span>
+                <span style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#F2B45C;word-break:break-all">Oura/heartrate.csv</span>
+              </div>
+              <span style="font-size:13px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">That is Oura&#8217;s raw heart-rate log &#8212; one row per reading, with no daily summary Noop can attach to a date. There is nothing wrong with the file; it is the wrong one of the set.</span>
+            </div>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">Two ways out</span>
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+              <sc-for list="{{ fixes }}" as="f" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:11px;padding:14px 0;border-bottom:{{ f.border }}">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:13px;color:#C6CEC9">{{ f.k }}</span>
+                    <span style="font-size:11.5px;line-height:1.45;color:#8B958F;text-wrap:pretty">{{ f.v }}</span>
+                  </div>
+                  <span style="{{ icoChev }}"></span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">The JSON is the better of the two: one file, every category, and Noop can tell it from Fitbit&#8217;s and Garmin&#8217;s by its keys.</span>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0;display:flex;flex-direction:column;gap:10px">
+            <div style="height:46px;border-radius:16px;background:rgba(224,138,155,.92);display:flex;align-items:center;justify-content:center">
+              <span style="font-size:13.5px;font-weight:600;color:#201013">Choose another file</span>
+            </div>
+            <span style="font-size:11.5px;line-height:1.55;color:#8B958F;text-wrap:pretty">Your 1,284 stored days are untouched. A rejected file changes nothing &#8212; it is read, judged and dropped.</span>
+          </div>
+
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="width:9px;height:9px;border-radius:50%;background:#E08A9B;flex:none"></span>
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">5 &#183; The door out</span>
+      </div>
+      <div style="border-radius:48px;overflow:hidden">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ yes }}" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+          <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:470px;height:430px;border-radius:50%;background:radial-gradient(circle,rgba(224,138,155,.15),rgba(224,138,155,0) 68%);pointer-events:none"></div>
+
+          <div style="position:relative;padding:58px 18px 0;display:flex;align-items:center;gap:12px">
+            <span style="width:30px;height:30px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center"><span style="{{ icoBack }}"></span></span>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:13.5px;color:#939C97">Your data</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">Backup and sync</span>
+            </div>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0">
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px 17px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">Last snapshot</span>
+                  <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:300;letter-spacing:-.02em;line-height:1.2">2 days ago</span>
+                  <span style="font-size:11.5px;color:#7F8A85">iCloud Drive &#183; 214 MB</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;flex:none;padding:5px 10px 5px 9px;border-radius:10px;background:rgba(224,138,155,.12);border:.5px solid rgba(224,138,155,.3)">
+                  <span style="width:5px;height:5px;border-radius:50%;background:rgba(224,138,155,.75);flex:none"></span>
+                  <span style="font-size:10.5px;letter-spacing:.06em;font-weight:600;color:#F6D3DA">Weekly</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding-top:2px;border-top:.5px solid rgba(255,255,255,.06)">
+                <span style="{{ icoClock }}"></span>
+                <span style="font-size:11.5px;color:#8B958F;padding-top:10px;margin-top:-10px">Next on Sunday, keeping the last 8</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">Take one now</span>
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 16px">
+              <sc-for list="{{ exports }}" as="e" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:11px;padding:14px 0;border-bottom:{{ e.border }}">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:13px;color:#C6CEC9">{{ e.k }}</span>
+                    <span style="font-size:11.5px;line-height:1.45;color:#8B958F;text-wrap:pretty">{{ e.v }}</span>
+                  </div>
+                  <span style="{{ icoUpload }}"></span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">In the CSV, anything Noop worked out itself is tagged <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#8B958F">noop (APPROXIMATE)</span> and skipped on the way back in, and Apple Health rows are left out entirely so they cannot be mis-attributed to a strap.</span>
+          </div>
+
+          <div style="position:relative;padding:20px 18px 0;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">On a new phone</span>
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:14px 16px;display:flex;align-items:center;gap:11px">
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13px;color:#C6CEC9">Restore from a .noopbak</span>
+                <span style="font-size:11.5px;line-height:1.45;color:#8B958F;text-wrap:pretty">Replaces everything on this phone. It will tell you which build wrote the file first.</span>
+              </div>
+              <span style="{{ icoChev }}"></span>
+            </div>
+            <span style="font-size:11.5px;line-height:1.55;color:#8B958F;text-wrap:pretty">There is no account and no server, so this file is the only way your history reaches another phone. That is the whole reason this screen ships with Act 5.</span>
+          </div>
+
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:22px">
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">One tap down &#183; the twelve</span>
+        <div style="background:#0A0C0B;border-radius:24px;padding:18px 16px;display:flex;flex-direction:column;gap:16px">
+          <sc-for list="{{ catalog }}" as="g" hint-placeholder-count="2">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;color:#8B958F">{{ g.name }}</span>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <sc-for list="{{ g.items }}" as="i" hint-placeholder-count="6">
+                  <div style="display:flex;align-items:baseline;gap:9px">
+                    <span style="width:5px;height:5px;border-radius:50%;flex:none;background:rgba(224,138,155,.6);margin-top:5px"></span>
+                    <div style="display:flex;flex-direction:column;gap:1px">
+                      <span style="font-size:11.5px;font-weight:600;color:#C6CEC9">{{ i.k }}</span>
+                      <span style="font-size:10.5px;line-height:1.45;color:#8B958F;text-wrap:pretty">{{ i.v }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <span style="font-size:10.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty;padding-top:3px;border-top:.5px solid rgba(255,255,255,.06)">Oura, Fitbit and Garmin share one importer and are told apart by JSON key shape. That is why the phone screen shows a summary and this list sits behind a chevron: it is documentation, not a control.</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">What the copy has to carry</span>
+        <div style="background:#0A0C0B;border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:13px">
+          <sc-for list="{{ guarantees }}" as="g" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:11.5px;font-weight:600;color:#C6CEC9">{{ g.k }}</span>
+              <span style="font-size:10.5px;line-height:1.5;color:#8B958F;text-wrap:pretty">{{ g.v }}</span>
+            </div>
+          </sc-for>
+          <span style="font-size:10.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty;padding-top:3px;border-top:.5px solid rgba(255,255,255,.06)">All three are already true of the code. The screen&#8217;s job is to say them out loud, at the moment they matter.</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">Where amber is allowed</span>
+        <div style="background:#0A0C0B;border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:11px">
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <span style="width:9px;height:9px;border-radius:50%;flex:none;margin-top:4px;background:#F2B45C"></span>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:11.5px;font-weight:600;color:#C6CEC9">A rejected file, and a stale backup</span>
+              <span style="font-size:10.5px;line-height:1.45;color:#8B958F;text-wrap:pretty">Both want something from you, which is exactly the reserved meaning. Screen 4 is amber; the <em style="font-family:'Instrument Serif',serif;font-size:13px">Weekly</em> chip on screen 5 turns amber only when a scheduled snapshot has been missed.</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <span style="width:9px;height:9px;border-radius:50%;flex:none;margin-top:4px;background:#E08A9B"></span>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:11.5px;font-weight:600;color:#C6CEC9">Everything else is blush</span>
+              <span style="font-size:10.5px;line-height:1.45;color:#8B958F;text-wrap:pretty">Progress and success are not severity states, the same argument the confidence chip settles.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:2560,&quot;height&quot;:1180}}">
+const GLYPH = {
+  back: 'M15 5l-7 7 7 7',
+  chev: 'M9 5l7 7-7 7',
+  inbox: 'M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4M12 3.5v9.5M8 9.5l4 3.5 4-3.5',
+  upload: 'M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3M12 13.5V4M8 7.5l4-3.5 4 3.5',
+  alert: 'M12 9v4.5M12 17h.01M10.3 4.2 2.7 17.2A1.9 1.9 0 0 0 4.4 20h15.2a1.9 1.9 0 0 0 1.7-2.8L13.7 4.2a1.9 1.9 0 0 0-3.4 0z',
+  check: 'M5 12.5 9.5 17 19 7',
+  clock: 'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 1.8'
+};
+const mask = d => 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+// The list-card primitive divides between rows, never after the last one
+// (Noop Act 1 - The Night.dc.html). A border hard-coded in an <sc-for> row
+// template hits every iteration, so it travels in the row data.
+const rows = list => list.map((r, i) => Object.assign({}, r, {
+  border: i === list.length - 1 ? 'none' : '.5px solid rgba(255,255,255,.06)'
+}));
+const ico = (key, size, color) => {
+  const u = mask(GLYPH[key]);
+  return {
+    width: size, height: size, flex: 'none', display: 'block', background: color,
+    WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+  };
+};
+
+class Component extends DCLogic {
+  renderVals() {
+    const DIM = '#7F8A85';
+    return {
+      yes: true,
+      icoBack: ico('back', 15, '#939C97'),
+      icoChev: ico('chev', 15, '#7F8A85'),
+      icoInbox: ico('inbox', 21, '#E08A9B'),
+      icoUpload: ico('upload', 17, 'rgba(224,138,155,.8)'),
+      icoAlert: ico('alert', 16, '#F2B45C'),
+      icoCheck: ico('check', 16, '#E08A9B'),
+      icoClock: ico('clock', 13, '#7F8A85'),
+      reads: rows([
+        { k: 'Wearable exports', v: 'WHOOP, Apple Health, Oura, Fitbit, Garmin, Mi Band' },
+        { k: 'Single files', v: 'Workouts, nutrition, lab markers, lifting' }
+      ]),
+      progressRows: rows([
+        { k: 'Sleeps', v: '1,904', valColor: '#EDF1EF' },
+        { k: 'Resting heart rate', v: '2,210 days', valColor: '#EDF1EF' },
+        { k: 'Variability', v: '1,860 nights', valColor: '#EDF1EF' },
+        { k: 'Workouts', v: 'just started', valColor: DIM }
+      ]),
+      resultRows: rows([
+        { k: 'Sleeps', note: 'with stages', v: '2,491', keyColor: '#C6CEC9', valColor: '#EDF1EF' },
+        { k: 'Cycles', note: 'day boundaries and strain', v: '2,540', keyColor: '#C6CEC9', valColor: '#EDF1EF' },
+        { k: 'Workouts', note: '', v: '1,208', keyColor: '#C6CEC9', valColor: '#EDF1EF' },
+        { k: 'Resting heart rate', note: '', v: '2,547 days', keyColor: '#C6CEC9', valColor: '#EDF1EF' },
+        { k: 'Variability', note: '', v: '2,533 nights', keyColor: '#C6CEC9', valColor: '#EDF1EF' },
+        { k: 'Skin temperature', note: 'not in a 5.0 export', v: '—', keyColor: '#8B958F', valColor: DIM },
+        { k: 'Blood oxygen', note: 'not in a 5.0 export', v: '—', keyColor: '#8B958F', valColor: DIM }
+      ]),
+      fixes: rows([
+        { k: 'Export as JSON instead', v: 'Oura app → Account → Export Data. One file, every category.' },
+        { k: 'Or hand it the daily CSVs', v: 'sleep, readiness or activity — the summaries, not the logs.' }
+      ]),
+      exports: rows([
+        { k: 'Everything, exactly · .noopbak', v: 'The whole database, your settings, and which build wrote it. The phone-to-phone path.' },
+        { k: 'A readable copy · WHOOP CSV', v: 'Four CSVs in a zip. Reads back into Noop, and into the Android build.' }
+      ]),
+      catalog: [
+        { name: 'Wearables · six', items: [
+          { k: 'WHOOP', v: '.zip or folder — the four CSVs; 4.0, 5.0 and MG. Biomarker export too.' },
+          { k: 'Apple Health', v: 'export.zip, export.xml or a folder. Streamed and aggregated on-device.' },
+          { k: 'Oura', v: 'Account → Export Data JSON, or the per-category daily CSVs.' },
+          { k: 'Fitbit', v: 'Google Takeout → Fitbit → JSON.' },
+          { k: 'Garmin', v: 'Connect → Export Your Data, the GDPR .zip.' },
+          { k: 'Xiaomi / Mi Band', v: 'The Mi Fitness sandbox folder, a .zip of it, or the bare user_id.db.' }
+        ] },
+        { name: 'Files · six', items: [
+          { k: 'A single workout', v: 'GPX, TCX or FIT.' },
+          { k: 'Nutrition', v: 'Daily CSV from Cronometer or MacroFactor.' },
+          { k: 'Lab markers', v: 'CSV.' },
+          { k: 'A lab report', v: 'As text.' },
+          { k: 'Lifting', v: 'A strength-training log.' },
+          { k: 'The strap', v: 'Live over Bluetooth — the one that is not a file.' }
+        ] }
+      ],
+      guarantees: [
+        { k: 'An imported score never becomes your score', v: 'A brand\u2019s own readiness or sleep score is stored under a reference key and never surfaced as Charge, Effort or Rest. Said on screen 1, because a migrating user\u2019s first question is why their old numbers moved.' },
+        { k: 'Only what the export carries gets written', v: 'Unknown stays nil, not zero. So the result is a count per category with visible blanks, never a single success tick.' },
+        { k: 'The errors are specific', v: 'Named file, what it actually is, and the corrective action. Screen 4 is the worked example the importer already produces — it needs room for a sentence, not an icon and a retry.' }
+      ]
+    };
+  }
+}
+
+</script>
+</body>
+</html>

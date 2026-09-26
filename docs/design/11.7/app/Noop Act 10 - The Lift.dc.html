@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes barDot{0%{opacity:.45}50%{opacity:1}100%{opacity:.45}}
+@keyframes sheetUp{from{transform:translateY(102%)}to{transform:translateY(0)}}
+@keyframes dialogIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.scr{animation:fadeUp .3s cubic-bezier(.22,.61,.36,1) both}
+.hb::-webkit-scrollbar{width:0;height:0}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="display:flex;gap:60px;align-items:flex-start;padding:52px 48px 100px">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:16px">
+  <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">ACT 10</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">The lift — working prototype</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">a program line is a name, and that is the normal case</span>
+  </div>
+  </sc-if>
+
+  <div style="border-radius:48px;overflow:hidden;flex:none">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+    <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+      <div style="{{ ambient }}"></div>
+
+      <div class="hb" style="position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain">
+
+        <sc-if value="{{ isLive }}" hint-placeholder-val="{{ true }}">
+        <div class="scr" data-screen-label="lift-live" style="min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;padding-bottom:26px">
+
+          <div style="padding:54px 20px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="{{ clockStyle }}">{{ elapsed }}</span>
+              <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#7F8A85;font-weight:600">{{ clockLabel }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">
+              <span style="font-size:13px;color:#C6CEC9">{{ progName }}</span>
+              <span style="font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ exCounter }}</span>
+            </div>
+          </div>
+
+          <div style="padding:18px 20px 0;display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Outfit',sans-serif;font-size:29px;font-weight:300;letter-spacing:-.03em;line-height:1.08;text-wrap:pretty">{{ exName }}</span>
+            <span style="font-size:12px;color:#7F8A85">{{ exEquip }}</span>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:9px">
+
+            <div style="{{ reasonCard }}">
+              <span style="font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#8FD3F5;font-weight:600">{{ reasonKicker }}</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#B7C3C9;text-wrap:pretty">{{ reasonText }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 14px 4px;display:flex;flex-direction:column">
+              <sc-for list="{{ setRows }}" as="r" hint-placeholder-count="5">
+                <div style="{{ r.row }}">
+                  <span style="{{ r.mark }}"></span>
+                  <span style="{{ r.idxStyle }}">{{ r.idx }}</span>
+                  <div style="flex:1;min-width:0;display:flex;align-items:baseline;gap:7px">
+                    <span style="{{ r.valStyle }}">{{ r.val }}</span>
+                    <span style="{{ r.chip }}">{{ r.chipText }}</span>
+                  </div>
+                  <span style="{{ r.restStyle }}">{{ r.restText }}</span>
+                </div>
+              </sc-for>
+              <span style="{{ clusterNote }}">{{ clusterText }}</span>
+            </div>
+
+            <div style="{{ padCard }}">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ padTitle }}</span>
+                <span style="{{ padHintStyle }}">{{ padHint }}</span>
+              </div>
+              <div style="display:flex;gap:9px">
+                <div style="flex:1.25;display:flex;flex-direction:column;gap:6px">
+                  <span style="font-size:10.5px;color:#7F8A85">{{ loadLabel }}</span>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div onClick="{{ loadDown }}" style="width:44px;height:48px;flex:none;border-radius:14px;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                      <span style="width:13px;height:1.6px;background:#C6CEC9;display:block"></span>
+                    </div>
+                    <div style="flex:1;height:48px;border-radius:14px;background:rgba(23,162,230,.1);border:.5px solid rgba(23,162,230,.3);display:flex;align-items:center;justify-content:center">
+                      <span style="{{ loadFieldStyle }}">{{ loadField }}</span>
+                    </div>
+                    <div onClick="{{ loadUp }}" style="width:44px;height:48px;flex:none;border-radius:14px;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                      <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:300;color:#C6CEC9;line-height:1">+</span>
+                    </div>
+                  </div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                  <span style="font-size:10.5px;color:#7F8A85">reps</span>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div onClick="{{ repDown }}" style="width:44px;height:48px;flex:none;border-radius:14px;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                      <span style="width:13px;height:1.6px;background:#C6CEC9;display:block"></span>
+                    </div>
+                    <div style="flex:1;height:48px;border-radius:14px;background:rgba(23,162,230,.1);border:.5px solid rgba(23,162,230,.3);display:flex;align-items:center;justify-content:center">
+                      <span style="{{ repFieldStyle }}">{{ repField }}</span>
+                    </div>
+                    <div onClick="{{ repUp }}" style="width:44px;height:48px;flex:none;border-radius:14px;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                      <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:300;color:#C6CEC9;line-height:1">+</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div onClick="{{ logSet }}" style="{{ logBtn }}">
+                <span style="{{ logLabel }}">{{ logText }}</span>
+              </div>
+              <div style="{{ tapHint }}">
+                <span style="{{ icoTap }}"></span>
+                <span style="flex:1;font-size:11.5px;line-height:1.5;color:#C6CEC9;text-wrap:pretty">Double-tap the strap to log this set and start the rest timer. You do not have to pick the phone up.</span>
+              </div>
+            </div>
+
+            <div style="{{ restCard }}">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ restTitle }}</span>
+              <span style="{{ restBig }}">{{ restLeft }}</span>
+              <span style="font-size:12.5px;line-height:1.55;color:#939C97;text-align:center;text-wrap:pretty">{{ restNext }}</span>
+              <div onClick="{{ skipRest }}" style="height:44px;border-radius:15px;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-size:13px;font-weight:600;color:#C6CEC9">Skip the rest of it</span>
+              </div>
+            </div>
+
+            <div onClick="{{ goNextEx }}" style="{{ nextCard }}">
+              <span style="{{ icoNext }}"></span>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ nextKicker }}</span>
+                <span style="font-size:13.5px;color:#EDF1EF">{{ nextName }}</span>
+              </div>
+              <span style="font-size:11.5px;color:#7F8A85;flex:none;font-variant-numeric:tabular-nums">{{ nextMeta }}</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:10px;padding-top:4px">
+              <div onClick="{{ togglePause }}" style="{{ pauseBtn }}">
+                <span style="{{ pauseIcon }}"></span>
+                <span style="{{ pauseLabel }}">{{ pauseText }}</span>
+              </div>
+              <div onClick="{{ finish }}" style="{{ finishBtn }}">
+                <span style="{{ finishLabel }}">{{ finishText }}</span>
+              </div>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">{{ liveFoot }}</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isLibrary }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" data-screen-label="lift-library" style="{{ libPad }}">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ backEffort }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Today’s session</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Programs</span>
+              <span style="font-size:13px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ libIntro }}</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ programs }}" as="p" hint-placeholder-count="3">
+                <div style="{{ p.card }}">
+                  <div onClick="{{ p.open }}" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer">
+                    <span style="{{ p.icon }}"></span>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                      <span style="font-size:15px;font-weight:600;color:#EDF1EF">{{ p.name }}</span>
+                      <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ p.meta }}</span>
+                    </div>
+                    <span style="{{ p.chip }}">{{ p.chipText }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div onClick="{{ p.start }}" style="{{ p.startBtn }}">
+                      <span style="{{ p.startLabel }}">{{ p.startText }}</span>
+                    </div>
+                    <div onClick="{{ p.open }}" style="height:44px;padding:0 16px;flex:none;border-radius:15px;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;cursor:pointer">
+                      <span style="font-size:13px;color:#C6CEC9">{{ p.openText }}</span>
+                    </div>
+                  </div>
+                  <span style="{{ p.lineStyle }}">{{ p.lineText }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="{{ emptyCard }}">
+              <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">Nothing here yet. A program is a list of lines you keep — write one, or bring your programs across from Hevy.</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <div onClick="{{ newProgram }}" style="display:flex;align-items:center;gap:13px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px;cursor:pointer">
+                <span style="{{ icoPlus }}"></span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">Write a program</span>
+                  <span style="font-size:11.5px;color:#7F8A85">a name is enough to start with</span>
+                </div>
+                <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+              </div>
+              <div onClick="{{ goImport }}" style="display:flex;align-items:center;gap:13px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px;cursor:pointer">
+                <span style="{{ icoFile }}"></span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">Bring sessions in from Hevy</span>
+                  <span style="font-size:11.5px;color:#7F8A85">adds what it reads, changes nothing you have</span>
+                </div>
+                <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+              </div>
+            </div>
+
+            <div style="{{ archCard }}">
+              <div onClick="{{ toggleArch }}" style="display:flex;align-items:center;gap:11px;cursor:pointer">
+                <span style="flex:1;font-size:12.5px;color:#8FD3F5">{{ archLabel }}</span>
+                <span style="{{ archChev }}"></span>
+              </div>
+              <div style="{{ archList }}">
+                <sc-for list="{{ archived }}" as="a" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-top:.5px solid rgba(255,255,255,.055);opacity:.38">
+                    <span style="{{ a.icon }}"></span>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                      <span style="font-size:13px;color:#EDF1EF">{{ a.name }}</span>
+                      <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ a.meta }}</span>
+                    </div>
+                    <span style="font-size:10.5px;font-weight:600;color:#8A938F">read-only</span>
+                  </div>
+                </sc-for>
+                <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;padding:11px 0 0;border-top:.5px solid rgba(255,255,255,.055);text-wrap:pretty">An archived program keeps every session you did on it. Restore it to change a line.</span>
+              </div>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Lifting is not a sixth tab. It lives under Today, the way a session does, and a program is something you keep rather than somewhere you go.</span>
+
+            <div style="display:flex;flex-direction:column;gap:6px;padding:4px 2px 0">
+              <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:#7F8A85;font-weight:600">Where the exercises come from</span>
+              <span style="font-size:11px;line-height:1.7;color:#939C97;text-wrap:pretty">Exercise data: ExerciseDB v1 via hasaneyldrm/exercises-dataset, MIT licence. Exercise media is not included and is not covered by that licence.</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isProgram }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" data-screen-label="lift-program" style="padding-bottom:40px">
+          <div style="padding:58px 18px 8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div onClick="{{ goLibrary }}" style="height:34px;padding:0 4px;display:flex;align-items:center;cursor:pointer">
+              <span style="font-size:13.5px;color:#8FD3F5">Programs</span>
+            </div>
+            <span style="{{ saveStyle }}">{{ saveText }}</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="{{ progTitleStyle }}">{{ progTitle }}</span>
+              <span style="font-size:12.5px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ progSub }}</span>
+            </div>
+
+            <div style="{{ roStrip }}">
+              <span style="{{ icoLock }}"></span>
+              <span style="flex:1;font-size:11.5px;line-height:1.5;color:#B7C3C9;text-wrap:pretty">Archived on 4 August, read-only. Restore it from Programs and every line becomes editable again.</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:4px 14px;display:flex;flex-direction:column">
+              <sc-for list="{{ lines }}" as="l" hint-placeholder-count="6">
+                <div onClick="{{ l.tap }}" style="{{ l.row }}">
+                  <span style="{{ l.grip }}"></span>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:13.5px;color:#EDF1EF">{{ l.name }}</span>
+                    <span style="{{ l.targetStyle }}">{{ l.targets }}</span>
+                  </div>
+                  <span style="{{ l.chev }}"></span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="{{ editorCard }}">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ editorTitle }}</span>
+                <span style="font-size:11px;color:#7F8A85">{{ editorMode }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ targets }}" as="t" hint-placeholder-count="6">
+                  <div style="{{ t.row }}">
+                    <span style="flex:1;font-size:13px;color:#EDF1EF">{{ t.k }}</span>
+                    <span style="{{ t.valStyle }}">{{ t.v }}</span>
+                    <span style="{{ t.clear }}"></span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;text-wrap:pretty">Every one of these is optional and most lines carry none of them. An unset target is not shown at all while you lift — no em-dash, no empty field to walk past.</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 6px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Six ways a set is measured</span>
+                <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">1,324 in the catalogue</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ modes }}" as="m" hint-placeholder-count="6">
+                  <div style="{{ m.row }}">
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                      <span style="font-size:12.5px;color:#EDF1EF">{{ m.k }}</span>
+                      <span style="font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ m.n }}</span>
+                    </div>
+                    <span style="font-family:'Outfit',sans-serif;font-size:15px;font-weight:400;color:#8FD3F5;font-variant-numeric:tabular-nums;flex:none">{{ m.eg }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 0 10px;text-wrap:pretty">The row is one control that changes shape, not six controls. Weights are held in kilograms and shown in the unit you already picked for the app — lifting does not get a second unit switch.</span>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Drag to reorder. Nothing here is a plan for the week — a program is a list you keep, and the day it is done is still a decision Act 3 makes with you.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" data-screen-label="lift-detail" style="{{ libPad }}">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ backEffort }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">{{ detailBack }}</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <span style="font-family:'Outfit',sans-serif;font-size:27px;font-weight:300;letter-spacing:-.028em">{{ dTitle }}</span>
+              <span style="font-size:13px;color:#939C97;font-variant-numeric:tabular-nums">{{ dWhen }}</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+              <sc-for list="{{ dTiles }}" as="t" hint-placeholder-count="4">
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:18px;padding:14px 15px;display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;align-items:baseline;gap:5px">
+                    <span style="{{ t.big }}">{{ t.v }}</span>
+                    <span style="font-size:10.5px;color:#6C7570">{{ t.unit }}</span>
+                  </div>
+                  <span style="font-size:11px;line-height:1.45;color:#7F8A85;text-wrap:pretty">{{ t.k }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <span style="{{ rpeNote }}">{{ rpeText }}</span>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 8px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">What you lifted</span>
+                <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ dWarmNote }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:15px">
+                <sc-for list="{{ dExercises }}" as="e" hint-placeholder-count="4">
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="display:flex;align-items:baseline;gap:8px">
+                      <span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;color:#EDF1EF">{{ e.name }}</span>
+                      <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums;flex:none">{{ e.meta }}</span>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px">
+                      <sc-for list="{{ e.sets }}" as="s" hint-placeholder-count="4">
+                        <span style="{{ s.pill }}">{{ s.t }}</span>
+                      </sc-for>
+                    </div>
+                    <span style="{{ e.noteStyle }}">{{ e.note }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div onClick="{{ goEdit }}" style="display:flex;align-items:center;gap:9px;padding:13px 2px 14px;border-top:.5px solid rgba(255,255,255,.06);cursor:pointer">
+                <span style="flex:1;font-size:12.5px;color:#8FD3F5">Correct something in this session</span>
+                <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+              </div>
+            </div>
+
+            <div onClick="{{ goMuscles }}" style="display:flex;align-items:center;gap:13px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px;cursor:pointer">
+              <span style="{{ icoBody }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">Which muscles this credited</span>
+                <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ musclesSub }}</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:22px;background:rgba(139,153,214,.08);border:.5px solid rgba(139,153,214,.2)">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="{{ icoMoon }}"></span>
+                <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">What it cost you</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ dCost }}" as="c" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                    <span style="flex:1;font-size:12.5px;line-height:1.5;color:#B7C3C9;text-wrap:pretty">{{ c.label }}</span>
+                    <span style="font-size:13px;font-weight:600;color:#EDF1EF;font-variant-numeric:tabular-nums;flex:none">{{ c.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.6;color:#939C97;text-wrap:pretty">Priced the way a ride is priced, in the same currency: minutes on tonight’s sleep need and load on the week. A lift is not a different kind of effort.</span>
+            </div>
+
+            <div style="{{ creditCard }}">
+              <span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:#7F8A85;font-weight:600">Where these exercises come from</span>
+              <span style="font-size:11px;line-height:1.7;color:#939C97;text-wrap:pretty">Exercise data: ExerciseDB v1 via hasaneyldrm/exercises-dataset, MIT licence. Exercise media is not included and is not covered by that licence.</span>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">{{ detailFoot }}</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" data-screen-label="lift-edit" style="padding-bottom:40px">
+          <div style="padding:58px 18px 8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div onClick="{{ goDetail }}" style="height:34px;padding:0 4px;display:flex;align-items:center;cursor:pointer">
+              <span style="font-size:13.5px;color:#8FD3F5">Cancel</span>
+            </div>
+            <span style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Correcting</span>
+            <div onClick="{{ commitEdit }}" style="height:34px;padding:0 4px;display:flex;align-items:center;cursor:pointer">
+              <span style="{{ commitStyle }}">{{ commitText }}</span>
+            </div>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:300;letter-spacing:-.028em">Upper A, Tuesday</span>
+              <span style="font-size:12.5px;line-height:1.55;color:#939C97;text-wrap:pretty">Change what you logged. What the strap measured during the session — your pulse, the minutes, the cost — is not touched by anything here.</span>
+            </div>
+
+            <div style="{{ committedCard }}">
+              <span style="{{ icoDone }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:13.5px;font-weight:600;color:#A8E0B0">Saved</span>
+                <span style="font-size:11.5px;line-height:1.5;color:#B7C3C9">Thirteen working sets, 4,540 kg. The session’s figures are recomputed from what is here now.</span>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:14px 16px 6px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Bench press</span>
+                <span style="{{ totalStyle }}">{{ totalText }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ editRows }}" as="r" hint-placeholder-count="5">
+                  <div style="{{ r.row }}">
+                    <span style="{{ r.idxStyle }}">{{ r.idx }}</span>
+                    <div style="flex:1;min-width:0;display:flex;align-items:center;gap:7px">
+                      <span style="{{ r.field }}">{{ r.load }}</span>
+                      <span style="{{ r.sep }}">×</span>
+                      <span style="{{ r.field }}">{{ r.reps }}</span>
+                      <span style="{{ r.chip }}">{{ r.chipText }}</span>
+                    </div>
+                    <span onClick="{{ r.act }}" style="{{ r.actStyle }}">{{ r.actText }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div onClick="{{ addSet }}" style="display:flex;align-items:center;gap:9px;padding:13px 0 14px;border-top:.5px solid rgba(255,255,255,.06);cursor:pointer">
+                <span style="{{ icoPlusSm }}"></span>
+                <span style="flex:1;font-size:12.5px;color:#8FD3F5">Add a set you forgot</span>
+              </div>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">A corrected session is the session. Noop keeps one record and this screen edits it — there is no second, truer copy kept somewhere you cannot see.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isImport }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" data-screen-label="lift-import" style="padding-bottom:40px">
+          <div style="padding:58px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goLibrary }}" style="height:34px;padding:0 4px;display:flex;align-items:center;cursor:pointer">
+              <span style="font-size:13.5px;color:#8FD3F5">Programs</span>
+            </div>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Bring your lifting across</span>
+              <span style="font-size:13px;line-height:1.6;color:#939C97;text-wrap:pretty">Import <strong style="font-weight:600;color:#C6CEC9">adds</strong> sessions. Nothing you already have is changed, replaced or removed, and running it twice does not double anything.</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ doors }}" as="d" hint-placeholder-count="2">
+                <div onClick="{{ d.tap }}" style="{{ d.card }}">
+                  <div style="display:flex;align-items:center;gap:13px">
+                    <span style="{{ d.icon }}"></span>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                      <span style="font-size:14.5px;font-weight:600;color:#EDF1EF">{{ d.name }}</span>
+                      <span style="font-size:11.5px;color:#7F8A85">{{ d.meta }}</span>
+                    </div>
+                    <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+                  </div>
+                  <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ d.note }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="{{ readingCard }}">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8FD3F5;font-weight:600">Reading the file</span>
+                <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ readCount }}</span>
+              </div>
+              <div style="height:6px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden">
+                <div style="{{ readBar }}"></div>
+              </div>
+              <span style="font-size:12px;line-height:1.55;color:#939C97;text-wrap:pretty">Reading does not write anything. Nothing is added until you have seen what it found.</span>
+            </div>
+
+            <div style="{{ failCard }}">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">{{ failTitle }}</span>
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <sc-for list="{{ failParts }}" as="f" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:flex-start;gap:10px">
+                    <span style="{{ f.dot }}"></span>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                      <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ f.k }}</span>
+                      <span style="font-size:12.5px;line-height:1.55;color:#B7C3C9;text-wrap:pretty">{{ f.t }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;gap:8px;padding-top:2px">
+                <div onClick="{{ retry }}" style="flex:1;height:46px;border-radius:15px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <span style="font-size:13.5px;font-weight:600;color:#C6CEC9">Pick another file</span>
+                </div>
+                <div onClick="{{ goLibrary }}" style="flex:1;height:46px;border-radius:15px;border:.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <span style="font-size:13.5px;color:#C6CEC9">Leave it</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:9px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Two things it does to your numbers</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#B7C3C9;text-wrap:pretty">Hevy counts warm-ups in a set count. Noop does not: <strong style="font-weight:600;color:#EDF1EF">warm-up sets fold away</strong> and are left out of every figure a session states, so an imported session usually reads two or three sets shorter than it did there.</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#B7C3C9;text-wrap:pretty">Exercise names are matched to Noop’s own catalogue where they match, and kept exactly as the file wrote them where they do not. Nothing is renamed for you.</span>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">The file stays where it is. Noop reads it, writes its own rows, and never modifies or deletes what you handed it.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isReview }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" data-screen-label="lift-review" style="padding-bottom:40px">
+          <div style="padding:58px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goImport }}" style="height:34px;padding:0 4px;display:flex;align-items:center;cursor:pointer">
+              <span style="font-size:13.5px;color:#8FD3F5">Import</span>
+            </div>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">{{ revTitle }}</span>
+              <span style="font-size:13px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ revIntro }}</span>
+            </div>
+
+            <div style="{{ revSummaryCard }}">
+              <sc-for list="{{ revFigures }}" as="f" hint-placeholder-count="4">
+                <div style="{{ f.row }}">
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13px;color:#EDF1EF">{{ f.k }}</span>
+                    <span style="{{ f.subStyle }}">{{ f.sub }}</span>
+                  </div>
+                  <span style="{{ f.vStyle }}">{{ f.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="{{ revRowsCard }}">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">The newest of them</span>
+                <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ revRowsNote }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ revRows }}" as="r" hint-placeholder-count="5">
+                  <div style="{{ r.row }}">
+                    <span style="width:52px;flex:none;font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ r.day }}</span>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                      <span style="font-size:13px;color:#EDF1EF">{{ r.name }}</span>
+                      <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ r.meta }}</span>
+                    </div>
+                    <span style="{{ r.chip }}">{{ r.chipText }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding-top:2px;text-wrap:pretty">There is nothing to tick here. The file carries whole sessions and no reference back to the row each set came from, so Noop cannot show you a line and honestly claim it is the line it read — it can only tell you what it made of the file.</span>
+            </div>
+
+            <div style="{{ revSkipCard }}">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">{{ revSkipTitle }}</span>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ revSkips }}" as="s" hint-placeholder-count="3">
+                  <div style="{{ s.row }}">
+                    <span style="flex:1;font-size:12.5px;line-height:1.5;color:#B7C3C9;text-wrap:pretty">{{ s.t }}</span>
+                    <span style="font-size:12.5px;font-weight:600;color:#EDF1EF;flex:none;font-variant-numeric:tabular-nums">{{ s.n }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ revSkipNote }}</span>
+            </div>
+
+            <div style="{{ revCommitWrap }}">
+              <div onClick="{{ commitReview }}" style="height:54px;border-radius:18px;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-size:15px;font-weight:600;color:#04121A">{{ revCommitText }}</span>
+              </div>
+              <div onClick="{{ goLibrary }}" style="height:46px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-size:13px;color:#7F8A85">Not now</span>
+              </div>
+            </div>
+
+            <div style="{{ revDoneCard }}">
+              <span style="{{ icoDone }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:14px;font-weight:600;color:#A8E0B0">{{ revDoneTitle }}</span>
+                <span style="font-size:12px;line-height:1.55;color:#B7C3C9;text-wrap:pretty">They are in your record from today, dated when they happened. Everything that reads your history — the week’s load, your muscles, the trends — has them now.</span>
+              </div>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">{{ revFoot }}</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isMuscles }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" data-screen-label="lift-muscles" style="{{ libPad }}">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goDetail }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Session</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Muscles</span>
+              <span style="font-size:13px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ musIntro }}</span>
+            </div>
+
+            <div style="{{ musUnitCard }}">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">How a set is credited</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#B7C3C9;text-wrap:pretty">A working set counts <strong style="font-weight:600;color:#EDF1EF">1.0</strong> to the muscle the exercise is built around and <strong style="font-weight:600;color:#EDF1EF">0.5</strong> to the ones it also uses. Stabilisers count nothing — they are written down, not credited. Warm-ups count nothing either.</span>
+            </div>
+
+            <div style="{{ musCalCard }}">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">{{ musCalTitle }}</span>
+                <span style="font-size:11px;font-weight:600;padding:4px 8px;border-radius:7px;color:#8FD3F5;background:rgba(23,162,230,.13);flex:none">{{ musCalChip }}</span>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:#B7C3C9;text-wrap:pretty">{{ musCalText }}</span>
+            </div>
+
+            <div style="{{ musTreeWrap }}">
+              <sc-for list="{{ regions }}" as="g" hint-placeholder-count="7">
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px 13px;display:flex;flex-direction:column;gap:11px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                    <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">{{ g.name }}</span>
+                    <span style="{{ g.totalStyle }}">{{ g.total }}</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:9px">
+                    <sc-for list="{{ g.muscles }}" as="m" hint-placeholder-count="4">
+                      <div style="{{ m.row }}">
+                        <span style="{{ m.nameStyle }}">{{ m.name }}</span>
+                        <div style="flex:1;min-width:34px;height:5px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden">
+                          <div style="{{ m.bar }}"></div>
+                        </div>
+                        <span style="{{ m.valStyle }}">{{ m.v }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <span style="{{ g.readStyle }}">{{ g.read }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="{{ musProvCard }}">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Where the mapping comes from</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#B7C3C9;text-wrap:pretty">{{ musProvText }}</span>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                <sc-for list="{{ musProvChips }}" as="c" hint-placeholder-count="3">
+                  <span style="{{ c.s }}">{{ c.t }}</span>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="{{ musAbsentCard }}">
+              <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">No lifting on record. This screen fills itself the first time you finish a session — there is nothing to set up and nothing to connect.</span>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#7F8A85;padding:0 2px;text-wrap:pretty">Seven regions and thirty-three muscles, which is what the catalogue actually knows. Credited sets are a count of work, not a target: there is no weekly figure to hit here and nothing on this screen goes red.</span>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <sc-if value="{{ isActivity }}" hint-placeholder-val="{{ false }}">
+      <div class="scr" data-screen-label="lock screen — the lift activity" style="min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;padding:0 14px 34px;background:linear-gradient(168deg,#0E1512 0%,#0A0C0B 54%,#101A20 100%)">
+        <div style="padding:64px 8px 0;display:flex;flex-direction:column;align-items:center;gap:1px">
+          <span style="font-size:15px;color:#C6CEC9">Thursday 18 September</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:84px;font-weight:200;letter-spacing:-.035em;line-height:1.02;color:#EDF1EF;font-variant-numeric:tabular-nums">18:42</span>
+        </div>
+
+        <div style="flex:1;min-height:40px"></div>
+
+        <div style="border-radius:22px;padding:15px 16px 16px;background:rgba(20,24,23,.9);border:.5px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:11px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="{{ acDot }}"></span>
+            <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#939C97;font-weight:600">Noop · Upper A</span>
+          </div>
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:14px">
+            <span style="flex:1;min-width:0;font-family:'Outfit',sans-serif;font-size:22px;font-weight:300;letter-spacing:-.02em;line-height:1.1;color:#EDF1EF">Bench press</span>
+            <span style="{{ acClock }}">{{ acTime }}</span>
+          </div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+            <span style="flex:1;min-width:0;font-size:12.5px;color:#C6CEC9">{{ acStatus }}</span>
+            <span style="{{ acDetailStyle }}">{{ acDetail }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px;padding-top:1px">
+            <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.12)">
+              <div style="{{ acFill }}"></div>
+            </div>
+            <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ acSets }}</span>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showBar }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;left:0;right:0;bottom:90px;padding:0 14px;pointer-events:none;z-index:7">
+        <div onClick="{{ goLive }}" style="{{ barCard }}">
+          <span style="{{ barDot }}"></span>
+          <span style="{{ barName }}">{{ barExercise }}</span>
+          <span style="{{ barClock }}">{{ barTime }}</span>
+          <span style="{{ barSet }}">{{ barSetText }}</span>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showTabs }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none;z-index:6">
+        <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5);pointer-events:auto">
+          <div onClick="{{ tabToday }}" style="flex:1.7;height:46px;border-radius:20px;background:#17A2E6;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer">
+            <span style="{{ icoTodayOn }}"></span>
+            <span style="font-size:12.5px;font-weight:600;color:#04121A">Today</span>
+          </div>
+          <div onClick="{{ tabTrends }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoTrends }}"></span>
+          </div>
+          <div onClick="{{ goLibrary }}" style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(23,162,230,.4)">
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;color:#04121A;line-height:1;margin-top:-2px">+</span>
+          </div>
+          <div onClick="{{ tabRest }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoRest }}"></span>
+          </div>
+          <div onClick="{{ tabYou }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoYou }}"></span>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isCollision }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:9;background:rgba(6,8,7,.66);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:26px">
+        <div style="animation:dialogIn .22s cubic-bezier(.22,.61,.36,1) both;width:100%;border-radius:26px;padding:20px 20px 16px;background:#171C1A;border:.5px solid rgba(255,255,255,.12);box-shadow:0 20px 60px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:13px">
+          <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:400;letter-spacing:-.022em;line-height:1.2">A session is already running</span>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ collParts }}" as="c" hint-placeholder-count="3">
+              <div style="display:flex;align-items:flex-start;gap:10px">
+                <span style="{{ c.dot }}"></span>
+                <span style="flex:1;font-size:12.5px;line-height:1.55;color:#B7C3C9;text-wrap:pretty">{{ c.t }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding-top:2px">
+            <div onClick="{{ goLive }}" style="height:48px;border-radius:16px;background:rgba(255,255,255,.07);border:.5px solid rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-size:14px;font-weight:600;color:#EDF1EF">Go to it</span>
+            </div>
+            <div onClick="{{ dismissColl }}" style="height:48px;border-radius:16px;border:.5px solid rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-size:14px;color:#C6CEC9">Not now</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+  </x-import>
+  </div>
+</div>
+
+<sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+<div style="width:430px;flex:none;padding-top:34px;display:flex;flex-direction:column;gap:30px">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:33px;line-height:1.16;letter-spacing:-.028em;color:#17150F;text-wrap:pretty">Eight screens, drawn around a program line that is nothing but a name.</h1>
+    <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;text-wrap:pretty">Act 10 hangs off Today, the way Act 3 does — lifting is an effort, not a place to browse. Every target on a line is optional and <strong style="font-weight:600;color:#17150F">most lines carry none</strong>, so the bare line is the default drawing here and the fully-targeted one is the variant. Switch <em style="font-family:'Instrument Serif',serif;font-style:italic">screen</em> and each screen’s <em style="font-family:'Instrument Serif',serif;font-style:italic">state</em> in the panel; the route id is under each title below. The ninth item in the picker is the <em style="font-family:'Instrument Serif',serif;font-style:italic">Lock Screen activity</em>, which is not a screen of the act.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0">
+    <div style="display:grid;grid-template-columns:82px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">W2 · 1</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">lift-live — the working screen</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Six states, and <strong style="font-weight:600;color:#17150F">bare</strong> is the one to judge it on: no targets, no prefilled numbers, no em-dashes standing in for six fields nobody set. Running shows the decorated case with the progression reason beside the exercise, because that sentence is the only reason the prefilled weight is not a mystery. Every control is 44 pt or more and the pad is one tap from the number keyboard. <strong style="font-weight:600;color:#17150F">last</strong> is the drop set expanding mid-session: one planned line became three rows and the screen grew.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:82px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">W2 · 2</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">lift-library — programs you keep</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">List, open, start, archive, and the two doors in. Archived programs are shown at 38 % and read-only rather than hidden — they still own their sessions. The <strong style="font-weight:600;color:#17150F">collision</strong> state is the refusal: a cardio session is running, so starting a lift is declined rather than silently ending it. Three parts, no red, no End button, and neither action is styled as the safe one.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:82px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">W2 · 3</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">lift-program — the editor, and the six modes</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Lines reorder by drag; a line with no targets reads <em style="font-family:'Instrument Serif',serif;font-style:italic">just the exercise</em> in quiet type rather than a row of blanks. The expanded editor shows all six optional targets with <em style="font-family:'Instrument Serif',serif;font-style:italic">not set</em> where they are unset. Underneath, the block engineering needs: <strong style="font-weight:600;color:#17150F">six measurement modes, one row</strong> — weight × reps, bodyweight reps, duration, weighted, assisted, reps only, with the catalogue counts and exactly how each renders.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:82px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">W2 · 4</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">lift-detail — read-only, and priced in Act 1’s currency</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Four figures, then every exercise with its sets as pills, warm-ups folded away with the count stated. <strong style="font-weight:600;color:#17150F">noRpe</strong> shows the absent case: an em-dash and a reason, never a zero. <strong style="font-weight:600;color:#17150F">noProgram</strong> is the session logged without one — it is not an error and reads as an ordinary Tuesday. The cost card is Act 3’s, unchanged: a lift is not a different kind of effort.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:82px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">W2 · 5</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">lift-edit — correcting it afterwards</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">A deleted set stays visible, struck through, with <em style="font-family:'Instrument Serif',serif;font-style:italic">undo</em> until you save; the working-set total above restates as you go so the figure and the rows can never disagree. <strong style="font-weight:600;color:#17150F">committed</strong> is green in place for two seconds, no toast. One line says the boundary: what you logged is editable, what the strap measured is not.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:82px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">W2 · 6</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">lift-import — file or key, and the word is <em style="font-family:'Instrument Serif',serif;font-style:italic">adds</em></span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Four states. Reading renders the card at final size with real counts rather than a spinner. <strong style="font-weight:600;color:#17150F">failed</strong> is a three-part refusal — what happened, why, what you can do instead — and not red. Nowhere on this screen or the next does the word sync, update or replace appear: import adds, and running it twice does not double anything.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:82px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">W2 · 7</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">lift-review — summary and commit, because the file cannot do better</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Your answer changed this screen. With no per-set provenance there is nothing honest to tick, so it states what it made of the file — sessions, span, matched and unmatched names, warm-ups folded — and says plainly why there are no checkboxes. <strong style="font-weight:600;color:#17150F">partial</strong> names every skipped session and its reason; <strong style="font-weight:600;color:#17150F">nothing</strong> is a refusal, not an empty list.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:82px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">W2 · 8</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">lift-muscles — credited sets, seven regions, thirty-three muscles</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Drawn on your projection: 1.0 primary, 0.5 secondary, stabilisers zero — so the unit is <strong style="font-weight:600;color:#17150F">credited sets</strong> and the screen says so at the top. Group headers come from the region derivation, not the parent chain, so there are no orphans and no invented parents. <strong style="font-weight:600;color:#17150F">calibrating</strong> withholds the figures and shows the session count instead, per rule 13; <strong style="font-weight:600;color:#17150F">absent</strong> is one sentence. Recovery reads in lavender, never amber — a worked muscle is not a warning.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:82px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#C4657A;letter-spacing:.06em;padding-top:3px">W2 · BAR</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">One bar, two contents</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Same 46 pt bar, same four slots in the same order. The middle two change: the exercise name replaces the workout name, the clock counts the <strong style="font-weight:600;color:#17150F">set or the rest</strong> rather than the session, and the set counter takes the heart rate’s place. Working is the running blue; <strong style="font-weight:600;color:#17150F">resting is neutral, not amber</strong> — rest is not a thing you must act on, and amber in this app means exactly that. The third state is drawn now too — <strong style="font-weight:600;color:#17150F">ready</strong>, where the rest has run out but the next set has not started. It is the state a drawing usually forgets, and the bar says <em style="font-family:'Instrument Serif',serif;font-style:italic">Ready</em> rather than holding a countdown at zero.</span>
+      </div>
+    </div>
+  </div>
+
+    <div style="display:grid;grid-template-columns:82px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11);border-bottom:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#C4657A;letter-spacing:.06em;padding-top:3px">W2 · LOCK</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The Lock Screen activity — chosen where it is read</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">You asked for the neutral value picked on the Lock Screen rather than on the sheet, so it is drawn there: one card, on a dark ground, at size. <strong style="font-weight:600;color:#17150F">Working #17A2E6. Resting #C6CEC9</strong> — the app's secondary ink, opaque, because a low-alpha white does not survive a wallpaper. One value per state, dot and figure together, which is the shape your one line already has. Slots read in the bar's order and the Lock Screen keeps the two fields the bar has no room for: the set's numbers and the session's progress. <strong style="font-weight:600;color:#17150F">noDetail</strong> is your empty case — neither reps nor weight known, so the slot is absent rather than blank.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">The four doors, and the tab</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">Act 10 lights <span style="color:#EDF1EF">Today</span> — your recommendation, taken. In: <span style="color:#EDF1EF">effort/session</span> → Swap → a lift; the <span style="color:#EDF1EF">+</span> sheet → Start a lift; today’s session card when it is a lift; and a <span style="color:#EDF1EF">plumbing/history</span> row with an identity. Route ids are prefixed — <span style="color:#EDF1EF">lift-live</span>, <span style="color:#EDF1EF">lift-library</span>, <span style="color:#EDF1EF">lift-program</span>, <span style="color:#EDF1EF">lift-detail</span>, <span style="color:#EDF1EF">lift-edit</span>, <span style="color:#EDF1EF">lift-import</span>, <span style="color:#EDF1EF">lift-review</span>, <span style="color:#EDF1EF">lift-muscles</span> — also taken, and they read the same way in QA as they do here. Your three shell choices stand exactly as you made them: Today lights, <span style="color:#EDF1EF">+</span> opens <span style="color:#EDF1EF">lift-library</span>, and the ambient stays aura blue.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Answered: the two values the widget needs</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">The Lock Screen activity is green through a set and amber through the rest. Green means <em style="font-family:'Instrument Serif',serif;font-style:italic">done, written</em> in this palette and amber means <em style="font-family:'Instrument Serif',serif;font-style:italic">something needs you</em>; a set in progress is neither. Both surfaces read aura blue while the set is worked and neutral while the clock runs down. The two values are <span style="color:#EDF1EF">#17A2E6</span> working and <span style="color:#EDF1EF">#C6CEC9</span> resting — one each, so the widget's one line stays one line. Move the palette into the shared package however suits you; the values are the decision, not the plumbing.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Not drawn, on purpose</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">No demo loop on the exercise: the catalogue ships no media and the licence does not cover it, so <span style="color:#EDF1EF">lift-detail</span> is built around the text instructions. The credit is one line on the session, not a field on each exercise: Noop does not credit Noop, so the built-in and the your-own cases render nothing at all. No second unit switch. No weekly set target. And no exercise-confidence chip per row — the mapping’s provenance is stated once, on muscles, where it changes what a number means.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Pause, and what it stops</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">Yes, the bar has a pause, and it is the one on <span style="color:#EDF1EF">lift-live</span> — not a second control. It stops <span style="color:#EDF1EF">both clocks</span>, the set clock and the rest countdown, and holds the part-typed set. It does not mean <em style="font-family:'Instrument Serif',serif;font-style:italic">I have left the gym</em>: nothing is ended, nothing is written, and the session is still owned above the tab bar. Picking it up resumes both clocks from where they stopped — rest does not restart, because a rest you already took is time that passed.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Next</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">Wave 3: the merged engines get faces — the energy card and <span style="color:#EDF1EF">day/energy</span> with a real <em style="font-family:'Instrument Serif',serif;font-style:italic">we do not know</em> for every nil figure, <span style="color:#EDF1EF">What changed</span> in trends, the weight trend in health, and the instrument’s raw capture.</p>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;live&quot;,&quot;library&quot;,&quot;program&quot;,&quot;detail&quot;,&quot;edit&quot;,&quot;import&quot;,&quot;review&quot;,&quot;muscles&quot;,&quot;activity&quot;],&quot;default&quot;:&quot;live&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;liveState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;running&quot;,&quot;resting&quot;,&quot;warmup&quot;,&quot;bare&quot;,&quot;last&quot;,&quot;paused&quot;],&quot;default&quot;:&quot;running&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States&quot;},&quot;libraryState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;populated&quot;,&quot;empty&quot;,&quot;archived&quot;,&quot;collision&quot;],&quot;default&quot;:&quot;populated&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States&quot;},&quot;programState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;editing&quot;,&quot;new&quot;,&quot;readonly&quot;],&quot;default&quot;:&quot;editing&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States&quot;},&quot;sessionState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ordinary&quot;,&quot;noProgram&quot;,&quot;noRpe&quot;,&quot;committed&quot;],&quot;default&quot;:&quot;ordinary&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States&quot;},&quot;importState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;reading&quot;,&quot;failed&quot;,&quot;nothing&quot;],&quot;default&quot;:&quot;idle&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States&quot;},&quot;reviewState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;summary&quot;,&quot;partial&quot;,&quot;nothing&quot;,&quot;committed&quot;],&quot;default&quot;:&quot;summary&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States&quot;},&quot;musclesState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;read&quot;,&quot;calibrating&quot;,&quot;absent&quot;],&quot;default&quot;:&quot;read&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States&quot;},&quot;activityState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;working&quot;,&quot;resting&quot;,&quot;ready&quot;,&quot;noDetail&quot;],&quot;default&quot;:&quot;resting&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States&quot;},&quot;credit&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;catalogue&quot;,&quot;mine&quot;],&quot;default&quot;:&quot;catalogue&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States&quot;},&quot;bar&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;working&quot;,&quot;resting&quot;,&quot;ready&quot;,&quot;paused&quot;,&quot;off&quot;],&quot;default&quot;:&quot;working&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;units&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;kg&quot;,&quot;lb&quot;],&quot;default&quot;:&quot;kg&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+const GLYPH = {
+  today: 'M12 3v2M12 19v2M4.2 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z',
+  trends: 'M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9',
+  moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+  you: 'M12 4.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM5.5 19.5c0-3.3 2.9-5.3 6.5-5.3s6.5 2 6.5 5.3',
+  weight: 'M4 9v6M7 6.5v11M17 6.5v11M20 9v6M7 12h10',
+  timer: 'M12 7.6v4.9l3 2M12 4.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2zM9.6 2.6h4.8',
+  check: 'M5 12.8 9.6 17.4 19 7.6',
+  pause: 'M9.5 6v12M14.5 6v12',
+  play: 'M8.5 5.5 18 12l-9.5 6.5z',
+  plus: 'M12 5.5v13M5.5 12h13',
+  file: 'M14 3.5H7.5A1.5 1.5 0 0 0 6 5v14a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V7.5zM14 3.5V7.5H18',
+  link: 'M10.5 13.5a3.4 3.4 0 0 0 4.8 0l2.4-2.4a3.4 3.4 0 0 0-4.8-4.8l-1 1M13.5 10.5a3.4 3.4 0 0 0-4.8 0l-2.4 2.4a3.4 3.4 0 0 0 4.8 4.8l1-1',
+  lock: 'M7.5 10.5V8a4.5 4.5 0 0 1 9 0v2.5M6.5 10.5h11V19h-11z',
+  body: 'M12 3.4a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6zM8.4 8.2h7.2l1.4 4.6-2.2.7-.5 6.9H9.7l-.5-6.9-2.2-.7z',
+  tap: 'M12 4.4v5M8.4 6.2 7 4.8M15.6 6.2 17 4.8M10 12.4v4.2M14 12.4v4.2M9.2 11.4a2.8 2.8 0 0 1 5.6 0v8.2H9.2z',
+  arrow: 'M5 12h13M13 7l5 5-5 5',
+  trash: 'M5.5 7.5h13M9.5 7.5V5.2h5v2.3M7.5 7.5 8.4 19h7.2l.9-11.5',
+  grip: 'M9 7h.01M15 7h.01M9 12h.01M15 12h.01M9 17h.01M15 17h.01'
+};
+const mask = function (d) {
+  return 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+};
+const ico = function (key, size, color) {
+  const u = mask(GLYPH[key]);
+  return {
+    width: size, height: size, flex: 'none', display: 'block', background: color,
+    WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+  };
+};
+const hide = { display: 'none' };
+
+const A = '#17A2E6';
+const LAV = '#8B99D6';
+const WARM = '#F2B45C';
+const GREEN = '#6FBF7F';
+
+const fmt = function (s) {
+  const m = Math.floor(s / 60), r = s % 60;
+  return m + ':' + (r < 10 ? '0' + r : r);
+};
+const fmtLong = function (s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  const mm = (m < 10 ? '0' + m : '' + m), rr = (r < 10 ? '0' + r : '' + r);
+  return h > 0 ? h + ':' + mm + ':' + rr : m + ':' + rr;
+};
+
+// ─────────────────────────────────────────────────────────────────
+// Upper A. Two lines carry targets, four are nothing but a name —
+// which is the ratio in the real data, and the reason the bare
+// line is the default drawing rather than the edge case.
+// ─────────────────────────────────────────────────────────────────
+const LINES = [
+  { name: 'Bench press', equip: 'Barbell · flat bench', sets: 4, reps: 8, kg: 80, rest: 150, rpe: 8,
+    reason: 'Two and a half kilos over the top set you finished at RPE 7 last Tuesday. Nothing about today changed it.' },
+  { name: 'Incline dumbbell press', equip: 'Dumbbells · incline bench' },
+  { name: 'Lat pulldown', equip: 'Cable · wide bar', sets: 3, reps: 10 },
+  { name: 'Cable fly', equip: 'Cable · high anchor' },
+  { name: 'Lateral raise', equip: 'Dumbbells', intensifier: 'drop set' },
+  { name: 'Face pull', equip: 'Cable · rope' }
+];
+
+const MODES = [
+  { k: 'Weight × reps', n: '881 exercises', eg: '80 kg × 8' },
+  { k: 'Bodyweight reps', n: '284 exercises', eg: '× 12' },
+  { k: 'Duration', n: '102 exercises', eg: '0:45' },
+  { k: 'Weighted bodyweight', n: '36 exercises', eg: '+10 kg × 8' },
+  { k: 'Assisted bodyweight', n: '15 exercises', eg: '\u221220 kg × 8' },
+  { k: 'Reps only', n: '6 exercises', eg: '× 20' }
+];
+
+// seven regions, thirty-three muscles — the region grouping is derived,
+// not walked up the parent chain, so nothing orphans
+const TREE = [
+  { name: 'Chest', read: 'Worked hard. Recovered by Thursday morning.', muscles: [
+    { n: 'Chest', v: 7, sub: false }, { n: 'Upper chest', v: 4.5, sub: false }, { n: 'Lower chest', v: 2.5, sub: false }
+  ] },
+  { name: 'Shoulders', read: 'Worked. Nothing owed by tomorrow.', muscles: [
+    { n: 'Front delts', v: 5.5, sub: false }, { n: 'Side delts', v: 4, sub: false }, { n: 'Rear delts', v: 2, sub: false },
+    { n: 'Rotator cuff', v: 0, sub: false }, { n: 'Neck', v: 0, sub: false }
+  ] },
+  { name: 'Arms', read: '', muscles: [
+    { n: 'Triceps', v: 5, sub: false }, { n: 'Biceps', v: 1.5, sub: false }, { n: 'Forearms', v: 0.5, sub: false }
+  ] },
+  { name: 'Back', read: 'Light this week — one pulling line in six.', muscles: [
+    { n: 'Lats', v: 3, sub: false }, { n: 'Upper back', v: 1.5, sub: false }, { n: 'Rhomboids', v: 1.5, sub: false },
+    { n: 'Traps', v: 1, sub: false }, { n: 'Upper traps', v: 0.5, sub: true }, { n: 'Lower traps', v: 0.5, sub: true },
+    { n: 'Lower back', v: 0, sub: false }
+  ] },
+  { name: 'Core', read: '', muscles: [
+    { n: 'Abdominals', v: 0.5, sub: false }, { n: 'Upper abs', v: 0, sub: true }, { n: 'Lower abs', v: 0, sub: true },
+    { n: 'Obliques', v: 0, sub: false }, { n: 'Serratus', v: 0.5, sub: false }
+  ] },
+  { name: 'Legs', read: 'Nothing this week. Monday’s ride is the only thing your legs have had.', muscles: [
+    { n: 'Quadriceps', v: 0, sub: false }, { n: 'Inner quadriceps', v: 0, sub: true }, { n: 'Outer quadriceps', v: 0, sub: true },
+    { n: 'Hamstrings', v: 0, sub: false }, { n: 'Glutes', v: 0, sub: false }, { n: 'Hip flexors', v: 0, sub: false },
+    { n: 'Adductors', v: 0, sub: false }, { n: 'Abductors', v: 0, sub: false }, { n: 'Calves', v: 0, sub: false },
+    { n: 'Tibialis', v: 0, sub: false }
+  ] }
+];
+
+class Component extends DCLogic {
+  state = { screen: null, live: null, tick: 0, t0: 0, paused: false, load: null, reps: null, arch: false,
+    coll: null, committed: null, deleted: true, lineOpen: 0 };
+
+  componentDidMount() {
+    const self = this;
+    this.timer = setInterval(function () {
+      if (self.state.paused) return;
+      self.setState(function (s) { return { tick: s.tick + 1 }; });
+    }, 1000);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+
+  componentDidUpdate(prev) {
+    if (prev.screen !== this.props.screen && this.props.screen) this.setState({ screen: this.props.screen });
+    if (prev.liveState !== this.props.liveState && this.props.liveState) this.setState({ live: this.props.liveState, paused: this.props.liveState === 'paused' });
+  }
+
+  renderVals() {
+    const self = this;
+    const S = this.state;
+    const screen = S.screen || this.props.screen || 'live';
+    const live = S.live || this.props.liveState || 'running';
+    const kg = (this.props.units || 'kg') === 'kg';
+    const libState = this.props.libraryState || 'populated';
+    const progState = this.props.programState || 'editing';
+    const sess = this.props.sessionState || 'ordinary';
+    const impState = this.props.importState || 'idle';
+    const revState = this.props.reviewState || 'summary';
+    const musState = this.props.musclesState || 'read';
+    const barState = this.props.bar || 'working';
+    const acState = this.props.activityState || 'resting';
+    const acKg = (this.props.units || 'kg') === 'kg';
+    // ONE value per state, and it is chosen on the Lock Screen: aura while the set is worked,
+    // the app's secondary ink while the clock runs down. No alpha — it has to hold on any wallpaper.
+    const acInk = acState === 'resting' ? '#C6CEC9' : '#17A2E6';
+
+    const go = function (k) { return function () { self.setState({ screen: k, coll: null }); }; };
+    const u = function (v) { return kg ? Math.round(v) + ' kg' : Math.round(v * 2.20462) + ' lb'; };
+    const uNum = function (v) { return kg ? Math.round(v) : Math.round(v * 2.20462); };
+    const unitWord = kg ? 'kg' : 'lb';
+
+    const num = function (size, color) {
+      return { fontFamily: "'Outfit',sans-serif", fontSize: size, fontWeight: 300, letterSpacing: '-.025em',
+        lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: color };
+    };
+
+    // ── live ─────────────────────────────────────────────────────
+    const bare = live === 'bare';
+    const resting = live === 'resting';
+    const paused = live === 'paused' || S.paused;
+    const lastEx = live === 'last';
+    const warm = live === 'warmup';
+    const L = bare ? LINES[1] : lastEx ? LINES[4] : LINES[0];
+    const e = Math.max(0, S.tick - S.t0);
+    const sessionSecs = 1394 + (paused ? 0 : e);
+    const restLeft = Math.max(0, 150 - (e % 152));
+
+    const loadVal = S.load == null ? (L.kg || 0) : S.load;
+    const repVal = S.reps == null ? (L.reps || 0) : S.reps;
+
+    const rowBase = function (i) {
+      return { display: 'flex', alignItems: 'center', gap: 11, minHeight: 46, padding: '4px 0',
+        borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)' };
+    };
+    const markDone = Object.assign(ico('check', 16, GREEN), { opacity: .8 });
+    const markNow = { width: 17, height: 17, flex: 'none', borderRadius: '50%', background: A,
+      display: 'block', boxShadow: '0 0 0 4px rgba(23,162,230,.16)' };
+    const markNext = { width: 17, height: 17, flex: 'none', borderRadius: '50%', background: 'transparent',
+      display: 'block', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.18)' };
+    const idxS = function (c) { return { width: 20, flex: 'none', fontSize: 11.5, fontWeight: 600, color: c, fontVariantNumeric: 'tabular-nums' }; };
+    const chipS = function (fg, bg) {
+      return { fontSize: 10, fontWeight: 600, padding: '3px 7px', borderRadius: 6, flex: 'none', whiteSpace: 'nowrap', color: fg, background: bg };
+    };
+
+    let rows = [];
+    if (bare) {
+      rows = [
+        { idx: '1', val: u(22) + ' × 12', done: true, chipText: '', rest: '2:10' },
+        { idx: '2', val: u(22) + ' × 11', done: true, chipText: '', rest: '2:14' },
+        { idx: '3', val: 'logging', done: false, now: true, chipText: '', rest: '' }
+      ];
+    } else if (lastEx) {
+      rows = [
+        { idx: '1', val: u(12) + ' × 14', done: true, chipText: '', rest: '1:30' },
+        { idx: '2', val: u(12) + ' × 12', done: true, chipText: '', rest: '1:32' },
+        { idx: '3a', val: u(12) + ' × 11', done: true, chipText: 'drop', rest: '' },
+        { idx: '3b', val: u(8) + ' × 9', done: true, chipText: 'drop', rest: '' },
+        { idx: '3c', val: u(6) + ' × 7', done: false, now: true, chipText: 'drop', rest: '' }
+      ];
+    } else {
+      rows = [
+        { idx: 'W', val: u(40) + ' × 10', done: true, chipText: 'warm-up', warm: true, rest: '' },
+        { idx: 'W', val: u(60) + ' × 5', done: true, chipText: 'warm-up', warm: true, rest: '' },
+        { idx: '1', val: u(80) + ' × 8', done: true, chipText: '', rest: '2:30' },
+        { idx: '2', val: u(80) + ' × 8', done: true, chipText: '', rest: '2:31' },
+        { idx: '3', val: u(80) + ' × 8', done: false, now: !warm, chipText: '', rest: '' },
+        { idx: '4', val: u(80) + ' × 8', done: false, chipText: '', rest: '' }
+      ];
+      if (warm) {
+        rows = [
+          { idx: 'W', val: u(40) + ' × 10', done: true, chipText: 'warm-up', warm: true, rest: '' },
+          { idx: 'W', val: u(60) + ' × 5', done: false, now: true, chipText: 'warm-up', warm: true, rest: '' },
+          { idx: '1', val: u(80) + ' × 8', done: false, chipText: '', rest: '' },
+          { idx: '2', val: u(80) + ' × 8', done: false, chipText: '', rest: '' },
+          { idx: '3', val: u(80) + ' × 8', done: false, chipText: '', rest: '' },
+          { idx: '4', val: u(80) + ' × 8', done: false, chipText: '', rest: '' }
+        ];
+      }
+    }
+    const setRows = rows.map(function (r, i) {
+      const fg = r.done ? '#939C97' : r.now ? '#EDF1EF' : '#6C7570';
+      return {
+        idx: r.idx, val: r.val,
+        row: rowBase(i),
+        mark: r.done ? markDone : r.now ? markNow : markNext,
+        idxStyle: idxS(r.warm ? '#7F8A85' : r.now ? '#8FD3F5' : '#7F8A85'),
+        valStyle: { fontSize: 14, fontWeight: r.now ? 600 : 400, color: fg, fontVariantNumeric: 'tabular-nums' },
+        chipText: r.chipText,
+        chip: r.chipText ? chipS(r.chipText === 'drop' ? '#C9D0EE' : '#8A938F', r.chipText === 'drop' ? 'rgba(139,153,214,.16)' : 'rgba(255,255,255,.06)') : hide,
+        restText: r.rest, restStyle: r.rest ? { fontSize: 11, color: '#7F8A85', flex: 'none', fontVariantNumeric: 'tabular-nums' } : hide
+      };
+    });
+
+    const collision = libState === 'collision' && S.coll !== false;
+
+    const barTint = barState === 'working'
+      ? { bg: 'rgba(23,162,230,.14)', bd: 'rgba(23,162,230,.4)', dot: A, num: '#EDF1EF' }
+      : barState === 'ready'
+      ? { bg: 'rgba(23,162,230,.14)', bd: 'rgba(23,162,230,.4)', dot: A, num: '#8FD3F5' }
+      : barState === 'resting'
+      ? { bg: 'rgba(255,255,255,.07)', bd: 'rgba(255,255,255,.17)', dot: '#8FD3F5', num: '#8FD3F5' }
+      : { bg: 'rgba(255,255,255,.06)', bd: 'rgba(255,255,255,.16)', dot: '#7F8A85', num: '#7F8A85' };
+
+    const regTotals = TREE.map(function (g) {
+      return g.muscles.reduce(function (t, m) { return t + (m.sub ? 0 : m.v); }, 0);
+    });
+    const maxM = 7;
+    const regions = TREE.map(function (g, gi) {
+      const total = regTotals[gi];
+      return {
+        name: g.name,
+        total: total > 0 ? total.toFixed(1).replace('.0', '') + ' credited' : 'nothing this week',
+        totalStyle: { fontSize: 11.5, fontWeight: 600, flex: 'none', fontVariantNumeric: 'tabular-nums',
+          color: total > 0 ? '#8FD3F5' : '#6C7570' },
+        muscles: g.muscles.map(function (m) {
+          return {
+            name: m.n,
+            row: { display: 'flex', alignItems: 'center', gap: 10 },
+            nameStyle: { width: m.sub ? 112 : 100, flex: 'none', fontSize: 12.5, color: m.v > 0 ? '#EDF1EF' : '#6C7570',
+              paddingLeft: m.sub ? 12 : 0 },
+            bar: { width: Math.max(0, (m.v / maxM) * 100) + '%', height: '100%', borderRadius: 3,
+              background: m.v >= 4 ? A : m.v > 0 ? 'rgba(23,162,230,.55)' : 'transparent' },
+            v: m.v > 0 ? m.v.toFixed(1).replace('.0', '') : '—',
+            valStyle: { width: 26, flex: 'none', textAlign: 'right', fontSize: 12, fontVariantNumeric: 'tabular-nums',
+              color: m.v > 0 ? '#C6CEC9' : '#7F8A85' }
+          };
+        }),
+        read: g.read,
+        readStyle: g.read ? { fontSize: 11.5, lineHeight: 1.55, color: '#A9B4E0', textWrap: 'pretty' } : hide
+      };
+    });
+
+    const dExercises = (sess === 'noProgram'
+      ? [
+        { name: 'Bench press', meta: '3 working sets', sets: [u(75) + ' × 8', u(75) + ' × 8', u(75) + ' × 6'], note: '' },
+        { name: 'Dumbbell row', meta: '3 working sets', sets: [u(30) + ' × 10', u(30) + ' × 10', u(30) + ' × 9'], note: '' },
+        { name: 'Standing press', meta: '2 working sets', sets: [u(42) + ' × 6', u(42) + ' × 5'], note: 'Logged as you went, with no program behind it. That is an ordinary way to lift and nothing here is missing.' }
+      ]
+      : [
+        { name: 'Bench press', meta: '4 working sets', sets: [u(80) + ' × 8', u(80) + ' × 8', u(80) + ' × 7', u(80) + ' × 6'], note: '2 warm-ups folded away' },
+        { name: 'Incline dumbbell press', meta: '3 working sets', sets: [u(22) + ' × 12', u(22) + ' × 11', u(22) + ' × 9'], note: 'No targets on this line — this is what you did.' },
+        { name: 'Lat pulldown', meta: '3 working sets', sets: [u(55) + ' × 10', u(55) + ' × 10', u(55) + ' × 8'], note: '' },
+        { name: 'Lateral raise', meta: '3 working sets, one dropped', sets: [u(12) + ' × 14', u(12) + ' × 12', u(12) + ' × 11', u(8) + ' × 9', u(6) + ' × 7'], note: 'The third set expanded into three rows when you dropped the weight.' }
+      ]).map(function (x) {
+      return {
+        name: x.name, meta: x.meta,
+        sets: x.sets.map(function (t) {
+          return { t: t, pill: { fontSize: 12, fontWeight: 500, padding: '6px 10px', borderRadius: 9,
+            color: '#C6CEC9', background: 'rgba(255,255,255,.05)', border: '.5px solid rgba(255,255,255,.08)',
+            fontVariantNumeric: 'tabular-nums' } };
+        }),
+        note: x.note,
+        noteStyle: x.note ? { fontSize: 11.5, lineHeight: 1.5, color: '#7F8A85', textWrap: 'pretty' } : hide
+      };
+    });
+
+    const editRows = [
+      { idx: '1', load: u(80), reps: '8', chipText: '' },
+      { idx: '2', load: u(80), reps: '8', chipText: '' },
+      { idx: '3', load: u(80), reps: '7', chipText: '' },
+      { idx: '4', load: u(80), reps: '6', chipText: 'deleted', del: S.deleted }
+    ].map(function (r, i) {
+      const del = !!r.del;
+      return {
+        idx: r.idx, load: r.load, reps: r.reps,
+        idxStyle: idxS(del ? '#7F8A85' : '#7F8A85'),
+        row: { display: 'flex', alignItems: 'center', gap: 11, minHeight: 48, padding: '4px 0',
+          borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)', opacity: del ? .5 : 1 },
+        sep: { fontSize: 12, color: del ? '#7F8A85' : '#939C97' },
+        field: { fontSize: 14, fontWeight: 500, padding: '8px 11px', borderRadius: 11, fontVariantNumeric: 'tabular-nums',
+          color: del ? '#7F8A85' : '#EDF1EF', background: del ? 'transparent' : 'rgba(255,255,255,.05)',
+          border: '.5px solid ' + (del ? 'transparent' : 'rgba(255,255,255,.12)'),
+          textDecoration: del ? 'line-through' : 'none' },
+        chipText: del ? 'deleted' : '',
+        chip: del ? chipS('#8A938F', 'rgba(255,255,255,.06)') : hide,
+        actText: del ? 'Undo' : '',
+        actStyle: del
+          ? { fontSize: 12.5, fontWeight: 600, color: '#8FD3F5', flex: 'none', cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center' }
+          : Object.assign({ cursor: 'pointer', minHeight: 44, flex: 'none' }, ico('trash', 17, '#7F8A85')),
+        act: function () { self.setState(function (s) { return { deleted: !s.deleted }; }); }
+      };
+    });
+
+    const impDoors = [
+      { name: 'Choose a file', meta: 'the CSV Hevy exports', g: 'file',
+        note: 'Everything in the export: sessions, exercises, every set with its weight and reps, and the notes you wrote.' },
+      { name: 'Use your Hevy key', meta: 'read-only, and revocable there', g: 'link',
+        note: 'The same sessions, fetched rather than picked. The key is kept on the phone and nothing is ever written back to Hevy.' }
+    ].map(function (d) {
+      return {
+        name: d.name, meta: d.meta, note: d.note, icon: ico(d.g, 21, A), tap: go('review'),
+        card: { display: 'flex', flexDirection: 'column', gap: 9, cursor: 'pointer', borderRadius: 20,
+          padding: '15px 16px 14px', background: '#141817', border: '.5px solid rgba(255,255,255,.06)' }
+      };
+    });
+
+    const dot = function (c) { return { width: 7, height: 7, flex: 'none', borderRadius: '50%', marginTop: 6, background: c }; };
+    const failParts = [
+      { k: 'What happened', t: 'The file opened, and none of its columns are the ones a Hevy export writes. It has 4 columns; the export has 14.', c: '#8FD3F5' },
+      { k: 'Why it stopped', t: 'Guessing which column is a weight and which is a rep count would write numbers into your record that nobody measured.', c: '#8FD3F5' },
+      { k: 'What you can do', t: 'In Hevy: Profile, then Export data. The file it mails you is the one this reads. A workout summary or a screenshot cannot be read, and nothing was added.', c: '#8FD3F5' }
+    ].map(function (p) { return { k: p.k, t: p.t, dot: dot(p.c) }; });
+
+    const collParts = [
+      { k: '', t: 'Easy 40 min has been running for 23 minutes. Noop holds one session at a time, so it will not start a lift on top of it.', c: A },
+      { k: '', t: 'Nothing has been ended and nothing is lost — the ride is still counting, and the bar above the tab bar is still yours to tap.', c: A },
+      { k: '', t: 'End the ride on its own screen and it will be written down properly, with what it cost. Then Upper A will start.', c: A }
+    ].map(function (p) { return { t: p.t, dot: dot(p.c) }; });
+
+    const revFigures = [
+      { k: 'Sessions read', sub: '12 March to 14 September', v: '38' },
+      { k: 'Exercises matched to the catalogue', sub: 'by name, where the name matched', v: '206' },
+      { k: 'Names kept as the file wrote them', sub: 'no match, so nothing was renamed', v: '14' },
+      { k: 'Warm-up sets folded away', sub: 'out of every figure a session states', v: '96' }
+    ].map(function (f, i) {
+      return {
+        k: f.k, sub: f.sub, v: f.v,
+        row: { display: 'flex', alignItems: 'center', gap: 12, minHeight: 52, padding: '6px 0',
+          borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)' },
+        subStyle: { fontSize: 11.5, lineHeight: 1.45, color: '#7F8A85', textWrap: 'pretty' },
+        vStyle: { fontFamily: "'Outfit',sans-serif", fontSize: 20, fontWeight: 400, letterSpacing: '-.02em',
+          flex: 'none', fontVariantNumeric: 'tabular-nums', color: '#8FD3F5' }
+      };
+    });
+    const revRows = [
+      { day: '14 Sep', name: 'Upper A', meta: '5 exercises · 16 working sets · 62 min' },
+      { day: '12 Sep', name: 'Lower A', meta: '4 exercises · 13 working sets · 54 min' },
+      { day: '9 Sep', name: 'Upper B', meta: '6 exercises · 18 working sets · 71 min' },
+      { day: '7 Sep', name: 'Untitled', meta: '3 exercises · 9 working sets · 38 min' },
+      { day: '4 Sep', name: 'Lower A', meta: '4 exercises · 12 working sets · 49 min' }
+    ].map(function (r, i) {
+      return {
+        day: r.day, name: r.name, meta: r.meta,
+        row: { display: 'flex', alignItems: 'center', gap: 11, padding: '11px 2px',
+          borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)' },
+        chipText: 'from the file', chip: chipS('#8A938F', 'rgba(255,255,255,.06)')
+      };
+    });
+    const revSkips = [
+      { t: 'No date Noop could read', n: '4' },
+      { t: 'No sets in the session at all', n: '2' },
+      { t: 'A duplicate of a session already in your record', n: '1' }
+    ].map(function (s, i) {
+      return { t: s.t, n: s.n, row: { display: 'flex', alignItems: 'baseline', gap: 12, padding: '10px 0',
+        borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)' } };
+    });
+
+    const programs = [
+      { name: 'Upper A', meta: '6 lines · last done Tuesday', chipText: 'next up', line: 'Two lines carry targets. The other four are exercise names, which is all a line needs to be.' },
+      { name: 'Lower A', meta: '5 lines · last done a week ago', chipText: '', line: '' },
+      { name: 'Deadlift only', meta: '1 line · last done in July', chipText: '', line: '' }
+    ].map(function (p, i) {
+      return {
+        name: p.name, meta: p.meta, chipText: p.chipText,
+        chip: p.chipText ? chipS('#8FD3F5', 'rgba(23,162,230,.13)') : hide,
+        icon: ico('weight', 21, i === 0 ? A : '#7F8A85'),
+        open: go('program'), start: i === 0 && libState === 'collision' ? function () { self.setState({ coll: true }); } : go('live'),
+        openText: 'Open', startText: i === 0 ? 'Start it' : 'Start',
+        startBtn: { flex: 1, height: 44, borderRadius: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', background: i === 0 ? A : 'rgba(255,255,255,.05)',
+          border: '.5px solid ' + (i === 0 ? 'rgba(23,162,230,.5)' : 'rgba(255,255,255,.12)') },
+        startLabel: { fontSize: 13.5, fontWeight: 600, color: i === 0 ? '#04121A' : '#C6CEC9' },
+        card: { display: 'flex', flexDirection: 'column', gap: 11, borderRadius: 20, padding: '15px 16px 14px',
+          background: i === 0 ? 'rgba(23,162,230,.08)' : '#141817',
+          border: '.5px solid ' + (i === 0 ? 'rgba(23,162,230,.3)' : 'rgba(255,255,255,.06)') },
+        lineText: p.line,
+        lineStyle: p.line ? { fontSize: 11.5, lineHeight: 1.5, color: '#7F8A85', textWrap: 'pretty' } : hide
+      };
+    });
+    const archived = [
+      { name: 'Winter block', meta: '8 lines · 34 sessions on it', icon: ico('weight', 17, '#7F8A85') },
+      { name: 'Upper A, old', meta: '6 lines · 12 sessions on it', icon: ico('weight', 17, '#7F8A85') }
+    ];
+
+    const lines = LINES.map(function (l, i) {
+      const has = l.sets || l.reps || l.kg || l.rest || l.rpe || l.intensifier;
+      const parts = [];
+      if (l.sets) parts.push(l.sets + ' × ' + (l.reps || '—'));
+      else if (l.reps) parts.push('reps ' + l.reps);
+      if (l.kg) parts.push(u(l.kg));
+      if (l.rest) parts.push('rest ' + fmt(l.rest));
+      if (l.rpe) parts.push('RPE ' + l.rpe);
+      if (l.intensifier) parts.push(l.intensifier);
+      const open = i === S.lineOpen;
+      // read-only: the editor is gone, so the line opens nothing — and a row that
+      // does nothing carries no chevron (32-nav-addendum, Change 4). No grip either.
+      const ro = progState === 'readonly';
+      return {
+        name: l.name,
+        targets: has ? parts.join(' · ') : 'just the exercise',
+        targetStyle: { fontSize: 11.5, color: has ? '#8FD3F5' : '#6C7570', fontVariantNumeric: 'tabular-nums' },
+        grip: ro ? hide : ico('grip', 17, '#4E5754'),
+        chev: ro ? hide : { width: 8, height: 8, flex: 'none', borderTop: '1.6px solid #57605C', borderRight: '1.6px solid #57605C',
+          transform: open ? 'rotate(135deg)' : 'rotate(45deg)' },
+        tap: ro ? undefined : function () { self.setState({ lineOpen: i }); },
+        row: { display: 'flex', alignItems: 'center', gap: 11, minHeight: 52, padding: '6px 0',
+          cursor: ro ? 'default' : 'pointer',
+          borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)' }
+      };
+    });
+    const OL = LINES[S.lineOpen] || LINES[0];
+    const targets = [
+      { k: 'Sets', v: OL.sets ? '' + OL.sets : 'not set' },
+      { k: 'Reps', v: OL.reps ? '' + OL.reps : 'not set' },
+      { k: 'Weight', v: OL.kg ? u(OL.kg) : 'not set' },
+      { k: 'Rest between sets', v: OL.rest ? fmt(OL.rest) : 'not set' },
+      { k: 'Effort to aim for', v: OL.rpe ? 'RPE ' + OL.rpe : 'not set' },
+      { k: 'Time under the bar', v: 'not set' }
+    ].map(function (t, i) {
+      const set = t.v !== 'not set';
+      return {
+        k: t.k, v: t.v,
+        valStyle: { fontSize: 13, fontWeight: set ? 600 : 400, flex: 'none', fontVariantNumeric: 'tabular-nums',
+          color: set ? '#EDF1EF' : '#6C7570' },
+        clear: set ? Object.assign({ marginLeft: 10, cursor: 'pointer' }, ico('plus', 15, '#7F8A85')) : hide,
+        row: { display: 'flex', alignItems: 'center', gap: 6, minHeight: 46, padding: '4px 0',
+          borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)' }
+      };
+    });
+
+    const workingSets = S.deleted ? 13 : 14;
+    const volume = S.deleted ? 4540 : 5020;
+
+    return {
+      isDark: true, notes: this.props.showNotes !== false,
+      isLive: screen === 'live', isLibrary: screen === 'library', isProgram: screen === 'program',
+      isDetail: screen === 'detail', isEdit: screen === 'edit', isImport: screen === 'import',
+      isReview: screen === 'review', isMuscles: screen === 'muscles', isActivity: screen === 'activity',
+      isCollision: collision,
+      showTabs: screen === 'library' || screen === 'detail' || screen === 'muscles',
+      showBar: barState !== 'off' && (screen === 'library' || screen === 'detail' || screen === 'muscles'),
+      libPad: (barState !== 'off' && (screen === 'library' || screen === 'detail' || screen === 'muscles')) ? 'padding-bottom:168px' : 'padding-bottom:116px',
+
+      ambient: {
+        position: 'absolute', top: -150, left: '50%', transform: 'translateX(-50%)',
+        width: 470, height: 410, borderRadius: '50%', filter: 'blur(18px)', pointerEvents: 'none',
+        background: 'radial-gradient(circle,' + (resting ? 'rgba(139,153,214,.13)' : 'rgba(23,162,230,.16)') + ',rgba(23,162,230,0) 70%)'
+      },
+
+      goLive: go('live'), goLibrary: go('library'), goDetail: go('detail'), goEdit: go('edit'),
+      goImport: go('import'), goMuscles: go('muscles'), newProgram: go('program'), retry: go('import'),
+      goNextEx: go('live'), commitReview: go('library'), commitEdit: go('detail'), addSet: go('edit'),
+      dismissColl: function () { self.setState({ coll: false }); },
+      backEffort: function () { if (self.props.onNav) self.props.onNav('effort', 'session'); },
+      tabToday: function () { if (self.props.onNav) self.props.onNav('day', 'today'); },
+      tabTrends: function () { if (self.props.onNav) self.props.onNav('picture', 'trends'); },
+      tabRest: function () { if (self.props.onNav) self.props.onNav('night', 'rest'); },
+      tabYou: function () { if (self.props.onNav) self.props.onNav('plumbing', 'you'); },
+
+      // live
+      elapsed: resting ? fmt(restLeft) : fmtLong(sessionSecs),
+      clockLabel: resting ? 'rest left' : paused ? 'paused' : 'in the session',
+      clockStyle: num(20, paused ? '#7F8A85' : resting ? '#8FD3F5' : '#EDF1EF'),
+      progName: bare ? 'Upper A' : lastEx ? 'Upper A' : 'Upper A',
+      exCounter: bare ? 'Exercise 2 of 6' : lastEx ? 'Exercise 5 of 6' : 'Exercise 1 of 6',
+      exName: L.name, exEquip: L.equip,
+      reasonCard: L.reason
+        ? { borderRadius: 18, padding: '13px 14px', display: 'flex', flexDirection: 'column', gap: 5,
+            background: 'rgba(23,162,230,.08)', border: '.5px solid rgba(23,162,230,.24)' }
+        : bare
+        ? { borderRadius: 18, padding: '13px 14px', display: 'flex', flexDirection: 'column', gap: 5,
+            background: 'rgba(255,255,255,.04)', border: '.5px solid rgba(255,255,255,.09)' }
+        : hide,
+      reasonKicker: L.reason ? 'Why these numbers' : 'No targets on this line',
+      reasonText: L.reason || 'This line is a name, which is all it has to be. Log what you actually did and Noop will keep it — there is nothing here you are falling short of.',
+      setRows: setRows,
+      clusterText: lastEx ? 'One planned set, three rows: the cluster grew when you dropped the weight, and all three are credited.' : '',
+      clusterNote: lastEx ? { fontSize: 11.5, lineHeight: 1.55, color: '#A9B4E0', padding: '8px 0 10px', textWrap: 'pretty' } : hide,
+
+      padCard: resting ? hide : { borderRadius: 22, padding: '15px 16px 14px', display: 'flex', flexDirection: 'column', gap: 12,
+        background: '#141817', border: '.5px solid rgba(255,255,255,.06)', opacity: paused ? .48 : 1 },
+      padTitle: warm ? 'Warm-up set 2' : bare ? 'Set 3' : lastEx ? 'Drop 3c' : 'Set 3 of 4',
+      padHint: warm ? 'not counted in anything this session states' : bare ? 'no target to hit' : '',
+      padHintStyle: (warm || bare) ? { fontSize: 11, color: '#7F8A85', flex: 'none' } : hide,
+      loadLabel: unitWord,
+      loadField: bare && S.load == null ? '—' : '' + uNum(loadVal || 22),
+      loadFieldStyle: num(21, bare && S.load == null ? '#7F8A85' : '#EDF1EF'),
+      repField: bare && S.reps == null ? '—' : '' + (repVal || 10),
+      repFieldStyle: num(21, bare && S.reps == null ? '#7F8A85' : '#EDF1EF'),
+      loadUp: function () { self.setState({ load: (S.load == null ? (L.kg || 22) : S.load) + 2.5 }); },
+      loadDown: function () { self.setState({ load: Math.max(0, (S.load == null ? (L.kg || 22) : S.load) - 2.5) }); },
+      repUp: function () { self.setState({ reps: (S.reps == null ? (L.reps || 10) : S.reps) + 1 }); },
+      repDown: function () { self.setState({ reps: Math.max(0, (S.reps == null ? (L.reps || 10) : S.reps) - 1) }); },
+      logSet: go('live'),
+      logText: lastEx ? 'Log it and finish' : 'Log the set',
+      logBtn: { height: 56, borderRadius: 18, background: A, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 26px rgba(23,162,230,.28)' },
+      logLabel: { fontSize: 15.5, fontWeight: 600, color: '#04121A' },
+      tapHint: paused ? hide : { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 12px',
+        borderRadius: 14, background: 'rgba(255,255,255,.04)', border: '.5px dashed rgba(255,255,255,.16)' },
+      icoTap: ico('tap', 17, '#8FD3F5'),
+
+      restCard: resting ? { borderRadius: 22, padding: '18px 16px 16px', display: 'flex', flexDirection: 'column',
+        gap: 12, alignItems: 'center', background: 'rgba(255,255,255,.05)', border: '.5px solid rgba(255,255,255,.1)' } : hide,
+      restTitle: 'Rest · 2:30 asked for',
+      restLeft: fmt(restLeft),
+      restBig: { fontFamily: "'Outfit',sans-serif", fontSize: 76, fontWeight: 200, letterSpacing: '-.045em',
+        lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: '#F6FDFF' },
+      restNext: 'Next: set 4 of 4, ' + u(80) + ' × 8. The strap will buzz once when the clock runs out.',
+      skipRest: go('live'),
+
+      nextCard: resting || lastEx ? hide : { display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+        borderRadius: 20, padding: '14px 16px', background: '#141817', border: '.5px solid rgba(255,255,255,.06)' },
+      icoNext: ico('arrow', 19, '#7F8A85'),
+      nextKicker: 'Next',
+      nextName: bare ? 'Lat pulldown' : 'Incline dumbbell press',
+      nextMeta: bare ? '3 × 10' : 'no targets',
+
+      togglePause: function () { self.setState(function (s) { return { paused: !s.paused }; }); },
+      pauseBtn: { flex: 1, height: 48, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 8, cursor: 'pointer', background: paused ? 'rgba(23,162,230,.16)' : 'rgba(255,255,255,.05)',
+        border: '.5px solid ' + (paused ? 'rgba(23,162,230,.4)' : 'rgba(255,255,255,.12)') },
+      pauseIcon: ico(paused ? 'play' : 'pause', 17, paused ? '#8FD3F5' : '#C6CEC9'),
+      pauseLabel: { fontSize: 13.5, fontWeight: 600, color: paused ? '#8FD3F5' : '#C6CEC9' },
+      pauseText: paused ? 'Pick it up' : 'Pause',
+      finish: go('detail'),
+      finishBtn: { flex: 1, height: 48, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', background: 'rgba(242,180,92,.1)', border: '.5px solid rgba(242,180,92,.34)' },
+      finishLabel: { fontSize: 13.5, fontWeight: 600, color: '#F3C888' },
+      finishText: 'Finish',
+      liveFoot: paused
+        ? 'Paused stops both clocks — the set clock and the rest countdown — and holds the numbers you had already typed. It does not mean you have left the gym: nothing is ended and nothing is written. The session is owned above this screen, so leaving it, by accident or on purpose, does not end it either.'
+        : 'Warm-ups are excluded from every figure this session states. Nothing on this screen is a target you are behind on.',
+
+      // library
+      libIntro: libState === 'empty'
+        ? 'A program is a list of lines you keep. Every target on a line is optional, and a line that is only an exercise name is a finished line.'
+        : 'A list of lines you keep. Every target is optional — four of Upper A’s six lines are nothing but an exercise name.',
+      programs: libState === 'empty' ? [] : programs,
+      emptyCard: libState === 'empty' ? { borderRadius: 20, padding: '16px', background: '#141817',
+        border: '.5px solid rgba(255,255,255,.06)', display: 'flex' } : hide,
+      archCard: (libState === 'archived' || libState === 'populated') ? { background: '#141817',
+        border: '.5px solid rgba(255,255,255,.06)', borderRadius: 20, padding: '14px 16px',
+        display: 'flex', flexDirection: 'column', gap: 4 } : hide,
+      archLabel: (S.arch || libState === 'archived') ? 'Archived · 2' : 'Show 2 archived programs',
+      archChev: { width: 8, height: 8, flex: 'none', borderTop: '1.6px solid #57605C', borderRight: '1.6px solid #57605C',
+        transform: (S.arch || libState === 'archived') ? 'rotate(-45deg)' : 'rotate(45deg)' },
+      toggleArch: function () { self.setState(function (s) { return { arch: !s.arch }; }); },
+      archList: (S.arch || libState === 'archived') ? { display: 'flex', flexDirection: 'column' } : hide,
+      archived: archived,
+      icoPlus: ico('plus', 20, A), icoFile: ico('file', 20, A),
+      collParts: collParts,
+
+      // program editor
+      progTitle: progState === 'new' ? 'Name it' : 'Upper A',
+      progTitleStyle: { fontFamily: "'Outfit',sans-serif", fontSize: 25, fontWeight: 400, letterSpacing: '-.025em',
+        color: progState === 'new' ? '#6C7570' : '#EDF1EF' },
+      progSub: progState === 'new'
+        ? 'A name and one exercise is a program. Add targets later, or never.'
+        : progState === 'readonly'
+        ? 'Six lines, as they were the day you archived it.'
+        : 'Six lines. Drag to reorder; tap a line to set or clear its targets.',
+      saveText: progState === 'readonly' ? '' : 'Done',
+      saveStyle: progState === 'readonly' ? hide : { fontSize: 13.5, fontWeight: 600, color: '#8FD3F5', cursor: 'pointer' },
+      roStrip: progState === 'readonly' ? { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 13px',
+        borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '.5px solid rgba(255,255,255,.1)' } : hide,
+      icoLock: ico('lock', 17, '#8A938F'),
+      lines: lines, targets: targets, modes: MODES,
+      editorCard: progState === 'readonly' ? hide : { background: '#141817', border: '.5px solid rgba(255,255,255,.06)',
+        borderRadius: 22, padding: '15px 16px 14px', display: 'flex', flexDirection: 'column', gap: 11 },
+      editorTitle: OL.name,
+      editorMode: 'weight × reps',
+
+      // detail
+      detailBack: sess === 'noProgram' ? 'Everything you logged' : 'Today',
+      dTitle: sess === 'noProgram' ? 'A lift, Thursday' : 'Upper A',
+      dWhen: sess === 'noProgram' ? 'Thursday, 07:40 · 44 min · no program' : 'Tuesday, 18:12 · 62 min · Upper A',
+      dTiles: [
+        { v: sess === 'noProgram' ? 8 : 16, unit: 'sets', k: 'working sets, warm-ups left out' },
+        { v: kg ? (sess === 'noProgram' ? '3,140' : '6,280') : (sess === 'noProgram' ? '6,920' : '13,840'), unit: unitWord, k: 'lifted altogether' },
+        { v: sess === 'noProgram' ? u(75) : u(80), unit: '× 8', k: 'heaviest set you finished' },
+        { v: sess === 'noRpe' ? '—' : '7.5', unit: sess === 'noRpe' ? '' : 'RPE', k: sess === 'noRpe' ? 'how hard it was — not recorded' : 'how hard it was, your reading' }
+      ].map(function (t) { return { v: t.v, unit: t.unit, k: t.k, big: num(27, '#EDF1EF') }; }),
+      rpeText: sess === 'noRpe'
+        ? 'You did not rate this session, so there is no figure for how hard it was. Noop will not estimate one from the weights — an effort reading is yours or it is nothing.'
+        : '',
+      rpeNote: sess === 'noRpe'
+        ? { fontSize: 12, lineHeight: 1.6, color: '#7F8A85', padding: '0 2px', textWrap: 'pretty' } : hide,
+      dWarmNote: sess === 'noProgram' ? 'no warm-ups logged' : '5 warm-ups folded',
+      dExercises: dExercises,
+      musclesSub: '7 regions · 22.5 credited sets · mapping stated',
+      dCost: [
+        { label: 'Added to tonight’s sleep need', v: '+18 min' },
+        { label: 'Recovered by', v: 'Thursday, 09:00' },
+        { label: 'Load added to the week', v: '64 → 324' }
+      ],
+      creditCard: (this.props.credit || 'catalogue') === 'catalogue'
+        ? { display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 2px 0' }
+        : hide,
+      detailFoot: 'No score, no grade, no medal. A session is a thing you did and a cost you paid, and both are written down plainly.',
+      icoBody: ico('body', 21, '#C4657A'), icoMoon: ico('moon', 18, LAV),
+      icoDone: ico('check', 19, GREEN), icoPlusSm: ico('plus', 16, '#8FD3F5'),
+
+      // edit
+      editRows: editRows,
+      totalText: (S.deleted ? '14 → ' + workingSets : workingSets + '') + ' working sets · ' + (kg ? volume.toLocaleString('en-GB') + ' kg' : Math.round(volume * 2.20462).toLocaleString('en-GB') + ' lb'),
+      totalStyle: { fontSize: 11.5, fontWeight: 600, color: '#8FD3F5', flex: 'none', fontVariantNumeric: 'tabular-nums' },
+      commitText: sess === 'committed' ? 'Saved' : 'Save',
+      commitStyle: { fontSize: 13.5, fontWeight: 600, color: sess === 'committed' ? GREEN : '#8FD3F5', cursor: 'pointer' },
+      committedCard: sess === 'committed' ? { display: 'flex', alignItems: 'flex-start', gap: 11, padding: '14px 15px',
+        borderRadius: 20, background: 'rgba(111,191,127,.1)', border: '.5px solid rgba(111,191,127,.3)' } : hide,
+
+      // import
+      doors: impState === 'idle' ? impDoors : [],
+      readingCard: impState === 'reading' ? { borderRadius: 22, padding: '16px', display: 'flex', flexDirection: 'column',
+        gap: 11, background: 'rgba(23,162,230,.08)', border: '.5px solid rgba(23,162,230,.26)' } : hide,
+      readCount: '31 of 38 sessions',
+      readBar: { width: '82%', height: '100%', borderRadius: 3, background: A },
+      failCard: (impState === 'failed' || impState === 'nothing') ? { borderRadius: 22, padding: '16px',
+        display: 'flex', flexDirection: 'column', gap: 13, background: '#141817',
+        border: '.5px solid rgba(255,255,255,.1)' } : hide,
+      failTitle: impState === 'nothing' ? 'Nothing in this file is a session' : 'This file is not a Hevy export',
+      failParts: failParts,
+
+      // review
+      revTitle: revState === 'committed' ? 'Added' : revState === 'nothing' ? 'Nothing to add' : 'What the file holds',
+      revIntro: revState === 'committed'
+        ? 'Thirty-eight sessions are in your record.'
+        : revState === 'nothing'
+        ? 'The file read cleanly and carried no session Noop could use. Nothing was added, and the file is untouched.'
+        : revState === 'partial'
+        ? 'Thirty-one of thirty-eight sessions read. The seven that did not are named below with the reason, so you can decide whether the rest is worth adding.'
+        : 'This is what Noop made of the file. Read it before you add anything — after that it is part of your record and priced like everything else in it.',
+      revFigures: revState === 'summary' || revState === 'partial' ? revFigures : [],
+      revSummaryCard: (revState === 'summary' || revState === 'partial')
+        ? { background: '#141817', border: '.5px solid rgba(255,255,255,.06)', borderRadius: 22, padding: '6px 16px',
+            display: 'flex', flexDirection: 'column' } : hide,
+      revRowsCard: (revState === 'summary' || revState === 'partial')
+        ? { background: '#141817', border: '.5px solid rgba(255,255,255,.06)', borderRadius: 22, padding: '16px 16px 14px',
+            display: 'flex', flexDirection: 'column', gap: 12 } : hide,
+      revRows: revRows, revRowsNote: 'newest 5 of 38',
+      revSkipCard: revState === 'partial' ? { borderRadius: 22, padding: '16px', display: 'flex', flexDirection: 'column',
+        gap: 11, background: 'rgba(242,180,92,.08)', border: '.5px solid rgba(242,180,92,.26)' } : hide,
+      revSkipTitle: 'The seven it skipped',
+      revSkips: revSkips,
+      revSkipNote: 'A skipped session is left in the file, not half-added. Fix it there and read the file again — the duplicate will be skipped a second time.',
+      revCommitWrap: (revState === 'summary' || revState === 'partial')
+        ? { display: 'flex', flexDirection: 'column', gap: 8 } : hide,
+      revCommitText: revState === 'partial' ? 'Add the 31 it read' : 'Add 38 sessions',
+      revDoneCard: revState === 'committed' ? { display: 'flex', alignItems: 'flex-start', gap: 11, padding: '16px',
+        borderRadius: 22, background: 'rgba(111,191,127,.1)', border: '.5px solid rgba(111,191,127,.3)' } : hide,
+      revDoneTitle: '38 sessions added',
+      revFoot: revState === 'nothing'
+        ? 'Nothing was written, nothing was changed, and the file is exactly as you handed it over.'
+        : 'Import adds. Nothing already in your record is changed, replaced or removed by anything on this screen.',
+
+      // muscles
+      musIntro: musState === 'absent'
+        ? 'What your lifting credited, once there is some.'
+        : musState === 'calibrating'
+        ? 'What your lifting credited, over seven days. Too little of it yet to state a figure.'
+        : 'Credited sets over seven days, from the six sessions in them.',
+      musUnitCard: musState === 'absent' ? hide : { background: '#141817', border: '.5px solid rgba(255,255,255,.06)',
+        borderRadius: 22, padding: '15px 16px', display: 'flex', flexDirection: 'column', gap: 8 },
+      musCalCard: musState === 'calibrating' ? { borderRadius: 22, padding: '16px', display: 'flex',
+        flexDirection: 'column', gap: 9, background: 'rgba(23,162,230,.08)', border: '.5px solid rgba(23,162,230,.26)' } : hide,
+      musCalTitle: 'Four sessions recorded',
+      musCalChip: 'still learning',
+      musCalText: 'Credited sets are held back until a week of lifting is on record, because four sessions in one part of the body would read as a plan rather than a sample. The count is what there is to show, so the count is what is shown.',
+      musTreeWrap: (musState === 'read') ? { display: 'flex', flexDirection: 'column', gap: 9 } : hide,
+      regions: musState === 'read' ? regions : [],
+      musProvCard: musState === 'read' ? { background: '#141817', border: '.5px solid rgba(255,255,255,.06)',
+        borderRadius: 22, padding: '15px 16px', display: 'flex', flexDirection: 'column', gap: 9 } : hide,
+      musProvText: 'Nineteen of this week’s twenty-four exercises carry a muscle mapping someone checked by hand. Five fall back to the catalogue’s own, which is usually right and occasionally generous about what a movement uses. They are named so a number you doubt can be traced.',
+      musProvChips: [
+        { t: '19 checked', s: chipS('#8FD3F5', 'rgba(23,162,230,.13)') },
+        { t: '5 from the catalogue', s: chipS('#8A938F', 'rgba(255,255,255,.06)') },
+        { t: '0 you confirmed', s: chipS('#8A938F', 'rgba(255,255,255,.06)') }
+      ],
+      musAbsentCard: musState === 'absent' ? { borderRadius: 22, padding: '16px', background: '#141817',
+        border: '.5px solid rgba(255,255,255,.06)', display: 'flex' } : hide,
+
+      // the bar, lift variant
+      barCard: { height: 46, borderRadius: 20, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 11,
+        cursor: 'pointer', pointerEvents: 'auto', backdropFilter: 'blur(20px)', background: barTint.bg,
+        border: '.5px solid ' + barTint.bd, boxShadow: '0 8px 26px rgba(0,0,0,.45)' },
+      barDot: { width: 8, height: 8, flex: 'none', borderRadius: '50%', background: barTint.dot,
+        animation: barState === 'paused' ? 'none' : 'barDot 1.1s ease-in-out infinite' },
+      barExercise: barState === 'paused' ? 'Bench press' : barState === 'resting' ? 'Bench press' : 'Bench press',
+      barName: { flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap', color: barState === 'paused' ? '#C6CEC9' : '#EDF1EF' },
+      barTime: barState === 'resting' ? fmt(restLeft) : barState === 'paused' ? 'Paused'
+        : barState === 'ready' ? 'Ready' : '0:41',
+      barClock: barState === 'paused' || barState === 'ready'
+        ? { fontSize: 13, fontWeight: 600, color: barState === 'ready' ? '#8FD3F5' : '#7F8A85', flex: 'none' }
+        : { fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: '-.02em',
+            fontVariantNumeric: 'tabular-nums', flex: 'none', color: barTint.num },
+      barSetText: barState === 'resting' ? 'rest' : barState === 'ready' ? 'Set 4/4' : 'Set 3/4',
+      barSet: { fontSize: 12, fontWeight: 600, flex: 'none', color: barState === 'paused' ? '#7F8A85' : '#939C97',
+        fontVariantNumeric: 'tabular-nums' },
+
+      // ── the Lock Screen activity. Two extra fields the widget already computes — the set's
+      // numbers and the session's progress — because the Lock Screen has the room the bar does not.
+      // noDetail is the case where neither reps nor weight is known yet: the slot is absent, not blank.
+      acDot: { width: 8, height: 8, flex: 'none', borderRadius: '50%', background: acInk,
+        animation: 'barDot 1.1s ease-in-out infinite' },
+      acClock: acState === 'ready'
+        ? { fontSize: 15, fontWeight: 600, color: acInk, flex: 'none', letterSpacing: '-.01em' }
+        : { fontFamily: "'Outfit',sans-serif", fontSize: 31, fontWeight: 300, letterSpacing: '-.025em',
+            lineHeight: 1, color: acInk, flex: 'none', fontVariantNumeric: 'tabular-nums' },
+      acTime: acState === 'resting' ? '2:30' : acState === 'ready' ? 'Ready' : '1:12',
+      acStatus: acState === 'resting' ? 'Resting after set 3'
+        : acState === 'ready' ? 'Ready for the next set' : 'Set 3 of 4',
+      acDetail: acState === 'noDetail' ? '' : (acKg ? '8 × 30 kg' : '8 × 66 lb'),
+      acDetailStyle: acState === 'noDetail' ? hide
+        : { fontSize: 12.5, fontWeight: 600, color: '#EDF1EF', flex: 'none', fontVariantNumeric: 'tabular-nums' },
+      acFill: { height: 3, borderRadius: 2, width: '16%', background: acInk },
+      acSets: '3 of 19 sets done',
+
+      icoTodayOn: ico('today', 19, '#04121A'), icoTrends: ico('trends', 19, '#7F8A85'),
+      icoRest: ico('moon', 19, '#7F8A85'), icoYou: ico('you', 19, '#7F8A85')
+    };
+  }
+}
+</script>
+</body>
+</html>

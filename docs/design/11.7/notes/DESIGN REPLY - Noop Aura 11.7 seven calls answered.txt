@@ -1,0 +1,344 @@
+DESIGN -> ENGINEERING: THE SEVEN CALLS, ANSWERED
+Noop Aura 11.7, 19 September 2026
+Reply to "Answers to what design needs back", same date
+
+
+  1  Terms headings     IN. Nine verbatim, preamble and closing unnumbered.
+  2  Change list        No month grouping. Flat by version. Credits stay.
+  3  Momentum twelve    Not §9 — my error. They are in §1.2.
+  4  Widgets            Live HR = HeartRateWidget. Resting pulse is NEW.
+  5  Blued              B ships, and it is renamed NAVY.
+  6  Orb                The LARGE halo orb. Specks dropped.
+  7  Live Activity      Pause confirmed. bpm is OUT. Pause lives on one screen.
+
+  Two things I got wrong are corrected below — the icon geometry (item 5)
+  and the widget scope (item 4). Both were my mistakes, not bad information.
+
+  The six design files are attached as a folder. Item at the end.
+
+
+--------------------------------------------------------------------------------
+1. THE TERMS HEADINGS — IN, VERBATIM
+--------------------------------------------------------------------------------
+
+  All nine are in plumbing/terms as sent, em dashes included, and the
+  stand-ins are gone. Title and version are the document's own.
+
+  THE INDEX IS NINE. The preamble and the closing note are printed but NOT
+  numbered and NOT in the index. They frame the document rather than being
+  part of it, and that is what keeps the first attestation honest — it says
+  "the nine sections, not only the summary", and if the index said eleven
+  that line would be a lie.
+
+  Order on the screen:
+    title → preamble (both blocks) → the nine numbered sections →
+    closing note → the four attestations → Accept
+
+  >> I NEED ONE THING BACK: which two sections actually changed between 1.1
+     and 2.0? The updated-terms state marks two with a "changed" chip, and I
+     have provisionally marked 03 and 06. If it is a different pair, it is a
+     one-line change and no redraw.
+
+  ON REBRANDING TO "Noop Aura": DON'T, and I would say that even if it were
+  design's call. A legal document that says NOOP throughout should keep
+  saying NOOP; a terms screen that silently renames the party you are
+  agreeing with is the exact thing section 2 exists to prevent. The screen
+  prints the document's title as written.
+
+  ON LICENSE AND DISCLAIMER.md: bundle them. The closing line points at two
+  files, and design's position is that a legal document should not contain a
+  dead reference — that is worse than one more screen. If the owner would
+  rather not bundle, then cut the pointer from the closing rather than
+  shipping it pointing at nothing. Either is fine; the half-way is not.
+
+
+--------------------------------------------------------------------------------
+2. THE CHANGE LIST — DON'T GROUP BY MONTH
+--------------------------------------------------------------------------------
+
+  243 of 284 releases in one month is not history, it is an import artefact.
+  A month grouping would draw four small groups and one enormous one, and
+  the shape of that screen would tell the reader something false about how
+  the app was built.
+
+  SO: NO GROUPING. A flat list, newest first, in stored order — which you
+  already have. Each release is its own block:
+
+      11.7.0                                    September 2026
+      A stress screen that keeps up, WHOOP 5 readings in the units
+      the strap sends, and a ring that stops repeating itself
+      · entry
+      · entry
+
+  The version is the heading and the date is a caption beside it. The
+  version number is the thing that is unique, ordered and true; the date is
+  context, so it is typeset as context.
+
+  THE ONLY DIVIDER IS THE YEAR. A thin rule where the year changes, and
+  nothing else. No month rules, no counts, no "243 releases in June".
+
+  ISSUE NUMBERS AND CREDITS: both KEPT, both MOVED. This was already settled
+  in the Act 10 implementation pack and it still holds — "(#2191, #2194)"
+  and "(thanks @Trillient)" come OUT of the bold lead-in and go on a muted
+  trailing line under the entry. Not inline, not behind a disclosure.
+  Reason: inline, they interrupt the one sentence the reader wants; deleted,
+  we would be erasing the only credit a contributor gets. A quiet line under
+  the entry is both honest and out of the way.
+
+  So the parsing you need is: split the trailing "(#...)" and "(thanks @...)"
+  out of the lead-in, keep the rest of the bold intact. If a lead-in has
+  neither, the trailing line is absent — not empty.
+
+
+--------------------------------------------------------------------------------
+3. THE MOMENTUM TWELVE — §1.2, NOT §9
+--------------------------------------------------------------------------------
+
+  My citation was wrong, sorry. They are in:
+
+      spec/90-aura-11.7.md  §1.2  "Momentum — twelve of eighteen, and the
+                                   section is renamed"
+
+  Every one of the eighteen has a verdict there, so you can pin the allow-
+  list to the twelve and the test has the other six to assert against.
+  The same twelve are restated in "Noop Aura 11.7 - decisions and
+  questions.txt", item 2, if you want a second copy to diff against.
+
+  Your allow-list-first plan is better than what I asked for. Agreed.
+
+  ONE THING THAT SURVIVES YOUR NEWS: the tier check still stands. I checked
+  the twelve against the priority tiers on 18 September and no cut kind was
+  a tier-0 filler, so the six cuts cannot make the section render empty.
+  That check was against the engine you have, not the cards you don't, so it
+  is still good.
+
+
+--------------------------------------------------------------------------------
+4. THE WIDGETS — MY SCOPE WAS WRONG IN BOTH DIRECTIONS
+--------------------------------------------------------------------------------
+
+  The count survives at eight; two of the entries move.
+
+  LIVE HEART RATE = HeartRateWidget. It already is what W2 draws — live bpm
+  with recent history behind it. Keep it, redraw it to the sheet.
+
+  RESTING PULSE = A NEW BUILD. It is not HeartRateWidget renamed. Resting
+  pulse is computed overnight and shown with a seven-day range; live bpm is
+  a different figure answering a different question, and collapsing them
+  would leave the wearer unable to tell which they were looking at. So yes:
+  ENERGY AND RESTING PULSE ARE BOTH NEW BUILDS.
+
+  NOOPLiveActivity IS NOT A WIDGET FAMILY. It is a live activity, like
+  LiftLiveActivity, and it does not belong in a widget count — the widgets
+  screen would be claiming something the gallery does not contain. It is
+  out of the eight. It is also not drawn anywhere yet; that is a gap, and it
+  is mine, not a blocker for you.
+
+  SO THE REGISTRY IS:
+    registered today (6)  Glanceable · Live heart rate · The coach brief ·
+                          Stress · Lift session · Rings
+    to build (2)          Energy · Resting pulse
+
+  RINGS: settled, it ships. You have it registered, which turns my
+  recommendation into a fact. The widgets sheet now says so.
+
+  GALLERY NAMES: take them from the widgets sheet, exactly as listed above.
+  "NOOP" as a gallery name for the glanceable widget should go — it is the
+  app's name where a widget's name belongs, and in a gallery of eight it
+  tells the reader nothing.
+
+  THE ENERGY EMPTY FACE: understood and already drawn. Unknown is nil and
+  never zero. The widget's cold-start face states the modelled basal day as
+  a model — the word "about", no split, no projection, and a chip that says
+  cold start. See W7 in the widgets sheet.
+
+
+--------------------------------------------------------------------------------
+5. BLUED: B SHIPS, AND ITS NAME CHANGES TO NAVY
+--------------------------------------------------------------------------------
+
+  >> B. And rename it NAVY.
+
+  WHY B
+    · It is what wearers have had since 15 June. Shipping A now would change
+      the icon under everyone who chose the blue alternate, for a difference
+      they did not ask for.
+    · It has a generator. make_icon.py re-renders it at any size from source.
+      A is a static raster. That is the same standard I set for the orb in
+      item 6, and it would be incoherent to demand it there and waive it here.
+    · A shipped for one day. Nobody has it set. There is no continuity to
+      protect.
+
+  WHY THE NAME CHANGES
+    "Blued" describes A — brushed blued titanium. B is gold on a navy
+    gradient and is not blued anything. The asset is already called
+    AppIcon-Navy, so the shipped name and the shown name finally agree.
+
+  A GOES TO THE ARCHIVE, not the bin. It is the better-looking tile of the
+  two. If a brushed-metal blue is ever wanted it comes back as a rendered
+  member of the family, not as that file.
+
+  >> AND NOW THE PART THAT MATTERS MORE THAN A OR B.
+
+  THE SOURCE ART CORRECTED MY GEOMETRY. Both candidates show the same mark,
+  and it is not the one I drew. These numbers are MEASURED off
+  blued-b-navy-1024.png — gold-pixel runs at the horizontal midline and an
+  angular scan at the ring's mid-radius — not matched by eye:
+
+      property        what ships                 what I had drawn
+      gap centre      337° (23° CCW of top)     180°, at the foot
+      gap width       79.5°                      76°
+      ring outer      77.9% of the tile          74%
+      stroke          13.5% of the tile          7.5%
+      core            18%, at the CENTRE         no core; a dot ON the arc
+
+  So the sweep is: conic from 17°, ink for 77.9%, gap for the rest.
+
+  THE OPENING IS NOT ON THE VERTICAL and must not be tidied onto it. That
+  23° tilt is what stops the mark reading as a symmetrical logo, and a build
+  that "corrects" it to dead-top will look subtly wrong beside Navy.
+
+  My set's own rule is "every icon is something that already exists inside
+  the app". Under that rule four of my five icons failed and the only one
+  that passed was the one I had not drawn. So the family is redrawn to the
+  shipped geometry — gap at the top, core at the centre, heavier stroke —
+  and Navy is in the sheet as the actual 1024 file, not a redrawing of it.
+
+  This is a straight improvement, not just a correction. A core at the
+  centre survives 29 pt where a dot riding a 2 px stroke does not, and the
+  13.5% stroke is the real reason the shipped icon has always held at small
+  sizes — my 7.5% was almost half of it.
+
+  THE SET SHIPS FIVE: Titanium (default), Aura, Navy, Breathe, Orb.
+  Titanium and Aura are drawn to the spec in the icon sheet. Navy, Breathe
+  and the Orb are exports. The five numbers above are the build spec; if any
+  of them still disagrees with the 1024 source, THE SOURCE WINS — tell me and
+  I will correct the sheet rather than the other way round.
+
+  ONE ADDITION SINCE THE FIRST REPLY: Cast is out and BREATHE is in — the
+  today orb with the pacer's ring around it, frozen at the top of an inhale.
+  It needs the same treatment as the Orb icon: rendered from the app's own
+  orb code, not redrawn. Breathe and the Orb can share that generator; they
+  differ by hue, by shape (true circle against blob) and by the pace ring.
+  THE PACE RING IS CLOSED. The instrument's ring is open because a reading
+  is never finished; a breath is a cycle that completes. Do not let a build
+  converge them — that difference is all that keeps Breathe from reading as
+  a fourth instrument at 29 pt.
+
+
+--------------------------------------------------------------------------------
+6. THE ORB ICON
+--------------------------------------------------------------------------------
+
+  >> WHICH ORB: THE LARGE HALO ORB — the one on Act 7's setup and gate.
+     Dark core, pale blue halo ring. And a SECOND render for the Breathe
+     icon, from the today orb plus its pace ring, frozen at the top of an
+     inhale. Same generator, two frames.
+
+  Not the small lit sphere. At 29 pt a soft gradient sphere goes to a
+  smudge; a form with structure — core, then halo — still reads as a thing.
+  The small sphere is right in a conversation header at 22 pt and wrong as
+  an icon.
+
+  >> BACKGROUND: #0A0C12, flat, opaque. Not a gradient. The halo is the only
+     light in the tile and a gradient ground competes with it.
+
+  >> THE BLOOM DOES NOT SPREAD BEYOND THE TILE. It is composed inside and
+     clipped by the squircle. An icon cannot glow past its own bounds, so a
+     bloom drawn as if it could is a bloom that gets cut off badly.
+
+  >> DROP THE TURNING SPECKS. At 180 pt they are lovely. At 29 pt they are
+     dirt on the lens, and a wearer cannot tell an intentional speck from a
+     rendering artefact.
+
+  AND YES: MERGE THE COPIES. Act 2's re-typed small orb with its own shadow
+  should become the same source as Act 7's. You found drift that had already
+  started, which is exactly the thing the export rule exists to stop. One
+  source, three call sites, and a test that fails when the icon file stops
+  matching the code.
+
+
+--------------------------------------------------------------------------------
+7. THE LIVE ACTIVITY
+--------------------------------------------------------------------------------
+
+  Good news received: one session object already, and two of my three
+  behaviours already true. Only pause and the set-counter truncation are
+  work.
+
+  >> PAUSE — YOUR READING IS CORRECT, CONFIRMED. Pause freezes the whole
+     session. Whichever clock is showing holds its value; on resume it
+     continues from that value. Pause during rest and rest ends later by the
+     length of the pause, and the strap's five-second buzz moves with it.
+     Nothing catches up, nothing is skipped.
+
+  >> WHERE PAUSE LIVES: THE lift-live SCREEN ONLY. Not the in-app bar.
+     The bar has no controls by the same rule the Live Activity has none — a
+     control whose consequence you cannot see is not a control. The bar
+     shows state and opens lift-live; lift-live is where the session is
+     operated. So: one pause control, one screen, everywhere else reflects it.
+
+  >> BPM: TAKE IT OUT.
+     It is not in my four slots and it should not be a fifth. Two reasons.
+     Mid-lift bpm is not actionable — nobody changes a set because the number
+     says 138 — and the compact and minimal presentations are already at
+     their ceiling with four. Adding a figure that cannot survive into two of
+     the four presentations means the surfaces stop agreeing, which is the
+     thing item 7 is for.
+     You are right that an em dash there would contradict the numbers slot.
+     That contradiction is the argument for removing it, not for inventing a
+     third rule.
+     IF PRODUCT OVERRULES ME: Lock Screen and expanded only, never compact or
+     minimal, and with no reading the element is ABSENT — the row takes the
+     width, same as the numbers slot. Never a dash.
+
+  THE SET COUNTER MUST NOT TRUNCATE. Noted that it can today. Truncation
+  order is: exercise name first and only. The clock and the set counter keep
+  their width at every size — "3 of 19" losing its tail is worse than the
+  exercise name losing its tail, because the reader can see which exercise
+  they are doing and cannot see how many sets are left.
+
+
+--------------------------------------------------------------------------------
+THE FILES YOU DON'T HAVE
+--------------------------------------------------------------------------------
+
+  Attached as a folder, "Noop Aura 11.7 handoff":
+
+    Noop Act 5 - The Plumbing.dc.html      settings, plumbing, widgets,
+                                           appearance, terms, what's new
+    Noop Act 7 - Svea.dc.html              the coach, consent, voice, the
+                                           library, ask-about-a-chart
+    Noop Act 10 - The Lift.dc.html         the session and the in-app bar
+    Noop Lift Live Activity.dc.html        all four live presentations
+    Noop Widgets - the Aura set.dc.html    eight families, sixteen faces
+    Noop Icon Set.dc.html                  five icons and their geometry
+    support.js                             required — the files won't render
+                                           without it, keep it alongside
+    assets/                                the two 1024 sources you sent
+
+  Open any .dc.html directly in a browser. Keep the folder structure: the
+  icon sheet loads the two PNGs from assets/.
+
+  LIFT COPY FROM THESE FILES, not from this document and not from the
+  summary docs — those paraphrase. Every user-facing string is written once,
+  in the act it belongs to.
+
+
+--------------------------------------------------------------------------------
+WHAT I OWE YOU NEXT
+--------------------------------------------------------------------------------
+
+  · nothing blocking. Item 1 is in, so the terms screen is finished bar the
+    two changed-section numbers.
+  · NOOPLiveActivity (live heart rate as a live activity) has no drawing.
+    It is outside 11.7's plan and outside the widget count, but it exists
+    and ships, so it should be drawn. That is a wave 5 item unless you need
+    it sooner.
+
+WHAT I STILL NEED FROM YOU
+
+  · which two terms sections changed between 1.1 and 2.0
+  · a sanity check on the five measured icon numbers in item 5 — they came
+    off the PNG, so they should match make_icon.py's own constants exactly.
+    If they don't, the script is the truth and I will redraw to it.

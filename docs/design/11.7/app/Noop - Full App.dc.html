@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+<template id="__bundler_thumbnail" data-bg-color="#0A0C0B">
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="800" fill="#0A0C0B"/>
+<defs><radialGradient id="orb" cx="38%" cy="32%"><stop offset="0" stop-color="#9FE2FB"/><stop offset=".55" stop-color="#2FB2F0"/><stop offset="1" stop-color="#0A5F92"/></radialGradient></defs>
+<circle cx="600" cy="400" r="186" fill="none" stroke="rgba(159,226,251,.34)" stroke-width="4"/>
+<circle cx="600" cy="400" r="132" fill="url(#orb)"/>
+<text x="600" y="418" font-family="system-ui,sans-serif" font-size="86" font-weight="200" fill="#F6FDFF" text-anchor="middle">56</text>
+</svg>
+</template>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0B0D0C;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#17A2E6;text-decoration:none}a:hover{color:#5FC2F0}
+*{-webkit-tap-highlight-color:transparent}
+.rail::-webkit-scrollbar{width:0}
+</style>
+</helmet>
+
+<div style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none" aria-hidden="true">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="1px,1px"></x-import>
+</div>
+
+<div style="display:flex;align-items:stretch;min-height:100vh;background:#0B0D0C;color:#EDF1EF">
+
+  <aside class="rail" style="width:286px;flex:none;border-right:.5px solid rgba(255,255,255,.09);background:#0E1110;padding:30px 0 40px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh;overflow:auto">
+    <div style="padding:0 24px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:11px">
+        <span style="width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#8FD3F5,#17A2E6 62%,#0E6E9C);box-shadow:0 2px 10px rgba(23,162,230,.4)"></span>
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:22px;letter-spacing:-.03em">Noop</span>
+      </div>
+      <span style="font-size:11px;line-height:1.6;color:#6C7570">{{ shellBlurb }}</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:2px;padding:0 12px">
+      <sc-for list="{{ acts }}" as="a" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column">
+          <div onClick="{{ a.tap }}" style="{{ a.row }}">
+            <span style="{{ a.num }}">{{ a.n }}</span>
+            <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+              <span style="{{ a.label }}">{{ a.name }}</span>
+              <span style="font-size:10.5px;color:#6C7570;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.hint }}</span>
+            </div>
+            <span style="font-size:10px;color:#4E5653;margin-left:auto;font-weight:600">{{ a.count }}</span>
+          </div>
+          <sc-if value="{{ a.open }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:1px;padding:4px 0 10px 44px">
+              <sc-for list="{{ a.screens }}" as="s" hint-placeholder-count="4">
+                <div onClick="{{ s.tap }}" style="{{ s.row }}">
+                  <span style="{{ s.dot }}"></span>
+                  <span>{{ s.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:auto;padding:0 24px;display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#4E5653;font-weight:600">Who's wearing it</span>
+      <div style="display:flex;gap:5px;padding:4px;background:#141817;border:.5px solid rgba(255,255,255,.07);border-radius:12px">
+        <div onClick="{{ setDay }}" style="{{ dayPill }}">Day worker</div>
+        <div onClick="{{ setNight }}" style="{{ nightPill }}">Night shift</div>
+      </div>
+      <span style="font-size:10.5px;line-height:1.6;color:#6C7570">Every act re-anchors: Act 1 reads “last sleep”, Act 2's day starts at 15:00.</span>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;padding:34px 40px 60px;gap:22px">
+    <div style="width:100%;max-width:640px;display:flex;align-items:flex-end;justify-content:space-between;gap:20px">
+      <div style="display:flex;flex-direction:column;gap:5px;min-width:0">
+        <span style="font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:#17A2E6;font-weight:600">{{ actKicker }}</span>
+        <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:27px;letter-spacing:-.028em;line-height:1.15">{{ screenName }}</h1>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex:none">
+        <div onClick="{{ goHome }}" style="height:32px;padding:0 14px;border-radius:11px;background:#141817;border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;font-size:11.5px;font-weight:600;color:#C6CEC9;cursor:pointer">Home</div>
+        <span style="font-size:11px;color:#6C7570">{{ position }}</span>
+      </div>
+    </div>
+
+    <div style="position:relative;flex:none">
+      <div style="{{ w1 }}"><div style="position:relative;width:402px;height:874px;overflow:hidden;border-radius:48px"><div style="position:absolute;top:-52px;left:-48px"><dc-import name="Noop Act 1 - The Night" show-notes="{{ false }}" screen="{{ s1 }}" nav-seq="{{ seq }}" schedule="{{ sched }}" on-nav="{{ nav }}" hint-size="402px,874px"></dc-import></div></div></div>
+      <div style="{{ w2 }}"><div style="position:relative;width:402px;height:874px;overflow:hidden;border-radius:48px"><div style="position:absolute;top:-52px;left:-48px"><dc-import name="Noop Act 2 - The Day" show-notes="{{ false }}" screen="{{ s2 }}" sheet="{{ sheet }}" sheet-seq="{{ sheetSeq }}" done-name="{{ doneName }}" done-mins="{{ doneMins }}" done-km="{{ doneKm }}" done-at="{{ doneAt }}" nav-seq="{{ seq }}" schedule="{{ sched }}" on-nav="{{ nav }}" hint-size="402px,874px"></dc-import></div></div></div>
+      <div style="{{ w3 }}"><div style="position:relative;width:402px;height:874px;overflow:hidden;border-radius:48px"><div style="position:absolute;top:-52px;left:-48px"><dc-import name="Noop Act 3 - The Effort" show-notes="{{ false }}" screen="{{ s3 }}" nav-seq="{{ seq }}" schedule="{{ sched }}" on-nav="{{ nav }}" on-session="{{ onSession }}" hint-size="402px,874px" done-name="{{ doneName }}" done-mins="{{ doneMins }}" done-km="{{ doneKm }}" done-at="{{ doneAt }}"></dc-import></div></div></div>
+      <div style="{{ w4 }}"><div style="position:relative;width:402px;height:874px;overflow:hidden;border-radius:48px"><div style="position:absolute;top:-52px;left:-48px"><dc-import name="Noop Act 4 - The Bigger Picture" show-notes="{{ false }}" screen="{{ s4 }}" nav-seq="{{ seq }}" schedule="{{ sched }}" on-nav="{{ nav }}" hint-size="402px,874px"></dc-import></div></div></div>
+      <div style="{{ w5 }}"><div style="position:relative;width:402px;height:874px;overflow:hidden;border-radius:48px"><div style="position:absolute;top:-52px;left:-48px"><dc-import name="Noop Act 5 - The Plumbing" show-notes="{{ false }}" screen="{{ s5 }}" nav-seq="{{ seq }}" schedule="{{ sched }}" on-nav="{{ nav }}" hint-size="402px,874px"></dc-import></div></div></div>
+      <div style="{{ w6 }}"><div style="position:relative;width:402px;height:874px;overflow:hidden;border-radius:48px"><div style="position:absolute;top:-52px;left:-48px"><dc-import name="Noop Act 6 - Your Ages" show-notes="{{ false }}" screen="{{ s6 }}" nav-seq="{{ seq }}" schedule="{{ sched }}" on-nav="{{ nav }}" hint-size="402px,874px"></dc-import></div></div></div>
+      <div style="{{ w7 }}"><div style="position:relative;width:402px;height:874px;overflow:hidden;border-radius:48px"><div style="position:absolute;top:-52px;left:-48px"><dc-import name="Noop Act 7 - Svea" show-notes="{{ false }}" screen="{{ s7 }}" nav-seq="{{ seq }}" schedule="{{ sched }}" on-nav="{{ nav }}" hint-size="402px,874px"></dc-import></div></div></div>
+      <div style="{{ w8 }}"><div style="position:relative;width:402px;height:874px;overflow:hidden;border-radius:48px"><div style="position:absolute;top:-52px;left:-48px"><dc-import name="Noop Act 8 - Goals and Labs" show-notes="{{ false }}" screen="{{ s8 }}" nav-seq="{{ seq }}" schedule="{{ sched }}" on-nav="{{ nav }}" hint-size="402px,874px"></dc-import></div></div></div>
+      <div style="{{ w9 }}"><div style="position:relative;width:402px;height:874px;overflow:hidden;border-radius:48px"><div style="position:absolute;top:-52px;left:-48px"><dc-import name="Noop Act 9 - The Instrument" show-notes="{{ false }}" screen="{{ s9 }}" nav-seq="{{ seq }}" schedule="{{ sched }}" on-nav="{{ nav }}" hint-size="402px,874px"></dc-import></div></div></div>
+      <sc-if value="{{ barUp }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ barTap }}" style="position:absolute;left:14px;right:14px;bottom:90px;height:46px;border-radius:16px;background:rgba(23,28,26,.94);backdrop-filter:blur(20px);border:.5px solid rgba(242,180,92,.34);box-shadow:0 8px 26px rgba(0,0,0,.55);display:flex;align-items:center;gap:10px;padding:0 14px;cursor:pointer;z-index:9">
+          <span style="width:6px;height:6px;flex:none;border-radius:50%;background:#F2B45C"></span>
+          <span style="font-size:12.5px;font-weight:600;color:#EDF1EF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ barName }}</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:15px;font-weight:400;color:#F6DCB4;font-variant-numeric:tabular-nums;margin-left:auto;flex:none">{{ barTime }}</span>
+          <span style="{{ barRightStyle }}">{{ barRight }}</span>
+        </div>
+      </sc-if>
+    </div>
+
+    <span style="max-width:520px;text-align:center;font-size:11.5px;line-height:1.7;color:#5E6764;text-wrap:pretty">Each act keeps its own place, so switching acts and coming back lands you where you left off. Static data — nothing is wired to a strap yet.</span>
+  </main>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;schedule&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;day&quot;,&quot;night&quot;],&quot;default&quot;:&quot;day&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+const ACTS = [
+  { key: 'night', n: '1', name: 'The night', hint: 'sleep, tonight, why', home: 'rest',
+    screens: [['rest', 'Rest'], ['tonight', 'Tonight'], ['alarm', 'Smart alarm'], ['why', 'Why last night'], ['debt', 'Sleep debt']] },
+  { key: 'day', n: '2', name: 'The day', hint: 'today, vitals, stress', home: 'today',
+    screens: [['today', 'Today'], ['inbox', 'Updates'], ['charge', 'Where it went'], ['day', 'The day so far'], ['vitals', 'Vitals'], ['stress', 'Stress'], ['heart', 'Live heart rate'],
+      ['breathe', 'Breathe'], ['bcatalog', 'Eighteen protocols'], ['bplayer', 'The pacer'], ['bsweep', 'Finding your pace'], ['bfound', 'Your pace']] },
+  { key: 'effort', n: '3', name: 'The effort', hint: 'session, live, after', home: 'session',
+    screens: [['session', "Today's session"], ['pick', 'Choose something else'], ['ready', 'Ready'], ['live', 'In the effort'], ['intervals', 'Intervals'], ['detail', 'After'], ['across', 'Every session, in aggregate']] },
+  { key: 'picture', n: '4', name: 'The bigger picture', hint: 'trends, capacity, year', home: 'trends',
+    screens: [['trends', 'Trends'], ['capacity', 'Capacity'], ['rhythm', 'Rhythm'], ['year', 'The year so far']] },
+  { key: 'plumbing', n: '5', name: 'The plumbing', hint: 'you, strap, settings, lab', home: 'you',
+    screens: [['you', 'You'], ['record', 'Your record'], ['zones', 'Zones'], ['history', 'History'], ['strap', 'Your strap'], ['apple', 'Apple Health'], ['notifs', 'Notification buzz'], ['devices', 'Manage straps'], ['data', 'Data & privacy'], ['import', 'Bring history in'], ['reading', 'Reading a file'], ['imported', 'What was written'], ['rejected', 'The wrong file'], ['backup', 'Backup and sync'], ['position', 'What we will not ask'], ['settings', 'Settings'], ['automations', 'Automations'], ['widgets', 'Widgets'], ['lab', 'The Lab'], ['onboard', 'Onboarding'], ['pair', 'Pair the strap']] },
+  { key: 'ages', n: '6', name: 'Your ages', hint: 'body age, drivers, health', home: 'ages',
+    screens: [['ages', 'Your ages'], ['building', 'The first week'], ['driver', 'A driver'], ['method', 'How it is figured'], ['health', 'Health hub']] },
+  { key: 'svea', n: '7', name: 'Svea', hint: 'coach, key, consent', home: 'coach',
+    screens: [['coach', 'The coach'], ['gate', 'No provider yet'], ['setup', 'Provider and key'], ['consent', 'What it may read'], ['memory', 'Memory']] },
+  { key: 'labs', n: '8', name: 'Goals and labs', hint: 'journey, bloodwork', home: 'goal',
+    screens: [['goal', 'Journey'], ['set', 'Set the goal'], ['labs', 'Biomarkers'], ['picker', 'Photograph a report'], ['review', 'Review a photo'], ['marker', 'One marker']] },
+  { key: 'instrument', n: '9', name: 'The instrument', hint: 'index, dossier, effects', home: 'index',
+    screens: [['index', 'Ask it something'], ['metric', 'One signal'], ['compare', 'Two at once'], ['effects', 'What moves you']] },
+];
+
+class Component extends DCLogic {
+  state = {
+    act: 'day', seq: 0, sched: null, sess: null, sessT0: 0, tick: 0, sheet: null, sheetSeq: 0, doneName: '', doneMins: 0, doneKm: 0, doneAt: 0,
+    at: { night: 'rest', day: 'today', effort: 'session', picture: 'trends', ages: 'ages', plumbing: 'you', svea: 'coach', labs: 'goal', instrument: 'index' }
+  };
+
+  componentDidMount() {
+    const self = this;
+    this.t = setInterval(function () { if (self.state.sess) self.setState({ tick: Date.now() }); }, 1000);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+
+  go(act, screen) {
+    // 'log' is the + arriving from an act with no sheet of its own: today, sheet up
+    const sheet = screen === 'log';
+    const scr = sheet ? 'today' : screen;
+    this.setState(s => ({
+      act: act, seq: s.seq + 1,
+      sheet: sheet ? 'log' : s.sheet, sheetSeq: sheet ? s.sheetSeq + 1 : s.sheetSeq,
+      at: Object.assign({}, s.at, scr ? { [act]: scr } : null)
+    }));
+  }
+
+  componentDidUpdate(prev) {
+    if (prev.schedule !== this.props.schedule && this.props.schedule) this.setState({ sched: this.props.schedule });
+  }
+
+  renderVals() {
+    const self = this;
+    const S = this.state;
+    // ── the session lives here, above the tab bar, so leaving the screen cannot end it
+    const sess = S.sess;
+    const el = sess ? Math.max(0, Math.round((Date.now() - S.sessT0) / 1000)) : 0;
+    const pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    const sched = S.sched || this.props.schedule || 'day';
+    const cur = ACTS.filter(a => a.key === S.act)[0] || ACTS[1];
+    const curScreen = S.at[cur.key];
+    const flat = [];
+    ACTS.forEach(a => a.screens.forEach(sc => flat.push(a.key + '/' + sc[0])));
+    const idx = flat.indexOf(cur.key + '/' + curScreen) + 1;
+
+    const pill = on => 'flex:1;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;cursor:pointer;' +
+      (on ? 'background:#17A2E6;color:#04121A' : 'color:#8A938F');
+
+    const vals = {
+      sched: sched, seq: S.seq, sheet: S.sheet, sheetSeq: S.sheetSeq, doneName: S.doneName, doneMins: S.doneMins, doneKm: S.doneKm, doneAt: S.doneAt,
+      onSession: function (s) {
+        if (s && !self.state.sess) self.setState({ sess: s, sessT0: Date.now() });
+        else if (s) self.setState({ sess: s });
+        // a session that ends is a session today's card has to carry
+        else if (self.state.sess) {
+          const d = self.state.sess;
+          self.setState({ sess: null, doneName: d.name, doneMins: d.mins || 0, doneKm: d.km || 0, doneAt: Date.now() });
+        }
+      },
+      barUp: !!sess && !(S.act === 'effort' && (curScreen === 'live' || curScreen === 'intervals')),
+      barName: sess ? sess.name : '',
+      barTime: pad(Math.floor(el / 60)) + ':' + pad(el % 60),
+      barRight: sess && sess.paused ? 'Paused' : '148 bpm',
+      barRightStyle: 'font-size:11.5px;font-weight:600;flex:none;color:' + (sess && sess.paused ? '#8B958F' : '#C6CEC9'),
+      barTap: function () { self.go('effort', sess ? sess.screen : 'live'); },
+      nav: (a, sc) => self.go(a, sc),
+      goHome: () => self.go('day', 'today'),
+      setDay: () => self.setState({ sched: 'day' }),
+      setNight: () => self.setState({ sched: 'night' }),
+      dayPill: pill(sched === 'day'),
+      nightPill: pill(sched === 'night'),
+      actKicker: 'Act ' + cur.n + ' · ' + cur.name,
+      screenName: (cur.screens.filter(sc => sc[0] === curScreen)[0] || ['', ''])[1],
+      position: idx + ' / ' + flat.length,
+      shellBlurb: 'Full app · nine acts · ' + flat.length + ' screens. Tap the phone — the tab bar crosses acts, and a rightward swipe goes back.',
+      acts: ACTS.map(a => {
+        const on = a.key === S.act;
+        return {
+          n: a.n, name: a.name, hint: a.hint, open: on, count: a.screens.length,
+          tap: () => self.go(a.key, null),
+          row: 'display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;cursor:pointer;' +
+            (on ? 'background:rgba(23,162,230,.11)' : ''),
+          num: 'width:20px;height:20px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font:600 10px ui-monospace,Menlo,monospace;' +
+            (on ? 'background:#17A2E6;color:#04121A' : 'background:rgba(255,255,255,.07);color:#8A938F'),
+          label: 'font-family:Outfit,sans-serif;font-size:14.5px;font-weight:500;letter-spacing:-.01em;white-space:nowrap;' +
+            (on ? 'color:#EDF1EF' : 'color:#A9B2AE'),
+          screens: a.screens.map(sc => {
+            const sel = on && sc[0] === curScreen;
+            return {
+              label: sc[1],
+              tap: () => self.go(a.key, sc[0]),
+              row: 'display:flex;align-items:center;gap:9px;padding:6px 10px;border-radius:9px;cursor:pointer;font-size:12px;' +
+                (sel ? 'color:#EDF1EF;background:rgba(255,255,255,.05);font-weight:600' : 'color:#7F8A85'),
+              dot: 'width:4px;height:4px;flex:none;border-radius:50%;background:' + (sel ? '#17A2E6' : 'rgba(255,255,255,.18)')
+            };
+          })
+        };
+      })
+    };
+    ACTS.forEach((a, i) => {
+      vals['s' + (i + 1)] = S.at[a.key];
+      vals['w' + (i + 1)] = a.key === S.act ? 'display:block' : 'display:none';
+    });
+    return vals;
+  }
+}
+
+</script>
+</body>
+</html>

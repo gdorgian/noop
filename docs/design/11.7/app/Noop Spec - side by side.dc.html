@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF}
+a{color:#8FD3F5;text-decoration:none}a:hover{color:#9FE2FB}
+*{-webkit-tap-highlight-color:transparent}
+.md h1{font-family:'Outfit',sans-serif;font-size:29px;font-weight:400;letter-spacing:-.03em;margin:0 0 14px;line-height:1.15}
+.md h2{font-family:'Outfit',sans-serif;font-size:22px;font-weight:400;letter-spacing:-.025em;margin:38px 0 12px;padding-top:22px;border-top:.5px solid rgba(255,255,255,.09);line-height:1.2}
+.md h3{font-size:14px;font-weight:600;margin:26px 0 10px;color:#EDF1EF}
+.md p{font-size:13.5px;line-height:1.62;color:#C6CEC9;margin:0 0 12px;max-width:660px;text-wrap:pretty}
+.md em{font-family:'Instrument Serif',serif;font-style:italic;color:#C9D0EE}
+.md strong{font-weight:600;color:#EDF1EF}
+.md code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9FE2FB;background:rgba(23,162,230,.09);padding:1.5px 5px;border-radius:5px}
+.md pre{background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:14px;padding:14px 16px;overflow-x:auto;margin:0 0 14px}
+.md pre code{background:none;padding:0;color:#C6CEC9;font-size:11.5px;line-height:1.6}
+.md ul,.md ol{margin:0 0 14px;padding-left:20px}
+.md li{font-size:13.5px;line-height:1.6;color:#C6CEC9;margin-bottom:5px;max-width:640px}
+.md table{border-collapse:collapse;margin:0 0 16px;border:.5px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;font-size:12.5px;width:100%;max-width:760px}
+.md th{text-align:left;padding:9px 13px;background:rgba(255,255,255,.04);font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#8B958F;white-space:nowrap}
+.md td{padding:10px 13px;border-top:.5px solid rgba(255,255,255,.06);color:#C6CEC9;line-height:1.5;vertical-align:top}
+.md hr{border:0;border-top:.5px solid rgba(255,255,255,.09);margin:32px 0}
+.md blockquote{margin:0 0 14px;padding-left:14px;border-left:2px solid rgba(23,162,230,.4);color:#939C97;font-size:13px}
+.tag{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;font-weight:600;padding:1.5px 6px;border-radius:5px}
+.hb::-webkit-scrollbar{width:0;height:0}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;min-height:0;overflow:hidden;align-items:stretch">
+
+  <div class="hb" style="flex:none;width:250px;min-height:0;overflow-y:auto;border-right:.5px solid rgba(255,255,255,.09);padding:30px 0 60px">
+    <div style="padding:0 22px 20px">
+      <div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#8B958F">Noop</div>
+      <div style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:400;letter-spacing:-.02em;margin-top:4px">Implementation spec</div>
+      <div style="font-size:11px;line-height:1.5;color:#7F8A85;margin-top:7px">48 screens &#183; 402&#215;874 &#183; points</div>
+    </div>
+    <sc-for list="{{ nav }}" as="s" hint-placeholder-count="14">
+      <div onClick="{{ s.pick }}" style="{{ s.style }}">
+        <span style="{{ s.labelStyle }}">{{ s.label }}</span>
+        <span style="{{ s.metaStyle }}">{{ s.meta }}</span>
+      </div>
+    </sc-for>
+    <div style="padding:20px 22px 0;margin-top:14px;border-top:.5px solid rgba(255,255,255,.09)">
+      <div onClick="{{ togglePhone }}" style="{{ phoneBtn }}">{{ phoneLabel }}</div>
+      <div style="font-size:10.5px;line-height:1.5;color:#7F8A85;margin-top:10px">The prototype is the reference for every number. Where it disagrees with the spec, it wins &#8212; and the spec has a typo worth reporting.</div>
+    </div>
+  </div>
+
+  <div class="hb md" style="box-sizing:border-box;flex:1 1 auto;min-width:640px;min-height:0;overflow-y:auto;padding:44px 52px 140px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:26px">
+      <span class="tag" style="background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.09);color:#939C97">[static] final &#183; type it exactly</span>
+      <span class="tag" style="background:rgba(23,162,230,.1);border:.5px solid rgba(23,162,230,.26);color:#9FE2FB">[bound] real data</span>
+      <span class="tag" style="background:rgba(224,138,155,.1);border:.5px solid rgba(224,138,155,.26);color:#F6D3DA">[formula] derive it</span>
+      <span class="tag" style="background:rgba(242,180,92,.1);border:.5px solid rgba(242,180,92,.3);color:#F2B45C">[proto] do not build</span>
+    </div>
+    <div>{{ doc }}</div>
+  </div>
+
+  <sc-if value="{{ showPhone }}" hint-placeholder-val="{{ true }}">
+  <div style="flex:0 1 452px;min-width:300px;min-height:0;border-left:.5px solid rgba(255,255,255,.09);display:flex;flex-direction:column;background:#080A09">
+    <div style="flex:none;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:.5px solid rgba(255,255,255,.09)">
+      <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#8B958F">The prototype</span>
+      <a href="./design_handoff_noop_app/Noop app - standalone (open me).html" target="_blank" style="font-size:11.5px;font-weight:600">Open full &#8599;</a>
+    </div>
+    <iframe src="./design_handoff_noop_app/Noop app - standalone (open me).html" style="flex:1;width:100%;border:0;background:#0A0C0B"></iframe>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  // The doc pane needs 640px to hold the spec's measurement tables, so the phone column is the
+  // one that yields: it is off by default until there is room for both.
+  state = {
+    file: 'spec/00-RULES.md', src: '', err: '',
+    showPhone: typeof window !== 'undefined' && window.innerWidth >= 1200
+  };
+
+  static FILES = [
+    ['spec/README.md', 'Start here', 'index'],
+    ['spec/00-RULES.md', 'The twelve rules', 'fidelity'],
+    ['spec/10-tokens.md', 'Tokens', 'colour + metrics'],
+    ['spec/20-primitives.md', 'The primitives', '14 of them'],
+    ['spec/30-routes.md', 'Routes and state', 'every tap'],
+    ['spec/acts/40-act1-night.md', 'Act 1 — The night', '4 screens'],
+    ['spec/acts/41-act2-day.md', 'Act 2 — The day', '6 screens'],
+    ['spec/acts/42-act3-effort.md', 'Act 3 — The effort', '6 screens'],
+    ['spec/acts/43-act4-trends.md', 'Act 4 — The bigger picture', '4 screens'],
+    ['spec/acts/44-act5-plumbing.md', 'Act 5 — The plumbing', '13 screens'],
+    ['spec/acts/45-act6-ages.md', 'Act 6 — Your ages', '5 screens'],
+    ['spec/acts/46-act7-svea.md', 'Act 7 — Svea', '5 screens'],
+    ['spec/acts/47-act8-goals.md', 'Act 8 — Goals and labs', '5 screens'],
+  ];
+
+  componentDidMount() {
+    this.load(this.state.file);
+    // Auto-yield the phone column when the window can no longer hold both, unless the user has
+    // said otherwise this session.
+    this._onResize = () => {
+      if (this._userSet) return;
+      const room = window.innerWidth >= 1200;
+      if (room !== this.state.showPhone) this.setState({ showPhone: room });
+    };
+    window.addEventListener('resize', this._onResize);
+  }
+
+  componentWillUnmount() { window.removeEventListener('resize', this._onResize); }
+
+  load(file) {
+    this.setState({ file: file, src: '', err: '' });
+    fetch(file)
+      .then(r => r.ok ? r.text() : Promise.reject(r.status))
+      .then(t => this.setState({ src: t }))
+      .catch(e => this.setState({ err: 'Could not load ' + file + ' (' + e + ')' }));
+  }
+
+  // Minimal markdown → React. Handles the subset the spec files actually use:
+  // headings, tables, fenced code, lists, hr, and inline code/bold/italic/tags.
+  inline(text, key) {
+    const parts = [];
+    // The spec authors provenance tags inside backticks (`[static]`), so the code-span branch
+    // would otherwise swallow all 344 of them. Route them to the tag branch first.
+    const TAG = /^`?\[(?:static|bound|formula|proto)\]`?$/;
+    const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(\[(?:static|bound|formula|proto)\])/g;
+    let last = 0, m, i = 0;
+    while ((m = re.exec(text))) {
+      if (m.index > last) parts.push(text.slice(last, m.index));
+      const t = m[0];
+      if (t.startsWith('`') && !TAG.test(t)) parts.push(React.createElement('code', { key: key + 'c' + i++ }, t.slice(1, -1)));
+      // Recurse, so a code span nested inside bold/italic renders as code rather than printing
+      // its literal backticks.
+      else if (t.startsWith('**')) parts.push(React.createElement('strong', { key: key + 'b' + i++ }, this.inline(t.slice(2, -2), key + 'bn' + i)));
+      else if (TAG.test(t)) {
+        const kind = t.replace(/^`|`$/g, '').slice(1, -1);
+        const colour = kind === 'bound' ? ['rgba(23,162,230,.1)', 'rgba(23,162,230,.26)', '#9FE2FB']
+          : kind === 'formula' ? ['rgba(224,138,155,.1)', 'rgba(224,138,155,.26)', '#F6D3DA']
+          : kind === 'proto' ? ['rgba(242,180,92,.1)', 'rgba(242,180,92,.3)', '#F2B45C']
+          : ['rgba(255,255,255,.05)', 'rgba(255,255,255,.09)', '#939C97'];
+        parts.push(React.createElement('span', {
+          key: key + 't' + i++, className: 'tag',
+          style: { background: colour[0], border: '.5px solid ' + colour[1], color: colour[2], marginRight: 2 }
+        }, kind));
+      } else parts.push(React.createElement('em', { key: key + 'i' + i++ }, this.inline(t.slice(1, -1), key + 'in' + i)));
+      last = m.index + t.length;
+    }
+    if (last < text.length) parts.push(text.slice(last));
+    return parts;
+  }
+
+  render(src) {
+    const lines = src.split('\n');
+    const out = [];
+    let i = 0, k = 0;
+
+    const cells = row => row.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      if (/^```/.test(line)) {
+        const buf = [];
+        i++;
+        while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
+        i++;
+        out.push(React.createElement('pre', { key: k++ }, React.createElement('code', null, buf.join('\n'))));
+        continue;
+      }
+
+      if (/^\|/.test(line) && i + 1 < lines.length && /^\|[\s:|-]+\|$/.test(lines[i + 1])) {
+        const head = cells(line);
+        i += 2;
+        const rows = [];
+        while (i < lines.length && /^\|/.test(lines[i])) { rows.push(cells(lines[i])); i++; }
+        out.push(React.createElement('table', { key: k++ }, [
+          React.createElement('thead', { key: 'h' },
+            React.createElement('tr', null, head.map((c, n) => React.createElement('th', { key: n }, this.inline(c, k + 'h' + n))))),
+          React.createElement('tbody', { key: 'b' }, rows.map((r, rn) =>
+            React.createElement('tr', { key: rn }, r.map((c, cn) =>
+              React.createElement('td', { key: cn }, this.inline(c, k + 'r' + rn + cn))))))
+        ]));
+        continue;
+      }
+
+      const h = line.match(/^(#{1,4})\s+(.*)$/);
+      if (h) {
+        out.push(React.createElement('h' + Math.min(h[1].length, 3), { key: k++ }, this.inline(h[2], k)));
+        i++; continue;
+      }
+
+      if (/^---+$/.test(line)) { out.push(React.createElement('hr', { key: k++ })); i++; continue; }
+
+      if (/^\s*[-*]\s+/.test(line) || /^\s*\d+\.\s+/.test(line)) {
+        const ordered = /^\s*\d+\.\s+/.test(line);
+        const items = [];
+        while (i < lines.length && (/^\s*[-*]\s+/.test(lines[i]) || /^\s*\d+\.\s+/.test(lines[i]) || /^\s{2,}\S/.test(lines[i]))) {
+          if (/^\s{2,}\S/.test(lines[i]) && items.length) items[items.length - 1] += ' ' + lines[i].trim();
+          else items.push(lines[i].replace(/^\s*(?:[-*]|\d+\.)\s+/, ''));
+          i++;
+        }
+        out.push(React.createElement(ordered ? 'ol' : 'ul', { key: k++ },
+          items.map((t, n) => React.createElement('li', { key: n }, this.inline(t, k + 'l' + n)))));
+        continue;
+      }
+
+      if (!line.trim()) { i++; continue; }
+
+      const buf = [line];
+      i++;
+      while (i < lines.length && lines[i].trim() && !/^[|#`>-]/.test(lines[i]) && !/^\s*[-*]\s/.test(lines[i])) { buf.push(lines[i]); i++; }
+      out.push(React.createElement('p', { key: k++ }, this.inline(buf.join(' '), k)));
+    }
+    return out;
+  }
+
+  renderVals() {
+    const self = this;
+    const file = this.state.file;
+
+    return {
+      showPhone: this.state.showPhone,
+      phoneLabel: this.state.showPhone ? 'Hide the prototype' : 'Show the prototype',
+      phoneBtn: {
+        fontSize: 12, fontWeight: 600, padding: '10px 12px', borderRadius: 13, textAlign: 'center',
+        cursor: 'pointer', background: 'rgba(255,255,255,.06)', border: '.5px solid rgba(255,255,255,.09)',
+        color: '#C6CEC9'
+      },
+      togglePhone: () => { this._userSet = true; this.setState(s => ({ showPhone: !s.showPhone })); },
+
+      nav: Component.FILES.map(f => {
+        const on = f[0] === file;
+        return {
+          label: f[1], meta: f[2],
+          pick: () => self.load(f[0]),
+          style: {
+            display: 'flex', flexDirection: 'column', gap: 2, padding: '9px 22px', cursor: 'pointer',
+            borderLeft: '2px solid ' + (on ? '#17A2E6' : 'transparent'),
+            background: on ? 'rgba(23,162,230,.07)' : 'transparent'
+          },
+          labelStyle: { fontSize: 12.5, fontWeight: on ? 600 : 400, color: on ? '#EDF1EF' : '#C6CEC9' },
+          metaStyle: { fontSize: 10.5, color: on ? '#8FD3F5' : '#7F8A85' }
+        };
+      }),
+
+      doc: this.state.err
+        ? React.createElement('p', { style: { color: '#F2B45C' } }, this.state.err
+            + ' — open this file from the project root so the spec files resolve.')
+        : this.state.src
+          ? this.render(this.state.src)
+          : React.createElement('p', { style: { color: '#7F8A85' } }, 'Loading…')
+    };
+  }
+}
+</script>
+</body>
+</html>

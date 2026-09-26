@@ -1,0 +1,382 @@
+NOOP AURA — WHERE THE PLAN STANDS, AND WHAT IS LEFT
+Design status · 2026-09-18, second pass
+Against: "Noop Aura 11.7 Plan" (spec/90-aura-11.7.md) · branch
+integration/noop-aura-upstream-11.7, last read at head 5bdd07b30
+
+
+THE SHAPE OF IT
+
+  Four waves. 69 → 82 screens, one new act.
+
+    Wave 1   the first impression and the paperwork ......... CLOSED
+    Wave 2   Act 10 · The lift ............................... CLOSED
+    Wave 3   the merged engines get faces .................... DRAWN
+    Wave 4   Svea, and the outside of the app ................ not started
+
+  All five decisions are settled, all six of my questions came back, and every
+  call engineering asked me for on 18 September is answered in
+  "Noop Aura - design answers, 18 September.txt". Nothing in waves 3 and 4 is
+  blocked: every engine, store and model they need is in the tree and named.
+
+  WAVE 2 IS CLOSED, NOT JUST DRAWN. The eight screens were drawn on the 18th;
+  what closed it was the round of answers the same day — the attribution line,
+  the routes, the tint, pause, and the terms patch design owed. The three
+  states their sheet found missing are now in the drawing: the credit slot's
+  two cases, the bar's "ready", and the Lock Screen activity with its empty
+  detail. What is left on wave 2 is engineering's build of it.
+
+
+════════════════════════════════════════════════════════════════════════
+DONE — WAVE 1, CLOSED
+════════════════════════════════════════════════════════════════════════
+
+1a · STRINGS AND RENAMES
+
+  · The step position kept, its reason rewritten. New third denial on
+    you/position: steps feed the spend estimate and nothing else, no tally,
+    no target. Two prototype files render it — you/position and
+    "What We Will Not Ask" (onboard's panel does not enumerate the five).
+  · The steps entry removed from Act 9's registry, in the same change as the
+    string. That removal also takes the picker option and the correlation
+    candidate with it, which is the point: the position has to hold on the
+    screen that shows everything.
+  · Voice → Manner in Act 7 setup and Act 5's Svea row, option list unified
+    to four stops.
+  · Manner → Off finished 17 September with engineering's sentence. Act 7 is
+    at four options; the brief becomes the single "nothing was fetched" line,
+    kicker "Not briefed · off", and the proactive block dims to 0.48 and
+    stops taking touches. This was wave 1's last held item.
+
+1b · THE TWO LAUNCH SCREENS
+
+  · plumbing/terms — the gate, both states. Plain summary first and accurate,
+    then the line that keeps it honest: that is the summary, and the summary
+    is not the agreement. The changed-since state names the two sections that
+    moved and marks them in place. Act 5 is at its full 22 screens.
+  · day/release — What's new, both states (bump and bell). Four readings
+    written as facts about the app. The spend reading is a gauge, not a flame.
+    Act 2 is at 13 of 14; day/energy lands in wave 3.
+
+1c · THE SMALL SURFACES
+
+  · The restore guard — a dialog, three parts, not red, both buttons the same
+    weight. It is the wearer's own file out of their own Files and the copy
+    says so.
+  · The oversize-backup notice — deliberately not a dialog. A fact about a
+    file, said at export because at restore it is too late to have chosen the
+    CSV instead.
+  · Device inventory on plumbing/data; Apple Health sync figures on
+    plumbing/apple, with the line that stops 1,100 skipped rows reading as a
+    broken bridge.
+
+
+════════════════════════════════════════════════════════════════════════
+DONE — WAVE 2, ACT 10 · THE LIFT
+════════════════════════════════════════════════════════════════════════
+
+Prototype: "Noop Act 10 - The Lift.dc.html". Eight screens, every state in
+the matrix, the bar's lift variant, the session-collision refusal. Recorded in
+spec §12, which wins over §3.1 where they differ.
+
+  ROUTE IDS, prefixed, unique across the flat enum, and the same strings the
+  QA launch argument uses:
+
+    lift-live · lift-library · lift-program · lift-detail
+    lift-edit · lift-import · lift-review · lift-muscles
+
+  THE TAB: Today. A gym session is an effort. Five tabs, unchanged.
+
+  THE FOUR STATES THAT CARRY THE ACT
+
+    · lift-live · bare — the default drawing. A program line that is nothing
+      but a name: no prefilled numbers, no six em-dashes. The decorated
+      variant carries the progression reason beside the exercise.
+    · lift-live · last — the drop set expanding: one planned set as rows
+      3a, 3b, 3c, with the cluster note. The case that breaks fixed layouts.
+    · lift-review — summary-and-commit, because the file carries no per-set
+      provenance, and the screen says so rather than faking checkboxes.
+    · lift-library · collision — the refusal. Three parts, no red, no End
+      button, neither action styled as the safe one. "Go to it" / "Not now".
+
+  MUSCLES, CORRECTED. 33 muscles in 7 regions, not nineteen in four. The unit
+  is credited sets from the merged projection — 1.0 primary, 0.5 secondary,
+  stabilisers nothing — and the screen states that arithmetic at the top.
+  Group headers come from the region derivation, never the parent chain.
+  Work in aura blue, recovery in lavender, never amber.
+
+  SIX MEASUREMENT MODES, one row that changes shape, drawn on lift-program
+  with the catalogue counts. No second unit switch in the act.
+
+  ONE BAR, TWO CONTENTS — AND A THIRD STATE. Same 46 pt bar, same four slots,
+  same order: the exercise name replaces the workout name, the clock counts the
+  set or the rest, and the set counter takes the heart rate's place. Blue while
+  worked, neutral while resting, and READY where the rest has run out but the
+  next set has not started — the state a drawing forgets.
+
+  THE LOCK SCREEN ACTIVITY, drawn as its own screen (screen: activity) because
+  the neutral had to be chosen where it is read: WORKING #17A2E6, RESTING
+  #C6CEC9, one opaque value per state. Four cases, including the one where
+  neither reps nor weight is known and the numbers slot is absent.
+
+  THE CATALOGUE CREDIT is one line per session, not a field per exercise. It is
+  on lift-library always, and on lift-detail when that session used a catalogue
+  exercise. Noop does not credit Noop, so the built-in and your-own cases print
+  nothing at all.
+
+  PAUSE stops both clocks and holds the part-typed set. It is not "I have left
+  the gym"; leaving is Finish. One control, on lift-live — the bar has none.
+
+  ALSO DRAWN: warm-ups excluded from every stated figure and said out loud
+  where the count changes; the strap's double-tap taught on lift-live; the
+  archived program read-only with no chevron, no grip and no instruction to
+  do a thing it does not offer.
+
+
+════════════════════════════════════════════════════════════════════════
+WAVE 3, THE MERGED ENGINES GET FACES — ALL FIVE DRAWN
+════════════════════════════════════════════════════════════════════════
+
+Prototype: "Noop Act 2 - The Day.dc.html", now at its full 14 screens. One
+prop, energyCase, switches the five readings: measured · learning · partial ·
+steps · cold.
+
+  3a · THE ENERGY CARD, on today — DRAWN
+       "What today has cost", between the day's shape and today's session.
+       Four things in reading order: what it measured, the basal-against-active
+       split, where the day is heading AS A RANGE, and how much of the day it
+       saw — in words at the foot, never a percentage chip. The confidence chip
+       sits in the header's trailing slot, in Act 2's own hue, and solid is
+       plain.
+
+       THE ONE DECISION WORTH READING: the thin-number answer here is rule 7's
+       INTERVAL, not rule 13's withholding. The band widens continuously as
+       coverage falls (0.10 + 0.20 x (1 - coverage)), so steps-only shows a
+       RANGE where a measured day shows a figure, and the card never publishes
+       a point value it cannot stand behind. Only the cold start has no
+       measured spend at all, and there the one figure Noop can always stand
+       behind — estimatedBMR24h — is stated flat as "about", with the chip
+       carrying the reason. §9.2's withholding applies to a thin score; a
+       model stated as a model is not one.
+
+       Spend only throughout: no target, no deficit, nothing remaining. A past
+       day loses the projection entirely — a forecast for yesterday is not a
+       forecast.
+
+  3b · day/energy — Act 2's 14th screen — DRAWN
+       The hero and the split, then the day hour by hour: solid columns for
+       measured hours, HAIRLINE COLUMNS at modelled basal for the hours it did
+       not see. Same idea as the gauge's ghost ticks — a gap is not a zero, and
+       drawing it as one would be the lie the whole card is built to avoid.
+       Then "What it read" in four rows: source, coverage as a figure, the
+       unattributed heart-rate time named plainly, and the forecast's width.
+
+       ONE RULE HOLDS BOTH SURFACES, AND IT IS WHY THE FIGURES MOVED: an
+       unmeasured hour contributes NOTHING to the figure and is drawn as a
+       hairline at its modelled basal. Coverage, the band and the prose are all
+       derived from the same measured-hours count, so no case can claim a gap
+       it does not draw or fold a modelled hour into a measured total.
+       Measured reads 1,280 over fifteen of sixteen hours; partial reads 910
+       over eleven, with the 09:20-13:40 gap drawn and uncounted.
+       Em dash and a reason wherever the engine returns nil. The spend-only
+       sentence is stated once, here, in the position screen's own words.
+
+  3c · WHAT CHANGED, a section in trends — Act 4 — DRAWN
+       Prototype: "Noop Act 4 - The Bigger Picture.dc.html", on "changed":
+       settled · alert · calibrating · quiet.
+
+       Placed under the four measured lines and above Showing up, so the screen
+       reads: verdict, then measurements, then events, then attendance. ONE
+       SHELL for all twelve kinds — leading rule, the fact, the detail, a
+       destination — because twelve kinds must not become twelve layouts.
+       PRIORITY SORTS AND NOTHING ELSE: tier moves a card up or down and never
+       makes one bigger, brighter or badged. healthAlert is the only amber, and
+       it sorts first because it is tier 1 rather than because it is amber; it
+       names what was measured and where to look, never a condition.
+
+       THE TIER CHECK ENGINEERING ASKED FOR, done. Their warning was that
+       dropping a tier-0 kind lets the feed render empty. It does not: the three
+       kinds that are always computable — calibrating, statusOverride,
+       strapBattery — ALL SURVIVE the cut of six. My tiers, for the build to
+       confirm against the engine's table:
+
+         t0  always computable, so the section can never be structurally empty
+             calibrating · statusOverride · strapBattery
+         t1  act on it today
+             healthAlert · restDayNeeded · trainingSuggestion · planDeviation ·
+             recoveryRead
+         t2  facts about the week
+             sleepCatchUp · hrvTrend · bedtimeTarget · milestone
+
+       The two quiet cases are drawn rather than described: "calibrating" is the
+       first-week face, with a tier-0 device fact under it proving the section
+       fills on day one; "quiet" is the settled week where nothing moved, which
+       says so in one card instead of padding itself out.
+
+  3d · THE WEIGHT TREND, in ages/health — Act 6 — DRAWN
+       Inline on the Body composition card's Weight row: direction and rate,
+       gated twice by 70-copy.md — the 0.5 kg noise threshold AND the six-week
+       window. Together they mean MOST WEARERS SEE NO DIRECTION FOR SIX WEEKS,
+       so "learning" is this design's normal state, not its empty one: it says
+       what it is waiting for rather than drawing a flat line. "steady" is the
+       other quiet case — window long enough, movement too small. No goal line,
+       no target, no "to go" figure, no projection. The sparkline appears only
+       once the window gate is passed, because a six-week line invites exactly
+       the reading the gate exists to prevent. The figure IS the series' last
+       reading, so the number and the line cannot disagree. On "weightTrend".
+
+  3e · instrument/raw AND instrument/capture — Act 9 — DRAWN
+       Reached by a third door on the index. Deliberately the most utilitarian
+       pair in Noop — monospaced figures, no editorial, no orb — because that
+       is how nobody mistakes it for a feature.
+
+       ARMED IS UNMISSABLE, which was the brief: the card changes ground, the
+       dot pulses, the clock doubles in size, and the screen says out loud that
+       recording will not stop on its own and will not stop when you leave the
+       screen. It names the battery cost in the same breath. Arm and Stop work
+       in the prototype. The list is files with sizes, not sessions.
+
+       On capture: duration, channels, rate, samples, dropped, size and source
+       as a monospaced table, then a per-channel strip that draws the DROPPED
+       samples as a flat stretch — the same rule as the energy chart, a gap
+       recorded rather than interpolated across. Export hands a file to the
+       share sheet and says that where it goes next is the wearer's decision.
+       Three states on "rawState": idle, armed, and none for the first visit.
+
+  3c · "What changed" in trends — Act 4
+       Twelve surviving kinds, one card shell, priority sorts rather than
+       decorates, healthAlert the only amber, and a calibrating state that is
+       the section's honest first week. The engine itself is genuinely new —
+       nothing in the tree computes this yet.
+       OWED BY ME FIRST: check my twelve against the kinds' priority tiers.
+       If a tier-0 kind is in the cut list, that cut becomes a render filter
+       rather than a deletion, or the feed can render empty.
+
+  3d · The weight trend, into ages/health's Body composition
+       Direction and rate inline, gated by the 0.5 kg noise threshold and the
+       six-week window — so most wearers see no direction for six weeks, and
+       that is the normal state, not the empty one. No goal, no target, no
+       "to go" figure.
+
+  3e · instrument/raw and instrument/capture — Act 9
+       Arm, stop, the list of captures, and one capture in full: channels,
+       rate, duration, size, export. Armed is unmissable. Allowed to look
+       utilitarian — monospaced figures, no editorial, no orb.
+
+
+════════════════════════════════════════════════════════════════════════
+WHAT IS LEFT — WAVE 4, SVEA AND THE OUTSIDE OF THE APP
+════════════════════════════════════════════════════════════════════════
+
+  4a · SVEA'S FOUR, all inside Act 7's existing screens. No new Svea screen.
+       · Voice input in the composer — Hold to speak, four states: idle,
+         recording, transcribing, not understood.
+       · The daily brief landing in an empty conversation, with a dateline.
+         One case only: the engine will not interrupt a chat in progress.
+       · Ask about a chart — one affordance, one position, on every chart in
+         Acts 2, 4, 6 and 9. Drawn once, placed by rule. The enable row goes
+         on consent, not setup, because it puts a picture of your own data on
+         the wire.
+       · The prompt library — the suggestion strip gains one More
+         affordance opening the curated set. Not a screen.
+
+  4b · THE WIDGET SET — one artefact, "Noop Widgets — the Aura set", at true
+       widget dimensions, every family with its populated and no-data face
+       side by side.
+       REVISED SCOPE, from engineering's count: six families ship today, not
+       three — glanceable, live HR activity, coach brief, heart rate, stress,
+       lift session. A rings widget exists in the target but is not in the
+       bundle. So the work is two new families (energy, and the Lift Live
+       Activity's three presentations) plus the rings decision, and the
+       plumbing/widgets sentence gets its real number only when this lands.
+       MY RECOMMENDATION ON RINGS: ship it. It is built.
+
+  4c · THE LIFT LIVE ACTIVITY — Lock Screen, and Dynamic Island compact and
+       expanded. All three read the same live session as the bar, all three
+       legible at a glance mid-set, all three in the bar's blue-and-neutral.
+
+  4d · THE ICON SET — Titanium (default), Aura (new), and Blued only if the
+       source art exists. Two if it does not; Blued retires rather than
+       shipping as a worse copy of itself. The Appearance row becomes a
+       three-up segmented control and stops saying Later.
+
+  4e · plumbing/widgets' count sentence, and the Trends section heading named
+       "What changed" in the build — both deliberately deferred to the wave
+       that makes them true.
+
+
+════════════════════════════════════════════════════════════════════════
+OPEN ITEMS, WITH OWNERS
+════════════════════════════════════════════════════════════════════════
+
+ENGINEERING
+
+  1. THE NINE SECTION HEADINGS FROM TERMS.md, VERBATIM — and whether the
+     reader hands the screen the preamble and the closing note separately from
+     the nine. The document is bundled now and headed 2.0, and TermsDocument
+     parses it; the drawing's headings are stand-ins until the real nine come
+     across. This is the only thing design is waiting on.
+  2. The per-release change list. Already authored, 278 releases deep in
+     AppChangelog.swift. day/release needs binding, not writing.
+  3. The Manner row's title match, once more: the row is "Manner", one word,
+     because it already sits under a Svea header. Storage key still untouched.
+  4. The momentum filter as a named list rather than a switch in a card
+     factory, so a cut kind cannot be reintroduced by the next merge, and a
+     cut kind never counts toward the section's badge or its empty state.
+
+DESIGN
+
+  5. Wave 4, in the spec's order: Svea's four (8a voice input, 8b the daily
+     brief, 8c ask-about-a-chart, 8d the prompt library), the widget sheet
+     "Noop Widgets — the Aura set", and plumbing/widgets' count sentence —
+     five you can add, two that arrive on their own — plus the line that says
+     why two of them lead with Charge.
+
+NO LONGER OPEN
+
+  · plumbing/terms' disabled-Accept state — DRAWN 18 September. Four
+    attestations, the ticks are the gate, Accept visible from the first pixel
+    and enabled only when all four are ticked, nothing gated on scroll depth.
+    Version chip at 2.0, nine sections.
+  · The catalogue attribution string — in hand, and in both drawings verbatim.
+  · The eight --noop-route arguments — in hand.
+  · The Live Activity tint — decided: #17A2E6 working, #C6CEC9 resting.
+  · Pause — decided: both clocks, and it is not a gym-exit state.
+  · The rings widget — registered. The count sentence is five, not eight.
+  · The momentum twelve against the priority tiers — CHECKED 18 September. No
+    cut kind was a tier-0 filler, so the six cuts cannot make the feed render
+    empty. The tier table is in 3c above and in the drawing's notes.
+  · Manner → Off's sentence — answered and drawn.
+  · lift/muscles' dependency on the DX muscle model — it merged.
+  · The Hevy importer's shape — whole sessions, no per-set provenance, so
+     review is summary-and-commit.
+  · An energy coverage floor — there is no floor; the ladder and the
+     confidence chip cover it.
+  · Icon source art — two icons unless the renders turn up.
+  · A measure preference to read — plumbing/record's, readable from any
+     screen. No new setting.
+
+
+════════════════════════════════════════════════════════════════════════
+THE FILES
+════════════════════════════════════════════════════════════════════════
+
+  Noop Act 10 - The Lift.dc.html ....... wave 2, eight screens + the Lock
+                                         Screen activity
+  Noop Act 2 - The Day.dc.html ......... wave 3a and 3b, at 14 screens
+  Noop Act 4 - The Bigger Picture.dc.html  wave 3c, What changed in trends
+  Noop Act 6 - Your Ages.dc.html ....... wave 3d, the weight trend
+  Noop Act 9 - The Instrument.dc.html .. wave 3e, raw and capture
+  Noop Aura - design answers, 18 September.txt ... the current reply
+  Noop Act 7 - Svea.dc.html ............ Manner, now at four options
+  Noop Act 5 - The Plumbing.dc.html .... terms gate, guard, notice, rows
+  Noop Act 2 - The Day.dc.html ......... day/release
+  Noop You - What We Will Not Ask ...... the step reason's second site
+  spec/90-aura-11.7.md ................. the plan; §9 answers, §10 wave 1b,
+                                         §11 wave 1c, §12 wave 2
+  Noop Aura 11.7 Plan - print.dc.html .. the plan, printable
+  Noop Aura 11.7 - wave 2 drawn, five answered.txt ... the current reply
+  spec/00-RULES.md · 70-copy.md ........ what wins on visuals, and on
+                                         sentences
+
+Every static string lives once, in the act file. Lift them from there rather
+than from this document.

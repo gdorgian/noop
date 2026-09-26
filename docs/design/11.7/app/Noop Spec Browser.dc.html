@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF}
+a{color:#8FD3F5;text-decoration:none}a:hover{color:#9FE2FB}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="display:flex;gap:0;align-items:flex-start;padding:0;min-height:100vh">
+
+  <div style="position:sticky;top:0;flex:none;width:236px;height:100vh;overflow-y:auto;border-right:.5px solid rgba(255,255,255,.09);padding:34px 0 60px;background:#0A0C0B">
+    <div style="padding:0 22px 22px">
+      <div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#8B958F">Noop</div>
+      <div style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:400;letter-spacing:-.02em;margin-top:5px">Redlines</div>
+      <div style="font-size:11px;line-height:1.55;color:#7F8A85;margin-top:8px;text-wrap:pretty">True-size anatomy for the nine primitives every screen is built from. Every number here is points at 402&#215;874.</div>
+    </div>
+    <div style="display:flex;flex-direction:column">
+      <a href="#p1" style="font-size:12.5px;padding:9px 22px;color:#C6CEC9;border-left:2px solid transparent" style-hover="background:rgba(255,255,255,.04);border-left-color:#17A2E6">1 &#183; Card</a>
+      <a href="#p2" style="font-size:12.5px;padding:9px 22px;color:#C6CEC9;border-left:2px solid transparent" style-hover="background:rgba(255,255,255,.04);border-left-color:#17A2E6">2 &#183; List row</a>
+      <a href="#p3" style="font-size:12.5px;padding:9px 22px;color:#C6CEC9;border-left:2px solid transparent" style-hover="background:rgba(255,255,255,.04);border-left-color:#17A2E6">3 &#183; Header + back</a>
+      <a href="#p4" style="font-size:12.5px;padding:9px 22px;color:#C6CEC9;border-left:2px solid transparent" style-hover="background:rgba(255,255,255,.04);border-left-color:#17A2E6">4 &#183; Toggle</a>
+      <a href="#p5" style="font-size:12.5px;padding:9px 22px;color:#C6CEC9;border-left:2px solid transparent" style-hover="background:rgba(255,255,255,.04);border-left-color:#17A2E6">5 &#183; Segmented</a>
+      <a href="#p6" style="font-size:12.5px;padding:9px 22px;color:#C6CEC9;border-left:2px solid transparent" style-hover="background:rgba(255,255,255,.04);border-left-color:#17A2E6">6 &#183; Chip</a>
+      <a href="#p7" style="font-size:12.5px;padding:9px 22px;color:#C6CEC9;border-left:2px solid transparent" style-hover="background:rgba(255,255,255,.04);border-left-color:#17A2E6">7 &#183; Battery chip</a>
+      <a href="#p8" style="font-size:12.5px;padding:9px 22px;color:#C6CEC9;border-left:2px solid transparent" style-hover="background:rgba(255,255,255,.04);border-left-color:#17A2E6">8 &#183; Tab bar</a>
+      <a href="#p9" style="font-size:12.5px;padding:9px 22px;color:#C6CEC9;border-left:2px solid transparent" style-hover="background:rgba(255,255,255,.04);border-left-color:#17A2E6">9 &#183; Charge gauge</a>
+      <a href="#type" style="font-size:12.5px;padding:9px 22px;color:#C6CEC9;border-left:2px solid transparent" style-hover="background:rgba(255,255,255,.04);border-left-color:#17A2E6">Type ruler</a>
+    </div>
+  </div>
+
+  <div style="flex:1;min-width:0;padding:52px 56px 120px;display:flex;flex-direction:column;gap:60px;max-width:1180px">
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#8B958F">Foundations pack &#183; 5 of 5</div>
+      <div style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:300;letter-spacing:-.03em;line-height:1.1">Redline overlays</div>
+      <div style="font-size:13.5px;line-height:1.55;color:#C6CEC9;max-width:620px;text-wrap:pretty">Each block below is the real component at true size on the real canvas, with every measurement that matters called out. Where a number here disagrees with a screen spec, this wins. Pair it with <span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#9FE2FB">20-primitives.md</span>, which carries the reasoning.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <span style="font-size:11px;font-weight:600;padding:5px 10px;border-radius:9px;background:rgba(23,162,230,.12);border:.5px solid rgba(23,162,230,.26);color:#9FE2FB">measurement</span>
+        <span style="font-size:11px;font-weight:600;padding:5px 10px;border-radius:9px;background:rgba(224,138,155,.12);border:.5px solid rgba(224,138,155,.26);color:#F6D3DA">gets broken most</span>
+        <span style="font-size:11px;font-weight:600;padding:5px 10px;border-radius:9px;background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.09);color:#939C97">0.5 px border, .continuous, strokeBorder</span>
+      </div>
+    </div>
+
+    <div id="p1" style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:none;width:402px;padding:24px 20px;background:#0A0C0B;border:.5px dashed rgba(255,255,255,.14);border-radius:8px;position:relative">
+        <div style="position:absolute;top:-9px;left:14px;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#7F8A85;background:#0A0C0B;padding:0 6px">402 pt stage</div>
+        <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:8px;position:relative">
+          <div style="font-size:14px;font-weight:600">Standard card</div>
+          <div style="font-size:13.5px;line-height:1.5;color:#C6CEC9">Fill #141817, radius 22, padding 16, border 0.5 white 6&#37;. No shadow, no gradient.</div>
+          <div style="position:absolute;left:0;top:-1px;bottom:-1px;width:16px;background:repeating-linear-gradient(45deg,rgba(23,162,230,.22) 0 3px,transparent 3px 6px);border-right:.5px dashed rgba(23,162,230,.5)"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+          <div style="height:.5px;flex:1;background:rgba(23,162,230,.4)"></div>
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#9FE2FB">padding 16 &#183; radius 22</span>
+          <div style="height:.5px;flex:1;background:rgba(23,162,230,.4)"></div>
+        </div>
+      </div>
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">1 &#183; Card</div>
+        <div style="display:flex;flex-direction:column;gap:0;border:.5px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden">
+          <div style="display:flex;padding:9px 14px;background:rgba(255,255,255,.04);font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#8B958F"><span style="flex:1">Kind</span><span style="width:70px">Radius</span><span style="width:150px">Padding</span></div>
+          <div style="display:flex;padding:10px 14px;font-size:12.5px;color:#C6CEC9;border-top:.5px solid rgba(255,255,255,.06)"><span style="flex:1">Standard</span><span style="width:70px;font-family:ui-monospace,Menlo,monospace">22</span><span style="width:150px;font-family:ui-monospace,Menlo,monospace">16</span></div>
+          <div style="display:flex;padding:10px 14px;font-size:12.5px;color:#C6CEC9;border-top:.5px solid rgba(255,255,255,.06)"><span style="flex:1">Row card</span><span style="width:70px;font-family:ui-monospace,Menlo,monospace">22</span><span style="width:150px;font-family:ui-monospace,Menlo,monospace">15 v &#183; 16 h</span></div>
+          <div style="display:flex;padding:10px 14px;font-size:12.5px;color:#C6CEC9;border-top:.5px solid rgba(255,255,255,.06)"><span style="flex:1">Hero card</span><span style="width:70px;font-family:ui-monospace,Menlo,monospace">24</span><span style="width:150px;font-family:ui-monospace,Menlo,monospace">20 / 18 / 18</span></div>
+          <div style="display:flex;padding:10px 14px;font-size:12.5px;color:#C6CEC9;border-top:.5px solid rgba(255,255,255,.06)"><span style="flex:1">List card</span><span style="width:70px;font-family:ui-monospace,Menlo,monospace">22</span><span style="width:150px;font-family:ui-monospace,Menlo,monospace">6 v &#183; 16 h</span></div>
+        </div>
+        <div style="font-size:12.5px;line-height:1.55;color:#F6D3DA;background:rgba(224,138,155,.09);border:.5px solid rgba(224,138,155,.24);border-radius:12px;padding:12px 14px;text-wrap:pretty">Do not use <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">NoopPanelSurface</span> or <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">.noopPanel()</span>. Both add a vertical gradient and an elevation this design does not have &#8212; that is what makes a faithful card read as a web div.</div>
+      </div>
+    </div>
+
+    <div id="p2" style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:none;width:402px;padding:24px 20px;background:#0A0C0B;border:.5px dashed rgba(255,255,255,.14);border-radius:8px">
+        <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 0;min-height:62px;box-sizing:border-box">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:13.5px;color:#EDF1EF">Mirror phone notifications</span>
+              <span style="font-size:11.5px;line-height:1.45;color:#7F8A85">About four percent of the strap&#8217;s day.</span>
+            </div>
+            <div style="width:46px;height:28px;border-radius:14px;background:#17A2E6;position:relative;flex:none">
+              <div style="position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#EDF1EF;transform:translateX(18px)"></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 0;min-height:62px;box-sizing:border-box;border-top:.5px solid rgba(255,255,255,.06)">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:13.5px;color:#EDF1EF">Only when the phone is locked</span>
+              <span style="font-size:11.5px;line-height:1.45;color:#7F8A85">If you are already looking at the screen, your wrist adds nothing.</span>
+            </div>
+            <div style="width:46px;height:28px;border-radius:14px;background:rgba(255,255,255,.09);position:relative;flex:none">
+              <div style="position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#EDF1EF"></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+          <div style="height:.5px;flex:1;background:rgba(23,162,230,.4)"></div>
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#9FE2FB">row 11 v &#183; gap 12 &#183; min-h 62 &#183; divider on row 2+</span>
+          <div style="height:.5px;flex:1;background:rgba(23,162,230,.4)"></div>
+        </div>
+      </div>
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">2 &#183; List row</div>
+        <div style="font-size:13.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">Half of all 48 screens are a stack of these. Label 13.5 <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9FE2FB">#EDF1EF</span>, sub-line 11.5 line-height 1.45 <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9FE2FB">#7F8A85</span>. The divider is a 0.5 pt top border on every row except the first &#8212; an overlay, never a <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">Divider()</span>, which inherits a system colour and a leading inset.</div>
+        <div style="font-size:12.5px;line-height:1.55;color:#F6D3DA;background:rgba(224,138,155,.09);border:.5px solid rgba(224,138,155,.24);border-radius:12px;padding:12px 14px;text-wrap:pretty">The whole row is the tap target, and the toggle inside it is <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">allowsHitTesting(false)</span>. A 46 pt track as the only target fails the 44 pt rule the moment the row has a sub-line.</div>
+      </div>
+    </div>
+
+    <div id="p3" style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:none;width:402px;padding:0;background:#0A0C0B;border:.5px dashed rgba(255,255,255,.14);border-radius:8px;overflow:hidden">
+        <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px;position:relative">
+          <div style="position:absolute;left:0;right:0;top:0;height:56px;background:repeating-linear-gradient(45deg,rgba(23,162,230,.14) 0 3px,transparent 3px 6px);border-bottom:.5px dashed rgba(23,162,230,.4)"></div>
+          <div style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;flex:none">
+            <span style="display:block;width:9px;height:9px;border-left:1.6px solid #EDF1EF;border-bottom:1.6px solid #EDF1EF;transform:rotate(45deg);margin-left:-2px"></span>
+          </div>
+          <span style="font-size:13.5px;color:#939C97">Your strap</span>
+        </div>
+        <div style="padding:8px 20px 24px">
+          <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Buzz for notifications</div>
+        </div>
+      </div>
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">3 &#183; Header + back</div>
+        <div style="font-size:13.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">Insets <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9FE2FB">56 / 18 / 8 / 18</span>, gap 12. Back button 34 circle, fill white 6&#37;, border 0.5 white 9&#37;. The chevron is 9&#215;9, drawn from 1.6 pt left + bottom borders rotated 45&#176;, offset x &#8722;2.</div>
+        <div style="font-size:12.5px;line-height:1.55;color:#F6D3DA;background:rgba(224,138,155,.09);border:.5px solid rgba(224,138,155,.24);border-radius:12px;padding:12px 14px;text-wrap:pretty">Two things go wrong here: the label is the <b style="font-weight:600">parent</b> screen&#8217;s name, not this screen&#8217;s; and the chevron is drawn, not <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">chevron.left</span> &#8212; the SF Symbol is a different weight, a different optical size, and it shrinks with Dynamic Type. This one never shrinks.</div>
+        <div style="font-size:12.5px;line-height:1.55;color:#939C97;text-wrap:pretty">Home screens do not use this header. Today&#8217;s is <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">58 / 20 / 4</span>, gap 14, top-aligned.</div>
+      </div>
+    </div>
+
+    <div id="p4" style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:none;width:402px;padding:34px 20px;background:#0A0C0B;border:.5px dashed rgba(255,255,255,.14);border-radius:8px;display:flex;gap:44px;align-items:center;justify-content:center">
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+          <div style="width:46px;height:28px;border-radius:14px;background:rgba(255,255,255,.09);position:relative">
+            <div style="position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#EDF1EF"></div>
+          </div>
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#7F8A85">off</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+          <div style="width:46px;height:28px;border-radius:14px;background:#17A2E6;position:relative">
+            <div style="position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#EDF1EF;transform:translateX(18px)"></div>
+          </div>
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#9FE2FB">on &#183; aura</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+          <div style="width:46px;height:28px;border-radius:14px;background:#E08A9B;position:relative">
+            <div style="position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#EDF1EF;transform:translateX(18px)"></div>
+          </div>
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#F6D3DA">on &#183; blush</span>
+        </div>
+      </div>
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">4 &#183; Toggle</div>
+        <div style="font-size:13.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">Track 46&#215;28 radius 14. Knob 24 circle <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9FE2FB">#EDF1EF</span> at top/left 2, travelling 18. Off track is white 13&#37;; on is the hue of the surrounding context &#8212; aura for the strap, blush for identity, green for Apple Health, lavender for sleep.</div>
+        <div style="font-size:12.5px;line-height:1.55;color:#F6D3DA;background:rgba(224,138,155,.09);border:.5px solid rgba(224,138,155,.24);border-radius:12px;padding:12px 14px;text-wrap:pretty">Two curves on one control: track 220 ms <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">cubic-bezier(.4,0,.2,1)</span>, knob 240 ms <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">cubic-bezier(.34,1.25,.64,1)</span> with a slight overshoot. A stock <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">Toggle</span> gets neither, and that single detail is most of why the build&#8217;s controls feel generic.</div>
+      </div>
+    </div>
+
+    <div id="p5" style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:none;width:402px;padding:34px 20px;background:#0A0C0B;border:.5px dashed rgba(255,255,255,.14);border-radius:8px;display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;padding:4px;border-radius:14px;background:rgba(255,255,255,.05)">
+          <div style="flex:1;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:11.5px;color:#939C97">One buzz</div>
+          <div style="flex:1;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;color:#9FE2FB;background:rgba(23,162,230,.2);border:.5px solid rgba(23,162,230,.42);box-sizing:border-box">Two short</div>
+          <div style="flex:1;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:11.5px;color:#939C97">Long</div>
+        </div>
+        <div style="display:flex;padding:4px;border-radius:14px;background:rgba(255,255,255,.05)">
+          <div style="flex:1;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;color:#C9D0EE;background:rgba(139,153,214,.2);border:.5px solid rgba(139,153,214,.42);box-sizing:border-box">Six weeks</div>
+          <div style="flex:1;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:11.5px;color:#939C97">Six months</div>
+          <div style="flex:1;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:11.5px;color:#939C97">The year</div>
+        </div>
+      </div>
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">5 &#183; Segmented</div>
+        <div style="font-size:13.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">Wrapper padding 4, radius 14, fill white 5&#37;. Option flex 1, height 32, radius 11. Selected: hue at 20&#37; fill, 42&#37; border, label 600 in the hue&#8217;s text variant. Unselected: no fill, no border, 400 at <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9FE2FB">#939C97</span>. 180 ms ease on all three properties together.</div>
+        <div style="font-size:12.5px;line-height:1.55;color:#939C97;text-wrap:pretty">At <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">accessibilityLarge</span> and above this becomes a vertical list of full-width 44 pt options with the same fills &#8212; it never truncates and never scrolls sideways.</div>
+      </div>
+    </div>
+
+    <div id="p6" style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:none;width:402px;padding:34px 20px;background:#0A0C0B;border:.5px dashed rgba(255,255,255,.14);border-radius:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center">
+        <span style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:10px;background:rgba(23,162,230,.12);border:.5px solid rgba(23,162,230,.26);color:#9FE2FB;font-variant-numeric:tabular-nums">Enough for the evening</span>
+        <span style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:10px;background:rgba(143,227,180,.12);border:.5px solid rgba(143,227,180,.26);color:#8FE3B4;font-variant-numeric:tabular-nums">+3</span>
+        <span style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:10px;background:rgba(242,180,92,.12);border:.5px solid rgba(242,180,92,.3);color:#F2B45C;font-variant-numeric:tabular-nums">&#8722;7</span>
+        <span style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:10px;background:rgba(224,138,155,.12);border:.5px solid rgba(224,138,155,.26);color:#F6D3DA;font-variant-numeric:tabular-nums">Running low</span>
+        <span style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:10px;background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.09);color:#939C97">Soon</span>
+      </div>
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">6 &#183; Chip</div>
+        <div style="font-size:13.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">10.5&#8211;12 pt, padding 5&#8211;6 v / 10&#8211;11 h, radius 9&#8211;10. Hue at 12&#37; over base with a 22&#8211;30&#37; border. Numeric chips are tabular, and delta chips always carry a sign.</div>
+        <div style="font-size:12.5px;line-height:1.55;color:#F6D3DA;background:rgba(224,138,155,.09);border:.5px solid rgba(224,138,155,.24);border-radius:12px;padding:12px 14px;text-wrap:pretty">Amber means something needs attention. Blush means <b style="font-weight:600">you</b>. Neither is ever decoration, and blush is never a warning &#8212; the palette rule is the one most worth policing in review.</div>
+      </div>
+    </div>
+
+    <div id="p7" style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:none;width:402px;padding:34px 20px;background:#0A0C0B;border:.5px dashed rgba(255,255,255,.14);border-radius:8px;display:flex;gap:16px;align-items:center;justify-content:center;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:15px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1)">
+          <div style="display:flex;align-items:center;gap:1px">
+            <div style="width:21px;height:11px;border-radius:3.4px;border:1px solid rgba(237,241,239,.4);padding:1.2px;box-sizing:border-box"><div style="width:52%;height:100%;border-radius:2.2px;background:#8FD3F5"></div></div>
+            <span style="width:1.6px;height:4.4px;border-radius:0 1.5px 1.5px 0;background:rgba(237,241,239,.4);margin-left:1px"></span>
+          </div>
+          <span style="font-size:12px;font-weight:600;color:#C6CEC9;font-variant-numeric:tabular-nums">52&#37;</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:15px;background:rgba(242,180,92,.12);border:.5px solid rgba(242,180,92,.34)">
+          <div style="display:flex;align-items:center;gap:1px">
+            <div style="width:21px;height:11px;border-radius:3.4px;border:1px solid #F2B45C;padding:1.2px;box-sizing:border-box"><div style="width:18%;height:100%;border-radius:2.2px;background:#F2B45C"></div></div>
+            <span style="width:1.6px;height:4.4px;border-radius:0 1.5px 1.5px 0;background:#F2B45C;margin-left:1px"></span>
+          </div>
+          <span style="font-size:12px;font-weight:600;color:#F2B45C;font-variant-numeric:tabular-nums">18&#37;</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:15px;background:rgba(240,116,44,.12);border:.5px solid rgba(240,116,44,.34)">
+          <div style="display:flex;align-items:center;gap:1px">
+            <div style="width:21px;height:11px;border-radius:3.4px;border:1px solid #F0742C;padding:1.2px;box-sizing:border-box"><div style="width:8%;height:100%;border-radius:2.2px;background:#F0742C"></div></div>
+            <span style="width:1.6px;height:4.4px;border-radius:0 1.5px 1.5px 0;background:#F0742C;margin-left:1px"></span>
+          </div>
+          <span style="font-size:12px;font-weight:600;color:#F0742C;font-variant-numeric:tabular-nums">8&#37;</span>
+        </div>
+      </div>
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">7 &#183; Strap battery chip</div>
+        <div style="font-size:13.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">Pill height 30, padding 0/11, radius 15, gap 7. Glyph body 21&#215;11, radius 3.4, <b style="font-weight:600">1 pt</b> border &#8212; one of only two 1 pt strokes in the app. Fill inset 1.2, radius 2.2, width (21 &#8722; 2.4) &#215; level. Nub 1.6&#215;4.4.</div>
+        <div style="font-size:12.5px;line-height:1.55;color:#939C97;text-wrap:pretty">&#8804; 20&#37; goes amber, &#8804; 10&#37; hot &#8212; border, nub, fill, label <i style="font-family:'Instrument Serif',serif">and</i> the pill tint, all together. This is device battery, not Charge, and it is deliberately quiet: no chevron, even though it navigates.</div>
+      </div>
+    </div>
+
+    <div id="p8" style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:none;width:402px;padding:34px 0 26px;background:#0A0C0B;border:.5px dashed rgba(255,255,255,.14);border-radius:8px">
+        <div style="padding:0 14px">
+          <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5)">
+            <div style="flex:1.7;height:46px;border-radius:20px;background:#17A2E6;display:flex;align-items:center;justify-content:center;gap:7px">
+              <span style="width:15px;height:15px;border-radius:3px;border:1.7px solid #04121A;box-sizing:border-box"></span>
+              <span style="font-size:12.5px;font-weight:600;color:#04121A">Today</span>
+            </div>
+            <div style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center"><span style="width:15px;height:15px;border-radius:3px;border:1.7px solid #939C97;box-sizing:border-box"></span></div>
+            <div style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(23,162,230,.4)"><span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;color:#04121A;line-height:1">+</span></div>
+            <div style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center"><span style="width:15px;height:15px;border-radius:50%;border:1.7px solid #939C97;box-sizing:border-box"></span></div>
+            <div style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center"><span style="width:15px;height:15px;border-radius:50%;border:1.7px solid #939C97;box-sizing:border-box"></span></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:0 20px">
+          <div style="height:.5px;flex:1;background:rgba(23,162,230,.4)"></div>
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#9FE2FB">container 0/14/26 &#183; row pad 6 &#183; r 26 &#183; tab r 20</span>
+          <div style="height:.5px;flex:1;background:rgba(23,162,230,.4)"></div>
+        </div>
+      </div>
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">8 &#183; Tab bar</div>
+        <div style="font-size:13.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">Row gap 3, padding 6, radius 26, fill <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9FE2FB">rgba(23,28,26,.82)</span> over a 20 pt blur, border 0.5 white 9&#37;, shadow <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">0 8 26 rgba(0,0,0,.5)</span>. Active tab flex 1.7, filled aura, icon + label. Centre + is a 44 circle with its own aura shadow.</div>
+        <div style="font-size:12.5px;line-height:1.55;color:#F6D3DA;background:rgba(224,138,155,.09);border:.5px solid rgba(224,138,155,.24);border-radius:12px;padding:12px 14px;text-wrap:pretty">Not <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">.ultraThinMaterial</span> &#8212; it carries its own tint and a much wider radius, which lightens the bar and desaturates what is behind it. And the container must be non-interactive with only the row taking touches, or it eats scrolls that start near the bottom.</div>
+      </div>
+    </div>
+
+    <div id="p9" style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:none;width:402px;padding:20px;background:#0A0C0B;border:.5px dashed rgba(255,255,255,.14);border-radius:8px;display:flex;align-items:center;justify-content:center">
+        <x-import component-from-global-scope="noop-gauge" from="./noop-gauge.js" charge="56" wake="92" hint-size="318px,318px"></x-import>
+      </div>
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">9 &#183; Charge gauge</div>
+        <div style="font-size:13.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">Box 306&#215;306 in a 318 tall block. 41 ticks, arc span 250&#176;, start &#8722;125&#176; so the gap centres at the bottom. Each tick 2&#215;9 radius 2; every 5th is 15 tall. Placed by <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">rotate(angle)</span> then <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">translateY(&#8722;142)</span>. Marker 12&#215;9 triangle at &#8722;131.</div>
+        <div style="display:flex;flex-direction:column;gap:0;border:.5px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden">
+          <div style="display:flex;padding:10px 14px;font-size:12.5px;color:#C6CEC9"><span style="width:70px;color:#9FE2FB;font-weight:600">Lit</span><span style="flex:1">level colour, opacity 0.32 &#8594; 1.0 toward the marker</span></div>
+          <div style="display:flex;padding:10px 14px;font-size:12.5px;color:#C6CEC9;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:70px;color:#9FE2FB;font-weight:600">Ghost</span><span style="flex:1">the headroom you woke with and spent &#8212; <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">auraPale 28&#37;</span></span></div>
+          <div style="display:flex;padding:10px 14px;font-size:12.5px;color:#C6CEC9;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:70px;color:#939C97;font-weight:600">Off</span><span style="flex:1"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">white 13&#37;</span></span></div>
+        </div>
+        <div style="font-size:12.5px;line-height:1.55;color:#F6D3DA;background:rgba(224,138,155,.09);border:.5px solid rgba(224,138,155,.24);border-radius:12px;padding:12px 14px;text-wrap:pretty">The ghost ticks are what make this a battery rather than a score. They are not decoration and not optional &#8212; a build without them has shipped the thing this redesign exists to remove. On arrival at Today the whole ring animates wake &#8594; now over 1150 ms ease-out-cubic, and only on arrival.</div>
+      </div>
+    </div>
+
+    <div id="type" style="display:flex;flex-direction:column;gap:20px">
+      <div style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Type ruler</div>
+      <div style="font-size:13.5px;line-height:1.55;color:#C6CEC9;max-width:620px;text-wrap:pretty">Every role at true size, with its tracking already converted to points. Hold this next to the build and the drift shows up immediately.</div>
+      <div style="display:flex;flex-direction:column;gap:0;border:.5px solid rgba(255,255,255,.06);border-radius:16px;overflow:hidden;background:#141817">
+        <div style="display:flex;align-items:baseline;gap:20px;padding:18px 20px"><span style="width:150px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#8B958F">52/200 &#183; &#8722;1.56</span><span style="font-family:'Outfit',sans-serif;font-size:52px;font-weight:200;letter-spacing:-1.56px;font-variant-numeric:tabular-nums;line-height:1">56</span></div>
+        <div style="display:flex;align-items:baseline;gap:20px;padding:18px 20px;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:150px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#8B958F">25/400 &#183; &#8722;0.625</span><span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.625px">Buzz for notifications</span></div>
+        <div style="display:flex;align-items:baseline;gap:20px;padding:18px 20px;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:150px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#8B958F">23/400 &#183; &#8722;0.46</span><span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.46px;line-height:1.15">Plenty of the day left</span></div>
+        <div style="display:flex;align-items:baseline;gap:20px;padding:18px 20px;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:150px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#8B958F">19/400 &#183; &#8722;0.38</span><span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.38px">Enough for the evening</span></div>
+        <div style="display:flex;align-items:baseline;gap:20px;padding:18px 20px;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:150px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#8B958F">17/400 &#183; &#8722;0.34 tab</span><span style="font-family:'Outfit',sans-serif;font-size:17px;font-weight:400;letter-spacing:-.34px;font-variant-numeric:tabular-nums">&#8722;14</span></div>
+        <div style="display:flex;align-items:baseline;gap:20px;padding:18px 20px;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:150px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#8B958F">14/600 &#183; 0</span><span style="font-size:14px;font-weight:600">Tonight puts it back</span></div>
+        <div style="display:flex;align-items:baseline;gap:20px;padding:18px 20px;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:150px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#8B958F">13.5/400 &#183; lh 1.5</span><span style="font-size:13.5px;line-height:1.5;color:#C6CEC9;max-width:420px">You woke with 92 and you have 56 left. Normal for this hour. Enough for the evening you had planned.</span></div>
+        <div style="display:flex;align-items:baseline;gap:20px;padding:18px 20px;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:150px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#8B958F">11.5/400 &#183; lh 1.45</span><span style="font-size:11.5px;line-height:1.45;color:#7F8A85;max-width:420px">Anyone who can already reach you. A group thread counts once.</span></div>
+        <div style="display:flex;align-items:baseline;gap:20px;padding:18px 20px;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:150px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#8B958F">10/600 &#183; +1.2 upper</span><span style="font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#8B958F">Where it went</span></div>
+        <div style="display:flex;align-items:baseline;gap:20px;padding:18px 20px;border-top:.5px solid rgba(255,255,255,.06)"><span style="width:150px;flex:none;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#8B958F">12.5/600 &#183; +1.375</span><span style="font-size:12.5px;font-weight:600;letter-spacing:1.375px;text-transform:uppercase;color:#9FE2FB">Hold</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

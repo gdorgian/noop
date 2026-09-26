@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="{{ sheet }}">
+
+<div style="display:flex;flex-direction:column;gap:18px;max-width:880px;padding-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">WAVE 4B</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">Noop Widgets — the Aura set</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">true dimensions, and the face each one shows when it has nothing</span>
+  </div>
+
+  <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:38px;line-height:1.12;letter-spacing:-.03em;color:#17150F;text-wrap:pretty">A widget is the app's only chance to be wrong in public.</h1>
+
+  <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;max-width:720px;text-wrap:pretty">Eight families, each drawn twice: populated, and with nothing to show. The empty face is the one that decides whether the set is honest, so it is never a zero, never a flat line and never a cheerful prompt — it is an em dash and the reason there is an em dash. Nothing here publishes a figure the app itself would withhold.</p>
+
+  <div style="display:flex;flex-wrap:wrap;gap:9px">
+    <sc-for list="{{ rules }}" as="r" hint-placeholder-count="3">
+      <span style="padding:8px 13px;border-radius:10px;background:rgba(23,21,15,.06);font-size:12px;font-weight:600;color:#4A463D">{{ r.k }}</span>
+    </sc-for>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 28px;padding:16px 0 4px;border-top:1px solid rgba(23,21,15,.11)">
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em">SCOPE, CORRECTED</span>
+      <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Six families are registered in the bundle today — glanceable, live heart rate, the coach brief, stress, the lift session and rings. The work is therefore two builds, <strong style="font-weight:600;color:#17150F">energy</strong> and <strong style="font-weight:600;color:#17150F">resting pulse</strong>. Rings turned out to be registered already, which moves it from a recommendation to a shipping family; resting pulse turned out not to exist at all, which moves it the other way.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em">THE DIMENSIONS ARE REAL</span>
+      <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Drawn at 430 pt device scale: small 170 × 170, medium 364 × 170. On a 393 pt phone the same widgets are 158 × 158 and 338 × 158, so every layout here has to survive a 7% squeeze — nothing is pinned to a width, and the one figure per widget is the last thing allowed to shrink.</span>
+    </div>
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">W1</span>
+    <span style="{{ nm }}">Glanceable</span>
+    <span style="{{ meta }}">systemSmall · 170 × 170 · ships today</span>
+    <span style="{{ body }}">The night, then the day, in that order — because the night is settled and the day is still moving. No score, no composite, no ring: two facts the app already stands behind.</span>
+    <span style="{{ bodyq }}">Nothing to show: the strap has not been worn. It names the last time it was, which is the only thing that makes the em dash actionable.</span>
+  </div>
+  <div style="{{ tiles }}">
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ small }}">
+          <span style="{{ kick }}">Last night</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:300;letter-spacing:-.03em;line-height:1.15;margin-top:6px">7h 12m</span>
+          <span style="font-size:10.5px;color:#7F8A85;margin-top:3px">need 7h 05m · met</span>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:7px">
+            <div style="height:.5px;background:rgba(255,255,255,.09)"></div>
+            <div style="display:flex;align-items:baseline;gap:7px">
+              <span style="font-size:10.5px;color:#7F8A85">Charge</span>
+              <span style="font:600 12px ui-monospace,Menlo,monospace;color:#17A2E6">steady</span>
+            </div>
+            <div style="height:4px;border-radius:2px;background:rgba(255,255,255,.1)">
+              <div style="height:4px;width:62%;border-radius:2px;background:#17A2E6"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">POPULATED</span>
+    </div>
+
+    <sc-if value="{{ empties }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ small }}">
+          <span style="{{ kick }}">Last night</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:300;letter-spacing:-.03em;line-height:1.15;margin-top:6px;color:#7F8A85">—</span>
+          <span style="font-size:10.5px;color:#7F8A85;margin-top:3px">no night recorded</span>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:7px">
+            <div style="height:.5px;background:rgba(255,255,255,.09)"></div>
+            <span style="font-size:10.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">Strap last seen Tuesday, 21:40.</span>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">NOTHING TO SHOW</span>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">W2</span>
+    <span style="{{ nm }}">Live heart rate</span>
+    <span style="{{ meta }}">systemSmall · 170 × 170 · ships today</span>
+    <span style="{{ body }}">One figure at the size you can read at arm's length, the zone under it as a word, and the clock. The zone ladder is the only chrome — it earns its place by making the number mean something without a legend.</span>
+    <span style="{{ bodyq }}">Nothing running is this widget's <em style="font-family:'Instrument Serif',serif;font-style:italic">normal</em> state, not its failure, so it says what it last saw rather than apologising.</span>
+  </div>
+  <div style="{{ tiles }}">
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ small }}">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="width:6px;height:6px;flex:none;border-radius:50%;background:#17A2E6"></span>
+            <span style="{{ kick }}">Session · 24:06</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:5px;margin-top:8px">
+            <span style="font-family:'Outfit',sans-serif;font-size:38px;font-weight:300;letter-spacing:-.035em;line-height:1;font-variant-numeric:tabular-nums">142</span>
+            <span style="font-size:11px;color:#7F8A85">bpm</span>
+          </div>
+          <span style="font-size:11px;color:#C6CEC9;margin-top:4px">zone 3 · tempo</span>
+          <div style="margin-top:auto;display:flex;gap:3px">
+            <sc-for list="{{ zones }}" as="z" hint-placeholder-count="5">
+              <div style="{{ z.s }}"></div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">POPULATED · MID-SESSION</span>
+    </div>
+
+    <sc-if value="{{ empties }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ small }}">
+          <span style="{{ kick }}">Heart rate · session</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:38px;font-weight:300;letter-spacing:-.035em;line-height:1;margin-top:8px;color:#7F8A85">—</span>
+          <span style="font-size:11px;color:#7F8A85;margin-top:4px">nothing running</span>
+          <span style="margin-top:auto;font-size:10.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">Last session yesterday, 18:40 · 52 min</span>
+        </div>
+      </div>
+      <span style="{{ cap }}">NOTHING TO SHOW</span>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">W3</span>
+    <span style="{{ nm }}">The coach brief</span>
+    <span style="{{ meta }}">systemMedium · 364 × 170 · ships today</span>
+    <span style="{{ body }}">The only periwinkle widget in the set, and the only one carrying a sentence somebody's model wrote. It keeps Act 7's rule out on the home screen: generated prose sits on periwinkle and says <em style="font-family:'Instrument Serif',serif;font-style:italic">written</em>; it never quotes a figure without the tile treatment.</span>
+    <span style="{{ bodyq }}">No provider is the honest empty: Svea has nothing to write with, and the widget does not fill the space with encouragement.</span>
+  </div>
+  <div style="{{ tiles }}">
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ med }}">
+          <div style="display:flex;align-items:flex-start;gap:14px;height:100%">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;height:100%">
+              <span style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#C9D0EE;font-weight:600">Today's brief · 07:12</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#DCE3E0;margin-top:9px;text-wrap:pretty">Sleep landed on your need and variability is up a fourth night. A good day for the kind of session you can hold a conversation through.</span>
+              <div style="margin-top:auto;display:flex;align-items:center;gap:7px">
+                <span style="width:5px;height:5px;flex:none;border-radius:50%;background:#8B99D6"></span>
+                <span style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#A9B4E0;font-weight:600">Svea · written, not measured</span>
+              </div>
+            </div>
+            <div style="position:relative;width:30px;height:30px;flex:none">
+              <div style="position:absolute;inset:-5px;border-radius:50%;background:radial-gradient(circle,rgba(139,153,214,.4),rgba(139,153,214,0) 66%)"></div>
+              <div style="position:absolute;inset:0;border-radius:58% 42% 46% 54%/49% 55% 45% 51%;background:radial-gradient(circle at 44% 38%,#DDE3F6,#8B99D6 58%,#4A56A8)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">POPULATED</span>
+    </div>
+
+    <sc-if value="{{ empties }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ med }}">
+          <div style="display:flex;flex-direction:column;height:100%">
+            <span style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Not briefed</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:300;letter-spacing:-.025em;line-height:1.2;margin-top:8px;color:#C6CEC9">No provider yet</span>
+            <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;margin-top:6px;text-wrap:pretty">Svea runs on a key you own, and there is not one on this phone. Nothing was fetched, and nothing was written in its place.</span>
+            <span style="margin-top:auto;font-size:11px;font-weight:600;color:#A9B4E0">Add one in Svea</span>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">NOTHING TO SHOW</span>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ixNew }}">W4 · NEW</span>
+    <span style="{{ nm }}">Heart rate</span>
+    <span style="{{ meta }}">systemSmall · 170 × 170 · to build</span>
+    <span style="{{ body }}">Resting pulse this morning with the week behind it. The range is stated because a single resting figure invites a comparison the wearer cannot make on their own.</span>
+    <span style="{{ bodyq }}">A new build, not a rename. The bundle's HeartRateWidget shows <em style="font-family:'Instrument Serif',serif;font-style:italic">live</em> bpm with a three-hour trace — that is W2's job, and this is a different figure computed overnight. When the strap comes off the line stops: it does not drop to the floor and it does not interpolate across the gap.</span>
+  </div>
+  <div style="{{ tiles }}">
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ small }}">
+          <span style="{{ kick }}">Resting pulse</span>
+          <div style="display:flex;align-items:baseline;gap:5px;margin-top:7px">
+            <span style="font-family:'Outfit',sans-serif;font-size:36px;font-weight:300;letter-spacing:-.035em;line-height:1;font-variant-numeric:tabular-nums">52</span>
+            <span style="font-size:11px;color:#7F8A85">bpm</span>
+          </div>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;align-items:flex-end;gap:4px;height:30px">
+              <sc-for list="{{ hr }}" as="h" hint-placeholder-count="7">
+                <div style="{{ h.s }}"></div>
+              </sc-for>
+            </div>
+            <span style="font-size:10px;color:#7F8A85">7-day range 49 – 56</span>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">POPULATED</span>
+    </div>
+
+    <sc-if value="{{ empties }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ small }}">
+          <span style="{{ kick }}">Resting pulse</span>
+          <div style="display:flex;align-items:baseline;gap:5px;margin-top:7px">
+            <span style="font-family:'Outfit',sans-serif;font-size:36px;font-weight:300;letter-spacing:-.035em;line-height:1;color:#7F8A85">—</span>
+          </div>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;align-items:flex-end;gap:4px;height:30px">
+              <sc-for list="{{ hrGap }}" as="h" hint-placeholder-count="7">
+                <div style="{{ h.s }}"></div>
+              </sc-for>
+            </div>
+            <span style="font-size:10px;line-height:1.5;color:#7F8A85">strap off since 09:20 · the line stops</span>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">NOTHING TO SHOW</span>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">W5</span>
+    <span style="{{ nm }}">Stress</span>
+    <span style="{{ meta }}">systemSmall · 170 × 170 · ships today</span>
+    <span style="{{ body }}">A word and a ladder, not a percentage. Four stops, the reading on one of them, and the two signals it came from named underneath — a stress figure with no provenance is a horoscope.</span>
+    <span style="{{ bodyq }}">Under coverage it withholds rather than widening. This is rule 13's case, not rule 7's: a thin stress read is not a wider stress read, it is no read.</span>
+  </div>
+  <div style="{{ tiles }}">
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ small }}">
+          <span style="{{ kick }}">Stress · 14:20</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:300;letter-spacing:-.028em;line-height:1.15;margin-top:8px">Settled</span>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:4px">
+              <sc-for list="{{ stress }}" as="s" hint-placeholder-count="4">
+                <div style="{{ s.s }}"></div>
+              </sc-for>
+            </div>
+            <span style="font-size:10px;line-height:1.45;color:#7F8A85">from variability and pulse, measured</span>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">POPULATED</span>
+    </div>
+
+    <sc-if value="{{ empties }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ small }}">
+          <span style="{{ kick }}">Stress</span>
+          <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:300;letter-spacing:-.028em;line-height:1.15;margin-top:8px;color:#7F8A85">—</span>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:4px">
+              <sc-for list="{{ stressOff }}" as="s" hint-placeholder-count="4">
+                <div style="{{ s.s }}"></div>
+              </sc-for>
+            </div>
+            <span style="font-size:10px;line-height:1.45;color:#7F8A85;text-wrap:pretty">2h 10m of today seen. Not enough to say yet.</span>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">NOTHING TO SHOW</span>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">W6</span>
+    <span style="{{ nm }}">Lift session</span>
+    <span style="{{ meta }}">systemMedium · 364 × 170 · ships today</span>
+    <span style="{{ body }}">The next session as a name and its lines — no prefilled numbers, exactly as on lift-live. Warm-ups are excluded from the set count here as everywhere, and the count says so rather than quietly differing from the session screen.</span>
+    <span style="{{ bodyq }}">No program is not a failure either: free-form sessions still count, and the widget says the thing it has nothing to point at.</span>
+  </div>
+  <div style="{{ tiles }}">
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ med }}">
+          <div style="display:flex;gap:16px;height:100%">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+              <span style="{{ kick }}">Next session</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:300;letter-spacing:-.025em;line-height:1.2;margin-top:6px">Upper A</span>
+              <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px">
+                <sc-for list="{{ lifts }}" as="l" hint-placeholder-count="3">
+                  <span style="font-size:11.5px;color:#939C97;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.k }}</span>
+                </sc-for>
+              </div>
+            </div>
+            <div style="width:112px;flex:none;display:flex;flex-direction:column;align-items:flex-end;text-align:right">
+              <span style="font:600 11.5px ui-monospace,Menlo,monospace;color:#17A2E6">5 exercises</span>
+              <span style="font:600 11.5px ui-monospace,Menlo,monospace;color:#C6CEC9;margin-top:3px">19 working sets</span>
+              <span style="margin-top:auto;font-size:10.5px;line-height:1.5;color:#7F8A85">Last done Tuesday<br>62 min</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">POPULATED</span>
+    </div>
+
+    <sc-if value="{{ empties }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ med }}">
+          <div style="display:flex;flex-direction:column;height:100%">
+            <span style="{{ kick }}">Lift</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:300;letter-spacing:-.025em;line-height:1.2;margin-top:6px;color:#C6CEC9">No program running</span>
+            <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;margin-top:7px;max-width:290px;text-wrap:pretty">Sessions you log as you go still count — there is simply nothing scheduled for this widget to name.</span>
+            <span style="margin-top:auto;font-size:11px;font-weight:600;color:#8FD3F5">Open Lift</span>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">NOTHING TO SHOW</span>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+
+<div style="{{ rowNew }}">
+  <div style="{{ col }}">
+    <span style="{{ ixNew }}">W7 · NEW</span>
+    <span style="{{ nm }}">Energy</span>
+    <span style="{{ meta }}">systemMedium · 364 × 170 · to build</span>
+    <span style="{{ body }}">Wave 3a's card, reduced to what survives at widget size: what it has cost so far, the basal-against-active split, and where the day is heading <strong style="font-weight:600;color:#17150F">as a range</strong>. Spend only — no target, no deficit, nothing remaining. Coverage is words at the foot, never a percentage chip.</span>
+    <span style="{{ bodyq }}">The cold start is the interesting face: no measured spend exists, so it states the one figure Noop can always stand behind — the modelled basal day — flat, as “about”, with the chip carrying the reason.</span>
+  </div>
+  <div style="{{ tiles }}">
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ med }}">
+          <div style="display:flex;flex-direction:column;height:100%">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="{{ kick }}">What today has cost</span>
+              <span style="margin-left:auto;flex:none;font-size:9px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#8FD3F5;padding:3px 7px;border-radius:6px;border:.5px solid rgba(143,211,245,.42)">measured</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:7px">
+              <span style="font-family:'Outfit',sans-serif;font-size:32px;font-weight:300;letter-spacing:-.035em;line-height:1;font-variant-numeric:tabular-nums">1,280</span>
+              <span style="font-size:11px;color:#7F8A85">kcal so far</span>
+            </div>
+            <div style="display:flex;gap:3px;margin-top:10px;height:5px">
+              <div style="flex:890;border-radius:2px;background:#17A2E6"></div>
+              <div style="flex:390;border-radius:2px;background:#8FD3F5"></div>
+            </div>
+            <div style="display:flex;gap:14px;margin-top:6px">
+              <span style="font-size:10.5px;color:#7F8A85">basal <span style="color:#C6CEC9;font-weight:600">890</span></span>
+              <span style="font-size:10.5px;color:#7F8A85">active <span style="color:#C6CEC9;font-weight:600">390</span></span>
+            </div>
+            <div style="margin-top:auto;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+              <span style="font-size:11.5px;color:#C6CEC9">heading for <span style="font-weight:600;font-family:ui-monospace,Menlo,monospace">1,900 – 2,150</span></span>
+              <span style="font-size:10.5px;color:#7F8A85">saw most of the day</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">POPULATED · MEASURED DAY</span>
+    </div>
+
+    <sc-if value="{{ empties }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ med }}">
+          <div style="display:flex;flex-direction:column;height:100%">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="{{ kick }}">What today has cost</span>
+              <span style="margin-left:auto;flex:none;font-size:9px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:#C6CEC9;padding:3px 7px;border-radius:6px;border:.5px solid rgba(198,206,201,.34)">cold start</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:7px">
+              <span style="font-size:13px;color:#7F8A85">about</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:32px;font-weight:300;letter-spacing:-.035em;line-height:1;font-variant-numeric:tabular-nums;color:#C6CEC9">1,650</span>
+              <span style="font-size:11px;color:#7F8A85">kcal, all day</span>
+            </div>
+            <div style="display:flex;gap:3px;margin-top:10px;height:5px">
+              <div style="flex:1;border-radius:2px;border:.5px dashed rgba(255,255,255,.2)"></div>
+            </div>
+            <span style="font-size:10.5px;color:#7F8A85;margin-top:6px">no measured spend yet · nothing to split</span>
+            <span style="margin-top:auto;font-size:11px;line-height:1.5;color:#7F8A85;text-wrap:pretty">A model of your basal day, stated as a model. The projection is absent because there is nothing yet to project from.</span>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">COLD START</span>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+
+<div style="{{ rowNew }}">
+  <div style="{{ col }}">
+    <span style="{{ ixNew }}">W8 · SHIPS</span>
+    <span style="{{ nm }}">Rings</span>
+    <span style="{{ meta }}">systemSmall · 170 × 170 · registered · ships</span>
+    <span style="{{ body }}">Three arcs, Noop's own axes — charge, effort, sleep — and the only place in the product all three are seen at once.</span>
+    <span style="{{ bodyq }}"><strong style="font-weight:600;color:#17150F">Settled: it ships.</strong> NOOPRingsWidget is already registered in the bundle, so this was never a build, only a decision. The empty face is what had to be resolved — the ghost-tick rule again: an axis with nothing logged is drawn hairline, not at zero, because a closed-to-nothing ring reads as a failure the wearer did not earn.</span>
+  </div>
+  <div style="{{ tiles }}">
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ small }}">
+          <div style="display:flex;align-items:center;justify-content:center;flex:1;position:relative">
+            <div style="{{ ringA }}"><div style="{{ ringHole }}"></div></div>
+            <div style="{{ ringB }}"><div style="{{ ringHole }}"></div></div>
+            <div style="{{ ringC }}"><div style="{{ ringHole }}"></div></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:6px">
+            <sc-for list="{{ ringLegend }}" as="l" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:5px">
+                <span style="{{ l.dot }}"></span>
+                <span style="font:600 10px ui-monospace,Menlo,monospace;color:#C6CEC9">{{ l.v }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">POPULATED</span>
+    </div>
+
+    <sc-if value="{{ empties }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ small }}">
+          <div style="display:flex;align-items:center;justify-content:center;flex:1;position:relative">
+            <div style="{{ ringA }}"><div style="{{ ringHole }}"></div></div>
+            <div style="{{ ringGhost }}"></div>
+            <div style="{{ ringC }}"><div style="{{ ringHole }}"></div></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:6px">
+            <sc-for list="{{ ringLegendOff }}" as="l" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:5px">
+                <span style="{{ l.dot }}"></span>
+                <span style="{{ l.t }}">{{ l.v }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <span style="{{ cap }}">ONE AXIS WITH NOTHING</span>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+
+<div style="display:flex;gap:34px;align-items:flex-start;padding:26px 0 0;border-top:1px solid rgba(23,21,15,.11);max-width:1090px">
+  <div style="{{ col }}">
+    <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">STILL OPEN</span>
+    <span style="{{ nm }}">What this sheet does not settle</span>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:13px">
+    <span style="{{ body }}">The count sentence on plumbing/widgets is bound to a registry, not typed — engineering has agreed one registry the settings row, the widgets screen and the bundle all read, with a test that fails when the bundle and the registry disagree. Eight families is what this sheet draws and what the registry should hold: six registered today, two to build.</span>
+    <span style="{{ body }}">The lift session's <em style="font-family:'Instrument Serif',serif;font-style:italic">live</em> presentations — Lock Screen, Dynamic Island compact and expanded — are not widgets and are not here. They are wave 4c, drawn in <a href="./Noop Lift Live Activity.dc.html">Noop Lift Live Activity</a>, against the same blue-and-neutral the bar uses. The bundle also carries a second live activity, NOOPLiveActivity, for live heart rate: it is a live activity and not a widget family, so it is outside this sheet's eight and outside the count.</span>
+    <span style="{{ body }}">Accessory families (Lock Screen circular, rectangular and inline) are out of this wave. Three of these eight would reduce cleanly — heart rate, energy and rings — and none of the other five would; that is a decision worth taking on its own rather than inside this one.</span>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;wallpaper&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Warm&quot;,&quot;Dark&quot;,&quot;Light&quot;],&quot;default&quot;:&quot;Warm&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Sheet&quot;,&quot;label&quot;:&quot;Wallpaper behind the tiles&quot;},&quot;showEmpty&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Sheet&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const A = '#17A2E6', LAV = '#8B99D6', NEU = '#C6CEC9', SKY = '#8FD3F5';
+    const WP = {
+      Warm: 'linear-gradient(152deg,#2C332E 0%,#16120E 58%,#1E2622 100%)',
+      Dark: 'linear-gradient(152deg,#15191A 0%,#0A0C0B 60%,#101416 100%)',
+      Light: 'linear-gradient(152deg,#CFC8BA 0%,#A9A294 58%,#BFC6C2 100%)'
+    };
+    const wp = WP[this.props.wallpaper] || WP.Warm;
+
+    const hrv = [51, 54, 50, 53, 52, 50, 52];
+    const hr = hrv.map(function (v, i) {
+      const last = i === hrv.length - 1;
+      return { s: { flex: 1, height: Math.round((v - 45) * 3.4) + 4, borderRadius: 2, background: last ? SKY : 'rgba(255,255,255,.17)' } };
+    });
+    // the gap face: four measured bars, then nothing — not three zero-height bars
+    const hrGap = hrv.map(function (v, i) {
+      const dead = i > 3;
+      return { s: dead
+        ? { flex: 1, height: 1, borderRadius: 1, background: 'rgba(255,255,255,.14)' }
+        : { flex: 1, height: Math.round((v - 45) * 3.4) + 4, borderRadius: 2, background: 'rgba(255,255,255,.17)' } };
+    });
+
+    const zones = [0, 1, 2, 3, 4].map(function (i) {
+      return { s: { flex: 1, height: 5, borderRadius: 2, background: i === 2 ? A : 'rgba(255,255,255,.12)' } };
+    });
+    const stress = [0, 1, 2, 3].map(function (i) {
+      return { s: { flex: 1, height: 6, borderRadius: 3, background: i === 1 ? SKY : 'rgba(255,255,255,.12)' } };
+    });
+    const stressOff = [0, 1, 2, 3].map(function () {
+      return { s: { flex: 1, height: 6, borderRadius: 3, border: '.5px dashed rgba(255,255,255,.18)', boxSizing: 'border-box' } };
+    });
+
+    const lifts = [{ k: 'Bench press' }, { k: 'Incline dumbbell press' }, { k: 'Lat pulldown' }];
+
+    const ring = function (size, pct, color) {
+      return {
+        position: 'absolute', width: size, height: size, borderRadius: '50%',
+        background: 'conic-gradient(' + color + ' 0 ' + pct + '%, rgba(255,255,255,.09) ' + pct + '% 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      };
+    };
+    const ringHole = { width: 'calc(100% - 17px)', height: 'calc(100% - 17px)', borderRadius: '50%', background: '#0F1312' };
+    const dot = function (c) { return { width: 7, height: 7, flex: 'none', borderRadius: '50%', background: c }; };
+
+    const lab = { fontSize: 10, fontWeight: 600, fontFamily: 'ui-monospace,Menlo,monospace', color: '#C6CEC9' };
+
+    return {
+      sheet: { display: 'flex', flexDirection: 'column', gap: 0, padding: '52px 48px 110px', '--wp': wp },
+      empties: this.props.showEmpty !== false,
+
+      rules: [
+        { k: 'A gap is an em dash and a reason — never a zero' },
+        { k: 'Periwinkle is written; monospace in a tile is measured' },
+        { k: 'No widget publishes a figure the app would withhold' },
+        { k: 'One figure per widget, and it shrinks last' }
+      ],
+
+      row: { display: 'flex', gap: 34, alignItems: 'flex-start', padding: '30px 0', borderTop: '1px solid rgba(23,21,15,.11)' },
+      rowNew: { display: 'flex', gap: 34, alignItems: 'flex-start', padding: '30px 0', borderTop: '1px solid rgba(23,21,15,.11)' },
+      col: { width: 268, flex: 'none', display: 'flex', flexDirection: 'column', gap: 7 },
+      tiles: { display: 'flex', gap: 22, alignItems: 'flex-start', flexWrap: 'wrap' },
+      stack: { display: 'flex', flexDirection: 'column', gap: 9 },
+      pad: { padding: 18, borderRadius: 34, background: 'var(--wp,linear-gradient(152deg,#2C332E 0%,#16120E 58%,#1E2622 100%))' },
+      small: { width: 170, height: 170, boxSizing: 'border-box', borderRadius: 24, background: '#0F1312', border: '.5px solid rgba(255,255,255,.07)', padding: 14, display: 'flex', flexDirection: 'column', color: '#EDF1EF', overflow: 'hidden' },
+      med: { width: 364, height: 170, boxSizing: 'border-box', borderRadius: 24, background: '#0F1312', border: '.5px solid rgba(255,255,255,.07)', padding: 16, display: 'flex', flexDirection: 'column', color: '#EDF1EF', overflow: 'hidden' },
+      cap: { font: '600 9.5px ui-monospace,Menlo,monospace', letterSpacing: '.06em', color: 'rgba(23,21,15,.5)' },
+      kick: { fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: '#6C7570', fontWeight: 600 },
+      ix: { font: '600 9.5px ui-monospace,Menlo,monospace', color: '#17a2e6', letterSpacing: '.06em' },
+      ixNew: { font: '600 9.5px ui-monospace,Menlo,monospace', color: '#B4543A', letterSpacing: '.06em' },
+      nm: { fontFamily: "'Outfit',sans-serif", fontWeight: 500, fontSize: 17, color: '#17150F', letterSpacing: '-.015em' },
+      meta: { font: '600 10px ui-monospace,Menlo,monospace', color: 'rgba(23,21,15,.5)', paddingBottom: 3 },
+      body: { fontSize: 12.5, lineHeight: 1.62, color: '#6B6558', textWrap: 'pretty' },
+      bodyq: { fontSize: 12.5, lineHeight: 1.62, color: '#6B6558', textWrap: 'pretty' },
+
+      hr, hrGap, zones, stress, stressOff, lifts,
+      ringA: ring(96, 72, A), ringB: ring(68, 40, LAV), ringC: ring(40, 100, NEU),
+      ringHole,
+      ringGhost: { position: 'absolute', width: 68, height: 68, borderRadius: '50%', border: '1px dashed rgba(255,255,255,.2)', boxSizing: 'border-box' },
+      ringLegend: [
+        { v: '72%', dot: dot(A) }, { v: '40%', dot: dot(LAV) }, { v: '100%', dot: dot(NEU) }
+      ],
+      ringLegendOff: [
+        { v: '72%', dot: dot(A), t: lab },
+        { v: '—', dot: { width: 7, height: 7, flex: 'none', borderRadius: '50%', border: '1px dashed rgba(255,255,255,.35)', boxSizing: 'border-box' }, t: { fontSize: 10, fontWeight: 600, fontFamily: 'ui-monospace,Menlo,monospace', color: '#7F8A85' } },
+        { v: '100%', dot: dot(NEU), t: lab }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

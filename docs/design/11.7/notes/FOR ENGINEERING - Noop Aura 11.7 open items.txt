@@ -1,0 +1,173 @@
+FOR ENGINEERING — NOOP AURA 11.7, WHAT DESIGN NEEDS BACK
+Handoff · updated 2026-09-20
+Branch: integration/noop-aura-upstream-11.7
+Against: spec/90-aura-11.7.md §13
+
+Both outstanding answers arrived on 19 September and are now IN THE DRAWINGS.
+Nothing below is blocking. Six build-time items remain.
+
+
+════════════════════════════════════════════════════════════════════════
+CLOSED BY YOUR 19 SEPTEMBER ANSWERS
+════════════════════════════════════════════════════════════════════════
+
+A. THE NINE HEADINGS, AND WHICH TWO CHANGED — CLOSED
+   The nine are in verbatim. The "changed" markers have moved off 03 and
+   06 and onto 07 (Your acknowledgment) and 08 (WHOOP personnel).
+
+   The rewrite of §7 changed the gate, not just the copy. The four ticks
+   are no longer design's four — they are §7's four, each ticked on its
+   own before Accept unlocks:
+
+     1. not WHOOP staff, and will not ask WHOOP for support
+     2. own device, own data, own risk
+     3. unofficial, as-is, not a medical device
+     4. liability waiver
+
+   Two consequences you should know about rather than discover:
+
+     · THE "I HAVE READ THESE TERMS" TICK IS GONE. It was design's, not
+       the document's, and §7 does not ask for it. Nothing now gates on
+       having read — which was already true, since nothing gated on
+       scroll depth either.
+     · The gate line now says accepting records WHICH VERSION and WHEN
+       on the device. That is your sentence, from the §7 rewrite. If the
+       app does not in fact write that record, tell design and the line
+       comes out.
+
+   The closing note is drawn, unnumbered, under section 09, verbatim:
+   "Noop Aura is free, on-device, and independent. Thank you for using
+   it responsibly." The preamble stays unnumbered too. Nine sections is
+   still true, which keeps the index spacing as drawn.
+
+B. THE RENAME — IN, ON THE TERMS SCREEN AND THE GATE
+   Title, heading 1, closing note, the five plain points and the four
+   statements all say Noop Aura. §1 claims iPhone only; macOS and
+   Android are gone. The version stays 2.0 and existing users are not
+   re-prompted, which is why the rename is NOT marked as a change.
+
+   SCOPE SETTLED 20 SEPTEMBER: the document and the first-launch gate
+   say Noop Aura. THE APP STAYS NOOP. Acts 5, 7 and 10, the widgets and
+   both live activities are unchanged and that is intentional, not a
+   half-finished pass. If the owner meant it wider, it comes back as one
+   change across every act rather than screen by screen.
+
+C. THE FIVE ICON NUMBERS — CHECKED AGAINST make_icon.py, TWO WERE WRONG
+   Your constants are now the drawing. The two that did not match:
+
+     WHAT                 DESIGN HAD        SCRIPT      NOW
+     Gap centre           337° (23° off)    12 o'clock  12 o'clock
+     Ink                  280.5° / 77.9%    302° /84%   302°
+     Ring outer radius    0.39              0.39        unchanged
+     Stroke               0.135             0.135       unchanged
+     Core radius          0.090             0.090       unchanged
+
+   Both errors came from design's own angular scan of the PNG, not from
+   the script. The tilt was an artefact and the paragraph justifying it
+   has been deleted. Caps are now ROUND at half the stroke, so the
+   visible gap draws as 33.9° and not as the 58° between cap centres.
+
+   Your gradient stops are recorded on the sheet. Titanium and Aura now
+   take the same sweep structure in their own inks — deep at the
+   upper-right cap, full colour at the bottom, pale at the upper-left.
+
+   Also noted: make_icon.py draws Blued B only. Blued A has no
+   generator, a different ring and its gap elsewhere, so it is not the
+   family mark. It stays archived, which is the decision already made.
+
+
+════════════════════════════════════════════════════════════════════════
+STILL OPEN — ALL BUILD-TIME
+════════════════════════════════════════════════════════════════════════
+
+1. THE PER-RELEASE CHANGE LIST — BIND IT
+   AppChangelog.swift, 278 releases. Confirmed flat by version with year
+   dividers only, so design has drawn it that way. Still needs wiring:
+   version → entries, sorted deterministically.
+
+2. THE MOMENTUM FILTER — MAKE IT A NAMED LIST
+   Lift the card-kind set out of the factory switch into one named,
+   explicit list. Confirmed NOT month-grouped: the 243-in-one-month
+   figure is an import artefact, and the drawing reflects that.
+   A cut card kind must not be able to return as a merged switch case.
+
+3. THE WIDGET COUNT — BIND THE NUMBER TO THE REGISTRY
+   settings → plumbing → Widgets, two places. Design has EIGHT, named:
+   Glanceable · Live heart rate · The coach brief · Resting pulse ·
+   Stress · Lift session · Energy (new) · Rings (new). Resting pulse is
+   confirmed a new build, not a rename. If the bundle registers a
+   different set, the list changes, not just the digit.
+
+4. THE ORB ICON — EXPORT IT, DO NOT RE-DRAW IT
+   Orb and Breathe both render from the app's own orb source, frozen:
+   Breathe at the top of an inhale, so the pace ring is at its widest.
+   If they cannot share a source with Act 7's orb, design ships four
+   icons rather than two orbs that drift.
+
+5. THE LIVE ACTIVITY — ONE SESSION OBJECT, NOT FOUR CLOCKS
+   Lock Screen card, three Dynamic Island presentations, in-app bar on
+   lift-live: one live session object, one tick. bpm comes off the live
+   activity, confirmed.
+   · PAUSED FREEZES, IT DOES NOT HIDE — held value, disabled ink #7F8A85
+   · the numbers slot is ABSENT where neither reps nor weight is known
+   · the exercise name takes the ellipsis; clock and set counter never do
+   · NO controls on the activity. Deliberate, not an oversight.
+   All four lift presentations are drawn — Noop Lift Live Activity.dc.html.
+
+6. THE HEART RATE ACTIVITY — NOOPLiveActivity, NOW DRAWN
+   Noop Live Heart Rate Activity.dc.html. Four presentations, same four
+   slots and same inks as the lift activity, no controls.
+   Three things the build has to honour, all of them consequences of the
+   activity having an update BUDGET rather than a stream:
+   · EVERY READING CARRIES ITS AGE. Seconds, then minutes. Never a bare
+     figure — a bare figure claims a freshness the budget cannot supply.
+   · NO READING MEANS NO FIGURE. The element is not rendered and the
+     status line takes the width with the last value and its time. Not
+     greyed, not dashed, not held at the old number.
+   · NO SPARKLINE, at any size. If a trace is wanted later it needs real
+     sample density, and that conversation starts with the density.
+   The amber over-ceiling face renders ONLY when the wearer has the
+   ceiling switched on. Gate it on the setting, not on the value.
+   And confirm the figure is the activity's own value — same one the
+   today orb reads. Two reads of the stream drift silently.
+
+
+════════════════════════════════════════════════════════════════════════
+WHERE THE STRINGS LIVE
+════════════════════════════════════════════════════════════════════════
+
+Every user-facing string is written once, in the act or artefact file it
+belongs to. Lift copy from those files, not from this document and not
+from the summary docs — those paraphrase.
+
+  Noop Act 5 - The Plumbing.dc.html ..... settings, plumbing, widgets,
+                                          appearance, terms, what's new
+  Noop Act 7 - Svea.dc.html ............. the coach, consent, voice, the
+                                          prompt library, ask-about-a-chart
+  Noop Act 10 - The Lift.dc.html ........ the session and the in-app bar
+  Noop Lift Live Activity.dc.html ....... the four lift presentations
+  Noop Live Heart Rate Activity.dc.html . the four heart rate presentations
+  Noop Widgets - the Aura set.dc.html ... all eight widget families
+  Noop Icon Set.dc.html ................. the five icons and their geometry
+  Noop Accessory Widgets.dc.html ........ the accessory mark, ten Lock
+                                          Screen placements, five refusals
+
+────────────────────────────────────────────────────────────────────────
+ONE PALETTE CHANGE YOU NEED TO PICK UP
+────────────────────────────────────────────────────────────────────────
+
+NoopPalette.textDim (#57605C) IS RETIRED FOR TYPE. It measures 3.0:1 on
+surfaceBase and it was carrying 11 pt captions across thirty files. Every
+caption that used it now uses textQuiet (#7F8A85, 5.5:1).
+
+The value survives under a NEW NAME — chevronDim — for the row chevron's
+stroke only, which is a graphical object and fine at 3:1.
+
+So: textDim no longer exists. If the codebase references it for type,
+that is the site of a contrast failure, not a missing token. The drawings
+and 10-tokens.md, 12-palette-bindings.md and NoopPalette.swift all agree
+as of 20 September.
+
+Questions on any of the above go back to design rather than getting
+resolved in code — most of them look like copy questions and are
+actually decisions.

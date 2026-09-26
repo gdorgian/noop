@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="{{ sheet }}">
+
+<div style="display:flex;flex-direction:column;gap:18px;max-width:880px;padding-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">WAVE 4C</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">The lift live activity</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">one session, four presentations, four states</span>
+  </div>
+
+  <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:38px;line-height:1.12;letter-spacing:-.03em;color:#17150F;text-wrap:pretty">Read at a glance, mid-set, from a phone on the floor.</h1>
+
+  <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;max-width:730px;text-wrap:pretty">All four presentations read the same live session as the bar on <a href="./Noop Act 10 - The Lift.dc.html">lift-live</a>, and carry the same four slots in the same order: what is running, the exercise, the clock, the set. What changes between them is only how much of that survives the space. The Lock Screen card was settled in wave 2; the three Dynamic Island presentations are this sheet's work, and <strong style="font-weight:600;color:#17150F">paused</strong> is the state the wave-2 matrix was missing.</p>
+
+  <div style="display:flex;flex-wrap:wrap;gap:9px">
+    <sc-for list="{{ rules }}" as="r" hint-placeholder-count="4">
+      <span style="padding:8px 13px;border-radius:10px;background:rgba(23,21,15,.06);font-size:12px;font-weight:600;color:#4A463D">{{ r.k }}</span>
+    </sc-for>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 28px;padding:16px 0 4px;border-top:1px solid rgba(23,21,15,.11)">
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em">TWO INKS, NO ALPHA</span>
+      <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty"><strong style="font-weight:600;color:#17150F">#17A2E6</strong> while the set is worked, <strong style="font-weight:600;color:#17150F">#C6CEC9</strong> while the clock runs down, one opaque value each. Ready keeps the working ink because the next set is the thing to act on; paused drops to #7F8A85, the app's disabled ink, because nothing is counting. Never amber, and never a translucent tint — this sits on somebody's photograph.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em">THE ACTIVITY CARRIES NO CONTROLS</span>
+      <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">No Pause, no Next set, no Finish. Pause lives on lift-live and nowhere else, exactly as the bar has none — a control whose consequence you cannot see is not a control, and a Finish button an inch from a Lock Screen swipe is a lost session. Tapping anywhere opens lift-live, which is where every one of those decisions is already drawn.</span>
+    </div>
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">P1</span>
+    <span style="{{ nm }}">Lock Screen and banner</span>
+    <span style="{{ meta }}">364 pt wide · content-sized · wave 2</span>
+    <span style="{{ body }}">The full card, unchanged from the act: what is running, the exercise, the clock, then the status line with the set's numbers and the session's progress. Five faces, because the numbers slot has to be able to disappear.</span>
+    <span style="{{ bodyq }}">The resting ink here is <strong style="font-weight:600;color:#17150F">not</strong> the bar's resting ink. The bar sits on the app's own ground and can afford #8FD3F5; this sits on a photograph, so it takes the flattest legible neutral in the palette. That divergence is deliberate and it is the only one.</span>
+  </div>
+  <div style="{{ tiles }}">
+    <sc-for list="{{ lock }}" as="t" hint-placeholder-count="5">
+      <div style="{{ stack }}">
+        <div style="{{ pad }}">
+          <div style="{{ card }}">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="{{ t.dot }}"></span>
+              <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#939C97;font-weight:600">Noop · Upper A</span>
+            </div>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:14px">
+              <span style="flex:1;min-width:0;font-family:'Outfit',sans-serif;font-size:22px;font-weight:300;letter-spacing:-.02em;line-height:1.1;color:#EDF1EF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bench press</span>
+              <span style="{{ t.clockS }}">{{ t.clock }}</span>
+            </div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+              <span style="flex:1;min-width:0;font-size:12.5px;color:#C6CEC9">{{ t.status }}</span>
+              <span style="{{ t.detailS }}">{{ t.detail }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:7px;padding-top:1px">
+              <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.12)">
+                <div style="{{ t.fillS }}"></div>
+              </div>
+              <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">3 of 19 sets done</span>
+            </div>
+          </div>
+        </div>
+        <span style="{{ cap }}">{{ t.cap }}</span>
+        <span style="{{ tnote }}">{{ t.note }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">P2</span>
+    <span style="{{ nm }}">Dynamic Island · compact</span>
+    <span style="{{ meta }}">leading ≤ 44 pt · trailing ≤ 56 pt · 37 pt tall</span>
+    <span style="{{ body }}">Two slots either side of the sensors, and the 84 pt between them is not ours. The dot carries the state and the trailing slot carries the clock — the two things worth a glance while the phone is face-up on a bench. The exercise name does not fit and is not attempted.</span>
+    <span style="{{ bodyq }}">Ready is the one word allowed in the trailing slot, at 12 pt and five glyphs. Anything longer is a truncation, and a truncated clock is worse than no clock.</span>
+  </div>
+  <div style="{{ tiles }}">
+    <sc-for list="{{ compact }}" as="t" hint-placeholder-count="4">
+      <div style="{{ stack }}">
+        <div style="{{ padSm }}">
+          <div style="{{ pill }}">
+            <span style="{{ t.dot }}"></span>
+            <div style="width:84px;flex:none"></div>
+            <span style="{{ t.clockS }}">{{ t.clock }}</span>
+          </div>
+        </div>
+        <span style="{{ cap }}">{{ t.cap }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">P3</span>
+    <span style="{{ nm }}">Dynamic Island · expanded</span>
+    <span style="{{ meta }}">364 × 172 pt · leading, trailing, bottom</span>
+    <span style="{{ body }}">The long press. Leading names the session, trailing holds the clock, and everything that matters lives in the bottom region where the full width is available. The centre region stays empty: it is the sensor's neighbourhood and text there is read at an angle.</span>
+    <span style="{{ bodyq }}">It is the Lock Screen card rearranged, not a different design — same four slots, same order, same two inks. 172 pt is near the practical ceiling, which is the reason nothing else was invited in.</span>
+  </div>
+  <div style="{{ tiles }}">
+    <sc-for list="{{ expanded }}" as="t" hint-placeholder-count="4">
+      <div style="{{ stack }}">
+        <div style="{{ padSm }}">
+          <div style="{{ island }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                <span style="{{ t.dot }}"></span>
+                <span style="font-size:11.5px;font-weight:600;color:#C6CEC9;white-space:nowrap">Upper A</span>
+              </div>
+              <div style="width:84px;flex:none"></div>
+              <span style="{{ t.clockS }}">{{ t.clock }}</span>
+            </div>
+            <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px">
+              <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;letter-spacing:-.025em;line-height:1.1;color:#EDF1EF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bench press</span>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                <span style="flex:1;min-width:0;font-size:12.5px;color:#C6CEC9">{{ t.status }}</span>
+                <span style="{{ t.detailS }}">{{ t.detail }}</span>
+              </div>
+              <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.12)">
+                <div style="{{ t.fillS }}"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span style="{{ cap }}">{{ t.cap }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">P4</span>
+    <span style="{{ nm }}">Dynamic Island · minimal</span>
+    <span style="{{ meta }}">~24 pt of content, attached to the island</span>
+    <span style="{{ body }}">What is left when another app's activity is frontmost. A state and nothing else: filled while you work, hollow while you rest, ringed when the rest has run out, and dimmed when nothing is counting.</span>
+    <span style="{{ bodyq }}">Four states is this slot's ceiling and it is already at it. No number goes in here — a two-glyph clock at 24 pt is a smudge, and a smudge that looks like data is worse than an empty slot.</span>
+  </div>
+  <div style="{{ tiles }}">
+    <sc-for list="{{ minimal }}" as="t" hint-placeholder-count="4">
+      <div style="{{ stack }}">
+        <div style="{{ padSm }}">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="width:126px;height:37px;border-radius:19px;background:#000;flex:none"></div>
+            <div style="{{ t.slot }}"><div style="{{ t.inner }}"></div></div>
+          </div>
+        </div>
+        <span style="{{ cap }}">{{ t.cap }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<div style="display:flex;gap:34px;align-items:flex-start;padding:28px 0 0;border-top:1px solid rgba(23,21,15,.11);max-width:1180px">
+  <div style="{{ col }}">
+    <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">FOR THE BUILD</span>
+    <span style="{{ nm }}">Four things to hold to</span>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:12px">
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">One source.</strong> All four presentations and the in-app bar read the same live session object. If the bar says ready, the island says ready in the same tick — they are not two clocks that happen to agree.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">Paused freezes, it does not hide.</strong> The clock stays on screen at its held value in disabled ink. Hiding it reads as a reset, and a wearer who thinks the set timer reset will redo the set.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">The numbers slot is absent, never a dash pair.</strong> Where neither reps nor weight is known the element is not rendered — the status line simply takes the width. Six em dashes are the thing this whole act refuses.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">Truncate the exercise, never the clock.</strong> "Incline dumbbell press" at 23 pt overruns 364 pt; the name takes the ellipsis and the clock and the set counter keep their width at every size.</span>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;wallpaper&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Warm&quot;,&quot;Dark&quot;,&quot;Light&quot;],&quot;default&quot;:&quot;Warm&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Sheet&quot;},&quot;units&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;kg&quot;,&quot;lb&quot;],&quot;default&quot;:&quot;kg&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Session&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const A = '#17A2E6', NEU = '#C6CEC9', OFF = '#7F8A85';
+    const WP = {
+      Warm: 'linear-gradient(152deg,#2C332E 0%,#16120E 58%,#1E2622 100%)',
+      Dark: 'linear-gradient(152deg,#15191A 0%,#0A0C0B 60%,#101416 100%)',
+      Light: 'linear-gradient(152deg,#CFC8BA 0%,#A9A294 58%,#BFC6C2 100%)'
+    };
+    const wp = WP[this.props.wallpaper] || WP.Warm;
+    const kg = (this.props.units || 'kg') === 'kg';
+    const NUM = kg ? '8 × 30 kg' : '8 × 66 lb';
+
+    // one state table; every presentation reads from it, the way every presentation
+    // reads from one live session.
+    const ST = {
+      working: { ink: A, clock: '1:12', status: 'Set 3 of 4', detail: NUM, cap: 'WORKING · #17A2E6' },
+      resting: { ink: NEU, clock: '2:30', status: 'Resting after set 3', detail: NUM, cap: 'RESTING · #C6CEC9' },
+      ready: { ink: A, clock: 'Ready', status: 'Ready for the next set', detail: NUM, cap: 'READY · REST RUN OUT' },
+      paused: { ink: OFF, clock: '1:12', status: 'Paused · set 3 of 4', detail: NUM, cap: 'PAUSED · CLOCK FROZEN' },
+      noDetail: { ink: A, clock: '1:12', status: 'Set 3 of 4', detail: '', cap: 'NO REPS, NO WEIGHT' }
+    };
+    const dot = function (k) {
+      const s = ST[k];
+      if (k === 'paused') return { width: 7, height: 7, flex: 'none', borderRadius: '50%', border: '1.4px solid ' + OFF, boxSizing: 'border-box' };
+      if (k === 'resting') return { width: 7, height: 7, flex: 'none', borderRadius: '50%', background: NEU };
+      return { width: 7, height: 7, flex: 'none', borderRadius: '50%', background: s.ink, boxShadow: '0 0 9px rgba(23,162,230,.7)' };
+    };
+    const clockS = function (k, big) {
+      const s = ST[k], word = s.clock === 'Ready';
+      return {
+        fontFamily: "'Outfit',sans-serif", fontWeight: word ? 400 : 300,
+        fontSize: word ? (big ? 20 : 12.5) : (big ? 31 : 13.5),
+        letterSpacing: '-.025em', lineHeight: 1, color: s.ink, flex: 'none',
+        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'
+      };
+    };
+    const detailS = function (k) {
+      return ST[k].detail
+        ? { fontSize: 12.5, fontWeight: 600, color: '#EDF1EF', flex: 'none', fontVariantNumeric: 'tabular-nums' }
+        : { display: 'none' };
+    };
+    const fillS = function (k) {
+      return { height: 3, borderRadius: 2, width: '16%', background: ST[k].ink };
+    };
+    const NOTES = {
+      working: 'The default face. Set clock counting up.',
+      resting: 'Rest counting down. Same card, two words changed.',
+      ready: 'The state a drawing forgets: rest spent, next set not begun.',
+      paused: 'Neither clock moves. The figure stays put, dimmed.',
+      noDetail: 'Numbers slot absent — the status line takes the width.'
+    };
+    const mk = function (k, big) {
+      return {
+        cap: ST[k].cap, note: NOTES[k], clock: ST[k].clock, status: ST[k].status, detail: ST[k].detail,
+        dot: dot(k), clockS: clockS(k, big), detailS: detailS(k), fillS: fillS(k)
+      };
+    };
+    const minSlot = function (k) {
+      const base = { width: 26, height: 26, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' };
+      if (k === 'working') return Object.assign({}, base, { background: A });
+      if (k === 'resting') return Object.assign({}, base, { border: '2px solid ' + NEU });
+      if (k === 'ready') return Object.assign({}, base, { border: '2px solid ' + A });
+      return Object.assign({}, base, { border: '2px solid ' + OFF, opacity: .75 });
+    };
+    const minInner = function (k) {
+      if (k === 'ready') return { width: 9, height: 9, borderRadius: '50%', background: A };
+      if (k === 'paused') return { width: 9, height: 2.5, borderRadius: 2, background: OFF };
+      return { display: 'none' };
+    };
+
+    return {
+      sheet: { display: 'flex', flexDirection: 'column', gap: 0, padding: '52px 48px 110px', '--wp': wp },
+      rules: [
+        { k: 'Same four slots, same order, every presentation' },
+        { k: 'One session object, one clock, one truth' },
+        { k: 'Two inks, opaque — it sits on a photograph' },
+        { k: 'No controls: pause lives on lift-live' }
+      ],
+
+      lock: ['working', 'resting', 'ready', 'paused', 'noDetail'].map(function (k) { return mk(k, true); }),
+      compact: ['working', 'resting', 'ready', 'paused'].map(function (k) { return mk(k, false); }),
+      expanded: ['working', 'resting', 'ready', 'paused'].map(function (k) { return mk(k, true); }),
+      minimal: ['working', 'resting', 'ready', 'paused'].map(function (k) {
+        return { cap: ST[k].cap, slot: minSlot(k), inner: minInner(k) };
+      }),
+
+      row: { display: 'flex', gap: 34, alignItems: 'flex-start', padding: '30px 0', borderTop: '1px solid rgba(23,21,15,.11)' },
+      col: { width: 268, flex: 'none', display: 'flex', flexDirection: 'column', gap: 7 },
+      tiles: { display: 'flex', gap: 22, alignItems: 'flex-start', flexWrap: 'wrap', maxWidth: 840 },
+      stack: { display: 'flex', flexDirection: 'column', gap: 9, maxWidth: 400 },
+      pad: { padding: 18, borderRadius: 34, background: 'var(--wp,linear-gradient(152deg,#2C332E 0%,#16120E 58%,#1E2622 100%))' },
+      padSm: { padding: '20px 18px', borderRadius: 30, background: 'var(--wp,linear-gradient(152deg,#2C332E 0%,#16120E 58%,#1E2622 100%))', display: 'flex', justifyContent: 'center' },
+      card: { width: 364, boxSizing: 'border-box', borderRadius: 22, padding: '15px 16px 16px', background: 'rgba(20,24,23,.9)', border: '.5px solid rgba(255,255,255,.1)', display: 'flex', flexDirection: 'column', gap: 11 },
+      pill: { width: 236, height: 37, boxSizing: 'border-box', borderRadius: 19, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px' },
+      island: { width: 364, height: 172, boxSizing: 'border-box', borderRadius: 44, background: '#000', padding: '16px 22px 20px', display: 'flex', flexDirection: 'column', color: '#EDF1EF' },
+
+      cap: { font: '600 9.5px ui-monospace,Menlo,monospace', letterSpacing: '.06em', color: 'rgba(23,21,15,.5)' },
+      tnote: { fontSize: 11.5, lineHeight: 1.5, color: '#6B6558', maxWidth: 364, textWrap: 'pretty' },
+      ix: { font: '600 9.5px ui-monospace,Menlo,monospace', color: '#17a2e6', letterSpacing: '.06em' },
+      nm: { fontFamily: "'Outfit',sans-serif", fontWeight: 500, fontSize: 17, color: '#17150F', letterSpacing: '-.015em' },
+      meta: { font: '600 10px ui-monospace,Menlo,monospace', color: 'rgba(23,21,15,.5)', paddingBottom: 3 },
+      body: { fontSize: 12.5, lineHeight: 1.62, color: '#6B6558', textWrap: 'pretty' },
+      bodyq: { fontSize: 12.5, lineHeight: 1.62, color: '#6B6558', textWrap: 'pretty' }
+    };
+  }
+}
+</script>
+</body>
+</html>

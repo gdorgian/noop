@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#0B6FA8;text-decoration:none}a:hover{color:#084F78}
+</style>
+</helmet>
+
+<div style="padding:38px 40px 44px;display:flex;flex-direction:column;gap:26px;background:#E9E5DD;box-sizing:border-box;min-width:940px">
+
+  <div style="display:flex;flex-direction:column;gap:9px;max-width:44em">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:600;padding:3px 7px;border-radius:4px;background:#1B1F1E;color:#E9E5DD">C</span>
+      <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">Confidence ladder &#183; candidate</span>
+    </div>
+    <div style="font-family:'Outfit',sans-serif;font-size:34px;font-weight:300;letter-spacing:-.03em;line-height:1.1;color:#151917">A chip, in a fixed slot</div>
+    <div style="font-size:14.5px;line-height:1.6;color:#3E4644;text-wrap:pretty">One pill, always above the number, always the same three words in the same three colours &#8212; and on small cards it shrinks to a single dot in the corner. The slot is reserved whether or not there is anything to say, so nothing moves; a chip is also the only one of the three that a user can tap for the explanation behind it.</div>
+    <div style="display:flex;gap:22px;margin-top:4px;font-size:12.5px;color:#5E6663">
+      <span><strong style="color:#151917;font-weight:600">Costs</strong> the most visual noise, on all 48 screens at once</span>
+      <span><strong style="color:#151917;font-weight:600">Buys</strong> unmistakable, tappable, and it scales to a dot</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:30px;align-items:flex-start;flex-wrap:wrap">
+
+    <div style="border-radius:48px;overflow:hidden;flex:none">
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ yes }}" hint-size="402px,874px">
+      <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+        <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:470px;height:430px;border-radius:50%;background:radial-gradient(circle,rgba(139,153,214,.20),rgba(139,153,214,0) 68%);pointer-events:none"></div>
+
+        <div style="position:relative;padding:58px 20px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span style="font-size:13.5px;color:#939C97">Last night</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">Rest</span>
+          </div>
+          <span style="width:30px;height:30px;flex:none;border-radius:50%;border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:13px;color:#939C97">&#8942;</span>
+        </div>
+
+        <div style="position:relative;padding:14px 20px 0;display:flex;flex-direction:column;align-items:center;gap:9px">
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 10px 4px 8px;border-radius:11px;background:rgba(23,162,230,.13);border:.5px solid rgba(23,162,230,.3);cursor:pointer">
+            <span style="width:6px;height:6px;border-radius:50%;background:#4FB8EC;flex:none"></span>
+            <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#7FCBF0">Building</span>
+            <span style="font-size:10px;color:#4FB8EC;font-weight:600;padding-left:1px">?</span>
+          </div>
+          <div style="position:relative;width:170px;height:170px;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 180 180" style="position:absolute;inset:0;width:170px;height:170px;transform:rotate(-90deg)">
+              <circle cx="90" cy="90" r="76" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="9"></circle>
+              <circle cx="90" cy="90" r="76" fill="none" stroke="#8B99D6" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ dash78 }}"></circle>
+            </svg>
+            <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+              <span style="font-family:'Outfit',sans-serif;font-size:52px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 24px rgba(0,0,0,.6)">78</span>
+              <span style="font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#93A0A6;font-weight:600;padding-top:7px">rest</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="position:relative;padding:24px 20px 0;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+            <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8B958F;font-weight:600">Against your need</span>
+            <span style="font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">7h 12m of 7h 05m</span>
+          </div>
+          <div style="height:7px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden">
+            <div style="width:78%;height:100%;border-radius:4px;background:linear-gradient(90deg,rgba(139,153,214,.55),#8B99D6)"></div>
+          </div>
+        </div>
+
+        <div style="position:relative;padding:20px 20px 0;display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+            <div style="position:relative;width:calc(50% - 4px);box-sizing:border-box;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:18px;padding:13px 15px 13px;display:flex;flex-direction:column;gap:5px">
+              <span style="position:absolute;top:12px;right:13px;width:6px;height:6px;border-radius:50%;background:{{ s.dot }}"></span>
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ s.k }}</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.02em;font-variant-numeric:tabular-nums">{{ s.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+      </div>
+    </x-import>
+    </div>
+
+    <div style="flex:1;min-width:390px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6E7671">The three rungs, same screen</span>
+      <div style="display:flex;gap:10px">
+        <sc-for list="{{ rungs }}" as="r" hint-placeholder-count="3">
+          <div style="flex:1;background:#0A0C0B;border-radius:24px;padding:20px 16px 18px;display:flex;flex-direction:column;align-items:center;gap:14px">
+            <span style="font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#6C7570">{{ r.name }}</span>
+            <div style="display:flex;align-items:center;gap:5px;padding:3px 8px 3px 7px;border-radius:10px;background:{{ r.chipBg }};border:.5px solid {{ r.chipBorder }}">
+              <span style="width:5px;height:5px;border-radius:50%;flex:none;background:{{ r.chipDot }}"></span>
+              <span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:{{ r.chipText }}">{{ r.chipLabel }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;min-height:62px;justify-content:center">
+              <span style="font-family:'Outfit',sans-serif;font-size:38px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;color:#EDF1EF">{{ r.num }}</span>
+              <span style="font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#93A0A6;font-weight:600">rest</span>
+            </div>
+            <div style="position:relative;width:100%;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:4px">
+              <span style="position:absolute;top:10px;right:11px;width:5px;height:5px;border-radius:50%;background:{{ r.chipDot }}"></span>
+              <span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6C7570;font-weight:600">Resting HR</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:400;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:#EDF1EF">{{ r.stat }}</span>
+            </div>
+            <span style="font-size:11px;line-height:1.5;color:#8B958F;text-align:center;text-wrap:pretty">{{ r.note }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:980,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  renderVals() {
+    const C = 2 * Math.PI * 76;
+    const dash = p => (C * p / 100).toFixed(0) + ' ' + (C * (1 - p / 100)).toFixed(0);
+    const AMBER = '#D9AE62', BLUE = '#4FB8EC', GREEN = '#8FC9A3';
+    return {
+      yes: true,
+      dash78: dash(78),
+      stats: [
+        { k: 'Time asleep', v: '7h 12m', dot: GREEN },
+        { k: 'Efficiency', v: '91%', dot: GREEN },
+        { k: 'Resting HR', v: '52', dot: BLUE },
+        { k: 'Variability', v: '38', dot: AMBER }
+      ],
+      rungs: [
+        { name: 'Calibrating', num: '78', stat: '52', chipLabel: 'Calibrating',
+          chipBg: 'rgba(214,163,74,.14)', chipBorder: 'rgba(214,163,74,.32)', chipText: '#E3C48B', chipDot: AMBER,
+          note: 'Amber. The one rung that asks you to wait.' },
+        { name: 'Building', num: '78', stat: '52', chipLabel: 'Building',
+          chipBg: 'rgba(23,162,230,.13)', chipBorder: 'rgba(23,162,230,.3)', chipText: '#7FCBF0', chipDot: BLUE,
+          note: 'Blue, the app’s own accent. Progress, not a warning.' },
+        { name: 'Solid', num: '78', stat: '52', chipLabel: 'Solid',
+          chipBg: 'rgba(126,186,146,.12)', chipBorder: 'rgba(126,186,146,.26)', chipText: '#A6D6B6', chipDot: GREEN,
+          note: 'Stays visible. Trust is stated, not implied by absence.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

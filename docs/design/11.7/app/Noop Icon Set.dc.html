@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="{{ sheet }}">
+
+<div style="display:flex;flex-direction:column;gap:18px;max-width:880px;padding-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">WAVE 4E · TO THE CONSTANT</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">The icon set, and the Appearance row</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">five icons — three instruments and two orbs</span>
+  </div>
+
+  <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:38px;line-height:1.12;letter-spacing:-.03em;color:#17150F;text-wrap:pretty">The script had the numbers. I was still measuring.</h1>
+
+  <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;max-width:750px;text-wrap:pretty">Engineering sent <strong style="font-weight:600;color:#17150F">make_icon.py's own constants</strong>, and they overrule the two numbers I read off the render by hand. The mark held: an open ring with a solid core at the centre, shipping that way since June. Its opening did not. It sits <strong style="font-weight:600;color:#17150F">square at twelve o'clock</strong> where I had it tilted 23° off, and it is narrower than I drew — 302° of ink between round caps 29° either side of top. Every proportion on this sheet is now the script's arithmetic rather than my arithmetic about the script, and the shipped file matches it to within a pixel.</p>
+
+  <div style="display:flex;flex-wrap:wrap;gap:9px">
+    <sc-for list="{{ rules }}" as="r" hint-placeholder-count="4">
+      <span style="padding:8px 13px;border-radius:10px;background:rgba(23,21,15,.06);font-size:12px;font-weight:600;color:#4A463D">{{ r.k }}</span>
+    </sc-for>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 28px;padding:16px 0 4px;border-top:1px solid rgba(23,21,15,.11)">
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">WHAT THE CONSTANTS CORRECTED</span>
+      <span style="{{ body }}">Two of my numbers, and both corrections make the mark plainer. The opening is <strong style="font-weight:600;color:#17150F">centred at twelve o'clock</strong>, dead on the vertical, where I had it 23° counter-clockwise: the mark is symmetrical about its own axis and always was, so the tilt I had built a paragraph of reasoning around was an artefact of my scan. And the gap is <strong style="font-weight:600;color:#17150F">narrower</strong> — cap centres 58° apart, 302° of ink, and a visible opening of 33.9° once the round caps are drawn in, against the 79.5° hole I had. What survives is the part that mattered: the reading is a <strong style="font-weight:600;color:#17150F">core at the centre</strong> rather than a dot riding the arc, and the stroke is 13.5% of the tile, which is the real reason the shipped icon holds at 29 pt.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">TWO ORBS, AND WHY THAT IS FINE</span>
+      <span style="{{ body }}">Cast is out — it was a formal exercise, and it looked like one. In its place is <strong style="font-weight:600;color:#17150F">Breathe</strong>, which earns its slot the way everything else here does: it is a real part of the app, five screens deep, and it is the only icon that opens onto something you do rather than something you read. Two orbs work because they differ on <em style="font-family:'Instrument Serif',serif;font-style:italic">three</em> axes at once — hue (cyan against periwinkle), shape (a true circle against a blob) and structure (a closed pace ring against a soft halo). Any one of those alone would not survive 29 pt.</span>
+      <span style="{{ body }}">One cost, stated: <strong style="font-weight:600;color:#17150F">Titanium is now the set's only pale tile.</strong> Cast was the other. A wearer on a light wallpaper has exactly one icon that holds, and it happens to be the default — workable, but it is a real narrowing and worth knowing about rather than discovering.</span>
+    </div>
+  </div>
+</div>
+
+<sc-for list="{{ icons }}" as="i" hint-placeholder-count="5">
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ i.ixS }}">{{ i.ix }}</span>
+    <span style="{{ nm }}">{{ i.k }}</span>
+    <span style="{{ meta }}">{{ i.meta }}</span>
+    <span style="{{ body }}">{{ i.note }}</span>
+    <span style="{{ body }}">{{ i.note2 }}</span>
+  </div>
+  <div style="{{ tiles }}">
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ i.g180 }}">
+          <div style="{{ i.bloom180 }}"></div>
+          <div style="{{ i.orb180 }}"></div>
+          <div style="{{ i.r180 }}"></div>
+          <div style="{{ i.c180 }}"></div>
+        </div>
+      </div>
+      <span style="{{ cap }}">{{ i.cap }}</span>
+    </div>
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:7px;width:76px">
+          <div style="{{ i.g60 }}">
+            <div style="{{ i.bloom60 }}"></div>
+            <div style="{{ i.orb60 }}"></div>
+            <div style="{{ i.r60 }}"></div>
+            <div style="{{ i.c60 }}"></div>
+          </div>
+          <span style="font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)">Noop</span>
+        </div>
+      </div>
+      <span style="{{ cap }}">HOME SCREEN · 60 PT</span>
+    </div>
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="display:flex;align-items:center;gap:12px;width:196px;height:44px">
+          <div style="{{ i.g29 }}">
+            <div style="{{ i.bloom29 }}"></div>
+            <div style="{{ i.orb29 }}"></div>
+            <div style="{{ i.r29 }}"></div>
+            <div style="{{ i.c29 }}"></div>
+          </div>
+          <span style="font-size:13.5px;color:#EDF1EF">Noop</span>
+          <span style="margin-left:auto;font-size:12px;color:#7F8A85">{{ i.k }}</span>
+        </div>
+      </div>
+      <span style="{{ cap }}">SETTINGS ROW · 29 PT</span>
+    </div>
+
+  </div>
+</div>
+</sc-for>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="{{ ix }}">THE ROW</span>
+    <span style="{{ nm }}">Appearance · App icon</span>
+    <span style="{{ meta }}">settings/appearance · replaces the Later chip</span>
+    <span style="{{ body }}">The row stops being a promise. It becomes what every other choice in Appearance already is — a control with the options visible and the current one obvious — except the options are surfaces, so they are shown rather than named twice.</span>
+    <span style="{{ body }}">Tiles are 46 pt in a 44 pt target, three across, wrapping to a second line. The name sits under each, and the picked one carries a ring and the app's own aura blue rather than a tick: a tick on an icon reads as a badge on the icon. Tap the tiles — the row keeps its answer.</span>
+    <span style="{{ body }}">Changing an alternate icon is a system alert Noop does not own, so the row says so in one line instead of letting the wearer wonder what the flash was.</span>
+  </div>
+  <div style="{{ tiles }}">
+
+    <div style="{{ stack }}">
+      <div style="{{ pad }}">
+        <div style="{{ card }}">
+          <div style="display:flex;align-items:center;gap:13px">
+            <span style="{{ icoGrid }}"></span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:13.5px;color:#EDF1EF">App icon</span>
+              <span style="font-size:11.5px;line-height:1.45;color:#7F8A85">{{ pickedSub }}</span>
+            </div>
+          </div>
+          <div style="{{ grid }}">
+            <sc-for list="{{ picker }}" as="p" hint-placeholder-count="5">
+              <div onClick="{{ p.pick }}" style="{{ p.wrap }}">
+                <div style="{{ p.ground }}">
+                  <div style="{{ p.bloom }}"></div>
+                  <div style="{{ p.orb }}"></div>
+                  <div style="{{ p.ring }}"></div>
+                  <div style="{{ p.core }}"></div>
+                </div>
+                <span style="{{ p.label }}">{{ p.k }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <span style="font-size:11px;line-height:1.55;color:#7F8A85;text-wrap:pretty">iOS shows its own alert when the icon changes, and the new one can take a moment to appear on the Home Screen. Nothing else about the app changes.</span>
+        </div>
+      </div>
+      <span style="{{ cap }}">FIVE-UP · THE SHIPPING SET</span>
+    </div>
+
+  </div>
+</div>
+
+<div style="{{ row }}">
+  <div style="{{ col }}">
+    <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">THE OTHER CANDIDATE</span>
+    <span style="{{ nm }}">Blued A, and why it does not ship</span>
+    <span style="{{ meta }}">brushed blued titanium · 14 June 2026 · one day</span>
+    <span style="{{ body }}">It is the better-looking tile of the two and it still does not ship. It lived for a day, so nobody has it set; swapping it in now would change the icon under every wearer who chose the blue one, for a difference they did not ask for.</span>
+    <span style="{{ body }}">It is also a static raster with no generator behind it, where B re-renders from a script at any size — and engineering confirms make_icon.py draws B only. A has a different ring and puts its gap somewhere else, so it is not even the family mark. The set's rule about the orb applies here too: prefer the thing that has a source over the thing that has a file.</span>
+    <span style="{{ body }}">Worth keeping in the archive. If a brushed-metal blue is ever wanted, this is the reference — but it would come back as a rendered member of the family, not as this file.</span>
+  </div>
+  <div style="{{ tiles }}">
+    <div style="{{ stack }}">
+      <div style="{{ pad }}"><div style="{{ altA }}"></div></div>
+      <span style="{{ cap }}">BLUED A · ARCHIVE, NOT SHIPPED</span>
+    </div>
+    <div style="{{ stack }}">
+      <div style="{{ pad }}"><div style="{{ altB }}"></div></div>
+      <span style="{{ cap }}">BLUED B · SHIPS AS NAVY</span>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:34px;align-items:flex-start;padding:28px 0 0;border-top:1px solid rgba(23,21,15,.11);max-width:1180px">
+  <div style="{{ col }}">
+    <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em">FOR THE BUILD</span>
+    <span style="{{ nm }}">Five things to hold to</span>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:12px">
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">The mark is make_icon.py's, to the constant.</strong> Outer radius 0.39 of the tile, stroke 0.135, core radius 0.090. 302° of ink, round caps at half the stroke, the gap centred at twelve o'clock with cap centres 29° either side. Engineering measured the shipped 1024 against those constants and every radius came back within a pixel — that is anti-aliasing off a 4× render, not drift. Navy is that file; Titanium and Aura are the same arithmetic in other surfaces, and nothing here is a number anybody read off a picture.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">The stroke has a floor.</strong> 13.5% of the tile, never under 2 pt — at 29 pt in a Settings row a thin arc turns into a grey smudge, which is how an icon stops being recognisable at the one size everybody sees it.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">An open ring reads; a closed ring acts.</strong> The instrument's ring is open and heavy because a reading is never finished. Breathe's pace ring is closed and thin because a breath is a cycle that completes. Do not let the two converge — that distinction is the only thing keeping Breathe from reading as a fourth instrument at small sizes.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">Navy, Breathe and the Orb are exports, not re-drawings.</strong> Navy comes out of the repo's own generator; Breathe and the Orb render from the app's own orb code, frozen at one moment — Breathe at the top of an inhale, so the pace ring is at its widest. All three should fail a test if the shipped file stops matching its source. Titanium and Aura are drawn to the spec above. No text in any tile, at any size.</span>
+    <span style="{{ body }}"><strong style="font-weight:600;color:#17150F">Titanium stays the default.</strong> Not on contrast — it is a pale tile and it wants a dark wallpaper behind it. It is the default because it matches the hardware, and a wearer who never opens Appearance should have the icon that looks like the thing on their wrist.</span>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;picked&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Titanium&quot;,&quot;Aura&quot;,&quot;Navy&quot;,&quot;Breathe&quot;,&quot;Orb&quot;],&quot;default&quot;:&quot;Titanium&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Set&quot;}}">
+class Component extends DCLogic {
+  state = { pick: null };
+
+  renderVals() {
+    const self = this;
+    const A = '#17A2E6', SKY = '#8FD3F5';
+    void SKY;
+
+    // GEOMETRY IS THE GENERATOR'S, NOT A MEASUREMENT. Engineering sent Tools/make_icon.py's
+    // own constants on 19 September with their measurements of the shipped file beside them:
+    // every radius within 1 px, so the shipped icon IS the script's output, unretouched.
+    // Two numbers I took off the render by hand were wrong and are corrected here — the gap
+    // is centred at TWELVE O'CLOCK, not 23° off it, and the ink is 302° (83.9%), not 280°.
+    // Fractions of the tile, so a proportion fixed here is fixed at every export size.
+    const RING = 0.78;   // outer DIAMETER = 2 × 0.39
+    const STROKE = 0.135;
+    const CORE = 0.18;   // core DIAMETER = 2 × 0.090
+    const CAPDEG = 29;   // cap centres either side of 12 o'clock — 302° of ink between them
+
+    // Caps are ROUND, radius half the stroke, which is why the visible gap is 33.9° and not
+    // the 58° between cap centres. A conic gradient cannot round its own ends, so the ring
+    // is an arc drawn with a round linecap and used as a mask over the ink.
+    const ARC = (function () {
+      const rOut = RING * 50, w = STROKE * 100, rc = rOut - w / 2;
+      const a = CAPDEG * Math.PI / 180;
+      const dx = rc * Math.sin(a), y = (50 - rc * Math.cos(a)).toFixed(3);
+      const d = 'M' + (50 + dx).toFixed(3) + ' ' + y + 'A' + rc + ' ' + rc +
+        ' 0 1 1 ' + (50 - dx).toFixed(3) + ' ' + y;
+      return 'url("data:image/svg+xml;utf8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="' + d +
+        '" fill="none" stroke="#000" stroke-width="' + w + '" stroke-linecap="round"/></svg>'
+      ) + '")';
+    })();
+
+    const build = function (size, s) {
+      const R = size * RING;
+      const core = Math.max(3, size * CORE);
+      const none = { display: 'none' };
+      const isArt = s.kind === 'art', isOrb = s.kind === 'orb', isBreathe = s.kind === 'breathe';
+      const isSphere = isOrb || isBreathe;
+      const hasRing = !isArt && !isSphere;
+      // the pace ring is CLOSED and thin, against the instrument's open, heavy one —
+      // a reading is never finished, a breath is a cycle that closes
+      const paceW = Math.max(2, size * 0.055);
+      const glow = s.glow ? 'drop-shadow(0 0 ' + (size * 0.045).toFixed(1) + 'px rgba(23,162,230,.7))' : 'none';
+      return {
+        ground: {
+          width: size, height: size, flex: 'none', boxSizing: 'border-box',
+          borderRadius: size * 0.2237, position: 'relative', overflow: 'hidden',
+          background: isArt ? 'url("' + s.src + '") center/cover no-repeat' : s.g,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 ' + (size * 0.05).toFixed(1) + 'px ' + (size * 0.14).toFixed(1) + 'px rgba(0,0,0,.34)'
+        },
+        ring: hasRing ? {
+          position: 'absolute', width: size, height: size,
+          background: s.ink,
+          WebkitMaskImage: ARC, maskImage: ARC,
+          WebkitMaskSize: '100% 100%', maskSize: '100% 100%',
+          WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+          filter: glow
+        } : (isBreathe ? {
+          position: 'absolute', width: R, height: R, borderRadius: '50%', boxSizing: 'border-box',
+          border: paceW + 'px solid ' + SKY
+        } : none),
+        core: hasRing ? {
+          position: 'absolute', width: core, height: core, borderRadius: '50%',
+          background: s.dot, filter: glow
+        } : none,
+        // Svea is a blob; the breath orb is a true circle. Shape carries the difference
+        // at the sizes where hue stops being reliable.
+        orb: isSphere ? {
+          position: 'absolute',
+          width: size * (isOrb ? 0.5 : 0.4), height: size * (isOrb ? 0.5 : 0.4),
+          borderRadius: isOrb ? '58% 42% 46% 54%/49% 55% 45% 51%' : '50%',
+          background: isOrb
+            ? 'radial-gradient(circle at 44% 38%,#DDE3F6,#8B99D6 58%,#4A56A8)'
+            : 'radial-gradient(circle at 42% 36%,#E4F6FF,#8FD3F5 50%,#17A2E6 100%)'
+        } : none,
+        bloom: isSphere ? {
+          position: 'absolute',
+          width: size * (isOrb ? 0.84 : 0.66), height: size * (isOrb ? 0.84 : 0.66), borderRadius: '50%',
+          background: isOrb
+            ? 'radial-gradient(circle,rgba(139,153,214,.42),rgba(139,153,214,0) 66%)'
+            : 'radial-gradient(circle,rgba(23,162,230,.5),rgba(23,162,230,0) 68%)'
+        } : none
+      };
+    };
+
+    const NAVY_SRC = 'assets/blued-b-navy-1024.png';
+    const SET = [
+      { id: 'Titanium', kind: 'gauge', ix: 'I1 · DEFAULT', ixHue: '#17a2e6',
+        g: 'linear-gradient(147deg,#E7E3DA 0%,#C2BCB0 38%,#DAD5CA 58%,#A49E92 100%)',
+        ink: 'conic-gradient(from 29deg,#171510,#2A2720 42%,#4A453C 84%)', dot: A,
+        cap: '1024 MASTER · SHOWN AT 180',
+        meta: 'ships · the default · redrawn to the source geometry',
+        note: 'The hardware, on the Home Screen: warm brushed metal, the ring cut into it in near-black, and the core in the app\u2019s aura blue so there is one live thing in an otherwise inert tile.',
+        note2: 'The default because it matches the hardware, not because it wins a contrast test \u2014 it is a pale tile and wants a dark wallpaper behind it. Since Cast came out it is the set\u2019s only pale tile; a wearer on a light wallpaper is better served by Aura, Navy, Breathe or the Orb, all four of which are dark.' },
+
+      { id: 'Aura', kind: 'gauge', ix: 'I2 · NEW', ixHue: '#B4543A',
+        g: 'radial-gradient(circle at 40% 34%,#1D2E38 0%,#0C1216 46%,#060808 100%)',
+        ink: 'conic-gradient(from 29deg,#0B6591,#17A2E6 42%,#9BDDF8 84%)', dot: SKY, glow: true,
+        cap: '1024 MASTER · SHOWN AT 180',
+        meta: 'to build \u00b7 new drawing',
+        note: 'The app\u2019s own ground, and the only icon in the family that glows: the ring carries aura blue with a soft bloom behind it, the way the orb does inside the app.',
+        note2: 'Drawn against the dark wallpaper most wearers use. On a white background the bloom disappears and the mark still reads \u2014 that was the test it had to pass. Its blue runs along the sweep the way Navy\u2019s gold does: deep at the upper-right cap, full aura blue at the bottom, pale at the upper-left.' },
+
+      { id: 'Navy', kind: 'art', ix: 'I3 · THE REFERENCE', ixHue: '#17a2e6', src: NAVY_SRC,
+        cap: 'THE ACTUAL 1024 RENDER',
+        meta: 'ships since 15 June 2026 \u00b7 AppIcon-Navy \u00b7 Tools/make_icon.py',
+        note: 'Not a drawing on this sheet \u2014 the real file, dropped in. Gold on a navy gradient, and the icon every wearer who picked the blue alternate already has. It is the reference the other three are measured against.',
+        note2: 'Gold is the one colour in the set from outside the palette, and it stays: it is grandfathered by three months of shipping, and re-tinting it to aura blue would change the icon under people who chose this one. It runs along the sweep rather than across the tile \u2014 #FCEBA8 at the pale cap, #E8B84B at the bottom, #C8902F at the deep one, over a #0A1322 \u2192 #05080F ground \u2014 and it re-renders from the repo\u2019s own script at any size.' },
+
+      { id: 'Breathe', kind: 'breathe', ix: 'I4 · NEW', ixHue: '#B4543A',
+        g: 'radial-gradient(circle at 44% 36%,#0E2430 0%,#071016 52%,#04080B 100%)',
+        cap: '1024 MASTER · SHOWN AT 180',
+        meta: 'to build \u00b7 render from the today orb and its pacer',
+        note: 'The breathing orb, caught mid-breath: the orb from <em>today</em> with the pacer\u2019s ring around it, frozen at the top of an inhale. Breathe is five screens reached by long-pressing that orb \u2014 the catalogue, the pacer, the sweep and its result \u2014 and this is the only icon that opens onto something you <em>do</em> rather than something you read.',
+        note2: 'THE PACE RING IS CLOSED, and thin. The instrument\u2019s ring is open and heavy because a reading is never finished; a breath is a cycle that closes, so its ring does. That single difference is what keeps this from reading as a fourth instrument variant at 29 pt.' },
+
+      { id: 'Orb', kind: 'orb', ix: 'I5 · NEW', ixHue: '#B4543A',
+        g: 'radial-gradient(circle at 44% 36%,#161B28 0%,#0A0C12 52%,#06070A 100%)',
+        cap: '1024 MASTER · SHOWN AT 180',
+        meta: 'to build \u00b7 render from Svea\u2019s orb source',
+        note: 'Svea, on the Home Screen, for the wearer whose Noop is mostly the coach. The large halo orb from Act 7\u2019s setup \u2014 core and halo, not the small lit sphere \u2014 because a form with structure survives 29 pt where a soft gradient goes to a smudge.',
+        note2: 'The one icon with no ring at all, and the set\u2019s only periwinkle. It is deliberately a <em>blob</em> where the breath orb is a true circle: two orbs in one set only works if shape, not just hue, tells them apart. Rendered from the same drawing code as the orb in the app, frozen and flattened \u2014 bloom composed inside the tile, turning specks dropped, because at 29 pt they read as dirt.' }
+    ];
+
+    const icons = SET.map(function (s) {
+      const big = build(180, s), mid = build(60, s), sml = build(29, s);
+      return {
+        k: s.id, ix: s.ix, meta: s.meta, note: s.note, note2: s.note2, cap: s.cap,
+        ixS: { font: '600 9.5px ui-monospace,Menlo,monospace', color: s.ixHue, letterSpacing: '.06em' },
+        g180: big.ground, r180: big.ring, c180: big.core, orb180: big.orb, bloom180: big.bloom,
+        g60: mid.ground, r60: mid.ring, c60: mid.core, orb60: mid.orb, bloom60: mid.bloom,
+        g29: sml.ground, r29: sml.ring, c29: sml.core, orb29: sml.orb, bloom29: sml.bloom
+      };
+    });
+
+    const picked = this.state.pick || this.props.picked || 'Titanium';
+    const picker = SET.map(function (s) {
+      const on = s.id === picked, t = build(46, s);
+      return {
+        k: s.id,
+        pick: function () { self.setState({ pick: s.id }); },
+        wrap: {
+          minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+          padding: '9px 6px 8px', borderRadius: 16, cursor: 'pointer', minHeight: 44,
+          background: on ? 'rgba(23,162,230,.1)' : 'rgba(255,255,255,.04)',
+          border: '.5px solid ' + (on ? 'rgba(23,162,230,.5)' : 'rgba(255,255,255,.08)')
+        },
+        ground: t.ground, ring: t.ring, core: t.core, orb: t.orb, bloom: t.bloom,
+        label: { fontSize: 11, fontWeight: 600, color: on ? '#9FE2FB' : '#8B958F', whiteSpace: 'nowrap' }
+      };
+    });
+
+    const SUB = {
+      Titanium: 'Titanium · the default, and the one that matches the strap',
+      Aura: 'Aura · the app\u2019s own ground, with the bloom',
+      Navy: 'Navy · the blue alternate you already had',
+      Breathe: 'Breathe · the today orb, caught mid-breath',
+      Orb: 'Orb · Svea, rendered from the app\u2019s own drawing'
+    };
+    const alt = function (src) {
+      return {
+        width: 180, height: 180, flex: 'none', borderRadius: 180 * 0.2237,
+        background: 'url("' + src + '") center/cover no-repeat',
+        boxShadow: '0 9px 25px rgba(0,0,0,.34)'
+      };
+    };
+
+    const GRID = 'M4.5 4.5h6v6h-6zM13.5 4.5h6v6h-6zM4.5 13.5h6v6h-6zM13.5 13.5h6v6h-6z';
+    const u = 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + GRID + '"/></svg>') + '")';
+
+    return {
+      sheet: { display: 'flex', flexDirection: 'column', gap: 0, padding: '52px 48px 110px' },
+      rules: [
+        { k: 'The geometry is the generator\u2019s, to the constant' },
+        { k: 'The opening is at twelve, and the caps are round' },
+        { k: 'Open ring reads, closed ring acts' },
+        { k: 'Five is the ceiling, and Titanium stays default' }
+      ],
+      icons, picker,
+      pickedSub: SUB[picked] || SUB.Titanium,
+      altA: alt('assets/blued-a-brushed-titanium-1024.png'),
+      altB: alt(NAVY_SRC),
+      grid: { display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 9 },
+      icoGrid: {
+        width: 19, height: 19, flex: 'none', display: 'block', background: '#9FE2FB',
+        WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+      },
+
+      row: { display: 'flex', gap: 34, alignItems: 'flex-start', padding: '30px 0', borderTop: '1px solid rgba(23,21,15,.11)' },
+      col: { width: 268, flex: 'none', display: 'flex', flexDirection: 'column', gap: 7 },
+      tiles: { display: 'flex', gap: 22, alignItems: 'flex-start', flexWrap: 'wrap', maxWidth: 840 },
+      stack: { display: 'flex', flexDirection: 'column', gap: 9 },
+      pad: { padding: 22, borderRadius: 30, background: 'linear-gradient(152deg,#2C332E 0%,#16120E 58%,#1E2622 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      card: { width: 340, boxSizing: 'border-box', borderRadius: 22, padding: '16px', background: '#141817', border: '.5px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', gap: 14, color: '#EDF1EF' },
+      cap: { font: '600 9.5px ui-monospace,Menlo,monospace', letterSpacing: '.06em', color: 'rgba(23,21,15,.5)' },
+      ix: { font: '600 9.5px ui-monospace,Menlo,monospace', color: '#17a2e6', letterSpacing: '.06em' },
+      nm: { fontFamily: "'Outfit',sans-serif", fontWeight: 500, fontSize: 17, color: '#17150F', letterSpacing: '-.015em' },
+      meta: { font: '600 10px ui-monospace,Menlo,monospace', color: 'rgba(23,21,15,.5)', paddingBottom: 3 },
+      body: { fontSize: 12.5, lineHeight: 1.62, color: '#6B6558', textWrap: 'pretty' }
+    };
+  }
+}
+</script>
+</body>
+</html>
