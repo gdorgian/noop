@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+<template id="__bundler_thumbnail" data-bg-color="#0A0C0B">
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="800" fill="#0A0C0B"/>
+<defs><radialGradient id="o" cx="36%" cy="30%"><stop offset="0" stop-color="#8FD3F5"/><stop offset=".62" stop-color="#17a2e6"/><stop offset="1" stop-color="#0E6E9C"/></radialGradient></defs>
+<circle cx="600" cy="400" r="150" fill="none" stroke="rgba(23,162,230,.5)" stroke-width="3"/>
+<circle cx="600" cy="400" r="112" fill="url(#o)"/>
+</svg>
+</template>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes heartbeat{0%{transform:scale(1)}9%{transform:scale(1.045)}18%{transform:scale(1.01)}27%{transform:scale(1.03)}42%{transform:scale(1)}100%{transform:scale(1)}}
+@keyframes heartglow{0%{opacity:.4}9%{opacity:.78}18%{opacity:.5}27%{opacity:.68}42%{opacity:.4}100%{opacity:.4}}
+@keyframes sheetUp{from{transform:translateY(102%)}to{transform:translateY(0)}}
+.scr{animation:fadeUp .3s cubic-bezier(.22,.61,.36,1) both}
+.hb::-webkit-scrollbar{width:0;height:0}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="display:flex;gap:60px;align-items:flex-start;padding:52px 48px 100px">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:16px">
+  <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">ACT 3</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">The effort — working prototype</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">what today can take, then out of the way</span>
+  </div>
+  </sc-if>
+
+  <div style="border-radius:48px;overflow:hidden;flex:none">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+    <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+      <div style="{{ ambient }}"></div>
+
+      <div class="hb" onPointerDown="{{ swipeStart }}" onPointerUp="{{ swipeEnd }}" style="position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain">
+
+        <sc-if value="{{ isSession }}" hint-placeholder-val="{{ true }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:58px 20px 4px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span style="font-size:13.5px;color:#939C97">{{ t.when }}</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">{{ t.title }}</span>
+            </div>
+            <div onClick="{{ goStrapPage }}" style="{{ battChip }}">
+                <div style="display:flex;align-items:center;gap:1px;flex:none">
+                  <div style="{{ battBody }}"><div style="{{ battFill }}"></div></div>
+                  <span style="{{ battNub }}"></span>
+                </div>
+                <span style="{{ battLabel }}">{{ battPct }}</span>
+              </div>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:9px">
+
+            <div style="{{ heroCard }}">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="{{ heroKicker }}">{{ heroKick }}</span>
+                <span style="font-size:11px;color:#7F8A85">{{ heroWas }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <span style="font-family:'Outfit',sans-serif;font-size:29px;font-weight:300;letter-spacing:-.03em;line-height:1.05">{{ heroName }}</span>
+                <span style="font-size:13.5px;line-height:1.55;color:#B7C3C9;text-wrap:pretty">{{ heroWhy }}</span>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0 2px">
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:300;letter-spacing:-.025em;font-variant-numeric:tabular-nums">{{ heroDur }}</span>
+                  <span style="font-size:10.5px;color:#6C7570">minutes</span>
+                </div>
+                <span style="width:.5px;height:30px;background:rgba(255,255,255,.12)"></span>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:300;letter-spacing:-.025em;font-variant-numeric:tabular-nums">{{ heroBand }}</span>
+                  <span style="font-size:10.5px;color:#6C7570">bpm to hold</span>
+                </div>
+                <span style="width:.5px;height:30px;background:rgba(255,255,255,.12)"></span>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:300;letter-spacing:-.025em;font-variant-numeric:tabular-nums">{{ heroLoad }}</span>
+                  <span style="font-size:10.5px;color:#6C7570">load it adds</span>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div onClick="{{ goReady }}" style="height:54px;border-radius:18px;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <span style="font-size:15px;font-weight:600;color:#04121A">Get ready</span>
+                </div>
+                <div onClick="{{ goPick }}" style="height:46px;border-radius:16px;border:.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <span style="font-size:13.5px;color:#C6CEC9">Choose something else</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px 14px;display:flex;flex-direction:column;gap:13px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ whyTitle }}</span>
+              <div style="display:flex;flex-direction:column;gap:11px">
+                <sc-for list="{{ whyRows }}" as="w" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:flex-start;gap:11px">
+                    <span style="{{ w.dot }}"></span>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                      <span style="font-size:13px;color:#EDF1EF">{{ w.label }}</span>
+                      <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ w.note }}</span>
+                    </div>
+                    <span style="{{ w.chip }}">{{ w.verdict }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px 13px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Load, last seven days</span>
+                <span style="font-size:11px;color:#57605C;font-variant-numeric:tabular-nums">{{ loadTotal }} total</span>
+              </div>
+              <div style="display:flex;align-items:flex-end;gap:6px;height:62px">
+                <sc-for list="{{ loadBars }}" as="b" hint-placeholder-count="8">
+                  <div style="{{ b.s }}"></div>
+                </sc-for>
+              </div>
+              <div style="display:flex;gap:6px">
+                <sc-for list="{{ loadBars }}" as="b" hint-placeholder-count="8">
+                  <span style="{{ b.lab }}">{{ b.d }}</span>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ loadRead }}</span>
+            </div>
+
+            <div onClick="{{ goDetail }}" style="display:flex;align-items:center;gap:13px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px;cursor:pointer">
+              <span style="{{ icoBike }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">{{ lastRowTitle }}</span>
+                <span style="font-size:11.5px;color:#7F8A85">{{ lastRowMeta }}</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <div onClick="{{ goAcross }}" style="display:flex;align-items:center;gap:13px;background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px;cursor:pointer">
+              <span style="{{ icoAcross }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">Every session, in aggregate</span>
+                <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ acrossSub }}</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px;padding:15px 16px 14px;border-radius:20px;background:rgba(139,153,214,.07);border:.5px solid rgba(139,153,214,.18)">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">Rather not today?</span>
+              <span style="font-size:12px;line-height:1.55;color:#939C97;text-wrap:pretty">Skipping costs you nothing. There is no streak to break here — a rest day is a training decision, and Noop will fold it into tomorrow's number.</span>
+              <div onClick="{{ toggleRest }}" style="{{ restBtn }}">
+                <span style="{{ restLabel }}">{{ restText }}</span>
+              </div>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#57605C;padding:0 2px;text-wrap:pretty">One session, one reason, two buttons. Noop will not offer you a plan for the week — it only knows what today can take.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isPick }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goSession }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Today's session</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Choose something else</span>
+              <span style="font-size:13px;line-height:1.55;color:#939C97;text-wrap:pretty">Nothing here is locked. Each one says what it would cost you today, and you decide anyway.</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ options }}" as="o" hint-placeholder-count="5">
+                <div onClick="{{ o.choose }}" style="{{ o.card }}">
+                  <div style="display:flex;align-items:center;gap:13px">
+                    <span style="{{ o.icon }}"></span>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                      <span style="font-size:14.5px;font-weight:600;color:#EDF1EF">{{ o.name }}</span>
+                      <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ o.meta }}</span>
+                    </div>
+                    <span style="{{ o.chip }}">{{ o.fit }}</span>
+                  </div>
+                  <span style="{{ o.noteStyle }}">{{ o.note }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#57605C;padding:0 2px;text-wrap:pretty">Amber is not a wall. It means the cost is higher than today's readiness — you will feel it tomorrow, and the app will say so tonight.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isReady }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="min-height:100%;display:flex;flex-direction:column">
+          <div style="padding:56px 18px 0;display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div onClick="{{ goSession }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Ready</span>
+            <span style="width:34px;flex:none"></span>
+          </div>
+
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:20px 24px 0">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+              <span style="{{ readyIcon }}"></span>
+              <span style="font-family:'Outfit',sans-serif;font-size:31px;font-weight:300;letter-spacing:-.03em;text-align:center;line-height:1.1">{{ heroName }}</span>
+              <span style="font-size:13.5px;color:#939C97;font-variant-numeric:tabular-nums">{{ readyMeta }}</span>
+            </div>
+
+            <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;gap:3px;height:12px;border-radius:6px;overflow:hidden">
+                <sc-for list="{{ readyZones }}" as="z" hint-placeholder-count="5">
+                  <div style="{{ z.s }}"></div>
+                </sc-for>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <sc-for list="{{ readyZones }}" as="z" hint-placeholder-count="5">
+                  <span style="{{ z.lab }}">{{ z.name }}</span>
+                </sc-for>
+              </div>
+              <span style="font-size:12.5px;line-height:1.55;color:#939C97;text-align:center;text-wrap:pretty;padding-top:4px">{{ readyBandRead }}</span>
+            </div>
+
+            <div style="width:100%;display:flex;flex-direction:column;gap:11px;padding:16px;border-radius:20px;background:#141817;border:.5px solid rgba(255,255,255,.06)">
+              <sc-for list="{{ readyChecks }}" as="c" hint-placeholder-count="3">
+                <div style="display:flex;align-items:flex-start;gap:11px">
+                  <span style="{{ c.icon }}"></span>
+                  <span style="flex:1;font-size:12.5px;line-height:1.5;color:#B7C3C9;text-wrap:pretty">{{ c.text }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="padding:18px 24px 26px;display:flex;flex-direction:column;gap:8px">
+            <div onClick="{{ start }}" style="height:60px;border-radius:20px;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 26px rgba(23,162,230,.3)">
+              <span style="font-size:16px;font-weight:600;color:#04121A">Start</span>
+            </div>
+            <div onClick="{{ goSession }}" style="height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-size:13px;color:#7F8A85">Not now</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="{{ liveWrap }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:300;letter-spacing:-.02em;font-variant-numeric:tabular-nums">{{ liveElapsed }}</span>
+              <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#7F8A85;font-weight:600">elapsed</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">
+              <span style="font-size:13px;color:#C6CEC9">{{ heroName }}</span>
+              <span style="font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">hold {{ heroBand }}</span>
+            </div>
+          </div>
+
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;position:relative">
+            <span style="{{ liveGlow }}"></span>
+            <span style="{{ liveBig }}">{{ liveBpm }}</span>
+            <span style="{{ liveZoneWord }}">{{ liveZone }}</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="position:relative;height:24px">
+              <div style="position:absolute;top:10px;left:0;right:0;height:4px;border-radius:3px;background:rgba(255,255,255,.08)"></div>
+              <div style="{{ liveBand }}"></div>
+              <div style="{{ liveDot }}"></div>
+            </div>
+            <span style="{{ liveCueStyle }}">{{ liveCue }}</span>
+          </div>
+
+          <div style="display:flex;align-items:stretch;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.08);border-radius:20px;padding:14px 4px">
+            <sc-for list="{{ liveStats }}" as="s" hint-placeholder-count="3">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+                <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:300;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:#EDF1EF">{{ s.v }}</span>
+                <span style="font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ s.k }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:center;gap:20px;padding-top:4px">
+            <div onClick="{{ togglePause }}" style="{{ pauseBtn }}">
+              <span style="{{ pauseIcon }}"></span>
+            </div>
+            <div onClick="{{ end }}" style="width:62px;height:62px;border-radius:50%;background:rgba(240,116,44,.14);border:.5px solid rgba(240,116,44,.4);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="{{ icoStop }}"></span>
+            </div>
+          </div>
+          <span style="font-size:11px;color:#57605C;text-align:center">{{ pauseHint }}</span>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isIntervals }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="{{ ivWrap }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:300;letter-spacing:-.02em;font-variant-numeric:tabular-nums">{{ liveElapsed }}</span>
+              <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#7F8A85;font-weight:600">elapsed</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">
+              <span style="font-size:13px;color:#C6CEC9">{{ heroName }}</span>
+              <span style="font-size:10.5px;color:#7F8A85;font-variant-numeric:tabular-nums">round {{ ivRound }} of 6</span>
+            </div>
+          </div>
+
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+            <span style="{{ ivStepWord }}">{{ ivStep }}</span>
+            <span style="{{ ivCount }}">{{ ivRemain }}</span>
+            <div style="display:flex;align-items:center;gap:9px;padding:8px 14px;border-radius:14px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09)">
+              <span style="{{ ivHeartIcon }}"></span>
+              <span style="{{ ivBpmStyle }}">{{ liveBpm }}</span>
+              <span style="font-size:11.5px;color:#939C97">{{ liveZone }}</span>
+            </div>
+            <span style="font-size:12.5px;color:#939C97">{{ ivNext }}</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:5px;height:6px">
+              <sc-for list="{{ ivBars }}" as="b" hint-placeholder-count="6">
+                <div style="{{ b.s }}"></div>
+              </sc-for>
+            </div>
+            <span style="{{ ivCueStyle }}">{{ ivCue }}</span>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:center;gap:20px;padding-top:4px">
+            <div onClick="{{ togglePause }}" style="{{ pauseBtn }}">
+              <span style="{{ pauseIcon }}"></span>
+            </div>
+            <div onClick="{{ end }}" style="width:62px;height:62px;border-radius:50%;background:rgba(240,116,44,.14);border:.5px solid rgba(240,116,44,.4);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="{{ icoStop }}"></span>
+            </div>
+          </div>
+          <span style="font-size:11px;color:#57605C;text-align:center">{{ pauseHint }}</span>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goSession }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Session</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <span style="font-family:'Outfit',sans-serif;font-size:27px;font-weight:300;letter-spacing:-.028em">{{ dTitle }}</span>
+              <span style="font-size:13px;color:#939C97;font-variant-numeric:tabular-nums">{{ dWhen }}</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+              <sc-for list="{{ detailStats }}" as="s" hint-placeholder-count="4">
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:18px;padding:14px 15px;display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;align-items:baseline;gap:5px">
+                    <span style="{{ s.big }}">{{ s.v }}</span>
+                    <span style="font-size:10.5px;color:#6C7570">{{ s.unit }}</span>
+                  </div>
+                  <span style="font-size:11px;color:#7F8A85">{{ s.k }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 13px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Pulse against the zone</span>
+                <span style="font-size:11px;color:#57605C;font-variant-numeric:tabular-nums">112–128 asked</span>
+              </div>
+              <svg viewBox="0 0 300 104" style="width:100%;height:104px;overflow:visible">
+                <rect x="0" y="{{ bandY }}" width="300" height="{{ bandH }}" fill="rgba(23,162,230,.16)" rx="3"></rect>
+                <polyline points="{{ wLine }}" fill="none" stroke="#17A2E6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              </svg>
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#57605C;font-variant-numeric:tabular-nums">
+                <span>17:04</span>
+                <span>17:18</span>
+                <span>17:32</span>
+                <span>17:46</span>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">The shaded stretch is what the session asked for. You spent 34 of 42 minutes inside it, and the two climbs above were both hills.</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Where the effort went</span>
+              <div style="display:flex;gap:3px;height:12px;border-radius:6px;overflow:hidden">
+                <sc-for list="{{ wzBar }}" as="z" hint-placeholder-count="3">
+                  <div style="{{ z.s }}"></div>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <sc-for list="{{ wzRows }}" as="z" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:11px">
+                    <span style="{{ z.swatch }}"></span>
+                    <span style="flex:1;font-size:13px;color:#EDF1EF">{{ z.name }}</span>
+                    <span style="font-size:12.5px;color:#939C97;font-variant-numeric:tabular-nums">{{ z.time }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:22px;background:rgba(139,153,214,.08);border:.5px solid rgba(139,153,214,.2)">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="{{ icoMoon }}"></span>
+                <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">What it cost you</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ costRows }}" as="c" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                    <span style="flex:1;font-size:12.5px;line-height:1.5;color:#B7C3C9;text-wrap:pretty">{{ c.label }}</span>
+                    <span style="font-size:13px;font-weight:600;color:#EDF1EF;font-variant-numeric:tabular-nums;flex:none">{{ c.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.6;color:#939C97;text-wrap:pretty">Effort is not free and Noop will not pretend otherwise. Tonight's sleep need went up because of this ride, and tomorrow's session already knows.</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Svea</span>
+              <span style="font-size:14px;line-height:1.65;color:#DCE3E0;text-wrap:pretty">You held the zone without needing to be told twice, and your pulse came down inside forty seconds every time you crested a hill. That recovery is the reason today looks the way it does.</span>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#57605C;padding:0 2px;text-wrap:pretty">No score, no grade, no medal. A session is a thing you did and a cost you paid, and both are written down plainly.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAcross }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goSession }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">{{ t.title }}</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Every session</span>
+            <span style="font-size:13px;line-height:1.55;color:#939C97;text-wrap:pretty">How much you actually did, over a window you choose — the same figures one session is priced in, added up.</span>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:0;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.07);border-radius:15px;padding:3px">
+              <sc-for list="{{ aRanges }}" as="g" hint-placeholder-count="5">
+                <div onClick="{{ g.pick }}" style="{{ g.seg }}">{{ g.k }}</div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:7px;padding:0 3px">
+              <span style="font-family:'Outfit',sans-serif;font-size:17px;font-weight:300;color:#EDF1EF;font-variant-numeric:tabular-nums">{{ aCount }}</span>
+              <span style="font-size:12px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ aCountNote }}</span>
+            </div>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:9px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+              <sc-for list="{{ aTiles }}" as="t" hint-placeholder-count="4">
+                <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:18px;padding:14px 15px;display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;align-items:baseline;gap:5px">
+                    <span style="{{ t.big }}">{{ t.v }}</span>
+                    <span style="font-size:10.5px;color:#6C7570">{{ t.unit }}</span>
+                  </div>
+                  <span style="font-size:11px;line-height:1.45;color:#7F8A85">{{ t.k }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:22px;background:rgba(139,153,214,.08);border:.5px solid rgba(139,153,214,.2)">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="{{ icoMoon }}"></span>
+                <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">What it cost you</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ aCost }}" as="c" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                    <span style="flex:1;font-size:12.5px;line-height:1.5;color:#B7C3C9;text-wrap:pretty">{{ c.label }}</span>
+                    <span style="font-size:13px;font-weight:600;color:#EDF1EF;font-variant-numeric:tabular-nums;flex:none">{{ c.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ aCostNote }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:13px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Where the time went</span>
+                <span style="font-size:11px;color:#57605C">{{ aTopNote }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:13px">
+                <sc-for list="{{ aSports }}" as="s" hint-placeholder-count="4">
+                  <div style="display:flex;flex-direction:column;gap:7px">
+                    <div style="display:flex;align-items:center;gap:11px">
+                      <span style="{{ s.icon }}"></span>
+                      <span style="flex:1;font-size:13.5px;font-weight:600;color:#EDF1EF">{{ s.name }}</span>
+                      <span style="font-size:12.5px;color:#939C97;font-variant-numeric:tabular-nums">{{ s.time }}</span>
+                    </div>
+                    <div style="height:5px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden">
+                      <div style="{{ s.bar }}"></div>
+                    </div>
+                    <span style="font-size:11.5px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ s.meta }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 4px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Session by session</span>
+                <span style="font-size:11px;color:#57605C;font-variant-numeric:tabular-nums">{{ aRowsNote }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ aRows }}" as="r" hint-placeholder-count="6">
+                  <div onClick="{{ r.tap }}" style="{{ r.row }}">
+                    <span style="width:42px;flex:none;font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ r.day }}</span>
+                    <span style="{{ r.icon }}"></span>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                      <span style="font-size:13px;color:#EDF1EF">{{ r.name }}</span>
+                      <span style="font-size:11px;color:#7F8A85;font-variant-numeric:tabular-nums">{{ r.meta }}</span>
+                    </div>
+                    <span style="{{ r.srcChip }}">{{ r.src }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div onClick="{{ aHistory }}" style="display:flex;align-items:center;gap:9px;padding:13px 2px;border-top:.5px solid rgba(255,255,255,.06);cursor:pointer">
+                <span style="flex:1;font-size:12.5px;color:#8FD3F5">{{ aAllLabel }}</span>
+                <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+              </div>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#57605C;padding:0 2px;text-wrap:pretty">Every comparison here is you against you. No age-group ranking, no weekly grade, and no calorie total — Noop does not keep one, and a training month is not a number out of ten.</span>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none;z-index:6">
+        <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5);pointer-events:auto">
+          <div onClick="{{ todayTab }}" style="flex:1.7;height:46px;border-radius:20px;background:#17A2E6;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer">
+            <span style="{{ icoTodayOn }}"></span>
+            <span style="font-size:12.5px;font-weight:600;color:#04121A">Today</span>
+          </div>
+          <div onClick="{{ tabTrends }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoTrends }}"></span>
+          </div>
+          <div onClick="{{ goPick }}" style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(23,162,230,.4)">
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;color:#04121A;line-height:1;margin-top:-2px">+</span>
+          </div>
+          <div onClick="{{ tabRest }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoRest }}"></span>
+          </div>
+          <div onClick="{{ tabYou }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoYou }}"></span>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+  </x-import>
+  </div>
+</div>
+
+<sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+<div style="width:430px;flex:none;padding-top:34px;display:flex;flex-direction:column;gap:30px">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:33px;line-height:1.16;letter-spacing:-.028em;color:#17150F;text-wrap:pretty">One session, one reason. Then the app gets out of the way.</h1>
+    <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;text-wrap:pretty">Act 3 is the only place Noop asks anything of you, so it asks once. Today's session is a single card with a single recommendation and the reason it changed — <strong style="font-weight:600;color:#17150F">breathing rate came in above its zone</strong>, so the intervals became a steady ride. Everything after that is either doing it or reading what it cost.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0">
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T1 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Today's session</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Name, minutes, the zone to hold, the load it adds — and, when the plan changed, what it was before. Underneath: the three readings that decided it, straight out of Acts 1 and 2. Turn off the <em style="font-family:'Instrument Serif',serif;font-style:italic">adapted</em> tweak to see the unadjusted version.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T2 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Choose something else</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Five alternatives, each carrying its honest fit for today. The hard one is still tappable — amber means a cost, not a lock. Pick it and the session card, the ready screen and the live screen all become that session.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T3 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Ready — the promise before the effort</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">The zone ladder with your target lit, and three plain statements about what the watch will and will not do: one buzz if you drift out, auto-pause at the lights, no ring to close. Then one button.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T4 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">In the effort — the orb's grammar, again</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">One number dead centre, beating, with one word underneath — exactly the breathing orb, so the two live screens in the app read the same way. The zone sits below with your dot in it; drift out and the number, the dot and the whole screen warm to amber together. Tap the pause circle.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T5 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Intervals — the step owns the screen</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Work or easy, the seconds left, and what is next. Your pulse stays present but demoted to a chip, because during a minute of work the only thing you can act on is the clock. It is running: watch it roll into the easy step.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T6 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">After — priced in Act 1's currency</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Four figures, your pulse drawn against the zone it was asked to hold, where the effort went, and then the part most apps leave out: <strong style="font-weight:600;color:#17150F">what it cost</strong> — minutes added to tonight's sleep need, when you are recovered, load added to the week.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11);border-bottom:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#17a2e6;letter-spacing:.06em;padding-top:3px">T7 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Every session, in aggregate</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">The across-time view Act 3 never had — <em style="font-family:'Instrument Serif',serif;font-style:italic">how much did I ride this month</em>. Act 9's range control, in Act 3's hue and in the same position: under the header, above the first card. Every figure is summed out of one 258-day record, so the windows are real — and <strong style="font-weight:600;color:#17150F">1Y is dimmed and cannot be picked</strong>, because your history does not reach back that far. It is priced in the body-state currency like everything else, it counts the days you did not train, and it keeps no calorie total. Each row carries the source it came from: the strap knows only the days since you paired it, and everything older arrived through the import hub.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Where the + went</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">Act 2 gave the <span style="color:#EDF1EF">+</span> to logging. It keeps it — with <span style="color:#EDF1EF">Start a session</span> as the last tile in that sheet. Here the + jumps straight to the picker so you can reach these screens without rebuilding the sheet.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Night shift, same act</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">Flip <span style="color:#EDF1EF">schedule</span> and the session is placed against your shift, not the clock: before it, between sleeps, or on a rest day the shift already spent. The recommendation is the same logic — only the words for <em style="font-family:'Instrument Serif',serif;font-style:italic">today</em> change.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Next</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">Act 4, the bigger picture: weeks and months rather than days — trend lines that mean something, the fitness and readiness curve, and the one screen that answers “am I getting better at this”.</p>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;doneName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;doneMins&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:42,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;schedule&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;day&quot;,&quot;night&quot;],&quot;default&quot;:&quot;day&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;session&quot;,&quot;pick&quot;,&quot;ready&quot;,&quot;live&quot;,&quot;intervals&quot;,&quot;detail&quot;,&quot;across&quot;],&quot;default&quot;:&quot;session&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;adapted&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;units&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;km&quot;,&quot;mi&quot;],&quot;default&quot;:&quot;km&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+const GLYPH = {
+  today: 'M12 3v2M12 19v2M4.2 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z',
+  trends: 'M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9',
+  moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+  you: 'M12 4.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM5.5 19.5c0-3.3 2.9-5.3 6.5-5.3s6.5 2 6.5 5.3',
+  heart: 'M12 20s-7-4.6-7-9.4A3.8 3.8 0 0 1 12 8a3.8 3.8 0 0 1 7 2.6C19 15.4 12 20 12 20z',
+  bike: 'M6.5 18.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17.5 18.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6.8 15.5h4.8l3-7.2M12.4 8.3h4.1l1.4 7.2M9.4 8.3h4',
+  walk: 'M13.2 4.2a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8zM12.4 8.6 10 13.2l2.7 1.6.6 5.2M10 13.2 8 20M14.4 10.2l2.8 1.8',
+  weight: 'M4 9v6M7 6.5v11M17 6.5v11M20 9v6M7 12h10',
+  wave: 'M3 10c2-2 4 2 6 0s4 2 6 0 4 2 6 0M3 16c2-2 4 2 6 0s4 2 6 0 4 2 6 0',
+  bolt: 'M13.2 3 6 13.6h4.6L9.8 21 17.4 10.2h-4.7z',
+  timer: 'M12 7.6v4.9l3 2M12 4.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2zM9.6 2.6h4.8',
+  check: 'M5 12.8 9.6 17.4 19 7.6',
+  pause: 'M9.5 6v12M14.5 6v12',
+  play: 'M8.5 5.5 18 12l-9.5 6.5z',
+  stop: 'M7.5 7.5h9v9h-9z',
+  bell: 'M12 4a5 5 0 0 0-5 5v3.5L5.5 16h13L17 12.5V9a5 5 0 0 0-5-5zM10 19a2 2 0 0 0 4 0',
+  lungs: 'M12 4v8M8.6 20c-2 0-3.6-1.4-3.6-3.4 0-2.7.9-5.1 2.5-6.7.8-.9 2.1-.3 2.1.9v6.9c0 1.3-.5 2.3-1 2.3zM15.4 20c2 0 3.6-1.4 3.6-3.4 0-2.7-.9-5.1-2.5-6.7-.8-.9-2.1-.3-2.1.9v6.9c0 1.3.5 2.3 1 2.3z'
+};
+const mask = function (d) {
+  return 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+};
+const ico = function (key, size, color) {
+  const u = mask(GLYPH[key]);
+  return {
+    width: size, height: size, flex: 'none', display: 'block', background: color,
+    WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+  };
+};
+
+const A = '#17A2E6';
+const COOL = '#4FB8E8';
+const LAV = '#8B99D6';
+const WARM = '#F2B45C';
+const HOT = '#F0742C';
+const DEEPB = '#3E6C86';
+
+const SESSIONS = {
+  steady: { name: 'Steady ride', g: 'bike', dur: 40, lo: 112, hi: 128, load: 48, fit: 'as planned', ok: true,
+    why: 'Forty minutes, easy the whole way. Hold your pulse between 112 and 128 and let the hills come to you.',
+    note: 'What today can take without borrowing from tomorrow.', kind: 'live' },
+  intervals: { name: '6 × 1 min hard', g: 'bolt', dur: 22, lo: 152, hi: 168, load: 86, fit: 'harder than today allows', ok: false,
+    why: 'Six one-minute efforts with thirty seconds easy between them. This is the session you had planned, and it is still here if you want it.',
+    note: 'Costs about two days of recovery from where you are this morning.', kind: 'intervals' },
+  walk: { name: 'Long walk', g: 'walk', dur: 50, lo: 92, hi: 110, load: 18, fit: 'well inside today', ok: true,
+    why: 'Fifty easy minutes. Nothing to hold, nothing to hit — it counts as movement and costs you almost nothing.',
+    note: 'The honest choice on a day your breathing is up.', kind: 'live' },
+  strength: { name: 'Strength, lower body', g: 'weight', dur: 35, lo: 104, hi: 128, load: 62, fit: 'legs are two days out', ok: false,
+    why: 'Thirty-five minutes of lower body work. Your legs took a real load on Monday and have not finished the job.',
+    note: 'Better on Friday, when the ride has been paid off.', kind: 'live' },
+  swim: { name: 'Easy swim', g: 'wave', dur: 30, lo: 108, hi: 126, load: 42, fit: 'as good as the ride', ok: true,
+    why: 'Thirty minutes, easy. Same effect as the ride with less through your legs.',
+    note: 'Swap freely — the recommendation does not mind which one you pick.', kind: 'live' }
+};
+const ORDER = ['steady', 'intervals', 'walk', 'strength', 'swim'];
+
+const TERMS = {
+  day: { when: 'Wednesday, 14:20', title: "Today's session", lastWhen: 'Yesterday', word: 'today' },
+  night: { when: 'Wednesday, before your shift', title: "This shift's session", lastWhen: 'Before last shift', word: 'this shift' }
+};
+
+const LOAD = [
+  { d: 'Thu', v: 42 }, { d: 'Fri', v: 0 }, { d: 'Sat', v: 74 },
+  { d: 'Sun', v: 86 }, { d: 'Mon', v: 88 }, { d: 'Tue', v: 12 }, { d: 'Wed', v: 0 }
+];
+
+const ZL = [
+  { name: 'Rest', lo: 40, hi: 62, c: DEEPB },
+  { name: 'Easy', lo: 62, hi: 96, c: COOL },
+  { name: 'Steady', lo: 96, hi: 128, c: A },
+  { name: 'Hard', lo: 128, hi: 152, c: WARM },
+  { name: 'All out', lo: 152, hi: 190, c: HOT }
+];
+const zoneOf = function (b) {
+  for (let i = ZL.length - 1; i >= 0; i--) { if (b >= ZL[i].lo) return ZL[i]; }
+  return ZL[0];
+};
+
+const WHR = [94, 106, 116, 121, 124, 126, 122, 119, 124, 130, 136, 133, 127, 123, 120, 124, 127, 131, 138, 134, 126, 121, 114, 104];
+
+const fmt = function (s) {
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m + ':' + (r < 10 ? '0' + r : r);
+};
+
+// ─────────────────────────────────────────────────────────────────
+// The record. 258 days of it, which is exactly the history Act 9
+// works from — the oldest of it arrived through the import hub, the
+// newest came off the strap. Every figure on `across` is summed out
+// of this, so the range control is real rather than decorative.
+// ─────────────────────────────────────────────────────────────────
+const HIST_D = 258;
+const SPORTS = [
+  { k: 'ride', n: 'Ride', g: 'bike', w: .3, dur: [34, 64], load: [36, 74], dist: [11, 27], p: 'on the bike' },
+  { k: 'walk', n: 'Long walk', g: 'walk', w: .24, dur: [38, 68], load: [12, 26], dist: [3.6, 7.4], p: 'walking' },
+  { k: 'strength', n: 'Strength', g: 'weight', w: .2, dur: [28, 48], load: [42, 72], dist: null, p: 'lifting' },
+  { k: 'swim', n: 'Swim', g: 'wave', w: .14, dur: [24, 42], load: [30, 54], dist: [1.2, 2.6], p: 'in the water' },
+  { k: 'intervals', n: 'Intervals', g: 'bolt', w: .12, dur: [18, 30], load: [72, 98], dist: [4.2, 8.6], p: 'in intervals' }
+];
+const HH = function (n) { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+const SESSION_LOG = (function () {
+  const out = [];
+  for (let d = 1; d < HIST_D; d++) {
+    if (HH(d * 7 + 3) > .58) continue;
+    let p = HH(d * 13 + 5), sp = SPORTS[0], acc = 0;
+    for (let i = 0; i < SPORTS.length; i++) { acc += SPORTS[i].w; if (p <= acc) { sp = SPORTS[i]; break; } }
+    const j = HH(d * 17 + 9);
+    out.push({
+      d: d, s: sp,
+      dur: Math.round(sp.dur[0] + (sp.dur[1] - sp.dur[0]) * j),
+      load: Math.round(sp.load[0] + (sp.load[1] - sp.load[0]) * HH(d * 19 + 11)),
+      dist: sp.dist ? +(sp.dist[0] + (sp.dist[1] - sp.dist[0]) * j).toFixed(1) : null,
+      // where the row came from: the strap only knows the days since you paired it
+      src: d > 126 ? 'whoop' : HH(d * 23 + 7) > .88 ? 'health' : 'noop'
+    });
+  }
+  return out;
+})();
+const ARANGES = [
+  { id: '7', k: '7D', n: 7 }, { id: '30', k: '30D', n: 30 }, { id: '90', k: '90D', n: 90 },
+  { id: '365', k: '1Y', n: 365 }, { id: 'all', k: 'All', n: HIST_D }
+];
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const fmtH = function (m) { return m < 60 ? m + 'm' : Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : ''); };
+
+class Component extends DCLogic {
+  state = { sx: null, sy: null, screen: null, chosen: null, tick: 0, t0: 0, paused: false, rest: false, arange: null };
+
+  componentDidMount() {
+    const self = this;
+    this.timer = setInterval(function () {
+      if (self.state.paused) return;
+      self.setState(function (s) { return { tick: s.tick + 1 }; });
+    }, 1000);
+    this.reportSession();
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+
+  // ── the session is owned above this screen: the shell is told what is running,
+  //    so leaving live cannot quietly destroy it
+  reportSession() {
+    const S = this.state;
+    const scr = S.screen || this.props.screen || 'session';
+    const running = scr === 'live' || scr === 'intervals';
+    const key = S.chosen || (this.props.adapted !== false ? 'steady' : 'intervals');
+    // the live figures travel with the report: what the shell keeps when this ends has to be
+    // the same record 'detail' and today's card read, never a second computation (00-RULES §13)
+    const secs = (scr === 'live' ? 0 : 872) + Math.max(0, S.tick - S.t0);
+    const sess = running ? {
+      name: SESSIONS[key].name, paused: !!S.paused, screen: scr,
+      secs: secs, mins: Math.max(1, Math.round(secs / 60)), km: +((secs / 60) * 0.35).toFixed(1)
+    } : null;
+    const sig = sess ? sess.name + '|' + sess.paused + '|' + sess.screen + '|' + sess.mins : '';
+    if (sig !== this.__sessSig) {
+      this.__sessSig = sig;
+      if (this.props.onSession) this.props.onSession(sess);
+    }
+  }
+
+  componentDidUpdate(prev) {
+    const p = this.props;
+    if ((prev.screen !== p.screen || prev.navSeq !== p.navSeq) && p.screen) this.setState({ screen: p.screen });
+    this.reportSession();
+  }
+
+  renderVals() {
+    const self = this;
+    const S = this.state;
+    const screen = S.screen || this.props.screen || 'session';
+    const T = (this.props.schedule || 'day') === 'night' ? TERMS.night : TERMS.day;
+    const adapted = this.props.adapted !== false;
+    const metric = (this.props.units || 'km') === 'km';
+    const go = function (k) {
+      return function () {
+        self.setState(function (s) { return { screen: k, t0: s.tick, paused: false }; });
+      };
+    };
+
+    const key = S.chosen || (adapted ? 'steady' : 'intervals');
+    const W = SESSIONS[key];
+    const chosenByUser = !!S.chosen;
+
+    // ── why the recommendation looks like this: three readings out of Acts 1 and 2
+    const whyRows = [
+      { label: 'Slept 7h 12m, seven minutes over your need', note: 'Deep came early. Nothing owed from last night.', good: true, verdict: 'in zone' },
+      adapted
+        ? { label: 'Breathing rate 16.1 a minute', note: 'Almost two above your normal and outside your zone for the first time in three weeks. Usually a warm room or something you are fighting off.', good: false, verdict: 'out of zone' }
+        : { label: 'Breathing rate 14.2 a minute', note: 'Sitting on your baseline, where it has been for three weeks.', good: true, verdict: 'in zone' },
+      { label: 'Two hard days back to back', note: 'Sunday and Monday both went over 80. Tuesday was almost nothing, which is not the same as recovered.', good: false, verdict: 'legs 2 days out' }
+    ].map(function (r) {
+      return {
+        label: r.label, note: r.note, verdict: r.verdict,
+        dot: {
+          width: 9, height: 9, borderRadius: '50%', flex: 'none', marginTop: 5,
+          background: r.good ? A : WARM,
+          boxShadow: '0 0 0 4px ' + (r.good ? 'rgba(23,162,230,.14)' : 'rgba(242,180,92,.14)')
+        },
+        chip: {
+          fontSize: 10.5, fontWeight: 600, padding: '4px 8px', borderRadius: 7, flex: 'none', whiteSpace: 'nowrap',
+          color: r.good ? '#8FD3F5' : '#F3C888',
+          background: r.good ? 'rgba(23,162,230,.13)' : 'rgba(242,180,92,.13)'
+        }
+      };
+    });
+
+    const warmHero = chosenByUser ? !W.ok : adapted;
+    const heroCard = {
+      borderRadius: 24, padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 13,
+      background: 'linear-gradient(158deg,' + (warmHero ? 'rgba(242,180,92,.15)' : 'rgba(23,162,230,.16)') + ',rgba(23,162,230,.03))',
+      border: '.5px solid ' + (warmHero ? 'rgba(242,180,92,.3)' : 'rgba(23,162,230,.3)')
+    };
+
+    // ── load, seven days plus today's ask as a ghost bar
+    const bars = LOAD.map(function (d, i) {
+      return { d: d.d, v: d.v, today: i === LOAD.length - 1 };
+    });
+    const maxL = 100;
+    const loadBars = bars.map(function (b) {
+      const v = b.today ? W.load : b.v;
+      return {
+        d: b.d,
+        s: {
+          flex: 1, height: Math.max(3, (v / maxL) * 62), borderRadius: 4,
+          background: b.today ? 'transparent' : v > 78 ? WARM : v === 0 ? 'rgba(255,255,255,.07)' : 'rgba(23,162,230,.5)',
+          border: b.today ? '1px dashed ' + (W.ok ? 'rgba(23,162,230,.7)' : 'rgba(242,180,92,.75)') : 'none'
+        },
+        lab: {
+          flex: 1, fontSize: 9.5, textAlign: 'center', fontWeight: b.today ? 600 : 400,
+          color: b.today ? (W.ok ? '#8FD3F5' : '#F3C888') : '#57605C'
+        }
+      };
+    });
+
+    const options = ORDER.map(function (k) {
+      const o = SESSIONS[k];
+      const on = k === key;
+      return {
+        name: o.name, note: o.note,
+        meta: o.dur + ' min · ' + o.lo + '–' + o.hi + ' bpm · load ' + o.load,
+        fit: o.fit,
+        choose: function () { self.setState({ chosen: k, screen: 'session' }); },
+        icon: ico(o.g, 21, o.ok ? A : WARM),
+        card: {
+          display: 'flex', flexDirection: 'column', gap: 9, cursor: 'pointer',
+          borderRadius: 20, padding: '15px 16px 14px',
+          background: on ? 'rgba(23,162,230,.09)' : '#141817',
+          border: '.5px solid ' + (on ? 'rgba(23,162,230,.34)' : 'rgba(255,255,255,.06)'),
+          transition: 'background .18s ease, border-color .18s ease, color .18s ease'
+        },
+        chip: {
+          fontSize: 10.5, fontWeight: 600, padding: '5px 9px', borderRadius: 8, flex: 'none',
+          maxWidth: 118, textAlign: 'right', lineHeight: 1.25,
+          color: o.ok ? '#8FD3F5' : '#F3C888',
+          background: o.ok ? 'rgba(23,162,230,.13)' : 'rgba(242,180,92,.13)'
+        },
+        noteStyle: { fontSize: 11.5, lineHeight: 1.5, color: '#7F8A85', textWrap: 'pretty' }
+      };
+    });
+
+    // ── ready: the zone ladder with the asked-for band lit
+    const readyZones = ZL.map(function (z) {
+      const on = z.hi > W.lo && z.lo < W.hi;
+      return {
+        name: z.name,
+        s: { flex: z.hi - z.lo, background: on ? z.c : 'rgba(255,255,255,.07)', opacity: on ? 1 : 1 },
+        lab: { flex: z.hi - z.lo, fontSize: 9.5, textAlign: 'center', fontWeight: on ? 600 : 400, color: on ? '#C6CEC9' : '#57605C' }
+      };
+    });
+    const readyChecks = [
+      { g: 'bell', text: 'One buzz if you drift out of the zone, and one when you come back. Nothing else will interrupt you.' },
+      { g: 'timer', text: 'Auto-pause at the lights. Stopped time is not counted against you.' },
+      { g: 'check', text: 'No ring to close, no medal at the end. The session is done when the minutes are done.' }
+    ].map(function (c) { return { text: c.text, icon: ico(c.g, 17, A) }; });
+
+    // ── live, ticking
+    const e = Math.max(0, S.tick - S.t0);
+    const live = W.kind === 'intervals';
+
+    // steady effort: wanders inside the band and occasionally over it
+    const sBpm = Math.round((W.lo + W.hi) / 2 + 9 * Math.sin(e / 7) + 4 * Math.sin(e / 2.4));
+
+    // intervals: 60s work, 30s easy, six rounds, looping for the demo
+    const cyc = 90;
+    const eIv = e % (cyc * 6);
+    const round = Math.floor(eIv / cyc) + 1;
+    const within = eIv % cyc;
+    const isWork = within < 60;
+    const remain = isWork ? 60 - within : cyc - within;
+    const iBpm = isWork
+      ? Math.min(174, Math.round(138 + within * 0.55))
+      : Math.max(128, Math.round(170 - (within - 60) * 1.4));
+
+    const bpm = live ? iBpm : sBpm;
+    const z = zoneOf(bpm);
+    const over = bpm > W.hi;
+    const under = bpm < W.lo;
+    const off = live ? (isWork && bpm < W.lo) : (over || under);
+    const accent = live ? (isWork ? HOT : COOL) : off ? WARM : A;
+
+    const elapsedBase = live ? 0 : 872;
+    const dist = ((elapsedBase + e) / 60) * (metric ? 0.35 : 0.217);
+
+    const pos = function (b) { return Math.max(0, Math.min(100, ((b - 90) / 90) * 100)); };
+
+    const shell = function (tint) {
+      return {
+        minHeight: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16,
+        padding: '54px 22px 26px',
+        background: 'linear-gradient(180deg,' + tint + ',rgba(10,12,11,0) 46%)'
+      };
+    };
+
+    const liveCue = S.paused
+      ? 'Paused. It will pick up on its own when you start moving.'
+      : over ? (bpm - W.hi) + ' beats over. Ease off and let it come back down.'
+      : under ? (W.lo - bpm) + ' beats under. Lift it a little if that feels easy.'
+      : 'Right in the middle of the zone. Hold this.';
+
+    const ivCue = S.paused
+      ? 'Paused. The step will resume where you left it.'
+      : isWork
+      ? (bpm < W.lo ? 'Still climbing. Give it everything for the rest of the minute.' : 'That is the effort. Hold it to zero.')
+      : 'Let it fall. Anything under 140 before the next one is fine.';
+
+    const detailStats = [
+      { v: '42:10', unit: 'min', k: 'moving time', warm: false },
+      { v: '126', unit: 'bpm', k: 'average pulse', warm: false },
+      { v: '141', unit: 'bpm', k: 'highest, on the second hill', warm: true },
+      { v: '82', unit: '%', k: 'of it inside the zone', warm: false }
+    ].map(function (s) {
+      return {
+        v: s.v, unit: s.unit, k: s.k,
+        big: {
+          fontFamily: "'Outfit',sans-serif", fontSize: 27, fontWeight: 300, letterSpacing: '-.03em',
+          lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: s.warm ? '#F3C888' : '#EDF1EF'
+        }
+      };
+    });
+
+    const wy = function (v) { return 104 - ((v - 88) / 62) * 96; };
+    const wLine = WHR.map(function (v, i) {
+      return ((i / (WHR.length - 1)) * 300).toFixed(1) + ',' + wy(v).toFixed(1);
+    }).join(' ');
+
+    const WZ = [
+      { name: 'Easy, under the zone', time: '6m', f: 14, c: COOL },
+      { name: 'Steady, the zone itself', time: '31m', f: 74, c: A },
+      { name: 'Hard, the two hills', time: '5m', f: 12, c: WARM }
+    ];
+
+    const costRows = [
+      { label: 'Added to tonight\u2019s sleep need', v: '+12 min' },
+      { label: 'Recovered by', v: 'tomorrow, 11:00' },
+      { label: 'Load added to the week', v: '48 → 260' }
+    ];
+
+    // ── across: the whole record, in whatever window is asked for ──
+    const AR = S.arange || '90';
+    const aR = ARANGES.filter(function (r) { return r.id === AR; })[0] || ARANGES[2];
+    const aSeg = function (on, dim) {
+      return 'flex:1;text-align:center;padding:10px 0;border-radius:12px;font-size:12px;font-weight:600;transition:background .18s ease,color .18s ease;'
+        + (on ? 'background:rgba(23,162,230,.2);color:#9FE2FB;cursor:pointer;'
+          : dim ? 'color:rgba(237,241,239,.34);' : 'color:#939C97;cursor:pointer;');
+    };
+    // a window your record cannot fill is shown, dimmed, and cannot be picked
+    const aRanges = ARANGES.map(function (r) {
+      const dim = r.n > HIST_D;
+      return {
+        k: r.k, seg: aSeg(r.id === aR.id, dim),
+        pick: dim ? undefined : function () { self.setState({ arange: r.id }); }
+      };
+    });
+    const inR = SESSION_LOG.filter(function (x) { return x.d <= aR.n; });
+    const aSum = function (f) { return inR.reduce(function (t, x) { return t + f(x); }, 0); };
+    const aMin = aSum(function (x) { return x.dur; });
+    const aLoad = aSum(function (x) { return x.load; });
+    const aKm = aSum(function (x) { return x.dist || 0; });
+    const aDist = metric ? aKm : aKm * 0.6214;
+    const aDays = Math.min(aR.n, HIST_D);
+    const tileBig = {
+      fontFamily: "'Outfit',sans-serif", fontSize: 27, fontWeight: 300, letterSpacing: '-.03em',
+      lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: '#EDF1EF'
+    };
+    const aTiles = [
+      { v: inR.length, unit: inR.length === 1 ? 'session' : 'sessions', k: 'you actually did' },
+      { v: aMin < 600 ? aMin : Math.round(aMin / 60), unit: aMin < 600 ? 'min' : 'hours', k: 'moving, with stopped time taken off' },
+      { v: aLoad, unit: 'load', k: 'the unit one session is priced in' },
+      { v: Math.round(aDist), unit: metric ? 'km' : 'miles', k: 'ridden, walked and swum' }
+    ].map(function (t) { return { v: t.v, unit: t.unit, k: t.k, big: tileBig }; });
+
+    const aCharge = Math.round(aLoad * 0.375);
+    const aSleep = Math.round(aLoad * 0.25);
+    const aCost = [
+      { label: 'Charge spent on training', v: '\u2212' + aCharge },
+      { label: 'Added to the nights after', v: '+' + (aSleep >= 60 ? Math.floor(aSleep / 60) + 'h ' + (aSleep % 60) + 'm' : aSleep + ' min') },
+      { label: 'Days you did not train', v: Math.max(0, aDays - inR.length) + ' of ' + aDays }
+    ];
+    const aCostNote = 'Training is priced here the way it is priced on the day — in what you had and what was left. The rest days are counted on purpose: they are a training decision, not a gap.';
+
+    const byS = {};
+    inR.forEach(function (x) {
+      const b = byS[x.s.k] || (byS[x.s.k] = { s: x.s, n: 0, min: 0, load: 0 });
+      b.n++; b.min += x.dur; b.load += x.load;
+    });
+    const sList = Object.keys(byS).map(function (k) { return byS[k]; }).sort(function (a, b) { return b.min - a.min; });
+    const maxMin = sList.length ? sList[0].min : 1;
+    const aSports = sList.map(function (b) {
+      return {
+        name: b.s.n, icon: ico(b.s.g, 19, b.s.k === 'intervals' ? WARM : A), time: fmtH(b.min),
+        bar: {
+          width: Math.max(2, (b.min / maxMin) * 100).toFixed(0) + '%', height: '100%', borderRadius: 3,
+          background: b.s.k === 'intervals' ? WARM : A
+        },
+        meta: b.n + (b.n === 1 ? ' session' : ' sessions') + ' · ' + Math.round(b.min / b.n) + ' min each · load ' + Math.round(b.load / b.n) + ' a time'
+      };
+    });
+
+    const aDay = function (d) {
+      if (d === 1) return 'Yest.';
+      if (d < 7) return DOW[(3 - d + 14) % 7];
+      const dt = new Date(2026, 7, 26 - d);
+      return dt.getDate() + ' ' + MON[dt.getMonth()];
+    };
+    const aRows = inR.slice(0, 8).map(function (x, i) {
+      const own = x.src === 'noop';
+      return {
+        day: aDay(x.d), name: x.s.n, icon: ico(x.s.g, 17, x.s.k === 'intervals' ? WARM : A),
+        meta: x.dur + ' min · load ' + x.load + (x.dist ? ' · ' + (metric ? x.dist : (x.dist * 0.6214).toFixed(1)) + ' ' + (metric ? 'km' : 'mi') : ''),
+        src: own ? 'strap' : x.src === 'whoop' ? 'imported' : 'Health',
+        srcChip: {
+          fontSize: 9.5, fontWeight: 600, padding: '3px 7px', borderRadius: 6, flex: 'none', whiteSpace: 'nowrap',
+          color: own ? '#8FD3F5' : '#8A938F',
+          background: own ? 'rgba(23,162,230,.12)' : 'rgba(255,255,255,.06)'
+        },
+        tap: go('detail'),
+        row: {
+          display: 'flex', alignItems: 'center', gap: 11, padding: '11px 2px', cursor: 'pointer',
+          borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)'
+        }
+      };
+    });
+
+    const l30 = SESSION_LOG.filter(function (x) { return x.d <= 30; }).length;
+    // the finished session, held by the shell so it survives leaving the act
+    const DONE = (function () {
+      const n = (self.props.doneName || '').trim();
+      if (!n) return {};
+      // a tap-through stop after a few seconds is a demo artefact, not a ride: below two
+      // minutes the record stays the session's own 42 min, so every screen still agrees
+      const mins = (self.props.doneMins || 0) >= 2 ? self.props.doneMins : 42;
+      return { name: n, mins: mins, km: +(mins * 0.352).toFixed(1), when: 'Just now' };
+    })();
+    const __nav = this.props.onNav;
+    const __go = function (a, s) { return function () { if (__nav) __nav(a, s); }; };
+    return {
+      tabToday: __go('day', 'today'), tabTrends: __go('picture', 'trends'), tabRest: __go('night', 'rest'), tabYou: __go('plumbing', 'you'),
+      goStrapPage: __go('plumbing', 'strap'),
+      battPct: '52%',
+      battChip: { display: 'flex', alignItems: 'center', gap: 7, height: 30, padding: '0 11px', borderRadius: 15, cursor: 'pointer', flex: 'none', background: 'rgba(255,255,255,.06)', border: '.5px solid rgba(255,255,255,.1)' },
+      battBody: { position: 'relative', width: 21, height: 11, borderRadius: 3.4, boxSizing: 'border-box', border: '1px solid rgba(237,241,239,.4)', flex: 'none' },
+      battFill: { position: 'absolute', left: 1.2, top: 1.2, bottom: 1.2, width: 'calc((100% - 2.4px) * 0.52)', borderRadius: 2.2, background: '#8FD3F5' },
+      battNub: { width: 1.6, height: 4.4, borderRadius: '0 1.5px 1.5px 0', marginLeft: 1, flex: 'none', background: 'rgba(237,241,239,.4)' },
+      battLabel: { fontSize: 12, fontWeight: 600, letterSpacing: '-.01em', fontVariantNumeric: 'tabular-nums', color: '#C6CEC9' },
+      swipeStart: (e) => this.setState({ sx: e.clientX, sy: e.clientY }),
+      swipeEnd: (e) => {
+        const st = this.state;
+        if (st.sx == null) return;
+        const dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+        this.setState({ sx: null, sy: null });
+        if (dx <= 78 || Math.abs(dy) >= 58) return;
+        if (st.logs) { this.setState({ logs: false }); return; }
+        const cur = st.screen || this.props.screen || "session";
+        // ready's chevron reads Today's session, so the swipe pops to session, not to pick.
+        // live and intervals carry NO chevron: the only ways out are pause and end, so a
+        // swipe there does nothing. No entry, no navigation.
+        const to = ({"pick":"session","ready":"session","detail":"session","across":"session"})[cur];
+        if (to) this.setState({ screen: to });
+      },
+      isDark: true, notes: this.props.showNotes !== false, t: T,
+      isSession: screen === 'session', isPick: screen === 'pick', isReady: screen === 'ready',
+      isLive: screen === 'live', isIntervals: screen === 'intervals', isDetail: screen === 'detail',
+      isAcross: screen === 'across',
+      showTabs: screen === 'session' || screen === 'pick' || screen === 'detail' || screen === 'across',
+      goSession: go('session'), goPick: go('pick'), goReady: go('ready'), goDetail: go('detail'),
+      goAcross: go('across'),
+      icoAcross: ico('trends', 21, A),
+      acrossSub: SESSION_LOG.length + ' on record · ' + l30 + ' in the last thirty days',
+      aRanges: aRanges,
+      aCount: aDays,
+      aCountNote: inR.length < 3
+        ? 'days, with ' + inR.length + (inR.length === 1 ? ' session' : ' sessions') + ' in them — too few to average anything on, and Noop will not try.'
+        : aR.id === 'all'
+          ? 'days on record. There is no more history than this.'
+          : 'days of your record, and every session inside them',
+      aTiles: aTiles, aCost: aCost, aCostNote: aCostNote,
+      aSports: aSports,
+      aTopNote: sList.length ? 'most of it ' + sList[0].s.p : '',
+      aRows: aRows,
+      aRowsNote: aRows.length < inR.length ? 'newest ' + aRows.length + ' of ' + inR.length : 'all ' + inR.length,
+      aAllLabel: 'All ' + SESSION_LOG.length + ' sessions in your history',
+      aHistory: __go('plumbing', 'history'),
+      // the lit Today tab pops to Act 3's root, and from the root back out to the tab's own root
+      todayTab: screen === 'session' ? __go('day', 'today') : go('session'),
+      start: go(W.kind),
+      end: go('detail'),
+
+      ambient: {
+        position: 'absolute', top: -150, left: '50%', transform: 'translateX(-50%)',
+        width: 470, height: 410, borderRadius: '50%', filter: 'blur(18px)', pointerEvents: 'none',
+        background: 'radial-gradient(circle,' + (warmHero ? 'rgba(242,180,92,.15)' : 'rgba(23,162,230,.17)') + ',rgba(23,162,230,0) 70%)'
+      },
+
+      heroCard, heroName: W.name, heroWhy: W.why,
+      heroKick: chosenByUser ? 'Your choice' : adapted ? 'Dialled back for today' : 'As planned',
+      heroWas: chosenByUser
+        ? (W.ok ? 'inside today' : 'above today')
+        : adapted ? 'was 6 × 1 min hard' : 'nothing in the way',
+      heroKicker: {
+        fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600,
+        color: warmHero ? WARM : A
+      },
+      heroDur: W.dur, heroBand: W.lo + '–' + W.hi, heroLoad: W.load,
+      whyTitle: adapted ? 'Why this, and not the intervals' : 'Why today can take it',
+      whyRows,
+
+      loadBars, loadTotal: 302,
+      loadRead: adapted
+        ? 'Sunday and Monday were both hard, and the dashed bar is what today would add. Keeping it under fifty is the whole idea.'
+        : 'A quiet Tuesday after two hard days, and the dashed bar is what the intervals would add.',
+
+      restText: S.rest ? 'Today is a rest day' : 'Mark today as rest',
+      toggleRest: function () { self.setState(function (s) { return { rest: !s.rest }; }); },
+      restBtn: {
+        height: 44, borderRadius: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+        background: S.rest ? 'rgba(139,153,214,.22)' : 'rgba(255,255,255,.05)',
+        border: '.5px solid ' + (S.rest ? 'rgba(139,153,214,.45)' : 'rgba(255,255,255,.12)'),
+        transition: 'background .18s ease, border-color .18s ease, color .18s ease'
+      },
+      restLabel: { fontSize: 13.5, fontWeight: 600, color: S.rest ? '#C9D0EE' : '#C6CEC9', transition: 'color .18s ease' },
+
+      options,
+
+      readyIcon: ico(W.g, 30, A),
+      readyMeta: W.dur + ' minutes · hold ' + W.lo + '–' + W.hi + ' bpm',
+      readyZones,
+      readyBandRead: 'Your target is the lit stretch: ' + z.name.toLowerCase() + ' is where this session lives, and the watch will tell you once if you leave it.',
+      readyChecks,
+
+      liveWrap: shell(off ? 'rgba(242,180,92,.16)' : 'rgba(23,162,230,.16)'),
+      ivWrap: shell(isWork ? 'rgba(240,116,44,.17)' : 'rgba(79,184,232,.15)'),
+
+      liveElapsed: fmt(elapsedBase + e),
+      liveBpm: bpm,
+      liveZone: z.name,
+      liveBig: {
+        fontFamily: "'Outfit',sans-serif", fontSize: 92, fontWeight: 200, letterSpacing: '-.05em',
+        lineHeight: 1, fontVariantNumeric: 'tabular-nums', position: 'relative',
+        color: S.paused ? '#7F8A85' : off ? '#FBDCAA' : '#F6FDFF',
+        animation: S.paused ? 'none' : 'heartbeat .52s ease-in-out infinite'
+      },
+      liveGlow: {
+        position: 'absolute', width: 210, height: 150, borderRadius: '50%', pointerEvents: 'none',
+        background: 'radial-gradient(circle,' + (off ? 'rgba(242,180,92,.3)' : 'rgba(23,162,230,.3)') + ',rgba(23,162,230,0) 70%)',
+        animation: S.paused ? 'none' : 'heartglow .52s ease-in-out infinite'
+      },
+      liveZoneWord: {
+        fontSize: 12.5, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600,
+        color: S.paused ? '#7F8A85' : 'rgba(246,253,255,.86)'
+      },
+      liveBand: {
+        position: 'absolute', top: 10, left: pos(W.lo) + '%', width: (pos(W.hi) - pos(W.lo)) + '%',
+        height: 4, borderRadius: 3, background: 'rgba(23,162,230,.42)'
+      },
+      liveDot: {
+        position: 'absolute', top: 5, left: 'calc(' + pos(bpm) + '% - 7px)', width: 14, height: 14,
+        borderRadius: '50%', background: off ? WARM : A,
+        boxShadow: '0 0 0 4px ' + (off ? 'rgba(242,180,92,.18)' : 'rgba(23,162,230,.18)') + ', 0 2px 6px rgba(0,0,0,.45)',
+        transition: 'left .6s ease-out'
+      },
+      liveCue,
+      liveCueStyle: {
+        fontSize: 13, lineHeight: 1.5, textWrap: 'pretty',
+        color: S.paused ? '#939C97' : off ? '#F3C888' : '#B7C3C9'
+      },
+      liveStats: [
+        { k: metric ? 'km' : 'miles', v: dist.toFixed(1) },
+        { k: 'avg pulse', v: Math.round((W.lo + W.hi) / 2 - 2) },
+        { k: 'in zone', v: (over || under ? 88 : 91) + '%' }
+      ],
+
+      ivRound: round,
+      ivStep: isWork ? 'Work' : 'Easy',
+      ivRemain: fmt(remain),
+      ivStepWord: {
+        fontSize: 12.5, letterSpacing: '.16em', textTransform: 'uppercase', fontWeight: 600,
+        color: isWork ? '#F7C39B' : '#9FE2FB'
+      },
+      ivCount: {
+        fontFamily: "'Outfit',sans-serif", fontSize: 88, fontWeight: 200, letterSpacing: '-.045em',
+        lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+        color: S.paused ? '#7F8A85' : '#F6FDFF'
+      },
+      ivBpmStyle: {
+        fontFamily: "'Outfit',sans-serif", fontSize: 22, fontWeight: 300, letterSpacing: '-.02em',
+        fontVariantNumeric: 'tabular-nums', color: '#EDF1EF',
+        animation: S.paused ? 'none' : 'heartbeat .44s ease-in-out infinite'
+      },
+      ivHeartIcon: ico('heart', 15, accent),
+      ivNext: isWork
+        ? 'Next: 30 seconds easy'
+        : round >= 6 ? 'Next: the last minute' : 'Next: minute ' + (round + 1) + ' of 6',
+      ivBars: Array.from({ length: 6 }).map(function (_, i) {
+        const done = i + 1 < round;
+        const now = i + 1 === round;
+        return {
+          s: {
+            flex: 1, borderRadius: 3,
+            background: done ? 'rgba(240,116,44,.55)' : now ? (isWork ? HOT : COOL) : 'rgba(255,255,255,.1)',
+            opacity: now ? 1 : done ? 1 : .8,
+            transform: now ? 'scaleY(1.6)' : 'none'
+          }
+        };
+      }),
+      ivCue,
+      ivCueStyle: {
+        fontSize: 13, lineHeight: 1.5, textWrap: 'pretty',
+        color: S.paused ? '#939C97' : isWork ? '#F7C39B' : '#B7C3C9'
+      },
+
+      togglePause: function () { self.setState(function (s) { return { paused: !s.paused }; }); },
+      pauseBtn: {
+        width: 62, height: 62, borderRadius: '50%', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: S.paused ? '#17A2E6' : 'rgba(255,255,255,.08)',
+        border: '.5px solid ' + (S.paused ? 'rgba(23,162,230,.6)' : 'rgba(255,255,255,.16)'),
+        transition: 'background .18s ease, border-color .18s ease, color .18s ease'
+      },
+      pauseIcon: ico(S.paused ? 'play' : 'pause', 20, S.paused ? '#04121A' : '#EDF1EF'),
+      pauseHint: S.paused ? 'Tap play, or just start moving' : 'Auto-pauses when you stop',
+      icoStop: ico('stop', 18, HOT),
+
+      unitLabel: metric ? 'km' : 'miles',
+      // a session that ended moments ago is not 'Yesterday': one record, read twice
+      dTitle: DONE.name || 'Steady ride',
+      dWhen: (DONE.name ? DONE.when : T.lastWhen + ', 17:04')
+        + ' \u00b7 ' + (DONE.mins || 42) + ' min \u00b7 '
+        + (metric ? (DONE.km || 14.8) : ((DONE.km || 14.8) * 0.6214).toFixed(1)) + ' ' + (metric ? 'km' : 'miles'),
+      lastRowTitle: (DONE.name ? 'Just now' : T.lastWhen) + ' \u00b7 ' + (DONE.name || 'Steady ride'),
+      lastRowMeta: (DONE.mins || 42) + ' min \u00b7 in zone 82% of the time',
+      detailStats,
+      wLine, bandY: wy(128).toFixed(1), bandH: (wy(112) - wy(128)).toFixed(1),
+      wzBar: WZ.map(function (w) { return { s: { flex: w.f, background: w.c } }; }),
+      wzRows: WZ.map(function (w) {
+        return {
+          name: w.name, time: w.time,
+          swatch: { width: 9, height: 9, borderRadius: 3, background: w.c, flex: 'none' }
+        };
+      }),
+      costRows,
+
+      icoBike: ico('bike', 21, A), icoMoon: ico('moon', 18, LAV),
+      icoTodayOn: ico('today', 19, '#04121A'), icoTrends: ico('trends', 19, '#7F8A85'),
+      icoRest: ico('moon', 19, '#7F8A85'), icoYou: ico('you', 19, '#7F8A85')
+    };
+  }
+}
+</script>
+</body>
+</html>

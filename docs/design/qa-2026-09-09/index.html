@@ -1,0 +1,251 @@
+<!doctype html><meta charset=utf-8>
+<title>Noop flip-comparison QA</title>
+<style>
+:root{--bg:#0d100f;--card:#141817;--ink:#e6ece9;--dim:#8b958f;--line:#232827;--acc:#6fc9f0;--bad:#e08a9b;--warn:#e0b45c;--ok:#5fc98a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:40px 28px 80px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:30px;letter-spacing:-.02em;margin:0 0 6px}
+h2{font-size:19px;letter-spacing:-.01em;margin:44px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:0 0 6px}
+.sub{color:var(--dim);margin:0 0 26px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:22px 0}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.kpi b{display:block;font-size:24px;letter-spacing:-.02em}
+.kpi span{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+section,article{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 12px}
+section p,article p{margin:4px 0 0;color:#c6cec9}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;color:var(--dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.09em;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.bad{color:var(--bad);font-weight:600} .warn{color:var(--warn)} .ok{color:var(--ok)}
+.lbl{color:var(--dim);font-size:11.5px}
+code{font:12.5px ui-monospace,Menlo,monospace;color:var(--acc)}
+a{color:var(--acc)} .ev a{font-size:12px}
+.tag{display:inline-block;background:#1e2422;border:1px solid var(--line);color:var(--dim);border-radius:6px;padding:1px 7px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.f{margin:12px 0 0;padding-top:10px;border-top:1px solid var(--line)}
+.f:first-of-type{border-top:0;padding-top:0}
+img{width:100%;border-radius:10px;border:1px solid var(--line);margin-top:14px;display:block}
+.note{background:#1a1512;border-color:#3a2c1c}
+</style><div class=wrap>
+<h1>Noop — flip-comparison QA</h1>
+<p class=sub>Acts 1–8 · final handoff, 9 September · build <code>f729e6c8</code> · worktree <code>qa/flip-comparison</code></p>
+<div class=kpis>
+<div class=kpi><b>65</b><span>spec screens, Acts 1–8</span></div>
+<div class=kpi><b>50</b><span>compared</span></div>
+<div class=kpi><b>15</b><span>no route — wiring gap</span></div>
+<div class=kpi><b>8</b><span>vertical drift ≥6px</span></div>
+<div class=kpi><b>4.58–18.16</b><span>MAE range (body)</span></div>
+</div>
+<section class=note><h3>Read this before filing anything</h3><p>Two rig faults were found and fixed before any screen was judged. <strong>(1)</strong> The prototype phone sits at y=103 with height 874 in a 956-tall viewport, so its last <strong>21 px</strong> fell below the fold and captured as page background — this alone inflated <code>act3-ready</code> to MAE 25.92; it is 7.26 once corrected. <strong>(2)</strong> The simulator clock was live. Both are fixed in the numbers below. Depth is honest: the three screens in “Findings” were read frame by frame; the remaining 47 are automated triage with evidence attached for review.</p></section>
+<h2>Systematic findings</h2><section><h3>Demo seed does not reproduce the prototype’s fixtures</h3><p>Confirmed on <code>act2-today</code>: charge is 44 in the prototype and 56 in the build from the same starting value and the same day window. Any screen whose copy is computed from a value will read as a copy defect when it is really a seed difference. This was the risk raised before the run and it has materialised; it needs settling before copy findings on numeric screens can be trusted.</p></section><section><h3>Status bar is matched, not ignored</h3><p>The prototype’s <code>9:41</code> is <code>[proto]</code>-tagged. Rather than let a wrong clock pollute fifty scores, the simulator status bar was overridden to 9:41 / wifi / 4 bars / 100% discharging. MAE is reported both full-frame and body-only (rows 54–874).</p></section><section><h3>Eight screens carry real vertical drift</h3><p>Offsets of ±6–12 px. Where the residual falls after shifting (<code>act8-labs</code> +12 → 2.74, <code>act3-live</code> +8 → 1.90, <code>act3-intervals</code> +6 → 1.84) the screen is correct but displaced. Where it stays high (<code>act5-data</code> −12 → 15.59, <code>act8-review</code> +6 → 15.20) the content itself differs.</p></section><section><h3>Fifteen spec screens have no route</h3><p>54 of the spec’s 69 screens exist as <code>NoopRoute</code> cases. The 15 below were found twice by independent methods — diffing the enum, and mapping prototype labels to spec headings — with the same result each time.</p></section>
+<h2>Findings — read in detail</h2><article><h3><code>act8-review</code> — Review a photo</h3><div class=f><span class=tag>Typography / copy</span><p>Chip reads <code>READ, NOT MEASURED</code> (uppercase, tracked) in the design; the build renders <code>read, not measured</code> lowercase. RULES §1 puts +1.2 pt tracking on uppercase captions — a lowercase chip has neither the case nor the tracking.</p></div><div class=f><span class=tag>Fixture content</span><p>Body copy is rewritten. Design: <em>“Each row shows the strip of the page it came from — check the number against it, fix it if the read is wrong…”</em>. Build: <em>“Where a strip is shown, it is the part of the page the number was read from. Check each number against your report…”</em>. RULES tags <code>[static]</code> copy as final; rewording is a bug of the same class as a wrong hex.</p></div><div class=f><span class=tag>Behaviour</span><p>Footer sub-line differs. Design: <em>“Confirm or fix a row — Save does nothing until then”</em>, which is CLOSURE §3’s dead-button requirement stated in words. Build: <em>“4 still to check · 0 discarded”</em>, a progress count that does not say what would make Save live.</p></div><div class=f><span class=tag>Geometry</span><p>+6 px vertical drift, residual 15.2 — the residual stays high after shifting, so this is divergent content and not a displaced copy of the same screen.</p></div><a class=big href="evidence/act8-review-triptych.png"><img src="evidence/act8-review-triptych.png" loading=lazy></a></article><article><h3><code>act5-data</code> — Data &amp; privacy</h3><div class=f><span class=tag>Routing — highest severity</span><p>The build’s <code>data</code> route renders <code>import</code>’s screen. Design shows spec 5.9 <em>“Data and permissions”</em> — What the strap records / Where it lives / Apple Health + Strava toggles. The build shows spec 5.17 <em>“Bring your history in”</em> — the blush drop target and “Choose a file or folder”.</p></div><div class=f><span class=tag>Routing consequence</span><p>This also explains <code>import</code> appearing in the wiring-gap list: it has no <code>NoopRoute</code> case because it has taken over <code>data</code>’s. Two spec screens are collapsed onto one route, so the spec’s <code>data</code> screen — including the <strong>Delete</strong> destructive action and its required confirmation (5.9 §3) — has no route at all.</p></div><div class=f><span class=tag>Evidence</span><p>Best-fit vertical offset −12 px with residual 15.59. A residual that stays high at every offset means the two frames are not the same screen; contrast <code>act8-labs</code>, which shifts 12 px but drops to residual 2.74.</p></div><a class=big href="evidence/act5-data-triptych.png"><img src="evidence/act5-data-triptych.png" loading=lazy></a></article><article><h3><code>act2-today</code> — Today</h3><div class=f><span class=tag>Fixture content — blocks copy review</span><p>Charge diverges: design <em>“you have 44 left”</em> / headline <em>“Just under half left”</em>; build <em>“you have 56 left”</em> / <em>“Enough for the evening”</em>. Both start from “woke with 92” and both render the same window <code>06:41 → 14:20</code>, so this is a computed-value divergence, not a clock difference. The headline is driven off the value, so the copy cannot be judged until the seeds agree.</p></div><div class=f><span class=tag>Not a defect</span><p>The orb differs (<code>67 / OUT</code> vs <code>73 / IN</code>) because the box-breathing pacer is live; the two captures are different phases of the same animation. Recorded here so it is not filed as a defect.</p></div><div class=f><span class=tag>Materials</span><p>Gauge tick marks read pale/white in the design and aura-blue in the build. Partly confounded by the charge divergence above, since fill state may be charge-dependent — needs re-checking once seeds match.</p></div><div class=f><span class=tag>Geometry</span><p>Vertical offset 0 px. Header, cards and tab bar align.</p></div><a class=big href="evidence/act2-today-triptych.png"><img src="evidence/act2-today-triptych.png" loading=lazy></a></article>
+<h2>Wiring gaps — spec screen with no <code>NoopRoute</code> case</h2>
+<section><p>Found independently twice, same 15 both times. <code>import</code> appears here because it occupies <code>data</code>’s route (see <code>act5-data</code>).</p>
+<table><thead><tr><th>Act</th><th>Route</th><th>Prototype screen</th></tr></thead><tbody><tr><td>Act 1</td><td><code>alarm</code></td><td>Smart alarm</td></tr><tr><td>Act 2</td><td><code>breathe</code></td><td>Breathe</td></tr><tr><td>Act 2</td><td><code>bcatalog</code></td><td>Eighteen protocols</td></tr><tr><td>Act 2</td><td><code>bplayer</code></td><td>The pacer</td></tr><tr><td>Act 2</td><td><code>bsweep</code></td><td>Finding your pace</td></tr><tr><td>Act 2</td><td><code>bfound</code></td><td>Your pace</td></tr><tr><td>Act 5</td><td><code>apple</code></td><td>Apple Health</td></tr><tr><td>Act 5</td><td><code>notifs</code></td><td>Notification buzz</td></tr><tr><td>Act 5</td><td><code>import</code></td><td>Bring history in</td></tr><tr><td>Act 5</td><td><code>reading</code></td><td>Reading a file</td></tr><tr><td>Act 5</td><td><code>imported</code></td><td>What was written</td></tr><tr><td>Act 5</td><td><code>rejected</code></td><td>The wrong file</td></tr><tr><td>Act 5</td><td><code>backup</code></td><td>Backup and sync</td></tr><tr><td>Act 5</td><td><code>automations</code></td><td>Automations</td></tr><tr><td>Act 8</td><td><code>picker</code></td><td>Photograph a report</td></tr></tbody></table></section>
+<h2>All 50 compared screens</h2>
+<section><table><thead><tr><th>Screen</th><th class=num>MAE body</th><th class=num>MAE full</th><th class=num>v-offset</th><th class=num>residual</th><th class=num>rows ≠</th><th>Evidence</th></tr></thead><tbody><tr>
+<td><code>act8-review</code><div class=lbl>Review a photo</div></td>
+<td class="num bad">18.16</td><td class=num>17.36</td>
+<td class="num bad">+6</td><td class=num>15.2</td><td class=num>554</td>
+<td class=ev><a href="evidence/act8-review-triptych.png">triptych</a> · <a href="evidence/act8-review-overlay.png">overlay</a> · <a href="evidence/act8-review-diff.png">diff</a></td></tr><tr>
+<td><code>act5-data</code><div class=lbl>Data &amp; privacy</div></td>
+<td class="num bad">17.16</td><td class=num>16.41</td>
+<td class="num bad">-12</td><td class=num>15.59</td><td class=num>486</td>
+<td class=ev><a href="evidence/act5-data-triptych.png">triptych</a> · <a href="evidence/act5-data-overlay.png">overlay</a> · <a href="evidence/act5-data-diff.png">diff</a></td></tr><tr>
+<td><code>act8-set</code><div class=lbl>Set the goal</div></td>
+<td class="num bad">14.14</td><td class=num>13.59</td>
+<td class="num ">+1</td><td class=num>11.46</td><td class=num>390</td>
+<td class=ev><a href="evidence/act8-set-triptych.png">triptych</a> · <a href="evidence/act8-set-overlay.png">overlay</a> · <a href="evidence/act8-set-diff.png">diff</a></td></tr><tr>
+<td><code>act2-today</code><div class=lbl>Today</div></td>
+<td class="num bad">12.94</td><td class=num>12.46</td>
+<td class="num ">0</td><td class=num>8.12</td><td class=num>478</td>
+<td class=ev><a href="evidence/act2-today-triptych.png">triptych</a> · <a href="evidence/act2-today-overlay.png">overlay</a> · <a href="evidence/act2-today-diff.png">diff</a></td></tr><tr>
+<td><code>act2-stress</code><div class=lbl>Stress</div></td>
+<td class="num bad">12.62</td><td class=num>12.16</td>
+<td class="num bad">-6</td><td class=num>9.48</td><td class=num>382</td>
+<td class=ev><a href="evidence/act2-stress-triptych.png">triptych</a> · <a href="evidence/act2-stress-overlay.png">overlay</a> · <a href="evidence/act2-stress-diff.png">diff</a></td></tr><tr>
+<td><code>act5-position</code><div class=lbl>What we will not ask</div></td>
+<td class="num bad">12.07</td><td class=num>11.64</td>
+<td class="num ">0</td><td class=num>9.76</td><td class=num>382</td>
+<td class=ev><a href="evidence/act5-position-triptych.png">triptych</a> · <a href="evidence/act5-position-overlay.png">overlay</a> · <a href="evidence/act5-position-diff.png">diff</a></td></tr><tr>
+<td><code>act6-health</code><div class=lbl>Health hub</div></td>
+<td class="num warn">11.86</td><td class=num>11.43</td>
+<td class="num ">-1</td><td class=num>5.95</td><td class=num>421</td>
+<td class=ev><a href="evidence/act6-health-triptych.png">triptych</a> · <a href="evidence/act6-health-overlay.png">overlay</a> · <a href="evidence/act6-health-diff.png">diff</a></td></tr><tr>
+<td><code>act6-driver</code><div class=lbl>A driver</div></td>
+<td class="num warn">11.82</td><td class=num>11.39</td>
+<td class="num ">0</td><td class=num>9.97</td><td class=num>411</td>
+<td class=ev><a href="evidence/act6-driver-triptych.png">triptych</a> · <a href="evidence/act6-driver-overlay.png">overlay</a> · <a href="evidence/act6-driver-diff.png">diff</a></td></tr><tr>
+<td><code>act2-charge</code><div class=lbl>Where it went</div></td>
+<td class="num warn">11.46</td><td class=num>11.06</td>
+<td class="num ">-2</td><td class=num>8.78</td><td class=num>488</td>
+<td class=ev><a href="evidence/act2-charge-triptych.png">triptych</a> · <a href="evidence/act2-charge-overlay.png">overlay</a> · <a href="evidence/act2-charge-diff.png">diff</a></td></tr><tr>
+<td><code>act4-rhythm</code><div class=lbl>Rhythm</div></td>
+<td class="num warn">11.46</td><td class=num>11.06</td>
+<td class="num bad">+12</td><td class=num>9.08</td><td class=num>468</td>
+<td class=ev><a href="evidence/act4-rhythm-triptych.png">triptych</a> · <a href="evidence/act4-rhythm-overlay.png">overlay</a> · <a href="evidence/act4-rhythm-diff.png">diff</a></td></tr><tr>
+<td><code>act1-tonight</code><div class=lbl>Tonight</div></td>
+<td class="num warn">11.36</td><td class=num>11.02</td>
+<td class="num ">-1</td><td class=num>5.0</td><td class=num>359</td>
+<td class=ev><a href="evidence/act1-tonight-triptych.png">triptych</a> · <a href="evidence/act1-tonight-overlay.png">overlay</a> · <a href="evidence/act1-tonight-diff.png">diff</a></td></tr><tr>
+<td><code>act6-ages</code><div class=lbl>Your ages</div></td>
+<td class="num warn">10.84</td><td class=num>10.48</td>
+<td class="num ">-2</td><td class=num>7.35</td><td class=num>374</td>
+<td class=ev><a href="evidence/act6-ages-triptych.png">triptych</a> · <a href="evidence/act6-ages-overlay.png">overlay</a> · <a href="evidence/act6-ages-diff.png">diff</a></td></tr><tr>
+<td><code>act1-why</code><div class=lbl>Why last night</div></td>
+<td class="num warn">10.73</td><td class=num>10.40</td>
+<td class="num ">+1</td><td class=num>3.39</td><td class=num>348</td>
+<td class=ev><a href="evidence/act1-why-triptych.png">triptych</a> · <a href="evidence/act1-why-overlay.png">overlay</a> · <a href="evidence/act1-why-diff.png">diff</a></td></tr><tr>
+<td><code>act7-consent</code><div class=lbl>What it may read</div></td>
+<td class="num warn">10.45</td><td class=num>10.13</td>
+<td class="num ">+2</td><td class=num>5.29</td><td class=num>342</td>
+<td class=ev><a href="evidence/act7-consent-triptych.png">triptych</a> · <a href="evidence/act7-consent-overlay.png">overlay</a> · <a href="evidence/act7-consent-diff.png">diff</a></td></tr><tr>
+<td><code>act8-goal</code><div class=lbl>Journey</div></td>
+<td class="num warn">10.33</td><td class=num>10.02</td>
+<td class="num ">0</td><td class=num>6.46</td><td class=num>338</td>
+<td class=ev><a href="evidence/act8-goal-triptych.png">triptych</a> · <a href="evidence/act8-goal-overlay.png">overlay</a> · <a href="evidence/act8-goal-diff.png">diff</a></td></tr><tr>
+<td><code>act7-coach</code><div class=lbl>The coach</div></td>
+<td class="num warn">10.22</td><td class=num>9.91</td>
+<td class="num ">-1</td><td class=num>2.81</td><td class=num>318</td>
+<td class=ev><a href="evidence/act7-coach-triptych.png">triptych</a> · <a href="evidence/act7-coach-overlay.png">overlay</a> · <a href="evidence/act7-coach-diff.png">diff</a></td></tr><tr>
+<td><code>act6-building</code><div class=lbl>The first week</div></td>
+<td class="num warn">9.94</td><td class=num>9.63</td>
+<td class="num ">0</td><td class=num>8.62</td><td class=num>391</td>
+<td class=ev><a href="evidence/act6-building-triptych.png">triptych</a> · <a href="evidence/act6-building-overlay.png">overlay</a> · <a href="evidence/act6-building-diff.png">diff</a></td></tr><tr>
+<td><code>act6-method</code><div class=lbl>How it is figured</div></td>
+<td class="num warn">9.67</td><td class=num>9.38</td>
+<td class="num bad">-6</td><td class=num>4.9</td><td class=num>377</td>
+<td class=ev><a href="evidence/act6-method-triptych.png">triptych</a> · <a href="evidence/act6-method-overlay.png">overlay</a> · <a href="evidence/act6-method-diff.png">diff</a></td></tr><tr>
+<td><code>act3-session</code><div class=lbl>Today&#x27;s session</div></td>
+<td class="num warn">9.56</td><td class=num>9.29</td>
+<td class="num ">-2</td><td class=num>5.07</td><td class=num>337</td>
+<td class=ev><a href="evidence/act3-session-triptych.png">triptych</a> · <a href="evidence/act3-session-overlay.png">overlay</a> · <a href="evidence/act3-session-diff.png">diff</a></td></tr><tr>
+<td><code>act5-lab</code><div class=lbl>The Lab</div></td>
+<td class="num warn">9.37</td><td class=num>9.10</td>
+<td class="num ">0</td><td class=num>4.56</td><td class=num>335</td>
+<td class=ev><a href="evidence/act5-lab-triptych.png">triptych</a> · <a href="evidence/act5-lab-overlay.png">overlay</a> · <a href="evidence/act5-lab-diff.png">diff</a></td></tr><tr>
+<td><code>act5-strap</code><div class=lbl>Your strap</div></td>
+<td class="num warn">9.32</td><td class=num>9.05</td>
+<td class="num ">-2</td><td class=num>6.0</td><td class=num>387</td>
+<td class=ev><a href="evidence/act5-strap-triptych.png">triptych</a> · <a href="evidence/act5-strap-overlay.png">overlay</a> · <a href="evidence/act5-strap-diff.png">diff</a></td></tr><tr>
+<td><code>act8-marker</code><div class=lbl>One marker</div></td>
+<td class="num warn">8.45</td><td class=num>8.25</td>
+<td class="num ">-2</td><td class=num>5.08</td><td class=num>342</td>
+<td class=ev><a href="evidence/act8-marker-triptych.png">triptych</a> · <a href="evidence/act8-marker-overlay.png">overlay</a> · <a href="evidence/act8-marker-diff.png">diff</a></td></tr><tr>
+<td><code>act2-vitals</code><div class=lbl>Vitals</div></td>
+<td class="num warn">8.24</td><td class=num>8.04</td>
+<td class="num ">0</td><td class=num>6.19</td><td class=num>343</td>
+<td class=ev><a href="evidence/act2-vitals-triptych.png">triptych</a> · <a href="evidence/act2-vitals-overlay.png">overlay</a> · <a href="evidence/act2-vitals-diff.png">diff</a></td></tr><tr>
+<td><code>act5-devices</code><div class=lbl>Manage straps</div></td>
+<td class="num warn">8.21</td><td class=num>8.01</td>
+<td class="num ">+2</td><td class=num>4.43</td><td class=num>319</td>
+<td class=ev><a href="evidence/act5-devices-triptych.png">triptych</a> · <a href="evidence/act5-devices-overlay.png">overlay</a> · <a href="evidence/act5-devices-diff.png">diff</a></td></tr><tr>
+<td><code>act4-year</code><div class=lbl>The year so far</div></td>
+<td class="num warn">8.20</td><td class=num>7.99</td>
+<td class="num ">-1</td><td class=num>2.73</td><td class=num>290</td>
+<td class=ev><a href="evidence/act4-year-triptych.png">triptych</a> · <a href="evidence/act4-year-overlay.png">overlay</a> · <a href="evidence/act4-year-diff.png">diff</a></td></tr><tr>
+<td><code>act2-heart</code><div class=lbl>Live heart rate</div></td>
+<td class="num warn">8.19</td><td class=num>7.99</td>
+<td class="num ">-5</td><td class=num>3.58</td><td class=num>370</td>
+<td class=ev><a href="evidence/act2-heart-triptych.png">triptych</a> · <a href="evidence/act2-heart-overlay.png">overlay</a> · <a href="evidence/act2-heart-diff.png">diff</a></td></tr><tr>
+<td><code>act4-trends</code><div class=lbl>Trends</div></td>
+<td class="num warn">8.05</td><td class=num>7.85</td>
+<td class="num ">+4</td><td class=num>3.16</td><td class=num>342</td>
+<td class=ev><a href="evidence/act4-trends-triptych.png">triptych</a> · <a href="evidence/act4-trends-overlay.png">overlay</a> · <a href="evidence/act4-trends-diff.png">diff</a></td></tr><tr>
+<td><code>act5-zones</code><div class=lbl>Zones</div></td>
+<td class="num ok">7.73</td><td class=num>7.56</td>
+<td class="num ">+2</td><td class=num>2.48</td><td class=num>346</td>
+<td class=ev><a href="evidence/act5-zones-triptych.png">triptych</a> · <a href="evidence/act5-zones-overlay.png">overlay</a> · <a href="evidence/act5-zones-diff.png">diff</a></td></tr><tr>
+<td><code>act1-debt</code><div class=lbl>Sleep debt</div></td>
+<td class="num ok">7.57</td><td class=num>7.57</td>
+<td class="num ">-2</td><td class=num>3.12</td><td class=num>327</td>
+<td class=ev><a href="evidence/act1-debt-triptych.png">triptych</a> · <a href="evidence/act1-debt-overlay.png">overlay</a> · <a href="evidence/act1-debt-diff.png">diff</a></td></tr><tr>
+<td><code>act5-settings</code><div class=lbl>Settings</div></td>
+<td class="num ok">7.54</td><td class=num>7.38</td>
+<td class="num ">-4</td><td class=num>5.29</td><td class=num>341</td>
+<td class=ev><a href="evidence/act5-settings-triptych.png">triptych</a> · <a href="evidence/act5-settings-overlay.png">overlay</a> · <a href="evidence/act5-settings-diff.png">diff</a></td></tr><tr>
+<td><code>act7-memory</code><div class=lbl>Memory</div></td>
+<td class="num ok">7.40</td><td class=num>7.27</td>
+<td class="num ">+1</td><td class=num>1.69</td><td class=num>248</td>
+<td class=ev><a href="evidence/act7-memory-triptych.png">triptych</a> · <a href="evidence/act7-memory-overlay.png">overlay</a> · <a href="evidence/act7-memory-diff.png">diff</a></td></tr><tr>
+<td><code>act2-inbox</code><div class=lbl>Updates</div></td>
+<td class="num ok">7.35</td><td class=num>7.21</td>
+<td class="num ">0</td><td class=num>2.66</td><td class=num>261</td>
+<td class=ev><a href="evidence/act2-inbox-triptych.png">triptych</a> · <a href="evidence/act2-inbox-overlay.png">overlay</a> · <a href="evidence/act2-inbox-diff.png">diff</a></td></tr><tr>
+<td><code>act3-ready</code><div class=lbl>Ready</div></td>
+<td class="num ok">7.26</td><td class=num>7.54</td>
+<td class="num ">+2</td><td class=num>4.11</td><td class=num>332</td>
+<td class=ev><a href="evidence/act3-ready-triptych.png">triptych</a> · <a href="evidence/act3-ready-overlay.png">overlay</a> · <a href="evidence/act3-ready-diff.png">diff</a></td></tr><tr>
+<td><code>act5-widgets</code><div class=lbl>Widgets</div></td>
+<td class="num ok">7.24</td><td class=num>7.10</td>
+<td class="num ">+1</td><td class=num>2.91</td><td class=num>308</td>
+<td class=ev><a href="evidence/act5-widgets-triptych.png">triptych</a> · <a href="evidence/act5-widgets-overlay.png">overlay</a> · <a href="evidence/act5-widgets-diff.png">diff</a></td></tr><tr>
+<td><code>act3-pick</code><div class=lbl>Choose something else</div></td>
+<td class="num ok">7.23</td><td class=num>7.10</td>
+<td class="num ">-1</td><td class=num>2.15</td><td class=num>291</td>
+<td class=ev><a href="evidence/act3-pick-triptych.png">triptych</a> · <a href="evidence/act3-pick-overlay.png">overlay</a> · <a href="evidence/act3-pick-diff.png">diff</a></td></tr><tr>
+<td><code>act5-you</code><div class=lbl>You</div></td>
+<td class="num ok">7.05</td><td class=num>6.93</td>
+<td class="num ">-2</td><td class=num>4.12</td><td class=num>275</td>
+<td class=ev><a href="evidence/act5-you-triptych.png">triptych</a> · <a href="evidence/act5-you-overlay.png">overlay</a> · <a href="evidence/act5-you-diff.png">diff</a></td></tr><tr>
+<td><code>act5-record</code><div class=lbl>Your record</div></td>
+<td class="num ok">6.84</td><td class=num>6.73</td>
+<td class="num ">+1</td><td class=num>3.17</td><td class=num>288</td>
+<td class=ev><a href="evidence/act5-record-triptych.png">triptych</a> · <a href="evidence/act5-record-overlay.png">overlay</a> · <a href="evidence/act5-record-diff.png">diff</a></td></tr><tr>
+<td><code>act4-capacity</code><div class=lbl>Capacity</div></td>
+<td class="num ok">6.83</td><td class=num>6.71</td>
+<td class="num ">-1</td><td class=num>2.72</td><td class=num>258</td>
+<td class=ev><a href="evidence/act4-capacity-triptych.png">triptych</a> · <a href="evidence/act4-capacity-overlay.png">overlay</a> · <a href="evidence/act4-capacity-diff.png">diff</a></td></tr><tr>
+<td><code>act5-onboard</code><div class=lbl>Onboarding</div></td>
+<td class="num ok">6.71</td><td class=num>6.61</td>
+<td class="num ">0</td><td class=num>2.99</td><td class=num>228</td>
+<td class=ev><a href="evidence/act5-onboard-triptych.png">triptych</a> · <a href="evidence/act5-onboard-overlay.png">overlay</a> · <a href="evidence/act5-onboard-diff.png">diff</a></td></tr><tr>
+<td><code>act3-across</code><div class=lbl>Every session, in aggregate</div></td>
+<td class="num ok">6.65</td><td class=num>6.56</td>
+<td class="num ">-1</td><td class=num>2.76</td><td class=num>248</td>
+<td class=ev><a href="evidence/act3-across-triptych.png">triptych</a> · <a href="evidence/act3-across-overlay.png">overlay</a> · <a href="evidence/act3-across-diff.png">diff</a></td></tr><tr>
+<td><code>act5-history</code><div class=lbl>History</div></td>
+<td class="num ok">6.45</td><td class=num>6.36</td>
+<td class="num ">+2</td><td class=num>2.07</td><td class=num>276</td>
+<td class=ev><a href="evidence/act5-history-triptych.png">triptych</a> · <a href="evidence/act5-history-overlay.png">overlay</a> · <a href="evidence/act5-history-diff.png">diff</a></td></tr><tr>
+<td><code>act8-labs</code><div class=lbl>Biomarkers</div></td>
+<td class="num ok">6.41</td><td class=num>6.33</td>
+<td class="num bad">+12</td><td class=num>2.74</td><td class=num>367</td>
+<td class=ev><a href="evidence/act8-labs-triptych.png">triptych</a> · <a href="evidence/act8-labs-overlay.png">overlay</a> · <a href="evidence/act8-labs-diff.png">diff</a></td></tr><tr>
+<td><code>act7-gate</code><div class=lbl>No provider yet</div></td>
+<td class="num ok">6.19</td><td class=num>6.13</td>
+<td class="num ">0</td><td class=num>3.35</td><td class=num>190</td>
+<td class=ev><a href="evidence/act7-gate-triptych.png">triptych</a> · <a href="evidence/act7-gate-overlay.png">overlay</a> · <a href="evidence/act7-gate-diff.png">diff</a></td></tr><tr>
+<td><code>act7-setup</code><div class=lbl>Provider and key</div></td>
+<td class="num ok">6.18</td><td class=num>6.12</td>
+<td class="num ">0</td><td class=num>2.05</td><td class=num>227</td>
+<td class=ev><a href="evidence/act7-setup-triptych.png">triptych</a> · <a href="evidence/act7-setup-overlay.png">overlay</a> · <a href="evidence/act7-setup-diff.png">diff</a></td></tr><tr>
+<td><code>act1-rest</code><div class=lbl>Rest</div></td>
+<td class="num ok">5.87</td><td class=num>5.94</td>
+<td class="num ">-1</td><td class=num>2.39</td><td class=num>237</td>
+<td class=ev><a href="evidence/act1-rest-triptych.png">triptych</a> · <a href="evidence/act1-rest-overlay.png">overlay</a> · <a href="evidence/act1-rest-diff.png">diff</a></td></tr><tr>
+<td><code>act5-pair</code><div class=lbl>Pair the strap</div></td>
+<td class="num ok">5.66</td><td class=num>5.62</td>
+<td class="num ">+4</td><td class=num>1.54</td><td class=num>152</td>
+<td class=ev><a href="evidence/act5-pair-triptych.png">triptych</a> · <a href="evidence/act5-pair-overlay.png">overlay</a> · <a href="evidence/act5-pair-diff.png">diff</a></td></tr><tr>
+<td><code>act3-detail</code><div class=lbl>After</div></td>
+<td class="num ok">5.65</td><td class=num>5.62</td>
+<td class="num ">-1</td><td class=num>2.17</td><td class=num>240</td>
+<td class=ev><a href="evidence/act3-detail-triptych.png">triptych</a> · <a href="evidence/act3-detail-overlay.png">overlay</a> · <a href="evidence/act3-detail-diff.png">diff</a></td></tr><tr>
+<td><code>act2-day</code><div class=lbl>The day so far</div></td>
+<td class="num ok">5.61</td><td class=num>5.58</td>
+<td class="num ">-3</td><td class=num>3.31</td><td class=num>290</td>
+<td class=ev><a href="evidence/act2-day-triptych.png">triptych</a> · <a href="evidence/act2-day-overlay.png">overlay</a> · <a href="evidence/act2-day-diff.png">diff</a></td></tr><tr>
+<td><code>act3-intervals</code><div class=lbl>Intervals</div></td>
+<td class="num ok">4.76</td><td class=num>4.87</td>
+<td class="num bad">+6</td><td class=num>1.84</td><td class=num>197</td>
+<td class=ev><a href="evidence/act3-intervals-triptych.png">triptych</a> · <a href="evidence/act3-intervals-overlay.png">overlay</a> · <a href="evidence/act3-intervals-diff.png">diff</a></td></tr><tr>
+<td><code>act3-live</code><div class=lbl>In the effort</div></td>
+<td class="num ok">4.58</td><td class=num>4.70</td>
+<td class="num bad">+8</td><td class=num>1.9</td><td class=num>212</td>
+<td class=ev><a href="evidence/act3-live-triptych.png">triptych</a> · <a href="evidence/act3-live-overlay.png">overlay</a> · <a href="evidence/act3-live-diff.png">diff</a></td></tr></tbody></table></section>
+<h2>Method</h2>
+<section><p>Prototype captured through headless Brave over CDP at a 1470×956 window, locating the visible element whose bounding rect measures exactly 402×874 by hit-test rather than hardcoded coordinates, captured with <code>Page.captureScreenshot</code> and <code>captureBeyondViewport</code>. Navigation by clicking the visible Act label then the visible screen label by exact text, filtered to <code>data-dc-tpl</code> 20 and 28 so hidden and zero-sized matches are excluded, 650–750 ms settle. iOS captured with <code>simctl</code> at 1206×2622 and reduced with <code>sips -z 874 402</code>, launched per route with <code>--demo-seed --noop-route</code>. Comparison is Pillow blend / difference / MAE, plus 16 horizontal bands, 8 vertical columns, and a ±12 px luminance cross-correlation for drift. The same-position flip is the acceptance test; MAE is diagnostic only.</p></section>
+</div>

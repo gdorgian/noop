@@ -1,0 +1,418 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "How Noop Aura works",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/gdorgian/noop",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "7cbcad30d93b52466f4f673712f8edb9fc625b3c"
+    },
+    "views": [
+      {
+        "id": "strap-to-screen",
+        "label": "Strap to screen",
+        "focus": [
+          "strap",
+          "ble",
+          "decode",
+          "store",
+          "repo",
+          "screens"
+        ],
+        "note": "One reading, from the strap's Bluetooth frame to the Aura screen that shows it."
+      },
+      {
+        "id": "scores",
+        "label": "Where scores come from",
+        "focus": [
+          "store",
+          "repo",
+          "engines",
+          "importers"
+        ],
+        "note": "History from the strap or an import is read back and scored on the phone."
+      },
+      {
+        "id": "leaving-the-app",
+        "label": "What leaves the app",
+        "focus": [
+          "repo",
+          "screens",
+          "health",
+          "widgets",
+          "svea"
+        ],
+        "note": "Apple Health and the widgets stay on the iPhone; Svea's provider is reached only with consent."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "strap",
+      "type": "external",
+      "label": "WHOOP strap",
+      "sublabel": "4.0 · 5.0 / MG",
+      "pos": [
+        40,
+        430
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "ble",
+      "type": "backend",
+      "label": "Bluetooth link",
+      "sublabel": "CoreBluetooth",
+      "tag": "CRC-gated",
+      "pos": [
+        240,
+        430
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "Strand/BLE/BLEManager.swift",
+          "label": "BLEManager"
+        }
+      ]
+    },
+    {
+      "id": "decode",
+      "type": "backend",
+      "label": "Protocol decoders",
+      "sublabel": "WhoopProtocol",
+      "pos": [
+        440,
+        430
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "Packages/WhoopProtocol/Sources/WhoopProtocol/Framing.swift",
+          "label": "Framing"
+        },
+        {
+          "path": "Packages/WhoopProtocol/Sources/WhoopProtocol/Interpreter.swift",
+          "label": "Interpreter"
+        }
+      ]
+    },
+    {
+      "id": "store",
+      "type": "database",
+      "label": "On-device store",
+      "sublabel": "WhoopStore · SQLite",
+      "pos": [
+        640,
+        430
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "Packages/WhoopStore/Sources/WhoopStore/Database.swift",
+          "label": "Database"
+        }
+      ]
+    },
+    {
+      "id": "repo",
+      "type": "backend",
+      "label": "Repository",
+      "sublabel": "AppModel",
+      "pos": [
+        840,
+        430
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "Strand/Data/Repository.swift",
+          "label": "Repository"
+        },
+        {
+          "path": "Strand/App/AppModel.swift",
+          "label": "AppModel"
+        }
+      ]
+    },
+    {
+      "id": "screens",
+      "type": "frontend",
+      "label": "Aura screens",
+      "sublabel": "NoopVerifiedAppShell",
+      "pos": [
+        1040,
+        430
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "StrandiOS/NoopUI/NoopShell.swift",
+          "label": "NoopShell"
+        }
+      ]
+    },
+    {
+      "id": "importers",
+      "type": "backend",
+      "label": "Importers",
+      "sublabel": "WHOOP CSV · Health",
+      "pos": [
+        640,
+        260
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "Strand/Data/WhoopImporter.swift",
+          "label": "WhoopImporter"
+        },
+        {
+          "path": "Packages/StrandImport/Sources/StrandImport/AppleHealthImporter.swift",
+          "label": "AppleHealthImporter"
+        }
+      ]
+    },
+    {
+      "id": "engines",
+      "type": "backend",
+      "label": "Analytics engines",
+      "sublabel": "StrandAnalytics",
+      "tag": "sleep · HRV · Body Age",
+      "pos": [
+        840,
+        260
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "Packages/StrandAnalytics/Sources/StrandAnalytics/VitalityEngine.swift",
+          "label": "VitalityEngine"
+        },
+        {
+          "path": "Strand/Data/IntelligenceEngine.swift",
+          "label": "IntelligenceEngine"
+        }
+      ]
+    },
+    {
+      "id": "health",
+      "type": "external",
+      "label": "Apple Health",
+      "sublabel": "HealthKit",
+      "pos": [
+        840,
+        570
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "StrandiOS/Health/HealthKitBridge.swift",
+          "label": "HealthKitBridge"
+        }
+      ]
+    },
+    {
+      "id": "widgets",
+      "type": "frontend",
+      "label": "Widgets",
+      "sublabel": "Live Activity",
+      "tag": "App Group",
+      "pos": [
+        1040,
+        570
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "StrandiOSShared/WidgetSnapshot.swift",
+          "label": "WidgetSnapshot"
+        },
+        {
+          "path": "StrandiOSWidgets/NOOPWidgetBundle.swift",
+          "label": "NOOPWidgetBundle"
+        }
+      ]
+    },
+    {
+      "id": "svea",
+      "type": "external",
+      "label": "Svea's provider",
+      "sublabel": "optional AI coach",
+      "pos": [
+        1040,
+        120
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "Strand/AI/SveaDataGrants.swift",
+          "label": "SveaDataGrants"
+        },
+        {
+          "path": "Strand/AI/AICoach.swift",
+          "label": "AICoach"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Your iPhone",
+      "wraps": [
+        "ble",
+        "decode",
+        "store",
+        "repo",
+        "screens",
+        "importers",
+        "engines",
+        "widgets"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "strap-frames",
+      "from": "strap",
+      "to": "ble",
+      "label": "BLE",
+      "variant": "emphasis"
+    },
+    {
+      "id": "raw-frames",
+      "from": "ble",
+      "to": "decode",
+      "label": "frames"
+    },
+    {
+      "id": "decoded-samples",
+      "from": "decode",
+      "to": "store",
+      "label": "samples"
+    },
+    {
+      "id": "store-reads",
+      "from": "store",
+      "to": "repo",
+      "label": "rows"
+    },
+    {
+      "id": "records",
+      "from": "repo",
+      "to": "screens",
+      "label": "records",
+      "variant": "emphasis"
+    },
+    {
+      "id": "import-history",
+      "from": "importers",
+      "to": "store",
+      "label": "history",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "scoring",
+      "from": "repo",
+      "to": "engines",
+      "label": "score",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "health-writeback",
+      "from": "repo",
+      "to": "health",
+      "label": "write-back",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "widget-snapshot",
+      "from": "screens",
+      "to": "widgets",
+      "label": "snapshot",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "svea-consent",
+      "from": "screens",
+      "to": "svea",
+      "label": "with consent",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "On the phone",
+      "items": [
+        "Strap data is decoded and stored in SQLite on the iPhone",
+        "Scores are computed on the device by StrandAnalytics",
+        "No server and no account"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Shared on the phone",
+      "items": [
+        "Apple Health receives write-backs through HealthKit",
+        "Widgets and the Live Activity read an App Group snapshot"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Leaves the phone",
+      "items": [
+        "Only Svea's requests, to the provider you choose",
+        "Only the data categories you grant"
+      ]
+    }
+  ]
+}

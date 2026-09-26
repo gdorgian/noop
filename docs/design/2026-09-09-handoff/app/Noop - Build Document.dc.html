@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<script src="./doc-page.js"></script>
+<style>
+doc-page:not(:defined){visibility:hidden}
+body{margin:0;font-family:'Instrument Sans',system-ui,sans-serif}
+doc-page,doc-page [slot="header"],doc-page [slot="footer"]{font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#0B6FA8;text-decoration:none}a:hover{color:#084F78}
+doc-page h1{font-family:'Outfit',sans-serif;font-size:23pt;font-weight:400;letter-spacing:-.02em;margin:0 0 10pt;line-height:1.15;color:#111413;break-after:avoid}
+doc-page h2{font-family:'Outfit',sans-serif;font-size:15pt;font-weight:400;letter-spacing:-.02em;margin:20pt 0 8pt;padding-top:9pt;border-top:.5pt solid #D6DAD8;line-height:1.2;color:#111413;break-after:avoid}
+doc-page h3{font-size:10.5pt;font-weight:600;margin:14pt 0 6pt;color:#111413;break-after:avoid}
+doc-page h4{font-size:9.5pt;font-weight:600;margin:11pt 0 5pt;color:#2A302E;break-after:avoid}
+doc-page p{font-size:9.5pt;line-height:1.5;color:#2A302E;margin:0 0 7pt;text-wrap:pretty;orphans:3;widows:3}
+doc-page em{font-family:'Instrument Serif',serif;font-style:italic}
+doc-page strong{font-weight:600;color:#111413}
+doc-page code{font-family:ui-monospace,Menlo,monospace;font-size:8.5pt;color:#0B5E8C;background:#EEF4F8;padding:.5pt 3pt;border-radius:2pt}
+doc-page pre{background:#F4F6F5;border:.5pt solid #D6DAD8;border-radius:5pt;padding:8pt 10pt;margin:0 0 8pt;break-inside:avoid}
+doc-page pre code{background:none;padding:0;color:#2A302E;font-size:8pt;line-height:1.45}
+doc-page ul,doc-page ol{margin:0 0 8pt;padding-left:14pt}
+doc-page li{font-size:9.5pt;line-height:1.5;color:#2A302E;margin-bottom:3pt;orphans:3;widows:3}
+doc-page table{border-collapse:collapse;margin:0 0 10pt;width:100%;font-size:8.5pt;break-inside:auto}
+doc-page th{text-align:left;padding:5pt 7pt;background:#F0F3F2;font-size:7pt;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#5E6663;border-bottom:.5pt solid #C8CDCB}
+doc-page td{padding:5pt 7pt;border-bottom:.5pt solid #E4E8E6;color:#2A302E;line-height:1.4;vertical-align:top}
+doc-page tr{break-inside:avoid}
+doc-page hr{border:0;border-top:.5pt solid #D6DAD8;margin:14pt 0}
+doc-page blockquote{margin:0 0 8pt;padding-left:8pt;border-left:1.5pt solid #9FB8C6;color:#5E6663;font-size:9pt}
+.q{font-family:'Instrument Sans',system-ui,sans-serif;font-size:8.5pt;line-height:1.45;color:#111413;background:#FBFAF7;border:.5pt solid #E4E8E6;border-left:1.5pt solid #6B77B8;border-radius:3pt;padding:5pt 7pt;margin:0 0 6pt;display:block}
+.tag{font-family:ui-monospace,Menlo,monospace;font-size:7.5pt;font-weight:600;padding:.5pt 3pt;border-radius:2pt;white-space:nowrap}
+.st{background:#E4F3EA;color:#1E6B45}
+.bd{background:#E6F1F8;color:#0B5E8C}
+.fm{background:#EEF0F9;color:#4A56A0}
+.pr{background:#FBEAE4;color:#9A4227}
+.sec{break-before:page}
+.no{background:#FDF3F0;border:.5pt solid #F2DCD5;border-radius:4pt;padding:7pt 9pt;margin:0 0 8pt}
+.yes{background:#F1F8F3;border:.5pt solid #D6E8DC;border-radius:4pt;padding:7pt 9pt;margin:0 0 8pt}
+</style>
+</helmet>
+
+<doc-page margin="0.72in">
+
+  <div slot="header" style="display:flex;align-items:baseline;justify-content:space-between;padding-bottom:5pt;border-bottom:.5pt solid #D6DAD8">
+    <span style="font-size:7pt;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#5E6663">Noop &#183; the build document</span>
+    <span style="font-size:7pt;color:#8A918E">Nine acts &#183; 69 screens &#183; 402&#215;874 pt</span>
+  </div>
+
+  <div slot="footer" style="display:flex;align-items:baseline;justify-content:space-between;padding-top:5pt;border-top:.5pt solid #D6DAD8">
+    <span style="font-size:7pt;color:#8A918E">Copy is final. If a string reads awkwardly, raise it &mdash; do not fix it locally.</span>
+    <span style="font-size:7pt;color:#8A918E">Dark theme only</span>
+  </div>
+
+  <h1>How to type this app, not just build it</h1>
+
+  <p><strong>This document exists because the copy is the product.</strong> Noop&rsquo;s whole claim is that it will not overstate what it knows, and that claim lives entirely in sentences. A build can have every hex, radius and curve right and still ship a different product, because someone rewrote <em>no real change</em> as <em>stable</em>, or <em>not enough yet</em> as <em>keep going!</em>, or added an exclamation mark to a line that was deliberately flat.</p>
+
+  <p>So this is not a second design spec. <code>spec/00-RULES.md</code> and the eight act specs already carry geometry, tokens, primitives and routes, and they still win on all of that. This document carries the things a coder has to get right that are not geometry: <strong>where every string comes from, which strings the app writes itself, and the gates that decide whether a sentence is allowed to exist at all.</strong></p>
+
+  <h3>Read in this order</h3>
+  <ol>
+    <li><code>spec/00-RULES.md</code> &mdash; the <strong>thirteen</strong> things that make a faithful build look cheap (&sect;1&ndash;&sect;13; &sect;0 is the provenance legend, not a rule). Still the top authority on anything visual.</li>
+    <li><strong>This document, &sect;1&ndash;&sect;3.</strong> The copy law, the lift procedure, the honesty gates. Twenty minutes, and it prevents the class of bug that is invisible in review.</li>
+    <li><code>spec/10-tokens.md</code>, <code>20-primitives.md</code>, <code>30-routes.md</code> &mdash; build the fifteen primitives before any screen.</li>
+    <li>The act spec for the act you are on, alongside &sect;5 of this document for that act&rsquo;s generated strings.</li>
+    <li><code>spec/50-wiring.md</code> for what feeds each bound value, and <code>spec/acts/48-act9-instrument.md</code> for the new act.</li>
+  </ol>
+
+  <h3>What wins when two sources disagree</h3>
+  <table>
+    <thead><tr><th style="width:34%">Disagreement</th><th>Who wins</th></tr></thead>
+    <tbody>
+      <tr><td>A number (hex, radius, size, duration)</td><td>The prototype. The spec has a typo &mdash; report it.</td></tr>
+      <tr><td>A behaviour (what a tap does, what survives a back)</td><td>The spec. The prototype has scaffolding the app must not have.</td></tr>
+      <tr><td><strong>A sentence</strong></td><td><strong>The prototype, verbatim.</strong> Including its punctuation, its dashes and its lack of exclamation marks.</td></tr>
+      <tr><td>Whether a sentence may appear at all</td><td>This document, &sect;3. The gate is not a style preference.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">1 &middot; The copy law</h2>
+
+  <p>Twelve rules. Each one is a real defect that has shipped in a health app, and eleven of the twelve are things a well-meaning developer does while trying to be helpful.</p>
+
+  <h3>1.1 &mdash; A <span class="tag st">static</span> string is a literal, like a hex code</h3>
+  <p>Type it exactly. Do not shorten it to fit, do not sentence-case a lowercase label, do not expand a contraction, do not swap an em dash for a hyphen. If it does not fit your layout, the layout is wrong &mdash; the strings were written against 402&nbsp;pt with the real type scale.</p>
+
+  <h3>1.2 &mdash; Never invent a sentence for a state you have not been given</h3>
+  <p>If your data hits a case the spec does not name, that is a spec gap and it blocks the screen. Do not fill it with <em>Something went wrong</em>. Every state in &sect;6 has a designed sentence; if yours is not there, ask.</p>
+
+  <h3>1.3 &mdash; No exclamation marks, anywhere in the app</h3>
+  <p>Not in a celebration, not in an error, not in an empty state. There are zero in the prototype and that is deliberate.</p>
+
+  <h3>1.4 &mdash; The app never congratulates and never scolds</h3>
+  <p>It reports, and it occasionally says something is worth noticing. <em>Great job!</em> and <em>You missed your goal</em> are both out of voice. The nearest the app comes to praise is naming what happened and its consequence: <em>Eleven weeks inside your own bedtime hour &mdash; previous best was three.</em></p>
+
+  <h3>1.5 &mdash; Second person, present tense, no imperatives unless there is one action</h3>
+  <p><em>You slept 7h 12m</em>, not <em>Sleep: 7h 12m</em> and not <em>User slept</em>. An imperative is allowed only where the screen offers exactly one thing to do, and then it names the action plainly: <em>Log a few days without it.</em></p>
+
+  <h3>1.6 &mdash; Numbers are written the way a person would say them</h3>
+  <table>
+    <thead><tr><th style="width:30%">Kind</th><th>Written</th><th style="width:26%">Never</th></tr></thead>
+    <tbody>
+      <tr><td>Duration, over an hour</td><td><code>7h 12m</code></td><td><code>7.2 h</code>, <code>432 min</code></td></tr>
+      <tr><td>Duration, under an hour</td><td><code>26 min</code>, <code>4 minutes</code> in prose</td><td><code>0h 26m</code></td></tr>
+      <tr><td>Clock time</td><td><code>23:18</code>, 24-hour, zero-padded</td><td><code>11:18 PM</code></td></tr>
+      <tr><td>Delta, in a chip</td><td><code>+3</code> / <code>&minus;3</code> with a true minus sign (U+2212)</td><td><code>-3</code>, <code>3 less</code></td></tr>
+      <tr><td>Correlation</td><td><code>+0.52</code>, two decimals, always signed</td><td><code>52%</code>, <code>r=.52</code></td></tr>
+      <tr><td>Counts of days</td><td><code>84 nights</code> &mdash; the noun is nights for sleep, days for behaviour</td><td><code>84 data points</code></td></tr>
+      <tr><td>Thousands</td><td><code>8,400</code> steps</td><td><code>8.4k</code> in a value; <code>6.4k</code> is allowed only as an axis label</td></tr>
+    </tbody>
+  </table>
+
+  <h3>1.7 &mdash; Uncertainty is stated in the sentence, not in a superscript</h3>
+  <p>Every estimate says it is one, in words, at the end of the screen it appears on. <em>Estimated from resting pulse, recovery after effort and the pace you hold at a given heart rate. It is a direction with an error bar, not a laboratory figure.</em> Do not replace this with an info icon.</p>
+
+  <h3>1.8 &mdash; The app never claims cause</h3>
+  <p>Association only, and the word <em>because</em> is only allowed when the app is describing something you did, not something it inferred. Banned constructions: <em>X caused Y</em>, <em>X improved your Y</em>, <em>because of your late meal</em>. Allowed: <em>On the mornings after a drink, your readiness runs 19% lower than on mornings without one.</em></p>
+
+  <h3>1.9 &mdash; A refusal is a designed answer, not an error</h3>
+  <p>When the app declines &mdash; not enough data, strap off the wrist, a night with a hole in it, a question Svea will not answer &mdash; it says what it cannot do, why, and what it can do instead. Three parts, in that order, and never in red.</p>
+
+  <h3>1.10 &mdash; Numbers in copy come from the same call as numbers on screen</h3>
+  <p>A sentence that says <em>down 5 beats</em> beside a chip that says <code>&minus;4</code> is the worst class of bug in this app, because it destroys the only thing the product sells. Compute once, format twice, from one value.</p>
+
+  <h3>1.11 &mdash; Empty is not zero</h3>
+  <p><code>0</code> means measured as none. Absent means not measured, and it renders as <code>&mdash;</code> with a reason available. Never print <code>0</code> for a missing reading, and never print <code>&mdash;</code> for a true zero.</p>
+
+  <h3>1.12 &mdash; Localisation happens once, centrally, or not at all</h3>
+  <p>Do not paraphrase in a locale file. The generated strings in &sect;5 are templates with slots; translate the template, keep the slots, keep the gates. A locale that reads more encouraging than English is a broken locale.</p>
+
+  <h4>Banned vocabulary</h4>
+  <table>
+    <thead><tr><th style="width:36%">Never</th><th>Because</th></tr></thead>
+    <tbody>
+      <tr><td>optimal, optimise, perfect</td><td>Implies a target the app does not set.</td></tr>
+      <tr><td>score, grade, rating</td><td>Charge and readiness are quantities, not marks. <em>Readiness</em> is out of 100 and is never called a score.</td></tr>
+      <tr><td>streak, badge, achievement, level up</td><td>The app counts attendance, and it does not reward it.</td></tr>
+      <tr><td>insight, AI, smart, powered by</td><td>Say what it is: <em>what it moves with</em>, <em>what actually moves you</em>.</td></tr>
+      <tr><td>should, must, need to (as advice)</td><td>Only <em>your need</em> as a sleep quantity. The app does not instruct.</td></tr>
+      <tr><td>failed, missed, poor performance</td><td>A short night is a short night. <em>A poor night</em> is allowed; <em>you failed</em> is not.</td></tr>
+      <tr><td>data, dataset, metrics (user-facing)</td><td>Say <em>your record</em>, <em>your nights</em>, <em>signals</em>.</td></tr>
+      <tr><td>Loading&hellip;, Please wait, Oops</td><td>&sect;6 names the real states.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">2 &middot; How to lift a string</h2>
+
+  <p>There are roughly 2,400 user-visible strings. They are not retyped in this document, because a retyped string is a string that can drift. Instead: <strong>every static string in the app exists exactly once, in the prototype, and you copy it out of there.</strong> This section is the procedure for finding it.</p>
+
+  <h3>2.1 &mdash; The source files</h3>
+  <table>
+    <thead><tr><th style="width:22%">Act</th><th style="width:40%">Prototype file</th><th>Routes</th></tr></thead>
+    <tbody>
+      <tr><td>1 &middot; The night</td><td><code>Noop Act 1 - The Night.dc.html</code></td><td><code>rest</code> <code>tonight</code> <code>alarm</code> <code>why</code> <code>debt</code></td></tr>
+      <tr><td>2 &middot; The day</td><td><code>Noop Act 2 - The Day.dc.html</code></td><td><code>today</code> <code>charge</code> <code>day</code> <code>vitals</code> <code>stress</code> <code>heart</code> <code>breathe</code> <code>bcatalog</code> <code>bplayer</code> <code>bsweep</code> <code>bfound</code></td></tr>
+      <tr><td>3 &middot; The effort</td><td><code>Noop Act 3 - The Effort.dc.html</code></td><td><code>session</code> <code>pick</code> <code>ready</code> <code>live</code> <code>intervals</code> <code>detail</code></td></tr>
+      <tr><td>4 &middot; The bigger picture</td><td><code>Noop Act 4 - The Bigger Picture.dc.html</code></td><td><code>trends</code> <code>capacity</code> <code>rhythm</code> <code>year</code></td></tr>
+      <tr><td>5 &middot; The plumbing</td><td><code>Noop Act 5 - The Plumbing.dc.html</code></td><td>21 routes, <code>you</code> &hellip; <code>pair</code></td></tr>
+      <tr><td>6 &middot; Your ages</td><td><code>Noop Act 6 - Your Ages.dc.html</code></td><td><code>ages</code> <code>building</code> <code>driver</code> <code>method</code> <code>health</code></td></tr>
+      <tr><td>7 &middot; Svea</td><td><code>Noop Act 7 - Svea.dc.html</code></td><td><code>coach</code> <code>gate</code> <code>setup</code> <code>consent</code> <code>memory</code></td></tr>
+      <tr><td>8 &middot; Goals and labs</td><td><code>Noop Act 8 - Goals and Labs.dc.html</code></td><td><code>goal</code> <code>set</code> <code>labs</code> <code>picker</code> <code>review</code> <code>marker</code></td></tr>
+      <tr><td>9 &middot; The instrument</td><td><code>Noop Act 9 - The Instrument.dc.html</code></td><td><code>index</code> <code>metric</code> <code>compare</code> <code>effects</code></td></tr>
+      <tr><td>All, in one shell</td><td><code>Noop - Full App.dc.html</code></td><td>The rail, the cross-act tab bar, the live session bar</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 &mdash; Where a string lives inside the file</h3>
+  <p>Each act file has two halves. The <strong>template</strong> is the markup; the <strong>logic class</strong> is a single <code>renderVals()</code> that returns everything the template interpolates.</p>
+  <ul>
+    <li>A string sitting in the template markup is <strong>fixed chrome</strong> &mdash; a section label, a caption, a footnote. It is <span class="tag st">static</span> without exception.</li>
+    <li>A string returned from <code>renderVals()</code> as a plain value is <strong>static copy held in code</strong>, usually because it varies by state. It is still final wording; the branch is what varies, not the words.</li>
+    <li>A string built by concatenation inside <code>renderVals()</code> is <span class="tag fm">formula</span>. Those are the ones this document tabulates in &sect;5, because they are where a build invents its own voice.</li>
+    <li>Anything under a <code>TERMS</code> or <code>T.</code> lookup is <strong>schedule vocabulary</strong> &mdash; &sect;4.</li>
+  </ul>
+
+  <h3>2.3 &mdash; The procedure</h3>
+  <ol>
+    <li>Open the act file. Search for the screen&rsquo;s <code>sc-if</code> block: <code>isCharge</code>, <code>isMetric</code>, <code>isAlarm</code>. Everything for that screen is inside it, in visual order.</li>
+    <li>Copy the strings out in that order into your Swift file. Keep the order &mdash; it is the reading order, and reordering cards changes the argument the screen is making.</li>
+    <li>For every <code>{{ hole }}</code>, find the key in <code>renderVals()</code>. If it is a concatenation, go to &sect;5 and implement the template, not the example output.</li>
+    <li>Diff your finished screen against the prototype with both on screen. Read the sentences aloud. A misplaced comma in this app is a bug report.</li>
+  </ol>
+
+  <div class="no">
+    <p style="margin:0"><strong>The one thing not to do:</strong> screenshot the prototype and transcribe from the image. Every apostrophe in the app is a typographic apostrophe (U+2019), every dash in prose is an em dash with no surrounding spaces, and every minus is U+2212. OCR gets all three wrong, and the result is a build that looks right and is subtly not the product.</p>
+  </div>
+
+  <h2 class="sec">3 &middot; The honesty gates</h2>
+
+  <p>These are the thresholds that decide whether a sentence is allowed to exist. They are product logic, not tuning parameters: if a gate fails, the screen still renders, and it renders the designed refusal from &sect;6 rather than a weaker version of the claim.</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Claim</th><th style="width:22%">Gate</th><th>When the gate fails</th></tr></thead>
+    <tbody>
+      <tr><td>A trend has a direction</td><td>|change| over the window exceeds the signal&rsquo;s noise threshold (&sect;3.1)</td><td>Chip reads <em>no real change</em>; the row&rsquo;s sentence switches to its <code>noise</code> variant; the sparkline goes grey. Never draw an arrow.</td></tr>
+      <tr><td>A trend is worth calling at all</td><td>Window is longer than six weeks</td><td>Headline is <em>Too early to say.</em> Every row reads its <code>short</code> variant. This is the whole design idea of Act 4.</td></tr>
+      <tr><td>A correlation exists</td><td>n &ge; 21 aligned days <strong>and</strong> |r| &ge; 0.22</td><td>The pair is omitted from <em>what it moves with</em>. Not shown faintly, not shown as &ldquo;weak&rdquo;.</td></tr>
+      <tr><td>A fit line may be drawn</td><td>|r| &ge; 0.28 and n &ge; 21</td><td>Card title becomes <em>No fit drawn</em> and the explanatory sentence replaces the fit.</td></tr>
+      <tr><td>A behaviour may be ranked</td><td>&ge; 5 days with it <strong>and</strong> &ge; 5 days without, in the window</td><td><em>Still learning</em> state, naming which side is short and by how many days.</td></tr>
+      <tr><td>A ranked effect is real</td><td>|effect| &ge; 3.5% of the target&rsquo;s mean</td><td>Excluded from the list. If nothing clears, the <em>Nothing here clears the bar</em> state renders &mdash; designed, not hidden.</td></tr>
+      <tr><td>Two group means differ</td><td>|difference| &ge; 3 points of readiness</td><td><em>No real difference</em> &mdash; presented as a real answer, with both n values.</td></tr>
+      <tr><td>A dose figure is yours</td><td>&ge; 40 of your own nights behind it</td><td>Borrowed or blending treatment (&sect;5.4). The colour carries this, before the sentence does.</td></tr>
+      <tr><td>A night may be read</td><td>No gap longer than 20 min in the sleep window; strap worn &ge; 85% of it</td><td>Act 1 <em>why</em> declines the night; Svea declines to brief on it. Both name the missing stretch.</td></tr>
+      <tr><td>Body age may be shown</td><td>14 nights, of which &ge; 10 worn</td><td>Act 6 <em>building</em> &mdash; the first-week state, with per-input coverage.</td></tr>
+      <tr><td>A biomarker row may state a value</td><td>The value was read from the report with confidence &ge; 0.75</td><td>Row shows <em>as read</em> with the raw string, and the confidence chip. Never a cleaned-up number.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.1 &mdash; Noise thresholds, per signal</h3>
+  <p>Below these, over the whole window, the change is not a change. Units are the signal&rsquo;s own.</p>
+  <table>
+    <thead><tr><th>Signal</th><th style="width:12%">Thresh</th><th>Signal</th><th style="width:12%">Thresh</th><th>Signal</th><th style="width:12%">Thresh</th></tr></thead>
+    <tbody>
+      <tr><td>Resting pulse</td><td>1.2 bpm</td><td>Deep sleep</td><td>1.4 %</td><td>Readiness</td><td>4 /100</td></tr>
+      <tr><td>Variability</td><td>3.2 ms</td><td>REM</td><td>1.6 %</td><td>Stress minutes</td><td>9 min</td></tr>
+      <tr><td>Time asleep</td><td>0.32 h</td><td>Breathing rate</td><td>0.32 br/min</td><td>Steps</td><td>700</td></tr>
+      <tr><td>Bedtime drift</td><td>7 min</td><td>Skin temperature</td><td>0.09 &deg;C</td><td>Training load</td><td>8</td></tr>
+      <tr><td>Capacity</td><td>0.5 ml/kg</td><td>Blood oxygen</td><td>0.4 %</td><td>Body age</td><td>0.4 yr</td></tr>
+      <tr><td>Weight</td><td>0.5 kg</td><td>Logged behaviour</td><td>0.4 /week</td><td colspan="2"></td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">4 &middot; Schedule vocabulary</h2>
+
+  <p>One profile answer &mdash; <em>at night, mostly</em> / <em>rotating shifts</em> / <em>permanent nights</em> &mdash; changes vocabulary in five acts. It is not a translation layer applied at display time: each screen holds both strings and picks one. Get this wrong and the app tells a shift worker to go to bed at the same hour every night, which is the single most alienating thing a wearable does.</p>
+
+  <table>
+    <thead><tr><th style="width:16%">Where</th><th style="width:42%">Day schedule</th><th>Night / rotating</th></tr></thead>
+    <tbody>
+      <tr><td><code>rhythm</code> section title</td><td>How far bedtime drifted</td><td>How far your anchor drifted</td></tr>
+      <tr><td><code>rhythm</code> read</td><td>Each bar is how many minutes that week&rsquo;s bedtime wandered from your own hour. Under half an hour is where your body stops noticing.</td><td>Each bar is how far that week&rsquo;s main sleep moved from your anchor. On a rotating roster this is the only regularity available, and it is the one that counts.</td></tr>
+      <tr><td><code>rhythm</code> row label</td><td>Bedtime drift</td><td>Anchor drift</td></tr>
+      <tr><td><code>rhythm</code> sleep title</td><td>Sleep against your need</td><td>Main sleep against your need</td></tr>
+      <tr><td><code>year</code> chapter 2</td><td>You started going to bed inside the same hour and walking most days&hellip;</td><td>You started holding your anchor &mdash; the same stretch of sleep in the same place, whatever the roster did around it &mdash; and walking most days&hellip;</td></tr>
+      <tr><td><code>year</code> firsts</td><td>Eleven weeks inside your own bedtime hour &middot; <em>previous best was three</em></td><td>Eleven weeks holding your anchor inside half an hour &middot; <em>previous best was three, and none of them through a roster change</em></td></tr>
+      <tr><td><code>year</code> Svea note</td><td>&hellip;because you went to bed at roughly the same hour for four months and walked most days.</td><td>&hellip;because you held your anchor for four months &mdash; through three roster changes &mdash; and walked most days.</td></tr>
+      <tr><td><code>driver</code> (regularity) action</td><td>Bed inside the same hour on the two nights you still drift &mdash; Friday and Saturday. Regularity counts for more here than duration does.</td><td>Hold your anchor on the two sleeps that still slide &mdash; the first rest day after a night run, and the changeover. The model reads a four-hour slide as a fresh time zone, and it costs more than a short night does.</td></tr>
+      <tr><td><code>driver</code> (regularity) caveat</td><td>Regularity is how consistent your timing is, not how long you slept. The two are scored separately.</td><td>On a rotating roster regularity is measured against your own anchor, not a clock hour. It is scored separately from how long you slept.</td></tr>
+      <tr><td><code>goal</code> milestone</td><td>Four weeks inside your bedtime hour</td><td>Four weeks holding your anchor</td></tr>
+      <tr><td><code>index</code> signal name</td><td>Bedtime drift</td><td>Anchor drift</td></tr>
+      <tr><td><code>you</code> anchor row</td><td>Your bedtime hour &middot; 23:20</td><td>Your anchor &middot; learned from your sleeps, not from a clock you set</td></tr>
+      <tr><td>Day boundary</td><td>Midnight to midnight</td><td>Anchored to your sleep, not the clock</td></tr>
+    </tbody>
+  </table>
+
+  <div class="yes">
+    <p style="margin:0"><strong>Implementation note.</strong> Hold these as a <code>ScheduleTerms</code> struct with one instance per schedule, injected at the screen root. Do not scatter <code>if isNightShift</code> through view bodies &mdash; the prototype holds them in a single <code>TERMS</code> map per act for exactly this reason, and every string in the table above is keyed there.</p>
+  </div>
+
+  <h2 class="sec">5 &middot; The strings the app writes itself</h2>
+
+  <p>These are the <span class="tag fm">formula</span> strings. Each is a template with slots; the slot is filled from the same value the screen displays (&sect;1.10). Where a template has variants, the variant is chosen by a gate from &sect;3 &mdash; never by how the number feels.</p>
+
+  <h3>5.1 &mdash; Trend rows (Act 4 <code>trends</code>)</h3>
+  <p>Four rows, each with four sentence variants. The variant is chosen: <code>short</code> if the window is six weeks; else <code>noise</code> if the change is under threshold; else <code>good</code> or <code>bad</code> by whether the change went the way the signal&rsquo;s <code>better</code> direction wants. Slots: <code>{d}</code> the absolute change with unit, <code>{m}</code> the change in minutes, <code>{from}</code> the window&rsquo;s start in words, <code>{inFrom}</code> the same with a preposition.</p>
+  <table>
+    <thead><tr><th style="width:16%">Row</th><th style="width:11%">Variant</th><th>String</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="4">Resting pulse</td><td>short</td><td>Six weeks is not enough to call this. It moves two beats either way with a warm room or a late meal.</td></tr>
+      <tr><td>noise</td><td>Flat, within the wobble your own week produces. Nothing to read.</td></tr>
+      <tr><td>good</td><td>{d} down since {from}, and it has held at this level for eleven weeks. The clearest thing on the screen.</td></tr>
+      <tr><td>bad</td><td>Up {d} over the window. Usually sleep before fitness &mdash; check Rhythm first.</td></tr>
+      <tr><td rowspan="4">Variability</td><td>short</td><td>Too noisy at this length to mean anything. It swings ten milliseconds on a glass of wine.</td></tr>
+      <tr><td>noise</td><td>Level, inside its normal swing.</td></tr>
+      <tr><td>good</td><td>Up {d} since {from}. Your body is absorbing effort better than it was in spring.</td></tr>
+      <tr><td>bad</td><td>Down {d} over the window, which usually follows a stretch of short nights.</td></tr>
+      <tr><td rowspan="4">Sleep</td><td>short</td><td>Six weeks of sleep tells you about six weeks, not about you.</td></tr>
+      <tr><td>noise</td><td>Unchanged on average &mdash; but look at the regularity in Rhythm, which is the part that moved.</td></tr>
+      <tr><td>good</td><td>{m} a night more than {inFrom}. Every other line on this screen follows from that one.</td></tr>
+      <tr><td>bad</td><td>Down {m} a night. This is the line to fix first; the others follow it.</td></tr>
+      <tr><td rowspan="4">Capacity</td><td>short</td><td>Capacity moves too slowly to show up in six weeks. Ask again in three months.</td></tr>
+      <tr><td>noise</td><td>Holding. It takes months to shift and it has not shifted.</td></tr>
+      <tr><td>good</td><td>Up {d} since {from}. Ordinary walking and steady rides did that, not intervals.</td></tr>
+      <tr><td>bad</td><td>Down {d}, which after a quiet stretch is expected rather than alarming.</td></tr>
+    </tbody>
+  </table>
+
+  <h4>The window verdict, same screen</h4>
+  <table>
+    <thead><tr><th style="width:14%">Window</th><th style="width:16%">Kicker &middot; headline</th><th>Body</th></tr></thead>
+    <tbody>
+      <tr><td>6 weeks</td><td>Six weeks in &middot; <strong>Too early to say.</strong></td><td>Nothing here has cleared its own noise yet. Every line on this window moves as much on a warm room or a late dinner as it does on training. Ask again at three months &mdash; the app would rather say nothing than draw you an arrow it cannot defend.</td></tr>
+      <tr><td>6 months</td><td>Six months in &middot; <strong>Yes &mdash; slowly.</strong></td><td>Resting pulse down {n} beats, variability up {n} milliseconds, capacity up {n} points. All three followed the sleep line, and the sleep line followed one decision: going to bed at roughly the same hour.</td></tr>
+      <tr><td>Year</td><td>Twelve months in &middot; <strong>Yes, and you can see where.</strong></td><td>The change is not spread evenly across the year &mdash; it starts in March and holds. Four chapters, one of which did most of the work.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.2 &mdash; The index and the dossier (Act 9 <code>index</code>, <code>metric</code>)</h3>
+  <table>
+    <thead><tr><th style="width:22%">Element</th><th>Template</th></tr></thead>
+    <tbody>
+      <tr><td>Nights behind the answer</td><td><strong>{worn}</strong> nights actually behind this answer. You asked for {requested}. &mdash; when the range is All: <em>&hellip;behind this answer, of {total} on record</em>; when the range exceeds the record: <em>nights on record &mdash; there is no more history than this</em></td></tr>
+      <tr><td>Index row chip</td><td><em>no real change</em> &middot; <em>{n} nights so far</em> (thin) &middot; <code>&plusmn;{delta}</code> otherwise. Behaviours: <em>about the same</em> or <code>&plusmn;{n} a week</code>.</td></tr>
+      <tr><td>Dossier read, thin</td><td>There are {n} nights of this. Noop will keep it on the list and say nothing else about it until there are twenty-one.</td></tr>
+      <tr><td>Dossier read, flat</td><td>Flat across this window, inside the wobble your own days produce. Nothing to read into it.</td></tr>
+      <tr><td>Dossier read, moved</td><td>{Up|Down} {delta} over {worn} nights, {in the direction you would want. | which is the direction you would not. | .}</td></tr>
+      <tr><td>Chart note</td><td>The band is the three-day spread around each point. The dashed line is the fit, and it is only drawn when the change clears the noise at this length.</td></tr>
+      <tr><td>Moves-with row, signal</td><td>A {higher|lower} {other} comes with a {higher|lower} {this}, strongest {same night|next morning|two days on}.</td></tr>
+      <tr><td>Moves-with row, behaviour</td><td>On the {same day|morning after|second day after} {behaviour}, your {this} runs {higher|lower} than on days without it.</td></tr>
+      <tr><td>Dossier footnote</td><td>Correlations are computed over the nights where both signals exist, at the best of three lags, and shown only above twenty-one nights and 0.22. Association, not cause.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.3 &mdash; The overlay (Act 9 <code>compare</code>)</h3>
+  <table>
+    <thead><tr><th style="width:22%">Element</th><th>Template</th></tr></thead>
+    <tbody>
+      <tr><td>Strength phrase, by |r|</td><td>&ge; 0.60 <em>They move together.</em> &middot; &ge; 0.40 <em>They move together, loosely.</em> &middot; &ge; 0.28 <em>A weak relationship.</em> &middot; below <em>No relationship worth drawing.</em></td></tr>
+      <tr><td>Fit card, cleared</td><td>{strength} {A} and {b}{, with {b} read {n} day(s) later}. That is a tendency across {n} nights, not a rule about any one of them.</td></tr>
+      <tr><td>Fit card, not cleared</td><td>At this length and this shift the two do not track each other closely enough to draw a line through. Noop leaves it off rather than drawing something faint and letting you read meaning into it.</td></tr>
+      <tr><td>Shift note, best = 0</td><td>Shifting does not improve it: whatever these two share, they share it on the same day.</td></tr>
+      <tr><td>Shift note, best &gt; 0</td><td>Reading {b} {n} day(s) later fits better than reading them together &mdash; the effect arrives after the day it was caused on, which is exactly what the lag treatment on the effects screen is for.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.4 &mdash; Effects, and borrowed against earned (Act 9 <code>effects</code>)</h3>
+  <table>
+    <thead><tr><th style="width:22%">Element</th><th>Template</th></tr></thead>
+    <tbody>
+      <tr><td>Ranked row</td><td>Readiness runs {n}% {higher|lower} {same night|next morning|two days on}, across {n1} days with and {n0} without.</td></tr>
+      <tr><td>Still learning</td><td>A behaviour needs five days with it and five without before Noop will rank it. These are the ones that are short, and which side is short &mdash; because &ldquo;log a few days without it&rdquo; is something you can act on, and &ldquo;not enough data&rdquo; is not.</td></tr>
+      <tr><td>&hellip;per short behaviour</td><td>{Behaviour} &mdash; {n1} days with it, {n0} without. {Log {k} more day(s) with it. | Give it {k} more day(s) off.}</td></tr>
+      <tr><td>Nothing clears</td><td>Six behaviours, {n} of them with enough days on both sides, and not one of them moves your readiness by more than the day-to-day wobble. That is a real answer, and a slightly uncomfortable one: at this window, what you are doing is not what is deciding your mornings.</td></tr>
+      <tr><td>With-and-without, difference</td><td>Readiness averages {n} points {higher|lower} {lag} {on the evenings you had one | on the days you had some | &hellip;}.</td></tr>
+      <tr><td>&hellip;no difference</td><td>No real difference. {n1} days with and {n0} without, and the two averages sit inside each other&rsquo;s ordinary spread.</td></tr>
+      <tr><td>&hellip;overlap line</td><td>The shaded spans overlap between {lo} and {hi}, which is why this is a tendency and not a rule. Plenty of individual days go the other way. &mdash; or, when they do not overlap: <em>The two spans do not overlap at all across this window, which is as clean as an association in one person&rsquo;s data gets.</em></td></tr>
+      <tr><td>Dose &middot; borrowed</td><td>Published figure. {n} of your nights so far &mdash; not you yet.</td></tr>
+      <tr><td>Dose &middot; blending</td><td>{n} of your nights. Half yours, and moving &mdash; watch it across weeks, not visits.</td></tr>
+      <tr><td>Dose &middot; yours</td><td>{n} of your nights behind it. This is your own number now, not the literature&rsquo;s.</td></tr>
+      <tr><td>Dose &middot; disagrees</td><td>{n} nights, and yours point {gentler|harder} than the literature&rsquo;s &minus;6. Both are shown; neither is hidden.</td></tr>
+      <tr><td>Dose footnote</td><td>Colour is ownership: grey while the figure is borrowed from the literature, the screen&rsquo;s hue once enough of your own nights sit behind it. It never shows a borrowed number as though it were measured.</td></tr>
+    </tbody>
+  </table>
+
+  <h4>The blend, exactly</h4>
+  <pre><code>w        = ownNights / (ownNights + 18)          // weight on your own slope
+shown    = published × (1 − w) + mine × w
+state    = ownNights &lt; 8   → borrowed
+           |mine − published| &gt; 3 and ownNights ≥ 40 → disagrees
+           ownNights &lt; 40  → blending
+           else            → yours
+hue      = borrowed #C6CEC9 · blending #AFB9E2 · yours/disagrees #8B99D6
+fillWidth= borrowed 6% · blending 48% · disagrees 88% · yours 100%</code></pre>
+  <p>The numeral takes the hue. That is the treatment doing the work the sentence would otherwise have to do, and it is the reason this engine can answer on day one without lying. <strong>If the build cannot hold that distinction, dose-response does not ship.</strong></p>
+
+  <h2 class="sec">6 &middot; The nine recurring states</h2>
+
+  <p>Every screen must render all of these that apply to it. They are not error paths; six of the nine are ordinary Tuesday.</p>
+  <table>
+    <thead><tr><th style="width:16%">State</th><th style="width:30%">What it means</th><th>How it reads</th></tr></thead>
+    <tbody>
+      <tr><td>Ordinary</td><td>Everything present.</td><td>The screen as drawn.</td></tr>
+      <tr><td>Thin</td><td>Fewer days than the claim needs.</td><td>Says how many there are and what the bar is. Keeps the row; drops the claim.</td></tr>
+      <tr><td>Flat</td><td>Present, and not moving.</td><td><em>No real change</em> &mdash; a result, in the same type size as any other.</td></tr>
+      <tr><td>Absent</td><td>Not measured.</td><td><code>&mdash;</code> plus a reason on tap. Never <code>0</code>.</td></tr>
+      <tr><td>Partial night</td><td>Strap off mid-window.</td><td>Names the missing stretch and its length, then offers the nearest complete night.</td></tr>
+      <tr><td>Declined</td><td>The app will not answer.</td><td>Cannot &middot; why &middot; what instead. Three parts, never red.</td></tr>
+      <tr><td>Uncomfortable</td><td>The honest answer is unwelcome.</td><td>Stated plainly, with the reason it is still useful. Designed, never suppressed.</td></tr>
+      <tr><td>Borrowed</td><td>The figure is not yours yet.</td><td>Grey numeral, weight bar, and the ownership sentence.</td></tr>
+      <tr><td>Building</td><td>The model has not converged.</td><td>Per-input coverage, and what will complete it.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">7 &middot; Screen inventory</h2>
+
+  <p>Sixty-nine screens, and the split is <strong>5 &middot; 12 &middot; 7 &middot; 4 &middot; 21 &middot; 5 &middot; 5 &middot; 6 &middot; 4</strong>. <strong>Door</strong> is the way a user actually arrives &mdash; if your build has a screen with no door, the screen is unfinished.</p>
+  <p><strong>A door is not a back destination, and this table only carries doors.</strong> <code>spec/30-routes.md</code> is the single back map, walked by both the header chevron and the swipe; where a screen&rsquo;s chevron leaves its act (<code>building</code>, <code>health</code>, <code>goal</code>, <code>labs</code>, <code>index</code>) or where it has no chevron at all (fourteen screens, including <code>live</code>, <code>intervals</code> and <code>gate</code>), that map is the answer and this column is not. Earlier revisions kept both and they drifted &mdash; four of the corrections in this pass were rows here that had quietly become a second, wrong map.</p>
+
+  <table>
+    <thead><tr><th style="width:15%">Route</th><th style="width:22%">Name</th><th style="width:30%">Door</th><th>The one thing it must get right</th></tr></thead>
+    <tbody>
+      <tr><td colspan="4" style="background:#F6F8F7;font-weight:600;font-size:8pt">Act 1 &middot; The night &mdash; 5</td></tr>
+      <tr><td><code>rest</code></td><td>Rest</td><td>Tab bar</td><td>One verdict sentence above the hypnogram, not below it.</td></tr>
+      <tr><td><code>tonight</code></td><td>Tonight</td><td><code>rest</code> row</td><td>The anchor is learned, and says so. It is not a bedtime you set.</td></tr>
+      <tr><td><code>alarm</code></td><td>Smart alarm</td><td><code>tonight</code> row</td><td>Two rows &mdash; set, then arm. Arming is a separate, reversible act, and the screen says when it will not fire.</td></tr>
+      <tr><td><code>why</code></td><td>Why last night</td><td><code>rest</code> row</td><td>Declines a night with a hole in it, naming the stretch.</td></tr>
+      <tr><td><code>debt</code></td><td>Sleep debt</td><td><code>rest</code> row</td><td>Debt is a fortnight&rsquo;s arithmetic, never a moral position.</td></tr>
+      <tr><td colspan="4" style="background:#F6F8F7;font-weight:600;font-size:8pt">Act 2 &middot; The day &mdash; 12</td></tr>
+      <tr><td><code>today</code></td><td>Today</td><td>Tab bar &middot; app home</td><td>The orb, one greeting line, and nothing that reads as a task list.</td></tr>
+      <tr><td><code>inbox</code></td><td>Updates</td><td><code>today</code> bell, badged</td><td>Three row kinds that behave differently. A proposal resolves in the row and names what accepting changed. The bell fills; it never buzzes.</td></tr>
+      <tr><td><code>charge</code></td><td>Where it went</td><td><code>today</code> gauge</td><td>Every drain priced against what remains. The drift signal is priced in here, never shown as a banner.</td></tr>
+      <tr><td><code>day</code></td><td>The day so far</td><td><code>today</code> row</td><td>Timeline, not a feed. Empty stretches stay empty.</td></tr>
+      <tr><td><code>vitals</code></td><td>Vitals</td><td><code>today</code> row</td><td>Each vital carries its own window and its own absent state.</td></tr>
+      <tr><td><code>stress</code></td><td>Stress</td><td><code>vitals</code></td><td>Minutes, not a level. No face, no colour alarm.</td></tr>
+      <tr><td><code>heart</code></td><td>Live heart rate</td><td><code>vitals</code></td><td>Live means live: it says when the last sample arrived.</td></tr>
+      <tr><td><code>breathe</code></td><td>Breathe</td><td><code>today</code> orb</td><td>Home for the suite. One protocol suggested, eighteen available.</td></tr>
+      <tr><td><code>bcatalog</code></td><td>Eighteen protocols</td><td><code>breathe</code></td><td>Each names what it is for in plain words, and its length.</td></tr>
+      <tr><td><code>bplayer</code></td><td>The pacer</td><td><code>bcatalog</code></td><td>Heart trace against the pace trace &mdash; the whole point is seeing them converge.</td></tr>
+      <tr><td><code>bsweep</code></td><td>Finding your pace</td><td><code>breathe</code></td><td>A sweep is a measurement. It ends with a number you keep.</td></tr>
+      <tr><td><code>bfound</code></td><td>Your pace</td><td><code>bsweep</code></td><td>Says how it was found, and offers to re-measure rather than assert forever.</td></tr>
+      <tr><td colspan="4" style="background:#F6F8F7;font-weight:600;font-size:8pt">Act 3 &middot; The effort &mdash; 7</td></tr>
+      <tr><td><code>session</code></td><td>Today&rsquo;s session</td><td>Act 3 home &middot; <code>today</code> row</td><td>An offer, with the reason it is today&rsquo;s. Declinable without penalty.</td></tr>
+      <tr><td><code>pick</code></td><td>Choose something else</td><td><code>session</code></td><td>The alternative list never scolds the choice.</td></tr>
+      <tr><td><code>ready</code></td><td>Ready</td><td><code>session</code></td><td>Pre-flight: strap, zones, what will be recorded.</td></tr>
+      <tr><td><code>live</code></td><td>In the effort</td><td><strong>&mdash; no back &mdash;</strong></td><td>Readable at arm&rsquo;s length, mid-effort. Leaving it does not end the session, and there is no chevron to leave by.</td></tr>
+      <tr><td><code>intervals</code></td><td>Intervals</td><td><strong>&mdash; no back &mdash;</strong></td><td>The next interval is the subject; the rest is context. <strong>No chevron and no map entry</strong>, like <code>live</code>: the ways out are pause and end.</td></tr>
+      <tr><td><code>detail</code></td><td>After</td><td>End of session &middot; <code>history</code></td><td>What it cost, what it bought, priced into tonight.</td></tr>
+      <tr><td><code>across</code></td><td>Every session, in aggregate</td><td><code>session</code> row &middot; <code>history</code></td><td>No calorie total &mdash; Noop keeps none. The days you did <em>not</em> train are counted, because a rest day is a training decision.</td></tr>
+      <tr><td colspan="4" style="background:#F6F8F7;font-weight:600;font-size:8pt">Act 4 &middot; The bigger picture &mdash; 4</td></tr>
+      <tr><td><code>trends</code></td><td>Trends</td><td>Tab bar</td><td>The window decides the verdict. Six weeks says <em>too early</em>.</td></tr>
+      <tr><td><code>capacity</code></td><td>Capacity</td><td><code>trends</code> row</td><td>Ends by admitting it is an estimate.</td></tr>
+      <tr><td><code>rhythm</code></td><td>Rhythm</td><td><code>trends</code> row</td><td>Regularity, not duration &mdash; and in the user&rsquo;s schedule vocabulary.</td></tr>
+      <tr><td><code>year</code></td><td>The year so far</td><td><code>trends</code> row</td><td>Chapters with names. No confetti, no unearned records.</td></tr>
+      <tr><td colspan="4" style="background:#F6F8F7;font-weight:600;font-size:8pt">Act 5 &middot; The plumbing &mdash; 21</td></tr>
+      <tr><td><code>you</code></td><td>You</td><td>Tab bar</td><td>The body clock, and five things the app will not ask for.</td></tr>
+      <tr><td><code>record</code></td><td>Your record</td><td><code>you</code></td><td>Everything held about you, exportable.</td></tr>
+      <tr><td><code>zones</code></td><td>Zones</td><td><code>you</code></td><td>Where they came from, and how to override.</td></tr>
+      <tr><td><code>history</code></td><td>History</td><td><code>you</code> &middot; logged sheet</td><td>Sleeps and sessions in one list &mdash; same kind of fact.</td></tr>
+      <tr><td><code>strap</code></td><td>Your strap</td><td>Battery chip, any screen</td><td>Battery as a duration, not a percentage alone.</td></tr>
+      <tr><td><code>apple</code></td><td>Apple Health</td><td><code>strap</code> card</td><td>Every kind with its own outcome, including <em>not asked</em> as an honest third state. Counts what was written rather than claiming success.</td></tr>
+      <tr><td><code>notifs</code></td><td>Notification buzz</td><td><code>settings</code> &middot; <code>strap</code></td><td><strong>Ships <span class="tag">later</span>:</strong> no permission request, no saved-to-strap state, no strap-battery cost, no live control. Cannot pre-populate the app list; says why.</td></tr>
+      <tr><td><code>devices</code></td><td>Manage straps</td><td><code>strap</code></td><td>Which strap wrote which night.</td></tr>
+      <tr><td><code>data</code></td><td>Data &amp; privacy</td><td><code>you</code></td><td>Per-source, per-permission, with what breaks if revoked.</td></tr>
+      <tr><td><code>import</code></td><td>Bring history in</td><td><code>data</code></td><td>The door. Names the formats and the cost.</td></tr>
+      <tr><td><code>reading</code></td><td>Reading a file</td><td><code>import</code></td><td>Streams progress with real counts, cancellable.</td></tr>
+      <tr><td><code>imported</code></td><td>What was written</td><td><code>reading</code></td><td>Per-signal counts, conflicts, and what it declined.</td></tr>
+      <tr><td><code>rejected</code></td><td>The wrong file</td><td><code>reading</code></td><td>Says what the file was and what would work.</td></tr>
+      <tr><td><code>backup</code></td><td>Backup and sync</td><td><code>data</code></td><td>What is in a backup, and restore as a first-class path.</td></tr>
+      <tr><td><code>position</code></td><td>What we will not ask</td><td><code>you</code></td><td>Five denials, each with its reason. Never softened.</td></tr>
+      <tr><td><code>settings</code></td><td>Settings</td><td><code>you</code></td><td>Grouped by what it interrupts, not by subsystem.</td></tr>
+      <tr><td><code>widgets</code></td><td>Widgets</td><td><code>settings</code></td><td>Preview at true widget size.</td></tr>
+      <tr><td><code>lab</code></td><td>The Lab</td><td><code>settings</code></td><td>Unfinished things, labelled unfinished.</td></tr>
+      <tr><td><code>automations</code></td><td>Automations</td><td><code>settings</code>, figured with how many are on</td><td>The ceiling resolves to a real bpm before it arms, and says why it moves. The illness row lands in <code>charge</code>&rsquo;s ledger, not as a banner.</td></tr>
+      <tr><td><code>onboard</code></td><td>Onboarding</td><td>First run</td><td>Asks the schedule question early, because five acts depend on it.</td></tr>
+      <tr><td><code>pair</code></td><td>Pair the strap</td><td><code>onboard</code> &middot; <code>devices</code></td><td>Every failure state has a next step.</td></tr>
+      <tr><td colspan="4" style="background:#F6F8F7;font-weight:600;font-size:8pt">Act 6 &middot; Your ages &mdash; 5</td></tr>
+      <tr><td><code>ages</code></td><td>Your ages</td><td><code>trends</code> hero</td><td>The &plusmn;5 band is part of the number, not a footnote.</td></tr>
+      <tr><td><code>building</code></td><td>The first week</td><td><code>trends</code>, gated</td><td>Coverage per input, and what completes it. Back leaves the act, to <code>picture/trends</code>.</td></tr>
+      <tr><td><code>driver</code></td><td>A driver</td><td><code>ages</code> row</td><td>Signed contribution, the scale it sits on, one action, one caveat.</td></tr>
+      <tr><td><code>method</code></td><td>How it is figured</td><td><code>ages</code> footer</td><td>Readable by someone who does not trust it.</td></tr>
+      <tr><td><code>health</code></td><td>Health hub</td><td><code>you</code></td><td>Aggregates without diagnosing. Back leaves the act, to <code>plumbing/you</code>.</td></tr>
+      <tr><td colspan="4" style="background:#F6F8F7;font-weight:600;font-size:8pt">Act 7 &middot; Svea &mdash; 5</td></tr>
+      <tr><td><code>coach</code></td><td>The coach</td><td>Tab bar</td><td>The brief carries its sources as chips. Answers can hand off to Act 9.</td></tr>
+      <tr><td><code>gate</code></td><td>No provider yet</td><td><code>coach</code>, no key</td><td>Explains the bring-your-own-key position without selling. <strong>No back chevron</strong> &mdash; the way on is <code>setup</code>.</td></tr>
+      <tr><td><code>setup</code></td><td>Provider and key</td><td><code>gate</code> &middot; <code>coach</code></td><td>Per-purpose model choice, and a real test. Back goes to <code>coach</code>; the key row has <strong>no Reveal</strong>, only the last four and Replace.</td></tr>
+      <tr><td><code>consent</code></td><td>What it may read</td><td><code>setup</code> &middot; <code>coach</code></td><td>Seven grants, each with what is lost by withholding. Back goes to <code>setup</code>. <strong>Deep insights is confirmed separately</strong> before sensitive journal access is granted.</td></tr>
+      <tr><td><code>memory</code></td><td>Memory</td><td><code>coach</code></td><td>Every remembered fact is forgettable in one tap.</td></tr>
+      <tr><td colspan="4" style="background:#F6F8F7;font-weight:600;font-size:8pt">Act 8 &middot; Goals and labs &mdash; 6</td></tr>
+      <tr><td><code>goal</code></td><td>Journey</td><td>Act 8 home</td><td>Milestones as a route, with attempts allowed.</td></tr>
+      <tr><td><code>set</code></td><td>Set the goal</td><td><code>goal</code></td><td>Refuses a goal the body cannot support, and says why.</td></tr>
+      <tr><td><code>labs</code></td><td>Biomarkers</td><td><code>you</code></td><td>Reference ranges are ranges, not verdicts. A <strong>second root</strong>, not a child of <code>goal</code> &mdash; back goes to <code>plumbing/you</code>.</td></tr>
+      <tr><td><code>picker</code></td><td>Photograph a report</td><td><code>labs</code></td><td>Camera or library, and the nothing-read state.</td></tr>
+      <tr><td><code>review</code></td><td>Review a photo &middot; or by hand</td><td><code>picker</code> only</td><td>Per-row confidence, the image reviewable full screen, <em>as read</em> honesty. <strong>Fix corrects the value</strong>; Save with nothing confirmed is a no-op; the photo and draft are deleted on Save and on leaving. Reached by hand it draws <strong>no image card, no strips and no chips</strong>.</td></tr>
+      <tr><td><code>marker</code></td><td>One marker</td><td><code>labs</code> row</td><td>History of a marker, and what moves it.</td></tr>
+      <tr><td colspan="4" style="background:#F6F8F7;font-weight:600;font-size:8pt">Act 9 &middot; The instrument &mdash; 4</td></tr>
+      <tr><td><code>index</code></td><td>Ask it something</td><td>Foot of <code>trends</code></td><td>Every signal, grouped, each with its movement number. The act has no door without it.</td></tr>
+      <tr><td><code>metric</code></td><td>One signal</td><td><code>index</code> row &middot; Svea answer</td><td>Real correlations, gated, with the lag in the row.</td></tr>
+      <tr><td><code>compare</code></td><td>Two at once</td><td><code>index</code> &middot; <code>metric</code></td><td>The fit is drawn only when it clears. The shift control is the insight.</td></tr>
+      <tr><td><code>effects</code></td><td>What moves you</td><td><code>index</code></td><td>Three engines, one screen. All three refusal states designed.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">8 &middot; Per-screen QA</h2>
+
+  <p>Fourteen checks. A screen is not done until all fourteen pass, and eight of them are about sentences.</p>
+  <ol>
+    <li>Every string matches the prototype character for character &mdash; apostrophes, em dashes, minus signs.</li>
+    <li>No exclamation marks. No banned vocabulary (&sect;1).</li>
+    <li>Every number in prose comes from the same value as the number in the chart.</li>
+    <li>Each applicable state from &sect;6 renders, and was viewed on device.</li>
+    <li>The thin state keeps the row and drops the claim.</li>
+    <li>The absent state shows <code>&mdash;</code>, not <code>0</code>.</li>
+    <li>Every refusal has all three parts, and is not red.</li>
+    <li>Schedule vocabulary switches with the profile answer (&sect;4).</li>
+    <li>Tracking in points, not ems. Line spacing computed, not guessed.</li>
+    <li>Borders 0.5&nbsp;pt with <code>strokeBorder</code>; corners <code>.continuous</code>.</li>
+    <li>Every tap target &ge; 44&nbsp;pt. The range control and segmented rows included.</li>
+    <li>Dynamic Type to XXL without clipping; numerals stay tabular.</li>
+    <li>Reduce Motion honoured; no animation re-runs on a range change &mdash; values interpolate, 220&nbsp;ms.</li>
+    <li>The screen has a door from somewhere a user actually stands.</li>
+  </ol>
+
+  <h2>9 &middot; Deliberately not built</h2>
+  <table>
+    <thead><tr><th style="width:24%">Thing</th><th>Position</th></tr></thead>
+    <tbody>
+      <tr><td>A sixth tab</td><td>The bar stays at five. A tab is for a place you stand daily; nobody interrogates their data daily. Act 9 gets two doors instead. Revisit only if usage says it became the second home &mdash; that is reversible; the reverse is not.</td></tr>
+      <tr><td>Cycle phase</td><td>Engine stays dark. Revisit after launch as a context layer, not a screen, and only if real users ask.</td></tr>
+      <tr><td>Light theme</td><td>No designed values exist. Do not interpolate one.</td></tr>
+      <tr><td>Percentiles, age-group ranking, weekly scores</td><td>Every comparison in the app is you against you.</td></tr>
+      <tr><td>A verdict Noop cannot evidence</td><td>The Charge level is restated, never interpreted, unless analytics supplies the interpretation. No bucketed verdict words, no comparison to a personal norm without one, no advice about an evening. &ldquo;The evening you had planned&rdquo; is gone for good: Noop reads no calendar, so nothing could earn it back. &sect;3.</td></tr>
+      <tr><td>The nine drawer utilities</td><td>Listed, dimmed, with a <em>Later</em> chip where the chevron would be, at the foot of <code>settings</code>. Decided and not built &mdash; never a live switch with nothing behind it.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">10 &middot; The visual contract</h2>
+
+  <p><code>spec/10-tokens.md</code> and <code>swift/NoopSpecTokens.swift</code> remain the authority on the palette, the radius ladder and the tinted-card rule. <strong>But that pack predates the work in Acts 6&ndash;9, and one of its rules is now wrong.</strong> This section is the correction and the additions &mdash; every graphic, gradient, blur, curve and measurement introduced since, at the exact value.</p>
+
+  <div class="no">
+    <p style="margin:0 0 4pt"><strong>Correction to <code>10-tokens.md</code> &sect;&ldquo;The one gradient&rdquo;.</strong> It says <em>there are no other gradients in the app; if a card in the build has one, delete it.</em> That was true of Acts 1&ndash;5. It is no longer true.</p>
+    <p style="margin:0">There are now <strong>four kinds of gradient</strong>, and no others: the orb (unchanged), the body-age aura, the tinted-verdict wash, and the screen-top ambient bloom. All four are written out below. A gradient anywhere else is still a bug &mdash; and in particular <strong>cards still have none</strong>, and neither does any button, chip, row or tab bar.</p>
+  </div>
+
+  <h3>10.1 &mdash; Type: two families, and one that is not in the app</h3>
+  <table>
+    <thead><tr><th style="width:24%">Role</th><th style="width:30%">Family / weight</th><th style="width:14%">Size</th><th>Tracking (pt)</th></tr></thead>
+    <tbody>
+      <tr><td>Hero numeral</td><td>Outfit 200</td><td>52&ndash;68</td><td>&minus;1.56 at 52, &minus;3.4 at 68 (&minus;.03em / &minus;.05em)</td></tr>
+      <tr><td>Card numeral</td><td>Outfit 200&ndash;300</td><td>26&ndash;34</td><td>&minus;.03em &times; size</td></tr>
+      <tr><td>Screen title</td><td>Outfit 400</td><td>25</td><td>&minus;0.625</td></tr>
+      <tr><td>Section head</td><td>Outfit 400</td><td>19&ndash;21</td><td>&minus;0.38 to &minus;0.53</td></tr>
+      <tr><td>Row figure</td><td>Outfit 400</td><td>16&ndash;20</td><td>&minus;.02em &times; size</td></tr>
+      <tr><td>Body</td><td>Instrument Sans 400</td><td>13&ndash;14</td><td>0</td></tr>
+      <tr><td>Row label</td><td>Instrument Sans 400&ndash;600</td><td>12.5&ndash;13.5</td><td>0</td></tr>
+      <tr><td>Caption / footnote</td><td>Instrument Sans 400</td><td>11&ndash;11.5</td><td>0</td></tr>
+      <tr><td>Uppercase label</td><td>Instrument Sans 600</td><td>10</td><td><strong>+1.2</strong> (.12em)</td></tr>
+      <tr><td>Micro uppercase</td><td>Instrument Sans 600</td><td>9&ndash;9.5</td><td>+1.08 to +1.14</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Every numeral that can change is <code>tabular-nums</code>.</strong> A value that jitters horizontally as it counts is the most obvious tell in a live screen &mdash; the live session clock, the pacer, the heart rate, every chip and every axis.</p>
+  <p><strong>Instrument Serif italic is not in the app.</strong> It appears only in the prototype&rsquo;s annotation column and in these documents. If it renders on a device screen, it is a bug.</p>
+
+  <h3>10.2 &mdash; Act 9&rsquo;s colour roles</h3>
+  <table>
+    <thead><tr><th style="width:22%">Role</th><th style="width:20%">Value</th><th>Rule</th></tr></thead>
+    <tbody>
+      <tr><td>The act&rsquo;s hue</td><td><code>#8B99D6</code> (Aura <code>rest</code>)</td><td>Every value the instrument owns. Act 9 does <strong>not</strong> use the green accent for its own numbers.</td></tr>
+      <tr><td>Second series only</td><td><code>#2ECC80</code></td><td>Series B on <code>compare</code>, and the &ldquo;without it&rdquo; bar on <code>effects</code>. Nowhere else in the act.</td></tr>
+      <tr><td>Borrowed</td><td><code>#C6CEC9</code></td><td>Body grey. A borrowed numeral is grey, full stop.</td></tr>
+      <tr><td>Blending</td><td><code>#AFB9E2</code></td><td>The one interpolated colour in the app. Do not compute more steps &mdash; there are three.</td></tr>
+      <tr><td>Disagrees</td><td><code>#E9C48A</code> chip on <code>rgba(242,180,92,.14)</code></td><td>Amber is &ldquo;this went the other way&rdquo;, never alarm. Same rule as Act 4.</td></tr>
+      <tr><td>Lag chip, lagged</td><td><code>#B7C0E8</code> on <code>rgba(139,153,214,.14)</code></td><td>Same-day lag chips are grey <code>#939C97</code> on <code>white 5%</code> &mdash; the tint means &ldquo;it arrives later&rdquo;.</td></tr>
+      <tr><td>Sparkline, by state</td><td>grey <code>#7F8A85</code> / thin <code>#4A5450</code> / lavender / green / amber</td><td>The stroke colour <strong>is</strong> the verdict. Do not colour all sparklines alike; do not colour a flat one.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>10.3 &mdash; The gradients, exactly</h3>
+  <p><strong>There is no &ldquo;only four gradients&rdquo; rule, and this heading used to assert one.</strong> The canonical HTML uses gradients in six named places and shadows in nine, and the registry is <code>spec/10-tokens.md</code> &sect;<em>Gradients and shadows, as built</em> &mdash; ambient hero glow, the orb&rsquo;s layers, the 158&deg; directional accent card, chart band fills, the coach/lavender treatment and the file preview. Do not go through the app deleting gradients. What is true is narrower: the <em>standard card</em> primitive has no gradient and no shadow. The four below are the four this document draws at full length; they are not the four the app is allowed.</p>
+  <h4>a &middot; The orb</h4>
+  <p>Unchanged from <code>10-tokens.md</code>. Reuse <code>AuraBodyState.restored.orbStops</code>.</p>
+
+  <h4>b &middot; The body-age aura (Act 4 hero, Act 6 <code>ages</code>)</h4>
+  <p>Four stacked layers, all <code>pointer-events: none</code>, centred in a 246 pt box:</p>
+  <pre><code>1 glow    296×296  radial(circle, rgba(46,204,128,.30), rgba(46,204,128,0) 62%)
+          blur 16   animation: agePulse 8s ease-in-out infinite
+2 body    226×226  radial(circle at 50% 50%,
+            #080B0A 0%, #080B0A 33%, rgba(46,204,128,.09) 41%,
+            rgba(46,204,128,.34) 54%, rgba(48,206,132,.78) 70%,
+            rgba(158,240,204,.42) 85%, rgba(46,204,128,.10) 95%,
+            rgba(46,204,128,0) 100%)
+          blur 5    radius 63% 37% 45% 55% / 52% 61% 39% 48%
+          animation: ageMorph 22s ease-in-out infinite
+3 counter 238×238  radial(circle at 50% 50%, rgba(8,11,10,0) 48%,
+            rgba(46,204,128,.13) 64%, rgba(150,240,200,.17) 80%,
+            rgba(46,204,128,0) 96%)
+          blur 10   radius 41% 59% 57% 43% / 57% 43% 57% 43%
+          animation: ageMorph 31s ease-in-out infinite reverse
+4 specks  224×224  76 dots on a golden-angle spiral (2.39996 rad step),
+          radius 0.56–1.02 of half-box, size 1.2–7.2, 14% of them "big"
+          fill rgba(216,255,236, .16–.70)
+          shadow 0 0 (size×2.6, big ×4.2) rgba(104,230,164, .5–.8)
+          animation: ageSpin 52s linear infinite</code></pre>
+  <p><strong>The pace wash</strong> is layer 2 repeated with the heat colour and the same morph, opacity scaled by <code>heat</code>. <code>heat = clamp((pace − 1) / 1.1, 0, 1)</code>; the ramp is green <code>46,204,128</code> &rarr; amber <code>242,180,92</code> over the first 55 % of heat, then amber &rarr; clay <code>198,104,72</code>. At <code>heat &lt; 0.02</code> the wash is <code>display:none</code> &mdash; not zero opacity.</p>
+  <p>The alternative <em>pour</em> treatment (prop <code>ageGraphic: pour</code>) is a deterministic SVG: 34 wedges, 16 quadratic veins, 78 cells, blurred 4 / 1.1 / 0, over an 11-stop green ramp, with a radial core mask that darkens the centre and the rim. It is a review option, not a second design &mdash; ship <code>aura</code> unless told otherwise.</p>
+
+  <h4>c &middot; The tinted-verdict wash</h4>
+  <pre><code>linear-gradient(158deg, tint(hue, .16), rgba(46,204,128,.03))
+border .5 pt  tintBorder(hue, .30)     radius 24
+</code></pre>
+  <p>Used on exactly three things: Act 4&rsquo;s window verdict, Act 9&rsquo;s fit card when the fit clears, and Act 8&rsquo;s reached-milestone card. <strong>158&deg;, not 160&deg; and not 180&deg;</strong> &mdash; it is the one directional gradient in the app and the angle is shared so the three read as one family. When the state does not clear, the card loses the gradient entirely and becomes a plain <code>#141817</code> card with a <code>white 8%</code> border. That swap is the honesty gate made visible.</p>
+
+  <h4>d &middot; The screen-top ambient bloom</h4>
+  <pre><code>position absolute; top −150; left 50%; translateX(−50%)
+470 × 410  radius 50%
+radial(circle, rgba(HUE,.15–.16), rgba(HUE,0) 70%)   blur 18
+</code></pre>
+  <p>One per screen root, in the act&rsquo;s hue: green in Acts 1&ndash;6, lavender in Acts 7 and 9. It is behind everything and it never animates. It is the reason the top of a screen does not look like a black rectangle, and builds that omit it look flat in a way reviewers describe as &ldquo;cheap&rdquo; without being able to name.</p>
+
+  <h3>10.4 &mdash; Motion: every animation in the app</h3>
+  <table>
+    <thead><tr><th style="width:20%">What</th><th style="width:26%">Keyframes</th><th style="width:22%">Duration / easing</th><th>Reduce Motion</th></tr></thead>
+    <tbody>
+      <tr><td>Screen arrival</td><td>opacity 0&rarr;1, translateY 9&rarr;0</td><td>300 ms <code>cubic-bezier(.22,.61,.36,1)</code></td><td>Opacity only, 200 ms</td></tr>
+      <tr><td>Sheet up</td><td>translateY 102%&rarr;0</td><td>300 ms same curve</td><td>Cross-fade, no translate</td></tr>
+      <tr><td>Scrim in</td><td>opacity 0&rarr;1</td><td>220 ms ease</td><td>Keep</td></tr>
+      <tr><td>Aura morph</td><td>radius + rotate + scale, 3 stops</td><td>22 s / 31 s ease-in-out, infinite</td><td><strong>Freeze at 0 %</strong> &mdash; the shape is part of the design, the motion is not</td></tr>
+      <tr><td>Aura pulse</td><td>opacity .72&rarr;1&rarr;.72</td><td>8 s ease-in-out, infinite</td><td>Freeze at 1</td></tr>
+      <tr><td>Aura spin</td><td>rotate 0&rarr;360</td><td>52 s linear, infinite</td><td>Freeze</td></tr>
+      <tr><td>Segment / chip select</td><td>background, border-color, color</td><td>180 ms ease</td><td>Keep &mdash; it is a state change, not decoration</td></tr>
+      <tr><td>Range change</td><td>chart values interpolate</td><td><strong>220 ms</strong>, never a rebuild from zero</td><td>Snap</td></tr>
+      <tr><td>Svea caret</td><td>opacity step</td><td>1 s <code>step-end</code>, infinite</td><td>Static caret</td></tr>
+      <tr><td>Breathe pacer</td><td>scale + opacity on the pace ring</td><td>Driven by the protocol&rsquo;s own timing, linear</td><td>Ring still moves &mdash; it <em>is</em> the instruction. Drop the glow only.</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Nothing else animates.</strong> No card entrance staggers, no number count-ups, no spring on tap, no shimmer on load. A number that counts up from zero is a lie about a measurement that was already taken.</p>
+
+  <h3>10.5 &mdash; Recurring geometry</h3>
+  <table>
+    <thead><tr><th style="width:38%">Element</th><th>Values</th></tr></thead>
+    <tbody>
+      <tr><td>Screen side padding</td><td>20 pt content, 18 pt on a back-header row</td></tr>
+      <tr><td>Header top padding</td><td>56 pt with a back row, 58 pt on an act home</td></tr>
+      <tr><td>Scroll bottom padding</td><td><strong>116 pt</strong> &mdash; clears the tab bar. 206 pt on <code>coach</code>, which has a composer.</td></tr>
+      <tr><td>Card</td><td><code>#141817</code>, border .5 pt <code>white 6%</code>, radius 22, padding 16 (15&ndash;19 by density)</td></tr>
+      <tr><td>List card</td><td>Same, padding <code>2px 15px</code> or <code>6px 16px</code>; rows carry their own height</td></tr>
+      <tr><td>Row min-height</td><td>50 compact &middot; 54 sheet &middot; 56 settings &middot; 60 link &middot; 68 signal-with-sparkline</td></tr>
+      <tr><td>Row hairline</td><td>.5 pt <code>white 5.5%</code>, <strong>and <code>none</code> on the first row</strong> &mdash; a line directly under a card edge is a defect</td></tr>
+      <tr><td>Inner card (nested)</td><td>radius 20, <code>#141817</code> on a tinted parent, or <code>rgba(10,12,11,.55)</code> inside a tint</td></tr>
+      <tr><td>Card gap in a stack</td><td>9 pt within a group, 14 pt between groups</td></tr>
+      <tr><td>Segmented control</td><td>Track radius 15, padding 3; segment radius 12, 11 pt vertical padding. Total <strong>&ge; 44 pt</strong>.</td></tr>
+      <tr><td>Chip</td><td>Radius 11, padding <code>7&ndash;8 &times; 12&ndash;13</code>, .5 pt border</td></tr>
+      <tr><td>Back chevron</td><td>34 circle, <code>white 6%</code>, border <code>white 9%</code>; glyph 9 pt, 1.6 pt stroke, rotated 45&deg;</td></tr>
+      <tr><td>Row chevron</td><td>7&ndash;8 pt, 1.5&ndash;1.6 pt stroke, <code>#57605C</code></td></tr>
+      <tr><td>Tab bar</td><td>Radius 26, padding 6, fill <code>rgba(23,28,26,.82)</code>, blur 20, border .5 pt <code>white 9%</code>, shadow <code>0 8 26 rgba(0,0,0,.5)</code>; items 46 tall radius 20; centre button 44 circle <code>#17A2E6</code>, shadow <code>0 4 14 rgba(23,162,230,.4)</code>; bottom inset 26</td></tr>
+      <tr><td>Live session bar</td><td>Bottom 90, height 46, radius 16, <code>rgba(23,28,26,.94)</code>, blur 20, border .5 pt <code>rgba(242,180,92,.34)</code></td></tr>
+      <tr><td>Sheet</td><td>Radius <code>28 28 0 0</code>, max-height 74&ndash;76 %, grabber 38 &times; 4 at <code>white 16%</code>, shadow <code>0 −14 44 rgba(0,0,0,.6)</code>, scrim <code>rgba(4,6,5,.66)</code> + blur 3</td></tr>
+      <tr><td>Chart boxes</td><td>300 &times; 118 capacity &middot; 300 &times; 112 rhythm &middot; 300 &times; 122 dossier &middot; 300 &times; 130 overlay &middot; sparkline 108 &times; 34 (Act 4) and 86 &times; 26 (Act 9 rows)</td></tr>
+      <tr><td>Chart strokes</td><td>Line 2&ndash;2.2 pt, <code>round</code> cap and join; last-point dot 2.4&ndash;4 r; area fill hue at 11&ndash;13 %; dashed fit <code>4 5</code> at <code>rgba(237,241,239,.42)</code>; dashed series B <code>5 4</code>; need-line <code>3 4</code> at <code>rgba(237,241,239,.3)</code></td></tr>
+      <tr><td>Bars and tracks</td><td>Track height 5&ndash;8, radius 3&ndash;5, <code>white 6&ndash;7%</code>; fill radius 3&ndash;4 in the hue</td></tr>
+      <tr><td>Lag slot dots</td><td>Filled 9 pt in hue + <code>0 0 10 rgba(139,153,214,.6)</code>; hollow 7 pt, 1.2 pt border, <code>white 22%</code> passed / <code>white 13%</code> future</td></tr>
+    </tbody>
+  </table>
+
+  <h3>10.6 &mdash; Icons</h3>
+  <p>Every icon in the app is a <strong>monochrome mask</strong>, not an image and not a multicolour SVG. One 24&times;24 box, <code>fill: none</code>, <code>stroke-width: 1.7</code>, round cap and join, and the colour comes from the mask&rsquo;s background &mdash; which is how the same glyph is amber in one row and grey in another.</p>
+  <pre><code>size    17 in a list row · 18–20 in a link row · 19 in the tab bar · 21 centre button
+colour  the row's own semantic colour, never a fixed icon grey
+</code></pre>
+  <p>In SwiftUI this is a <code>Path</code> in a 24-unit space with <code>.stroke(style: .init(lineWidth: 1.7, lineCap: .round, lineJoin: .round))</code>, scaled with <code>.scaledToFit()</code>, tinted by <code>.foregroundStyle</code>. Do not substitute SF Symbols: the weights do not match at these sizes and the app&rsquo;s glyph set is deliberately thinner than SF Symbols&rsquo; <code>.light</code>.</p>
+
+  <h3>10.7 &mdash; The eight visual traps</h3>
+  <ol>
+    <li><strong>A shadow on a card.</strong> Cards have none. <code>NoopPanelSurface</code> adds one by default &mdash; use <code>NoopSpecCard</code>.</li>
+    <li><strong>A gradient on a card, button or chip.</strong> Only the four in &sect;10.3.</li>
+    <li><strong><code>.stroke</code> instead of <code>.strokeBorder</code>.</strong> Half the line renders outside the shape, the radius visibly grows, and every edge in the app goes soft at once.</li>
+    <li><strong><code>.circular</code> corners.</strong> The default. At radius 22&ndash;26 the difference is plain.</li>
+    <li><strong>Tracking in ems.</strong> <code>.tracking()</code> takes points. This is the single largest source of drift.</li>
+    <li><strong>Uniform sparkline colour.</strong> The stroke carries the verdict; a screen of identically-coloured sparklines has thrown away the information.</li>
+    <li><strong>Dimming a whole row to show &ldquo;unavailable&rdquo;.</strong> The app dims the <em>control</em> to 38 % and leaves the text legible. A greyed row reads as broken; a dimmed segment reads as not-yet.</li>
+    <li><strong>Rounding a blur or an opacity.</strong> <code>blur 4.5</code> is not <code>blur 5</code> at these sizes, and <code>.055</code> is not <code>.06</code> on a hairline that runs the width of the screen.</li>
+  </ol>
+
+  <div class="yes">
+    <p style="margin:0"><strong>How to check yourself.</strong> Put the prototype and the build side by side at 402 pt, screenshot both, and difference the images. Everything in &sect;10 was chosen so that a correct build differences to near-black. If a region lights up, the value is in this section &mdash; look it up rather than nudging until it looks close, because &ldquo;looks close&rdquo; is how a build accumulates the twenty small wrongnesses that add up to a cheaper-feeling product.</p>
+  </div>
+
+  <blockquote>Where this document and the prototype disagree on a number, the prototype is right and this has a typo. Where they disagree on a sentence, the prototype is right and it is not a typo &mdash; it is the product.</blockquote>
+
+</doc-page>
+</x-dc>
+</body>
+</html>

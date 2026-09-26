@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+<template id="__bundler_thumbnail" data-bg-color="#0A0C0B">
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="800" fill="#0A0C0B"/>
+<defs><radialGradient id="o" cx="36%" cy="30%"><stop offset="0" stop-color="#8FEFC0"/><stop offset=".62" stop-color="#2ecc80"/><stop offset="1" stop-color="#137A50"/></radialGradient></defs>
+<circle cx="600" cy="400" r="150" fill="none" stroke="rgba(46,204,128,.5)" stroke-width="3"/>
+<circle cx="600" cy="400" r="112" fill="url(#o)"/>
+</svg>
+</template>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ageMorph{0%,100%{border-radius:63% 37% 45% 55%/52% 61% 39% 48%;transform:rotate(0deg) scale(1)}33%{border-radius:40% 60% 62% 38%/58% 42% 58% 42%;transform:rotate(6deg) scale(1.03)}66%{border-radius:55% 45% 38% 62%/41% 60% 40% 59%;transform:rotate(-5deg) scale(.98)}}
+@keyframes agePulse{0%,100%{opacity:.72}50%{opacity:1}}
+@keyframes ageSpin{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+@keyframes sheetUp{from{transform:translateY(102%)}to{transform:translateY(0)}}
+@keyframes scrimIn{from{opacity:0}to{opacity:1}}
+.scr{animation:fadeUp .3s cubic-bezier(.22,.61,.36,1) both}
+.hb::-webkit-scrollbar{width:0;height:0}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+
+<div style="display:flex;gap:60px;align-items:flex-start;padding:52px 48px 100px">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:16px">
+  <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">ACT 4</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">The bigger picture — working prototype</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">am I actually getting better at this</span>
+  </div>
+  </sc-if>
+
+  <div style="border-radius:48px;overflow:hidden;flex:none">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+    <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-150px;left:50%;transform:translateX(-50%);width:470px;height:410px;border-radius:50%;background:radial-gradient(circle,rgba(46,204,128,.15),rgba(46,204,128,0) 70%);filter:blur(18px);pointer-events:none"></div>
+
+      <div class="hb" onPointerDown="{{ swipeStart }}" onPointerUp="{{ swipeEnd }}" style="position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain">
+
+        <sc-if value="{{ isTrends }}" hint-placeholder-val="{{ true }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:58px 20px 4px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span style="font-size:13.5px;color:#939C97">{{ spanLabel }}</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:400;letter-spacing:-.02em;line-height:1.15">Trends</span>
+            </div>
+            <div onClick="{{ goStrapPage }}" style="{{ battChip }}">
+                <div style="display:flex;align-items:center;gap:1px;flex:none">
+                  <div style="{{ battBody }}"><div style="{{ battFill }}"></div></div>
+                  <span style="{{ battNub }}"></span>
+                </div>
+                <span style="{{ battLabel }}">{{ battPct }}</span>
+              </div>
+          </div>
+
+          <div onClick="{{ goAges }}" style="padding:10px 20px 0;cursor:pointer">
+            <div style="position:relative;display:flex;flex-direction:column;gap:2px">
+
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8B958F;font-weight:600">Body age</span>
+                <span style="font-size:10.5px;color:#57605C">next update Saturday</span>
+              </div>
+
+              <div style="position:relative;height:246px;display:flex;align-items:center;justify-content:center">
+                <sc-if value="{{ isPour }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(93,204,70,.26),rgba(158,224,74,.10) 46%,rgba(93,204,70,0) 68%);filter:blur(18px);animation:agePulse 8s ease-in-out infinite;pointer-events:none"></div>
+                <div style="position:absolute;width:242px;height:242px;overflow:hidden;border-radius:63% 37% 45% 55%/52% 61% 39% 48%;animation:ageMorph 26s ease-in-out infinite;pointer-events:none">
+                  <svg viewBox="0 0 240 240" style="display:block;width:242px;height:242px">
+                    <g style="filter:blur(4px)">
+                      <sc-for list="{{ pourWedges }}" as="w" hint-placeholder-count="34">
+                        <path d="{{ w.d }}" fill="{{ w.c }}" opacity="{{ w.o }}"></path>
+                      </sc-for>
+                    </g>
+                    <g style="filter:blur(1.1px)">
+                      <sc-for list="{{ pourVeins }}" as="v" hint-placeholder-count="16">
+                        <path d="{{ v.d }}" fill="none" stroke="{{ v.c }}" stroke-width="{{ v.w }}" opacity="{{ v.o }}" stroke-linecap="round"></path>
+                      </sc-for>
+                    </g>
+                    <g>
+                      <sc-for list="{{ pourCells }}" as="c" hint-placeholder-count="70">
+                        <circle cx="{{ c.x }}" cy="{{ c.y }}" r="{{ c.r }}" fill="{{ c.f }}" opacity="{{ c.o }}"></circle>
+                      </sc-for>
+                    </g>
+                    <circle cx="120" cy="120" r="120" fill="url(#pourCore)"></circle>
+                    <defs>
+                      <radialGradient id="pourCore">
+                        <stop offset="0" stop-color="#050806" stop-opacity=".95"></stop>
+                        <stop offset=".3" stop-color="#050806" stop-opacity=".5"></stop>
+                        <stop offset=".5" stop-color="#050806" stop-opacity="0"></stop>
+                        <stop offset=".9" stop-color="#050806" stop-opacity=".3"></stop>
+                        <stop offset="1" stop-color="#050806" stop-opacity=".85"></stop>
+                      </radialGradient>
+                    </defs>
+                  </svg>
+                </div>
+                </sc-if>
+                <sc-if value="{{ isAura }}" hint-placeholder-val="{{ true }}">
+                <div style="position:absolute;width:296px;height:296px;border-radius:50%;background:radial-gradient(circle,rgba(46,204,128,.30),rgba(46,204,128,0) 62%);filter:blur(16px);animation:agePulse 8s ease-in-out infinite;pointer-events:none"></div>
+                <div style="position:absolute;width:226px;height:226px;border-radius:63% 37% 45% 55%/52% 61% 39% 48%;background:radial-gradient(circle at 50% 50%,#080B0A 0%,#080B0A 33%,rgba(46,204,128,.09) 41%,rgba(46,204,128,.34) 54%,rgba(48,206,132,.78) 70%,rgba(158,240,204,.42) 85%,rgba(46,204,128,.10) 95%,rgba(46,204,128,0) 100%);filter:blur(5px);animation:ageMorph 22s ease-in-out infinite;pointer-events:none"></div>
+                <div style="position:absolute;width:238px;height:238px;border-radius:41% 59% 57% 43%/57% 43% 57% 43%;background:radial-gradient(circle at 50% 50%,rgba(8,11,10,0) 48%,rgba(46,204,128,.13) 64%,rgba(150,240,200,.17) 80%,rgba(46,204,128,0) 96%);filter:blur(10px);animation:ageMorph 31s ease-in-out infinite reverse;pointer-events:none"></div>
+                </sc-if>
+                <div style="{{ paceWash }}"></div>
+                <div style="position:absolute;left:50%;top:50%;width:224px;height:224px;transform:translate(-50%,-50%);animation:ageSpin 52s linear infinite;pointer-events:none">
+                  <sc-for list="{{ ageSpecks }}" as="p" hint-placeholder-count="40">
+                    <div style="{{ p.s }}"></div>
+                  </sc-for>
+                </div>
+                <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+                  <span style="font-family:'Outfit',sans-serif;font-size:68px;font-weight:200;letter-spacing:-.05em;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 26px rgba(0,0,0,.6)">{{ ageNum }}</span>
+                  <span style="font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#93A0A6;font-weight:600;padding-top:7px">Body age</span>
+                  <span style="{{ ageDeltaStyle }}">{{ ageDelta }}</span>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:9px;padding-top:4px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                  <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8B958F;font-weight:600">Pace of aging</span>
+                  <span style="{{ paceChipStyle }}">{{ paceChip }}</span>
+                </div>
+                <div style="position:relative;padding-top:24px">
+                  <span style="{{ paceValStyle }}">{{ paceVal }}</span>
+                  <div style="display:flex;align-items:flex-end;gap:2px;height:28px">
+                    <sc-for list="{{ paceTicks }}" as="t" hint-placeholder-count="47">
+                      <div style="{{ t.s }}"></div>
+                    </sc-for>
+                  </div>
+                  <div style="{{ paceMark }}"></div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                  <span style="font-size:10.5px;color:#57605C;font-variant-numeric:tabular-nums">−1.0×</span>
+                  <span style="font-size:10.5px;color:#57605C">1.0× = aging in real time</span>
+                  <span style="font-size:10.5px;color:#57605C;font-variant-numeric:tabular-nums">3.0×</span>
+                </div>
+                <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ paceNote }}</span>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:10px;margin-top:13px;padding:14px 16px;border-radius:20px;background:#141817;border:.5px solid rgba(255,255,255,.06)">
+                <span style="flex:1;font-size:12.5px;color:#C6CEC9">Your ages — five drivers, the ±5 band, and how it is figured</span>
+                <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #8FEFC0;border-right:1.6px solid #8FEFC0;transform:rotate(45deg)"></span>
+              </div>
+
+            </div>
+          </div>
+
+          <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:9px">
+
+            <div style="display:flex;gap:4px;padding:4px;border-radius:15px;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.07)">
+              <sc-for list="{{ periods }}" as="p" hint-placeholder-count="3">
+                <div onClick="{{ p.pick }}" style="{{ p.box }}">
+                  <span style="{{ p.label }}">{{ p.k }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="{{ verdictCard }}">
+              <span style="{{ verdictKicker }}">{{ verdictKick }}</span>
+              <span style="font-family:'Outfit',sans-serif;font-size:32px;font-weight:300;letter-spacing:-.032em;line-height:1.08">{{ verdictHead }}</span>
+              <span style="font-size:13.5px;line-height:1.6;color:#B4C9BE;text-wrap:pretty">{{ verdictBody }}</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ trendRows }}" as="r" hint-placeholder-count="4">
+                <div style="{{ r.card }}">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                    <div style="display:flex;flex-direction:column;gap:3px">
+                      <span style="font-size:13px;color:#C6CEC9">{{ r.name }}</span>
+                      <div style="display:flex;align-items:baseline;gap:5px">
+                        <span style="font-family:'Outfit',sans-serif;font-size:26px;font-weight:300;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums">{{ r.now }}</span>
+                        <span style="font-size:11px;color:#6C7570">{{ r.unit }}</span>
+                      </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+                      <span style="{{ r.chip }}">{{ r.delta }}</span>
+                      <svg viewBox="0 0 108 34" style="width:108px;height:34px;overflow:visible">
+                        <polyline points="{{ r.spark }}" fill="none" stroke="{{ r.stroke }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                        <circle cx="{{ r.dotX }}" cy="{{ r.dotY }}" r="2.8" fill="{{ r.stroke }}"></circle>
+                      </svg>
+                    </div>
+                  </div>
+                  <span style="{{ r.readStyle }}">{{ r.read }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Showing up</span>
+                <span style="font-size:11px;color:#57605C;font-variant-numeric:tabular-nums">{{ gridSpan }}</span>
+              </div>
+              <div style="display:flex;gap:4px">
+                <sc-for list="{{ gridCols }}" as="c" hint-placeholder-count="12">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                    <sc-for list="{{ c.cells }}" as="d" hint-placeholder-count="7">
+                      <div style="{{ d.s }}"></div>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:12px">
+                <sc-for list="{{ gridKey }}" as="k" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="{{ k.sw }}"></span>
+                    <span style="font-size:11px;color:#7F8A85">{{ k.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ gridRead }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+              <sc-for list="{{ links }}" as="l" hint-placeholder-count="2">
+                <div onClick="{{ l.go }}" style="{{ l.row }}">
+                  <span style="{{ l.icon }}"></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13.5px;color:#EDF1EF">{{ l.k }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85">{{ l.sub }}</span>
+                  </div>
+                  <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+                </div>
+              </sc-for>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#57605C;padding:0 2px;text-wrap:pretty">Four lines and a grid. Noop will not show you a trend it cannot defend — on a short window it says so instead of drawing an arrow.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isCapacity }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goTrends }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Trends</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Capacity</span>
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="font-family:'Outfit',sans-serif;font-size:54px;font-weight:200;letter-spacing:-.045em;line-height:1;font-variant-numeric:tabular-nums">{{ capNow }}</span>
+                <span style="font-size:13px;color:#939C97">ml/kg/min, estimated</span>
+              </div>
+              <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ capRead }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 13px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ spanLabel }}</span>
+                <span style="{{ capChip }}">{{ capDelta }}</span>
+              </div>
+              <svg viewBox="0 0 300 118" style="width:100%;height:118px;overflow:visible">
+                <path d="{{ capArea }}" fill="rgba(46,204,128,.11)"></path>
+                <polyline points="{{ capLine }}" fill="none" stroke="#2ECC80" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                <circle cx="{{ capDotX }}" cy="{{ capDotY }}" r="4" fill="#2ECC80"></circle>
+              </svg>
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#57605C">
+                <sc-for list="{{ capAxis }}" as="a" hint-placeholder-count="4">
+                  <span>{{ a.label }}</span>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:13px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">What moved it</span>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <sc-for list="{{ capFactors }}" as="f" hint-placeholder-count="3">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                      <span style="font-size:13px;color:#EDF1EF">{{ f.k }}</span>
+                      <span style="font-size:12px;color:#939C97;font-variant-numeric:tabular-nums">{{ f.v }}</span>
+                    </div>
+                    <div style="height:6px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden">
+                      <div style="{{ f.bar }}"></div>
+                    </div>
+                    <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ f.note }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px;padding:16px;border-radius:22px;background:rgba(46,204,128,.07);border:.5px solid rgba(46,204,128,.2)">
+              <span style="font-size:13.5px;font-weight:600;color:#EDF1EF">What would move it next</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#B4C9BE;text-wrap:pretty">One session a week with real intensity, on a day your readiness allows it. Everything else you are already doing. Noop will offer it when the morning agrees — it will not put it in a plan you then have to obey.</span>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#57605C;padding:0 2px;text-wrap:pretty">Estimated from resting pulse, recovery after effort and the pace you hold at a given heart rate. It is a direction with an error bar, not a laboratory figure.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isRhythm }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goTrends }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Trends</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">Rhythm</span>
+              <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ rhythmRead }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 16px 13px;display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ t.sleepTitle }}</span>
+                <span style="font-size:11px;color:#57605C;font-variant-numeric:tabular-nums">need 7h 12m</span>
+              </div>
+              <svg viewBox="0 0 300 112" style="width:100%;height:112px;overflow:visible">
+                <line x1="0" y1="{{ needY }}" x2="300" y2="{{ needY }}" stroke="rgba(237,241,239,.3)" stroke-width="1" stroke-dasharray="3 4"></line>
+                <polyline points="{{ sleepLine }}" fill="none" stroke="#8B99D6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              </svg>
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#57605C">
+                <sc-for list="{{ capAxis }}" as="a" hint-placeholder-count="4">
+                  <span>{{ a.label }}</span>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">Dashes are your need. You have been over it more weeks than under it since April, which is the whole reason the other three lines moved.</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">{{ t.consistencyTitle }}</span>
+              <div style="display:flex;align-items:flex-end;gap:3px;height:76px">
+                <sc-for list="{{ bedBars }}" as="b" hint-placeholder-count="26">
+                  <div style="{{ b.s }}"></div>
+                </sc-for>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#57605C">
+                <sc-for list="{{ capAxis }}" as="a" hint-placeholder-count="4">
+                  <span>{{ a.label }}</span>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ t.consistencyRead }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:6px 16px">
+              <sc-for list="{{ rhythmRows }}" as="r" hint-placeholder-count="4">
+                <div style="{{ r.row }}">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:13px;color:#EDF1EF">{{ r.k }}</span>
+                    <span style="font-size:11.5px;color:#7F8A85">{{ r.sub }}</span>
+                  </div>
+                  <span style="{{ r.val }}">{{ r.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#57605C;padding:0 2px;text-wrap:pretty">Regularity beats duration in the long run. It is the one thing on this screen you can decide tonight.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isYear }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 8px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goTrends }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Trends</span>
+          </div>
+
+          <div style="padding:8px 20px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">The year so far</span>
+              <span style="font-size:13.5px;line-height:1.6;color:#939C97;text-wrap:pretty">Eight months in four chapters, written the way you would tell it to someone — not as a chart you have to interpret.</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ chapters }}" as="c" hint-placeholder-count="4">
+                <div style="{{ c.card }}">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                    <span style="{{ c.kicker }}">{{ c.when }}</span>
+                    <span style="font-size:11px;color:#57605C;font-variant-numeric:tabular-nums">{{ c.stat }}</span>
+                  </div>
+                  <span style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:400;letter-spacing:-.02em;line-height:1.2">{{ c.title }}</span>
+                  <span style="font-size:12.5px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ c.body }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:13px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6C7570;font-weight:600">Firsts</span>
+              <div style="display:flex;flex-direction:column;gap:11px">
+                <sc-for list="{{ firsts }}" as="f" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:flex-start;gap:11px">
+                    <span style="{{ f.icon }}"></span>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                      <span style="font-size:13px;color:#EDF1EF">{{ f.k }}</span>
+                      <span style="font-size:11.5px;color:#7F8A85">{{ f.sub }}</span>
+                    </div>
+                    <span style="font-size:11.5px;color:#57605C;flex:none;font-variant-numeric:tabular-nums">{{ f.when }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px;padding:16px;border-radius:22px;background:rgba(139,153,214,.08);border:.5px solid rgba(139,153,214,.2)">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#C9D0EE;font-weight:600">Svea</span>
+              <sc-if value="{{ isDaySched }}" hint-placeholder-val="{{ true }}">
+              <span style="font-size:14px;line-height:1.68;color:#DCE3E0;text-wrap:pretty">Nothing here happened because of a hard week. It happened because you went to bed at roughly the same hour for four months and walked most days. The interesting part is that your body is now good enough at recovering that it can take the harder sessions you have been avoiding.</span>
+              </sc-if>
+              <sc-if value="{{ isNightSched }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:14px;line-height:1.68;color:#DCE3E0;text-wrap:pretty">Nothing here happened because of a hard week. It happened because you held your anchor for four months — through three roster changes — and walked most days. The interesting part is that your body is now good enough at recovering that it can take the harder sessions you have been avoiding.</span>
+              </sc-if>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#57605C;padding:0 2px;text-wrap:pretty">No year-in-review confetti, no personal bests you did not try for. A chapter only appears once there is enough of it to be true.</span>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <sc-if value="{{ showLogs }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:flex-end">
+        <div onClick="{{ closeLogs }}" style="position:absolute;inset:0;background:rgba(4,6,5,.66);backdrop-filter:blur(3px);animation:scrimIn .22s ease both"></div>
+        <div style="position:relative;max-height:74%;display:flex;flex-direction:column;background:#141817;border-top:.5px solid rgba(255,255,255,.09);border-radius:28px 28px 0 0;animation:sheetUp .3s cubic-bezier(.22,.61,.36,1) both;box-shadow:0 -14px 44px rgba(0,0,0,.6)">
+          <div style="flex:none;padding:12px 18px 10px;display:flex;flex-direction:column;gap:11px">
+            <span style="width:38px;height:4px;border-radius:3px;background:rgba(255,255,255,.16);align-self:center"></span>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                <span style="font-family:'Outfit',sans-serif;font-size:21px;font-weight:400;letter-spacing:-.025em">Everything you logged</span>
+                <span style="font-size:11.5px;color:#7F8A85">{{ logSummary }}</span>
+              </div>
+              <div onClick="{{ closeLogs }}" style="width:32px;height:32px;flex:none;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="{{ icoClose }}"></span>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ logFilters }}" as="f" hint-placeholder-count="4">
+                <div onClick="{{ f.pick }}" style="{{ f.box }}"><span style="{{ f.label }}">{{ f.k }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="hb" style="flex:1;overflow-y:auto;padding:0 18px 6px;display:flex;flex-direction:column;gap:14px">
+            <sc-for list="{{ logDays }}" as="d" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:0 2px">
+                  <span style="font-size:11.5px;font-weight:600;color:#C6CEC9">{{ d.label }}</span>
+                  <span style="font-size:10.5px;color:#57605C">{{ d.sum }}</span>
+                </div>
+                <div style="background:rgba(255,255,255,.035);border:.5px solid rgba(255,255,255,.06);border-radius:18px;padding:2px 14px">
+                  <sc-for list="{{ d.items }}" as="i" hint-placeholder-count="3">
+                    <div style="{{ i.row }}">
+                      <span style="{{ i.icon }}"></span>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:1px;min-width:0">
+                        <span style="{{ i.nameStyle }}">{{ i.name }}</span>
+                        <span style="font-size:10.5px;color:#7F8A85">{{ i.sub }}</span>
+                      </div>
+                      <span style="{{ i.figStyle }}">{{ i.fig }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex:none;padding:10px 18px 28px">
+            <div onClick="{{ goHistory }}" style="height:48px;border-radius:16px;background:rgba(46,204,128,.12);border:.5px solid rgba(46,204,128,.3);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer">
+              <span style="font-size:13.5px;font-weight:600;color:#8FEFC0">Open the full list</span>
+              <span style="display:block;flex:none;width:7px;height:7px;border-top:1.6px solid #8FEFC0;border-right:1.6px solid #8FEFC0;transform:rotate(45deg)"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none;z-index:6">
+        <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5);pointer-events:auto">
+          <div onClick="{{ tabToday }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoToday }}"></span>
+          </div>
+          <div onClick="{{ goTrends }}" style="flex:1.7;height:46px;border-radius:20px;background:#2ECC80;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer">
+            <span style="{{ icoTrendsOn }}"></span>
+            <span style="font-size:12.5px;font-weight:600;color:#04140C">Trends</span>
+          </div>
+          <div onClick="{{ openLogs }}" style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(23,162,230,.4);cursor:pointer">
+            <span style="{{ icoLogged }}"></span>
+          </div>
+          <div onClick="{{ tabRest }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoRest }}"></span>
+          </div>
+          <div onClick="{{ tabYou }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoYou }}"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </x-import>
+  </div>
+</div>
+
+<sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+<div style="width:430px;flex:none;padding-top:34px;display:flex;flex-direction:column;gap:30px">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:33px;line-height:1.16;letter-spacing:-.028em;color:#17150F;text-wrap:pretty">The one thing you cannot see from inside your own week.</h1>
+    <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;text-wrap:pretty">Act 4 answers a single question — <strong style="font-weight:600;color:#17150F">am I getting better at this</strong> — and the answer changes with the window you ask it in. Six weeks is noise and the app says so. Six months is a trend. A year is a story, so it gets told as one.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0">
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T1 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The window decides the verdict</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Tap between six weeks, six months and the year. On the short window the headline reads <em style="font-family:'Instrument Serif',serif;font-style:italic">too early to say</em> and the rows call themselves noise — the same data, honestly labelled. This is the whole design idea of the act.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T2 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Four lines, each with its own verdict</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Resting pulse, variability, sleep and capacity — value now, change over the window, a sparkline, and one sentence saying whether it means anything. Amber is used for “this went the wrong way”, never for alarm.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T3 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Showing up, as a grid</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">One dot per day: slept and worn, moved, or missing. It is the only place the app counts anything, and it counts attendance rather than achievement — the honest predictor of every other line on the screen.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T4 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Capacity — with its error bar admitted</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">The estimate, its curve, the three things that actually moved it with weights, and one line on what would move it next. It ends by telling you it is an estimate, because it is.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T5 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Rhythm — regularity, not duration</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Sleep against your need over the window, then how far each week's bedtime drifted from your own hour. The bars are the argument: the flat stretch in the middle is when everything else improved.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11);border-bottom:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#2ecc80;letter-spacing:.06em;padding-top:3px">T6 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The year, as chapters</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Four periods with a name and a sentence, a short list of firsts, and Svea's read on why it happened. No confetti, no medals for records you did not try to set.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">What Act 4 refuses to do</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">No percentile against strangers, no age-group ranking, no weekly score. Every comparison on these screens is <span style="color:#EDF1EF">you against you</span>, and every trend has to survive its own window before it is drawn as a trend.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Night shift, same act</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">Flip <span style="color:#EDF1EF">schedule</span> and Rhythm stops asking about bedtime and starts asking about <span style="color:#EDF1EF">anchor drift</span> — how far each week's main sleep moved from your own anchor, which is the only regularity a rotating roster can offer.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:20px 22px;background:#0A0C0B;border-radius:14px">
+    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5F6A65;font-weight:600">Four acts in, what is left</span>
+    <p style="margin:0;font-size:12.5px;line-height:1.7;color:#939C97;text-wrap:pretty">The night, the day, the effort and the bigger picture all exist now. What remains is plumbing rather than design: onboarding and pairing, where logged workouts live, sources and permissions, and the profile that holds your need, your zones and your anchor.</p>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;schedule&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;day&quot;,&quot;night&quot;],&quot;default&quot;:&quot;day&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;trends&quot;,&quot;capacity&quot;,&quot;rhythm&quot;,&quot;year&quot;],&quot;default&quot;:&quot;trends&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;window&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;6 weeks&quot;,&quot;6 months&quot;,&quot;Year&quot;],&quot;default&quot;:&quot;6 months&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;ageGraphic&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;pour&quot;,&quot;aura&quot;],&quot;default&quot;:&quot;aura&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Body age&quot;},&quot;pace&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:0.8,&quot;min&quot;:-0.4,&quot;max&quot;:2.4,&quot;step&quot;:0.1,&quot;unit&quot;:&quot;×&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Body age&quot;},&quot;bodyAge&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:34,&quot;min&quot;:24,&quot;max&quot;:60,&quot;unit&quot;:&quot;yr&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Body age&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+const GLYPH = {
+  today: 'M12 3v2M12 19v2M4.2 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z',
+  trends: 'M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9',
+  moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+  you: 'M12 4.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM5.5 19.5c0-3.3 2.9-5.3 6.5-5.3s6.5 2 6.5 5.3',
+  heart: 'M12 20s-7-4.6-7-9.4A3.8 3.8 0 0 1 12 8a3.8 3.8 0 0 1 7 2.6C19 15.4 12 20 12 20z',
+  lungs: 'M12 4v8M8.6 20c-2 0-3.6-1.4-3.6-3.4 0-2.7.9-5.1 2.5-6.7.8-.9 2.1-.3 2.1.9v6.9c0 1.3-.5 2.3-1 2.3zM15.4 20c2 0 3.6-1.4 3.6-3.4 0-2.7-.9-5.1-2.5-6.7-.8-.9-2.1-.3-2.1.9v6.9c0 1.3.5 2.3 1 2.3z',
+  bolt: 'M13.2 3 6 13.6h4.6L9.8 21 17.4 10.2h-4.7z',
+  close: 'M7 7l10 10M17 7 7 17',
+  spark: 'M12 3.5 13.6 9l5.4 1.6L13.6 12l-1.6 5.5L10.4 12 5 10.6 10.4 9z',
+  bike: 'M6.5 18.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17.5 18.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6.8 15.5h4.8l3-7.2M12.4 8.3h4.1l1.4 7.2M9.4 8.3h4',
+  cup: 'M4.5 8h11v5a5.5 5.5 0 0 1-11 0V8zM15.5 9H18a2.4 2.4 0 0 1 0 4.8h-2.5M4 20h13',
+  drop: 'M12 3.6c3.2 3.7 5 6.3 5 8.7a5 5 0 0 1-10 0c0-2.4 1.8-5 5-8.7z',
+  plate: 'M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8zM12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z',
+  bed: 'M3 19v-6h13a4 4 0 0 1 4 4v2M3 13V7M7.5 11.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4M3 19h17',
+  walk: 'M13.2 4.2a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8zM12.4 8.6 10 13.2l2.7 1.6.6 5.2M10 13.2 8 20M14.4 10.2l2.8 1.8',
+  check: 'M5 12.8 9.6 17.4 19 7.6',
+  clock: 'M12 7.6v4.9l3 2M12 4.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2z',
+  ask: 'M10.6 4.4a6.2 6.2 0 1 0 0 12.4 6.2 6.2 0 0 0 0-12.4zM15.2 15.2 20 20'
+};
+const mask = function (d) {
+  return 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+};
+const ico = function (key, size, color) {
+  const u = mask(GLYPH[key]);
+  return {
+    width: size, height: size, flex: 'none', display: 'block', background: color,
+    WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+  };
+};
+
+// ── the pour: the body-age graphic reimagined as an acrylic pour ──
+const POUR = (function () {
+  const CX = 120, CY = 120;
+  const h = function (n) { const x = Math.sin(n * 78.233 + 13.71) * 43758.545; return x - Math.floor(x); };
+  const pol = function (deg, r) {
+    const t = (deg * Math.PI) / 180;
+    return [CX + Math.cos(t) * r, CY + Math.sin(t) * r];
+  };
+  const RAMP = ['#12591F', '#1B7A28', '#249C31', '#2FAE38', '#3FBE3E', '#4FC842', '#5DCC46', '#7BD64A', '#9FE04A', '#B9E85C', '#CFEE7A'];
+  const wedges = [];
+  const N = 34;
+  for (let i = 0; i < N; i++) {
+    const a = i * (360 / N) + (h(i) - 0.5) * 7;
+    const w = 5 + h(i + 90) * 10;
+    const r0 = 7 + h(i + 30) * 16;
+    const r1 = 92 + h(i + 60) * 28;
+    const p0 = pol(a, r0), p1 = pol(a - w / 2, r1), p2 = pol(a + w / 2, r1);
+    wedges.push({
+      d: 'M' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) +
+        ' L' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1) +
+        ' A' + r1.toFixed(0) + ' ' + r1.toFixed(0) + ' 0 0 1 ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1) + ' Z',
+      c: RAMP[Math.floor(h(i + 7) * RAMP.length)],
+      o: (0.6 + h(i + 200) * 0.4).toFixed(2)
+    });
+  }
+  const veinAngles = [];
+  const veins = [];
+  for (let i = 0; i < 16; i++) {
+    const a = i * 22.5 + (h(i + 400) - 0.5) * 12;
+    veinAngles.push(a);
+    const bend = (h(i + 410) - 0.5) * 26;
+    const p0 = pol(a, 18), pm = pol(a + bend, 64), p1 = pol(a - bend * 0.5, 100 + h(i + 420) * 18);
+    veins.push({
+      d: 'M' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) +
+        ' Q' + pm[0].toFixed(1) + ' ' + pm[1].toFixed(1) + ' ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1),
+      c: h(i + 430) > 0.55 ? '#EFEAF4' : '#DCF3C8',
+      w: (1.4 + h(i + 440) * 3).toFixed(1),
+      o: (0.16 + h(i + 450) * 0.34).toFixed(2)
+    });
+  }
+  const cells = [];
+  for (let i = 0; i < 78; i++) {
+    const base = veinAngles[i % veinAngles.length];
+    const a = base + (h(i + 500) - 0.5) * 18;
+    const r = 26 + h(i + 510) * 88;
+    const p = pol(a, r);
+    const big = h(i + 520) > 0.86;
+    cells.push({
+      x: p[0].toFixed(1), y: p[1].toFixed(1),
+      r: (big ? 4.4 + h(i + 530) * 3.2 : 1 + h(i + 530) * 3.1).toFixed(1),
+      f: h(i + 540) > 0.62 ? '#F4F1F7' : h(i + 540) > 0.3 ? '#DCF3C8' : '#B9E85C',
+      o: (big ? 0.2 + h(i + 550) * 0.3 : 0.34 + h(i + 550) * 0.6).toFixed(2)
+    });
+  }
+  return { wedges: wedges, veins: veins, cells: cells };
+})();
+
+const LOGGED = [
+  { day: 'Today', items: [
+    { t: 'session', name: 'Steady ride', sub: '17:04 · 42 min · avg 126 bpm', fig: 'load 48', g: 'bike' },
+    { t: 'log', name: 'Coffee', sub: '07:20', fig: '', g: 'cup' },
+    { t: 'log', name: 'Water', sub: '09:40 · 11:15', fig: '×2', g: 'drop' },
+    { t: 'log', name: 'Meal', sub: '12:05', fig: '', g: 'plate' }
+  ] },
+  { day: 'Yesterday', items: [
+    { t: 'sleep', name: 'Slept 7h 12m', sub: '23:18 → 06:41 · 7 min over your need', fig: '', g: 'bed' },
+    { t: 'log', name: 'Coffee', sub: '07:15 · 13:40', fig: '×2', g: 'cup' },
+    { t: 'log', name: 'Alcohol', sub: '20:30 · one glass', fig: '', g: 'drop' }
+  ] },
+  { day: 'Monday 18 August', items: [
+    { t: 'session', name: '6 × 1 min hard', sub: '18:10 · 22 min · max 174 bpm', fig: 'load 86', g: 'bolt' },
+    { t: 'sleep', name: 'Slept 6h 48m', sub: '23:52 → 06:40 · 24 min under', fig: '', g: 'bed' },
+    { t: 'log', name: 'Nap', sub: '15:10 · 26 min', fig: '', g: 'bed' }
+  ] }
+];
+
+const A = '#2ECC80';
+const LAV = '#8B99D6';
+const WARM = '#F2B45C';
+
+// 52 weeks of weekly averages, oldest first — one deterministic series per signal
+const wobble = function (i, amp) {
+  return amp * (Math.sin(i * 1.71) * 0.6 + Math.sin(i * 0.63) * 0.4);
+};
+// the change is not spread evenly across the year: flat until March, then it moves
+const ramp = function (i, n) {
+  const p = Math.max(0, Math.min(1, ((i / (n - 1)) - 0.35) / 0.65));
+  return p * p * (3 - 2 * p);
+};
+const series = function (base, drift, amp, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(base + drift * ramp(i, n) + wobble(i, amp));
+  return out;
+};
+const RHR = series(62.6, -5.1, 0.8, 52);
+const HRV = series(42.6, 13.6, 2.2, 52);
+const SLP = series(6.85, 0.51, 0.28, 52);
+const CAP = series(40.4, 3.97, 0.35, 52);
+const DRIFT = series(54, -38, 8, 52).map(function (v) { return Math.max(6, v); });
+
+const WINDOWS = [
+  { k: '6 weeks', n: 6, span: 'Last six weeks', axis: ['6w ago', '4w', '2w', 'now'], verdict: 'short', from: 'six weeks ago', inFrom: 'six weeks ago' },
+  { k: '6 months', n: 26, span: 'Last six months', axis: ['Mar', 'Apr', 'Jun', 'Aug'], verdict: 'trend', from: 'March', inFrom: 'in March' },
+  { k: 'Year', n: 52, span: 'Last twelve months', axis: ['Sep', 'Dec', 'Mar', 'Aug'], verdict: 'story', from: 'last September', inFrom: 'last September' }
+];
+
+const TERMS = {
+  day: {
+    sleepTitle: 'Sleep against your need',
+    consistencyTitle: 'How far bedtime drifted',
+    consistencyRead: 'Each bar is how many minutes that week\u2019s bedtime wandered from your own hour. Under half an hour is where your body stops noticing.',
+    driftLabel: 'Bedtime drift',
+    chapterMarch: 'You started going to bed inside the same hour and walking most days. Nothing else changed, and by the end of April resting pulse was down two beats.',
+    firstReg: 'Eleven weeks inside your own bedtime hour',
+    firstRegSub: 'previous best was three'
+  },
+  night: {
+    sleepTitle: 'Main sleep against your need',
+    consistencyTitle: 'How far your anchor drifted',
+    consistencyRead: 'Each bar is how far that week\u2019s main sleep moved from your anchor. On a rotating roster this is the only regularity available, and it is the one that counts.',
+    driftLabel: 'Anchor drift',
+    chapterMarch: 'You started holding your anchor — the same stretch of sleep in the same place, whatever the roster did around it — and walking most days. By the end of April resting pulse was down two beats.',
+    firstReg: 'Eleven weeks holding your anchor inside half an hour',
+    firstRegSub: 'previous best was three, and none of them through a roster change'
+  }
+};
+
+const fmtH = function (h) {
+  const m = Math.round(h * 60);
+  return Math.floor(m / 60) + 'h ' + (m % 60 < 10 ? '0' : '') + (m % 60) + 'm';
+};
+
+class Component extends DCLogic {
+  state = { sx: null, sy: null, screen: null, win: null, logs: false, logFilter: 'All' };
+
+  componentDidUpdate(prev) {
+    const p = this.props;
+    if ((prev.screen !== p.screen || prev.navSeq !== p.navSeq) && p.screen) this.setState({ screen: p.screen });
+  }
+
+  renderVals() {
+    const self = this;
+    const S = this.state;
+    const screen = S.screen || this.props.screen || 'trends';
+    const T = (this.props.schedule || 'day') === 'night' ? TERMS.night : TERMS.day;
+    const go = function (k) { return function () { self.setState({ screen: k }); }; };
+
+    const winKey = S.win || this.props.window || '6 months';
+    const W = WINDOWS.filter(function (w) { return w.k === winKey; })[0] || WINDOWS[1];
+    const tail = function (arr) { return arr.slice(arr.length - W.n); };
+
+    const periods = WINDOWS.map(function (w) {
+      const on = w.k === W.k;
+      return {
+        k: w.k,
+        pick: function () { self.setState({ win: w.k }); },
+        box: {
+          flex: 1, height: 34, borderRadius: 11, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: on ? 'rgba(46,204,128,.18)' : 'transparent',
+          border: '.5px solid ' + (on ? 'rgba(46,204,128,.4)' : 'transparent'),
+          transition: 'background .18s ease, border-color .18s ease, color .18s ease'
+        },
+        label: { fontSize: 12.5, fontWeight: on ? 600 : 400, color: on ? '#9FE2FB' : '#939C97', transition: 'color .18s ease' }
+      };
+    });
+
+    // ── a trend is only a trend if it clears the noise in its own window
+    const spark = function (arr, invert) {
+      const w = 108, h = 30;
+      const lo = Math.min.apply(null, arr), hi = Math.max.apply(null, arr);
+      const rng = hi - lo || 1;
+      const pts = arr.map(function (v, i) {
+        const y = h - ((v - lo) / rng) * h + 2;
+        return [(i / (arr.length - 1)) * w, invert ? (h + 4) - y : y];
+      });
+      return {
+        line: pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '),
+        x: pts[pts.length - 1][0].toFixed(1), y: pts[pts.length - 1][1].toFixed(1)
+      };
+    };
+
+    const short = W.verdict === 'short';
+    const mk = function (name, arr, unit, dp, better, reads, to) {
+      const win = tail(arr);
+      const now = win[win.length - 1];
+      const change = now - win[0];
+      const noise = Math.abs(change) < (name === 'Variability' ? 3.4 : name === 'Resting pulse' ? 1.3 : name === 'Sleep' ? 0.34 : 0.5);
+      const good = better < 0 ? change < 0 : change > 0;
+      const flat = noise || short;
+      const sp = spark(win, false);
+      const col = flat ? '#7F8A85' : good ? A : WARM;
+      const fill = function (s) {
+        return s
+          .split('{d}').join(Math.abs(change).toFixed(dp) + ' ' + unit)
+          .split('{m}').join(Math.round(Math.abs(change) * 60) + ' minutes')
+          .split('{inFrom}').join(W.inFrom)
+          .split('{from}').join(W.from);
+      };
+      return {
+        name: name, unit: unit, now: now.toFixed(dp),
+        delta: flat ? 'no real change' : (change > 0 ? '+' : '−') + Math.abs(change).toFixed(dp) + ' ' + unit,
+        read: fill(short ? reads.short : noise ? reads.noise : good ? reads.good : reads.bad),
+        spark: sp.line, dotX: sp.x, dotY: sp.y, stroke: col,
+        card: {
+          background: '#141817', border: '.5px solid rgba(255,255,255,.06)', borderRadius: 20,
+          padding: '15px 16px 14px', display: 'flex', flexDirection: 'column', gap: 10
+        },
+        chip: {
+          fontSize: 11, fontWeight: 600, padding: '4px 9px', borderRadius: 8, whiteSpace: 'nowrap',
+          color: flat ? '#C6CEC9' : good ? '#8FEFC0' : '#F3C888',
+          background: flat ? 'rgba(255,255,255,.06)' : good ? 'rgba(46,204,128,.13)' : 'rgba(242,180,92,.13)'
+        },
+        readStyle: { fontSize: 11.5, lineHeight: 1.5, color: flat ? '#7F8A85' : '#939C97', textWrap: 'pretty' }
+      };
+    };
+
+    const trendRows = [
+      mk('Resting pulse', RHR, 'bpm', 0, -1, {
+        short: 'Six weeks is not enough to call this. It moves two beats either way with a warm room or a late meal.',
+        noise: 'Flat, within the wobble your own week produces. Nothing to read.',
+        good: '{d} down since {from}, and it has held at this level for eleven weeks. The clearest thing on the screen.',
+        bad: 'Up {d} over the window. Usually sleep before fitness — check Rhythm first.'
+      }, 'capacity'),
+      mk('Variability', HRV, 'ms', 0, 1, {
+        short: 'Too noisy at this length to mean anything. It swings ten milliseconds on a glass of wine.',
+        noise: 'Level, inside its normal swing.',
+        good: 'Up {d} since {from}. Your body is absorbing effort better than it was in spring.',
+        bad: 'Down {d} over the window, which usually follows a stretch of short nights.'
+      }, 'capacity'),
+      mk('Sleep', SLP, 'h', 1, 1, {
+        short: 'Six weeks of sleep tells you about six weeks, not about you.',
+        noise: 'Unchanged on average — but look at the regularity in Rhythm, which is the part that moved.',
+        good: '{m} a night more than {inFrom}. Every other line on this screen follows from that one.',
+        bad: 'Down {m} a night. This is the line to fix first; the others follow it.'
+      }, 'rhythm'),
+      mk('Capacity', CAP, 'ml/kg', 1, 1, {
+        short: 'Capacity moves too slowly to show up in six weeks. Ask again in three months.',
+        noise: 'Holding. It takes months to shift and it has not shifted.',
+        good: 'Up {d} since {from}. Ordinary walking and steady rides did that, not intervals.',
+        bad: 'Down {d}, which after a quiet stretch is expected rather than alarming.'
+      }, 'capacity')
+    ];
+
+    // ── attendance grid, twelve weeks of days
+    const gridCols = [];
+    for (let c = 0; c < 12; c++) {
+      const cells = [];
+      for (let r = 0; r < 7; r++) {
+        const i = c * 7 + r;
+        const gap = (i % 23 === 4) || (i > 30 && i < 34);
+        const moved = !gap && (i % 3 === 0 || i % 7 === 5);
+        cells.push({
+          s: {
+            height: 9, borderRadius: 3,
+            background: gap ? 'rgba(255,255,255,.06)' : moved ? A : 'rgba(46,204,128,.28)'
+          }
+        });
+      }
+      gridCols.push({ cells: cells });
+    }
+    const gridKey = [
+      { label: 'Slept, worn', c: 'rgba(46,204,128,.28)' },
+      { label: 'Moved as well', c: A },
+      { label: 'Nothing recorded', c: 'rgba(255,255,255,.06)' }
+    ].map(function (k) {
+      return { label: k.label, sw: { width: 9, height: 9, borderRadius: 3, background: k.c, flex: 'none' } };
+    });
+
+    // ── capacity screen
+    const capWin = tail(CAP);
+    const capLo = Math.min.apply(null, capWin) - 0.6;
+    const capHi = Math.max.apply(null, capWin) + 0.6;
+    const capPts = capWin.map(function (v, i) {
+      return [(i / (capWin.length - 1)) * 300, 110 - ((v - capLo) / (capHi - capLo)) * 100];
+    });
+    const capChange = capWin[capWin.length - 1] - capWin[0];
+
+    const slpWinC = tail(SLP);
+    const capFactors = [
+      { k: 'Sleep, and the regularity of it', pct: 46, note: 'The single biggest contributor: ' + Math.round((slpWinC[slpWinC.length - 1] - slpWinC[0]) * 60) + ' minutes more a night over this window, taken at roughly the same hour.' },
+      { k: 'Steady, easy sessions', pct: 38, note: 'Four to five hours a week at conversation pace. Unglamorous and responsible for most of the curve.' },
+      { k: 'Hard efforts', pct: 16, note: 'You have done nine of them in six months. This is the one with room left in it.' }
+    ].map(function (f) {
+      return {
+        k: f.k, v: f.pct + '%', note: f.note,
+        bar: { width: f.pct + '%', height: '100%', borderRadius: 4, background: A }
+      };
+    });
+
+    // ── rhythm screen
+    const slpWin = tail(SLP);
+    const sLo = Math.min.apply(null, slpWin) - 0.35;
+    const sHi = Math.max.apply(null, slpWin) + 0.35;
+    const sy = function (v) { return 104 - ((v - sLo) / (sHi - sLo)) * 94; };
+    const driftWin = tail(DRIFT);
+    const maxD = Math.max.apply(null, driftWin);
+
+    const rhythmRows = [
+      { k: 'Nights over your need', sub: 'in this window', v: Math.round(slpWin.filter(function (v) { return v >= 7.2; }).length / slpWin.length * 100) + '%', warm: false },
+      { k: T.driftLabel + ', now', sub: 'weekly average', v: Math.round(driftWin[driftWin.length - 1]) + ' min', warm: false },
+      { k: T.driftLabel + ', at the start', sub: 'same window', v: Math.round(driftWin[0]) + ' min', warm: true },
+      { k: 'Longest steady stretch', sub: 'under 30 minutes of drift', v: '11 weeks', warm: false }
+    ].map(function (r, i, arr) {
+      return {
+        k: r.k, sub: r.sub, v: r.v,
+        row: {
+          display: 'flex', alignItems: 'center', gap: 12, minHeight: 56,
+          borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.06)'
+        },
+        val: {
+          fontFamily: "'Outfit',sans-serif", fontSize: 19, fontWeight: 400, letterSpacing: '-.02em',
+          fontVariantNumeric: 'tabular-nums', flex: 'none', color: r.warm ? '#F3C888' : '#EDF1EF'
+        }
+      };
+    });
+
+    const chapters = [
+      { when: 'January – February', stat: 'drift 52 min', title: 'The flat start', c: '#57605C',
+        body: 'Six or seven hours a night at whatever hour the evening ended. Resting pulse 62, variability in the low forties, and nothing moving in either direction.' },
+      { when: 'March – April', stat: 'drift 34 min', title: 'The walking months', c: LAV,
+        body: T.chapterMarch },
+      { when: 'May – June', stat: 'drift 21 min', title: 'It took', c: A,
+        body: 'The first stretch where sleep was over your need more weeks than under it. Variability climbed eight milliseconds and the rides stopped feeling like efforts.' },
+      { when: 'July – August', stat: 'drift 18 min', title: 'The heat, and holding', c: A,
+        body: 'Two hot weeks pushed breathing rate up and sleep down, and it recovered on its own within ten days. That recovery is what the last eight months bought you.' }
+    ].map(function (c) {
+      return {
+        when: c.when, stat: c.stat, title: c.title, body: c.body,
+        card: {
+          borderRadius: 22, padding: '16px 16px 15px', display: 'flex', flexDirection: 'column', gap: 8,
+          background: '#141817', border: '.5px solid rgba(255,255,255,.06)',
+          borderLeft: '.5px solid rgba(255,255,255,.06)'
+        },
+        kicker: { fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase', fontWeight: 600, color: c.c }
+      };
+    });
+
+    const firsts = [
+      { k: 'Resting pulse under 60 for a full month', sub: 'it had never been under 60 for a week', when: 'May', g: 'heart' },
+      { k: T.firstReg, sub: T.firstRegSub, when: 'Jun', g: 'clock' },
+      { k: 'A hard session your body actually wanted', sub: 'readiness said yes and it was right', when: 'Jul', g: 'bolt' },
+      { k: 'A hot fortnight you recovered from unaided', sub: 'no debt carried into August', when: 'Aug', g: 'check' }
+    ].map(function (f) {
+      return { k: f.k, sub: f.sub, when: f.when, icon: ico(f.g, 17, A) };
+    });
+
+    const nav4 = this.props.onNav;
+
+    // ── the body-age hero: speckled aura, then the pace scale ────
+    const ageSpecks = [];
+    const hash = function (n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+    for (let i = 0; i < 76; i++) {
+      const ang = i * 2.39996 + hash(i) * 1.1;
+      const rad = 0.56 + hash(i + 90) * 0.46;
+      const big = hash(i + 210) > 0.86;
+      const sz = big ? 4.6 + hash(i + 7) * 2.6 : 1.2 + hash(i + 31) * 2.4;
+      const op = big ? 0.16 + hash(i + 55) * 0.16 : 0.20 + hash(i + 11) * 0.5;
+      ageSpecks.push({ s: {
+        position: 'absolute',
+        left: (50 + Math.cos(ang) * rad * 47).toFixed(2) + '%',
+        top: (50 + Math.sin(ang) * rad * 47).toFixed(2) + '%',
+        width: Number(sz.toFixed(1)), height: Number(sz.toFixed(1)), borderRadius: '50%',
+        background: 'rgba(216,255,236,' + op.toFixed(2) + ')',
+        boxShadow: '0 0 ' + (sz * (big ? 4.2 : 2.6)).toFixed(1) + 'px rgba(104,230,164,' + (big ? 0.5 : 0.8) + ')',
+        transform: 'translate(-50%,-50%)'
+      } });
+    }
+    // pace drives the temperature of the aura: green while you are ahead of the
+    // clock, amber as it turns, clay when it is running away
+    const pace = Number(this.props.pace != null ? this.props.pace : 0.8);
+    const heat = Math.max(0, Math.min(1, (pace - 1) / 1.1));
+    const lerp = function (a, b, t) { return Math.round(a + (b - a) * t); };
+    const hot = heat < 0.55
+      ? [lerp(46, 242, heat / 0.55), lerp(204, 180, heat / 0.55), lerp(128, 92, heat / 0.55)]
+      : [lerp(242, 198, (heat - 0.55) / 0.45), lerp(180, 104, (heat - 0.55) / 0.45), lerp(92, 72, (heat - 0.55) / 0.45)];
+    const hotRGB = hot[0] + ',' + hot[1] + ',' + hot[2];
+    const hotHex = heat < 0.55 ? '#F3C888' : '#E9A288';
+    const paceWash = heat < 0.02
+      ? { display: 'none' }
+      : {
+        position: 'absolute', width: 226, height: 226, pointerEvents: 'none',
+        borderRadius: '63% 37% 45% 55%/52% 61% 39% 48%', filter: 'blur(5px)',
+        animation: 'ageMorph 22s ease-in-out infinite',
+        background: 'radial-gradient(circle at 50% 50%,rgba(8,11,10,0) 33%,rgba(' + hotRGB + ',' + (heat * 0.34).toFixed(2) +
+          ') 47%,rgba(' + hotRGB + ',' + (heat * 0.92).toFixed(2) + ') 70%,rgba(' + hotRGB + ',' + (heat * 0.4).toFixed(2) +
+          ') 86%,rgba(' + hotRGB + ',0) 100%)'
+      };
+
+    const bodyAgeT = Math.round(Number(this.props.bodyAge != null ? this.props.bodyAge : 34));
+    const chronoT = 40, dT = chronoT - bodyAgeT, nT = Math.abs(dT);
+    const ageDelta = nT < 1 ? 'the age on your passport'
+      : nT + (nT === 1 ? ' year ' : ' years ') + (dT > 0 ? 'younger' : 'older');
+    const paceVal = pace.toFixed(1) + '×';
+    const paceChip = pace < 1 ? 'slower vs last month' : pace < 1.4 ? 'about even vs last month' : 'faster vs last month';
+    const months = Math.round(pace * 12);
+    const paceNote = pace < 1
+      ? 'At this pace you are putting on about ' + months + ' months of body age a year instead of twelve. Read it as a direction, not a promise.'
+      : pace < 1.4
+        ? 'At this pace you are aging roughly in real time — about ' + months + ' months a year. Nothing here needs fixing today.'
+        : 'At this pace you are putting on about ' + months + ' months of body age a year. The colour follows the number, and it is the drivers below that move it back.';
+
+    const pPct = ((pace - -1) / 4) * 100;
+    const paceTicks = [];
+    for (let i = 0; i < 47; i++) {
+      const at = (i / 46) * 100, d = Math.abs(at - pPct);
+      const near = d < 4.4;
+      paceTicks.push({ s: {
+        flex: 1, height: near ? 28 : d < 13 ? 22 : 16, borderRadius: 1,
+        background: near ? (heat < 0.02 ? 'rgba(150,240,200,.92)' : 'rgba(' + hotRGB + ',.95)') : d < 13 ? 'rgba(255,255,255,.26)' : 'rgba(255,255,255,.13)'
+      } });
+    }
+
+    const links = [
+      { k: 'Capacity', sub: 'the estimate, and what moved it', to: 'capacity', g: 'lungs' },
+      { k: 'Rhythm', sub: 'sleep, and how regular it has been', to: 'rhythm', g: 'moon' },
+      { k: 'The year so far', sub: 'eight months in four chapters', to: 'year', g: 'trends' },
+      { k: 'Ask it something', sub: 'every signal you keep, and what moves it', to: 'index', act: 'instrument', g: 'ask' }
+    ].map(function (l, i, arr) {
+      return {
+        k: l.k, sub: l.sub, icon: ico(l.g, 20, l.act ? '#8B99D6' : A),
+        go: l.act ? function () { if (nav4) nav4(l.act, l.to); } : l.to === 'ages' ? function () { if (nav4) nav4('ages', 'ages'); } : go(l.to),
+        row: {
+          display: 'flex', alignItems: 'center', gap: 13, minHeight: 60, cursor: 'pointer',
+          borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.06)'
+        }
+      };
+    });
+
+    const dOf = function (arr) { const w = tail(arr); return w[w.length - 1] - w[0]; };
+    const verdict = short
+      ? { kick: 'Six weeks in', head: 'Too early to say.', warm: true,
+          body: 'Nothing here has cleared its own noise yet. Every line on this window moves as much on a warm room or a late dinner as it does on training. Ask again at three months — the app would rather say nothing than draw you an arrow it cannot defend.' }
+      : W.verdict === 'trend'
+        ? { kick: 'Six months in', head: 'Yes — slowly.', warm: false,
+            body: 'Resting pulse down ' + Math.abs(dOf(RHR)).toFixed(0) + ' beats, variability up ' + Math.abs(dOf(HRV)).toFixed(0) + ' milliseconds, capacity up ' + Math.abs(dOf(CAP)).toFixed(1) + ' points. All three followed the sleep line, and the sleep line followed one decision: going to bed at roughly the same hour.' }
+        : { kick: 'Twelve months in', head: 'Yes, and you can see where.', warm: false,
+            body: 'The change is not spread evenly across the year — it starts in March and holds. Four chapters, one of which did most of the work.' };
+
+    const __nav = this.props.onNav;
+    const __go = function (a, s) { return function () { if (__nav) __nav(a, s); }; };
+    // ── the logged-items sheet, opened from the tab bar ──────────
+    const me4 = this;
+    const LF = ['All', 'Sessions', 'Sleep', 'Logs'];
+    const lf = this.state.logFilter;
+    const logFilters = LF.map(function (k) {
+      const on = k === lf;
+      return {
+        k: k, pick: function () { me4.setState({ logFilter: k }); },
+        box: {
+          padding: '7px 12px', borderRadius: 11, cursor: 'pointer',
+          background: on ? 'rgba(46,204,128,.18)' : 'rgba(255,255,255,.05)',
+          border: '.5px solid ' + (on ? 'rgba(46,204,128,.4)' : 'rgba(255,255,255,.07)'),
+          transition: 'background .18s ease, border-color .18s ease'
+        },
+        label: { fontSize: 11.5, fontWeight: 500, color: on ? '#8FEFC0' : '#939C97', transition: 'color .18s ease' }
+      };
+    });
+    const lKeep = function (t) {
+      return lf === 'All' || (lf === 'Sessions' && t === 'session') ||
+        (lf === 'Sleep' && t === 'sleep') || (lf === 'Logs' && t === 'log');
+    };
+    let lTotal = 0;
+    const logDays = LOGGED.map(function (d) {
+      const items = d.items.filter(function (i) { return lKeep(i.t); });
+      lTotal += items.length;
+      const n = function (t) { return items.filter(function (i) { return i.t === t; }).length; };
+      const parts = [];
+      if (n('session')) parts.push(n('session') + (n('session') > 1 ? ' sessions' : ' session'));
+      if (n('sleep')) parts.push(n('sleep') > 1 ? n('sleep') + ' sleeps' : 'sleep');
+      if (n('log')) parts.push(n('log') + (n('log') > 1 ? ' logs' : ' log'));
+      return {
+        label: d.day, sum: parts.join(' · '), has: items.length > 0,
+        items: items.map(function (i, k) {
+          return {
+            name: i.name, sub: i.sub, fig: i.fig,
+            icon: ico(i.g, 17, i.t === 'log' ? '#7F8A85' : i.t === 'sleep' ? LAV : A),
+            row: {
+              display: 'flex', alignItems: 'center', gap: 12, minHeight: 50,
+              borderTop: k === 0 ? 'none' : '.5px solid rgba(255,255,255,.055)'
+            },
+            nameStyle: { fontSize: 13, fontWeight: i.t === 'log' ? 400 : 600, color: i.t === 'log' ? '#C6CEC9' : '#EDF1EF' },
+            figStyle: { fontSize: 11, color: '#7F8A85', flex: 'none', fontVariantNumeric: 'tabular-nums' }
+          };
+        })
+      };
+    }).filter(function (d) { return d.has; });
+    const logSummary = lTotal + ' in the last three days · ' + (lf === 'All' ? 'everything' : lf.toLowerCase() + ' only');
+
+    return {
+      tabToday: __go('day', 'today'), tabTrends: __go('picture', 'trends'), tabRest: __go('night', 'rest'), tabYou: __go('plumbing', 'you'),
+      isPour: (this.props.ageGraphic || 'aura') === 'pour',
+      isAura: (this.props.ageGraphic || 'aura') === 'aura',
+      pourWedges: POUR.wedges, pourVeins: POUR.veins, pourCells: POUR.cells,
+      showLogs: this.state.logs,
+      openLogs: function () { me4.setState({ logs: true }); },
+      closeLogs: function () { me4.setState({ logs: false }); },
+      goHistory: function () { me4.setState({ logs: false }); if (nav4) nav4('plumbing', 'history'); },
+      icoLogged: ico('spark', 21, '#04121A'), icoClose: ico('close', 14, '#C6CEC9'),
+      logSummary: logSummary, logFilters: logFilters, logDays: logDays,
+      goStrapPage: __go('plumbing', 'strap'),
+      battPct: '52%',
+      battChip: { display: 'flex', alignItems: 'center', gap: 7, height: 30, padding: '0 11px', borderRadius: 15, cursor: 'pointer', flex: 'none', background: 'rgba(255,255,255,.06)', border: '.5px solid rgba(255,255,255,.1)' },
+      battBody: { position: 'relative', width: 21, height: 11, borderRadius: 3.4, boxSizing: 'border-box', border: '1px solid rgba(237,241,239,.4)', flex: 'none' },
+      battFill: { position: 'absolute', left: 1.2, top: 1.2, bottom: 1.2, width: 'calc((100% - 2.4px) * 0.52)', borderRadius: 2.2, background: '#8FD3F5' },
+      battNub: { width: 1.6, height: 4.4, borderRadius: '0 1.5px 1.5px 0', marginLeft: 1, flex: 'none', background: 'rgba(237,241,239,.4)' },
+      battLabel: { fontSize: 12, fontWeight: 600, letterSpacing: '-.01em', fontVariantNumeric: 'tabular-nums', color: '#C6CEC9' },
+      swipeStart: (e) => this.setState({ sx: e.clientX, sy: e.clientY }),
+      swipeEnd: (e) => {
+        const st = this.state;
+        if (st.sx == null) return;
+        const dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+        this.setState({ sx: null, sy: null });
+        if (dx <= 78 || Math.abs(dy) >= 58) return;
+        if (st.logs) { this.setState({ logs: false }); return; }
+        const cur = st.screen || this.props.screen || "trends";
+        const to = ({"capacity":"trends","rhythm":"trends","year":"trends"})[cur];
+        if (to) this.setState({ screen: to });
+      },
+      isDark: true, notes: this.props.showNotes !== false, t: T,
+      isDaySched: (this.props.schedule || 'day') !== 'night',
+      isNightSched: (this.props.schedule || 'day') === 'night',
+      isTrends: screen === 'trends', isCapacity: screen === 'capacity',
+      isRhythm: screen === 'rhythm', isYear: screen === 'year',
+      goTrends: go('trends'),
+      goAges: function () { if (nav4) nav4('ages', 'ages'); },
+      ageSpecks, paceTicks, paceWash, paceVal, paceChip, paceNote,
+      ageNum: bodyAgeT, ageDelta,
+      ageDeltaStyle: {
+        fontSize: 13.5, paddingTop: 9,
+        color: heat < 0.02 ? '#8FEFC0' : hotHex
+      },
+      paceChipStyle: {
+        fontSize: 11, fontWeight: 600, padding: '4px 9px', borderRadius: 8,
+        color: heat < 0.02 ? '#8FEFC0' : hotHex,
+        background: heat < 0.02 ? 'rgba(46,204,128,.13)' : 'rgba(' + hotRGB + ',.14)'
+      },
+      paceMark: {
+        position: 'absolute', left: 'calc(' + pPct.toFixed(1) + '% - 1px)', bottom: 0,
+        width: 2, height: 40, borderRadius: 1, background: '#EDF1EF',
+        boxShadow: '0 0 12px rgba(237,241,239,.55)'
+      },
+      paceValStyle: {
+        position: 'absolute', left: pPct.toFixed(1) + '%', top: 0, transform: 'translateX(-50%)',
+        fontFamily: "'Outfit',sans-serif", fontSize: 21, fontWeight: 400, letterSpacing: '-.025em',
+        color: '#EDF1EF', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'
+      },
+
+      periods, spanLabel: W.span,
+      verdictKick: verdict.kick, verdictHead: verdict.head, verdictBody: verdict.body,
+      verdictCard: {
+        borderRadius: 24, padding: '18px 18px 17px', display: 'flex', flexDirection: 'column', gap: 9,
+        background: 'linear-gradient(158deg,' + (verdict.warm ? 'rgba(139,153,214,.14)' : 'rgba(46,204,128,.16)') + ',rgba(46,204,128,.03))',
+        border: '.5px solid ' + (verdict.warm ? 'rgba(139,153,214,.28)' : 'rgba(46,204,128,.3)')
+      },
+      verdictKicker: {
+        fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600,
+        color: verdict.warm ? '#C9D0EE' : A
+      },
+
+      trendRows, gridCols, gridKey,
+      gridSpan: '12 weeks · 79 of 84 days',
+      gridRead: 'Five days missing in twelve weeks, and four of them were one week in June. Attendance is the only number Noop counts, because it predicts every other one.',
+      links,
+
+      capNow: capWin[capWin.length - 1].toFixed(1),
+      capRead: (capChange >= 0 ? 'Up from ' : 'Down from ') + capWin[0].toFixed(1) + ' ' + (W.k === 'Year' ? 'last September' : W.k === '6 months' ? 'in March' : 'six weeks ago') + '. Around four years under your age, which matters far less than the direction.',
+      capDelta: (capChange > 0 ? '+' : '−') + Math.abs(capChange).toFixed(1) + ' over the window',
+      capChip: {
+        fontSize: 11, fontWeight: 600, padding: '4px 9px', borderRadius: 8,
+        color: capChange > 0 ? '#8FEFC0' : '#F3C888',
+        background: capChange > 0 ? 'rgba(46,204,128,.13)' : 'rgba(242,180,92,.13)'
+      },
+      capLine: capPts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '),
+      capArea: 'M0,112 L' + capPts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' L') + ' L300,112 Z',
+      capDotX: capPts[capPts.length - 1][0].toFixed(1),
+      capDotY: capPts[capPts.length - 1][1].toFixed(1),
+      capAxis: W.axis.map(function (l) { return { label: l }; }),
+      capFactors,
+
+      rhythmRead: 'Average nightly sleep is ' + fmtH(slpWin[slpWin.length - 1]) + ', against a need of 7h 12m. The average is the less interesting half of this screen.',
+      sleepLine: slpWin.map(function (v, i) {
+        return ((i / (slpWin.length - 1)) * 300).toFixed(1) + ',' + sy(v).toFixed(1);
+      }).join(' '),
+      needY: sy(7.2).toFixed(1),
+      bedBars: driftWin.map(function (v) {
+        return {
+          s: {
+            flex: 1, height: Math.max(4, (v / maxD) * 72), borderRadius: 3,
+            background: v > 40 ? WARM : v > 26 ? 'rgba(139,153,214,.75)' : A
+          }
+        };
+      }),
+      rhythmRows,
+
+      chapters, firsts,
+
+      icoToday: ico('today', 19, '#7F8A85'), icoTrendsOn: ico('trends', 19, '#04140C'),
+      icoRest: ico('moon', 19, '#7F8A85'), icoYou: ico('you', 19, '#7F8A85')
+    };
+  }
+}
+</script>
+</body>
+</html>

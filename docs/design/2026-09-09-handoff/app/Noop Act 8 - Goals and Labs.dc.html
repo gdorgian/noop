@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DD;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#B4543A;text-decoration:none}a:hover{color:#8C3E29}
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes goalPulse{0%,100%{opacity:.7}50%{opacity:1}}
+@keyframes goalSpin{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.scr{animation:fadeUp .3s cubic-bezier(.22,.61,.36,1) both}
+.hb::-webkit-scrollbar{width:0;height:0}
+*{-webkit-tap-highlight-color:transparent}
+@media (prefers-reduced-motion:reduce){.scr{animation:none}}
+</style>
+</helmet>
+
+<div style="display:flex;gap:60px;align-items:flex-start;padding:52px 48px 100px">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:16px">
+  <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#17150F;color:#fff;border-radius:5px">ACT 8</span>
+    <span style="font:600 12.5px/1.2 'Instrument Sans',system-ui,sans-serif;color:#17150F">Goals and labs — working prototype</span>
+    <span style="font-size:11.5px;color:rgba(23,21,15,.45)">what you are aiming at, and what your blood says</span>
+  </div>
+  </sc-if>
+
+  <div style="border-radius:48px;overflow:hidden;flex:none">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+    <div style="height:100%;display:flex;flex-direction:column;background:#0A0C0B;font-family:'Instrument Sans',system-ui,sans-serif;color:#EDF1EF;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-170px;left:50%;transform:translateX(-50%);width:480px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(242,180,92,.15),rgba(242,180,92,0) 70%);filter:blur(18px);pointer-events:none"></div>
+
+      <div class="hb" onPointerDown="{{ swipeStart }}" onPointerUp="{{ swipeEnd }}" style="position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain">
+
+        <sc-if value="{{ isGoal }}" hint-placeholder-val="{{ true }}">
+        <div class="scr" style="padding-bottom:118px">
+          <div style="padding:56px 18px 0;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goYou }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="flex:1;font-size:13.5px;color:#939C97">You</span>
+            <div onClick="{{ goSet }}" style="height:30px;padding:0 12px;flex:none;border-radius:10px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1);display:flex;align-items:center;font-size:11.5px;font-weight:600;color:#C6CEC9;cursor:pointer">Change it</div>
+          </div>
+
+          <div style="padding:2px 20px 0;display:flex;flex-direction:column;gap:2px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0 0">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8B958F;font-weight:600">One goal at a time</span>
+              <span style="font-size:10.5px;color:#57605C">{{ daysLeft }}</span>
+            </div>
+
+            <div style="position:relative;height:252px;display:flex;align-items:center;justify-content:center">
+              <div style="position:absolute;width:300px;height:270px;border-radius:50%;background:radial-gradient(circle,rgba(242,180,92,.22),rgba(242,180,92,0) 62%);filter:blur(18px);animation:goalPulse 9s ease-in-out infinite;pointer-events:none"></div>
+              <div style="position:absolute;left:50%;top:50%;width:250px;height:250px;transform:translate(-50%,-50%);animation:goalSpin 110s linear infinite;pointer-events:none">
+                <sc-for list="{{ routeSpecks }}" as="p" hint-placeholder-count="24">
+                  <div style="{{ p.s }}"></div>
+                </sc-for>
+              </div>
+              <svg viewBox="0 0 330 220" style="position:absolute;width:330px;height:220px;overflow:visible;pointer-events:none">
+                <g style="filter:blur(8px);opacity:.85">
+                  <sc-for list="{{ routeSegs }}" as="s" hint-placeholder-count="34">
+                    <path d="{{ s.d }}" fill="none" stroke="{{ s.c }}" stroke-width="{{ s.w }}" stroke-linecap="round"></path>
+                  </sc-for>
+                </g>
+                <g>
+                  <sc-for list="{{ routeSegs }}" as="s" hint-placeholder-count="34">
+                    <path d="{{ s.d }}" fill="none" stroke="{{ s.c }}" stroke-width="{{ s.w }}" stroke-linecap="round"></path>
+                  </sc-for>
+                </g>
+                <sc-for list="{{ waypoints }}" as="w" hint-placeholder-count="5">
+                  <circle cx="{{ w.x }}" cy="{{ w.y }}" r="{{ w.r }}" fill="{{ w.fill }}" stroke="{{ w.stroke }}" stroke-width="1.8"></circle>
+                </sc-for>
+              </svg>
+              <div style="position:absolute;left:0;bottom:6px;display:flex;flex-direction:column;align-items:flex-start;gap:5px">
+                <span style="font-family:'Outfit',sans-serif;font-size:50px;font-weight:200;letter-spacing:-.045em;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 24px rgba(0,0,0,.75)">{{ progress }}</span>
+                <span style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#93A0A6;font-weight:600;line-height:1.5">of the route, recorded</span>
+              </div>
+              <div style="position:absolute;right:2px;top:6px;display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+                <span style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#57605C;font-weight:600">26 October</span>
+                <span style="font-size:11px;color:#7F8A85">the day itself</span>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:6px;padding:6px 2px 2px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:300;letter-spacing:-.03em;line-height:1.22;text-wrap:pretty">{{ goalTitle }}</span>
+              <span style="font-size:13px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ goalSub }}</span>
+            </div>
+
+            <div style="{{ callCard }}">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="{{ callDot }}"></span>
+                <span style="{{ callKicker }}">{{ callKick }}</span>
+              </div>
+              <span style="font-size:13.5px;line-height:1.62;color:#DCE3E0;text-wrap:pretty">{{ callBody }}</span>
+              <sc-if value="{{ callHasFix }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:7px;padding:12px 13px;border-radius:16px;background:rgba(10,12,11,.4);border:.5px solid rgba(255,255,255,.09)">
+                  <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8B958F;font-weight:600">What the data would accept</span>
+                  <span style="font-size:12.5px;line-height:1.55;color:#C6CEC9;text-wrap:pretty">{{ callFix }}</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px 16px 6px;margin-top:10px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px">
+                <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Waypoints</span>
+                <span style="font-size:11px;color:#57605C">only ticked when it happened</span>
+              </div>
+              <sc-for list="{{ ways }}" as="w" hint-placeholder-count="5">
+                <div style="{{ w.row }}">
+                  <span style="{{ w.mark }}"></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                    <span style="{{ w.title }}">{{ w.k }}</span>
+                    <span style="font-size:11.5px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ w.sub }}</span>
+                  </div>
+                  <span style="{{ w.tagStyle }}">{{ w.tag }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:linear-gradient(160deg,rgba(139,153,214,.14),rgba(139,153,214,.03));border:.5px solid rgba(139,153,214,.3);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:11px;margin-top:10px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="flex:none;white-space:nowrap;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#C9D0EE;font-weight:600">This week, from Svea</span>
+                <span style="margin-left:auto;flex:none;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#A9B4E0;font-weight:600;padding:3px 7px;border-radius:6px;border:.5px solid rgba(139,153,214,.45)">written</span>
+              </div>
+              <span style="font-size:13.5px;line-height:1.62;color:#DCE3E0;text-wrap:pretty">{{ weekProposal }}</span>
+              <div style="display:flex;gap:7px">
+                <div onClick="{{ takeWeek }}" style="flex:1.4;height:42px;border-radius:14px;background:#8B99D6;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#0C1024;cursor:pointer">Take the week</div>
+                <div onClick="{{ skipWeek }}" style="flex:1;height:42px;border-radius:14px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#C6CEC9;cursor:pointer">Not this week</div>
+              </div>
+              <sc-if value="{{ weekDone }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:10px;padding:12px 13px;border-radius:16px;background:rgba(139,153,214,.1);border:.5px solid rgba(139,153,214,.26)">
+                  <span style="font-size:12.5px;color:#DCE3E0">{{ weekState }}</span>
+                  <span onClick="{{ undoWeek }}" style="margin-left:auto;font-size:11.5px;font-weight:600;color:#A9B4E0;cursor:pointer">Undo</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <div onClick="{{ goLabs }}" style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;align-items:center;gap:13px;cursor:pointer;margin-top:10px">
+              <span style="{{ icoDrop }}"></span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:13.5px;color:#EDF1EF">Biomarkers</span>
+                <span style="font-size:11.5px;color:#7F8A85">{{ labsSub }}</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <span style="font-size:11px;line-height:1.6;color:#57605C;padding:8px 2px 0;text-wrap:pretty">Progress is counted from sessions that were actually recorded on your wrist. Noop will not credit you for a week it did not see, and it will not invent a streak to keep you going.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isSet }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:118px">
+          <div style="padding:56px 18px 6px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goGoal }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Journey</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:12px">
+            <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:300;letter-spacing:-.03em;line-height:1.2">Set the goal</span>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">What are you aiming at</span>
+              <div style="display:flex;flex-wrap:wrap;gap:7px">
+                <sc-for list="{{ kinds }}" as="k" hint-placeholder-count="4">
+                  <div onClick="{{ k.pick }}" style="{{ k.chip }}">{{ k.k }}</div>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:9px;padding-top:4px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                  <span style="font-size:12.5px;color:#C6CEC9">By when</span>
+                  <span style="font:600 12.5px ui-monospace,Menlo,monospace;color:#F6DCB4">{{ byWhen }}</span>
+                </div>
+                <div style="display:flex;gap:5px">
+                  <sc-for list="{{ weeksTicks }}" as="t" hint-placeholder-count="12">
+                    <div onClick="{{ t.pick }}" style="{{ t.s }}"></div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:10.5px;color:#57605C">6 weeks</span>
+                  <span style="font-size:10.5px;color:#57605C">a year</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="{{ callCard }}">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="{{ callDot }}"></span>
+                <span style="{{ callKicker }}">{{ callKick }}</span>
+              </div>
+              <span style="font-size:13.5px;line-height:1.62;color:#DCE3E0;text-wrap:pretty">{{ callBody }}</span>
+              <div style="display:flex;flex-direction:column;gap:10px;padding-top:2px">
+                <sc-for list="{{ evidence }}" as="e" hint-placeholder-count="3">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                      <span style="font-size:12.5px;color:#EDF1EF">{{ e.k }}</span>
+                      <span style="font:600 11.5px ui-monospace,Menlo,monospace;color:#C6CEC9">{{ e.v }}</span>
+                    </div>
+                    <div style="height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden">
+                      <div style="{{ e.bar }}"></div>
+                    </div>
+                    <span style="font-size:11px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ e.note }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#F3C888;font-weight:600">Safety check</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#C6CEC9;text-wrap:pretty">{{ safety }}</span>
+              <span style="font-size:11px;line-height:1.55;color:#7F8A85;text-wrap:pretty">Noop will not build a route that adds more than ten percent of weekly load a week, and it will hold a week back rather than meet a date. If that means the date moves, it says the date moves.</span>
+            </div>
+
+            <sc-if value="{{ commitPending }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:11px;padding:15px 15px 14px;border-radius:18px;background:rgba(233,162,136,.09);border:.5px solid rgba(233,162,136,.36)">
+                <span style="font-size:13px;line-height:1.55;color:#F3C0AC;text-wrap:pretty">{{ commitWarning }}</span>
+                <span style="font-size:11.5px;line-height:1.5;color:#C6CEC9;text-wrap:pretty">Saving it is allowed. Noop will still build the route it can build, and the difference between that route and this date will be on the journey screen every time you open it.</span>
+                <div style="display:flex;gap:7px">
+                  <div onClick="{{ confirmCommit }}" style="flex:1.3;height:44px;border-radius:15px;background:#E9A288;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#231009;cursor:pointer">Save it anyway</div>
+                  <div onClick="{{ cancelCommit }}" style="flex:1;height:44px;border-radius:15px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#C6CEC9;cursor:pointer">Change the date</div>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ commitOpen }}" hint-placeholder-val="{{ true }}">
+              <div onClick="{{ commit }}" style="{{ commitBtn }}">{{ commitLabel }}</div>
+            </sc-if>
+            <span style="font-size:11px;line-height:1.6;color:#57605C;padding:0 2px;text-wrap:pretty">One goal at a time, on purpose. A second one would compete with the first for the same nights of sleep, and the app would have to pretend it did not.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isLabs }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:118px">
+          <div style="padding:56px 18px 0;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goYou }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="flex:1;font-size:13.5px;color:#939C97">You</span>
+            <div onClick="{{ goPicker }}" style="height:30px;padding:0 12px;flex:none;border-radius:10px;background:rgba(242,180,92,.14);border:.5px solid rgba(242,180,92,.32);display:flex;align-items:center;font-size:11.5px;font-weight:600;color:#F6DCB4;cursor:pointer">Add results</div>
+          </div>
+
+          <div style="padding:2px 20px 0;display:flex;flex-direction:column;gap:2px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0 0">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8B958F;font-weight:600">Biomarkers</span>
+              <span style="font-size:10.5px;color:#57605C">drawn 14 August · Karolinska</span>
+            </div>
+
+            <div style="position:relative;height:266px;display:flex;align-items:center;justify-content:center">
+              <div style="{{ labGlow }}"></div>
+              <div style="position:absolute;left:50%;top:50%;width:250px;height:250px;transform:translate(-50%,-50%);animation:goalSpin 120s linear infinite;pointer-events:none">
+                <sc-for list="{{ labSpecks }}" as="p" hint-placeholder-count="22">
+                  <div style="{{ p.s }}"></div>
+                </sc-for>
+              </div>
+              <svg viewBox="0 0 240 240" style="position:absolute;width:240px;height:240px;overflow:visible;pointer-events:none">
+                <circle cx="120" cy="120" r="74" fill="rgba(46,204,128,.06)" stroke="rgba(46,204,128,.34)" stroke-width="1" stroke-dasharray="3 4"></circle>
+                <circle cx="120" cy="120" r="40" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="1"></circle>
+                <sc-for list="{{ markerDots }}" as="m" hint-placeholder-count="7">
+                  <line x1="120" y1="120" x2="{{ m.x }}" y2="{{ m.y }}" stroke="{{ m.line }}" stroke-width="1"></line>
+                </sc-for>
+                <sc-for list="{{ markerDots }}" as="m" hint-placeholder-count="7">
+                  <circle cx="{{ m.x }}" cy="{{ m.y }}" r="{{ m.r }}" fill="{{ m.c }}"></circle>
+                </sc-for>
+              </svg>
+              <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;max-width:96px">
+                <span style="font-family:'Outfit',sans-serif;font-size:40px;font-weight:200;letter-spacing:-.045em;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 22px rgba(0,0,0,.75)">{{ inRange }}</span>
+                <span style="font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#93A0A6;font-weight:600;text-align:center;white-space:nowrap">of {{ total }} in band</span>
+              </div>
+              <span style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);font-size:10.5px;color:#57605C;white-space:nowrap">outside the dashed edge is outside the lab's band</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:6px 16px;margin-top:10px">
+              <sc-for list="{{ markers }}" as="m" hint-placeholder-count="7">
+                <div onClick="{{ m.open }}" style="{{ m.row }}">
+                  <span style="{{ m.pip }}"></span>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:3px;min-width:0">
+                    <span style="font-size:13.5px;color:#EDF1EF">{{ m.k }}</span>
+                    <span style="font-size:11px;color:#7F8A85">{{ m.ref }}</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none">
+                    <div style="display:flex;align-items:baseline;gap:4px">
+                      <span style="{{ m.numStyle }}">{{ m.v }}</span>
+                      <span style="font-size:11px;color:#7F8A85">{{ m.unit }}</span>
+                    </div>
+                    <span style="{{ m.tagStyle }}">{{ m.tag }}</span>
+                  </div>
+                  <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:10px;margin-top:10px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Not measured here</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#939C97;text-wrap:pretty">Nothing on this screen came off the strap. These are numbers you or your clinic entered, kept beside the wearable data so they can be read together — and dated, because a ferritin from March is not a fact about today.</span>
+            </div>
+
+            <span style="font-size:11px;line-height:1.6;color:#57605C;padding:8px 2px 0;text-wrap:pretty">Reference bands are the laboratory's, not a target. Out of range is a reason to ask someone, not a verdict — and Noop will not tell you what to do about a blood test.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isReview }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:150px">
+          <div style="padding:56px 18px 6px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goLabs }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Biomarkers</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:12px">
+            <sc-if value="{{ showImageCard }}" hint-placeholder-val="{{ true }}">
+            <div onClick="{{ openShot }}" style="position:relative;height:132px;border-radius:20px;overflow:hidden;background:#101413;border:.5px solid rgba(255,255,255,.09);cursor:pointer;flex:none">
+              <sc-if value="{{ hasShot }}" hint-placeholder-val="{{ true }}">
+              <div style="position:absolute;inset:-14px;transform:rotate(-1.4deg);background:linear-gradient(163deg,#DFD9CB 0%,#CFC8B7 58%,#BEB6A3 100%);padding:16px 18px;display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between">
+                  <span style="font:600 8px ui-monospace,Menlo,monospace;letter-spacing:.12em;color:rgba(30,26,20,.62)">HAEMATOLOGY &middot; SERUM</span>
+                  <span style="font:400 7.5px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.42)">14 AUG</span>
+                </div>
+                <div style="height:1px;background:rgba(30,26,20,.2)"></div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <sc-for list="{{ pageLines }}" as="p" hint-placeholder-count="5">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="flex:1;font:400 9px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.74)">{{ p.k }}</span>
+                      <span style="font:600 9px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.88)">{{ p.v }}</span>
+                      <span style="width:38px;font:400 8px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.5)">{{ p.u }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+                <div style="position:absolute;inset:0;background:radial-gradient(120% 90% at 30% 25%,rgba(0,0,0,0) 30%,rgba(0,0,0,.34) 100%)"></div>
+                <div style="position:absolute;left:0;right:0;bottom:0;height:52px;background:linear-gradient(to top,rgba(4,6,5,.9),rgba(4,6,5,0))"></div>
+                <div style="position:absolute;left:12px;right:10px;bottom:9px;display:flex;align-items:center;gap:10px">
+                  <span style="flex:1;min-width:0;font-size:10.5px;color:#C6CEC9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">IMG_4471 &middot; 14 August &middot; read on this phone</span>
+                  <span onClick="{{ goPicker }}" style="flex:none;font-size:11px;font-weight:600;color:#F6DCB4;cursor:pointer">Retake</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{ noShot }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:0 26px">
+                  <span style="font-size:13px;font-weight:600;color:#EDF1EF">Nothing could be read off this photo</span>
+                  <span style="font-size:11.5px;line-height:1.5;color:#8B958F;text-align:center;text-wrap:pretty">The page is there, the numbers are not legible enough to lift. Retake it flat, in daylight, filling the frame.</span>
+                </div>
+              </sc-if>
+            </div>
+            </sc-if>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="flex:none;white-space:nowrap;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#F3C888;font-weight:600">Nothing is stored yet</span>
+                <span style="margin-left:auto;flex:none;white-space:nowrap;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#F3C888;font-weight:600;padding:3px 7px;border-radius:6px;border:.5px solid rgba(243,200,136,.45)">{{ reviewProvenance }}</span>
+              </div>
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:300;letter-spacing:-.03em;line-height:1.24;text-wrap:pretty">{{ reviewTitle }}</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ reviewSub }}</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ candidates }}" as="c" hint-placeholder-count="4">
+                <div style="{{ c.card }}">
+                  <div style="display:flex;align-items:flex-start;gap:12px">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:5px;min-width:0">
+                      <span style="font-size:13.5px;color:#EDF1EF">{{ c.k }}</span>
+                      <div style="display:flex;align-items:baseline;gap:5px">
+                        <span style="{{ c.numStyle }}">{{ c.v }}</span>
+                        <span style="font-size:11.5px;color:#7F8A85">{{ c.unit }}</span>
+                      </div>
+                      <span style="{{ c.confStyle }}">{{ c.conf }}</span>
+                    </div>
+                    <div style="flex:none;display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+                      <sc-if value="{{ c.hasStrip }}" hint-placeholder-val="{{ true }}">
+                        <div style="width:132px;height:26px;border-radius:6px;overflow:hidden;position:relative;background:#0C0E0D;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)">
+                          <div style="{{ c.stripPage }}">
+                            <span style="{{ c.stripName }}">{{ c.k }}</span>
+                            <span style="{{ c.stripVal }}">{{ c.rawVal }}</span>
+                            <span style="{{ c.stripUnit }}">{{ c.unit }}</span>
+                          </div>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ c.noStrip }}" hint-placeholder-val="{{ false }}">
+                        <div style="max-width:132px;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.09)">
+                          <span style="font:600 9px ui-monospace,Menlo,monospace;color:#C6CEC9;white-space:nowrap">{{ c.raw }}</span>
+                        </div>
+                      </sc-if>
+                      <span style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#57605C;font-weight:600">{{ c.cropLabel }}</span>
+                    </div>
+                  </div>
+                  <sc-if value="{{ c.pending }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;gap:7px">
+                      <div onClick="{{ c.keep }}" style="flex:1.3;height:40px;border-radius:13px;background:#F2B45C;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#1E1405;cursor:pointer">Confirm</div>
+                      <div onClick="{{ c.edit }}" style="flex:1;height:40px;border-radius:13px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#C6CEC9;cursor:pointer">Fix</div>
+                      <div onClick="{{ c.drop }}" style="flex:1;height:40px;border-radius:13px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#C6CEC9;cursor:pointer">Discard</div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ c.pendingHand }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;gap:7px">
+                      <div onClick="{{ c.edit }}" style="flex:1.3;height:40px;border-radius:13px;background:#F2B45C;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#1E1405;cursor:pointer">Type it in</div>
+                      <div onClick="{{ c.drop }}" style="flex:1;height:40px;border-radius:13px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#C6CEC9;cursor:pointer">Leave it out</div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ c.editing }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;flex-direction:column;gap:10px;padding:13px 13px 12px;border-radius:15px;background:rgba(255,255,255,.045);border:.5px solid rgba(242,180,92,.32)">
+                      <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#F3C888;font-weight:600">{{ c.editTitle }}</span>
+                      <div style="display:flex;align-items:center;gap:9px">
+                        <input value="{{ c.draft }}" onChange="{{ c.onDraft }}" inputMode="decimal" placeholder="{{ c.editHint }}" style="{{ c.inputStyle }}" />
+                        <span style="flex:none;font-size:12px;color:#7F8A85">{{ c.unit }}</span>
+                      </div>
+                      <span style="font-size:11px;line-height:1.5;color:#7F8A85;text-wrap:pretty">{{ c.editNote }}</span>
+                      <div style="display:flex;gap:7px">
+                        <div onClick="{{ c.commitEdit }}" style="{{ c.editSaveBtn }}">Use this value</div>
+                        <div onClick="{{ c.cancelEdit }}" style="flex:1;height:40px;border-radius:13px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#C6CEC9;cursor:pointer">{{ c.cancelLabel }}</div>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ c.settled }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:14px;background:rgba(255,255,255,.045);border:.5px solid rgba(255,255,255,.09)">
+                      <span style="font-size:12px;color:#C6CEC9">{{ c.state }}</span>
+                      <span onClick="{{ c.reset }}" style="margin-left:auto;font-size:11.5px;font-weight:600;color:#F6DCB4;cursor:pointer">Undo</span>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:9px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">What happens to the file</span>
+              <sc-for list="{{ fileFacts }}" as="f" hint-placeholder-count="3">
+                <div style="display:flex;align-items:flex-start;gap:10px">
+                  <span style="width:5px;height:5px;flex:none;margin-top:6px;border-radius:50%;background:#F2B45C"></span>
+                  <span style="flex:1;font-size:12px;line-height:1.55;color:#939C97;text-wrap:pretty">{{ f.t }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="position:absolute;left:0;right:0;bottom:88px;padding:0 14px;z-index:5;pointer-events:none">
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 12px 11px 16px;border-radius:22px;background:rgba(23,28,26,.92);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.1);box-shadow:0 8px 26px rgba(0,0,0,.45);pointer-events:auto">
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:12.5px;font-weight:600;color:#EDF1EF">{{ reviewCount }}</span>
+              <span style="font-size:11px;color:#7F8A85">{{ reviewNote }}</span>
+            </div>
+            <div onClick="{{ saveResults }}" style="{{ saveBtn }}">Save</div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isPicker }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:116px">
+          <div style="padding:56px 18px 6px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goLabs }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Biomarkers</span>
+          </div>
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:13px">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:300;letter-spacing:-.03em;line-height:1.24;text-wrap:pretty">Photograph the report</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#939C97;text-wrap:pretty">One page at a time, flat and filling the frame. Reading happens on this phone &mdash; the photo never leaves it, and it is dropped when you are done.</span>
+            </div>
+
+            <div onClick="{{ goReview }}" style="height:54px;border-radius:18px;background:#F2B45C;display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer">
+              <span style="{{ icoCamBtn }}"></span>
+              <span style="font-size:15px;font-weight:600;color:#1E1405">Take a photo</span>
+            </div>
+
+            <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600;padding:6px 2px 0">Or pick one you already have</span>
+            <div style="display:flex;gap:7px;flex-wrap:wrap">
+              <sc-for list="{{ shots }}" as="s" hint-placeholder-count="6">
+                <div onClick="{{ goReview }}" style="{{ s.tile }}">
+                  <div style="{{ s.page }}"></div>
+                  <span style="{{ s.stamp }}">{{ s.when }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div onClick="{{ goByHand }}" style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px;display:flex;align-items:center;gap:12px;cursor:pointer">
+              <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;color:#EDF1EF">Enter results by hand</span>
+                <span style="font-size:11.5px;line-height:1.45;color:#7F8A85;text-wrap:pretty">All nine markers, no photo. Every row is optional, and the confirm step drops its strips because there is no page to check against.</span>
+              </div>
+              <span style="width:8px;height:8px;flex:none;border-top:1.6px solid #57605C;border-right:1.6px solid #57605C;transform:rotate(45deg)"></span>
+            </div>
+
+            <span style="font-size:11.5px;line-height:1.6;color:#57605C;padding:2px 2px 0;text-wrap:pretty">Cancelling here adds nothing, and a photo you back out of is not remembered.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isMarker }}" hint-placeholder-val="{{ false }}">
+        <div class="scr" style="padding-bottom:118px">
+          <div style="padding:56px 18px 6px;display:flex;align-items:center;gap:12px">
+            <div onClick="{{ goLabs }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:block;flex:none;width:9px;height:9px;border-left:1.6px solid #C6CEC9;border-bottom:1.6px solid #C6CEC9;transform:rotate(45deg);margin-left:-2px"></span>
+            </div>
+            <span style="font-size:13.5px;color:#939C97">Biomarkers</span>
+          </div>
+
+          <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <span style="font-family:'Outfit',sans-serif;font-size:25px;font-weight:400;letter-spacing:-.025em">{{ mk.k }}</span>
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="font-family:'Outfit',sans-serif;font-size:54px;font-weight:200;letter-spacing:-.045em;line-height:1;font-variant-numeric:tabular-nums">{{ mk.v }}</span>
+                <span style="font-size:13px;color:#939C97">{{ mk.unit }}</span>
+                <span style="{{ mk.tagStyle }}">{{ mk.tag }}</span>
+              </div>
+              <span style="font-size:13px;line-height:1.6;color:#939C97;text-wrap:pretty">{{ mk.read }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">Four draws</span>
+                <span style="font-size:11px;color:#57605C">shaded — the lab's band</span>
+              </div>
+              <svg viewBox="0 0 300 118" style="width:100%;height:118px;overflow:visible">
+                <rect x="0" y="{{ mk.bandY }}" width="300" height="{{ mk.bandH }}" fill="rgba(46,204,128,.1)"></rect>
+                <sc-if value="{{ mk.showTop }}" hint-placeholder-val="{{ false }}">
+                  <line x1="0" y1="{{ mk.bandY }}" x2="300" y2="{{ mk.bandY }}" stroke="rgba(46,204,128,.32)" stroke-width="1" stroke-dasharray="3 4"></line>
+                </sc-if>
+                <sc-if value="{{ mk.showBottom }}" hint-placeholder-val="{{ true }}">
+                  <line x1="0" y1="{{ mk.bandB }}" x2="300" y2="{{ mk.bandB }}" stroke="rgba(46,204,128,.32)" stroke-width="1" stroke-dasharray="3 4"></line>
+                </sc-if>
+                <polyline points="{{ mk.line }}" fill="none" stroke="#F2B45C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                <sc-for list="{{ mk.dots }}" as="d" hint-placeholder-count="4">
+                  <circle cx="{{ d.x }}" cy="{{ d.y }}" r="3.6" fill="#0A0C0B" stroke="#F2B45C" stroke-width="2"></circle>
+                </sc-for>
+              </svg>
+              <div style="display:flex;justify-content:space-between">
+                <sc-for list="{{ mk.axis }}" as="a" hint-placeholder-count="4">
+                  <span style="font-size:10.5px;color:#57605C">{{ a.label }}</span>
+                </sc-for>
+              </div>
+              <span style="font-size:11px;line-height:1.55;color:#7F8A85;text-wrap:pretty">{{ mk.bandNote }}</span>
+            </div>
+
+            <div style="background:#141817;border:.5px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:11px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6C7570;font-weight:600">What it sits next to</span>
+              <sc-for list="{{ mk.beside }}" as="b" hint-placeholder-count="3">
+                <div style="display:flex;align-items:baseline;gap:10px">
+                  <span style="flex:1;font-size:12.5px;line-height:1.5;color:#C6CEC9;text-wrap:pretty">{{ b.k }}</span>
+                  <span style="font:600 11.5px ui-monospace,Menlo,monospace;color:#EDF1EF;flex:none">{{ b.v }}</span>
+                </div>
+              </sc-for>
+              <span style="font-size:11px;line-height:1.55;color:#7F8A85;text-wrap:pretty">Shown together because they were drawn on the same day, not because Noop found a relationship. It has four points — that is not enough to claim one.</span>
+            </div>
+
+            <div style="background:rgba(242,180,92,.08);border:.5px solid rgba(242,180,92,.26);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#F3C888;font-weight:600">Worth a retest</span>
+              <span style="font-size:12.5px;line-height:1.6;color:#DCE3E0;text-wrap:pretty">{{ mk.retest }}</span>
+            </div>
+
+            <span style="font-size:11px;line-height:1.6;color:#57605C;padding:2px 2px 0;text-wrap:pretty">Entered by you, from a laboratory report. Noop stores and dates it, draws it against the band the lab gave, and stops there — it is not a diagnosis and not advice.</span>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <sc-if value="{{ shotOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:30;background:#050706;display:flex;flex-direction:column">
+        <div style="padding:56px 18px 0;display:flex;align-items:center;gap:12px;flex:none">
+          <div onClick="{{ closeShot }}" style="width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="font-size:15px;color:#EDF1EF;line-height:1;margin-top:-2px">&times;</span></div>
+          <span style="font-size:13px;color:#939C97;font-family:ui-monospace,Menlo,monospace">IMG_4471 &middot; 14 August</span>
+        </div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:18px">
+          <div style="position:relative;width:100%;height:420px;border-radius:14px;overflow:hidden;background:#101413">
+              <div style="position:absolute;inset:-14px;transform:rotate(-1.4deg);background:linear-gradient(163deg,#DFD9CB 0%,#CFC8B7 58%,#BEB6A3 100%);padding:16px 18px;display:flex;flex-direction:column;gap:9px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between">
+                  <span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.12em;color:rgba(30,26,20,.62)">HAEMATOLOGY &middot; SERUM</span>
+                  <span style="font:400 10px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.42)">14 AUG</span>
+                </div>
+                <div style="height:1px;background:rgba(30,26,20,.2)"></div>
+                <div style="display:flex;flex-direction:column;gap:9px">
+                  <sc-for list="{{ pageLines }}" as="p" hint-placeholder-count="5">
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <span style="flex:1;font:400 12px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.74)">{{ p.k }}</span>
+                      <span style="font:600 12px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.88)">{{ p.v }}</span>
+                      <span style="width:52px;font:400 11px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.5)">{{ p.u }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+          </div>
+        </div>
+        <div style="padding:0 24px 34px;display:flex;flex-direction:column;gap:9px;flex:none">
+          <span style="font-size:12px;line-height:1.55;color:#8B958F;text-align:center;text-wrap:pretty">Pinch to zoom. This is the photo as it was read &mdash; nothing has been straightened, cropped or enhanced.</span>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:0 14px 26px;pointer-events:none;z-index:6">
+        <div style="display:flex;align-items:center;gap:3px;padding:6px;border-radius:26px;background:rgba(23,28,26,.82);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.09);box-shadow:0 8px 26px rgba(0,0,0,.5);pointer-events:auto">
+          <div onClick="{{ tabToday }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoToday }}"></span>
+          </div>
+          <div onClick="{{ tabTrends }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoTrends }}"></span>
+          </div>
+          <div onClick="{{ goPicker }}" style="width:44px;height:44px;flex:none;margin:0 2px;border-radius:50%;background:#17A2E6;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(23,162,230,.4)">
+            <span style="font-family:'Outfit',sans-serif;font-size:23px;font-weight:300;color:#04121A;line-height:1;margin-top:-2px">+</span>
+          </div>
+          <div onClick="{{ tabRest }}" style="flex:1;height:46px;border-radius:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="{{ icoRest }}"></span>
+          </div>
+          <div onClick="{{ goYou }}" style="flex:1.7;height:46px;border-radius:20px;background:#F2B45C;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer">
+            <span style="{{ icoYouOn }}"></span>
+            <span style="font-size:12.5px;font-weight:600;color:#1E1405">You</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </x-import>
+  </div>
+</div>
+
+<sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+<div style="width:430px;flex:none;padding-top:34px;display:flex;flex-direction:column;gap:30px">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <h1 style="margin:0;font-family:'Outfit',sans-serif;font-weight:300;font-size:33px;line-height:1.16;letter-spacing:-.028em;color:#17150F;text-wrap:pretty">A goal the data won't back is said to be unrealistic.</h1>
+    <p style="margin:0;font-size:14.5px;line-height:1.68;color:#4A463D;text-wrap:pretty">Two features that could each become a lie machine. A goal screen invites invented streaks and a lab screen invites an OCR misread of your own blood work, so both are built around the moment they could go wrong: <strong style="font-weight:600;color:#17150F">progress is only counted from sessions actually recorded</strong>, and <strong style="font-weight:600;color:#17150F">nothing enters the lab book until you confirm it against the strip of page it was read from</strong>. Warm amber is this act's colour, carried from You, where both live.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:7px">
+    <sc-for list="{{ chips }}" as="c" hint-placeholder-count="5">
+      <span onClick="{{ c.go }}" style="{{ c.s }}">{{ c.k }}</span>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0">
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em;padding-top:3px">T1 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The journey is a route, not a ring</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">A ring implies closure and punishes a missed week. The route is a line with waypoints: the lit part is behind you, the dim part ahead, and a bad week simply means the lit part stops where it stopped. Nothing resets, nothing breaks.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em;padding-top:3px">T2 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Feasibility is a verdict, with its evidence</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Set a date and the call appears with the three measurements behind it — long run, weekly load, weeks available — each as a bar against what the goal needs. Try the <em style="font-family:'Instrument Serif',serif;font-style:italic">feasibility</em> tweak: on <strong style="font-weight:600;color:#17150F">unrealistic</strong> the card turns clay, the commit button says <em style="font-family:'Instrument Serif',serif;font-style:italic">commit anyway</em>, and it names the date the data would accept instead.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em;padding-top:3px">T3 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">Biomarkers as distance from the band</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">One plot instead of nine sparklines: the dashed circle is the edge of the reference band, each spoke a marker, and the only thing that matters is whether its dot sits inside. Two out of range read instantly, without a table and without colour doing the work alone — every dot's row states the value and the word.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em;padding-top:3px">T4 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">The review step, made unmistakable</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">The risk is accepting a misread of your own blood work, so the screen opens with <em style="font-family:'Instrument Serif',serif;font-style:italic">nothing is stored yet</em>, shows the strip of page each value came from, marks a low-confidence read in amber, and keeps Save inert until something is confirmed. Confirm · Fix · Discard, per row, and the footer counts what will actually be kept.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr;gap:18px;padding:16px 0;border-top:1px solid rgba(23,21,15,.11);border-bottom:1px solid rgba(23,21,15,.11)">
+      <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:#B4543A;letter-spacing:.06em;padding-top:3px">T5 · NEW</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font-family:'Outfit',sans-serif;font-weight:500;font-size:15px;color:#17150F">A marker screen that refuses to interpret</span>
+        <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Four draws against the lab's band, what was drawn the same day, and one honest line: four points cannot support a correlation. The page ends by naming what it is not — not a diagnosis, not advice — because a lab value beside recovery data is exactly where an app is tempted to become both.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;padding:2px 0 0">
+    <span style="font:600 9.5px ui-monospace,Menlo,monospace;color:rgba(23,21,15,.5);letter-spacing:.06em">WHAT IS LEFT</span>
+    <span style="font-size:12.5px;line-height:1.6;color:#6B6558;text-wrap:pretty">Of the second brief: Live Session, Workouts and the More index — all three are variations on templates that now exist. Then the surfaces outside the app: home-screen and lock-screen widgets, and the live heart rate in the Dynamic Island.</span>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;goal&quot;,&quot;set&quot;,&quot;labs&quot;,&quot;picker&quot;,&quot;review&quot;,&quot;marker&quot;],&quot;default&quot;:&quot;goal&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;labsCase&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;read&quot;,&quot;nothing&quot;],&quot;default&quot;:&quot;read&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;feasibility&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;realistic&quot;,&quot;ambitious&quot;,&quot;unrealistic&quot;],&quot;default&quot;:&quot;realistic&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Goal&quot;},&quot;outOfRange&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:2,&quot;min&quot;:0,&quot;max&quot;:3,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Biomarkers&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;onNav&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(act: string, screen: string) =&gt; void&quot;}}">
+class Component extends DCLogic {
+  state = { sx: null, sy: null,
+    screen: null, kind: null, weeks: null, week: 'open', call: null, shot: false,
+    cand: {}, marker: 'Ferritin',
+    edited: {}, editing: null, draft: '', byHand: false, commitPending: false
+  };
+
+  componentDidUpdate(prev) {
+    const p = this.props;
+    if ((prev.screen !== p.screen || prev.navSeq !== p.navSeq) && p.screen) this.setState({ screen: p.screen });
+  }
+
+  renderVals() {
+    const self = this;
+    const S = this.state;
+    const WARM = '#F2B45C', WARM_L = '#F6DCB4', GREEN = '#2ECC80', GREEN_L = '#8FEFC0';
+
+    const GLYPH = {
+      today: 'M12 3v2M12 19v2M4.2 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z',
+      trends: 'M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9',
+      moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+      you: 'M12 4.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM5.5 19.5c0-3.3 2.9-5.3 6.5-5.3s6.5 2 6.5 5.3',
+      drop: 'M12 3.6s5.4 5.6 5.4 9.4A5.4 5.4 0 0 1 12 18.4a5.4 5.4 0 0 1-5.4-5.4C6.6 9.2 12 3.6 12 3.6z'
+    };
+    const mask = function (d) {
+      return 'url("data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>') + '")';
+    };
+    const ico = function (key, size, color) {
+      const u = mask(GLYPH[key]);
+      return {
+        width: size, height: size, flex: 'none', display: 'block', background: color,
+        WebkitMaskImage: u, maskImage: u, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center', maskPosition: 'center', WebkitMaskSize: 'contain', maskSize: 'contain'
+      };
+    };
+    const hair = function (i) {
+      return {
+        display: 'flex', alignItems: 'center', gap: 12, minHeight: 62, padding: '13px 0', cursor: 'pointer',
+        borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.06)'
+      };
+    };
+    const hash = function (n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+    const screen = S.screen || this.props.screen || 'goal';
+    const go = function (s) { return function () { self.setState({ screen: s }); }; };
+    const call = S.call || this.props.feasibility || 'realistic';
+    const outCount = Math.max(0, Math.min(3, Math.round(Number(this.props.outOfRange != null ? this.props.outOfRange : 2))));
+
+    // ── ONE CALCULATION, USED EVERYWHERE ON THIS SCREEN ─────────────────────────
+    //   weekly build = (peak ÷ now) ^ (1 ÷ building weeks) − 1
+    //   building weeks = weeks to the date − 2 easy weeks − 1 taper week   (11 − 3 = 8)
+    // The tolerance is this person's own history, not a rule of thumb: 5% a week is the steepest
+    // ramp their last two blocks absorbed without a poor night, and 10% is the line above which
+    // Noop will not build a route at all. The three verdicts differ in ONE input — the peak the
+    // finish they asked for requires. Nothing on this screen may state a build figure that does
+    // not come out of this function.
+    const NOW_KM = 34, BUILD_WEEKS = 8, ABSORBED = 0.05, CEILING = 0.10;
+    const PEAK = { realistic: 48, ambitious: 55, unrealistic: 75 };
+    const LONG_KM = { realistic: 18, ambitious: 18, unrealistic: 21 };
+    const ramp = function (peak, weeks) { return Math.pow(peak / NOW_KM, 1 / (weeks || BUILD_WEEKS)) - 1; };
+    const pc = function (x) { return (Math.round(x * 1000) / 10).toFixed(1).replace(/\.0$/, '') + '%'; };
+    const peakKm = PEAK[call] || PEAK.realistic;
+    const longKm = LONG_KM[call] || LONG_KM.realistic;
+    const rampPc = pc(ramp(peakKm));                                    // 4.4% · 6.2% · 10.4%
+    const gentleWeeks = Math.ceil(Math.log(peakKm / NOW_KM) / Math.log(1 + ABSORBED)) + 3;
+
+    // ── the route: a line with waypoints, never a ring ───────────
+    const PROG = call === 'unrealistic' ? 0.34 : call === 'ambitious' ? 0.41 : 0.46;
+    const rx = function (t) { return 22 + t * 296; };
+    const ry = function (t) { return 128 - Math.sin(t * 2.1) * 58 - t * 26 + Math.sin(t * 6.1) * 5; };
+    const NSEG = 36;
+    const routeSegs = [];
+    for (let i = 0; i < NSEG; i++) {
+      const t0 = i / NSEG, t1 = (i + 1) / NSEG;
+      const done = t1 <= PROG;
+      const edge = !done && t0 <= PROG;
+      routeSegs.push({
+        d: 'M' + rx(t0).toFixed(1) + ' ' + ry(t0).toFixed(1) + ' L' + rx(t1).toFixed(1) + ' ' + ry(t1).toFixed(1),
+        c: done ? WARM : edge ? 'rgba(242,180,92,.5)' : 'rgba(255,255,255,.11)',
+        w: done ? 7 : 4
+      });
+    }
+    const WAYS = [
+      { t: 0.06, k: 'First 12 km run', sub: 'done 3 August, at 6:04/km', tag: 'reached', when: 'Aug 3', label: '12 km' },
+      { t: 0.3, k: (this.props.schedule || 'day') === 'night' ? 'Four weeks holding your anchor' : 'Four weeks inside your bedtime hour', sub: 'done 17 August — the reason the rest is possible', tag: 'reached', when: 'Aug 17', label: '4 weeks' },
+      { t: 0.52, k: '18 km at conversational pace', sub: 'the next one. Two attempts allowed, no penalty for either', tag: 'next', when: 'Sep 14', label: '18 km' },
+      { t: 0.76, k: 'A week at ' + peakKm + ' km without a poor night', sub: 'the load ceiling this route is built around', tag: 'ahead', when: 'Oct 5', label: peakKm + ' km' },
+      { t: 0.97, k: 'Half marathon, 26 October', sub: 'the goal. Nothing about the date is a promise', tag: 'the day', when: 'Oct 26', label: 'race' }
+    ];
+    const waypoints = WAYS.map(function (w) {
+      const done = w.t <= PROG;
+      return {
+        x: rx(w.t).toFixed(1), y: ry(w.t).toFixed(1), r: done ? 6 : 5,
+        fill: done ? WARM : '#0A0C0B', stroke: done ? WARM_L : 'rgba(255,255,255,.3)'
+      };
+    });
+    const ways = WAYS.map(function (w, i) {
+      const done = w.t <= PROG;
+      return {
+        k: w.k, sub: w.sub, tag: done ? 'reached' : w.tag,
+        row: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 0', borderTop: i === 0 ? 'none' : '.5px solid rgba(255,255,255,.06)' },
+        mark: done
+          ? { width: 17, height: 17, flex: 'none', marginTop: 2, borderRadius: '50%', background: WARM, boxShadow: '0 0 12px rgba(242,180,92,.55)' }
+          : { width: 17, height: 17, flex: 'none', marginTop: 2, borderRadius: '50%', border: '1.6px dashed rgba(255,255,255,.24)' },
+        title: { fontSize: 13.5, lineHeight: 1.4, color: done ? '#EDF1EF' : '#A9B2AE' },
+        tagStyle: {
+          flex: 'none', fontSize: 10, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase',
+          padding: '4px 8px', borderRadius: 7,
+          color: done ? WARM_L : '#7F8A85',
+          background: done ? 'rgba(242,180,92,.14)' : 'rgba(255,255,255,.05)'
+        }
+      };
+    });
+    const routeSpecks = [];
+    for (let i = 0; i < 30; i++) {
+      const ang = i * 2.39996 + hash(i) * 1.3;
+      const rad = 0.72 + hash(i + 40) * 0.34;
+      const sz = 1 + hash(i + 9) * 2;
+      routeSpecks.push({ s: {
+        position: 'absolute',
+        left: (50 + Math.cos(ang) * rad * 47).toFixed(2) + '%',
+        top: (50 + Math.sin(ang) * rad * 47).toFixed(2) + '%',
+        width: Number(sz.toFixed(1)), height: Number(sz.toFixed(1)), borderRadius: '50%',
+        background: 'rgba(255,232,196,' + (0.14 + hash(i + 3) * 0.38).toFixed(2) + ')',
+        boxShadow: '0 0 ' + (sz * 2.6).toFixed(1) + 'px rgba(242,180,92,.7)',
+        transform: 'translate(-50%,-50%)'
+      } });
+    }
+
+    // ── the feasibility call, with its evidence ──────────────────
+    const CALL = {
+      realistic: {
+        kick: 'The data says yes', c: GREEN, cl: GREEN_L, rgb: '46,204,128',
+        body: 'Twelve kilometres at 6:04 with heart rate under 150, on 34 km a week and eleven weeks left. Finishing comfortably needs a 48 km peak, and eight of those eleven weeks build: ' + pc(ramp(48)) + ' a week, inside the 5% your last two blocks absorbed without a poor night.',
+        fix: null, commit: 'Keep this route'
+      },
+      ambitious: {
+        kick: 'Possible, with one condition', c: WARM, cl: WARM_L, rgb: '242,180,92',
+        body: 'The distance is there; the clock is what costs. Two hours needs a 55 km peak off 34, and only eight of the eleven weeks build — ' + pc(ramp(55)) + ' a week against the 5% your last two blocks absorbed. One steep week is nothing; eight in a row is the risk.',
+        fix: 'Drop the time and finish comfortably: same date, a 48 km peak, ' + pc(ramp(48)) + ' a week. Or keep two hours and move the race to 23 November, which puts the same 55 km peak inside your 5% at ' + pc(ramp(55, 12)) + '. Noop would take the first — the distance is not the risk, the ramp is.',
+        commit: 'Commit anyway'
+      },
+      unrealistic: {
+        kick: 'The data says not by then', c: '#E9A288', cl: '#F0BBA6', rgb: '233,162,136',
+        body: 'Your longest run this year is 12 km, off 34 km a week, and 1:45 means holding 4:58 a kilometre for all of it. That finish needs a 75 km peak, which across eight building weeks is ' + pc(ramp(75)) + ' a week — above the 10% Noop will not build, and twice what your last two blocks absorbed.',
+        fix: 'Sub-1:45 on 8 February: twenty-nine weeks, twenty-six of them building, and the same 75 km peak arrives at ' + pc(ramp(75, 26)) + ' a week. Or run 26 October for the finish and not the clock.',
+        commit: 'Commit anyway'
+      }
+    };
+    const C = CALL[call] || CALL.realistic;
+    const callCard = {
+      marginTop: 10, borderRadius: 24, padding: '17px 17px 16px', display: 'flex', flexDirection: 'column', gap: 11,
+      background: 'linear-gradient(158deg,rgba(' + C.rgb + ',.15),rgba(255,255,255,.02))',
+      border: '.5px solid rgba(' + C.rgb + ',.34)'
+    };
+
+    // EVERY BAR IS A REAL RATIO, not a verdict-coloured guess: what you have over what the route
+    // asks for. The third is the ramp headroom — the 5% your blocks absorbed over what this asks.
+    const EV = [
+      { k: 'Longest run this year', v: '12 km', need: 'the route needs ' + longKm + ' km on the way', f: 12 / longKm },
+      { k: 'Weekly distance now', v: '34 km', need: 'the route peaks at ' + peakKm + ' km', f: NOW_KM / peakKm },
+      { k: 'Weeks available', v: '11', need: 'a 5% build wants ' + gentleWeeks + ', of which eight can build', f: ABSORBED / ramp(peakKm) }
+    ];
+    const evidence = EV.map(function (e) {
+      const f = Math.max(0.08, Math.min(1, e.f));
+      return {
+        k: e.k, v: e.v, note: e.need,
+        bar: { width: Math.round(f * 100) + '%', height: '100%', borderRadius: 4, background: f > 0.9 ? GREEN : f > 0.55 ? WARM : '#E9A288' }
+      };
+    });
+
+    const KINDS = ['A distance', 'A pace', 'Sleep regularity', 'Body composition'];
+    const kind = S.kind || 'A distance';
+    const kinds = KINDS.map(function (k) {
+      return {
+        k: k, pick: function () { self.setState({ kind: k }); },
+        chip: {
+          padding: '8px 13px', borderRadius: 11, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          background: k === kind ? WARM : 'rgba(255,255,255,.055)',
+          color: k === kind ? '#1E1405' : '#A9B2AE',
+          border: '.5px solid ' + (k === kind ? 'transparent' : 'rgba(255,255,255,.1)')
+        }
+      };
+    });
+    const WEEK_LABELS = ['6 weeks', '2 months', '10 weeks', '3 months', '15 weeks', '4 months', '20 weeks', '5 months', '6 months', '8 months', '10 months', 'a year'];
+    const weeksSel = S.weeks == null ? 4 : S.weeks;
+    const weeksTicks = WEEK_LABELS.map(function (_, i) {
+      const on = i <= weeksSel;
+      return {
+        pick: function () { self.setState({ weeks: i }); },
+        s: {
+          flex: 1, height: i === weeksSel ? 34 : 24, borderRadius: 3, cursor: 'pointer',
+          background: i === weeksSel ? WARM : on ? 'rgba(242,180,92,.32)' : 'rgba(255,255,255,.1)'
+        }
+      };
+    });
+
+    // ── biomarkers, as distance from the band ────────────────────
+    // the tweak swaps in a genuinely out-of-band draw — it never overrides a verdict
+    const MKB = [
+      { k: 'Ferritin', unit: 'µg/L', lo: 30, hi: 400, inV: 62, outV: 28,
+        inNote: 'inside, at the low end of a very wide band', outNote: 'under the band, and the one worth asking about' },
+      { k: 'Vitamin D', unit: 'nmol/L', lo: 50, hi: 125, inV: 78, outV: 44,
+        inNote: 'inside, in August — it falls by February', outNote: 'under the band, which for August is early' },
+      { k: 'ApoB', unit: 'g/L', lo: 0.5, hi: 1, inV: 0.78, outV: 1.14,
+        inNote: 'comfortably inside', outNote: 'over the band, and the first thing a clinician would look at' },
+      { k: 'hs-CRP', unit: 'mg/L', lo: 0, hi: 3, inV: 0.6, outV: 4.1,
+        inNote: 'low, which is where you want it', outNote: 'over the band — worth repeating before reading anything into it' },
+      { k: 'HbA1c', unit: 'mmol/mol', lo: 20, hi: 42, inV: 33, outV: 46,
+        inNote: 'inside, and stable across four draws', outNote: 'over the band' },
+      { k: 'TSH', unit: 'mIU/L', lo: 0.4, hi: 4, inV: 2.1, outV: 5.2, inNote: 'inside', outNote: 'over the band' },
+      { k: 'ALT', unit: 'U/L', lo: 10, hi: 50, inV: 41, outV: 68,
+        inNote: 'inside, and it moves with hard training weeks', outNote: 'over the band, in a hard training block' },
+      { k: 'Haemoglobin', unit: 'g/L', lo: 130, hi: 170, inV: 141, outV: 121,
+        inNote: 'inside, and steady across four draws', outNote: 'under the band — the one to repeat before reading anything into it' },
+      { k: 'Creatine kinase', unit: 'U/L', lo: 30, hi: 200, inV: 186, outV: 340,
+        inNote: 'inside, and it climbs the week after a long run', outNote: 'over the band, two days after a long run — expected rather than alarming' }
+    ];
+    const MK = MKB.map(function (m, i) {
+      return {
+        k: m.k, unit: m.unit, lo: m.lo, hi: m.hi,
+        v: i < outCount ? m.outV : m.inV,
+        note: i < outCount ? m.outNote : m.inNote
+      };
+    });
+    const marked = MK.map(function (m) {
+      const out = m.v < m.lo || m.v > m.hi;
+      const span = m.hi - m.lo, mid = (m.lo + m.hi) / 2;
+      const over = m.v < m.lo ? m.lo - m.v : m.v > m.hi ? m.v - m.hi : 0;
+      const dev = out
+        ? 1.06 + Math.min(0.4, over / (span * 0.25))
+        : Math.min(0.92, (Math.abs(m.v - mid) / (span / 2)) * 0.92);
+      return { m: m, out: out, dev: dev };
+    });
+    const inRange = marked.filter(function (r) { return !r.out; }).length;
+    const markerDots = marked.map(function (r, i) {
+      const ang = (-90 + i * (360 / marked.length)) * Math.PI / 180;
+      // in-band dots live in the annulus 58–71, outside the label but inside the
+      // dashed edge at 74; out-of-band dots start at 78 so the ring never lies
+      const rad = r.out ? 78 + Math.min(0.4, r.dev - 1.06) * 35 : 58 + (r.dev / 0.92) * 13;
+      return {
+        x: (120 + Math.cos(ang) * rad).toFixed(1), y: (120 + Math.sin(ang) * rad).toFixed(1),
+        r: r.out ? 6 : 4.6, c: r.out ? WARM : GREEN,
+        line: r.out ? 'rgba(242,180,92,.4)' : 'rgba(46,204,128,.28)'
+      };
+    });
+    const markers = marked.map(function (r, i) {
+      const m = r.m;
+      return {
+        k: m.k, v: m.v, unit: m.unit, ref: 'band ' + m.lo + '–' + m.hi + ' ' + m.unit + ' · 14 Aug',
+        tag: r.out ? (m.v < m.lo ? 'below band' : 'above band') : 'in band',
+        open: function () { self.setState({ screen: 'marker', marker: m.k }); },
+        row: hair(i),
+        pip: {
+          width: 8, height: 8, flex: 'none', borderRadius: '50%', background: r.out ? WARM : GREEN,
+          boxShadow: '0 0 10px ' + (r.out ? 'rgba(242,180,92,.6)' : 'rgba(46,204,128,.5)')
+        },
+        numStyle: { fontFamily: "'Outfit',sans-serif", fontSize: 20, fontWeight: 300, letterSpacing: '-.02em', fontVariantNumeric: 'tabular-nums', color: '#EDF1EF' },
+        tagStyle: { fontSize: 10.5, fontWeight: 600, color: r.out ? WARM_L : '#8B958F' }
+      };
+    });
+    const labSpecks = [];
+    for (let i = 0; i < 26; i++) {
+      const ang = i * 2.39996 + hash(i + 71) * 1.3;
+      const rad = 0.8 + hash(i + 20) * 0.3;
+      const sz = 1 + hash(i + 5) * 1.9;
+      const warmDot = outCount > 0 && i % 3 === 0;
+      labSpecks.push({ s: {
+        position: 'absolute',
+        left: (50 + Math.cos(ang) * rad * 47).toFixed(2) + '%',
+        top: (50 + Math.sin(ang) * rad * 47).toFixed(2) + '%',
+        width: Number(sz.toFixed(1)), height: Number(sz.toFixed(1)), borderRadius: '50%',
+        background: warmDot ? 'rgba(255,232,196,.42)' : 'rgba(216,255,236,.34)',
+        boxShadow: '0 0 ' + (sz * 2.6).toFixed(1) + 'px ' + (warmDot ? 'rgba(242,180,92,.7)' : 'rgba(46,204,128,.65)'),
+        transform: 'translate(-50%,-50%)'
+      } });
+    }
+    const labGlow = {
+      position: 'absolute', width: 290, height: 290, borderRadius: '50%', pointerEvents: 'none',
+      filter: 'blur(18px)', animation: 'goalPulse 9s ease-in-out infinite',
+      background: outCount > 0
+        ? 'radial-gradient(circle,rgba(242,180,92,.2),rgba(242,180,92,0) 62%)'
+        : 'radial-gradient(circle,rgba(46,204,128,.2),rgba(46,204,128,0) 62%)'
+    };
+
+    // ── the review step ─────────────────────────────────────────
+    // the photo is not optional: with nothing read, the card stays and says so
+    // BY HAND IS NOT A PHOTO PATH. Reached from the picker's *Enter results* row, it fabricates no
+    // OCR: no image card, no strips, no confidence chips, and every row starts empty.
+    const BY_HAND = !!S.byHand;
+    const SHOT = ((this.props.labsCase || 'read') === 'read') && !BY_HAND;
+    // READ OFF THE PHOTO: whatever the sheet happened to print. This one prints four of the nine.
+    const CAND = [
+      { k: 'Ferritin', v: '28', unit: 'µg/L', raw: 'Ferritin  28 µg/L', conf: 'clear read', low: false, rect: true, rawVal: '28', tilt: -1.1 },
+      { k: 'Vitamin D', v: '52', unit: 'nmol/L', raw: '25-OH-D  52', conf: 'clear read', low: false, rect: true, rawVal: '52', tilt: 0.7 },
+      { k: 'ApoB', v: '0.78', unit: 'g/L', raw: 'ApoB  O.78 g/L', conf: 'low confidence — the O may be a zero', low: true, rect: true, rawVal: 'O.78', tilt: -0.6 },
+      { k: 'hs-CRP', v: '0.6', unit: 'mg/L', raw: 'hsCRP  <0,6', conf: 'low confidence — the page says “less than”', low: true, rect: false, rawVal: '<0,6', tilt: 0 }
+    ];
+    // BY HAND: NINE FIELDS — THE NINE MARKERS NOOP KEEPS, in the order a printed panel runs them.
+    // Every row is optional and starts collapsed at —; one input is open at a time; `ex` is
+    // placeholder text and is never stored. The nine are the same nine the Biomarkers list holds,
+    // so a typed value always has somewhere to live.
+    const PANEL = [
+      { k: 'Haemoglobin', unit: 'g/L', ex: '141' },
+      { k: 'Ferritin', unit: 'µg/L', ex: '28' },
+      { k: 'Vitamin D', unit: 'nmol/L', ex: '52' },
+      { k: 'ApoB', unit: 'g/L', ex: '0.78' },
+      { k: 'HbA1c', unit: 'mmol/mol', ex: '33' },
+      { k: 'hs-CRP', unit: 'mg/L', ex: '0.6' },
+      { k: 'TSH', unit: 'mIU/L', ex: '2.1' },
+      { k: 'ALT', unit: 'U/L', ex: '41' },
+      { k: 'Creatine kinase', unit: 'U/L', ex: '186' }
+    ].map(function (m) {
+      return { k: m.k, v: m.ex, unit: m.unit, raw: null, conf: null, low: false, rect: false, rawVal: null, tilt: 0 };
+    });
+    const ROWS = BY_HAND ? PANEL : CAND;
+    const candidates = ROWS.map(function (c) {
+      const st = S.cand[c.k];
+      const fixed = S.edited[c.k];
+      const isEditing = S.editing === c.k;
+      const shown = fixed != null && fixed !== '' ? fixed : (BY_HAND ? '—' : c.v);
+      const draft = S.editing === c.k ? S.draft : (fixed != null ? fixed : (BY_HAND ? '' : c.v));
+      return {
+        k: c.k, v: shown, unit: c.unit, raw: c.raw,
+        conf: BY_HAND ? (st ? 'typed in by you — there is no page to check it against' : 'not filled in') : c.conf,
+        pending: !BY_HAND && !st && !isEditing,
+        pendingHand: BY_HAND && !st && !isEditing,
+        editing: isEditing,
+        settled: !!st,
+        state: st === 'kept' ? 'Will be stored, dated 14 August'
+          : st === 'edited' ? 'Stored as ' + shown + ' ' + c.unit + (BY_HAND ? ', as you typed it' : ', corrected by you')
+            : BY_HAND ? 'Left out. Not stored, and not remembered as declined'
+              : 'Discarded. Not stored, and the file is not kept either',
+        // CONFIRM / FIX / DISCARD, unchanged — and Fix now actually corrects the value.
+        keep: function () { const n = Object.assign({}, self.state.cand); n[c.k] = 'kept'; self.setState({ cand: n, editing: null }); },
+        edit: function () { self.setState({ editing: c.k, draft: fixed != null ? fixed : (BY_HAND ? '' : c.v) }); },
+        drop: function () { const n = Object.assign({}, self.state.cand); n[c.k] = 'dropped'; self.setState({ cand: n, editing: null }); },
+        reset: function () {
+          const n = Object.assign({}, self.state.cand); n[c.k] = null;
+          const e = Object.assign({}, self.state.edited); delete e[c.k];
+          self.setState({ cand: n, edited: e, editing: null });
+        },
+        draft: draft,
+        editTitle: BY_HAND ? 'Type the value from your sheet' : 'Correct the value',
+        editHint: BY_HAND ? 'e.g. ' + c.v : c.v,
+        editNote: BY_HAND
+          ? 'Nothing is filled in for you and there is no page to check it against, so the row is stored as entered rather than read. Leave it out and nothing is stored.'
+          : 'Read as “' + c.rawVal + '”. What you type replaces it, and the row is stored as corrected — not as read.',
+        cancelLabel: 'Cancel',
+        onDraft: function (e) { self.setState({ editing: c.k, draft: e && e.target ? e.target.value : '' }); },
+        commitEdit: function () {
+          const v = String(self.state.editing === c.k ? self.state.draft : draft).trim();
+          if (!v) return;                                  // an empty correction is not a correction
+          const n = Object.assign({}, self.state.cand); n[c.k] = 'edited';
+          const e = Object.assign({}, self.state.edited); e[c.k] = v;
+          self.setState({ cand: n, edited: e, editing: null, draft: '' });
+        },
+        cancelEdit: function () { self.setState({ editing: null, draft: '' }); },
+        inputStyle: {
+          flex: 1, minWidth: 0, height: 40, padding: '0 12px', borderRadius: 12, boxSizing: 'border-box',
+          background: 'rgba(10,12,11,.55)', border: '.5px solid rgba(255,255,255,.14)', outline: 'none',
+          fontFamily: "'Outfit',sans-serif", fontSize: 19, fontWeight: 300, letterSpacing: '-.02em',
+          color: '#EDF1EF', fontVariantNumeric: 'tabular-nums'
+        },
+        editSaveBtn: {
+          flex: 1.3, height: 40, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12.5, fontWeight: 600,
+          background: String(draft || '').trim() ? '#F2B45C' : 'rgba(255,255,255,.07)',
+          color: String(draft || '').trim() ? '#1E1405' : '#57605C',
+          cursor: String(draft || '').trim() ? 'pointer' : 'default'
+        },
+        card: {
+          borderRadius: 22, padding: '15px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12,
+          background: '#141817',
+          border: '.5px solid ' + (c.low ? 'rgba(243,200,136,.34)' : 'rgba(255,255,255,.07)')
+        },
+        numStyle: { fontFamily: "'Outfit',sans-serif", fontSize: 30, fontWeight: 300, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: shown === '—' ? '#3F4744' : '#EDF1EF' },
+        confStyle: { fontSize: 11, lineHeight: 1.45, color: (c.low && !BY_HAND) ? '#F3C888' : '#7F8A85' },
+        crop: {
+          width: 136, padding: '9px 10px', borderRadius: 9, background: 'rgba(255,255,255,.9)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'
+        },
+        cropText: { font: '600 11px ui-monospace,Menlo,monospace', color: '#17150F', whiteSpace: 'nowrap' },
+        rawVal: c.rawVal,
+        hasStrip: c.rect !== false && SHOT,
+        noStrip: !BY_HAND && (c.rect === false || !SHOT),
+        cropLabel: BY_HAND ? '' : ((c.rect !== false && SHOT) ? 'from the page' : 'as read'),
+        stripPage: 'position:absolute;right:0;left:auto;top:-9px;width:186px;height:44px;transform:rotate(' + (c.tilt || 0)
+          + 'deg);background:linear-gradient(160deg,#E2DCCE,#CBC4B3);display:flex;align-items:center;gap:8px;padding:0 9px;box-sizing:border-box',
+        stripName: 'flex:1;font:400 10px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.72);white-space:nowrap;overflow:hidden',
+        stripVal: 'font:600 10px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.92)',
+        stripUnit: 'font:400 9px ui-monospace,Menlo,monospace;color:rgba(30,26,20,.6)'
+      };
+    });
+    // COUNTS COME OFF THE ACTIVE LIST — four read rows, or all nine by hand.
+    const kept = ROWS.filter(function (r) { return S.cand[r.k] === 'kept' || S.cand[r.k] === 'edited'; }).length;
+    const dropped = ROWS.filter(function (r) { return S.cand[r.k] === 'dropped'; }).length;
+    const undecided = ROWS.length - kept - dropped;
+
+    // ── one marker ───────────────────────────────────────────────
+    const MSEL = MK.filter(function (m) { return m.k === S.marker; })[0] || MK[0];
+    // four draws walking toward today's value, so the series always ends on it
+    const SLOPE = { Ferritin: 1.5, 'Vitamin D': 1.42, ApoB: 1.14, 'hs-CRP': 1.7, HbA1c: 1.06, TSH: 1.12, ALT: 0.84, Haemoglobin: 1.03, 'Creatine kinase': 0.72 };
+    const slope = SLOPE[MSEL.k] != null ? SLOPE[MSEL.k] : 1.2;
+    const series = [3, 2, 1, 0].map(function (back) {
+      if (back === 0) return MSEL.v;
+      const f = 1 + (slope - 1) * (back / 3);
+      return Math.round(MSEL.v * f * 100) / 100;
+    });
+    const vMin = Math.min.apply(null, series.concat([MSEL.lo])) * 0.86;
+    const vMax = Math.max.apply(null, series.concat([MSEL.lo])) * 1.14;
+    const my = function (v) { return ((vMax - v) / (vMax - vMin)) * 118; };
+    const mkOut = MSEL.v < MSEL.lo || MSEL.v > MSEL.hi;
+    const topIn = MSEL.hi <= vMax;
+    const botIn = MSEL.lo >= vMin;
+    const bandTop = topIn ? my(MSEL.hi) : 0;
+    const bandBottom = botIn ? my(MSEL.lo) : 118;
+    const mk = {
+      k: MSEL.k, v: MSEL.v, unit: MSEL.unit,
+      tag: mkOut ? (MSEL.v < MSEL.lo ? 'below the band' : 'above the band') : 'in the band',
+      tagStyle: {
+        fontSize: 11, fontWeight: 600, padding: '5px 9px', borderRadius: 8,
+        color: mkOut ? WARM_L : GREEN_L, background: mkOut ? 'rgba(242,180,92,.14)' : 'rgba(46,204,128,.13)'
+      },
+      read: 'Four draws in fourteen months. ' + MSEL.note.charAt(0).toUpperCase() + MSEL.note.slice(1) + '.',
+      bandY: bandTop.toFixed(1),
+      bandH: Math.max(2, bandBottom - bandTop).toFixed(1),
+      bandB: bandBottom.toFixed(1),
+      showTop: topIn, showBottom: botIn,
+      bandNote: topIn && botIn
+        ? 'The shaded area is the band the laboratory gave: ' + MSEL.lo + ' to ' + MSEL.hi + ' ' + MSEL.unit + '.'
+        : topIn
+          ? 'The shaded area is the laboratory\u2019s band. Its lower limit, ' + MSEL.lo + ' ' + MSEL.unit + ', sits below this scale.'
+          : 'The shaded area is the laboratory\u2019s band from ' + MSEL.lo + ' ' + MSEL.unit + ' upward. Its upper limit, ' + MSEL.hi + ' ' + MSEL.unit + ', is far off this scale and is not drawn.',
+      line: series.map(function (v, i) { return ((i / (series.length - 1)) * 300).toFixed(1) + ',' + my(v).toFixed(1); }).join(' '),
+      dots: series.map(function (v, i) { return { x: ((i / (series.length - 1)) * 300).toFixed(1), y: my(v).toFixed(1) }; }),
+      axis: [{ label: 'Jun 25' }, { label: 'Nov 25' }, { label: 'Mar 26' }, { label: '14 Aug' }],
+      beside: [
+        { k: 'Haemoglobin, same draw', v: '141 g/L' },
+        { k: 'Weekly distance that month', v: '34 km' },
+        { k: 'Nights over your need, that month', v: '17 of 31' }
+      ],
+      retest: mkOut
+        ? 'A single low ferritin inside a training block is common and not conclusive. The usual advice is a repeat draw in eight to twelve weeks — 9 November is the earliest that would tell you anything new.'
+        : 'Nothing here asks for a retest before your next routine draw. Noop will remind you in February, when vitamin D is lowest and worth catching.'
+    };
+
+    const chips = [
+      { k: 'Journey', s: 'goal' }, { k: 'Set the goal', s: 'set' }, { k: 'Biomarkers', s: 'labs' },
+      { k: 'Review a photo', s: 'review' }, { k: 'One marker', s: 'marker' }
+    ].map(function (c) {
+      return {
+        k: c.k, go: go(c.s),
+        s: {
+          padding: '8px 13px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+          background: screen === c.s ? '#17150F' : 'rgba(23,21,15,.06)',
+          color: screen === c.s ? '#fff' : '#4A463D'
+        }
+      };
+    });
+
+    const nav = this.props.onNav;
+    const tab = function (a, s) { return function () { if (nav) nav(a, s); }; };
+
+    return {
+      swipeStart: (e) => this.setState({ sx: e.clientX, sy: e.clientY }),
+      swipeEnd: (e) => {
+        const st = this.state;
+        if (st.sx == null) return;
+        const dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+        this.setState({ sx: null, sy: null });
+        if (dx <= 78 || Math.abs(dy) >= 58) return;
+        if (st.logs) { this.setState({ logs: false }); return; }
+        const cur = st.screen || this.props.screen || "goal";
+        // Two roots, both entered from You, and `labs` is NOT under `goal` — both chevrons
+        // read You, so both swipes leave for You. picker → labs, which the map had missing.
+        if (cur === 'goal' || cur === 'labs') { if (nav) nav('plumbing', 'you'); return; }
+        const to = ({"set":"goal","review":"labs","marker":"labs","picker":"labs"})[cur];
+        if (to) this.setState({ screen: to });
+      },
+      isDark: true, notes: this.props.showNotes !== false,
+      isGoal: screen === 'goal', isSet: screen === 'set', isLabs: screen === 'labs',
+      isReview: screen === 'review', isMarker: screen === 'marker', isPicker: screen === 'picker',
+      goPicker: function (e) { if (e && e.stopPropagation) e.stopPropagation(); self.setState({ screen: 'picker', shot: false, byHand: false, editing: null, draft: '', edited: {}, cand: {} }); },
+      hasShot: SHOT, noShot: !SHOT && !BY_HAND, showImageCard: !BY_HAND,
+      reviewProvenance: BY_HAND ? 'entered, not measured' : 'read, not measured',
+      reviewTitle: BY_HAND
+        ? 'Nine fields, and nothing filled in for you. Type the ones your sheet has.'
+        : 'Four candidates were read off your photo. Confirm the ones that are right.',
+      reviewSub: BY_HAND
+        ? 'The nine markers Noop keeps, in the order a printed panel runs them. No photo, so no strips and no confidence: there is no page to check a number against, and the app will not dress a typed value as a read one. Every row is optional — leave one out and it is not stored.'
+        : 'Read on this phone, nothing uploaded. Each row shows the strip of the page it came from — check the number against it, fix it if the read is wrong, and discard anything you would rather not keep.',
+      shotOpen: !!S.shot && SHOT,
+      openShot: function () { if (SHOT) self.setState({ shot: true }); },
+      closeShot: function () { self.setState({ shot: false }); },
+      icoCamBtn: ico('cam', 19, '#1E1405'),
+      pageLines: [
+        { k: 'Haemoglobin', v: '138', u: 'g/L' },
+        { k: 'Ferritin', v: '28', u: 'µg/L' },
+        { k: 'Vitamin D, 25-OH', v: '52', u: 'nmol/L' },
+        { k: 'ApoB', v: 'O.78', u: 'g/L' },
+        { k: 'hs-CRP', v: '<0,6', u: 'mg/L' }
+      ],
+      shots: [
+        { when: 'Today' }, { when: 'Today' }, { when: '14 Aug' },
+        { when: '14 Aug' }, { when: '2 Jul' }, { when: '2 Jul' }
+      ].map(function (s, i) {
+        return {
+          when: s.when,
+          tile: 'position:relative;width:110px;height:132px;border-radius:14px;overflow:hidden;background:#101413;border:.5px solid rgba(255,255,255,.08);cursor:pointer;flex:none',
+          page: 'position:absolute;inset:' + (i % 2 ? '-8px -12px' : '-10px -8px') + ';transform:rotate(' + (i % 3 === 1 ? 1.4 : -1.2) + 'deg);'
+            + 'background:repeating-linear-gradient(178deg,rgba(30,26,20,.16) 0 1px,rgba(0,0,0,0) 1px 7px),linear-gradient(163deg,#DFD9CB,#BEB6A3)',
+          stamp: 'position:absolute;left:8px;bottom:7px;font:600 9px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#EDF1EF;text-shadow:0 1px 6px rgba(0,0,0,.8)'
+        };
+      }),
+      goGoal: go('goal'), goSet: go('set'), goReview: go('review'),
+      // LEAVING THE REVIEW UNSAVED DROPS THE DRAFT. The photo, the read text and every correction
+      // go with it — there is no half-finished import to come back to.
+      goLabs: function () {
+        self.setState({ screen: 'labs', shot: false, byHand: false, editing: null, draft: '',
+          edited: {}, cand: {} });
+      },
+      // The by-hand route: no photo, so no image card, no strips and no confidence chips.
+      goByHand: function () { self.setState({ screen: 'review', byHand: true, shot: false, editing: null, draft: '' }); },
+      chips,
+
+      routeSegs, waypoints, ways, routeSpecks,
+      progress: Math.round(PROG * 100) + '%',
+      daysLeft: '11 weeks to 26 October',
+      goalTitle: 'Half marathon on 26 October, finishing comfortably.',
+      goalSub: 'Set 4 August. Two waypoints reached, both recorded on your wrist — 34 km a week at 6:04, and seventeen of the last thirty-one nights over your own need.',
+      callKick: C.kick, callBody: C.body, callFix: C.fix, callHasFix: !!C.fix, callCard,
+      callDot: { width: 8, height: 8, flex: 'none', borderRadius: '50%', background: C.c, boxShadow: '0 0 10px ' + C.c },
+      callKicker: { fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600, color: C.cl },
+      evidence, kinds, weeksTicks, byWhen: WEEK_LABELS[weeksSel],
+      peakKm: peakKm, rampPc: rampPc,
+      safety: call === 'unrealistic'
+        ? 'This route would ask ' + rampPc + ' a week across all eight of its building weeks, above the 10% Noop will not build. It will build the slower one and say so.'
+        : 'This route asks ' + rampPc + ' a week across eight building weeks, against the 5% your last two blocks absorbed. Two easy weeks are written in on purpose, and a poor run of sleep moves the next hard week rather than deleting it.',
+      commitBtn: {
+        height: 52, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 14, fontWeight: 600, cursor: 'pointer',
+        background: call === 'realistic' ? WARM : 'rgba(255,255,255,.06)',
+        border: call === 'realistic' ? 'none' : '.5px solid rgba(255,255,255,.14)',
+        color: call === 'realistic' ? '#1E1405' : '#C6CEC9'
+      },
+      commitLabel: C.commit,
+      // AN UNREALISTIC GOAL IS STILL ALLOWED — AND IT IS CONFIRMED FIRST. Only the route the data
+      // backs commits on one tap; the other two raise what they cost before anything is saved.
+      commitOpen: !S.commitPending,
+      commitPending: S.commitPending,
+      commitWarning: call === 'unrealistic'
+        ? 'This is the goal the data says it cannot build by that date: ' + rampPc + ' a week, twice the 5% your last two blocks absorbed and above the 10% line. Every block you have run that hot cost a week of sleep.'
+        : 'This route asks ' + rampPc + ' a week where your last two blocks absorbed 5%. It is possible, and it is the version with the least room for a bad week.',
+      commit: call === 'realistic'
+        ? function () { self.setState({ screen: 'goal' }); }
+        : function () { self.setState({ commitPending: true }); },
+      confirmCommit: function () { self.setState({ commitPending: false, screen: 'goal' }); },
+      cancelCommit: function () { self.setState({ commitPending: false }); },
+      weekProposal: 'Four runs: two easy, one 14 km on Saturday, and Wednesday only if Tuesday night lands over your need. Nothing in this week is fixed — it moves with the mornings.',
+      weekDone: S.week !== 'open',
+      weekState: S.week === 'taken' ? 'This week is in. Svea will still check each morning' : 'Left out. The route holds and the date does not move for one week',
+      takeWeek: function () { self.setState({ week: 'taken' }); },
+      skipWeek: function () { self.setState({ week: 'skipped' }); },
+      undoWeek: function () { self.setState({ week: 'open' }); },
+      labsSub: outCount > 0
+        ? outCount + ' of ' + MK.length + ' outside the lab band · drawn 14 August'
+        : 'all ' + MK.length + ' inside the lab band · drawn 14 August',
+
+      markers, markerDots, labSpecks, labGlow, inRange, total: MK.length,
+
+      candidates,
+      fileFacts: BY_HAND ? [
+        { t: 'What you type is stored when you save it, and discarded rows are not remembered — not as a value, and not as “you declined this”.' },
+        { t: 'No photograph was taken and none is needed. There is no page to check these against, so no row claims one.' },
+        { t: 'Nothing was uploaded. This is a local entry into your own lab book.' }
+      ] : [
+        { t: 'The photo and the text read from it are deleted when you leave this screen, whatever you decide.' },
+        { t: 'Discarded rows are not remembered — not as a value, and not as “you declined this”.' },
+        { t: 'Nothing was uploaded. The read happened on this phone, and it is the one part of the app that would rather be slow than remote.' }
+      ],
+      reviewCount: kept === 0 ? 'Nothing confirmed yet' : kept + (kept === 1 ? ' result' : ' results') + ' will be stored',
+      reviewNote: kept === 0
+        ? (BY_HAND ? 'Type a value and use it — Save does nothing until then' : 'Confirm or fix a row — Save does nothing until then')
+        : undecided > 0
+        ? undecided + ' still to check · ' + dropped + ' discarded'
+        : dropped + ' discarded · the rest dated 14 August',
+      // SAVE WITH NOTHING CONFIRMED IS A NO-OP. Not a toast, not a bounce back to the picker — the
+      // button is dead until a row is confirmed or corrected, and it says so in the count beside it.
+      saveResults: function () {
+        if (kept === 0) return;
+        self.setState({ screen: 'labs', shot: false, byHand: false, editing: null, draft: '',
+          edited: {}, cand: {} });
+      },
+      saveBtn: {
+        height: 42, padding: '0 20px', flex: 'none', borderRadius: 14,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600,
+        background: kept > 0 ? WARM : 'rgba(255,255,255,.07)',
+        color: kept > 0 ? '#1E1405' : '#57605C',
+        cursor: kept > 0 ? 'pointer' : 'default'
+      },
+
+      mk,
+
+      icoDrop: ico('drop', 20, WARM),
+      icoToday: ico('today', 19, '#7F8A85'), icoTrends: ico('trends', 19, '#7F8A85'),
+      icoRest: ico('moon', 19, '#7F8A85'), icoYouOn: ico('you', 19, '#1E1405'),
+      tabToday: tab('day', 'today'), tabRest: tab('night', 'rest'), tabTrends: tab('picture', 'trends'),
+      // THE + IS CONTEXTUAL. Act 8's own thing to add is a lab result, so the + enters the picker —
+      // never a fabricated review, and never Today's log.
+      goYou: tab('plumbing', 'you')
+    };
+  }
+}
+</script>
+</body>
+</html>
