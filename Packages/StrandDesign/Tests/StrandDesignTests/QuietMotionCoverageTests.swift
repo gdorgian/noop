@@ -155,6 +155,27 @@ final class QuietMotionCoverageTests: XCTestCase {
             """)
     }
 
+    /// Aura's frame clocks must use the wrapper that reads the composed gate. A file-level
+    /// symbol check alone could pass after one gated view was added beside an ungated one.
+    func testAuraFrameClocksUseSharedWrapper() throws {
+        let root = try repoRoot()
+        let auraFiles = swiftFiles(under: root).filter { item in
+            item.rel.hasPrefix("StrandiOS/NoopUI/") ||
+                item.rel == "Packages/StrandDesign/Sources/StrandDesign/Aura/NoopSpecPrimitives.swift"
+        }
+        let sources = auraFiles.map { item in
+            (item.rel, codeLines(item.text).joined().filter { !$0.isWhitespace })
+        }
+        let wrapperSites = sources.reduce(0) { $0 + $1.1.components(separatedBy: "NoopAnimatedTimeline(").count - 1 }
+        XCTAssertGreaterThanOrEqual(wrapperSites, 25, "expected the Aura frame clocks to be censused")
+        for (rel, code) in sources {
+            XCTAssertFalse(code.contains("TimelineView(.animation"), "raw frame clock in \(rel)")
+        }
+        let wrapper = try String(contentsOf: root.appendingPathComponent(
+            "Packages/StrandDesign/Sources/StrandDesign/NoopMotion.swift"), encoding: .utf8)
+        XCTAssertTrue(wrapper.contains("paused || motion.poseStill(reduceMotion)"))
+    }
+
     /// `StrandMotion.breathe` is the shared `repeatForever` primitive, so a call site can loop forever
     /// without the marker appearing on its own line. Census the call sites too.
     func testBreatheCallSitesConsultTheGate() throws {

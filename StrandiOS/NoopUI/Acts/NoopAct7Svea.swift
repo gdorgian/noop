@@ -1,3 +1,4 @@
+import StrandDesign
 import SwiftUI
 
 struct NoopAct7Screens: View {
@@ -622,7 +623,7 @@ private struct NoopSveaStreamingAnswer: View {
     var body: some View {
         NoopSveaTintCard(fillOpacity: 0.08, borderOpacity: 0.24, radius: 22, horizontalPadding: 16, topPadding: 15, bottomPadding: 15) {
             VStack(alignment: .leading, spacing: 9) {
-                TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 0.05, paused: reduceMotion)) { timeline in
+                NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 0.05, paused: reduceMotion) { timeline in
                     let phase = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1)
                     let caretOpacity = reduceMotion || phase <= 0.45 ? 1.0 : 0.12
                     (Text("Looking at four nights of variability against what you did after each one") +
@@ -2057,7 +2058,7 @@ private struct NoopSveaMiniOrb: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion) { timeline in
             let pulse = reduceMotion ? 0 : NoopA4Animation.pulse(
                 seconds: timeline.date.timeIntervalSinceReferenceDate,
                 duration: 6
@@ -2092,7 +2093,7 @@ private struct NoopSveaLargeOrb: View {
     var dimmed = false
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion) { timeline in
             let seconds = timeline.date.timeIntervalSinceReferenceDate
             let pulse = reduceMotion ? 0 : NoopA4Animation.pulse(seconds: seconds, duration: 8)
             let spin = reduceMotion ? 0 : seconds.truncatingRemainder(dividingBy: 64) / 64 * 360

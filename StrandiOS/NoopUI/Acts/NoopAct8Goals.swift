@@ -775,7 +775,7 @@ private struct NoopGoalRouteGraphic: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion) { timeline in
             let now = timeline.date.timeIntervalSinceReferenceDate
             let spin = reduceMotion ? 0 : now.truncatingRemainder(dividingBy: 110) / 110 * 360
             let pulsePhase = now.truncatingRemainder(dividingBy: 9) / 9
@@ -2402,7 +2402,7 @@ private struct NoopLabImageCard: View {
             }
 
             if state == .reading {
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0) { timeline in
                     GeometryReader { proxy in
                         let phase = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4
                         LinearGradient(

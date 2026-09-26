@@ -691,7 +691,7 @@ private struct NoopBodyClock: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion) { timeline in
             let heroPhase = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 9) / 9
             let heroWave = (1 - cos(heroPhase * 2 * .pi)) / 2
             let nowPhase = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3.4) / 3.4
@@ -4283,7 +4283,7 @@ private struct NoopA5PairPulse: View {
     @State private var animationStart = Date()
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion || paired)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion || paired) { timeline in
             ZStack {
                 if !paired {
                     pulseRing(at: timeline.date.timeIntervalSinceReferenceDate, delay: 0)

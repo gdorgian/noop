@@ -1,3 +1,4 @@
+import StrandDesign
 import SwiftUI
 
 struct NoopAct6Screens: View {
@@ -713,7 +714,7 @@ private struct NoopAgeOrb: View {
     var isOlder = false
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !animated)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !animated) { timeline in
             let seconds = animated ? timeline.date.timeIntervalSinceReferenceDate : 0
             let morph = NoopA4Animation.morph(seconds: seconds, duration: 24, reversed: false)
             let spin = reduceMotion || !animated ? 0 : seconds.truncatingRemainder(dividingBy: 60) / 60 * 360

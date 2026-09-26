@@ -936,7 +936,7 @@ public struct NoopSpecOrb: View {
                 orb(at: ctx.date)
             }
         } else {
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { ctx in
+            NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0) { ctx in
                 orb(at: ctx.date)
             }
         }
@@ -1438,7 +1438,10 @@ public struct NoopAmbientGlow: View {
     private let top: CGFloat
     private let pulses: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var motion = NoopMotionState.shared
     @State private var lifted = false
+
+    private var poseStill: Bool { motion.poseStill(reduceMotion) }
 
     /// - Parameters:
     ///   - top: negative, and it is a real offset off the top of the screen — most of the ellipse
@@ -1459,14 +1462,23 @@ public struct NoopAmbientGlow: View {
                 center: .center, startRadius: 0, endRadius: size.width * 0.35))   // tail at 70 %
             .frame(width: size.width, height: size.height)
             .blur(radius: 18)
-            .opacity(pulses && !reduceMotion ? (lifted ? 0.9 : 0.55) : 1)
+            .opacity(pulses && !poseStill ? (lifted ? 0.9 : 0.55) : 1)
             .offset(y: top)
             .allowsHitTesting(false)              // pointer-events: none, in every source
-            .onAppear {
-                guard pulses, !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: NoopSpecMotion.ambientGlowPulse / 2)
-                    .repeatForever(autoreverses: true)) { lifted = true }
-            }
+            .onAppear { updatePulse() }
+            .onChange(of: poseStill) { _ in updatePulse() }
+    }
+
+    private func updatePulse() {
+        if poseStill || !pulses {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { lifted = false }
+        } else {
+            lifted = false
+            withAnimation(.easeInOut(duration: NoopSpecMotion.ambientGlowPulse / 2)
+                .repeatForever(autoreverses: true)) { lifted = true }
+        }
     }
 }
 
@@ -1644,7 +1656,7 @@ public struct NoopPulse<Content: View>: View {
         if reduceMotion {
             frame(scale: 1.0, glow: tone.trough)          // FROZEN, and still on screen
         } else {
-            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { ctx in
+            NoopAnimatedTimeline(minimumInterval: 1.0 / 60.0) { ctx in
                 let now = pausedAt ?? ctx.date
                 let elapsed = max(0, now.timeIntervalSince(start) - accumulatedPause)
                 let cycle = max(period, 0.001)

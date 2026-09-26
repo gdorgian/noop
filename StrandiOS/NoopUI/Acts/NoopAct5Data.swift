@@ -1,5 +1,6 @@
 #if os(iOS)
 import StrandImport
+import StrandDesign
 import SwiftUI
 import UniformTypeIdentifiers
 import WhoopStore
@@ -931,7 +932,7 @@ struct NoopDataScreen: View {
 
                 VStack(alignment: .leading, spacing: 13) {
                     // The figure and the bar are one number, read twice.
-                    TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { timeline in
+                    NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0, paused: false) { timeline in
                         let fraction = Self.readFraction(from: navigation.importStartedAt, at: timeline.date)
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text("\(Int(fraction * 100))")
@@ -990,7 +991,7 @@ struct NoopDataScreen: View {
     }
 
     private var readingBar: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0, paused: false) { timeline in
             let fraction = Self.readFraction(from: navigation.importStartedAt, at: timeline.date)
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -1078,7 +1079,7 @@ struct NoopDataScreen: View {
     /// No fraction exists, so the fill does not claim one: a short segment travels the track while
     /// the importer is working, and the track sits empty when nothing is.
     private func liveReadingBar(running: Bool) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !running)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0, paused: !running) { timeline in
             GeometryReader { proxy in
                 let t = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.8) / 1.8
                 let segment = proxy.size.width * 0.28

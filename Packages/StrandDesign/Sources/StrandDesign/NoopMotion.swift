@@ -152,6 +152,41 @@ public final class NoopMotionState: ObservableObject {
     public var poseStillIgnoringReduceMotion: Bool { isLowPower || quietMotion }
 }
 
+/// A per-frame clock that stops decorative drawing for all three quiet-motion signals.
+/// Keep the gate here so a new screen cannot accidentally honour system Reduce Motion
+/// while still animating in Low Power Mode or after the in-app toggle is enabled.
+public struct NoopTimelineContext {
+    public let date: Date
+}
+
+public struct NoopAnimatedTimeline<Content: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var motion = NoopMotionState.shared
+
+    private let minimumInterval: TimeInterval
+    private let paused: Bool
+    private let content: (NoopTimelineContext) -> Content
+
+    public init(
+        minimumInterval: TimeInterval = 1.0 / 30.0,
+        paused: Bool = false,
+        @ViewBuilder content: @escaping (NoopTimelineContext) -> Content
+    ) {
+        self.minimumInterval = minimumInterval
+        self.paused = paused
+        self.content = content
+    }
+
+    public var body: some View {
+        TimelineView(.animation(
+            minimumInterval: minimumInterval,
+            paused: paused || motion.poseStill(reduceMotion)
+        )) { context in
+            content(NoopTimelineContext(date: context.date))
+        }
+    }
+}
+
 // MARK: - CountUpText
 //
 // Animates a numeric value counting up (or down) to its latest value whenever `value`

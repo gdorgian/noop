@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import StrandAnalytics
+import StrandDesign
 import WhoopStore
 import SwiftUI
 
@@ -2738,7 +2739,7 @@ private struct Act2TodayHeartRow: View {
 
     var body: some View {
         Button(action: action) {
-            TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0)) { timeline in
+            NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0) { timeline in
                 let elapsed = max(0, timeline.date.timeIntervalSince(anchor))
                 let orb = Act2OrbFrame(elapsed: elapsed, wakeCharge: wakeCharge, charge: charge, recordedBPM: recordedBPM, isHistorical: isHistorical)
                 let beat = Act2HeartbeatSample(elapsed: elapsed, reduceMotion: reduceMotion)
@@ -2801,7 +2802,7 @@ private struct Act2HeartHero: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0) { timeline in
             let elapsed = max(0, timeline.date.timeIntervalSince(anchor))
             let orb = Act2OrbFrame(elapsed: elapsed, wakeCharge: wakeCharge, charge: charge, recordedBPM: recordedBPM, isHistorical: isHistorical)
             let beat = Act2HeartbeatSample(elapsed: elapsed, reduceMotion: reduceMotion)
@@ -3016,7 +3017,7 @@ private struct Act2LiveHeartHero: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: bpm == nil)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: bpm == nil) { timeline in
             let beat = Act2HeartbeatSample(elapsed: max(0, timeline.date.timeIntervalSince(anchor)),
                                            reduceMotion: reduceMotion || bpm == nil)
             HStack(alignment: .firstTextBaseline, spacing: 7) {
@@ -3160,7 +3161,7 @@ private struct Act2BreathingOrb: View {
     @State private var arrival = Date()
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: 1.0 / 60.0) { timeline in
             let frame = Act2OrbFrame(
                 elapsed: max(0, timeline.date.timeIntervalSince(arrival)),
                 wakeCharge: wakeCharge,
@@ -4460,7 +4461,7 @@ struct NoopBreatheScreens: View {
     }
 
     private var breatheHero: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: 1 / 30, paused: reduceMotion) { timeline in
             // auraBreathe: 10 s ease-in-out, scale .92 ↔ 1.06, opacity .5 ↔ .85.
             let t = timeline.date.timeIntervalSince(arrival).truncatingRemainder(dividingBy: 10) / 10
             let k = reduceMotion ? 0.5 : 0.5 - 0.5 * cos(2 * .pi * t)
@@ -4687,7 +4688,7 @@ struct NoopBreatheScreens: View {
 
             Spacer(minLength: 0)
             VStack(spacing: 26) {
-                TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+                NoopAnimatedTimeline(minimumInterval: 1 / 30) { timeline in
                     pacer(item, at: timeline.date)
                 }
                 heartTrace
@@ -4720,7 +4721,7 @@ struct NoopBreatheScreens: View {
     private func buzzChip(_ item: NoopBreatheItem) -> some View {
         // A promise about hardware: say so when there is no strap to keep it.
         let buzzing = demo || (session.strapCanBuzz && item.kind == .paced)
-        return TimelineView(.animation(minimumInterval: 1 / 20)) { timeline in
+        return NoopAnimatedTimeline(minimumInterval: 1 / 20) { timeline in
             let t = session.sessionStart.map { timeline.date.timeIntervalSince($0) } ?? 0
             let b = NoopBreathePacer.breath(item: item, at: t)
             HStack(spacing: 6) {
@@ -4838,7 +4839,7 @@ struct NoopBreatheScreens: View {
             .padding(.top, 2)
 
             Spacer(minLength: 0)
-            TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+            NoopAnimatedTimeline(minimumInterval: 1 / 30) { timeline in
                 sweepBody(at: timeline.date)
             }
             .padding(.horizontal, 20)

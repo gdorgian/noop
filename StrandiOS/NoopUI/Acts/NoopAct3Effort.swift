@@ -1,5 +1,6 @@
 import Foundation
 import StrandAnalytics
+import StrandDesign
 import StrandImport
 import SwiftUI
 import WhoopStore
@@ -1725,7 +1726,7 @@ private struct Act3HeartbeatOrb: View {
     @State private var frozenPhase: Double?
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: paused || reduceMotion)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0, paused: paused || reduceMotion) { timeline in
             let phase = reduceMotion ? 0 : (frozenPhase ?? heartbeatPhase(at: timeline.date, duration: 0.52))
             let scale = reduceMotion ? 1 : heartbeatValue(
                 phase,
@@ -1788,7 +1789,7 @@ private struct Act3HeartbeatReadout: View {
     @State private var frozenPhase: Double?
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: paused || reduceMotion)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0, paused: paused || reduceMotion) { timeline in
             let phase = reduceMotion ? 0 : (frozenPhase ?? heartbeatPhase(at: timeline.date))
             let scale = reduceMotion ? 1 : heartbeatValue(
                 phase,

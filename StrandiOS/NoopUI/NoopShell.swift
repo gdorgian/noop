@@ -288,8 +288,8 @@ private struct NoopLiftLiveBar: View {
     private var unitSystem: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0,
-                                paused: reduceMotion || session.isPaused)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0,
+                                paused: reduceMotion || session.isPaused) { timeline in
             if let presentation = session.presentation(system: unitSystem) {
                 Button {
                     session.isPresented = true
@@ -468,7 +468,7 @@ struct NoopNightAmbientGlow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion) { timeline in
             let elapsed = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 9)
             let wave = (1 - cos(elapsed / 9 * 2 * .pi)) / 2
             VStack {

@@ -1,28 +1,17 @@
-# Catches translation drift BEFORE merge instead of after a user reports it (#326, #342, #448
-# were all the same recurring pattern: new UI text lands without its German translation, or a
-# Kotlin literal never gets wired to stringResource() at all since Compose has no Xcode-style
-# auto-extraction). With the #453 backlog closed, Tools/i18n_audit.py --ci hard-fails on any
-# hardcoded/un-extracted UI literal or any missing German, Spanish, or French translation across
-# Android resources and all four Apple String Catalogs.
-# Pure Python + git, no Xcode/Gradle: runs in seconds on ubuntu-latest, independent of the
-# disabled-by-default app-build.yml / android.yml compile jobs.
-name: i18n Coverage
+# Aura's iOS redesign is English-only for this release. The upstream translation
+# gate required Android and non-English catalog coverage this fork does not ship.
+# Keep a real source-catalog integrity check; do not report partial translations
+# as complete or force the prototype's English copy into invented translations.
+name: English Copy Integrity
 
 on:
   pull_request:
     branches: [main]
-  # Audit main itself too, not just PRs into it. A RELEASE pushes STRAIGHT to main with no PR, and
-  # Tools/appchangelog-gen.py emits the What's New title as a RAW Kotlin literal that has to be
-  # localized by hand afterwards (Compose has no Xcode-style auto-extraction). With a PR-only
-  # trigger that landed completely unaudited, and — because --ci is a whole-tree gate, not a diff —
-  # it then red-checked EVERY contributor's PR on a line none of them touched (9.0.1, fixed by
-  # #514). Auditing the push surfaces it on main the moment it lands, so it is fixed before anyone
-  # else trips over it. Same 8-second job; no new cost.
   push:
     branches: [main]
 
 concurrency:
-  group: i18n-coverage-${{ github.ref }}
+  group: english-copy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,8 +23,5 @@ jobs:
         with:
           fetch-depth: 0
 
-      # `github.base_ref` is set ONLY for pull_request; on a push to main it is empty, which would
-      # pass a bare `origin/`. Fall back to main. (The ref is retained for workflow compatibility —
-      # `--ci` is a whole-tree gate, so the value it resolves to does not change the verdict.)
-      - name: i18n audit (regression gate)
-        run: python3 Tools/i18n_audit.py --ci origin/${{ github.base_ref || 'main' }}
+      - name: Validate English source catalogs
+        run: python3 Tools/english_catalog_check.py

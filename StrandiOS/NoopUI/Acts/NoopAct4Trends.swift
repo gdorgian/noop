@@ -1,4 +1,5 @@
 import Foundation
+import StrandDesign
 import SwiftUI
 
 // MARK: - Act 4 · The bigger picture
@@ -486,7 +487,7 @@ private struct NoopA4AnimatedAgeAura: View {
     private var accentOuter: Color { olderThanChronological ? Color(hex: 0xFFE0A5, alpha: 0.42) : Color(hex: 0x9EF0CC, alpha: 0.42) }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || calibrating)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0, paused: reduceMotion || calibrating) { timeline in
             let seconds = calibrating ? 0 : timeline.date.timeIntervalSinceReferenceDate
             let pulse = calibrating ? 0.55 : (reduceMotion ? 1 : 0.72 + 0.28 * NoopA4Animation.pulse(seconds: seconds, duration: 8))
             let main = NoopA4Animation.morph(seconds: seconds, duration: 22, reversed: false)

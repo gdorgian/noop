@@ -122,9 +122,9 @@ which changes what validates a change:
 |---|---|---|
 | `swift-packages.yml` | `swift test` for `Packages/**` (incl. the fork-only `SemanticMemory`) | PR + push touching `Packages/**` |
 | `app-build.yml` | Compile of `Strand` (macOS) + `NOOPiOS` (iOS), **plus `StrandTests` on the macOS leg only** | PR + push touching `Strand/**`, `StrandiOS*/**`, `Packages/**`, `project.yml` |
-| `tools-python.yml` | The `Tools/linux-capture` Python suite (≥200 tests) | PR + push touching `Tools/**` |
+| `tools-python.yml` | The `Tools/linux-capture` suite (≥200 tests) plus Apple-relevant release, catalog and score-preservation contracts | PR + push touching those tools |
 | `source-hygiene.yml` | Detached doc comments + **commit attribution** (above) | every PR and push to `main` |
-| `i18n-coverage.yml` | EN source + DE/ES/FR/PT-PT complete (zero-tolerance); IT/RU/ZH-Hans/ZH-Hant ratcheted (see "Localization" below) | every PR and push to `main` |
+| `i18n-coverage.yml` | English Apple source-catalog integrity; Aura iOS copy is English-only | every PR and push to `main` |
 | `publish-ios-release.yml` | Cuts a release: unsigned IPA + universal macOS zip, updates the AltStore source, marks it latest | `workflow_dispatch` |
 | `sync-upstream.yml` | Opens a sync PR from `ryanbr/noop` | weekly cron + dispatch |
 
@@ -139,39 +139,17 @@ is an easy and very misleading mistake.
 
 ### Localization
 
-**The fork ships exactly the locale set `ryanbr/noop` ships, on both platforms — never a narrower
-one.** Apple (all four String Catalogs — `Strand/`, `Packages/StrandDesign/`, `NOOPWatch/`,
-`NOOPWatchComplications/`): `en` source + `de, es, fr, it, pl, pt-PT, ru, zh-Hans, zh-Hant`. Android
-(`values-<lang>/`): `de, es, fr, pl, pt-rPT, zh`. Don't hardcode this list anywhere else — `LANGS` in
-`Tools/i18n_audit.py` is the single source of truth, so if upstream ever adds a locale, updating that
-constant (and running the importer/extractor for it) is the whole change.
-
-`pl` arrived that way with the 10.1.0 sync (upstream #1250) and is in the ZERO-TOLERANCE tier, not
-the ratchet: upstream translated only the keys it ships, so the ~1300 fork-only strings were filled
-here in the same pass rather than baselined as an accepted gap. A locale that lands mid-ratchet is
-the harder case — see the 2026-08-15 row in [`fork/decisions.md`](fork/decisions.md).
-
-Two tiers, not one, because `i18n-coverage.yml` runs on **every** push/PR against the **whole tree**,
-not a diff — a lingering gap fails every subsequent push regardless of what it touches:
-
-- **DE, ES, FR, PT-PT: zero tolerance.** `LANGS` in `Tools/i18n_audit.py` holds these at 100%
-  complete, no exceptions. A new string — anywhere, including `StrandDesign` and the Watch targets —
-  ships translated into all four in the SAME PR, or `main` goes red on the very next unrelated push.
-- **IT, RU, ZH-Hans, ZH-Hant (plus Android's single `zh`): ratcheted, not gated.** A pre-existing
-  backlog is grandfathered per catalog/locale in `Tools/i18n_extra_locale_baseline.txt`. That number
-  may only shrink — the file's own header says so ("Ratchet DOWN as translations land — never up") —
-  so a new string doesn't strictly need these four translated, but every one that ships without them
-  eats into the tolerated gap. If the backlog for a target is already at zero (several are), a single
-  untranslated new string reopens a FAIL there immediately.
-
-Before pushing a change that adds UI copy — app screens, `StrandDesign`, or a Watch target — run the
-exact CI check locally:
+**Aura's new iOS UI is English-only for the current release**, as the owner specified. The inherited
+Apple catalogs still contain older upstream translations, but they are not a claim that new Aura
+screens have been translated. Android is absent. The old whole-tree translation ratchet and the
+Swift/Kotlin parity workflow were retired rather than made green by inflating baselines or fabricating
+translations. The source-language check still rejects malformed English Apple catalogs:
 ```bash
-python3 Tools/i18n_audit.py --ci origin/main
+python3 Tools/english_catalog_check.py
 ```
-Translating into DE/ES/FR/PT-PT is mandatory. Translating into IT/RU/ZH-Hans/ZH-Hant/`zh` too is
-appreciated and keeps the ratchet file honest, but isn't gating by itself — check the tool's own
-output, not this paragraph, for the current per-target allowance before deciding whether to bother.
+`Tools/i18n_audit.py` remains available for inspecting inherited localization debt, but it is not
+the Aura iOS release gate. A future localization release must restore a complete translation policy
+and update the shipped-language claims before enabling it in CI again.
 
 ## Documentation & session workflow
 

@@ -1,4 +1,5 @@
 #if os(iOS)
+import StrandDesign
 import SwiftUI
 
 // MARK: - Biomarkers hero (Act 8, `labs`)
@@ -38,6 +39,7 @@ struct NoopHelixHero: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var motion = NoopMotionState.shared
 
     private var anyOut: Bool { markers.contains(where: \.outOfBand) }
 
@@ -45,11 +47,11 @@ struct NoopHelixHero: View {
     /// `labs` destroys this view outright (NoopShell swaps on `.id(route)`), so a pushed screen
     /// stops the timeline without needing to be detected here.
     private var paused: Bool {
-        reduceMotion || scenePhase != .active || ProcessInfo.processInfo.isLowPowerModeEnabled
+        motion.poseStill(reduceMotion) || scenePhase != .active
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: paused)) { timeline in
+        NoopAnimatedTimeline(minimumInterval: 1.0 / 60.0, paused: paused) { timeline in
             // Frozen at a quarter turn: rungs near full extension, nothing moving.
             let t = paused
                 ? secondsPerTurn * 0.25
