@@ -17,6 +17,7 @@ Everything needed to continue lives in this repository; nothing depends on files
 | Design-vs-app screenshot comparison tool | [`Tools/design-flip`](../../Tools/design-flip/README.md) |
 | Why things are built the way they are | [`docs/fork/decisions.md`](../fork/decisions.md) |
 | Release notes for 11.7.0 | [`docs/fork/releases/v11.7.0.md`](../fork/releases/v11.7.0.md) |
+| The Discord post announcing the pause | [`community-post.md`](community-post.md) |
 | Older, unmerged experiments (August) | branches under `archive/` |
 
 The iOS code is on `main`. The Aura interface is `StrandiOS/NoopUI` (`NoopShell.swift` holds the

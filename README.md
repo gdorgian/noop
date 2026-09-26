@@ -65,6 +65,15 @@ provider you choose, about the parts of your record you allow.
 Everything is stored and computed on the iPhone. There is no Noop Aura account, no server and no
 telemetry.
 
+<p align="center">
+  <img src="docs/assets/aura-11.7/showcase/goals-and-bloodwork.png" width="49%" alt="Goals and bloodwork: the goal journey route, the lab hub, a lab report read from a photo, and a Ferritin trend">
+  <img src="docs/assets/aura-11.7/showcase/ages-and-heart.png" width="49%" alt="Your ages and your heart: the Body Age orb, a driver's detail, heart rate through the day and stress">
+  <img src="docs/assets/aura-11.7/showcase/breathe-train-ask.png" width="49%" alt="Breathe, train, ask: a guided breathing session, the live lift log, a finished lift and Svea's brief">
+  <img src="docs/assets/aura-11.7/showcase/the-long-view.png" width="49%" alt="The long view: two signals compared, one signal's history, sleep debt and the day's energy">
+</p>
+
+<p align="center"><sub>More of the designed screens, with the example person. Some show parts of the design still to be wired, such as intraday Charge. Every screen is in <a href="docs/assets/aura-11.7/screens"><code>docs/assets/aura-11.7/screens</code></a>.</sub></p>
+
 ## How it fits together
 
 <p align="center">
