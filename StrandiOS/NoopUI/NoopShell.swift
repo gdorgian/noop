@@ -503,6 +503,29 @@ struct NoopNightAmbientGlow: View {
 /// the richly populated canonical person remains a Debug-only visual fixture in `NoopAppShell`.
 /// As individual canonical screens gain verified adapters they can replace this route-by-route, but
 /// Release must never silently fall back to the fixture.
+/// A WHOOP 4.0 sends live heart rate only after TOGGLE_REALTIME_HR. Upstream arms it from its Live
+/// tab, which Aura does not have, so a 4.0 showed no pulse on Today, the live bar or the Dynamic
+/// Island. Hold one realtime want while Aura is not in the background; `holding` keeps each
+/// `startRealtimeHR()` balanced by exactly one `stopRealtimeHR()`.
+private struct NoopRealtimeHRHold: ViewModifier {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var holding = false
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { hold(scenePhase != .background) }
+            .onChange(of: scenePhase) { _, phase in hold(phase != .background) }
+            .onDisappear { hold(false) }
+    }
+
+    private func hold(_ want: Bool) {
+        guard want != holding else { return }
+        holding = want
+        if want { model.startRealtimeHR() } else { model.stopRealtimeHR() }
+    }
+}
+
 struct NoopVerifiedAppShell: View {
     @ObservedObject var navigation: NoopNavigation
     @EnvironmentObject private var repo: Repository
@@ -704,6 +727,7 @@ struct NoopVerifiedAppShell: View {
         // like the fixture shell. Without this, SwiftUI first removes the status-bar safe area and
         // NoopScreen adds 56 pt again, putting every verified Lab/Breathe page about 60 pt too low.
         .ignoresSafeArea(.container, edges: usesCanonicalCanvas ? .top : [])
+        .modifier(NoopRealtimeHRHold())
         .task(id: instrumentLoadKey) {
             guard instrumentLoadKey != nil else { return }
             await instrumentStore.load(from: repo)
