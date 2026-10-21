@@ -8,16 +8,22 @@ final class CoachLocalQueryRouterTests: XCTestCase {
     /// older `dataConsent` flag alone; with nothing granted there is nothing to assert against. Grant
     /// everything for the duration and put the wearer's real grants back after.
     private var savedGrants: SveaDataGrants?
+    private var savedDataConsent: Any?
 
     override func setUp() {
         super.setUp()
         savedGrants = SveaDataGrants.load()
         SveaDataGrants.all.save()
+        // The engine offers no tools at all unless data access is on. These tests only passed when an
+        // earlier test had left it on in the host's defaults; set it here, and put it back after.
+        savedDataConsent = UserDefaults.standard.object(forKey: "ai.dataConsent")
+        UserDefaults.standard.set(true, forKey: "ai.dataConsent")
     }
 
     override func tearDown() {
         savedGrants?.save()
         savedGrants = nil
+        UserDefaults.standard.set(savedDataConsent, forKey: "ai.dataConsent")
         super.tearDown()
     }
 
@@ -89,7 +95,8 @@ final class CoachLocalQueryRouterTests: XCTestCase {
         XCTAssertFalse(ordinary.contains(.myLogs))
 
         let trend = engine.coachTools(for: "How has my weight changed over 3 years?")
-        XCTAssertTrue(trend.contains(.dataCatalog))
+        // Aura never offers the merged data catalog (no grant covers it); history comes from metricHistory.
+        XCTAssertFalse(trend.contains(.dataCatalog))
         XCTAssertTrue(trend.contains(.metricHistory))
         XCTAssertFalse(trend.contains(.myLogs))
         XCTAssertFalse(trend.contains(.personalPatterns),

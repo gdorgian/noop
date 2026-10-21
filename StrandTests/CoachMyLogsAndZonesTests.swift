@@ -73,22 +73,28 @@ final class CoachMyLogsAndZonesTests: XCTestCase {
         // (ungranted) state.
         let restore = SveaDataGrants.load()
         SveaDataGrants.all.save()
-        defer { restore.save() }
+        let restoreConsent = UserDefaults.standard.object(forKey: "ai.dataConsent")
+        UserDefaults.standard.set(true, forKey: "ai.dataConsent")
+        defer {
+            restore.save()
+            UserDefaults.standard.set(restoreConsent, forKey: "ai.dataConsent")
+        }
         let engine = makeEngine()
         engine.toolConsent = ToolConsent(enabled: Set(CoachPurpose.allCases.filter { $0 != .patterns }))
         XCTAssertTrue(engine.coachTools.contains(.myLogs))
         XCTAssertTrue(engine.coachTools.contains(.zoneMinutes))
-        XCTAssertTrue(engine.coachTools.contains(.dataCatalog))
         XCTAssertTrue(engine.coachTools.contains(.metricHistory))
-        // 25 → 26: `estimate_session_effort` joined the wire. Reviewed and intended — the coach was
-        // stating Effort figures its own arithmetic could not produce ("15 for a 20-minute Zone 2
-        // ride"), and one small tool definition is a fair price for prescriptions that hold up.
-        XCTAssertEqual(engine.coachTools.count, 26,
+        // Aura: the seven grants have no category for the merged data catalog, saved memory or plans, so
+        // those tools are never offered to a provider (SveaDataGrantPolicy.isExplicitlyBlocked). Upstream's
+        // census of 26 counted them; with every grant given, Aura offers 21.
+        XCTAssertFalse(engine.coachTools.contains(.dataCatalog))
+        XCTAssertTrue(engine.coachTools.contains(.personalPatterns))
+        XCTAssertEqual(engine.coachTools.count, 21,
                        "tool count changed — confirm the added per-round cost is intended")
 
+        // Offering is decided by the grants alone; the older purpose toggle adds nothing on top.
         engine.toolConsent.enabled.insert(.patterns)
-        XCTAssertEqual(engine.coachTools.count, 28,
-                       "the second opt-in adds personal patterns and training preferences")
+        XCTAssertEqual(engine.coachTools.count, 21)
     }
 
     /// Every tool has a non-empty description and a well-formed object input schema — the new ones

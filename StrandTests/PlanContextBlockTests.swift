@@ -23,17 +23,23 @@ final class PlanContextBlockTests: XCTestCase {
     /// older `dataConsent` flag alone; with nothing granted there is nothing to assert against. Grant
     /// everything for the duration and put the wearer's real grants back after.
     private var savedGrants: SveaDataGrants?
+    private var savedDataConsent: Any?
 
     override func setUp() {
         super.setUp()
         savedGrants = SveaDataGrants.load()
         SveaDataGrants.all.save()
+        // The engine offers no tools at all unless data access is on. These tests only passed when an
+        // earlier test had left it on in the host's defaults; set it here, and put it back after.
+        savedDataConsent = UserDefaults.standard.object(forKey: "ai.dataConsent")
+        UserDefaults.standard.set(true, forKey: "ai.dataConsent")
         CoachPlanStore.shared.clearAll()
     }
 
     override func tearDown() {
         savedGrants?.save()
         savedGrants = nil
+        UserDefaults.standard.set(savedDataConsent, forKey: "ai.dataConsent")
         CoachPlanStore.shared.clearAll()
         super.tearDown()
     }
@@ -73,13 +79,15 @@ final class PlanContextBlockTests: XCTestCase {
 
     // MARK: - The real wrapper `send()` sends
 
-    func testToolModeContextCarriesThePlanBlockWhenSomethingIsPending() {
+    func testToolModeContextKeepsAPendingPlanLocal() {
         CoachPlanStore.shared.propose(PlanProposal(day: today, sport: "Tempo run", intent: .hard))
 
+        // Aura keeps plans on the phone: no grant covers goals or planning, so a pending proposal is
+        // NOT sent in the tool-path context (CoachTools.toolModeContext, includePlanning = false).
         let ctx = makeEngine().toolModeContext
-        XCTAssertTrue(ctx.contains("AWAITING THE USER'S DECISION"),
-                      "what's already on the table must ride the tool-path context")
-        XCTAssertTrue(ctx.contains("Tempo run"))
+        XCTAssertFalse(ctx.contains("AWAITING THE USER'S DECISION"),
+                       "plans stay local; no grant permits sending them to a provider")
+        XCTAssertFalse(ctx.contains("Tempo run"))
     }
 
     /// T4: the stable prose stays in the CACHED system block, so with nothing pending the tool-path
