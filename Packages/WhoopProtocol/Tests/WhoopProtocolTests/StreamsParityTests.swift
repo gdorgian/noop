@@ -38,7 +38,7 @@ final class StreamsParityTests: XCTestCase {
             StreamsGold.self, from: Data(contentsOf: resourceURL("streams_golden", "json")))
 
         let parsed = frames.map { parseFrame(bytes($0.hex)) }
-        let s = extractStreams(parsed, deviceClockRef: deviceClockRef, wallClockRef: wallClockRef)
+        let s = extractStreams(parsed, deviceClockRef: deviceClockRef, wallClockRef: wallClockRef, family: .whoop5)
 
         XCTAssertEqual(s.hr, gold.hr.map { HRSample(ts: $0.ts, bpm: $0.bpm) })
         XCTAssertEqual(s.rr, gold.rr.map {

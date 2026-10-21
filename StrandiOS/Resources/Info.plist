@@ -9,8 +9,10 @@
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).debugexport</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).semanticmemory</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).sveaproactive</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).coachbrief</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).healthwriteback</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).rescore</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).stalebattery</string>
 	</array>
 	<key>CADisableMinimumFrameDuration</key>
 	<true/>
@@ -24,13 +26,6 @@
 	<dict>
 		<key>CFBundleAlternateIcons</key>
 		<dict>
-			<key>AppIcon-Titanium</key>
-			<dict>
-				<key>CFBundleIconFiles</key>
-				<array/>
-				<key>UIPrerenderedIcon</key>
-				<false/>
-			</dict>
 			<key>AppIcon-Breathe</key>
 			<dict>
 				<key>CFBundleIconFiles</key>
@@ -46,6 +41,13 @@
 				<false/>
 			</dict>
 			<key>AppIcon-Orb</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array/>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>AppIcon-Titanium</key>
 			<dict>
 				<key>CFBundleIconFiles</key>
 				<array/>

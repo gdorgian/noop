@@ -7,7 +7,7 @@ import Foundation
 /// backgrounded — it stays alive as a `bluetooth-central` to receive the offload in the first place. But
 /// `analyzeRecent` is all-or-nothing: pass 1 writes nothing, every store write happens after both loops,
 /// and the watermark advances only at the very end so an interrupted run can never mark unscored data as
-/// scored. On a heavy install the pass measured **474,778 ms** — nearly eight minutes. iOS suspends the
+/// scored. On a heavy install the pass measured **474,778 ms** — nearly eight minutes. iOS ends the
 /// process long before that, so the work is lost in full.
 ///
 /// The lost work is not the worst of it. Because the watermark never advanced, the NEXT trigger still saw
@@ -17,7 +17,9 @@ import Foundation
 /// guarantees it will be attempted again. The score appeared 1 h 57 m after the data was complete, and only
 /// because the app happened to stay foregrounded for eight unbroken minutes.
 ///
-/// So this decides, before spending anything: is this a pass that can plausibly finish here?
+/// What ends those passes is the background CPU limit, not suspension (see `backgroundRestPerWorkSecond`):
+/// a suspended pass resumes on the next wake, a killed one does not. A backgrounded pass therefore paces
+/// itself under that limit, and this decides only whether one should start here at all.
 ///
 /// Deliberately NOT a fix for how long the pass takes. A cold process still re-scores every night in the
 /// window, because the per-day reuse cache is in-memory and starts empty (`IntelligenceEngine.dayScanCache`).
@@ -35,56 +37,103 @@ enum RescoreBackgroundPolicy {
         case deferToBackgroundTask(reason: String)
     }
 
-    /// What a background execution assertion is worth relying on, in seconds.
+    /// How long a backgrounded pass rests per second of work it just did.
     ///
-    /// `beginBackgroundTask` buys roughly 30 s on current iOS, and that figure is a courtesy rather than a
-    /// contract — it shrinks under memory pressure and in Low Power Mode. 20 s leaves headroom for the
-    /// assertion to be granted late and for the pass's own store writes to land, since being killed
-    /// mid-write is the one outcome worth spending real caution to avoid.
-    static let backgroundBudgetSeconds: Double = 20
+    /// What actually killed the background passes was CPU, not time: iOS terminates a background process
+    /// that holds more than 80% CPU over 60 s (`cpu_resource_fatal`). A cold pass is roughly 144 s of
+    /// near-continuous CPU on a large install, so every overnight attempt was killed about 52 s in — 26 kills
+    /// on one phone in five nights, each leaving the debt for the next attempt to be killed on. Resting as
+    /// long as it worked holds the pass near 50%. A suspension between rests is harmless: the pass is not
+    /// killed by it, it resumes on the next wake, so a pass longer than any single wake still completes.
+    static let backgroundRestPerWorkSecond: Double = 1.0
+
+    /// The longest single rest. Work measured on the uptime clock can include a suspension the process
+    /// spent mid-unit; resting for all of it would stall a pass that has already been idle.
+    static let maxBackgroundRestSeconds: Double = 30
+
+    /// How much work a backgrounded pass does between rests.
+    ///
+    /// Resting after every unit (every night) turned out to be the expensive part. A rest is a `Task.sleep`,
+    /// and a backgrounded process that is only sleeping is exactly what iOS suspends, until the next
+    /// bluetooth wake about ten minutes later. Each unit took milliseconds to a few seconds of CPU, so a pass
+    /// advanced roughly one night per wake. On one phone a 21-night pass ran 2 h 27 min, and a one-time
+    /// full-history pass held the re-score lock from 21:34 until after 11:00 the next day. Every post-offload
+    /// pass in between returned at the lock, so that morning's night was never scored. Working for ten seconds
+    /// before resting ten keeps the same ~50% ceiling under iOS's 80%-over-60 s kill, with one suspension
+    /// opportunity per ten seconds of work instead of one per night.
+    static let backgroundWorkQuantumSeconds: Double = 10
+
+    /// Seconds to rest after `workSeconds` of re-score work done since the last rest. Zero until a quantum of
+    /// work has accumulated (`backgroundWorkQuantumSeconds`), and always zero in the foreground, where no CPU
+    /// limit applies and the user is waiting on the result. A non-finite measurement rests zero.
+    static func restSeconds(afterWorkSeconds workSeconds: Double, isBackground: Bool) -> Double {
+        guard isBackground, workSeconds.isFinite, workSeconds >= backgroundWorkQuantumSeconds else { return 0 }
+        return min(workSeconds * backgroundRestPerWorkSecond, maxBackgroundRestSeconds)
+    }
 
     /// - Parameters:
     ///   - isBackground: whether the app is currently backgrounded. A foregrounded app is never deferred:
     ///     the user is looking at the screen, there is no suspension deadline, and the existing behaviour
     ///     is correct.
+    ///   - isRealUpdate: the trigger carries new data that must be scored (an offload), as opposed to the
+    ///     steady-state backstop tick. A backgrounded backstop does not run: a paced pass costs minutes,
+    ///     the tick cannot tell live HR from a real change, and every real update already runs its own.
     ///   - rescoreAlreadyOwed: a re-score is outstanding — either a pass marked itself started and never
     ///     marked itself finished (it was killed; the mark survives process death, which is the point,
     ///     because the killed process gets no chance to record anything) or an earlier trigger already
-    ///     deferred one. Both mean the same operationally: the work is spoken for, and starting it here
-    ///     would duplicate a pass that something better placed is going to run. This is the
-    ///     self-correcting part — the FIRST background attempt on an install we know nothing about is
-    ///     allowed to run, and from then on the work escalates instead of being re-killed on every
-    ///     offload.
-    ///   - lastCompletedPassSeconds: how long the last pass that ran to completion took, or nil if none
-    ///     has. Measured rather than assumed — the cost varies by more than an order of magnitude with
-    ///     history size, and a fixed guess would either defer installs that finish comfortably or wave
-    ///     through ones that never could.
-    ///   - budgetSeconds: see `backgroundBudgetSeconds`; a parameter so the tests can state the boundary
-    ///     rather than inherit it.
+    ///     deferred one. The work is spoken for by the processing task this escalated to.
+    ///   - passInProgress: a pass is running in THIS process. Its own started-mark is what reads as owed, so
+    ///     it is not evidence of a killed pass; the engine re-arms one follow-up pass for a trigger that
+    ///     lands mid-run. Deferring instead recorded a newer debt, the running pass then finished without
+    ///     settling it (#1681), and every offload after that deferred on it. Spacing does not apply either.
+    ///   - secondsSinceLastAttempt: how long ago the last pass STARTED, nil when unknown. An outstanding
+    ///     debt defers only while that attempt is recent (`interruptedRetryCooldownSeconds`), and any
+    ///     offload defers while it is under `backgroundSpacingSeconds`.
     static func decide(isBackground: Bool,
+                       isRealUpdate: Bool = true,
                        rescoreAlreadyOwed: Bool,
-                       lastCompletedPassSeconds: Double?,
-                       budgetSeconds: Double = backgroundBudgetSeconds) -> Decision {
+                       passInProgress: Bool = false,
+                       secondsSinceLastAttempt: Double? = nil) -> Decision {
         guard isBackground else { return .run }
 
-        if rescoreAlreadyOwed {
+        guard isRealUpdate else {
+            return .deferToBackgroundTask(
+                reason: "the backstop tick does not re-score while backgrounded; offloads run their own")
+        }
+
+        if rescoreAlreadyOwed, !passInProgress,
+           let since = secondsSinceLastAttempt, since >= 0, since < interruptedRetryCooldownSeconds {
             return .deferToBackgroundTask(
                 reason: "a re-score is already outstanding from an earlier trigger")
         }
 
-        // Only a FINITE, positive measurement can justify deferring. A nil (nothing has ever completed),
-        // a zero, or a NaN/infinity from a corrupted default all mean "unknown", and unknown must fall
-        // through to running: refusing to score on the strength of a value we cannot read would be a far
-        // worse failure than one wasted pass.
-        if budgetSeconds > 0,
-           let measured = lastCompletedPassSeconds,
-           measured.isFinite, measured > 0,
-           measured > budgetSeconds {
+        if !passInProgress, let since = secondsSinceLastAttempt, since >= 0, since < backgroundSpacingSeconds {
             return .deferToBackgroundTask(
-                reason: "last completed pass took \(Int(measured.rounded()))s, over the "
-                        + "\(Int(budgetSeconds.rounded()))s a background wake can be relied on for")
+                reason: "the last pass started \(Int(since / 60)) min ago; a backgrounded offload re-scores"
+                    + " at most every \(Int(backgroundSpacingSeconds / 60)) min")
         }
 
         return .run
     }
+
+    /// How long after an attempt that did not finish a backgrounded offload waits before trying again.
+    ///
+    /// Deferring on ANY outstanding debt, with no end, stopped scoring outright. A suspended app is
+    /// routinely terminated by iOS for memory, not CPU, so a pass interrupted that way is ordinary, and the
+    /// processing task it escalates to is granted rarely if ever. On one phone a pass left unfinished at
+    /// 11:25 deferred every offload until the app was next opened: 19 hours, with no score for the night
+    /// in between. Pacing (`backgroundRestPerWorkSecond`) is what keeps a background attempt under the CPU
+    /// limit now, so this only needs to stop a retry on every offload, not forever.
+    static let interruptedRetryCooldownSeconds: Double = 30 * 60
+
+    /// The least time between the starts of two backgrounded offload re-scores.
+    ///
+    /// A strap offloads about every ten minutes, and each offload re-scored the whole window. On one
+    /// WHOOP 5.0 that was about 7 passes an hour of 7–9 s CPU each, day and night: ~900 CPU-s over 16 h
+    /// in the background, mostly re-scoring a night still in progress that nobody was looking at. Spaced
+    /// 30 minutes apart, the same offloads cost ~250 CPU-s, and a backgrounded score trails its data by
+    /// at most the spacing plus one offload interval. The work is moved, not dropped: the deferral records
+    /// the debt, which the first offload past the spacing, the processing task or the next foreground
+    /// settles, and a foregrounded pass is never spaced.
+    static let backgroundSpacingSeconds: Double = 30 * 60
 }

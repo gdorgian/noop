@@ -211,6 +211,7 @@ extension WhoopStore {
                   (SELECT COUNT(*) FROM rrInterval WHERE srcChannel = 7
                      AND (tsSuspect IS NULL OR tsSuspect <> 1)) AS w7,
                   (SELECT COUNT(*) FROM rrInterval WHERE srcChannel IN (5, 6, 7)) AS w5tagged,
+                  (SELECT COUNT(*) FROM rrInterval WHERE srcChannel = 8) AS w4history,
                   (SELECT COALESCE(GROUP_CONCAT(identity, ';'), '') FROM
                     (SELECT QUOTE(id) || ':' || QUOTE(brand) || ':' || QUOTE(model) || ':' || QUOTE(status) AS identity
                      FROM pairedDevice ORDER BY id)) AS registry,
@@ -230,8 +231,9 @@ extension WhoopStore {
             }
             let historyCount: Int = row["w5"]
             let registry: String = row["registry"]
-            return "v3|h\(hc):\(hm)|" + tails.joined(separator: "|")
-                + "|w5\(historyCount)|w7\(row["w7"] as Int)|tagged\(row["w5tagged"] as Int)|registry\(registry)"
+            return "v5|h\(hc):\(hm)|" + tails.joined(separator: "|")
+                + "|w5\(historyCount)|w7\(row["w7"] as Int)|tagged\(row["w5tagged"] as Int)"
+                + "|w4history\(row["w4history"] as Int)|registry\(registry)"
         }
     }
 
@@ -248,11 +250,17 @@ extension WhoopStore {
     /// [hrFingerprint] uses, materialising no rows. `COUNT(*)` is the load-bearing half: it moves when a
     /// backfill lands rows INSIDE a window already covered, which `MAX(ts)` alone would miss.
     ///
+    /// The five R-R figures come from ONE walk (the `rr` derived table). Each needs `srcChannel` or
+    /// `tsSuspect`, which the key index does not hold, so every beat in the window costs a table lookup;
+    /// as five sub-selects they paid it up to five times, and on a 54-hour WHOOP 5 window (~280k beats)
+    /// that was 44% of a warm re-score's CPU. The values are unchanged.
+    ///
     /// The streams are exactly the ones the per-day loop reads and hands to `analyzeDay`:
     /// - `ppgHrSample`: the day's HR read is measured ∪ PPG-derived ([hrSamples]), so a PPG row for a second
     ///   with no measured HR changes the scored series while `hrSample` stays put.
-    /// - `rrInterval`: filtered exactly as [rrIntervals] filters at read (the 0x6E SpO2-IBI duplicate and
-    ///   future-stamped beats are excluded), so the witness counts the beats that are actually scored.
+    /// - `rrInterval`: filtered as [rrIntervals] filters at read (the 0x6E SpO2-IBI duplicate and
+    ///   future-stamped beats are excluded), but WITHOUT its one-Oura-channel selection: the witness counts
+    ///   every beat that selection chooses from, since a new row on either channel can change which is scored.
     /// - `sleepStateSample`: appended from the SAME v18 record at the same `ts` as HR, so a re-offloaded
     ///   record whose HR row is dropped on conflict still lands a new band row that `analyzeDay` scores.
     ///   Its letter is `b` (band), not `s`, which is reserved for the version prefix.
@@ -268,17 +276,9 @@ extension WhoopStore {
                 SELECT
                   (SELECT COUNT(*) FROM ppgHrSample WHERE deviceId = :d AND ts >= :f AND ts <= :t) AS pc,
                   (SELECT COALESCE(MAX(ts), 0) FROM ppgHrSample WHERE deviceId = :d AND ts >= :f AND ts <= :t) AS pm,
-                  (SELECT COUNT(*) FROM rrInterval WHERE deviceId = :d AND ts >= :f AND ts <= :t
-                     AND (srcChannel IS NULL OR srcChannel <> :rrx)
-                     AND (tsSuspect IS NULL OR tsSuspect <> 1)) AS rc,
-                  (SELECT COALESCE(MAX(ts), 0) FROM rrInterval WHERE deviceId = :d AND ts >= :f AND ts <= :t
-                     AND (srcChannel IS NULL OR srcChannel <> :rrx)
-                     AND (tsSuspect IS NULL OR tsSuspect <> 1)) AS rm,
-                  (SELECT COUNT(*) FROM rrInterval WHERE deviceId = :d AND ts >= :f AND ts <= :t
-                     AND srcChannel = 5 AND (tsSuspect IS NULL OR tsSuspect <> 1)) AS w5,
-                  (SELECT COUNT(*) FROM rrInterval WHERE deviceId = :d AND ts >= :f AND ts <= :t
-                     AND srcChannel = 7 AND (tsSuspect IS NULL OR tsSuspect <> 1)) AS w7,
+                  rr.rc AS rc, rr.rm AS rm, rr.w5 AS w5, rr.w7 AS w7,
                   EXISTS(SELECT 1 FROM rrInterval WHERE deviceId = :d AND srcChannel IN (5, 6, 7)) AS w5owner,
+                  rr.w4h AS w4h,
                   COALESCE((SELECT QUOTE(brand) || ':' || QUOTE(model) FROM pairedDevice
                             WHERE id = :d), 'absent') AS registry,
                   (SELECT COUNT(*) FROM respSample WHERE deviceId = :d AND ts >= :f AND ts <= :t) AS xc,
@@ -295,8 +295,17 @@ extension WhoopStore {
                   (SELECT COALESCE(MAX(ts), 0) FROM sleepStateSample WHERE deviceId = :d AND ts >= :f AND ts <= :t) AS bm,
                   (SELECT COUNT(*) FROM event WHERE deviceId = :d AND ts >= :f AND ts <= :t) AS ec,
                   (SELECT COALESCE(MAX(ts), 0) FROM event WHERE deviceId = :d AND ts >= :f AND ts <= :t) AS em
+                FROM (SELECT
+                        COUNT(CASE WHEN srcChannel IS NULL OR srcChannel <> :rrx THEN 1 END) AS rc,
+                        COALESCE(MAX(CASE WHEN srcChannel IS NULL OR srcChannel <> :rrx THEN ts END), 0) AS rm,
+                        COUNT(CASE WHEN srcChannel = 5 THEN 1 END) AS w5,
+                        COUNT(CASE WHEN srcChannel = 7 THEN 1 END) AS w7,
+                        COUNT(CASE WHEN srcChannel = :whoop4Historical THEN 1 END) AS w4h
+                      FROM rrInterval WHERE deviceId = :d AND ts >= :f AND ts <= :t
+                        AND (tsSuspect IS NULL OR tsSuspect <> 1)) AS rr
                 """, arguments: ["d": deviceId, "f": from, "t": to,
-                                 "rrx": RRSourceChannel.spo2Ibi.rawValue]) else { return "" }
+                                 "rrx": RRSourceChannel.spo2Ibi.rawValue,
+                                 "whoop4Historical": RRSourceChannel.whoop4Historical.rawValue]) else { return "" }
             let keys = ["p", "r", "x", "o", "g", "z", "t", "b", "e"]
             let parts = keys.map { key -> String in
                 let count: Int = row[key + "c"], maxTs: Int = row[key + "m"]
@@ -305,7 +314,8 @@ extension WhoopStore {
             let historyCount: Int = row["w5"]
             let registry: String = row["registry"]
             let strictRR = try Self.isWhoop5RRSource(db: db, deviceId: deviceId)
-            return "s2|" + parts.joined(separator: "|") + "|w5\(historyCount)|w7\(row["w7"] as Int)|ownerTagged\(row["w5owner"] as Int)|registry\(registry)|rr5=\(strictRR)"
+            return "s4|" + parts.joined(separator: "|") + "|w5\(historyCount)|w7\(row["w7"] as Int)"
+                + "|w4h\(row["w4h"] as Int)|ownerTagged\(row["w5owner"] as Int)|registry\(registry)|rr5=\(strictRR)"
         }
     }
 
@@ -399,6 +409,13 @@ extension WhoopStore {
         }
     }
 
+    /// The Oura beat channels `rrIntervals` chooses between, as a SQL list: `greenQuality` (0x80) on one
+    /// side, and the amplitude family on the other, `ibiAmplitude` (0x60) + `ibiBare` (0x44). Those two
+    /// share one decoder and were split for labelling only, so they are scored together, never against
+    /// each other. `spo2Ibi` (0x6E) is not listed because `rrIntervals` excludes it outright. Twin of
+    /// Kotlin `SCORABLE_OURA_CHANNELS`, so the channel set cannot drift between the two scoring reads.
+    static let scorableOuraChannels = "(1, 3, 4)"
+
     /// R-R intervals in EMISSION order (#823). `ord` leads the sort: ordering by `rrMs` returned a
     /// second's beats sorted by VALUE, which makes successive beats similar by construction and biases
     /// RMSSD — all successive differences — downward. Pre-v30 rows have `ord` NULL and SQLite sorts NULL
@@ -415,13 +432,31 @@ extension WhoopStore {
     /// The predicate EXCLUDES the one channel proven redundant (`spo2Ibi`, 0x6E) rather than whitelisting
     /// the one preferred (`greenQuality`, 0x80), which matters for what it does NOT drop:
     ///   - Outside strict WHOOP 5 policy, NULL is kept for WHOOP 4 and unlabelled legacy rows.
-    ///   - `ibiAmplitude` (0x60/0x44) is kept. It does not fire on the Gen-3 hardware this was measured
-    ///     on, so there is no evidence it duplicates green — and dropping a ring's ONLY beat source on an
-    ///     untested assumption is the more expensive mistake. If a capture ever shows 0x60 and 0x80 firing
-    ///     together, that is a second exclusion here, decided on that evidence.
+    ///   - `ibiAmplitude` (0x60/0x44) is kept, because dropping a ring's ONLY beat source on an untested
+    ///     assumption is the more expensive mistake.
     /// 0x6E is the one excluded because it is the demonstrated duplicate AND the worse measurement of the
     /// two: it is quantised to an 8 ms grid, applies no quality gate, and runs only while an SpO2
     /// measurement is on — so scoring off it would make HRV coverage a function of the SpO2 duty cycle.
+    ///
+    /// ONE Oura channel per window, not merely one excluded. Captures since have shown 0x60 and 0x80
+    /// firing TOGETHER over the same nights, on two rings. On one, 0x60 alone covers 0.91-0.99 of the
+    /// wall clock and 0x80 adds a partial second copy of 8-33 % of it, so the pair read 1.01-1.31 and the
+    /// #1118 coverage gate refused whichever nights happened to bank more 0x80. Neither channel is a
+    /// duplicate to exclude by name. Which one is complete is a property of the capture, not of the tag,
+    /// so the read keeps green alone when it holds MORE beats than the amplitude family (0x60 + 0x44, see
+    /// `scorableOuraChannels`), and the amplitude family alone otherwise, ties included. A ring with only
+    /// one of them keeps it, which is the guarantee the exclusion above was protecting. NULL rows and every
+    /// non-Oura code are untouched, so WHOOP and pre-v32 rows read exactly as before.
+    ///
+    /// The choice is made per UTC HOUR of the requested window, not once for the whole window. The two
+    /// channels overlap at night but are disjoint in time across a day: 0x60 is banked only overnight and
+    /// 0x80 carries every daytime beat. A single whole-window count let a night's 0x60 outvote the day's
+    /// 0x80 on any read that crossed wake, and dropped every daytime beat with it, so a day-wide timeline
+    /// drew windowed rMSSD for the night and nothing after. Per hour, an hour where both fire still keeps
+    /// the fuller one, and an hour where only one fires keeps that one. Each hour is counted over its part
+    /// of the requested window with the SAME time/suspect predicates as the outer read, before LIMIT, so a
+    /// window inside one hour reads exactly as the whole-window rule did. Same shape as the WHOOP 4
+    /// per-hour source choice below.
     ///
     /// Rows are FILTERED, never deleted: the 0x6E stream stays on disk as the cross-check on green.
     /// Every R-R consumer reads through this one function, so the `hrv diag` trace moves with the scores
@@ -441,17 +476,139 @@ extension WhoopStore {
             // One transport for the complete requested interval. Legacy WHOOP 5 rows mix units and
             // origins, so they remain stored but cannot be converted or spliced into a scored beat train.
             // This subquery uses the SAME time/suspect predicates as the outer read, before LIMIT.
-            let sourcePredicate = strictWhoop5 ? """
+            // A WHOOP 4 has labelled type-47 history, type-40 realtime, standard-BLE, and legacy
+            // unlabelled rows. Choose one source per UTC hour in provenance order, so overlapping live
+            // transports are never merged and partial history takes precedence only where it exists.
+            // Every other source takes the Oura branch: one beat channel per UTC hour, the fuller one
+            // (see the doc comment on `rrIntervals`), with NULL and non-Oura codes passing untouched.
+            let strictWhoop4History: Bool
+            if strictWhoop5 { strictWhoop4History = false }
+            else {
+                if try Self.isWhoop4RRSource(db: db, deviceId: deviceId) { strictWhoop4History = true }
+                else {
+                    strictWhoop4History = try Bool.fetchOne(db,
+                        sql: "SELECT EXISTS(SELECT 1 FROM rrInterval WHERE deviceId = ? AND srcChannel = ?)",
+                        arguments: [deviceId, RRSourceChannel.whoop4Historical.rawValue]) ?? false
+                }
+            }
+            let whoop5SourcePredicate = """
                 srcChannel = (SELECT MIN(srcChannel) FROM rrInterval
                     WHERE deviceId = :d AND ts >= :f AND ts <= :t AND srcChannel IN \(Self.scorableWhoop5Channels)
                     AND (tsSuspect IS NULL OR tsSuspect <> 1))
-                """ : "1"
-            return try Row.fetchAll(db, sql: """
+                """
+            // The WHOOP 4 source decision is per UTC hour. Materialize one choice per hour, then join
+            // that small result to the requested beats. Counting the same hour from every beat made
+            // wide HRV reads quadratic in the number of rows per hour and could stall metric screens.
+            let sql: String
+            if strictWhoop4History {
+                sql = """
+                    WITH whoop4HourChoice AS MATERIALIZED (
+                        SELECT ts / 3600 AS hour,
+                               MIN(CASE WHEN srcChannel = :whoop4Historical THEN 1
+                                        WHEN srcChannel = :whoop4Realtime THEN 2
+                                        WHEN srcChannel = :whoop4Standard THEN 3
+                                        WHEN srcChannel IS NULL THEN 4 END) AS sourceChoice
+                        FROM rrInterval
+                        WHERE deviceId = :d
+                          AND ts >= (:f / 3600) * 3600
+                          AND ts < ((:t / 3600) + 1) * 3600
+                          AND (tsSuspect IS NULL OR tsSuspect <> 1)
+                          AND (srcChannel IS NULL OR srcChannel IN
+                               (:whoop4Historical, :whoop4Realtime, :whoop4Standard))
+                        GROUP BY ts / 3600
+                    )
+                    SELECT r.ts, r.rrMs, r.srcChannel, r.ord, r.seq FROM rrInterval r
+                    JOIN whoop4HourChoice h ON h.hour = r.ts / 3600
+                    WHERE r.deviceId = :d AND r.ts >= :f AND r.ts <= :t
+                      AND (r.srcChannel IS NULL OR r.srcChannel <> :rrx)
+                      AND ((r.srcChannel = :whoop4Historical AND h.sourceChoice = 1)
+                           OR (r.srcChannel = :whoop4Realtime AND h.sourceChoice = 2)
+                           OR (r.srcChannel = :whoop4Standard AND h.sourceChoice = 3)
+                           OR (r.srcChannel IS NULL AND h.sourceChoice = 4))
+                      AND (r.tsSuspect IS NULL OR r.tsSuspect <> 1)
+                    ORDER BY r.ts ASC, r.ord ASC, r.rrMs ASC, r.seq ASC LIMIT :lim
+                    """
+            } else if strictWhoop5 {
+                sql = """
+                    SELECT ts, rrMs, srcChannel, ord, seq FROM rrInterval
+                    WHERE deviceId = :d AND ts >= :f AND ts <= :t
+                    AND (srcChannel IS NULL OR srcChannel <> :rrx)
+                    AND \(whoop5SourcePredicate)
+                    AND (tsSuspect IS NULL OR tsSuspect <> 1)   -- exclude future-stamped (#1073) and 500 ms fill (#2371) beats
+                    ORDER BY ts ASC, ord ASC, rrMs ASC, seq ASC LIMIT :lim
+                    """
+            } else {
+                // One Oura channel per UTC hour, counted inside the requested window. LEFT JOIN: only
+                // scorable Oura rows create an hour's choice, and NULL / non-Oura rows must pass whether
+                // or not their hour has one. The outer table stays unaliased so its column names read
+                // exactly as in the other branches.
+                sql = """
+                    WITH ouraHourChoice AS MATERIALIZED (
+                        SELECT ts / 3600 AS hour, SUM(srcChannel = 1) > SUM(srcChannel <> 1) AS keepGreen
+                        FROM rrInterval
+                        WHERE deviceId = :d AND ts >= :f AND ts <= :t AND srcChannel IN \(Self.scorableOuraChannels)
+                          AND (tsSuspect IS NULL OR tsSuspect <> 1)
+                        GROUP BY ts / 3600
+                    )
+                    SELECT ts, rrMs, srcChannel, ord, seq FROM rrInterval
+                    LEFT JOIN ouraHourChoice h ON h.hour = rrInterval.ts / 3600
+                    WHERE deviceId = :d AND ts >= :f AND ts <= :t
+                    AND (srcChannel IS NULL OR srcChannel <> :rrx)
+                    AND (srcChannel IS NULL OR srcChannel NOT IN \(Self.scorableOuraChannels)
+                         OR (srcChannel = 1) = h.keepGreen)
+                    AND (tsSuspect IS NULL OR tsSuspect <> 1)   -- exclude future-stamped (#1073) and 500 ms fill (#2371) beats
+                    ORDER BY ts ASC, ord ASC, rrMs ASC, seq ASC LIMIT :lim
+                    """
+            }
+            let rows = try Row.fetchAll(db, sql: sql,
+                                        arguments: ["d": deviceId, "f": from, "t": to,
+                                                    "rrx": RRSourceChannel.spo2Ibi.rawValue,
+                                                    "whoop4Historical": RRSourceChannel.whoop4Historical.rawValue,
+                                                    "whoop4Realtime": RRSourceChannel.whoop4Realtime.rawValue,
+                                                    "whoop4Standard": RRSourceChannel.whoop4Standard.rawValue,
+                                                    "lim": limit])
+                .map { row in
+                    RRInterval(ts: row["ts"], rrMs: row["rrMs"],
+                               srcChannel: (row["srcChannel"] as Int?).flatMap(RRSourceChannel.init(rawValue:)),
+                               ord: row["ord"] as Int?, seq: row["seq"])
+                }
+            // A ring record served twice is stored twice: each connection anchors on its own SyncTime,
+            // so the second copy lands a second or two off the first and misses the row key instead of
+            // colliding with it (#2456). Collapsed HERE rather than at one scorer, so every SCORING
+            // reader agrees: the damage shows up as a coverage over-count, and coverage is computed
+            // from this read.
+            //
+            // The raw diagnostic export deliberately does NOT come through here and still shows both
+            // copies. That is the point of a raw export, and it is the evidence the duplication was
+            // diagnosed from, so a strap log and the app can legitimately disagree on beat counts.
+            return OuraRedrainCollapse.withoutRedrainedRuns(rows)
+        }
+    }
+
+    /// The diagnostic read: every beat channel except the `spo2Ibi` (0x6E) duplicate, with NO scoring
+    /// selection, so a strap-log count or an export still carries both Oura beat channels as each other's
+    /// cross-check. This is what `rrIntervals` returned before the one-Oura-channel selection. Quarantined
+    /// (`tsSuspect`) beats stay excluded. Twin of Kotlin `WhoopDao.rawRrIntervals` (`RAW_RR_INTERVALS_SQL`).
+    ///
+    /// BANKED, on every device, which is not the same as "unchanged" everywhere. For a ring this restores
+    /// what `rr=` counted in every log filed before #2423. For a WHOOP 5 it CHANGES that number, because
+    /// the strict single-transport selection in `rrIntervals` predates #2423: a 5/MG's `rr=` now counts
+    /// every stored transport rather than the one scored. That is deliberate. This read answers what the
+    /// strap banked, and a legacy WHOOP 5 row that cannot be spliced into a scored beat train was still
+    /// banked; one number meaning "banked on a ring, scored on a strap" would be the worse answer. Expect
+    /// a 5/MG's `rr=` to step up once, and to sit above the scored count from then on.
+    ///
+    /// It also does NOT collapse a record the drain served twice (#2456), where `rrIntervals` does. So on
+    /// a redrained night this counts the duplicates and the `hrv diag` line does not, and the two together
+    /// are what shows a redrain happened at all. A strap log and the app disagreeing on beat counts is the
+    /// signal, not a fault.
+    public func rawRrIntervals(deviceId: String, from: Int, to: Int, limit: Int) async throws -> [RRInterval] {
+        try syncRead { db in
+            try Row.fetchAll(db, sql: """
                 SELECT ts, rrMs, srcChannel, ord, seq FROM rrInterval
                 WHERE deviceId = :d AND ts >= :f AND ts <= :t
                 AND (srcChannel IS NULL OR srcChannel <> :rrx)
-                AND \(sourcePredicate)
-                AND (tsSuspect IS NULL OR tsSuspect <> 1)   -- #1073: exclude future-stamped beats
+                AND (tsSuspect IS NULL OR tsSuspect <> 1)
                 ORDER BY ts ASC, ord ASC, rrMs ASC, seq ASC LIMIT :lim
                 """, arguments: ["d": deviceId, "f": from, "t": to,
                                  "rrx": RRSourceChannel.spo2Ibi.rawValue, "lim": limit])
@@ -477,6 +634,25 @@ extension WhoopStore {
                         from: Data(json.utf8))) ?? [:]
                     return WhoopEvent(ts: row["ts"], kind: row["kind"], payload: payload)
                 }
+        }
+    }
+
+    /// The most recent banked battery reading, with its charging bit (#2556).
+    ///
+    /// Separate from `batterySamples` because that one projects `ts, soc, mv` and drops `charging`, which
+    /// the table has carried since the column was added and every insert writes. A stale-battery warning
+    /// has to know whether the strap was last seen ON the charger, so it needs the column the existing read
+    /// leaves behind rather than a new one.
+    ///
+    /// Twin of Kotlin `WhoopDao.latestBattery`.
+    public func latestBattery(deviceId: String) async throws -> (ts: Int, soc: Double?, charging: Bool?)? {
+        try syncRead { db in
+            try Row.fetchOne(db, sql: """
+                SELECT ts, soc, charging FROM battery
+                WHERE deviceId = ?
+                ORDER BY ts DESC LIMIT 1
+                """, arguments: [deviceId])
+                .map { (ts: $0["ts"], soc: $0["soc"], charging: $0["charging"]) }
         }
     }
 

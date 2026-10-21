@@ -24,7 +24,7 @@ struct LiftLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 8) {
                         stateMark(context.state, size: 7)
-                        Text(context.attributes.programName)
+                        Text(context.state.programName)
                             .font(NoopSpecType.subline.weight(.semibold))
                             .foregroundStyle(bodyInk)
                             .lineLimit(1)
@@ -55,7 +55,7 @@ struct LiftLiveActivity: Widget {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 stateMark(state, size: 8)
-                Text("Noop · \(context.attributes.programName)")
+                Text("Noop · \(context.state.programName)")
                     .font(NoopSpecType.captionMicro)
                     .tracking(NoopSpecType.Tracking.captionMicro)
                     .textCase(.uppercase)

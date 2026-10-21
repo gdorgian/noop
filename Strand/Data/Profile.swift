@@ -201,9 +201,8 @@ final class ProfileStore: ObservableObject {
 
     // MARK: - Profile picture
 
-    /// The profile photo as a SwiftUI `Image`, or nil when none is set (callers fall back to the
-    /// `person.crop.circle` SF Symbol). Bridges the stored JPEG bytes through the platform bitmap
-    /// type (`NSImage`/`UIImage`) via the shared `Image(platformImage:)` initializer.
+    /// The profile photo as a SwiftUI `Image`, or nil when none is set. Aura's You header and record
+    /// draw it directly; upstream's own surfaces use `ProfileAvatarView`.
     var avatarImage: Image? {
         guard let data = avatarImageData, let img = PlatformImage(data: data) else { return nil }
         return Image(platformImage: img)
@@ -260,6 +259,25 @@ final class ProfileStore: ObservableObject {
     /// an out-of-range age.
     nonisolated static var dateOfBirthRange: ClosedRange<Date> {
         dateOfBirth(forAge: 100)...dateOfBirth(forAge: 13)
+    }
+
+    /// The effective HRmax an EFFORT score is computed against, resolved exactly as `AnalyticsEngine`
+    /// resolves it: the manual override when one is set, else Tanaka from age, else nil.
+    ///
+    /// Deliberately not `hrMax` below, which answers a different question and differs from this one in
+    /// two ways: it rounds Tanaka to an Int, and for an age-less profile it returns 208 rather than nil.
+    /// A day scored through it would not match the day the engine stored either.
+    ///
+    /// #2460: today's live Effort is computed in the Today views rather than read from the scored day,
+    /// and both of them passed Tanaka here with no reference to the override. Because the ring shows
+    /// `StrainScorer.effectiveEffort(live:stored:)`, which is `max(live, stored)`, and an override is
+    /// normally set BECAUSE the real maximum is above the formula, the Tanaka value was not merely
+    /// different, it was always the larger of the two and so always the one displayed. The setting
+    /// therefore did nothing until the day stopped being today. Both views now read this, so the live
+    /// value and the stored day are scored against one number.
+    var effortHRmax: Double? {
+        if hrMaxOverride > 0 { return Double(hrMaxOverride) }
+        return age > 0 ? StrainScorer.tanakaHRmax(age: Double(age)) : nil
     }
 
     /// Tanaka estimate unless overridden.

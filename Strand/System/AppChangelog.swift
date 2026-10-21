@@ -7,7 +7,7 @@ enum AppChangelog {
 
     /// Bump this when you add a release below. The "What's New" sheet shows automatically when the
     /// stored last-seen version is behind this. (Decoupled from the bundle version on purpose.)
-    static let currentVersion = "11.7.0"
+    static let currentVersion = "12.0.0"
 
     struct Release: Identifiable {
         let version: String
@@ -19,6 +19,43 @@ enum AppChangelog {
 
     /// Newest first.
     static let releases: [Release] = [
+        Release(
+            version: "12.0.0",
+            title: "Today your way, heart rate any app can read, and Italian",
+            date: "October 2026",
+            items: [
+                "**Today the way you want it (#2311, #2320, #2410, #2374, #2421, thanks @andigandhi and @mailingjash).** Today can draw its gauges as rings or as the liquid vessels, on Android and on Apple, and the choice is yours per device. The hero ring draws flat rather than through a bloom stand-in, its label sits centred on the ring, the active strap's own battery appears in the Liquid header, and Reduce Motion is honoured throughout. Nothing redraws while nothing moves (#2444, thanks @UtkuDenizAltiok).",
+                "**Your strap's heart rate, in any app (#2400, thanks @don86nl).** WHOOP 4.0 can broadcast heart rate over the standard Bluetooth profile, so another app on your phone can read it live. The Today row says Partly rather than Yes, because a 4.0 offers the broadcast and not the rest.",
+                "**Daytime stress measured against you (#2125, #2432, #2452, #2450, #2504, #2430, #2431, thanks @bartmuskala and @kavemang).** A personal daytime lens, resolved once a day instead of once per screen and anchored to real local days. The line ramps down the chart rather than across the day, hours masked by activity say why, and Today honours the same baseline the detail screen does. Opt-in, and off until you ask for it.",
+                "**ECG on WHOOP MG.** The R17 layout, its wrist values and its START list are corrected, Android drives the turn-on probe Apple already had, an in-flight offload is cleared before a realtime trace is requested, and the capture-may-be-running latch survives an app restart and reaches the Devices card.",
+                "**Italian, and Russian that counts properly (#2454).** NOOP speaks Italian. Russian now carries grammatical plurals across the app, the Watch complications and the Apple catalogues, so counts read correctly rather than always taking one form. Eight mistranslated Android strings are corrected, and the copy a widened scanner surfaced is localised.",
+                "**A Deep Timeline you can actually read (#2368, #2382, thanks @andigandhi).** X-axis labels and per-minute zoom ticks on Android and on iOS and macOS, and the zoom and pan no longer snap back where they were released.",
+                "**Sleep that reports what it used (#2576, #2550, #2372, thanks @UtkuDenizAltiok and @kavemang).** The deep base prior is lowered to 0.15 on PSG evidence, scored subject by subject rather than in aggregate. The hypnogram read-out matches its own rows in order and in value, stage rows align with chart depth, and two device sources recording the same night are collapsed into one.",
+                "**An Oura ring that keeps its place (#2442, #2457, #2455, #2412, #2564, #2624, #2433, #2443, thanks @pipiche38).** A sleep-window stash survives a reconnect, an interrupted drain banks its resume cursor so the next connect does not store again what it already holds, a night the drain served twice is readable, the hypnogram's padding tail is no longer laid out as elapsed time, and a read crossing wake keeps the daytime beats. The Experimental all-day heart rate and HRV holds its daytime arming for the learned night rather than for every screen-off.",
+                "**A Charge that agrees with itself (#2466, #2666, #2469, thanks @andremiliano and @DX23876).** The breakdown reads the headline's own baselines rather than resolving its own, an old WHOOP import no longer anchors them, and there is now a written rule for which nights a Charge baseline reads.",
+                "**A quicker Apple app (#2633, #2634, #2635, #2636, #2637, #2639, #2640, #2641, #2642, thanks @AlexSchmidt1999).** Live Today Effort computes off the main actor, resolved Trends windows are reused across unrelated publications, HealthKit observer deltas are bounded to the recent sync window, shared chart styles resolve once per update, full-resolution chart selection uses a date-ordered lookup, and the shared panel background composites fewer layers.",
+                "**Shortcuts, Health and the Lock Screen (#2340, thanks @rodrigosa7 and @paradix86).** A recorded GPS route comes back through Shortcuts as GPX or FIT, and the picker says what a FIT leaves out. The Apple Health export names its chart heart-rate sources and refreshes write authorization. Android reads your profile weight from Health Connect. Live notifications now have one switch each for what NOOP shows on the Lock Screen, and each switch touches only its own.",
+                "**Smaller corrections.** Android honours your selected accent in Material controls and rejects a malformed custom RGB value (#2627). A strap last seen low that has not been heard from since now says so. Vital dates carry their weekday (#2622, thanks @kavemang). Today explains when Start session is available, and the Sleep movement strip says its scale is per-night. The 4.0 broadcast row, the Key Metrics header and the hypnogram read-out all stopped naming something they were not showing (#2377, #2400, thanks @andremiliano).",
+            ]
+        ),
+        Release(
+            version: "11.8.0",
+            title: "A gym log book on your wrist, a Coach you can switch off, and a Sync Strap shortcut",
+            date: "September 2026",
+            items: [
+                "**A lift log you advance from the strap (#2098, #2099, #2232, thanks @UtkuDenizAltiok).** An on-device gym log book on iPhone and Mac: build a session, then move between sets with a double-tap on the strap instead of reaching for the phone. Android gets the groundwork this release, the new schema with its Room twin and the same set-metrics engine, but not the log book itself yet (#2327).",
+                "**A Coach you can turn off completely (#2269, #2254, #2222, #2207).** One master switch retires the AI Coach: the tab, the generated brief, the widget and the tray notification, and every request that would leave the device. Its settings moved to their own screen, Android gained the bottom-bar tab iPhone already had, and Disconnect is now somewhere an iPhone can actually reach.",
+                "**Sync the strap from a shortcut, and watch it work (#2272, thanks @npapatheodorou).** A Sync Strap App Intent runs a sync from Shortcuts or the Lock Screen, a Live Activity shows the offload as it goes, and an optional setting keeps the screen awake while it runs. Reconnecting off-screen now asks for the strap by name rather than scanning for it, which iOS throttles hard in the background.",
+                "**Workouts that are easier to keep tidy (#2287, #2286, #2260, #2220, #2213, thanks @tigercraft4).** Sessions under a minute are discarded, and the list splits into Current and Archived. Deleting one now clears it from every place the list reads, including the copy Apple Health kept. The WHOOP sports that were missing are selectable, their icons are fixed, and auto-detection only ever asks rather than saving on its own.",
+                "**An Oura ring that reads its own packets correctly (#2237, #2240, #2253, thanks @pipiche38).** A notification that tiles exactly into several packets is read in full instead of stopping at the first. A young ring no longer adopts the wrong anchor unit, settled by adjacency rather than by guessing, and a diagnostic reports which ring epoch each row believes in.",
+                "**WHOOP 5 readings that admit when they failed (#2193, #2223, #1985, #2230, thanks @Trillient, @bhelm and @kavemang).** A failed flag read is no longer reported as though it were a value, on either platform. The frame integrity verdict reaches every consumer rather than being narrowed on the way, and the strap family recorded is the one actually established.",
+                "**Charts that stop redrawing the whole screen (#2295, #2288, #2263, #2258, thanks @Iskrata and @kavemang).** Workouts and Sleep no longer re-evaluate their entire bodies on every live heart-rate tick. Three charts that had no tooltip gained one, two uncapped series are downsampled, the sleep motion trace computes its peak once, and the Apple stress level rounds the way Android's does.",
+                "**Steps charts, and an optional 30-day average (thanks @bhelm).** The steps charts are clearer, with a 30-day average card you can turn on.",
+                "**Apple Health that keeps up (#2279, #2291, #2296, #2251, #2271, thanks @Iskrata).** A deferred re-score now publishes once it lands rather than being missed, workouts are observed for live delivery, and a backgrounded pass paces itself under the CPU limit iOS enforces. A CSV import no longer turns a correct SDNN into RMSSD on the way back out.",
+                "**Smaller corrections.** The morning recap waits until 05:00 rather than arriving overnight (#2290). Stat labels no longer run into their neighbour (#2292). Battery says whose charge it is on all seven surfaces, not three (#2216). A night is named by the evening it belongs to (#2235). The Deep Timeline source row names the active device (#2276, thanks @pipiche38).",
+                "**Localization.** Chinese is complete in both scripts across the app and the watch complications (#2226, #2227, #2228, #2244), the French recovery and strain words are repaired (#2247), the theme picker says light rather than lightweight (#2249), and a gap that let UI copy ship English in every locale is closed, taking the Home screen and the terms you agree to with it (#2299, #2250).",
+            ]
+        ),
         Release(
             version: "11.7.0",
             title: "A stress screen that keeps up, WHOOP 5 readings in the units the strap sends, and a ring that stops repeating itself",

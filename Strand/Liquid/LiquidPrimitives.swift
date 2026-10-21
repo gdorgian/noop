@@ -13,153 +13,90 @@ import StrandDesign
 
 enum LiquidRender {
 
-    /// A circular vessel of liquid filled to `sim.level`, tinted, with parallax slosh, a light band
-    /// that follows tilt, surface glints, flake and droplets.
-    ///
-    /// RESTORED FROM `6a5856cd^`, and deliberately divergent from upstream.
-    ///
-    /// ryanbr replaced this with a flat progress ring in 6a5856cd ("Refine the iOS visual system and
-    /// key screen layouts", #1068, 2026-08-09) and this fork inherited that in the sync days later.
-    /// The liquid IS the reason the screen is called Liquid Today, so it comes back here. Only this
-    /// one function: `LiquidRender.tube` stayed on its post-#1068 solid rendering on purpose, and
-    /// `LiquidScoreGauge` (which that same commit introduced) still supplies the count-up number over
-    /// the top — the number is pinned white with a shadow, which is exactly what a moving surface
-    /// underneath needs.
-    ///
-    /// The physics did not have to be restored: `LiquidSim` in LiquidCore.swift has not changed since
-    /// before the removal, so every field this reads (`level`, `a`, `av`, `ab`, `abv`, `drops`,
-    /// `flecks`, `energy`, `p`) is still there and still stepped the same way.
-    ///
-    /// Cost to know: `LiquidPrimitives.swift` is a file upstream actively reworks, so a sync that
-    /// touches it will conflict HERE and has to be resolved by hand — this is not one of those
-    /// wholesale-drop conflicts like android/ was.
+    /// A softly sculpted circular progress ring. Geometry is fixed (`radius`, `lineWidth`, arc span);
+    /// this pass only deepens the material — recessed track, frosted inner disc, semantic progress
+    /// gradient — without neon bloom, tip dots, or layout changes.
     static func vessel(_ base: GraphicsContext, _ size: CGSize, _ sim: LiquidSim, now: Double, tint: Color) {
-        // Floor at 1 so a degenerate sub-3pt Canvas can't drive R negative (negative well rect / chord math).
-        let R = max(1, min(size.width, size.height) / 2 - 1.5)
-        let ext = R * 1.8
-        let cx = size.width / 2, cy = size.height / 2
-        let well = CGRect(x: -R, y: -R, width: 2 * R, height: 2 * R)
-
+        let diameter = max(2, min(size.width, size.height) - 3)
+        let rect = CGRect(x: (size.width - diameter) / 2, y: (size.height - diameter) / 2,
+                          width: diameter, height: diameter)
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        let radius = diameter * 0.39
+        let lineWidth = max(5, diameter * 0.105)
+        let cap = StrokeStyle(lineWidth: lineWidth, lineCap: .round)
         var ctx = base
-        ctx.translateBy(x: cx, y: cy)
-        ctx.fill(Path(ellipseIn: well), with: .color(Color(.sRGB, red: 10/255, green: 11/255, blue: 16/255, opacity: 0.55)))
 
-        var body = ctx
-        body.clip(to: Path(ellipseIn: well))
+        // Restrained outer lift — light gray shadow, not deep black.
+        let shadowRect = rect.offsetBy(dx: 0, dy: max(1, diameter * 0.010))
+        ctx.fill(Path(ellipseIn: shadowRect), with: .color(Color.black.opacity(0.14)))
 
-        let lv = sim.level
-        if lv > 0.004 {
-            let sy = R * (1 - 2 * min(0.985, lv))
-            let amp = (0.018 + sim.energy * 0.09) * R
+        // One continuous centre disc — soft 3D: light top face, gentle rim shade.
+        // No separate inset circle / hard ring line.
+        ctx.fill(Path(ellipseIn: rect), with: .linearGradient(
+            Gradient(colors: [
+                NoopVisualStyle.surfaceTop,
+                NoopVisualStyle.surfaceBottom
+            ]),
+            startPoint: CGPoint(x: rect.midX, y: rect.minY),
+            endPoint: CGPoint(x: rect.midX, y: rect.maxY)
+        ))
+        // Soft radial lift — brighter near the upper face, slightly deeper at the rim.
+        ctx.fill(Path(ellipseIn: rect), with: .radialGradient(
+            Gradient(stops: [
+                .init(color: Color.white.opacity(0.07), location: 0.00),
+                .init(color: Color.white.opacity(0.02), location: 0.42),
+                .init(color: Color.clear, location: 0.72),
+                .init(color: Color.black.opacity(0.10), location: 1.00)
+            ]),
+            center: CGPoint(x: rect.midX, y: rect.minY + diameter * 0.32),
+            startRadius: 0,
+            endRadius: diameter * 0.52
+        ))
+        // Very soft lower-edge shade for a lightly recessed read.
+        ctx.fill(Path(ellipseIn: rect), with: .linearGradient(
+            Gradient(stops: [
+                .init(color: Color.clear, location: 0.00),
+                .init(color: Color.clear, location: 0.55),
+                .init(color: Color.black.opacity(0.06), location: 1.00)
+            ]),
+            startPoint: CGPoint(x: rect.midX, y: rect.minY),
+            endPoint: CGPoint(x: rect.midX, y: rect.maxY)
+        ))
 
-            // helper to build a wave polygon in a given (already-transformed) context
-            func wavePolygon(_ w: (Double) -> Double) -> Path {
-                var p = Path()
-                p.move(to: CGPoint(x: -ext, y: w(-ext)))
-                var x = -ext + 4
-                while x <= ext { p.addLine(to: CGPoint(x: x, y: w(x))); x += 4 }
-                p.addLine(to: CGPoint(x: ext, y: w(ext)))
-                p.addLine(to: CGPoint(x: ext, y: R * 2.4))
-                p.addLine(to: CGPoint(x: -ext, y: R * 2.4))
-                p.closeSubpath()
-                return p
-            }
-            func surfaceLine(_ w: (Double) -> Double) -> Path {
-                var p = Path()
-                p.move(to: CGPoint(x: -ext, y: w(-ext)))
-                var x = -ext + 4
-                while x <= ext { p.addLine(to: CGPoint(x: x, y: w(x))); x += 4 }
-                p.addLine(to: CGPoint(x: ext, y: w(ext)))
-                return p
-            }
+        let track = fullArc(center: center, radius: radius)
 
-            // back parallax layer
-            let syB = sy - R * 0.04
-            let hwB = liquidChordHW(R, syB)
-            let wB: (Double) -> Double = {
-                liquidWave($0, amp: amp, R: R, hw: hwB, curl: liquidCurl(sim.abv),
-                           ph1: sim.p1 * 0.92 + 2.1, ph2: sim.p2 * 0.9 + 1.3, ampMul: 1.35)
-            }
-            var backCtx = body
-            backCtx.translateBy(x: 0, y: syB)
-            backCtx.rotate(by: .radians(sim.ab))
-            backCtx.fill(wavePolygon(wB), with: .color(tint.opacity(0.28)))
+        // Recessed track — gray channel (original border tone), not black.
+        ctx.stroke(track, with: .linearGradient(
+            Gradient(colors: [
+                Color.white.opacity(0.08),
+                NoopVisualStyle.border.opacity(0.18),
+                NoopVisualStyle.border.opacity(0.50)
+            ]),
+            startPoint: CGPoint(x: rect.midX, y: rect.minY),
+            endPoint: CGPoint(x: rect.midX, y: rect.maxY)
+        ), style: StrokeStyle(lineWidth: lineWidth + 1.6, lineCap: .round))
 
-            // main body
-            let hw = liquidChordHW(R, sy)
-            let w: (Double) -> Double = {
-                liquidWave($0, amp: amp, R: R, hw: hw, curl: liquidCurl(sim.av),
-                           ph1: sim.p1, ph2: sim.p2, ampMul: 1)
-            }
-            var mainCtx = body
-            mainCtx.translateBy(x: 0, y: sy)
-            mainCtx.rotate(by: .radians(sim.a))
-            mainCtx.fill(wavePolygon(w),
-                         with: .linearGradient(Gradient(colors: [tint.opacity(0.74),
-                                                                  tint.liquidDarker(0.28).opacity(0.80)]),
-                                               startPoint: CGPoint(x: 0, y: -amp),
-                                               endPoint: CGPoint(x: 0, y: R * 1.7)))
+        ctx.stroke(track, with: .color(NoopVisualStyle.border.opacity(0.72)), style: cap)
 
-            // a sheet of light gliding across as you tilt
-            var bandCtx = mainCtx
-            bandCtx.clip(to: wavePolygon(w))
-            let bandX = -sim.a * R * 2.2 + sin(now * 0.3) * R * 0.15
-            bandCtx.fill(Path(CGRect(x: -R * 2.4, y: -R * 2.4, width: R * 4.8, height: R * 4.8)),
-                         with: .linearGradient(Gradient(colors: [.white.opacity(0), .white.opacity(0.06), .white.opacity(0)]),
-                                               startPoint: CGPoint(x: bandX - R * 1.2, y: 0),
-                                               endPoint: CGPoint(x: bandX + R * 1.2, y: 0)))
+        let level = max(0, min(1, sim.level))
+        if level > 0.004 {
+            let progress = partialArc(center: center, radius: radius, level: level)
 
-            // surface sheen + glints + line
-            mainCtx.fill(Path(CGRect(x: -ext, y: 0, width: ext * 2, height: R * 0.15)),
-                         with: .linearGradient(Gradient(colors: [.white.opacity(0.09), .white.opacity(0)]),
-                                               startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: R * 0.15)))
-            var gx = -hw
-            while gx <= hw {
-                let slope = (w(gx + 3) - w(gx - 3)) / 6
-                if abs(slope) < 0.05 {
-                    let o = 0.22 * (1 - abs(slope) / 0.05)
-                    mainCtx.fill(Path(CGRect(x: gx - 2, y: w(gx) - 0.8, width: 4, height: 1.4)), with: .color(.white.opacity(o)))
-                }
-                gx += 6
-            }
-            mainCtx.stroke(surfaceLine(w), with: .color(.white.opacity(0.45)), lineWidth: 1.3)
+            // Contained under-lift — wider stroke, low opacity, no blur.
+            ctx.stroke(progress, with: .color(tint.opacity(0.18)),
+                       style: StrokeStyle(lineWidth: lineWidth + 2.0, lineCap: .round))
 
-            // droplets
-            for b in sim.drops {
-                let rr = max(0.7, b.r * R)
-                mainCtx.fill(Path(ellipseIn: CGRect(x: b.x * R - rr, y: b.y * R - rr, width: 2 * rr, height: 2 * rr)),
-                             with: .color(.white.opacity(min(0.55, b.life * 0.5) * 0.5)))
-            }
-
-            // suspended flake (circle frame, only inside the liquid)
-            let sa = sin(sim.a), ca = cos(sim.a)
-            for f in sim.flecks {
-                let fx = f.x * R, fy = f.y * R
-                if fx * fx + fy * fy > R * R * 0.9 { continue }
-                if -fx * sa + (fy - sy) * ca < R * 0.02 { continue }
-                let sVal = sin(f.ph + fx * 0.12 + sim.a * 5 + now * f.sp)
-                let spark = pow(max(0, sVal), 10)
-                let sz = 0.7 + f.z * 1.0 + spark * 1.4
-                let shade: Color
-                switch f.kind {
-                case 2: shade = Color(.sRGB, red: 8/255, green: 10/255, blue: 13/255, opacity: 0.12 + spark * 0.22)
-                case 1: shade = tint.liquidMix(.white, 0.55).opacity(0.10 + spark * 0.8)
-                default: shade = .white.opacity(0.08 * f.z + spark * 0.85)
-                }
-                body.fill(Path(CGRect(x: fx - sz / 2, y: fy - sz / 2, width: sz, height: sz)), with: .color(shade))
-            }
+            // Progress arc — harsh semantic gradient (visible dark ↔ light bands).
+            ctx.stroke(progress, with: .linearGradient(
+                progressGradient(tint),
+                startPoint: CGPoint(x: rect.minX, y: rect.maxY),
+                endPoint: CGPoint(x: rect.maxX, y: rect.minY)
+            ), style: cap)
         }
 
-        // inner top shadow
-        body.fill(Path(CGRect(x: -R, y: -R, width: 2 * R, height: R * 0.75)),
-                  with: .linearGradient(Gradient(colors: [.black.opacity(0.30), .black.opacity(0)]),
-                                        startPoint: CGPoint(x: 0, y: -R), endPoint: CGPoint(x: 0, y: -R * 0.30)))
-        // soft top-left highlight
-        body.fill(Path(ellipseIn: CGRect(x: -R * 0.72, y: -R * 0.78, width: R * 0.9, height: R * 0.5)),
-                  with: .radialGradient(Gradient(colors: [.white.opacity(0.09), .white.opacity(0)]),
-                                        center: CGPoint(x: -R * 0.27, y: -R * 0.5), startRadius: 0, endRadius: R * 0.55))
-        // rim
-        ctx.stroke(Path(ellipseIn: well), with: .color(tint.opacity(0.22)), lineWidth: 1.25)
+        // Outer instrument rim (unchanged placement).
+        ctx.stroke(Path(ellipseIn: rect.insetBy(dx: 0.5, dy: 0.5)),
+                   with: .color(NoopVisualStyle.borderHighlight.opacity(0.55)), lineWidth: 1)
     }
 
     /// Full-span track arc — geometry unchanged from the original vessel.
@@ -381,6 +318,11 @@ private struct LiquidSplashTap: ViewModifier {
     }
 }
 
+/// A circular liquid gauge. `value` is 0...1 (nil = empty/no-data). Tap → splash.
+///
+/// `animated: false` renders a single static frame (no TimelineView, no CoreMotion) — the small
+/// gauges in card rows / vitals slosh imperceptibly at 26–30pt but each cost a live 30fps Canvas,
+/// so they pose still and CoreAnimation caches them. The big hero gauges stay animated.
 struct LiquidVessel: View {
     let value: Double?
     let tint: Color
@@ -393,12 +335,10 @@ struct LiquidVessel: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var motion = NoopMotionState.shared
-    /// Re-arms the clock after a stand-down when the phone is tilted (see `LiquidWake`).
-    @ObservedObject private var wake = LiquidWake.shared
     @State private var sim: LiquidSim
     @State private var splashes = 0
-    /// True once the liquid has stopped moving and the clock has stood down. See `gauge`.
-    @State private var atRest = false
+    /// Whether the fill is still easing toward `value`: the only time the ring changes (see `gauge`).
+    @State private var filling = true
 
     // The custom init exists to seed `_sim` from `value`, which also means the memberwise init is NOT
     // synthesised: any new stored property has to be threaded through here or callers cannot pass it.
@@ -414,50 +354,60 @@ struct LiquidVessel: View {
         if animated && !motion.poseStill(reduceMotion) { gauge } else { staticGauge }
     }
 
+    /// The live gauge: the fill eases in from empty and to each new value, then the ring holds still.
+    ///
+    /// Since #1068 `LiquidRender.vessel` draws a ring from `sim.level` alone. The waves, tilt, flecks and
+    /// drops the sim still computes are no longer drawn, so once the level has arrived every frame is the
+    /// same picture. The frame loop now runs only while the fill moves; before, the three Today heroes and
+    /// Sleep's hero redrew an unchanged ring 60 times a second for as long as they were on screen. For the
+    /// same reason the vessel no longer holds the tilt sensor: tilt moved only what is not drawn.
     private var gauge: some View {
-        // 60fps: on the 120Hz ProMotion panel a 30fps cap updated the fluid only every 4th refresh,
-        // which read as juddery slosh. Only the 3 hero gauges + HR thread run live now (the small ones
-        // are static), so the higher rate is affordable and the liquid actually flows.
-        //
-        // …but only while the liquid is actually MOVING. `LiquidSim.settled` has always known when it
-        // has stopped, and nothing consulted it: the clock ran at 60fps forever, so Today idled with
-        // three Canvas fluid sims (28 flecks + drops + wave sampling each) on the main thread, which is
-        // what made scrolling and taps feel heavy. Standing the clock down on settle costs nothing
-        // visually — a settled vessel is a still picture, and CoreAnimation holds the last frame — and
-        // every way the picture can start moving again re-arms it below:
-        //   • the value changed          → `onChange(of: value)`
-        //   • the user tapped it         → the tap gesture (splash)
-        //   • the phone was tilted       → `LiquidWake.tiltEpoch`
-        // Nothing else can move it, so "no wake fired" and "the picture is unchanged" are the same
-        // state — there is no way for it to sit paused while it should be animating.
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: atRest)) { tl in
-            let now = liquidSeconds(tl.date)
-            Canvas { context, size in
-                sim.step(now: now, tilt: LiquidMotion.shared.tilt, target: value ?? 0)
-                LiquidRender.vessel(context, size, sim, now: now, tint: tint)
-                standDownIfSettled()
+        Group {
+            if filling {
+                // 60fps: on the 120Hz ProMotion panel a 30fps cap updated the fluid only every 4th refresh,
+                // which read as juddery slosh. Only the 3 hero gauges + HR thread run live now (the small ones
+                // are static), so the higher rate is affordable and the liquid actually flows.
+                TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { tl in
+                    let now = liquidSeconds(tl.date)
+                    Canvas { context, size in
+                        sim.step(now: now, tilt: 0, target: value ?? 0)
+                        LiquidRender.vessel(context, size, sim, now: now, tint: tint)
+                    }
+                }
+            } else {
+                // No timeline behind it: a paused one made the render server busier, not quieter (measured
+                // on the sky, `LiquidSky`).
+                Canvas { context, size in
+                    LiquidRender.vessel(context, size, sim, now: 0, tint: tint)
+                }
             }
         }
         .aspectRatio(1, contentMode: .fit)
         .contentShape(Circle())
-        .modifier(LiquidSplashTap(passesThrough: tapPassesThrough) { sim.splash(12); splashes &+= 1; atRest = false })
+        .modifier(LiquidSplashTap(passesThrough: tapPassesThrough) { sim.splash(12); splashes &+= 1 })
         .liquidTapHaptic(trigger: splashes)   // light tap feedback (guarded so the primitives compile on macOS 13)
-        .onChangeCompat(of: value) { _ in atRest = false }
-        .onChangeCompat(of: wake.tiltEpoch) { _ in atRest = false }
-        .onAppear { LiquidMotion.shared.acquire() }
-        .onDisappear { LiquidMotion.shared.release() }
+        .task(id: value) { await followFill() }
     }
 
-    /// Stand the clock down once the liquid has stopped moving.
+    /// Keeps the frame loop running until the fill has arrived at `value`, checking four times a second.
     ///
-    /// Deferred to the next runloop turn: this is called from inside the `Canvas` draw closure, and
-    /// writing `@State` synchronously during a view update is the "Modifying state during view update"
-    /// violation. The `atRest` half of the guard keeps it to one comparison per frame rather than one
-    /// `Task` per frame — the hop only happens on the single frame where the liquid comes to rest.
-    private func standDownIfSettled() {
-        guard sim.settled, !atRest else { return }
-        Task { @MainActor in atRest = true }
+    /// A vessel that draws no frames meanwhile (off screen) would never arrive; after `fillChecks` the ring is
+    /// set to its value and drawn still, so it can never be left showing a fill it was on the way from.
+    private func followFill() async {
+        sim.target = max(0, min(1, value ?? 0))
+        if !filling { sim.restartClock() }
+        filling = true
+        var checks = 0
+        while !sim.fillArrived && checks < Self.fillChecks {
+            do { try await Task.sleep(nanoseconds: 250_000_000) } catch { return }
+            checks += 1
+        }
+        if !sim.fillArrived { sim.level = sim.target }
+        filling = false
     }
+
+    /// Ten seconds of checks. The fill arrives in about three at 60 fps (`LiquidSim.step`).
+    static let fillChecks = 40
 
     /// One-shot, cached render — posed at the fill line, no clock, no motion acquire.
     private var staticGauge: some View {
@@ -490,14 +440,23 @@ struct LiquidTube: View {
     @State private var atRest = false
 
     var body: some View {
-        if animated && !motion.poseStill(reduceMotion) { liveTube } else { staticTube }
+        // At rest the tube draws its still frame with no timeline behind it: a paused animation
+        // timeline keeps the render server busy (upstream's measurement on `LiquidSky`).
+        if animated && !motion.poseStill(reduceMotion) && !atRest { liveTube } else { restingTube }
+    }
+
+    /// The settled liquid as a still picture, re-armed by a new `frac` or a tilt.
+    private var restingTube: some View {
+        staticTube
+            .onChangeCompat(of: frac) { _ in atRest = false }
+            .onChangeCompat(of: wake.tiltEpoch) { _ in atRest = false }
     }
 
     private var liveTube: some View {
         // Stands its clock down on settle, exactly as `LiquidVessel` does — a live tube is a second
         // fluid sim, and Today can hold several at once. A tube has no tap affordance, so the only
         // things that can restart it are a new `frac` and a tilt.
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: atRest)) { tl in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
             let now = liquidSeconds(tl.date)
             Canvas { context, size in
                 sim.step(now: now, tilt: LiquidMotion.shared.tilt, target: frac)

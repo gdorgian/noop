@@ -360,5 +360,6 @@ struct NOOPWidgetBundle: WidgetBundle {
         LiftLiveActivity()
         EnergyWidget()
         NOOPRingsWidget()
+        SyncLiveActivity()
     }
 }

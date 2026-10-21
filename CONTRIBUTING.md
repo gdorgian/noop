@@ -56,6 +56,20 @@ cd android
 ./gradlew testFullDebugUnitTest  # unit tests
 ```
 
+**After switching branches, add `--no-build-cache --rerun-tasks`:**
+
+```bash
+./gradlew testFullDebugUnitTest --no-build-cache --rerun-tasks
+```
+
+Gradle's cache is keyed on inputs it can see, and a branch switch can leave generated sources (Room
+DAOs, KSP output) from the previous branch in place, so the suite can run against code that is not the
+code you have checked out.
+
+If a failure looks unrelated to your change, re-run with those flags before concluding it is
+pre-existing on `main`. CI always builds clean, so a red test only you can see is worth one clean
+re-run before you write a note about it: several such failures have turned out not to reproduce.
+
 ---
 
 ## What CI checks
@@ -74,18 +88,21 @@ names. That column is why this table exists:
 | `check` | **i18n Coverage** (`i18n-coverage.yml`) | every PR |
 | `doc-comments` | **Source Hygiene** (`source-hygiene.yml`) | every PR |
 | `linux-capture` | **Tools Python CI** (`tools-python.yml`) | every PR |
+| `windows-capture` | **Tools Python CI (Windows)** (`tools-python-windows.yml`) | `Tools/linux-capture/**` |
 | `build-and-test` | **Android CI** (`android.yml`) | `android/**`, the protocol/store test resources, `Strand/Resources/Localizable.xcstrings` |
 | `test (…)`, `tools (…)` | **Swift Packages CI** (`swift-packages.yml`) | `Packages/**`, the `Tools/SleepBench`, `Tools/SleepPSG` and `Tools/Backfill` packages, `android/app/src/test/resources/**`, `Strand/Liquid/LiquidCore.swift` |
+| `build (Strand, …)`, `build (NOOPiOS, …)` | **App build** (`app-build.yml`) | `Strand/**`, `StrandTests/**`, `StrandiOS/**`, `StrandiOSShared/**`, `StrandiOSWidgets/**`, `NOOPWatch/**`, `NOOPWatchComplications/**`, `Packages/**`, `project.yml`, its own workflow file |
 
 Read that as a worked example: an Android-only PR runs Android CI plus the three that always
 run, so a short list of checks does not mean little was checked.
 
-**App build** (`app-build.yml`, app-target compile + the `StrandTests` macOS suite) is
-`disabled_manually` and is **not** in that list. App-target code — SwiftUI views,
-`BLEManager`, `Repository`, Compose screens — is compiled by **nothing** on a normal PR, so
-build it locally before you push, or ask a maintainer to dispatch `app-build.yml`. See
-[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md#what-ci-gates--and-what-it-deliberately-doesnt)
-for why the lean setup is deliberate and what else is gated at release time instead.
+**App build** compiles both Apple app targets and runs `StrandTests` on its macOS leg;
+the iOS leg is compile-only. It is active on relevant PRs. Package checks alone do not
+validate app-target Swift: build locally or verify the Apple app checks passed on the
+current PR head. Android CI compiles Compose screens and runs Android unit tests.
+App build has no push trigger, so a direct non-release commit to `main` needs a manual
+dispatch. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md#what-ci-gates--and-what-it-deliberately-doesnt)
+for the validation limits and checks gated at release time.
 
 If CI fails on your PR, fix the cause rather than working around it. Never commit
 generated output (`Strand.xcodeproj/`) or any secrets, keystores, or `local.properties`.
@@ -99,7 +116,10 @@ generated output (`Strand.xcodeproj/`) or any secrets, keystores, or `local.prop
 2. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md).
 3. For anything on the BLE path, state what you tested **on real hardware** and on
    which strap. A green build is not proof a command behaves correctly.
-4. For analytics changes, add a test and cite the method.
+4. For analytics changes, add a test and cite the method. If the change alters a
+   scoring output, follow [`docs/VALIDATION_PROTOCOL.md`](docs/VALIDATION_PROTOCOL.md)
+   and paste its checklist into the PR — a scoring change with no held-out number
+   may ship behind a flag, but may not be described as an improvement.
 5. For UI changes, use `StrandDesign` tokens only — no hardcoded colors, fonts,
    or spacing.
 

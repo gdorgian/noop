@@ -180,6 +180,8 @@ class ParityLedgerTests(unittest.TestCase):
         self.assertIn("kotlin", output)
         self.assertIn("android/app/src/main/java/com/noop/analytics/Engine.kt", output)
         self.assertIn("aFreshlyInventedOneSidedHelper/1#1", output)
+        self.assertIn("--refresh-derived", output)
+        self.assertIn("platform-qualified authority identity", output)
 
     def test_compact_authority_drift_uses_declaration_inventory_for_new_functions(self) -> None:
         self.write_clean_tree()

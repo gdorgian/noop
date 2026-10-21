@@ -105,20 +105,61 @@ class RepositoryBaselineTests(unittest.TestCase):
         core = (REPOSITORY / ".github/workflows/tools-python.yml").read_text(
             encoding="utf-8"
         )
+        windows = (REPOSITORY / ".github/workflows/tools-python-windows.yml").read_text(
+            encoding="utf-8"
+        )
         governance = (REPOSITORY / ".github/workflows/parity-governance.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn("pull_request:\n    branches: [main]\n    paths:", core)
+        # The core leg carries NO path filter, and that is the contract.
+        #
+        # It runs the Tools/ suites, and some of those assert on product source: test_home_i18n.py reads
+        # TodayScreen.kt, AppModel.swift and the xcstrings catalogues. A filter naming Tools/ therefore
+        # silences a suite whose inputs it does not describe. That was diagnosed once (#1691), written
+        # into the workflow header, and a Tools/** filter was reinstated under it anyway; on 2026-09-24
+        # an Android-only commit broke test_home_i18n.py and main carried it red through nine merges.
+        # Naming the product paths instead would only move the trap, since the list is whatever the
+        # assertions happen to read today.
+        self.assertNotIn("pull_request:\n    branches: [main]\n    paths:", core)
+        self.assertNotIn("push:\n    branches: [main]\n    paths:", core)
         core_paths = [
             line.strip()[3:-1]
             for line in core.splitlines()
             if line.startswith("      - '")
         ]
-        self.assertEqual(
-            ["Tools/**", ".github/workflows/tools-python.yml"] * 2,
-            core_paths,
-        )
+        self.assertEqual([], core_paths)
+        self.assertIn("working-directory: Tools\n", core)
         self.assertNotIn("unittest discover -s tests", core)
+        # THIS suite runs on the unfiltered leg, and that is the point of #2567.
+        #
+        # It does not test the scanner. It asserts the checked-in authority and baseline still reproduce
+        # from the CURRENT product source, so a product change is what invalidates it. While it ran only
+        # in parity-governance.yml, whose filter names `Tools/parity_*`, a change could move the
+        # declaration and call-site graph the ledger measures without the gate running at all. That cost
+        # main a red ratchet on 2026-09-29 and surfaced on an outside contributor's PR.
+        #
+        # Asserted here rather than left to the workflow, because the failure mode is someone quietly
+        # dropping the step or hanging a filter off it later. That already happened once to the leg this
+        # test guards (#1691), which is why the leg is unfiltered in the first place.
+        self.assertIn("tests.test_parity_governance_acceptance", core)
+        # #2587: the R-R contract reads IntelligenceEngine.swift and
+        # IntelligencePersistence.kt, so its two tests must run on this unfiltered leg.
+        self.assertIn("python3 -m unittest -v tests.test_rr_legacy_preservation_contract", core)
+        self.assertIn("expected at least 2 R-R preservation tests", core)
+        # The Windows leg keeps a filter, because it runs ONLY the Tools/linux-capture tests and those
+        # read nothing outside their own package. That is the whole reason it could be split off: the
+        # runner costs twice a Linux minute, and the cost argument is true for this job alone.
+        windows_paths = [
+            line.strip()[3:-1]
+            for line in windows.splitlines()
+            if line.startswith("      - '")
+        ]
+        self.assertEqual(
+            ["Tools/linux-capture/**", ".github/workflows/tools-python-windows.yml"] * 2,
+            windows_paths,
+        )
+        self.assertIn("working-directory: Tools/linux-capture", windows)
+        self.assertNotIn("working-directory: Tools\n", windows)
         self.assertIn("pull_request:\n    branches: [main]\n    paths:", governance)
         governance_paths = [
             line.strip()[3:-1]
@@ -130,13 +171,12 @@ class RepositoryBaselineTests(unittest.TestCase):
                 "Tools/issue_ref.py",
                 "Tools/parity_*.py",
                 "Tools/parity_*.json",
+                "Tools/parity_case_specs/**",
                 "Tools/tests/test_parity_*.py",
-                "Tools/tests/test_rr_legacy_preservation_contract.py",
                 ".github/workflows/parity-governance.yml",
             ] * 2,
             governance_paths,
         )
-        self.assertIn("Tools/**", core_paths)
         self.assertTrue(
             all(
                 path.startswith("Tools/")
@@ -150,7 +190,7 @@ class RepositoryBaselineTests(unittest.TestCase):
         self.assertNotIn("test_german_today_localization", governance)
         self.assertIn("tests.test_parity_ledger", governance)
         self.assertIn("tests.test_parity_governance_acceptance", governance)
-        self.assertIn("tests.test_rr_legacy_preservation_contract", governance)
+        self.assertNotIn("tests.test_rr_legacy_preservation_contract", governance)
         pull_request_paths = governance_paths[:6]
         self.assertFalse(any(
             fnmatchcase("Tools/tests/test_german_today_localization.py", pattern)
@@ -160,7 +200,7 @@ class RepositoryBaselineTests(unittest.TestCase):
             fnmatchcase("Tools/tests/test_parity_ledger.py", pattern)
             for pattern in pull_request_paths
         ))
-        self.assertTrue(any(
+        self.assertFalse(any(
             fnmatchcase("Tools/tests/test_rr_legacy_preservation_contract.py", pattern)
             for pattern in pull_request_paths
         ))
@@ -881,6 +921,33 @@ class GovernanceRatchetTests(unittest.TestCase):
             "rationale": "Uses an Android-only operating-system capability with no iOS equivalent.",
         }]})
         self.assertEqual([], parity_ratchet.compare_metadata(self.root, base, offline=True))
+
+    def test_inherited_disposition_can_name_excluded_twin_without_changing_authority(self) -> None:
+        kotlin = self.root / "android/app/src/main/java/com/noop/analytics/Engine.kt"
+        swift = self.root / "Strand/Data/Engine.swift"
+        kotlin.parent.mkdir(parents=True, exist_ok=True)
+        swift.parent.mkdir(parents=True, exist_ok=True)
+        kotlin.write_text("object Engine { fun counterpart() = Unit }\n", encoding="utf-8")
+        swift.write_text("enum Engine { static func counterpart() {} }\n", encoding="utf-8")
+        compact = parity_ledger.build_compact_twin_map(self.root)
+        identity = next(item for item in parity_ledger.semantic_authority(self.root)["unpaired_functions"]
+                        if "counterpart" in item)
+        self.write("Tools/parity_twin_map.json", compact)
+        self.write("Tools/parity_ledger_baseline.json",
+                   parity_ledger.build_compact_baseline(parity_ledger.scan(self.root, compact)))
+        old = {
+            "type": "platform_specific", "kind": "add-unpaired-function",
+            "identity": identity, "platform": "kotlin",
+            "identity_sha256": parity_ledger._canonical_sha256(identity),
+            "rationale": "The Swift counterpart lives outside the scanned packages.",
+        }
+        self.write("Tools/parity_dispositions.json", {"schema_version": 1, "dispositions": [old]})
+        base = self.commit()
+        current = {**old, "type": "out_of_scope_twin",
+                   "twin_path": "Strand/Data/Engine.swift"}
+        self.write("Tools/parity_dispositions.json", {"schema_version": 1, "dispositions": [current]})
+        self.assertEqual([], parity_ratchet.compare_metadata(self.root, base, offline=True))
+        self.assertEqual([], parity_ratchet.repository_consistency_errors(self.root))
 
     def test_debt_decrease_needs_no_metadata_rewrite_and_warns(self) -> None:
         swift = self.root / "Packages/StrandAnalytics/Sources/StrandAnalytics/Engine.swift"

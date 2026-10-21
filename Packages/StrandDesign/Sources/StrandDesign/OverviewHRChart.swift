@@ -259,9 +259,7 @@ public struct OverviewHRChart: View {
         guard !points.isEmpty else { return nil }
         let relX = x - plot.minX
         guard let date: Date = proxy.value(atX: relX) else { return nil }
-        return points.min(by: {
-            abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
-        })
+        return nearestTrendPoint(to: date, in: points)
     }
 
     // MARK: Mark layers
@@ -271,6 +269,12 @@ public struct OverviewHRChart: View {
     // and gets clipped by the card's fixed height on 13, so we position labels ourselves.
 
     @ChartContentBuilder private var marks: some ChartContent {
+        // Styles depend on the chart, not the individual sample. Share them across marks so a
+        // dense HR series does not recreate the same gradient for every line and area vertex.
+        let areaFill = LinearGradient(
+            colors: [StrandPalette.sample(stops: gradient.toStops(), at: unit(averageValue)).opacity(0.28), .clear],
+            startPoint: .top, endPoint: .bottom)
+        let lineStroke = valueGradient
         // Sleep band — shaded region behind the curve (drawn first so the HR line/area sit on top).
         if let sleep, sleep.end > xDomain.lowerBound {
             RectangleMark(
@@ -283,21 +287,13 @@ public struct OverviewHRChart: View {
         ForEach(displayPoints) { p in
             AreaMark(x: .value("Time", p.date), y: .value("BPM", p.value))
                 .interpolationMethod(.catmullRom)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [
-                            StrandPalette.sample(stops: gradient.toStops(), at: unit(averageValue)).opacity(0.28),
-                            Color.clear
-                        ],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
+                .foregroundStyle(areaFill)
         }
         ForEach(displayPoints) { p in
             LineMark(x: .value("Time", p.date), y: .value("BPM", p.value))
                 .interpolationMethod(.catmullRom)
                 .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                .foregroundStyle(valueGradient)
+                .foregroundStyle(lineStroke)
         }
 
         // Wake divider — the sleep→day boundary. Always shown with a sleep band so the band reads
@@ -417,6 +413,17 @@ public struct OverviewHRChart: View {
 
     // MARK: Body
 
+    /// Round wall-clock x-axis ticks for the visible domain, chosen by span.
+    ///
+    /// The sub-hour tiers are opened only for the Deep Timeline, keyed on `zoomBounds` rather than the
+    /// live `zoomDomain` for the reason this file already records twice: `zoomBounds` is set once by the
+    /// zooming call sites, while `zoomDomain` is nil until the first pinch, so keying on it would give a
+    /// not-yet-zoomed Deep Timeline the static tiers and then switch them under the user (#829).
+    private var xTicks: [Date] {
+        chartTimeTicks(start: xDomain.lowerBound, end: xDomain.upperBound,
+                       deepZoom: zoomBounds != nil)
+    }
+
     public var body: some View {
         Chart { marks }
         .chartXScale(domain: xDomain)
@@ -425,7 +432,9 @@ public struct OverviewHRChart: View {
         // unclipped — clip the plot so a spiky HR curve doesn't bleed past the chart (see TrendChart).
         .chartPlotStyle { plotArea in plotArea.clipped() }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 5)) { _ in
+            // Manual ticks chosen by visible span (6h down to 1min), matching Android chartTimeTicks.
+            // Swift Charts' .automatic(desiredCount:) doesn't guarantee per-minute ticks at deep zoom.
+            AxisMarks(values: xTicks) { _ in
                 AxisGridLine().foregroundStyle(StrandPalette.hairline.opacity(0.4))
                 AxisValueLabel().foregroundStyle(StrandPalette.textTertiary)
                     .font(StrandFont.footnote)
@@ -545,6 +554,68 @@ public struct OverviewHRChart: View {
         if h > 0 && m > 0 { return "\(h)h \(m)m" }
         return h > 0 ? "\(h)h" : "\(m)m"
     }
+}
+
+// MARK: - Chart time ticks (x-axis)
+
+/// Round wall-clock x-axis tick DATES for a `[start, end]` window, at fixed round intervals chosen by
+/// the visible span (a full day ticks every 6h, a 1h window every 15min). Ticks step in LOCAL
+/// wall-clock time from the window's local midnight, so a window crossing midnight lands on 00:00 and
+/// DST labels stay round. Pure and clock-free.
+///
+/// `deepZoom` opens the sub-hour tiers (5min/2min/1min) that the Deep Timeline's pinch-to-zoom wants.
+/// It is OFF by default because the Today cards share this chart and hand it the RENDERED extent of
+/// their banked buckets, not a nominal window: a morning holding ten minutes of HR would otherwise
+/// draw ten 1-minute gridlines on a small card.
+///
+/// Tick POSITIONS are the twin of Android `chartTimeTicks` (Charts.kt), thresholds included. The
+/// labels are not, and deliberately: Swift draws them with `AxisValueLabel()` in the viewer's locale,
+/// where the Kotlin side formats "HH:mm" itself. So this returns dates and never formats a string.
+public func chartTimeTicks(start: Date, end: Date, calendar: Calendar = .current,
+                           deepZoom: Bool = false) -> [Date] {
+    guard end > start else { return [] }
+    let spanMinutes = end.timeIntervalSince(start) / 60.0
+    // Thresholds sit below the nominal Today-card windows (24h/12h/6h/3h/1h) so a window whose
+    // banked data covers slightly less than nominal still lands on its intended interval. The
+    // deep-zoom tiers (≤30min down to 1-min steps) serve the Deep Timeline's pinch-to-zoom, so
+    // a user zoomed onto a 5-minute window sees per-minute ticks instead of 15-min gaps.
+    let stepMinutes: Int = {
+        switch spanMinutes {
+        case (20 * 60)...: return 360   // 6h ticks above 20h
+        case (10 * 60)...: return 180   // 3h ticks above 10h
+        case (5 * 60)...:  return 120   // 2h ticks above 5h
+        case (2 * 60)...:  return 60    // 1h ticks above 2h
+        default: break
+        }
+        // Below 2h the static cards stop at 15min; only the zooming surface goes finer.
+        guard deepZoom else { return 15 }
+        switch spanMinutes {
+        case 60...: return 15   // 15min ticks above 1h
+        case 30...: return 5    // 5min ticks above 30min
+        case 10...: return 2    // 2min ticks above 10min
+        default:    return 1    // 1min ticks below 10min
+        }
+    }()
+
+    // Start at local midnight of the start date, then step by stepMinutes.
+    var components = calendar.dateComponents([.year, .month, .day], from: start)
+    components.hour = 0; components.minute = 0; components.second = 0
+    var tick = calendar.date(from: components) ?? start
+    var out: [Date] = []
+    var last = Date.distantPast
+    // Bounded walk, so a malformed window cannot spin: a multi-day span at 6h steps, or a 10-minute
+    // span at 1-minute steps, both stay far below this.
+    var steps = 0
+    while steps < 4096 {
+        steps += 1
+        if tick > end { break }
+        if tick >= start && tick > last {
+            out.append(tick)
+            last = tick
+        }
+        tick = calendar.date(byAdding: .minute, value: stepMinutes, to: tick) ?? end
+    }
+    return out
 }
 
 // MARK: - Marker chrome

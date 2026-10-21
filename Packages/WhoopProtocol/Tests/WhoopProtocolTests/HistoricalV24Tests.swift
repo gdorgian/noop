@@ -58,7 +58,7 @@ final class HistoricalV24Tests: XCTestCase {
 
     func testV24ExtractHistoricalStreams() {
         let out = parseFrame(bytes(v24Hex))
-        let st = extractHistoricalStreams([out], deviceClockRef: 0, wallClockRef: 0)
+        let st = extractHistoricalStreams([out], deviceClockRef: 0, wallClockRef: 0, family: .whoop5)
         XCTAssertEqual(st.hr, [HRSample(ts: 1700000000, bpm: 63)])
         XCTAssertEqual(st.rr, [RRInterval(ts: 1700000000, rrMs: 850,
                                          srcChannel: .whoop5Historical)])

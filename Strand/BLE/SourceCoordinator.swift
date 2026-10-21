@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import WhoopStore
+import StrandAnalytics
 import OuraProtocol
 
 /// Runs exactly ONE device's live BLE at a time, driven by `DeviceRegistry.activeDeviceId`.
@@ -56,6 +57,9 @@ final class SourceCoordinator: ObservableObject {
     /// previously invisible). Passed straight into `StandardHRSource`. Defaults to a no-op so existing
     /// call sites (and tests) compile unchanged.
     private let straplog: (String) -> Void
+    /// Item 27: the learned night band an Oura ring's all-day HR hold stands down for (nil = cold start).
+    /// Read at each decision by `OuraLiveSource`; the app layer derives it from the sleep learner.
+    private let ouraNightBand: () -> NightStandDown.Band?
 
     // MARK: - State
 
@@ -115,7 +119,8 @@ final class SourceCoordinator: ObservableObject {
          setWhoopPreferredPeripheral: @escaping (String?) -> Void,
          setWhoopActiveDeviceId: @escaping (String) -> Void,
          connectedPeripheralUUID: AnyPublisher<String?, Never>,
-         straplog: @escaping (String) -> Void = { _ in }) {
+         straplog: @escaping (String) -> Void = { _ in },
+         ouraNightBand: @escaping () -> NightStandDown.Band? = { nil }) {
         self.registry = registry
         self.live = live
         self.storeHandle = storeHandle
@@ -125,6 +130,7 @@ final class SourceCoordinator: ObservableObject {
         self.setWhoopActiveDeviceId = setWhoopActiveDeviceId
         self.connectedPeripheralUUID = connectedPeripheralUUID
         self.straplog = straplog
+        self.ouraNightBand = ouraNightBand
     }
 
     // MARK: - Wiring
@@ -434,11 +440,14 @@ final class SourceCoordinator: ObservableObject {
                     }
                 }
             },
+            allDayLiveHR: { UserDefaults.standard.bool(forKey: AppModel.ouraAllDayLiveHRKey) },   // item 27
+            nightBand: ouraNightBand,   // item 27
             log: straplog,
             onBattery: { [live] pct in live.setBattery(Double(pct)) },
             onModel: { [registry] model in registry.setModel(id, model: model) },   // #772: correct a name-guessed gen
             onSerial: { [weak self] serial in self?.adoptOuraSerial(currentId: id, serial: serial) },  // #771
             onsetKeying: { UserDefaults.standard.bool(forKey: AppModel.ouraOnsetKeyingKey) },  // #1284 residual 3
+            notifyMaskFull: { UserDefaults.standard.bool(forKey: AppModel.ouraNotifyMaskFullKey) },  // packed-notification A/B
             adoptIntent: adoptIntent)
         if adoptIntent { straplog("Oura: adopt consent granted - this session may install NOOP's key") }
         ouraSource = source   // the published typed handle for the adopt mirror (same object as activeSource)
@@ -480,6 +489,13 @@ final class SourceCoordinator: ObservableObject {
     /// active. Per OURA_PROTOCOL.md s3.2 the install is a one-time, consent-gated provisioning write.
     func requestOuraAdopt(deviceId: String) {
         pendingAdoptDeviceId = deviceId
+    }
+
+    /// The user asked the Live console to reconnect the active ring (#2305). Forwarded to the live Oura
+    /// source's own `reconnect()`; a no-op when no ring is the live source, so the console can only ever
+    /// reconnect the device it is showing — never a WHOOP, never a ring that is not active.
+    func reconnectActiveRing() {
+        ouraSource?.reconnect()
     }
 
     /// Stop the live non-WHOOP source (standard strap, FTMS machine, Huami device, or Oura ring) and drop

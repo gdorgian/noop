@@ -18,10 +18,6 @@ import SemanticMemory
 // Pure macOS: Foundation + URLSession + Security (Keychain). Compiles on macOS 13, Swift 5.
 // Provider wire formats live in Providers/: OpenAI.swift, Anthropic.swift, Gemini.swift.
 
-/// One-line privacy note the UI should display verbatim near the composer / settings.
-public let aiCoachPrivacyNote =
-    "Private by default: nothing is sent until you add your own key and ask a question - only a short text summary of your metrics goes to the provider you pick."
-
 // MARK: - Chat model
 
 /// One turn in the coaching conversation.
@@ -1512,6 +1508,12 @@ final class AICoachEngine: ObservableObject {
     func send(_ userText: String) async {
         let trimmed = userText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { errorText = AICoachError.emptyQuestion.errorDescription; return }
+        // The master switch, checked at the EGRESS rather than only on the routes in. Every way into Coach
+        // is gated, but "gated everywhere I thought of" is what #2254 got wrong once: a revoked consent
+        // survived in memory because the conversation never re-read it. A wearer can be STANDING on this
+        // screen when the switch goes off, and that path passes no tab. Refusing here makes "the AI is off"
+        // true however the screen was reached.
+        guard CoachBriefScheduler.coachMasterEnabled else { return }
         guard let key = resolvedKey else { errorText = AICoachError.noKey.errorDescription; return }
         // Catch an unset model here rather than letting it reach the provider: every server answers a
         // `"model": ""` body with an opaque 400 that gives the user nothing to act on.
@@ -2555,6 +2557,8 @@ final class AICoachEngine: ObservableObject {
     /// a brief is a summary of data already gathered, not an investigation. Returns nil when not
     /// configured or consented, on any network failure, or when the reply is empty; never throws.
     func generateBriefText() async -> String? {
+        // Upstream 12.0: this entry has no UI, so it must honour the AI master switch itself.
+        guard CoachBriefScheduler.coachMasterEnabled else { return nil }
         guard isConfigured, dataConsent, let key = resolvedKey else { return nil }
         let context = await buildFullContext()
         let wire: [(role: ChatMessage.Role, content: String)] =

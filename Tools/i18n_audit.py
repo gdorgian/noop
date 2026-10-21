@@ -26,18 +26,26 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Callable
 
 ROOT = Path(__file__).resolve().parent.parent
-LANGS = ["de", "es", "fr", "pt-PT", "pl"]
+LANGS = ["de", "es", "fr", "pt-PT"]
 ANDROID_LOCALE_DIRS = {
     "de": "values-de",
     "es": "values-es",
     "fr": "values-fr",
     "pt-PT": "values-pt-rPT",
 }
+
+# A file's text (or None if absent) at some point in time — either the
+# working tree (`_disk_read`) or a git ref (`ref_reader`). Every scan_*/
+# *_gaps function accepts one so `ci_check` can compute the same violations
+# at HEAD and at `base_ref` and diff the two.
+Reader = Callable[[Path], str | None]
 
 # Strings that are legitimately identical across all languages (symbols,
 # format-only placeholders, brand name, units) — mirrors the exclude
@@ -268,6 +276,9 @@ ANDROID_DIRS = [
 # take its content as the first argument here.
 ANDROID_CALL_PATTERN = re.compile(r"\b(?:Text|Snackbar|TopAppBar|setContentTitle|setContentText)\s*\(")
 ANDROID_KWARG_PATTERN = re.compile(r"\b(?:title|label|text|contentDescription|placeholder)\s*=\s*")
+ANDROID_UI_STRING_PATTERN = re.compile(
+    r"\buiString\s*\(\s*R\.string\.([A-Za-z_][A-Za-z0-9_]*)"
+)
 
 # `contentDescription = <expr>` is UI accessibility text wherever it is ASSIGNED. Unlike the general
 # kwargs it most often sits inside a `Modifier.semantics { }` lambda, whose `{` is NOT an argument
@@ -419,13 +430,14 @@ def _visible_val_initializer(
 _PRECEDED_BY_ARG_BOUNDARY = re.compile(r"[(,]\s*\Z")
 
 
-def scan_android() -> list[tuple[str, int, str]]:
+def scan_android(read: Reader | None = None) -> list[tuple[str, int, str]]:
+    read = read or _disk_read
     findings = []
     for base in ANDROID_DIRS:
         if not base.exists():
             continue
         for path in sorted(base.rglob("*.kt")):
-            raw = path.read_text(encoding="utf-8", errors="replace")
+            raw = read(path) or ""
             text = _mask_comments(raw)
             seen: set[int] = set()
 
@@ -435,7 +447,7 @@ def scan_android() -> list[tuple[str, int, str]]:
                         continue
                     seen.add(offset)
                     line_no = text.count("\n", 0, offset) + 1
-                    findings.append((str(path.relative_to(ROOT)), line_no, literal))
+                    findings.append((path.relative_to(ROOT).as_posix(), line_no, literal))
 
             # The call's own first (content) argument only — catches
             # `Text(if (x) "a" else "b")` — never the whole call span, which
@@ -475,46 +487,114 @@ def scan_android() -> list[tuple[str, int, str]]:
     return findings
 
 
+def android_ui_string_concatenations(
+    read: Reader | None = None,
+) -> list[tuple[str, int, str]]:
+    """Localized Android resources immediately concatenated with another value.
+
+    Literal tails expose only the prefix to translators; dynamic tails also fix the
+    sentence order in Kotlin instead of letting a locale's positional format control
+    it. Both forms must be represented by one complete formatted resource.
+    """
+    read = read or _disk_read
+    findings: list[tuple[str, int, str]] = []
+    for base in ANDROID_DIRS:
+        if not base.exists():
+            continue
+        for path in sorted(base.rglob("*.kt")):
+            raw = read(path) or ""
+            text = _mask_comments(raw)
+            for match in ANDROID_UI_STRING_PATTERN.finditer(text):
+                open_paren = text.find("(", match.start(), match.end())
+                depth = 1
+                close_paren = open_paren + 1
+                while close_paren < len(text) and depth:
+                    if text[close_paren] == '"':
+                        close_paren = _skip_string_literal(text, close_paren)
+                        continue
+                    if text[close_paren] == "(":
+                        depth += 1
+                    elif text[close_paren] == ")":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    close_paren += 1
+                cursor = close_paren + 1
+                while cursor < len(text) and text[cursor].isspace():
+                    cursor += 1
+                if cursor >= len(text) or text[cursor] != "+":
+                    continue
+                findings.append((
+                    path.relative_to(ROOT).as_posix(),
+                    text.count("\n", 0, match.start()) + 1,
+                    match.group(1),
+                ))
+    return findings
+
+
 # Keys that are deliberately identical in every language, so their absence from a locale file is not
 # a gap. ONE definition: both the hard-gated focus locales and the #844 discovered ones subtract this,
 # and a second copy would let the two paths disagree the moment anyone adds a key here.
 ANDROID_EXEMPT_KEYS = {"app_name"}  # brand name
 
 
-def android_strings_xml_gaps() -> dict[str, set[str]]:
+def android_strings_xml_gaps(read: Reader | None = None) -> dict[str, set[str]]:
     """Keys present in the base values/strings.xml but missing from an
     existing values-<locale>/strings.xml. (Doesn't invent missing locale dirs —
     see the audit summary for languages with NO directory at all.)"""
+    read = read or _disk_read
     base_path = ROOT / "android/app/src/main/res/values/strings.xml"
-    # No Android tree in this fork (see docs/FORK_GUIDE.md) — nothing to compare, so no gaps.
-    if not base_path.is_file():
-        return {}
     # <plurals> count too: converting a hand-rolled singular/plural PAIR into one <plurals> would
     # otherwise DROP those keys out of this gate's view entirely, so a locale could silently lose them —
     # fixing the plural model must not open a coverage hole (see #540 for the same class of blind spot).
-    base_keys = set(re.findall(r'<(?:string|plurals) name="([^"]+)"', base_path.read_text(encoding="utf-8")))
+    base_keys = set(re.findall(r'<(?:string|plurals) name="([^"]+)"', read(base_path) or ""))
     gaps: dict[str, set[str]] = {}
     for lang in LANGS:
         locale_dir = ANDROID_LOCALE_DIRS[lang]
         lang_path = ROOT / f"android/app/src/main/res/{locale_dir}/strings.xml"
-        if not lang_path.exists():
+        lang_text = read(lang_path)
+        if lang_text is None:
             gaps[lang] = {"<entire %s/ directory is missing>" % locale_dir}
             continue
-        lang_keys = set(re.findall(r'<(?:string|plurals) name="([^"]+)"', lang_path.read_text(encoding="utf-8")))
+        lang_keys = set(re.findall(r'<(?:string|plurals) name="([^"]+)"', lang_text))
         missing = (base_keys - ANDROID_EXEMPT_KEYS) - lang_keys
         if missing:
             gaps[lang] = missing
     return gaps
 
 
+ANDROID_STRING_PATTERN = re.compile(r'<string name="([^"]+)"[^>]*>(.*?)</string>', re.S)
+
+
+def android_edge_whitespace() -> dict[str, list[str]]:
+    """Resource keys whose value starts or ends in whitespace, per locale directory.
+
+    AAPT2 trims leading and trailing whitespace from an unquoted string resource, so that
+    whitespace never reaches the device. Copy that leans on it renders two words run together
+    (the caption that read "scoredagainst your own calm hours today"). A resource that really
+    does need an edge space has to be wrapped in double quotes, which this check honours; the
+    reliable fix for a split sentence is to keep the joining space in the code instead.
+    """
+    out: dict[str, list[str]] = {}
+    for path in sorted((ROOT / "android/app/src/main/res").glob("values*/strings.xml")):
+        offenders = [
+            key
+            for key, value in (
+                (m.group(1), m.group(2)) for m in ANDROID_STRING_PATTERN.finditer(path.read_text(encoding="utf-8"))
+            )
+            if value != value.strip() and not value.strip().startswith('"')
+        ]
+        if offenders:
+            out[path.parent.name] = offenders
+    return out
+
+
 ANDROID_FORMAT_PATTERN = re.compile(r"%[1-9]\d*\$[-+0 #,(]*\d*(?:\.\d+)?([sdif])")
 
 
-def android_format_gaps() -> dict[str, list[str]]:
+def android_format_gaps(read: Reader | None = None) -> dict[str, list[str]]:
     """Resource keys whose translated Formatter arguments differ from English."""
-    # No Android tree in this fork (see docs/FORK_GUIDE.md) — nothing to compare.
-    if not (ROOT / "android/app/src/main/res/values/strings.xml").is_file():
-        return {}
+    read = read or _disk_read
     paths = {
         "en": ROOT / "android/app/src/main/res/values/strings.xml",
         **{
@@ -528,9 +608,10 @@ def android_format_gaps() -> dict[str, list[str]]:
     values: dict[str, dict[str, str]] = {}
     plural_items: dict[str, dict[str, list[str]]] = {}
     for lang, path in paths.items():
-        if not path.exists():
+        text = read(path)
+        if text is None:
             continue
-        root = ET.parse(path).getroot()
+        root = ET.fromstring(text)
         entries = {node.attrib["name"]: node.text or "" for node in root.findall("string")}
         items_by_key: dict[str, list[str]] = {}
         # <plurals> carry their format args on the <item> CHILDREN, so a plain findall("string") leaves
@@ -599,6 +680,204 @@ SWIFT_CALL_START_PATTERN = re.compile(
     r"\b(?:Text|Button|Label|Toggle|Menu|Picker|ProgressView|SectionHeader)\s*\("
     r"|"
     r"\.(?:navigationTitle|confirmationDialog|alert|accessibilityLabel|help)\s*\("
+    r"|"
+    # `String(localized:)` is the sanctioned spelling for copy that has to be a `String`, and it
+    # still has to EXIST in the catalog to render in anything but English. Without this alternative
+    # the spelling was invisible here, so nothing checked its key: 242 of them resolve to no catalog
+    # entry and ship English in every locale, the app's legal terms among them. The lookahead keeps
+    # `String(format:)`/`String(describing:)` out, which are not copy.
+    r"\bString\s*\((?=\s*localized:)"
+)
+
+# Project-custom call sites that carry copy, discovered rather than listed.
+#
+# SWIFT_CALL_START_PATTERN above enumerates SwiftUI's own views plus the handful of ours somebody
+# remembered to add. Anything else taking a `LocalizedStringKey` is invisible to it, and invisibility
+# here is not cosmetic: the literal never reaches `scan_ios`, so nothing checks that it has a catalog
+# entry, and SwiftUI renders the key itself. The copy ships in English in every locale with this gate
+# green, sitting between neighbours that are translated.
+#
+# That is how PR #2530 came to add `DataPendingNote(title: "Updating last night's sleep…")` with no
+# catalog entry at all, while its author had diligently written the Android half in all eight locales.
+# `DataPendingNote` simply was not on the list.
+#
+# Discovery, not a longer list, because a list is the thing that goes stale: a new view with a
+# `LocalizedStringKey` parameter is covered the day it is written, which is the same reason
+# `shipped_apple_langs` reads locales out of the catalog instead of a constant.
+SWIFT_TYPE_DECL_PATTERN = re.compile(r"\b(?:struct|enum|(?:final\s+)?class)\s+(\w+)")
+SWIFT_LSK_PROPERTY_PATTERN = re.compile(r"\b(?:let|var)\s+(\w+)\s*:\s*LocalizedStringKey")
+SWIFT_FUNC_DECL_PATTERN = re.compile(r"\bfunc\s+(\w+)\s*(?:<[^>\n]*>)?\s*\(")
+
+
+def _swift_paren_span_end(text: str, start: int) -> int:
+    """Index just past the `)` closing the list opened before `start`.
+
+    Distinct from `_swift_argument_span_end`, which stops at the first top-level comma because its
+    callers want the FIRST argument. A declaration has to be read whole: `row(icon: String, label:
+    LocalizedStringKey)` puts the type that matters after a comma, so the first-argument span misses
+    it and the function is never discovered. That mistake made this discovery silently find only
+    types, which the tests caught.
+    """
+    depth = 1
+    i = start
+    while i < len(text) and depth:
+        ch = text[i]
+        if ch == '"':
+            i = _skip_swift_string_literal(text, i)
+            continue
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        i += 1
+    return i
+
+
+def _mask_swift_comments(text: str) -> str:
+    """`text` with Swift comment bodies blanked, same length so offsets stay valid.
+
+    The Android path has masked comments since #540; the Apple path never did, and a quoted phrase in a
+    comment reads exactly like copy. Three findings came from prose: a `//` note explaining that
+    `"\\r\\nW" != "W"`, and two `///` comments quoting "the newest row with any recovery score" to say
+    what the code deliberately does NOT anchor on.
+    
+    The second pair is the instructive one. The comment reads "today's row (not "the newest row ...")",
+    and `row` is a discovered call name, so `row (` matched and the quoted phrase inside became its first
+    argument. Masking is the fix rather than tightening that pattern, because prose can contain any call
+    shape at all.
+
+    Separate from `_mask_comments` because that one uses the Kotlin literal skipper. Swift raw strings
+    (`#"..."#`) and multi-line `\"\"\"` literals need the Swift-aware one, or a `//` inside such a
+    literal would be blanked as a comment.
+    """
+    out = list(text)
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if ch == '"':
+            i = _skip_swift_string_literal(text, i)
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+            while i < n and text[i] != "\n":
+                out[i] = " "
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "*":
+            depth = 1
+            out[i] = out[i + 1] = " "
+            i += 2
+            while i < n and depth:
+                if text[i] == "/" and i + 1 < n and text[i + 1] == "*":
+                    depth += 1
+                    out[i] = out[i + 1] = " "
+                    i += 2
+                    continue
+                if text[i] == "*" and i + 1 < n and text[i + 1] == "/":
+                    depth -= 1
+                    out[i] = out[i + 1] = " "
+                    i += 2
+                    continue
+                if text[i] != "\n":
+                    out[i] = " "
+                i += 1
+            continue
+        i += 1
+    return "".join(out)
+
+
+def _swift_debug_spans(text: str) -> list[tuple[int, int]]:
+    """Byte ranges of `#if DEBUG` ... `#endif`, which are not shipped copy.
+
+    A `#Preview` lives inside one of these, and its fixture data reads exactly like copy: the skin-temp
+    preview passes `note: "Luteal range - temperature is running above your baseline."` into an engine
+    result. Auditing it would demand a catalog entry for a sentence no wearer can ever see, and pass the
+    demand on to every translator.
+
+    This matters more once custom call sites are discovered, because the literal scan descends
+    transparently through `(`, so a preview's nested initialiser argument becomes reachable from the
+    outer view's span. `test_home_i18n` caught exactly that and was right to.
+
+    Nesting is counted, so an inner `#if os(iOS)` does not end the region early.
+    """
+    spans: list[tuple[int, int]] = []
+    for m in re.finditer(r"^[ \t]*#if\s+DEBUG\b", text, re.MULTILINE):
+        depth = 1
+        i = m.end()
+        for token in re.finditer(r"^[ \t]*#(if|endif)\b", text[m.end():], re.MULTILINE):
+            depth += 1 if token.group(1) == "if" else -1
+            if depth == 0:
+                i = m.end() + token.end()
+                break
+        else:
+            i = len(text)
+        spans.append((m.start(), i))
+    return spans
+
+
+def swift_localized_key_call_names(read: "Reader | None" = None) -> frozenset[str]:
+    """Every name whose call site can carry `LocalizedStringKey` copy.
+
+    Two shapes reach a call site. A type with a stored `LocalizedStringKey` property gets it through
+    the memberwise init, so the name to watch is the TYPE (`DataPendingNote(title:)`). A function with
+    such a parameter is called by its own name (`field(_ label:)`). A computed `var x: LocalizedStringKey`
+    on an enum yields its enum name too, which is harmless: the pattern then looks for a call that does
+    not exist and finds nothing.
+
+    Takes `read` so the base-ref scan discovers the names as they were AT that ref. Using the current
+    set against base-ref sources would report a newly added view's literals on both sides and the
+    regression gate would cancel them out, which is the one way this check could quietly do nothing.
+    """
+    read = read or _disk_read
+    names: set[str] = set()
+    for dirs, _catalog_path in CATALOGS:
+        for base in dirs:
+            if not base.exists():
+                continue
+            for path in sorted(base.rglob("*.swift")):
+                text = read(path) or ""
+                if "LocalizedStringKey" not in text:
+                    continue
+                for m in SWIFT_LSK_PROPERTY_PATTERN.finditer(text):
+                    prior = [d for d in SWIFT_TYPE_DECL_PATTERN.finditer(text) if d.start() < m.start()]
+                    if prior:
+                        names.add(prior[-1].group(1))
+                for m in SWIFT_FUNC_DECL_PATTERN.finditer(text):
+                    if "LocalizedStringKey" in text[m.end():_swift_paren_span_end(text, m.end())]:
+                        names.add(m.group(1))
+    return frozenset(names)
+
+
+def swift_custom_call_pattern(names: "frozenset[str] | set[str]") -> "re.Pattern[str] | None":
+    """An alternation matching `Name(` for each discovered name, or None when there are none."""
+    if not names:
+        return None
+    return re.compile(r"\b(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\s*\(")
+
+
+# A computed property that RETURNS user-facing copy as a `String`, e.g.
+# `var label: String { ... }` on a screen's scope/mode enum.
+#
+# These are invisible to SWIFT_CALL_START_PATTERN above, because the literal sits
+# in a `return`, not inside a `Text(`/`Picker(` argument. That is not a harmless
+# miss: a bare literal returned as a String reaches `Text` already resolved, so it
+# renders in English on every device forever, and nothing flags it. It shipped
+# exactly once that way (a Workouts "Current"/"Archived" tab pair) while the gate
+# passed, having caught only the accessibility label beside it.
+#
+# The repository's own convention already avoids this, either `String(localized:)`
+# for a value that must be a String, or `LocalizedStringKey` when the value only
+# ever reaches `Text`. Both are recognised: the first because the literal sits in
+# a `localized:` argument, the second because `LocalizedStringKey` resolves in the
+# view environment. So this rule has no pre-existing findings to baseline; it
+# exists to keep it that way.
+#
+# Deliberately narrow. It matches only property names that ARE copy (label, title,
+# caption, subtitle) and only literals that are returned, so the many String
+# helpers that build keys, symbol names, trace tokens and log lines stay out.
+SWIFT_COPY_PROPERTY_PATTERN = re.compile(
+    r"\bvar\s+\w*(?:label|title|caption|subtitle)\w*\s*:\s*String\s*\{",
+    re.IGNORECASE,
 )
 
 # A placeholder generated by Swift's LocalizedStringKey interpolation. The
@@ -663,7 +942,7 @@ def _swift_argument_span_end(text: str, start: int) -> int:
     return i
 
 
-def swift_string_literals(text: str):
+def swift_string_literals(text: str, extra_pattern: "re.Pattern[str] | None" = None):
     """Yield (offset, literal contents) for every literal directly reachable
     in a localized SwiftUI call's FIRST argument — descends transparently
     through `(`/`[` (so `cond ? "a" : "b"` and nested calls are visible) but
@@ -677,31 +956,93 @@ def swift_string_literals(text: str):
     non-localizing `Text<S: StringProtocol>` overload, so it was always
     English regardless of device language (#540).
     """
-    for match in SWIFT_CALL_START_PATTERN.finditer(text):
-        open_paren = match.end() - 1
-        end = _swift_argument_span_end(text, open_paren + 1)
-        i = open_paren + 1
-        while i < end:
+    patterns = [SWIFT_CALL_START_PATTERN]
+    if extra_pattern is not None:
+        patterns.append(extra_pattern)
+    seen: set[int] = set()
+    for pattern in patterns:
+        for match in pattern.finditer(text):
+            open_paren = match.end() - 1
+            end = _swift_argument_span_end(text, open_paren + 1)
+            i = open_paren + 1
+            while i < end:
+                ch = text[i]
+                if ch == '"':
+                    j = _skip_swift_string_literal(text, i)
+                    if i not in seen:
+                        seen.add(i)
+                        yield i, text[i + 1:j - 1]
+                    i = j
+                    continue
+                if ch == "{":
+                    depth = 1
+                    i += 1
+                    while i < end and depth:
+                        c2 = text[i]
+                        if c2 == '"':
+                            i = _skip_swift_string_literal(text, i)
+                            continue
+                        if c2 in "({[":
+                            depth += 1
+                        elif c2 in ")}]":
+                            depth -= 1
+                        i += 1
+                    continue
+                i += 1
+
+
+def swift_returned_copy_literals(text: str):
+    """Yield (offset, literal) for copy RETURNED as a String from a `var label: String { ... }`-shaped
+    property, e.g. `case .current: return "Current"`.
+
+    Separate from `swift_string_literals`, and applied to SCREEN files only, because the same shape means
+    something else elsewhere: `Commands.swift` names BLE opcodes through a `var label: String`, and those
+    are diagnostics rather than copy a wearer reads. That directory restriction is what keeps this rule at
+    zero pre-existing findings instead of 71.
+
+    Only literals at the property's own brace level are yielded, so one nested inside a closure or a
+    helper call stays out and string building is not flagged.
+    """
+    for match in SWIFT_COPY_PROPERTY_PATTERN.finditer(text):
+        body_start = match.end() - 1
+        depth = 0
+        i = body_start
+        while i < len(text):
             ch = text[i]
             if ch == '"':
-                j = _skip_swift_string_literal(text, i)
-                yield i, text[i + 1:j - 1]
-                i = j
+                literal_end = _skip_swift_string_literal(text, i)
+                prefix = text[max(body_start, i - 60):i]
+                line = prefix.rsplit("\n", 1)[-1]
+                # Returned copy, in the spellings a label property actually uses: a `switch` arm
+                # (`case .a: return "Alpha"`, or the implicit-return form), or a ternary.
+                #
+                # A bare "ends with a colon" test is NOT enough to spot a case arm: every argument label
+                # ends the same way, so `joined(separator: ", ")` looked like returned copy and the
+                # separator was reported as untranslated UI.
+                #
+                # Keyed on the RETURN, not on brace depth. Depth alone looked right and silently missed
+                # the commoner shape: a `switch` opens a second brace level, so every `case ... return`
+                # arm sat a level deeper than the ternary this rule was first written against, and the
+                # dominant form in this repository went unchecked.
+                stripped = line.lstrip()
+                returned = (
+                    "return" in line                       # `return "Alpha"`
+                    or "?" in line                         # `cond ? "Alpha" : "Beta"`
+                    or stripped.startswith(("case ", "default"))  # `case .a: "Alpha"` (implicit return)
+                )
+                # `String(localized: "...")` is the sanctioned spelling for a String-typed value, so this
+                # rule leaves it alone. SWIFT_CALL_START_PATTERN is what checks its catalog key, a
+                # delegation that was only asserted in this comment until it was made true.
+                if returned and "localized:" not in prefix:
+                    yield i, text[i + 1:literal_end - 1]
+                i = literal_end
                 continue
             if ch == "{":
-                depth = 1
-                i += 1
-                while i < end and depth:
-                    c2 = text[i]
-                    if c2 == '"':
-                        i = _skip_swift_string_literal(text, i)
-                        continue
-                    if c2 in "({[":
-                        depth += 1
-                    elif c2 in ")}]":
-                        depth -= 1
-                    i += 1
-                continue
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    break
             i += 1
 
 
@@ -832,7 +1173,14 @@ def apple_format_gaps(cat: dict, lang: str) -> list[str]:
         # Compare EVERY form independently against the key, never a folded concatenation: folding would
         # make the signature depend on how many plural categories the language HAS (ru/pl carry four,
         # zh one), so a correct translation would read as a format mismatch purely for having more forms.
-        values = [u.get("value", "") for u in _string_units(entry, lang)] or [""]
+        # An ABSENT localization is a coverage gap, reported by the missing/allowance counters, and
+        # must not be read as a format mismatch. `or [""]` used to make one look like the other: the
+        # empty signature differs from any key carrying a specifier. That never showed for the focus
+        # languages, which are held at zero missing, and it turned every ratcheted gap in it/ru/pl
+        # into a false format failure the moment this check was widened past them.
+        values = [u.get("value", "") for u in _string_units(entry, lang)]
+        if not values:
+            continue
         if any(signature(key) != signature(v) for v in values):
             mismatched.append(key)
     return mismatched
@@ -846,28 +1194,39 @@ def catalog_lookup(cat: dict, key: str) -> dict | None:
     return cat.get("strings", {}).get(key)
 
 
-def scan_ios() -> tuple[list[tuple[str, int, str]], dict[str, list[str]]]:
+def scan_ios(read: Reader | None = None) -> tuple[list[tuple[str, int, str]], dict[str, list[str]]]:
+    read = read or _disk_read
     hardcoded: list[tuple[str, int, str]] = []  # not in any catalog at all
     lang_gaps: dict[str, list[str]] = {lang: [] for lang in LANGS}
+    # Discovered with THIS reader, so a base-ref scan uses the names as they were at that ref.
+    custom_calls = swift_custom_call_pattern(swift_localized_key_call_names(read))
 
     for dirs, catalog_path in CATALOGS:
-        # Some forks intentionally omit an Apple target (for example the retired Watch app). Its
-        # catalog disappears with the target, so skip the pair only when none of its source roots exist.
-        # A present target with a missing catalog must still fail loudly below.
-        if not any(base.exists() for base in dirs):
-            continue
-        cat = load_catalog(catalog_path)
+        cat_text = read(catalog_path)
+        cat = json.loads(cat_text) if cat_text else {"strings": {}}
         for base in dirs:
             if not base.exists():
                 continue
             for path in sorted(base.rglob("*.swift")):
-                text = path.read_text(encoding="utf-8", errors="replace")
-                for offset, literal in swift_string_literals(text):
+                raw = read(path) or ""
+                # Comment bodies blanked first: prose quoting a phrase is not copy, and `_mask_swift_comments`
+                # keeps the length so offsets and line numbers still refer to the real file.
+                text = _mask_swift_comments(raw)
+                literals = list(swift_string_literals(text, custom_calls))
+                # Screen files only: see `swift_returned_copy_literals` for why the same shape
+                # elsewhere (BLE opcode names, design-system internals) is not copy.
+                if "/Screens/" in path.as_posix() or "/Liquid/" in path.as_posix():
+                    literals += list(swift_returned_copy_literals(text))
+                debug_spans = _swift_debug_spans(text)
+                for offset, literal in literals:
                     if not is_probably_ui_text(literal):
+                        continue
+                    # Preview fixtures are not copy; see `_swift_debug_spans`.
+                    if any(lo <= offset < hi for lo, hi in debug_spans):
                         continue
                     entry = swift_catalog_lookup(cat, literal)
                     line_no = text.count("\n", 0, offset) + 1
-                    rel = str(path.relative_to(ROOT))
+                    rel = path.relative_to(ROOT).as_posix()
                     if entry is None:
                         hardcoded.append((rel, line_no, literal))
                         continue
@@ -875,7 +1234,7 @@ def scan_ios() -> tuple[list[tuple[str, int, str]], dict[str, list[str]]]:
                         continue
                     for lang in LANGS:
                         if not _is_translated(entry, lang):
-                            lang_gaps[lang].append(f"{catalog_path.relative_to(ROOT)} :: {literal!r}")
+                            lang_gaps[lang].append(f"{catalog_path.relative_to(ROOT).as_posix()} :: {literal!r}")
     for lang in lang_gaps:
         lang_gaps[lang] = sorted(set(lang_gaps[lang]))
     return hardcoded, lang_gaps
@@ -930,41 +1289,47 @@ def extra_locale_allowance() -> dict[str, int]:
     return out
 
 
-
 ECHO_BASELINE_PATH = ROOT / "Tools/i18n_echo_baseline.txt"
 
-#: Format specifiers stripped before deciding whether a string has translatable words in it.
+#: Format specifiers stripped before deciding whether a string has translatable words in it. Covers
+#: both the Apple (`%@`, `%lld`) and Android (`%1$s`, `%d`) conversion shapes.
 FORMAT_SPECIFIER_PATTERN = re.compile(r"%(?:\d+\$)?[@#0\-+ ]*[\d.]*(?:ll|l|h)?[@dfsu]|%%")
 
 
-def _has_translatable_words(key: str) -> bool:
-    """Whether a catalog key contains enough real words that an identical translation is suspicious.
+# Multi-word product names that travel verbatim into Latin-script locales. The two-word floor below
+# already lets a ONE-word brand through ("HRV", "Strava"); it cannot see a two-word one, so "iCloud
+# Drive" repeated verbatim in German reads as an untranslated echo when it is the correct rendering.
+# Only strings that are ENTIRELY brand are exempted (see `_is_pure_brand_phrase`), so "Apple Health
+# sync" stays gated on its translatable word. CJK locales that DO translate these are unaffected —
+# they differ from the source, so they were never counted as echoes in the first place.
+BRAND_PHRASES = ("iCloud Drive",)
 
-    Strips format specifiers first: "%@ · n = %lld" and "%@: %@. %@, %@. %@." are placeholders and
-    punctuation with nothing to translate, so a locale repeating them verbatim is CORRECT, not a gap.
-    Two words is the floor — one word is very often a term that legitimately travels ("HRV", "Yoga").
+
+def _is_pure_brand_phrase(text: str) -> bool:
+    """Whether a string is nothing but brand names, placeholders and punctuation."""
+    stripped = FORMAT_SPECIFIER_PATTERN.sub(" ", text)
+    for brand in BRAND_PHRASES:
+        stripped = stripped.replace(brand, " ")
+    return not re.search(r"[^\W\d_]{2,}", stripped, flags=re.UNICODE)
+
+
+def _has_translatable_words(text: str) -> bool:
+    """Whether a string carries enough real words that an identical translation is suspicious.
+
+    Strips format specifiers first: "%@ · n = %lld" / "%1$s: %2$s" are placeholders and punctuation
+    with nothing to translate, so a locale repeating them verbatim is CORRECT, not a gap. Two words is
+    the floor — one word is very often a term that legitimately travels ("HRV", "Yoga", a brand name).
+    A string that is entirely a multi-word brand is the same case one size up (see [BRAND_PHRASES]).
     """
-    stripped = FORMAT_SPECIFIER_PATTERN.sub(" ", key)
+    if _is_pure_brand_phrase(text):
+        return False
+    stripped = FORMAT_SPECIFIER_PATTERN.sub(" ", text)
     return len(re.findall(r"[^\W\d_]{2,}", stripped, flags=re.UNICODE)) >= 2
 
 
-def echoed_translation_counts() -> dict[str, int]:
-    """`<catalog> <lang> -> count` of localizations marked `translated` whose value IS the English key.
-
-    The hole this closes: the coverage gate above asks whether a key EXISTS in a language, never
-    whether the value differs from the source. A catalog can therefore be 100% "complete" while a
-    German reader sees English sentences — which is exactly what shipped, visible on the Today screen
-    as a German goal card whose body read "Add a daily action to turn a long-term goal into something
-    concrete today."
-
-    Counts rather than a key list, for the reason `extra_locale_allowance` gives: a list goes stale on
-    every edit and trains people to regenerate it unread.
-
-    NOT every hit is a missing translation — a brand ("Apple Health"), a design-system label
-    ("Headline / Semibold 17") or a term of art legitimately reads the same in every language. That is
-    why this ratchets against a baseline instead of demanding zero: the gate's job is to stop the
-    number GROWING, and the residue is a work list to draw down by hand, not a defect count.
-    """
+def _ios_echoed_counts() -> dict[str, int]:
+    """`<catalog> <lang> -> count` of xcstrings localizations marked `translated` whose value IS the
+    English key (in a String Catalog the key is the source string)."""
     counts: dict[str, int] = {}
     for _dirs, catalog_path in CATALOGS:
         if not catalog_path.is_file():
@@ -973,7 +1338,7 @@ def echoed_translation_counts() -> dict[str, int]:
             cat = json.loads(catalog_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        rel = str(catalog_path.relative_to(ROOT))
+        rel = catalog_path.relative_to(ROOT).as_posix()
         for key, entry in (cat.get("strings") or {}).items():
             if not _has_translatable_words(key):
                 continue
@@ -986,8 +1351,59 @@ def echoed_translation_counts() -> dict[str, int]:
     return counts
 
 
+def _android_echoed_counts() -> dict[str, int]:
+    """Android twin of `_ios_echoed_counts`: `values-<locale>/strings.xml` entries whose value is the
+    base `values/strings.xml` value VERBATIM. Android keys are identifiers, not the source text, so the
+    echo is `locale_value == base_value` (not value == key), and the translatable-words floor is applied
+    to the BASE value (the English copy)."""
+    base_path = ROOT / "android/app/src/main/res/values/strings.xml"
+    if not base_path.is_file():
+        return {}
+    try:
+        base = {n.attrib["name"]: (n.text or "") for n in ET.parse(base_path).getroot().findall("string")}
+    except ET.ParseError:
+        return {}
+    # Only base keys with real words to translate can be a meaningful echo — precompute once.
+    translatable = {k: v for k, v in base.items() if _has_translatable_words(v)}
+    counts: dict[str, int] = {}
+    res = ROOT / "android/app/src/main/res"
+    for locale_dir in shipped_android_locale_dirs():
+        lang = locale_dir[len("values-"):]
+        path = res / locale_dir / "strings.xml"
+        try:
+            loc = {n.attrib["name"]: (n.text or "") for n in ET.parse(path).getroot().findall("string")}
+        except ET.ParseError:
+            continue
+        rel = path.relative_to(ROOT).as_posix()
+        n = sum(1 for k, base_val in translatable.items() if loc.get(k) == base_val)
+        if n:
+            counts[f"{rel} {lang}"] = n
+    return counts
+
+
+def echoed_translation_counts() -> dict[str, int]:
+    """`<catalog-or-strings.xml> <lang> -> count` of localizations that are still the English source, on
+    BOTH platforms.
+
+    The hole this closes: the coverage gate asks whether a key EXISTS in a language, never whether the
+    value differs from the source. A catalog can therefore be 100% "complete" while a German reader sees
+    English sentences — which is exactly what shipped once (a German goal card whose body read "Add a
+    daily action …").
+
+    Counts rather than a key list, for the reason `extra_locale_allowance` gives: a list goes stale on
+    every edit and trains people to regenerate it unread. NOT every hit is a missing translation — a
+    brand ("Apple Health"), a design-system label ("Headline / Semibold 17") or a term of art
+    legitimately reads the same in every language — which is why this RATCHETS against a baseline instead
+    of demanding zero: the gate's job is to stop the number GROWING, and the residue is a work list to
+    draw down by hand. iOS/xcstrings keys are disjoint from Android strings.xml paths, so the two merge
+    without collision.
+    """
+    return {**_ios_echoed_counts(), **_android_echoed_counts()}
+
+
 def echo_allowance() -> dict[str, int]:
-    """`<catalog> <lang> -> allowed echo count`, same shape and ratchet as `extra_locale_allowance`."""
+    """`<catalog-or-strings.xml> <lang> -> allowed echo count`, same shape and ratchet as
+    `extra_locale_allowance`."""
     if not ECHO_BASELINE_PATH.exists():
         return {}
     out: dict[str, int] = {}
@@ -1037,96 +1453,199 @@ def write_baseline() -> None:
     print(f"Wrote {len(android)} android + {len(ios)} ios entries to {BASELINE_PATH.relative_to(ROOT)}")
 
 
+def _disk_read(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def git_show(ref: str, rel_path: str) -> str | None:
+    """File content at `ref`, or None if the path didn't exist there."""
+    result = subprocess.run(
+        ["git", "show", f"{ref}:{rel_path}"],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    return result.stdout if result.returncode == 0 else None
+
+
+def ref_reader(ref: str) -> Reader:
+    """A `Reader` backed by `git show ref:<path>` instead of disk, for diffing
+    the current tree against a base ref. Uses the CURRENT file list (a file
+    added by the PR simply reads as empty at the base ref, which correctly
+    counts its literals as new)."""
+    def read(path: Path) -> str | None:
+        return git_show(ref, str(path.relative_to(ROOT)))
+    return read
+
+
+def apple_missing_and_format_gaps(
+    read: Reader | None = None,
+) -> tuple[dict[tuple[str, str], set[str]], dict[tuple[str, str], set[str]]]:
+    """Per (catalog, lang): the set of catalog keys missing a translation, and
+    the set of catalog keys whose translated printf arguments don't match."""
+    read = read or _disk_read
+    missing: dict[tuple[str, str], set[str]] = {}
+    formats: dict[tuple[str, str], set[str]] = {}
+    for _dirs, catalog_path in CATALOGS:
+        cat_text = read(catalog_path)
+        cat = json.loads(cat_text) if cat_text else {"strings": {}}
+        rel = str(catalog_path.relative_to(ROOT))
+        for lang in LANGS:
+            keys_missing = {
+                key for key, entry in cat.get("strings", {}).items()
+                if entry.get("shouldTranslate") is not False and not _is_translated(entry, lang)
+            }
+            if keys_missing:
+                missing[(rel, lang)] = keys_missing
+            fmt_gaps = set(apple_format_gaps(cat, lang))
+            if fmt_gaps:
+                formats[(rel, lang)] = fmt_gaps
+    return missing, formats
+
+
 def ci_check(base_ref: str) -> int:
-    """Strict CI gate: the #453 backlog is closed, so every focus language
-    translation must remain complete, and no NEW hardcoded literal may land
-    (pre-existing ones are tracked in the baseline — see load_baseline()).
-    ``base_ref`` remains in the CLI for workflow compatibility but coverage
-    is now a standing invariant, not a diff-scoped allowance.
+    """CI gate, exempting a violation on either of two independent grounds:
+
+    1. It's in the committed baseline (Tools/i18n_audit_baseline.json) — the
+       248-entry backlog #540/#558's improved scanner surfaced, tracked so it
+       can be closed incrementally instead of blocking the scanner fix itself.
+    2. It already exists at `base_ref` — so this PR didn't cause it. A prior
+       version of this gate audited the whole tree unconditionally, ignoring
+       base_ref entirely: a transient regression on `base_ref` itself (e.g. a
+       release generating a raw literal, #514) then red-flagged every open PR
+       whose diff never touched the offending file, and those PRs stayed red
+       until they got a fresh push, because a GitHub `pull_request` workflow
+       doesn't re-run just because the base branch changed. The baseline
+       alone doesn't cover this case — it's a fixed snapshot, so a *new*
+       regression on main after the snapshot was taken would still red-flag
+       every unrelated PR until someone updates the baseline. Diffing against
+       `base_ref` closes that gap: a violation already present there isn't
+       this PR's fault regardless of whether it made it into the baseline,
+       so a main-side regression is self-contained to whoever caused it
+       instead of spreading.
+
+    Locale-gap and format-mismatch checks aren't in the baseline (it only
+    tracks hardcoded literals) — the base_ref diff is their only exemption,
+    which is sufficient since that backlog is fully closed today.
     """
+    base_read = ref_reader(base_ref)
     failed = False
     baseline = load_baseline()
 
-    # This fork removed the Android tree (see docs/FORK_GUIDE.md). Skip the whole Android arm when
-    # it is absent — several helpers below read android/app/src/main/res unguarded, so without this
-    # the gate crashes rather than reporting. Kept rather than deleted so the tool still works if the
-    # tree is restored temporarily (e.g. while resolving an upstream sync).
-    if (ROOT / "android").is_dir():
-        print("--- Android: no NEW hardcoded UI copy, and complete focus locales ---")
-        android_literals = scan_android()
-        android_found = {(p, lit) for p, _line, lit in android_literals}
-        android_new = [f for f in android_literals if (f[0], f[2]) not in baseline["android"]]
-        if android_new:
-            failed = True
-            print(f"FAIL {len(android_new)} NEW hardcoded literal(s) (not in {BASELINE_PATH.relative_to(ROOT)}):")
-            for path, line, literal in android_new[:30]:
-                print(f"  {path}:{line}: {literal!r}")
-        else:
-            print(f"  OK no new hardcoded literals ({len(android_found)} pre-existing, tracked in the baseline)")
-        android_fixed = baseline["android"] - android_found
-        if android_fixed:
-            print(f"  {len(android_fixed)} baseline entr(y/ies) no longer found — run --update-baseline to shrink the backlog")
-        android_gaps = android_strings_xml_gaps()
-        android_formats = android_format_gaps()
-        for lang in LANGS:
-            gaps = android_gaps.get(lang)
-            if gaps:
-                failed = True
-                locale_dir = ANDROID_LOCALE_DIRS[lang]
-                print(f"FAIL {locale_dir}/strings.xml missing {len(gaps)} key(s): {sorted(gaps)[:30]}")
-            else:
-                locale_dir = ANDROID_LOCALE_DIRS[lang]
-                print(f"  OK {locale_dir}/strings.xml")
-            format_gaps = android_formats.get(lang)
-            if format_gaps:
-                failed = True
-                locale_dir = ANDROID_LOCALE_DIRS[lang]
-                print(f"FAIL {locale_dir}/strings.xml has {len(format_gaps)} format mismatch(es): {format_gaps[:30]}")
-    else:
-        print("--- Android: tree not present in this fork — skipped ---")
-
-    print("\n--- Apple: no NEW un-extracted UI copy, and complete focus locales ---")
-    ios_literals, _source_gaps = scan_ios()
-    ios_found = {(p, lit) for p, _line, lit in ios_literals}
-    ios_new = [f for f in ios_literals if (f[0], f[2]) not in baseline["ios"]]
-    if ios_new:
+    print(f"--- Android: no new hardcoded UI copy or focus-locale gaps vs {base_ref} ---")
+    cur_android = scan_android()
+    android_found = {(p, lit) for p, _line, lit in cur_android}
+    base_android_keys = {(path, literal) for path, _line, literal in scan_android(base_read)}
+    exempt_android = baseline["android"] | base_android_keys
+    new_android = [f for f in cur_android if (f[0], f[2]) not in exempt_android]
+    if new_android:
         failed = True
-        print(f"FAIL {len(ios_new)} NEW literal(s) absent from their target catalog:")
-        for path, line, literal in ios_new[:30]:
+        print(f"FAIL {len(new_android)} new hardcoded literal(s):")
+        for path, line, literal in new_android[:30]:
             print(f"  {path}:{line}: {literal!r}")
     else:
-        print(f"  OK no new un-extracted literals ({len(ios_found)} pre-existing, tracked in the baseline)")
+        note = f" ({len(android_found)} pre-existing, tracked in the baseline or on {base_ref})" if android_found else ""
+        print(f"  OK no new hardcoded literals{note}")
+    android_fixed = baseline["android"] - android_found
+    if android_fixed:
+        print(f"  {len(android_fixed)} baseline entr(y/ies) no longer found — run --update-baseline to shrink the backlog")
+
+    cur_gaps = android_strings_xml_gaps()
+    base_gaps = android_strings_xml_gaps(base_read)
+    cur_formats = android_format_gaps()
+    base_formats = android_format_gaps(base_read)
+    for lang in LANGS:
+        new_gap = sorted(cur_gaps.get(lang, set()) - base_gaps.get(lang, set()))
+        if new_gap:
+            failed = True
+            locale_dir = ANDROID_LOCALE_DIRS[lang]
+            print(f"FAIL {locale_dir}/strings.xml has {len(new_gap)} new missing key(s): {new_gap[:30]}")
+        else:
+            locale_dir = ANDROID_LOCALE_DIRS[lang]
+            print(f"  OK {locale_dir}/strings.xml")
+        new_fmt = sorted(set(cur_formats.get(lang, [])) - set(base_formats.get(lang, [])))
+        if new_fmt:
+            failed = True
+            locale_dir = ANDROID_LOCALE_DIRS[lang]
+            print(f"FAIL {locale_dir}/strings.xml has {len(new_fmt)} new format mismatch(es): {new_fmt[:30]}")
+
+    edge = android_edge_whitespace()
+    if edge:
+        failed = True
+        for locale_dir, keys in edge.items():
+            print(f"FAIL {locale_dir}/strings.xml has {len(keys)} string(s) whose edge whitespace "
+                  f"AAPT2 strips: {sorted(keys)[:30]}")
+    else:
+        print("  OK no string resource leans on edge whitespace")
+
+    concatenations = android_ui_string_concatenations()
+    if concatenations:
+        failed = True
+        print(f"FAIL {len(concatenations)} localized Android string(s) are concatenated in code:")
+        for path, line, key in concatenations[:30]:
+            print(f"  {path}:{line}: {key}")
+    else:
+        print("  OK no localized Android string is assembled by concatenation")
+
+    print(f"\n--- Apple: no new un-extracted UI copy or focus-locale gaps vs {base_ref} ---")
+    cur_ios, _cur_ios_lang_gaps = scan_ios()
+    ios_found = {(p, lit) for p, _line, lit in cur_ios}
+    base_ios_keys = {(path, literal) for path, _line, literal in scan_ios(base_read)[0]}
+    exempt_ios = baseline["ios"] | base_ios_keys
+    new_ios = [f for f in cur_ios if (f[0], f[2]) not in exempt_ios]
+    if new_ios:
+        failed = True
+        print(f"FAIL {len(new_ios)} new literal(s) absent from their target catalog:")
+        for path, line, literal in new_ios[:30]:
+            print(f"  {path}:{line}: {literal!r}")
+    else:
+        note = f" ({len(ios_found)} pre-existing, tracked in the baseline or on {base_ref})" if ios_found else ""
+        print(f"  OK no new un-extracted literals{note}")
     ios_fixed = baseline["ios"] - ios_found
     if ios_fixed:
         print(f"  {len(ios_fixed)} baseline entr(y/ies) no longer found — run --update-baseline to shrink the backlog")
     allowance = extra_locale_allowance()
     extra_apple_gaps: dict[str, int] = {}
-    for dirs, catalog_path in CATALOGS:
-        if not any(base.exists() for base in dirs):
-            continue
-        cat = load_catalog(catalog_path)
+    cur_missing, cur_fmt = apple_missing_and_format_gaps()
+    base_missing, base_fmt = apple_missing_and_format_gaps(base_read)
+    for _dirs, catalog_path in CATALOGS:
+        rel = str(catalog_path.relative_to(ROOT))
         # #844: count the shipped locales OUTSIDE the focus set while the catalog is already parsed,
         # and gate them below. Reloading each catalog for a second pass wasted a full re-parse of a
-        # 3255-string file.
+        # 3255-string file. Deliberately disk-based like the rest of this ratchet (not base_ref-diffed
+        # like the LANGS check below): the allowance file is already the mechanism that keeps a main-side
+        # change here from spreading to unrelated PRs, by tracking a target count instead of demanding
+        # zero, so it doesn't need base_ref's protection on top.
+        cat = load_catalog(catalog_path)
         for extra in sorted(shipped_apple_langs(cat) - set(LANGS)):
-            extra_apple_gaps[f"{catalog_path.relative_to(ROOT)}:{extra}"] = sum(
+            extra_apple_gaps[f"{rel}:{extra}"] = sum(
                 1 for v in cat.get("strings", {}).values()
                 if v.get("shouldTranslate") is not False and not _is_translated(v, extra)
             )
+            # COVERAGE for these locales is ratcheted, because they carry inherited gaps that would
+            # red-check every open PR. FORMAT is not: a specifier the translation drops or invents is
+            # a runtime substitution bug, not a gap, and it is exactly as broken in Russian as in
+            # German. Checking it only for LANGS left zh, it, ru and pl free to ship a dropped `%@`
+            # through a green board, which is how `%lld app%@ on` and `%lld frame%@ captured this
+            # session.` kept a Russian mismatch each for as long as they existed. Zero tolerance
+            # here is affordable because the count across every catalogue and every locale is now 0.
+            extra_format_gaps = apple_format_gaps(cat, extra)
+            if extra_format_gaps:
+                failed = True
+                print(f"FAIL {catalog_path.relative_to(ROOT)} {extra}: "
+                      f"{len(extra_format_gaps)} format mismatch(es): {extra_format_gaps[:10]}")
         for lang in LANGS:
-            missing = sum(
-                1 for v in cat.get("strings", {}).values()
-                if v.get("shouldTranslate") is not False and not _is_translated(v, lang)
-            )
-            if missing:
+            key = (rel, lang)
+            new_missing = sorted(cur_missing.get(key, set()) - base_missing.get(key, set()))
+            if new_missing:
                 failed = True
-                print(f"FAIL {catalog_path.relative_to(ROOT)} {lang}: missing={missing}")
+                print(f"FAIL {rel} {lang}: {len(new_missing)} new missing translation(s): {new_missing[:30]}")
             else:
-                print(f"  OK {catalog_path.relative_to(ROOT)} {lang}")
-            format_gaps = apple_format_gaps(cat, lang)
-            if format_gaps:
+                print(f"  OK {rel} {lang}")
+            new_fmt_gap = sorted(cur_fmt.get(key, set()) - base_fmt.get(key, set()))
+            if new_fmt_gap:
                 failed = True
-                print(f"FAIL {catalog_path.relative_to(ROOT)} {lang}: {len(format_gaps)} format mismatch(es): {format_gaps[:10]}")
+                print(f"FAIL {rel} {lang}: {len(new_fmt_gap)} new format mismatch(es): {new_fmt_gap[:10]}")
 
     # A key that EXISTS in a language still says nothing about whether it was TRANSLATED. This section is
     # the difference between "complete" and "translated": it counts localizations whose value is the
@@ -1155,30 +1674,6 @@ def ci_check(base_ref: str) -> int:
     # #844: every OTHER shipped locale, gated against a ratcheting allowance. LANGS above stays at zero
     # tolerance; these carry real pre-existing debt (StrandDesign ships 14 of 95 Italian), so the gate
     # blocks GROWTH rather than demanding the backlog be cleared before anyone can merge.
-    # A key that EXISTS in a language still says nothing about whether it was translated. This section
-    # is the difference between "complete" and "translated": it counts localizations marked
-    # `translated` whose value is the English source verbatim. See `echoed_translation_counts`.
-    print("\n--- Translations that are still the English source (ratcheting allowance) ---")
-    echo_failed = False
-    echoes = echoed_translation_counts()
-    echo_allowed = echo_allowance()
-    echo_improved: list[str] = []
-    for target in sorted(set(echoes) | set(echo_allowed)):
-        found = echoes.get(target, 0)
-        allowed = echo_allowed.get(target, 0)
-        if found > allowed:
-            failed = True
-            echo_failed = True
-            print(f"FAIL {target}: {found} untranslated echo(es) exceeds the allowance of {allowed}")
-        elif found < allowed:
-            echo_improved.append(f"{target}: {allowed} -> {found}")
-    for line in echo_improved:
-        print(f"  IMPROVED {line}")
-    if echo_improved:
-        print(f"  Lower these in {ECHO_BASELINE_PATH.relative_to(ROOT)} to lock the gain in.")
-    if not echo_failed and not echo_improved:
-        print(f"  OK no new English-only translations ({sum(echoes.values())} tracked, ratcheting down)")
-
     print("\n--- Locales beyond the focus set: no NEW gaps (ratcheting allowance) ---")
     # Local, NOT the global `failed`: an earlier section failing (a German string, an un-extracted
     # literal) must not silence this section's own verdict. Reporting nothing here reads as "did not
@@ -1195,10 +1690,8 @@ def ci_check(base_ref: str) -> int:
             print(f"FAIL {target}: missing={missing} exceeds the allowance of {allowed}")
         elif missing < allowed:
             improved.append(f"{target}: {allowed} -> {missing}")
-    # Extra (non-focus) Android locales — skipped in this fork, which has no android/ tree.
-    if (ROOT / "android/app/src/main/res/values/strings.xml").is_file():
-        base_path = ROOT / "android/app/src/main/res/values/strings.xml"
-        base_keys = set(re.findall(r'<(?:string|plurals) name="([^"]+)"', base_path.read_text(encoding="utf-8")))
+    base_path = ROOT / "android/app/src/main/res/values/strings.xml"
+    base_keys = set(re.findall(r'<(?:string|plurals) name="([^"]+)"', base_path.read_text(encoding="utf-8")))
     for locale_dir in shipped_android_locale_dirs():
         if locale_dir in ANDROID_LOCALE_DIRS.values():
             continue   # already hard-gated above
@@ -1229,9 +1722,7 @@ def ci_check(base_ref: str) -> int:
 
 def catalog_summary() -> None:
     print("\n--- Apple catalogs: translated-key coverage (existing keys, any source) ---")
-    for dirs, catalog_path in CATALOGS:
-        if not any(base.exists() for base in dirs):
-            continue
+    for _dirs, catalog_path in CATALOGS:
         cat = load_catalog(catalog_path)
         strings = cat.get("strings", {})
         total = len(strings)
@@ -1245,8 +1736,16 @@ def catalog_summary() -> None:
             for v in strings.values():
                 if v.get("shouldTranslate") is False:
                     continue
-                state = (v.get("localizations", {}).get(lang) or {}).get("stringUnit", {}).get("state")
-                if state != "translated":
+                # Via `_is_translated`, NOT a bare `localizations[lang].stringUnit.state` read: a
+                # pluralised entry keeps its units under `variations.plural.<category>.stringUnit`, so the
+                # flat lookup returns None and scores a fully-translated plural as a gap. That is the exact
+                # trap `_string_units` was written for, and this summary was the one caller still falling
+                # into it — reporting de/es/fr/pt-PT missing=4 and pl missing=5 on the Strand catalog when
+                # every one of those entries was translated in every form. Worse than a wrong number: it
+                # sent a reader to re-translate strings that were already done, and it made Polish look
+                # like the worst-covered language precisely BECAUSE it correctly carries one/few/many/other
+                # where the others need only a flat unit.
+                if not _is_translated(v, lang):
                     missing += 1
             line += f"  {lang} missing={missing}"
         print(" ", line)
@@ -1256,7 +1755,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--platform", choices=["ios", "android", "all"], default="all")
     ap.add_argument("--full", action="store_true", help="print every finding, not just counts")
-    ap.add_argument("--ci", metavar="BASE_REF", help="strict coverage gate (BASE_REF is retained for workflow compatibility); see ci_check() docstring")
+    ap.add_argument("--ci", metavar="BASE_REF", help="coverage gate: fail only on violations new vs BASE_REF or the baseline; see ci_check() docstring")
     ap.add_argument("--update-baseline", action="store_true", help="rewrite Tools/i18n_audit_baseline.json from the current hardcoded-literal scan (see load_baseline() docstring). Does NOT touch Tools/i18n_extra_locale_baseline.txt — that one is lowered by hand, so shrinking it stays a deliberate act")
     args = ap.parse_args()
 
@@ -1279,6 +1778,23 @@ def main() -> int:
                 print(f"  {rel}:{line_no}: {literal!r}")
             if len(findings) > 25:
                 print(f"  ... and {len(findings) - 25} more (use --full)")
+
+        print("\n=== Android: string resources leaning on stripped edge whitespace ===")
+        edge = android_edge_whitespace()
+        if not edge:
+            print("  none")
+        for locale_dir, keys in edge.items():
+            print(f"  {locale_dir}: {len(keys)} string(s)")
+            if args.full:
+                for k in sorted(keys):
+                    print(f"    {k}")
+
+        print("\n=== Android: localized resources assembled by concatenation ===")
+        concatenations = android_ui_string_concatenations()
+        if not concatenations:
+            print("  none")
+        for rel, line_no, key in concatenations:
+            print(f"  {rel}:{line_no}: {key}")
 
         print("\n=== Android: values-<locale>/strings.xml key gaps ===")
         gaps = android_strings_xml_gaps()

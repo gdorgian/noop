@@ -17,6 +17,129 @@ approximate; downloads are on the [Releases](https://github.com/NoopApp/noop/rel
 
 ---
 
+## 12.0.0: Today your way, heart rate any app can read, and Italian (all platforms)
+
+A major release about choice and about honesty. Today can be drawn two different ways, a WHOOP 4.0 can
+hand its heart rate to any app on your phone, daytime stress is measured against your own baseline
+rather than a population's, and NOOP speaks a tenth language. Behind that, a long run of readouts that
+had been claiming slightly more than they could attribute now say only what they know.
+
+**Today, drawn your way**
+
+- **Ring gauges or liquid vessels (#2311, #2320, thanks @andigandhi).** Today's gauges can be rings or
+  the liquid vessels, chosen per device, on Android and on Apple. Reduce Motion is honoured in both.
+- **The hero ring, cleaned up (#2410, #2374, #2421, thanks @mailingjash).** It draws flat rather than
+  through a bloom stand-in, its label sits centred on the ring rather than beside it, and the active
+  strap's own battery appears in the Liquid header.
+- **Nothing redraws while nothing moves (#2444, thanks @UtkuDenizAltiok),** so the sky and the rings
+  stop re-rendering between ticks.
+- **A Today-only Key Metrics view (#2601, thanks @kavemang),** and the Key Metrics header no longer
+  names a window it is not drawing (#2377, thanks @andremiliano).
+- **Swipe the day the same way on both platforms (#2379, thanks @andremiliano).**
+
+**Your strap's heart rate, in any app**
+
+- **Direct Bluetooth heart-rate broadcast on WHOOP 4.0 (#2400, thanks @don86nl).** A 4.0 can advertise
+  the standard heart-rate profile, so another app on your phone reads it live. The Today row says
+  Partly rather than Yes, because the 4.0 offers the broadcast and not the rest of what a strap does.
+- **A link that reports its shape (#2399, #2429, #2436, #2411).** The epitaph carries the signal shape
+  rather than only its last reading, a false start-of-frame is rejected by its own header checksum, the
+  peripheral is asked for again once the radio is up instead of scanning for one already bonded, and an
+  OS-level strap link is adopted from either WHOOP family.
+- **A strap last seen low** that has not been heard from since now says so, rather than going quiet.
+
+**Daytime stress, measured against you**
+
+- **A personal daytime lens (#2125, #2430, #2431, #2432, #2452, thanks @bartmuskala).** Resolved once a
+  day instead of once per surface and anchored to real local days. The line ramps down the chart rather
+  than across the day, and hours masked by activity now say why they are masked.
+- **Today honours the same baseline the detail screen does (#2450, #2504, thanks @kavemang),** and it
+  loads faster. It stays opt-in and off until you ask for it.
+- **The LF/HF ratio prints through the same arithmetic on both platforms (#2369, thanks @ayiskakov).**
+
+**ECG on WHOOP MG**
+
+- **The R17 layout corrected,** along with its wrist values and its START list.
+- **Android drives the turn-on probe Apple already had,** an in-flight offload is cleared before a
+  realtime trace is requested, and the capture-may-be-running latch survives an app restart and reaches
+  the Devices card.
+
+**Language**
+
+- **Italian (#2454).** NOOP's tenth language.
+- **Russian that counts properly.** Grammatical plurals across the app, the Watch complications and the
+  Apple catalogues, so counts take the right form instead of always one. Eight mistranslated Android
+  strings are corrected, and the copy a widened scanner surfaced is localised.
+- **The coverage gate is diff-scoped again (#524, thanks @digitalerdude),** and a push is compared
+  against the tip before it rather than against itself (#2329).
+
+**Sleep**
+
+- **A deep base prior of 0.15, on PSG evidence (#2576, thanks @UtkuDenizAltiok),** scored subject by
+  subject rather than in aggregate.
+- **The hypnogram read-out matches its own rows,** in order and in value, and stage rows align with
+  chart depth.
+- **Two sources recording one night are collapsed (#2550, thanks @kavemang),** and the dedup heal's
+  bank-recency witness is handed to the computed id alone (#2372).
+
+**Oura**
+
+- **A ring that keeps its place (#2442, #2455, #2457, #2433, #2443, thanks @pipiche38).** A sleep-window
+  stash survives a reconnect, an interrupted drain banks its resume cursor so the next connect does not
+  store again what it already holds, and a night the drain served twice is readable.
+- **A hypnogram tail that is padding, not time (#2564, thanks @pipiche38),** so a pass no longer shifts
+  early, and the ring's final pass no longer loses to an older one.
+- **A read crossing wake keeps the daytime beats (#2624, thanks @pipiche38),** chosen per hour so a
+  day-wide read does not swap channels.
+- **Experimental all-day heart rate and HRV** holds its daytime arming for the learned night rather than
+  for every screen-off (#2412).
+
+**Charge**
+
+- **A breakdown that agrees with its headline (#2466, thanks @andremiliano).** It reads the headline's
+  own baselines rather than resolving a second set, and there is now a written rule for which nights a
+  Charge baseline reads.
+- **An old WHOOP import no longer anchors the baselines (#2666, thanks @DX23876).**
+
+**A quicker Apple app**
+
+- **Ten performance changes (#2633, #2634, #2635, #2636, #2637, #2639, #2640, #2641, #2642, thanks
+  @AlexSchmidt1999).** Live Today Effort computes off the main actor, resolved Trends windows are reused
+  across unrelated publications, HealthKit observer deltas are bounded to the recent sync window, shared
+  chart styles resolve once per content update, full-resolution chart selection uses a date-ordered
+  lookup, and the shared panel background composites fewer layers.
+- **Re-score passes that behave in the background (#2612, #2616, thanks @UtkuDenizAltiok and
+  @kavemang),** spaced at least thirty minutes apart and claiming their pass before a store await.
+
+**Shortcuts, Health and the Lock Screen**
+
+- **A recorded GPS route through Shortcuts (#2340, thanks @rodrigosa7),** as GPX or FIT, and the picker
+  says what a FIT leaves out.
+- **Apple Health export names its chart heart-rate sources** and refreshes write authorization.
+- **Android reads your profile weight from Health Connect (thanks @paradix86).**
+- **One Lock Screen switch per thing NOOP shows,** each touching only its own.
+
+**Smaller corrections**
+
+- **Android honours your selected accent in Material controls (#2627)** and rejects a malformed custom
+  RGB value.
+- **Vital dates carry their weekday (#2622, thanks @kavemang).**
+- **Today explains when Start session is available,** and the Sleep movement strip says its scale is
+  per-night.
+- **Deep Timeline zoom and pan stop snapping back (#2368, #2382, thanks @andigandhi),** with x-axis
+  labels and per-minute zoom ticks on both platforms.
+- **Saved-workout overlap suppression is measured rather than guessed at (#2527, thanks @kavemang),**
+  ahead of choosing a duration-aware threshold.
+
+**Still open**
+
+WHOOP 5/MG history remains unsolved, and the cause is now established rather than suspected: the strap
+refuses the pairing handshake outright, so it is never given a clock, and an un-clocked 5/MG does not
+persist sensor data to flash. Its offloads complete empty. Live heart rate works; the backfill cannot,
+until the handshake does.
+
+---
+
 ## 11.1.0: A clock you choose, sleep without motion, and logs that report instead of assuming (all platforms)
 
 **Choose how you read times**

@@ -173,7 +173,60 @@ final class QuietMotionCoverageTests: XCTestCase {
         }
         let wrapper = try String(contentsOf: root.appendingPathComponent(
             "Packages/StrandDesign/Sources/StrandDesign/NoopMotion.swift"), encoding: .utf8)
-        XCTAssertTrue(wrapper.contains("paused || motion.poseStill(reduceMotion)"))
+        // The gate chooses a still frame rather than pausing the clock (see the test below).
+        XCTAssertTrue(wrapper.filter { !$0.isWhitespace }.contains("ifpaused||motion.poseStill(reduceMotion)"))
+    }
+
+    /// A `TimelineView(.animation(…, paused: true))` is not a still view. Measured on Today (iPhone 17 Pro
+    /// simulator, Release), a paused one kept the render server busy: the sky's cost 46 CPU-seconds a minute
+    /// against 22 while it animated, and the header sync ring's 15 to 51 against 0.07 once drawn as a still
+    /// frame. So the resting frame is drawn with no timeline behind it (`LiquidSky`, `ChargeSyncMorph`), and
+    /// the gate picks the view rather than pausing the clock.
+    func testNoAnimationTimelineIsMerelyPaused() throws {
+        let root = try repoRoot()
+        var offenders: [String] = []
+        var timelines = 0
+        for (rel, text) in swiftFiles(under: root) {
+            for (line, arguments) in animationScheduleArguments(in: codeLines(text)) {
+                timelines += 1
+                if arguments.contains("paused:") { offenders.append("\(rel):\(line): .animation(\(arguments))") }
+            }
+        }
+        XCTAssertGreaterThanOrEqual(timelines, 6, "expected to find the known animation timelines, found \(timelines)")
+        XCTAssertTrue(offenders.isEmpty, """
+            \(offenders.count) animation timeline(s) are paused rather than removed. Draw the resting frame \
+            without a TimelineView instead:
+            \(offenders.joined(separator: "\n"))
+            """)
+    }
+
+    /// The argument list of every `TimelineView(.animation(…))`, whitespace removed, with the 1-based line it
+    /// starts on. Balanced on parentheses, so `minimumInterval: 1.0 / 20.0` or a nested call reads whole.
+    private func animationScheduleArguments(in lines: [String]) -> [(line: Int, arguments: String)] {
+        var flattened: [Character] = []
+        var lineOfCharacter: [Int] = []
+        for (index, line) in lines.enumerated() {
+            for character in line where !character.isWhitespace {
+                flattened.append(character)
+                lineOfCharacter.append(index + 1)
+            }
+        }
+        let marker = Array("TimelineView(.animation(")
+        var found: [(line: Int, arguments: String)] = []
+        var i = 0
+        while i + marker.count <= flattened.count {
+            guard Array(flattened[i..<(i + marker.count)]) == marker else { i += 1; continue }
+            var depth = 1
+            var j = i + marker.count
+            while j < flattened.count && depth > 0 {
+                if flattened[j] == "(" { depth += 1 } else if flattened[j] == ")" { depth -= 1 }
+                j += 1
+            }
+            found.append((line: lineOfCharacter[i],
+                          arguments: String(flattened[(i + marker.count)..<max(i + marker.count, j - 1)])))
+            i = j
+        }
+        return found
     }
 
     /// `StrandMotion.breathe` is the shared `repeatForever` primitive, so a call site can loop forever
@@ -205,13 +258,46 @@ final class QuietMotionCoverageTests: XCTestCase {
     // MARK: - The gate itself
 
     /// Losing one signal is invisible in the app — the screen looks right in whichever mode still
-    /// works — so pin that all three are read, and that the OS flag stays live.
-    func testGateReadsAllThreeSignalsAndStaysLive() throws {
+    /// works — so pin that all four are read, and that the OS flags stay live.
+    func testGateReadsAllFourSignalsAndStaysLive() throws {
         let root = try repoRoot()
         let src = try String(contentsOf: root.appendingPathComponent(
             "Packages/StrandDesign/Sources/StrandDesign/NoopMotion.swift"), encoding: .utf8)
-        XCTAssertTrue(src.contains("reduceMotion || isLowPower || quietMotion"),
-                      "poseStill must OR all three signals")
+        XCTAssertTrue(src.contains("reduceMotion || isLowPower || quietMotion || windowObscured"),
+                      "poseStill must OR all four signals")
+        // #2393: the window-visibility term is worthless if nothing ever sets it, and the three
+        // notification families answer different questions — hide/unhide is the app, occlusion is the
+        // window, miniaturise is the Dock. Which of them AppKit posts for any given user action is not
+        // established here (it was not measured, and the reporter's numbers cover Cmd+H only), which is
+        // the reason to observe all three rather than pick the one that looks sufficient.
+        for name in ["didHideNotification", "didUnhideNotification",
+                     "didChangeOcclusionStateNotification",
+                     "didMiniaturizeNotification", "didDeminiaturizeNotification"] {
+            XCTAssertTrue(src.contains(name),
+                          "windowObscured must stay live on \(name)")
+        }
+        // The window list MUST be filtered to real app windows. NOOP ships a MenuBarExtra whose
+        // status-item window lives in `NSApplication.shared.windows` forever, so dropping this filter
+        // leaves the gate permanently open and the fix silently inert.
+        //
+        // #2397: this assertion previously pinned `canBecomeMain`, and it passed for a week while the
+        // gate never once closed — a predicate that is correct for a visible window and wrong for a
+        // hidden one is exactly what a source census cannot see. It is kept, narrowed to the predicate
+        // that actually holds, and paired with the REGRESSION half below, because what a census IS good
+        // for is noticing that a known-bad predicate came back. The behaviour is pinned where it belongs,
+        // over window states, in `WindowObscuredGateTests`.
+        //
+        // Comment lines are dropped first: the source EXPLAINS why `canBecomeMain` was wrong, and a
+        // census that counted its own explanation would fail on an accurate account of the code it
+        // guards. Same treatment as `DynamicColorParseOnceTests`.
+        let code = src.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        XCTAssertTrue(code.contains("styleMask.contains(.titled)"),
+                      "the MenuBarExtra's status-item window must not hold the gate open")
+        XCTAssertFalse(code.contains("canBecomeMain"),
+                       "canBecomeMain answers false for a HIDDEN window, which empties the list at the "
+                       + "moment the gate should close (#2397)")
         XCTAssertTrue(src.contains("isLowPowerModeEnabled"), "must read Low Power Mode")
         XCTAssertTrue(src.contains("NSProcessInfoPowerStateDidChange"),
                       "Low Power Mode must stay live without a relaunch")

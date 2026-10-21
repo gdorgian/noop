@@ -102,8 +102,6 @@ struct RepositoryFreshness: Equatable, Sendable {
     var latestDay: String?
 
     static let empty = RepositoryFreshness()
-
-    var hasAnyHistory: Bool { importedDays > 0 || computedDays > 0 || appleDays > 0 }
 }
 
 /// What `deleteSleepSession` hands back so a transient UNDO can restore the night (#65). Carries the
@@ -184,6 +182,12 @@ final class Repository: ObservableObject {
 
     /// Daily metrics (recovery/strain/sleep/HRV/RHR…) over the recent window, oldest→newest.
     @Published var days: [DailyMetric] = []
+    /// The Charge baselines (HRV, resting HR, respiration) resolved from the imported and own daily rows
+    /// with the engine's own rule (#2525), recomputed on every `refresh()`. The single funnel every Charge
+    /// readout below the headline reads (the "What shaped it" rows, the calibration count, the confidence
+    /// tier), so none of them can fold a different history than the score was computed against. nil until
+    /// the first refresh.
+    @Published private(set) var chargeBaselines: ChargeBaselines.Resolved?
     /// Cached sleep sessions over the recent window, oldest→newest.
     @Published var sleeps: [CachedSleepSession] = []
     /// Imported (export-verbatim) sleep figures by day. Empty until a WHOOP import lands.
@@ -279,6 +283,43 @@ final class Repository: ObservableObject {
         return Self.rawWhoopSourceIds(activeDeviceId: deviceId, registeredWhoopIds: registeredWhoops)
     }
 
+    /// Every namespace the Workouts list reads a row out of, in read order, duplicates collapsed.
+    ///
+    /// Why this exists: the list unions many device ids while `deleteWorkout` deleted from exactly ONE,
+    /// the active strap. A row banked under any other namespace (a retained strap, a computed `-noop`
+    /// sibling, Apple Health, an imported lifting session or activity file) was therefore VISIBLE BUT
+    /// UNDELETABLE: the delete reported nothing, the reload re-read the row from the namespace the delete
+    /// never touched, and it came straight back. Reported as workouts that ignore the delete button
+    /// (#2278).
+    ///
+    /// Deriving both sides from one function is the point. Spelling the union out twice is what let them
+    /// disagree, and a future namespace added to the read alone would reintroduce exactly this bug.
+    nonisolated static func workoutNamespaces(rawIds: [String]) -> [String] {
+        deletableWorkoutNamespaces(rawIds: rawIds)
+            + [WorkoutSource.appleHealthSource, "lifting", "activity-file"]
+    }
+
+    /// The subset of [workoutNamespaces] a DELETE may touch: the strap namespaces only.
+    ///
+    /// Imported history is read-only, and that is enforced everywhere else: the row menu offers only
+    /// "Duplicate as manual…" for an imported row, `bulkDeleteWorkouts` skips those classes outright, and
+    /// `mergeWorkouts` refuses them with "never rewrite imported history". A delete that swept the import
+    /// namespaces would reach underneath all three guards and destroy a wearer's imported Apple Health,
+    /// Hevy/Liftosaur or FIT/GPX/TCX row, which nothing in the UI ever offers to remove.
+    ///
+    /// That a cross-source twin is COLLAPSED into one row at display time does not license deleting the
+    /// imported half of the pair: the dedup is a presentation decision, and the surviving import is
+    /// exactly the history this repository promises not to rewrite.
+    ///
+    /// A `.manual` row, the only class the delete button is offered for, is written under a strap id, so
+    /// this set is what a delete actually needs.
+    nonisolated static func deletableWorkoutNamespaces(rawIds: [String]) -> [String] {
+        (rawIds + rawIds.map { $0.hasSuffix("-noop") ? $0 : $0 + "-noop" })
+            .reduce(into: [String]()) { acc, id in
+                if !acc.contains(id) { acc.append(id) }
+            }
+    }
+
     /// Pure ordering contract shared with Android's parity guard: current active source first, every other
     /// registered WHOOP in stable registry order, canonical history last; duplicates collapse.
     nonisolated static func rawWhoopSourceIds(activeDeviceId: String,
@@ -360,7 +401,7 @@ final class Repository: ObservableObject {
                 out.append(beat)
             }
         }
-        if out.contains(where: { $0.srcChannel?.isWhoop5Transport == true }) {
+        if out.contains(where: { $0.srcChannel?.isWhoop5Transport == true || $0.srcChannel == .whoop4Historical }) {
             // Retain the selected stream's emission order within a second. Value sorting corrupts
             // successive differences; original offsets also keep owner precedence deterministic.
             return out.enumerated().sorted {
@@ -431,8 +472,8 @@ final class Repository: ObservableObject {
     }
 
     /// Sleep sessions across every registered WHOOP source for a ts range, keeping ALL sessions per day (a nap + a main
-    /// night both survive) and dropping only EXACT-duplicate blocks (same start+end) recorded under both
-    /// union ids. The downstream `mergeSleep`/`userEditedDays` do the per-day collapse, exactly as before.
+    /// night both survive) and collapsing near-identical nights recorded under different union ids.
+    /// The downstream `mergeSleep`/`userEditedDays` do the per-day collapse, exactly as before.
     private func unionSleepSessions(store: WhoopStore, from: Int, to: Int, limit: Int = 4000) async -> [CachedSleepSession] {
         Self.dedupBlocks(await unionRawSleepBlocks(store: store, ids: rawPhysiologyReadIds(store: store), from: from, to: to, limit: limit))
     }
@@ -449,8 +490,8 @@ final class Repository: ObservableObject {
         return byDay.values.sorted { $0.day < $1.day }
     }
 
-    /// Computed ("-noop") sleep sessions across every registered WHOOP source, keeping ALL sessions per day and dropping
-    /// only EXACT-duplicate blocks recorded under both computed siblings.
+    /// Computed ("-noop") sleep sessions across every registered WHOOP source, keeping ALL sessions per day
+    /// and collapsing near-identical nights recorded under different computed siblings.
     private func unionComputedSleepSessions(store: WhoopStore, from: Int, to: Int, limit: Int = 4000) async -> [CachedSleepSession] {
         Self.dedupBlocks(await unionRawSleepBlocks(store: store, ids: rawComputedReadIds(store: store), from: from, to: to, limit: limit))
     }
@@ -465,14 +506,27 @@ final class Repository: ObservableObject {
         return blocks
     }
 
-    /// Drop blocks that share a (startTs, endTs) key, the same physical session recorded under both union
-    /// ids, keeping the first (active strap). Preserves genuinely distinct blocks (naps + main night).
-    nonisolated private static func dedupBlocks(_ blocks: [CachedSleepSession]) -> [CachedSleepSession] {
-        var seen = Set<String>()
+    /// Keep the active source's copy of a night when another source recorded nearly the same interval.
+    /// Require a majority of BOTH intervals to overlap so a short nap inside a long night survives.
+    /// Separate blocks from one source remain distinct, including split sleeps.
+    nonisolated static func dedupBlocks(_ blocks: [CachedSleepSession]) -> [CachedSleepSession] {
+        var seen = Set<[Int]>()
         var out: [CachedSleepSession] = []
         for b in blocks {
-            let key = "\(b.startTs)-\(b.endTs)"
-            if seen.insert(key).inserted { out.append(b) }
+            let key = [b.startTs, b.endTs]
+            guard seen.insert(key).inserted else { continue }
+            let overlapsOtherSource = out.contains { kept in
+                guard let source = b.deviceId, let keptSource = kept.deviceId,
+                      source != keptSource else { return false }
+                let start = max(b.effectiveStartTs, kept.effectiveStartTs)
+                let end = min(b.endTs, kept.endTs)
+                let bDuration = b.endTs - b.effectiveStartTs
+                let keptDuration = kept.endTs - kept.effectiveStartTs
+                let overlap = end - start
+                return bDuration > 0 && keptDuration > 0 &&
+                    overlap > bDuration / 2 && overlap > keptDuration / 2
+            }
+            if !overlapsOtherSource { out.append(b) }
         }
         return out
     }
@@ -905,6 +959,7 @@ final class Repository: ObservableObject {
     private struct MergedCaches {
         let importedSleep: [String: ImportedSleepFigures]
         let days: [DailyMetric]
+        let chargeBaselines: ChargeBaselines.Resolved
         let sleeps: [CachedSleepSession]
         let vitalRows: [SourcedDailyMetric]
         let freshness: RepositoryFreshness
@@ -1013,6 +1068,13 @@ final class Repository: ObservableObject {
         let impSleep = await unionSleepSessions(store: store, from: lo, to: hi)
         let compSleep = await unionComputedSleepSessions(store: store, from: lo, to: hi)
 
+        // #2525: the Charge baselines' inputs, read on the main actor before detaching: today's local day
+        // (the same local-calendar key the engine anchors its fold on) and the two recalibration epochs the
+        // engine reads from the same UserDefaults keys.
+        let chargeAnchorDay = AnalyticsEngine.dayString(nowTs, offsetSec: TimeZone.current.secondsFromGMT(for: now))
+        let hrvEpoch = Baselines.hrvBaselineEpoch()
+        let recoveryEpoch = Baselines.recoveryBaselineEpoch()
+
         // Export-verbatim sleep figures (long-format metricSeries rows from WhoopImporter).
         // SleepView prefers these per day over its APPROXIMATE recomputations.
         let perf = await unionMetricSeries(store: store, key: "sleep_performance", from: fromDay, to: toDay)
@@ -1040,6 +1102,11 @@ final class Repository: ObservableObject {
                     into: Self.mergeDaily(imported: imported, computed: computed, userEditedDays: editedDays),
                     activityFile
                 ),
+                // From the two buckets BEFORE `mergeDaily` blends them: the rule needs to know which nights
+                // are imported and which are the wearer's own.
+                chargeBaselines: ChargeBaselines.resolve(imported: imported, own: computed,
+                                                         anchorDay: chargeAnchorDay,
+                                                         hrvEpoch: hrvEpoch, recoveryEpoch: recoveryEpoch),
                 sleeps: Self.mergeSleep(imported: impSleep, computed: compSleep),
                 vitalRows: Self.sourceRows(imported: imported, computed: computed, apple: apple),
                 freshness: Self.computeFreshness(imported: imported, computed: computed, apple: apple,
@@ -1056,6 +1123,7 @@ final class Repository: ObservableObject {
         // is what stops the analyze-tail's burst of refresh() calls each re-firing TodayView.loadAll().
         let unchanged = loaded
             && merged.days == days
+            && merged.chargeBaselines == chargeBaselines
             && merged.sleeps == sleeps
             && merged.importedSleep == importedSleep
             && merged.vitalRows == vitalRows
@@ -1066,6 +1134,7 @@ final class Repository: ObservableObject {
         // the intraday-updating views reload exactly once for this real change.
         self.importedSleep = merged.importedSleep
         self.days = merged.days
+        self.chargeBaselines = merged.chargeBaselines
         self.sleeps = merged.sleeps
         self.vitalRows = merged.vitalRows
         self.freshness = merged.freshness
@@ -1237,6 +1306,38 @@ final class Repository: ObservableObject {
             }
         }
         return byTs.values.sorted { $0.ts < $1.ts }
+    }
+
+    /// The most recent banked battery reading, for the stale-battery warning (#2556).
+    ///
+    /// Reads the ACTIVE device id rather than the union: a battery reading belongs to the strap that sent
+    /// it, and warning about one strap's charge using another's reading is the #1706 mistake.
+    func latestBattery() async -> (ts: Int, soc: Double?, charging: Bool?)? {
+        guard let store = await ensureStore() else { return nil }
+        return try? await store.latestBattery(deviceId: deviceId)
+    }
+
+    /// The HR fingerprint over the UNION `hrSamples(from:to:limit:)` reads, as one opaque string.
+    ///
+    /// A fingerprint narrower than the read it guards is worse than none: it would let a caller reuse a
+    /// cached result after a backfill landed rows under an alias id, which is the id set that union exists
+    /// to cover. So this walks `rawPhysiologyReadIds`, the same list, rather than `deviceId` alone.
+    ///
+    /// Cost is one COUNT plus one MAX per id, straight over the `(deviceId, ts)` index with no rows
+    /// materialized, against the per-day row fetches a caller would otherwise repeat. Compared only to
+    /// itself in memory, so the format is free to change. Kotlin twin:
+    /// `WhoopRepository.hrUnionFingerprint`, which is a twin in ROLE only: each side compares its own
+    /// value against its own previous value, neither is persisted or sent anywhere, and the two encode
+    /// the same facts differently. There is no byte-identity contract here and no oracle asserting one,
+    /// so do not "align" the encodings on the assumption that there is.
+    func hrFingerprintUnion(from: Int, to: Int) async -> String {
+        guard let store = await ensureStore() else { return "" }
+        var parts: [String] = []
+        for id in rawPhysiologyReadIds(store: store) {
+            let fp = (try? await store.hrFingerprint(deviceId: id, from: from, to: to)) ?? (count: 0, maxTs: 0)
+            parts.append("\(id):\(fp.count):\(fp.maxTs)")
+        }
+        return parts.joined(separator: "|")
     }
 
     func hrSamples(from: Int, to: Int, limit: Int = 8000) async -> [HRSample] {
@@ -1417,8 +1518,8 @@ final class Repository: ObservableObject {
         let rawIds = rawPhysiologyReadIds(store: store)
         let rawComputedIds = rawComputedReadIds(store: store)
         // UNION the active strap + canonical (imported) and their computed siblings, keeping ALL blocks (not
-        // one per day, this view expands split sleeps), but dropping any block that appears under BOTH union
-        // ids (same start+end key) so a day present in both namespaces isn't double-listed.
+        // one per day, this view expands split sleeps), but collapsing a night recorded under BOTH union
+        // ids even when the recorded bounds differ slightly.
         let imported = Self.dedupBlocks(await unionRawSleepBlocks(store: store, ids: rawIds, from: lo, to: hi))
         let computed = Self.dedupBlocks(await unionRawSleepBlocks(store: store, ids: rawComputedIds, from: lo, to: hi))
         let cal = Calendar.current
@@ -2155,6 +2256,17 @@ final class Repository: ObservableObject {
         let devices = (try? DeviceRegistryStore(dbQueue: store.registryWriter).all()) ?? []
         let d = devices.first(where: { $0.id == deviceId })
         return DeviceFamily.isWhoop5Registry(model: d?.model, brand: d?.brand)
+    }
+
+    /// The active device's registry display name (nickname, else "Brand Model") for a screen that names
+    /// the source of what it plots — the Deep Timeline's source row. `nil` when the active id has no
+    /// registry row (the pre-registry seeded strap), so the caller keeps its legacy "My WHOOP" copy.
+    /// Reads the registry, not a brand string compare: an active Oura ring must read "Oura …", not the
+    /// hardcoded strap label it was shipped with. Twin of Android's `FullDayChartScreen` source pill.
+    func activeDeviceDisplayName() -> String? {
+        guard let store else { return nil }
+        let devices = (try? DeviceRegistryStore(dbQueue: store.registryWriter).all()) ?? []
+        return devices.first(where: { $0.id == deviceId })?.displayName
     }
 
     /// Whether the active strap has EVER banked a sample of `metric` (#623) — distinguishes a strap that
@@ -2896,18 +3008,13 @@ final class Repository: ObservableObject {
         // De-dup identical same-source rows that appear under both union ids by natural key (the cross-SOURCE
         // dedup below only collapses strap-vs-Apple twins, not a row present in two strap namespaces).
         var rows: [WorkoutRow] = []
-        let rawIds = rawPhysiologyReadIds(store: store)
-        for id in rawIds { rows += (try? await store.workouts(deviceId: id, from: lo, to: hi, limit: 5000)) ?? [] }
-        for id in rawIds.map({ $0.hasSuffix("-noop") ? $0 : $0 + "-noop" }) {
+        // Every namespace in one list, shared with `deleteWorkout` so the two cannot disagree about where a
+        // row lives. Covers each raw id, its computed `-noop` sibling, Apple Health, imported lifting
+        // sessions (Hevy / Liftosaur) and imported activity FILES (#29: FIT / GPX / TCX, or a successful
+        // file import never appears here at all). HR is reconciled from the strap trace at the end.
+        for id in Self.workoutNamespaces(rawIds: rawPhysiologyReadIds(store: store)) {
             rows += (try? await store.workouts(deviceId: id, from: lo, to: hi, limit: 5000)) ?? []
         }
-        rows += (try? await store.workouts(deviceId: "apple-health", from: lo, to: hi, limit: 5000)) ?? []
-        // Imported lifting sessions (Hevy / Liftosaur) live under their own "lifting" source.
-        rows += (try? await store.workouts(deviceId: "lifting", from: lo, to: hi, limit: 5000)) ?? []
-        // #29: imported activity FILES (FIT / GPX / TCX) live under their own "activity-file" source — read
-        // them too, or a successful file import never appears in the Workouts list (Data Sources counts it,
-        // the load didn't). HR is reconciled from the strap trace at the end like every other row.
-        rows += (try? await store.workouts(deviceId: "activity-file", from: lo, to: hi, limit: 5000)) ?? []
         rows = Self.dedupWorkoutsByNaturalKey(rows)
         let spans = WorkoutSource.parseDismissedSpans(dismissedDetectedSpans)
         // #687: collapse the SAME activity tracked live under the strap AND imported from Health Connect /
@@ -3139,7 +3246,9 @@ final class Repository: ObservableObject {
             // #10: the GPS route lives in RouteStore keyed by the natural key (startTs + sport), NOT in the
             // DB row. Copy it only after the replacement row is durable. Keep the old copy until the old
             // DB row is successfully retired, so a delete failure preserves both complete versions.
-            let oldRoute = RouteStore.load(startTs: old.startTs, sport: old.sport)
+            // WITH points: this re-stores under a new natural key, and `load` hands back a drawable route
+            // only, so a plain load here would drop the recorded measurements on every edit.
+            let oldRoute = RouteStore.loadWithPoints(startTs: old.startTs, sport: old.sport)
             if let route = oldRoute {
                 RouteStore.store(route, startTs: row.startTs, sport: row.sport)
             }
@@ -3198,8 +3307,22 @@ final class Repository: ObservableObject {
     func deleteWorkout(_ row: WorkoutRow) async {
         if WorkoutSource.classify(row.source) == .detected { await dismissDetected(row); return }
         guard let store = await ensureStore() else { return }
-        _ = try? await store.deleteWorkouts(deviceId: deviceId, sport: row.sport,
-                                            from: row.startTs, to: row.startTs)
+        // Sweep every STRAP namespace, not just the active one. A manual row banked under a retained
+        // strap or a computed sibling is shown by `workoutRows` and was previously undeletable: the
+        // delete touched one namespace, the reload re-read the row from another, and it reappeared
+        // (#2278).
+        //
+        // Import namespaces are deliberately excluded, see `deletableWorkoutNamespaces`: imported
+        // history is read-only and no UI offers to remove it.
+        //
+        // Narrow by construction. The natural key is exact (`sport` plus a single `startTs`), so this
+        // removes the row the wearer tapped and its copies in the strap namespaces, nothing else. An
+        // overlapping-but-differently-keyed session is NOT touched; collapsing those is the dedup's job
+        // at display time, not a delete's.
+        for id in Self.deletableWorkoutNamespaces(rawIds: rawPhysiologyReadIds(store: store)) {
+            _ = try? await store.deleteWorkouts(deviceId: id, sport: row.sport,
+                                                from: row.startTs, to: row.startTs)
+        }
     }
 
     /// #64: merge two-or-more overlapping / adjacent MANUAL or DETECTED sessions into ONE manual session
@@ -3221,7 +3344,9 @@ final class Repository: ObservableObject {
         // below doesn't drop routes, so we read + move them explicitly). Keep the longest polyline.
         var bestRoute: (route: WorkoutRoute, startTs: Int, sport: String)?
         for r in rows {
-            guard let route = RouteStore.load(startTs: r.startTs, sport: r.sport) else { continue }
+            // WITH points, for the same reason as the edit path: the winner is re-stored under the merged
+            // key, so dropping its measurements here would lose them silently.
+            guard let route = RouteStore.loadWithPoints(startTs: r.startTs, sport: r.sport) else { continue }
             if bestRoute == nil || route.polyline.count > bestRoute!.route.polyline.count {
                 bestRoute = (route, r.startTs, r.sport)
             }

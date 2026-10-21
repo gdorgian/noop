@@ -1,4 +1,10 @@
 import SwiftUI
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
+// For the #2393 window-visibility gate. SwiftUI already makes AppKit types reachable on macOS (the
+// palette's NSColor path relies on it), but the dependency is explicit here because this file names
+// NSApplication and NSWindow directly rather than a type SwiftUI itself vends.
+import AppKit
+#endif
 
 // MARK: - NoopMotion — the "Design Reset" motion set (WHOOP design language, 2026-06-22)
 //
@@ -12,9 +18,8 @@ import SwiftUI
 //   • `.staggeredAppear(index:)` — list/grid items fade + rise in, once, in sequence
 //   • `.softCardTransition()` — card insert/remove (opacity + a hair of scale)
 //
-// Every helper is PUBLIC, GPU-cheap (opacity / offset / scale only), and honours
-// `@Environment(\.accessibilityReduceMotion)` — under Reduce Motion animations collapse
-// to their final frame instantly, with no offset, scale or counting.
+// Count-up values and staggered entrances use the shared quiet-motion gate so
+// Low Power Mode and the in-app preference also suppress their one-shot work.
 //
 // This complements `StrandMotion` (the physiological breathe/pulse set) rather than
 // replacing it: where StrandMotion leans organic, NoopMotion leans crisp and mechanical,
@@ -106,6 +111,21 @@ public final class NoopMotionState: ObservableObject {
     /// toggling the setting takes effect without a relaunch.
     @Published public private(set) var isLowPower: Bool
 
+    /// #2393, macOS only: every window of this app is hidden, minimised or fully covered, so nothing
+    /// a frame loop draws can be seen.
+    ///
+    /// A decorative `TimelineView(.animation…)` keeps running when the app is hidden. A reporter
+    /// measured NOOP at a third to half a core permanently on an M1 Pro, the largest single process on
+    /// their machine, ahead of `WindowServer` — and Cmd+H did not reduce it, it RAISED it (28.8% to
+    /// 49.3% of a core in one run, 34.2% to 41.8% in another, returning to baseline exactly on
+    /// re-show). Their hypothesis is that the display link paces the timeline while the window is on
+    /// screen and the schedule free-runs once it is not. That is unproven and does not need to be true:
+    /// drawing frames nobody can see is not worth doing either way.
+    ///
+    /// iOS and watchOS never set this. The system already stops rendering a backgrounded app there, and
+    /// `scenePhase` covers what it does not; this is the gap AppKit leaves.
+    @Published public private(set) var windowObscured: Bool = false
+
     /// The in-app "Reduce motion in NOOP" preference. Kept in step with `UserDefaults` so a
     /// non-SwiftUI reader (the motion sensor) and the `@AppStorage` toggle never disagree.
     @Published public private(set) var quietMotion: Bool
@@ -130,6 +150,84 @@ public final class NoopMotionState: ObservableObject {
                 if self?.quietMotion != now { self?.quietMotion = now }
             }
         }
+        #if canImport(AppKit) && !targetEnvironment(macCatalyst)
+        // #2393: hide/unhide covers Cmd+H, occlusion covers "another window is over it" and, with the
+        // miniaturise pair, the Dock. They all land on one recompute rather than each setting the flag
+        // its own way: the states overlap (hiding an app also occludes its windows) and a flag written
+        // from five places would disagree with itself the moment two of them arrived out of order.
+        for name in [NSApplication.didHideNotification,
+                     NSApplication.didUnhideNotification,
+                     NSWindow.didChangeOcclusionStateNotification,
+                     NSWindow.didMiniaturizeNotification,
+                     NSWindow.didDeminiaturizeNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshWindowObscured() }
+            }
+        }
+        #endif
+    }
+
+    #if canImport(AppKit) && !targetEnvironment(macCatalyst)
+    /// Recompute [windowObscured] from AppKit's current window list. Cheap: a handful of windows, and
+    /// it runs on notifications a user generates by hand, not on a clock.
+    private func refreshWindowObscured() {
+        // `.titled` is what separates a real app window from the `MenuBarExtra`'s status-item window,
+        // which lives in `NSApplication.shared.windows` for the whole life of the process and would
+        // otherwise report something on screen forever.
+        //
+        // #2397: this was `canBecomeMain`, and that was wrong in the one case the gate exists for.
+        // `canBecomeMain` describes a window's CURRENT STATE, not its kind: a hidden or miniaturised
+        // window answers false, so the real window left the filtered list at exactly the moment the gate
+        // should have closed, the list went empty, and the empty-list rule below then read that as "not
+        // obscured". Two individually reasonable decisions cancelling out. @nichtlegacy measured it:
+        //
+        //     visible     all=3  cbm=1  titled=2 (one on screen)   obscured=N
+        //     hidden      all=4  cbm=0  titled=2 (none on screen)  obscured=N, should be Y
+        //     minimised   all=4  cbm=0  titled=2 (none on screen)  obscured=N, should be Y
+        //
+        // `NSStatusBarWindow` reported `titled=N` in every state they logged, and the app window kept
+        // `titled=Y` in all three, which is the property this needs and `canBecomeMain` never had.
+        let windows = NSApplication.shared.windows
+            .filter { $0.styleMask.contains(.titled) }
+            .map { WindowVisibility(onScreen: $0.isVisible && $0.occlusionState.contains(.visible)) }
+        let now = NoopMotionState.obscured(windows)
+        if windowObscured != now { windowObscured = now }
+    }
+    #endif
+
+    /// One app window's contribution to the gate, as the pure decision sees it.
+    ///
+    /// #2397: a struct rather than two loose Bools because the decision is about a LIST of windows, and
+    /// the bug it replaces was invisible to a test that could only be handed a summary. Given
+    /// `hasWindows`/`anyWindowOnScreen` there was no way to express "the app window is hidden while the
+    /// status-item window is on screen", which is the exact state that was misread.
+    struct WindowVisibility: Equatable {
+        /// Visible AND not fully occluded: what `isVisible && occlusionState.contains(.visible)` answers.
+        let onScreen: Bool
+    }
+
+    /// Pure half of the recompute, so the rule can be tested without AppKit.
+    ///
+    /// Takes the already-filtered app windows: every entry is a titled window, the status-item window
+    /// having been dropped by the caller. Obscured means "there are app windows and none of them is on
+    /// screen".
+    ///
+    /// NO WINDOWS is deliberately NOT obscured, and the case is more common than it sounds: before the
+    /// first window exists during launch, and again when someone closes the window and leaves NOOP
+    /// running as a menu-bar app. Treating an empty list as "nothing on screen" would pose every surface
+    /// still until the next occlusion notification arrived — a first frame of static gauges on the way
+    /// to a live screen, caused by the optimisation. Nothing is lost by the other reading: with no
+    /// window there is no view hierarchy, so there is no frame loop to stop.
+    ///
+    /// That rule is only safe while the filter is state-INDEPENDENT. Under #2394's `canBecomeMain` the
+    /// list emptied whenever the window was hidden, so this clause silently answered the live question
+    /// instead of the launch one. `.titled` keeps a hidden window in the list, which is what returns this
+    /// rule to the case it was written for.
+    ///
+    /// `nonisolated` because the enclosing class is `@MainActor` and this decides nothing that needs the
+    /// main actor — without it a test could not call it off the main actor at all.
+    nonisolated static func obscured(_ windows: [WindowVisibility]) -> Bool {
+        !windows.isEmpty && !windows.contains { $0.onScreen }
     }
 
     /// The gate. `reduceMotion` comes from `@Environment(\.accessibilityReduceMotion)` at the call
@@ -143,13 +241,13 @@ public final class NoopMotionState: ObservableObject {
     /// ```
     @inline(__always)
     public func poseStill(_ reduceMotion: Bool) -> Bool {
-        reduceMotion || isLowPower || quietMotion
+        reduceMotion || isLowPower || quietMotion || windowObscured
     }
 
-    /// The two non-environment signals on their own, for an imperative (non-View) reader that
-    /// supplies its own Reduce Motion read — e.g. the decorative motion sensor deciding whether to
-    /// start at all. Views must use `poseStill(_:)` instead so they invalidate correctly.
-    public var poseStillIgnoringReduceMotion: Bool { isLowPower || quietMotion }
+    /// The non-environment signals on their own, for an imperative (non-View) reader that supplies its
+    /// own Reduce Motion read — e.g. the decorative motion sensor deciding whether to start at all.
+    /// Views must use `poseStill(_:)` instead so they invalidate correctly.
+    public var poseStillIgnoringReduceMotion: Bool { isLowPower || quietMotion || windowObscured }
 }
 
 /// A per-frame clock that stops decorative drawing for all three quiet-motion signals.
@@ -178,11 +276,15 @@ public struct NoopAnimatedTimeline<Content: View>: View {
     }
 
     public var body: some View {
-        TimelineView(.animation(
-            minimumInterval: minimumInterval,
-            paused: paused || motion.poseStill(reduceMotion)
-        )) { context in
-            content(NoopTimelineContext(date: context.date))
+        // A paused `TimelineView(.animation)` is not still: upstream measured one keeping the render
+        // server busy (46 CPU-s a minute vs 22 while animating). So the resting frame is drawn with no
+        // timeline behind it, and the gate chooses the view rather than pausing a clock.
+        if paused || motion.poseStill(reduceMotion) {
+            content(NoopTimelineContext(date: Date()))
+        } else {
+            TimelineView(.animation(minimumInterval: minimumInterval)) { context in
+                content(NoopTimelineContext(date: context.date))
+            }
         }
     }
 }
@@ -194,7 +296,7 @@ public struct NoopAnimatedTimeline<Content: View>: View {
 // so it works on the iOS 16 / macOS 13 floor (no TimelineView spring / PhaseAnimator needed)
 // and rides whatever animation the environment supplies — by default `NoopMotion.value`.
 //
-// Reduce Motion → the final value is shown instantly, with no tick.
+// Quiet motion → the final value is shown instantly, with no tick.
 
 /// A text view whose number animates from its previous value to the new one.
 /// Use for the big scores / hero metric read-outs.
@@ -219,6 +321,10 @@ public struct CountUpText: View {
     @State private var hasAppeared = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // The system flag alone misses NOOP's own preference and Low Power Mode. Use the same
+    // live gate as the decorative loops so a refresh cannot restart suppressed count-up work.
+    @ObservedObject private var motion = NoopMotionState.shared
+    private var poseStill: Bool { motion.poseStill(reduceMotion) }
 
     /// - Parameters:
     ///   - value: the number to display / animate to.
@@ -245,7 +351,7 @@ public struct CountUpText: View {
             .onAppear {
                 guard !hasAppeared else { return }
                 hasAppeared = true
-                if reduceMotion {
+                if poseStill {
                     target = value                      // snap, no tick
                 } else {
                     target = 0
@@ -253,7 +359,7 @@ public struct CountUpText: View {
                 }
             }
             .onChangeCompat(of: value) { newValue in
-                if reduceMotion {
+                if poseStill {
                     var tx = Transaction(); tx.disablesAnimations = true
                     withTransaction(tx) { target = newValue }
                 } else {
@@ -295,7 +401,7 @@ private struct _AnimatableNumber: View, Animatable {
 // MARK: - Staggered appear
 //
 // Fade-in + 8pt rise, sequenced by `index`. Runs ONCE per element (guarded by `hasAppeared`),
-// so re-renders / scroll recycling don't re-trigger it. Reduce Motion → visible instantly,
+// so re-renders / scroll recycling don't re-trigger it. Quiet motion → visible instantly,
 // no offset.
 
 private struct StaggeredAppear: ViewModifier {
@@ -304,17 +410,20 @@ private struct StaggeredAppear: ViewModifier {
 
     @State private var hasAppeared = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // Lazy sections enter repeatedly while scrolling. Quiet motion must expose their final pose
+    // immediately rather than scheduling another delayed entrance when they become visible.
+    @ObservedObject private var motion = NoopMotionState.shared
+    private var poseStill: Bool { motion.poseStill(reduceMotion) }
 
     func body(content: Content) -> some View {
-        // `shown` is true once we've appeared (or immediately under Reduce Motion / when the
-        // element is asked to appear without animation).
-        let shown = hasAppeared || reduceMotion
+        // Show immediately when the shared quiet-motion gate is closed.
+        let shown = hasAppeared || poseStill
         content
             .opacity(isVisible ? (shown ? 1 : 0) : 1)
             .offset(y: (isVisible && !shown) ? NoopMotion.riseOffset : 0)
             .onAppear {
                 guard isVisible, !hasAppeared else { return }
-                if reduceMotion {
+                if poseStill {
                     hasAppeared = true                  // no animation, no delay
                 } else {
                     let delay = Double(max(0, index)) * NoopMotion.stagger
@@ -323,13 +432,13 @@ private struct StaggeredAppear: ViewModifier {
                     }
                 }
             }
+            .onChangeCompat(of: poseStill) { if $0 { hasAppeared = true } }
     }
 }
 
 public extension View {
     /// Fade-in + 8pt rise on first appearance, delayed by `index * 0.04s` for a sequenced
-    /// list/grid reveal. Runs ONCE per element. Honours Reduce Motion (appears instantly,
-    /// no offset).
+    /// list/grid reveal. Runs ONCE per element. The quiet-motion gate shows it instantly.
     ///
     /// - Parameters:
     ///   - index: position in the sequence (0 = first / no delay).

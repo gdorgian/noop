@@ -533,7 +533,7 @@ def _mask_kotlin_template_code(text: str) -> str:
     return "".join(out)
 
 
-def _arity(masked: str, opening: int) -> int | None:
+def _arity(masked: str, opening: int, *, angles_are_brackets: bool = True) -> int | None:
     stack: list[str] = []
     pairs = {")": "(", "]": "[", "}": "{", ">": "<"}
     segments = 0
@@ -545,7 +545,17 @@ def _arity(masked: str, opening: int) -> int | None:
             stack.append(char)
         elif char == "<":
             # Parameter lists use angle brackets for types. Do not treat Kotlin/Swift arrows as generics.
-            if i + 1 >= len(masked) or masked[i + 1] not in "= ":
+            #
+            # Nor Swift's half-open range operator. `a[x..<y]` ends in a `<` whose next character is the
+            # start of the upper bound, so the arrow guard below lets it through and pushes a bracket that
+            # nothing ever closes; the walk then runs to the end of the file and returns None, and the
+            # CALLER SILENTLY DISAPPEARS (`if arity is None: continue`). That is how
+            # Interpreter.hexString/1 came to have "no production callsite" while being called on the very
+            # next line of its own file: its one call passes `frame[max(0, off)..<max(off, end)]`.
+            # A declaration whose only real call is invisible then reports as test-only the moment any
+            # test-local helper of the same name lends it a callsite (#2257).
+            is_half_open_range = masked[max(0, i - 2) : i] == ".."
+            if angles_are_brackets and not is_half_open_range and (i + 1 >= len(masked) or masked[i + 1] not in "= "):
                 stack.append(char)
         elif char in pairs:
             if char == ")" and not stack:
@@ -559,6 +569,28 @@ def _arity(masked: str, opening: int) -> int | None:
         elif not char.isspace() and not stack:
             segment_has_token = True
         i += 1
+
+    # The walk never balanced, which means some `<` was pushed that nothing closed. Falling out of
+    # here returns None, and every caller answers None with `continue` -- so an argument this walk
+    # cannot parse does not merely lose its arity, it ERASES THE ENTIRE CALLSITE and the scan reports
+    # a declaration nobody calls.
+    #
+    # `<` is the only genuinely ambiguous character: a generic argument list needs it treated as a
+    # bracket, while `a << b`, `a<b` and friends need it treated as an operator, and no lexical rule
+    # separates the two. Guarding one spelling at a time does not converge -- exempting `..<` above
+    # still leaves every shift expression erased. So resolve the ambiguity by OUTCOME rather than by
+    # guesswork. Retry with angle brackets demoted to ordinary characters; if that balances, it was
+    # an operator.
+    #
+    # Measured on this repository, the two walks together recover 418 callsites the strict walk alone
+    # erases: 377 spelled `..<`, 35 spelled `<<`, and a residue of other `<` uses. Declaration arities
+    # are unaffected (0 of them change), so no declaration can enter the inventory because of this.
+    #
+    # This can only add information. A call that already balanced returned above and never reaches
+    # the retry, so no successful parse changes. Only calls that currently contribute NOTHING can
+    # move, and they can only move from invisible to visible.
+    if angles_are_brackets:
+        return _arity(masked, opening, angles_are_brackets=False)
     return None
 
 
@@ -2526,8 +2558,15 @@ def build_compact_baseline(result: ScanResult) -> dict:
         if finding.rule in HARD_FINDING_RULES:
             continue
         if finding.rule not in BASELINE_REASONS:
+            if finding.rule.startswith("add-unpaired-"):
+                raise ValueError(
+                    f"finding {finding.identity} is source drift against the checked-in twin map, "
+                    "not compact-baseline debt; add an exact typed disposition for the "
+                    "platform-qualified authority identity, then run --refresh-derived"
+                )
             raise ValueError(
-                f"finding {finding.identity} has no reviewed compact-baseline disposition"
+                f"finding {finding.identity} cannot enter the compact baseline; "
+                "resolve the source or authority drift before refreshing derived snapshots"
             )
         grouped[(finding.rule, _finding_domain(finding.path))].append(finding.identity)
     return {
@@ -2783,6 +2822,11 @@ def main(argv: list[str] | None = None) -> int:
             print("\nActionable source drift:")
             for item in actionable:
                 print(f"  {item.output()}")
+            print(
+                "These pipe-separated finding identities are diagnostics, not typed-disposition "
+                "identities. For an intentional one-sided declaration, use its platform-qualified "
+                "authority identity in the registry, then run --refresh-derived."
+            )
         print(f"\nScanned {_summary(result)}")
         return 1
 

@@ -126,12 +126,24 @@ enum DebugDataDiagnostics {
         #endif
         #if os(iOS)
         // #52: iOS Backup & Sync folder-picker health. When users report "won't let me pick a folder",
-        // this pins the failure stage: "cancelled"/"never used" ⇒ the picker's Open button never fired
-        // (an iOS-side picker issue — the in-app "Use NOOP's own folder" fallback sidesteps it);
+        // this pins the failure stage: "closed without a folder"/"never used" ⇒ no URL came back;
         // "picked" + a FAILED flag ⇒ a returned folder failed to bookmark HERE (our bug).
+        //
+        // #2356: the no-URL case used to read "cancelled", which asserts an intent UIKit never tells us.
+        // It calls the same delegate method when someone taps Cancel and when someone picks a folder and
+        // taps Open that iOS then declines, and a reporter hit the second while the log claimed the first,
+        // sending the investigation after a disabled Open button that was never the problem. The two facts
+        // below are what let a reader tell them apart: a tap on Cancel closes in a second or two, whereas
+        // navigating into iCloud Drive and choosing a folder takes far longer.
         let pickEvent = d.string(forKey: "backupPicker.lastEvent") ?? "never used"
         let pickAt = d.double(forKey: "backupPicker.lastEventAt")
         lines.append("Folder picker: \(pickEvent)\(pickAt > 0 ? " (\(relTime(now - pickAt)))" : "")")
+        let openFor = d.double(forKey: "backupPicker.lastOpenSeconds")
+        if openFor > 0 {
+            let startedIn = d.string(forKey: "backupPicker.lastStart") ?? ""
+            lines.append("             open for \(String(format: "%.1f", openFor))s"
+                + (startedIn.isEmpty ? "" : ", opened on \(startedIn)"))
+        }
         if pickEvent == "picked" {
             let scoped = d.bool(forKey: "backupPicker.lastScopedOpen")
             let bmOk = d.bool(forKey: "backupPicker.lastBookmarkOk")
@@ -196,6 +208,11 @@ enum DebugDataDiagnostics {
         // `store` is fetched further down for the funnels; take a handle here rather than moving this
         // block below the funnel header, so the inventory prints beside the strap identity it qualifies —
         // the same position it holds on Android.
+        // Hoisted: the alarm section below needs the active strap's identity to attribute its clock verdict,
+        // and the inventory block that knows it is scoped to the store handle. A single paired strap is the
+        // safe default, because that is the case in which the legacy shared reading is attributable anyway.
+        var clockPeripheralId: String?
+        var clockPairedCount = 1
         if let invStore = await repo.storeHandle() {
             let invRegistry = DeviceRegistryStore(dbQueue: invStore.registryWriter)
             // Bound before the map so the rule below has a count to test. Reading `.all()` inline left
@@ -219,6 +236,8 @@ enum DebugDataDiagnostics {
                                  pairedCount: invDevices.count))
             }
             let invActive = (try? invRegistry.activeDeviceId()) ?? nil
+            clockPeripheralId = invDevices.first { $0.id == invActive }?.peripheralId
+            clockPairedCount = max(1, invDevices.count)
             lines.append(contentsOf: deviceInventoryLines(rows: invRows,
                                                           activeId: invActive,
                                                           nowSec: Int(Date().timeIntervalSince1970),
@@ -229,7 +248,7 @@ enum DebugDataDiagnostics {
         // the funnels since those can early-return, so this always lands in the export.
         lines += await workoutSourceLines(repo: repo)
         lines += await dailyDataLines(repo: repo)
-        lines += alarmLines()
+        lines += alarmLines(activePeripheralId: clockPeripheralId, pairedCount: clockPairedCount)
 
         // Funnels for the latest night — best-effort, self-reporting.
         lines.append(String(repeating: "─", count: 40))
@@ -269,7 +288,12 @@ enum DebugDataDiagnostics {
         }
         let grav = (try? await store.gravitySamples(deviceId: did, from: cs.startTs, to: cs.endTs, limit: 200_000)) ?? []
         let hr = await repo.hrSamples(from: cs.startTs, to: cs.endTs, limit: 200_000)
-        let rr = (try? await store.rrIntervals(deviceId: did, from: cs.startTs, to: cs.endTs, limit: 200_000)) ?? []
+        // Beats BANKED, not beats scored: the raw read, so `rr=` keeps the meaning it had in every log filed
+        // before the one-Oura-channel selection, on both platforms (Kotlin `AndroidDiagnostics`).
+        // On a WHOOP 5 this steps the number UP rather than restoring it: the strict transport
+        // selection predates that change, so `rr=` now counts every banked transport. Banked is what
+        // this line has always meant. See `rawRrIntervals` for why, and for the #2456 interaction.
+        let rr = (try? await store.rawRrIntervals(deviceId: did, from: cs.startTs, to: cs.endTs, limit: 200_000)) ?? []
         let resp = (try? await store.respSamples(deviceId: did, from: cs.startTs, to: cs.endTs, limit: 200_000)) ?? []
         lines.append("Night \(dayStamp(cs.startTs))"
                      + funnelFallbackNote(chosenDay: dayStamp(cs.startTs),
@@ -297,7 +321,17 @@ enum DebugDataDiagnostics {
             return lines
         }
         if let rem = SleepStager.remFunnelDiagnostic(start: cs.startTs, end: cs.endTs, grav: grav, hr: hr, rr: rr, resp: resp) {
-            lines.append(rem.summary)
+            // The funnel replays the V1 classifier, but the shipped hypnogram is staged by V2 whenever
+            // the default-on flag says so — name both, or the two totals read as one fact disagreeing.
+            // On a 5/MG the gap is maximal: V1's primary REM gate needs the raw resp channel that
+            // hardware never emits, while V2 recovers respiration from R-R, so the funnel can report
+            // ~46min REM against a 231min screen for the same night.
+            let screenStager = PuffinExperiment.experimentalSleepV2Enabled ? "V2" : "V1"
+            var summary = rem.summary + " · funnel replays V1; screen staged by \(screenStager)"
+            if screenStager != "V1" {
+                summary += " — totals can differ"
+            }
+            lines.append(summary)
         } else {
             lines.append("REM funnel: insufficient motion data (<2 gravity samples)")
         }
@@ -446,7 +480,11 @@ enum DebugDataDiagnostics {
     /// Alarm state for the debug export: the configured wake + the last arm's sent-vs-strap-reports (#34), so
     /// a "didn't buzz" report shows at a glance whether the strap accepted the time. Reads persisted defaults
     /// (written by BLEManager.armStrapAlarm + the FrameRouter readback); sync + guarded.
-    static func alarmLines() -> [String] {
+    /// `activePeripheralId` and `pairedCount` attribute the strap-clock verdict to the active strap, the
+    /// same way Firmware and Last sync are attributed. Defaulted so a caller with no registry to hand still
+    /// gets every other alarm line; with no identity the legacy shared reading is trusted only at a single
+    /// paired strap, which is exactly when it cannot have come from another one.
+    static func alarmLines(activePeripheralId: String? = nil, pairedCount: Int = 1) -> [String] {
         var lines: [String] = []
         lines.append(String(repeating: "─", count: 40))
         lines.append("Alarm")
@@ -462,7 +500,12 @@ enum DebugDataDiagnostics {
         // about the one case that matters. Three arms, mirroring the Kotlin `when`.
         switch WhoopModel(rawValue: d.string(forKey: "selectedWhoopModel") ?? "") {
         case .whoop5mg:
-            lines.append("Model: \(WhoopModel.whoop5mg.displayName) · experimental: \(PuffinExperiment.isEnabled ? "on" : "off → firmware alarm NOT armed")")
+            // Name the switch a reader can actually find. #2464 was filed because the Alarms copy sent a
+            // wearer to "Experimental" in Settings, which is neither where nor what the gate is; the copy
+            // and the refusal logs were corrected in #2484 / #2488 and this line was missed, so a wearer
+            // reading their own strap log was still sent hunting for the old name.
+            lines.append("Model: \(WhoopModel.whoop5mg.displayName) · Protocol probes (Test Centre): "
+                         + (PuffinExperiment.isEnabled ? "on" : "off → firmware alarm NOT armed"))
         case .whoop4:
             lines.append("Model: \(WhoopModel.whoop4.displayName)")
         case nil:
@@ -471,7 +514,23 @@ enum DebugDataDiagnostics {
         // #4 / #67: strap clock health — a reset/stale OR future-dated clock (the #34 / #928 causes) breaks
         // the alarm even when armed, AND misdates offloaded sleep: the strap banks last night with its wrong
         // RTC, so the night lands on the stale date and reads as "missed sleep" on the recent timeline (#67).
-        if let newest = d.object(forKey: "strap.newestRecordTs") as? Int, newest > 0 {
+        //
+        // Attributed to THIS strap. The global key holds whichever strap last answered a range reply, so a
+        // two-strap capture asserted "20d behind wall (reset/stale — alarm unreliable)" about an active
+        // 5/MG that had banked nothing; the 20 days belonged to a 4.0 last seen 20 days earlier. A verdict
+        // about one strap's alarm must not be computed from another strap's clock.
+        let attributedNewest = LastSyncAttribution.resolveStrapClockTs(
+            perDevice: LastSyncAttribution.strapClockPrefKey(peripheralId: activePeripheralId)
+                .flatMap { d.object(forKey: $0) as? Int },
+            legacyGlobal: d.object(forKey: "strap.newestRecordTs") as? Int,
+            pairedCount: pairedCount)
+        if attributedNewest == nil, pairedCount > 1 {
+            // Say why there is no verdict, rather than printing nothing and leaving the reader to assume
+            // the clock was checked and found fine.
+            lines.append("Strap clock: not known for this strap (no range reply recorded against it; the "
+                         + "legacy shared reading is not attributable with \(pairedCount) straps paired)")
+        }
+        if let newest = attributedNewest, newest > 0 {
             let behind = Int(Date().timeIntervalSince1970) - newest
             if behind > 3 * 86400 {
                 lines.append("Strap clock: \(behind / 86400)d behind wall (reset/stale — alarm unreliable; recent sleep may be filed ~\(behind / 86400)d in the past, #67)")
@@ -484,9 +543,13 @@ enum DebugDataDiagnostics {
             }
         }
         if let sent = d.object(forKey: "alarm.lastArmSentEpoch") as? Int {
-            var line = "Last arm: sent \(alarmStamp(sent))"
-            if let at = d.object(forKey: "alarm.lastArmAt") as? Double {
-                line += " · \(relTime(Date().timeIntervalSince1970 - at))"
+            // #2322: "for <alarm time> · sent <ago>". The old shape put both clocks on one line as
+            // "sent <alarm time> · <ago>", which reads as "we sent that time, that long ago" — but the
+            // stamp is the FUTURE instant armed and the relative time is when the command went out.
+            var line = "Last arm: for \(alarmStamp(sent))"
+            let armedAt = d.object(forKey: "alarm.lastArmAt") as? Double
+            if let armedAt {
+                line += " · sent \(relTime(Date().timeIntervalSince1970 - armedAt))"
             }
             if !d.bool(forKey: "alarm.lastArmConnected") { line += " · strap NOT connected (queued)" }
             // #34: the strap-clock skew AT ARM. Skew ~0 but the strap still rejects ⇒ a corrupted alarm
@@ -504,20 +567,42 @@ enum DebugDataDiagnostics {
             if let reported = d.object(forKey: "alarm.lastReportedEpoch") as? Int {
                 // #1706: only judge when both halves are known to be the SAME strap, otherwise this
                 // blames a device that was never asked.
+                // #2322: and only when the readback ANSWERED this arm. A readback that failed to decode
+                // leaves the previous one standing, so without the arrival stamps this line compared two
+                // different arms and blamed the strap for the difference.
+                let readAt = d.object(forKey: "alarm.lastReportedAt") as? Double
                 let verdict = AlarmReadback.verdict(
                     sentEpoch: sent,
                     reportedEpoch: reported,
                     sentDeviceId: d.string(forKey: "alarm.lastArmDeviceId"),
-                    reportedDeviceId: d.string(forKey: "alarm.lastReportedDeviceId"))
+                    reportedDeviceId: d.string(forKey: "alarm.lastReportedDeviceId"),
+                    sentAt: armedAt,
+                    reportedAt: readAt)
                 var rline = "Strap reports: \(alarmStamp(reported))" + AlarmReadback.suffix(verdict)
+                // When the readback landed, so a reader can see the provenance of both halves rather than
+                // having to trust that they belong together.
+                if let readAt { rline += " · read \(relTime(Date().timeIntervalSince1970 - readAt))" }
                 // #34: consecutive rejections — a persistent refusal (vs a one-off) points at a strap whose
                 // alarm register needs a reset, and is what SmartAlarmView warns the user about at ≥2.
                 let streak = d.integer(forKey: "alarm.rejectStreak")
                 if streak >= 2 { rline += " · \(streak) in a row (register likely needs a reset, #34)" }
                 lines.append(rline)
                 // The bytes the epoch was decoded from: what tells a stored stale alarm from a misdecode.
-                if let raw = d.string(forKey: "alarm.lastReportedRaw"), !raw.isEmpty {
-                    lines.append("Readback frame: \(raw)")
+                // #1707 started banking the frame on 2026-08-28, so a readback taken before that has an
+                // epoch and no frame. Printing nothing there read as "the frame was checked and was fine",
+                // and a 2045 readback in a 2026-09-28 capture cost a trip through git history to explain.
+                // Say which of the two it is, the way the strap-clock verdict says why it abstains rather
+                // than printing no line at all.
+                // Blank counts as not stored, matching Kotlin's isNotBlank: a whitespace-only value is as
+                // uninformative as an absent one, and printing it emitted a frame line carrying no bytes.
+                let reportedRaw = d.string(forKey: "alarm.lastReportedRaw")?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if let reportedRaw, !reportedRaw.isEmpty {
+                    lines.append("Readback frame: \(reportedRaw)")
+                } else {
+                    lines.append("Readback frame: not stored (this readback predates the frame capture, or "
+                        + "the write failed), so a genuinely-stored stale alarm cannot be told from a "
+                        + "misdecode of a fixed response field here")
                 }
             } else {
                 lines.append("Strap reports: (no readback)")

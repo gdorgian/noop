@@ -59,6 +59,40 @@ class DispositionKindVocabularyTests(unittest.TestCase):
         self.assertIn("add-unpaired-property", self._required_kinds())
         self.assertNotIn("add-unpaired-propertie", self._required_kinds())
 
+    def test_out_of_scope_twin_requires_excluded_swift_path(self) -> None:
+        identity = "kotlin\0android/app/src/main/java/com/noop/data/WhoopRepository.kt::hrUnionFingerprint/3#1"
+        item = {
+            "type": "out_of_scope_twin",
+            "kind": "add-unpaired-function",
+            "identity": identity,
+            "identity_sha256": parity_ledger._canonical_sha256(identity),
+            "platform": "kotlin",
+            "rationale": "The Swift role twin lives in the excluded app layer.",
+            "twin_path": "Strand/Data/Repository.swift",
+        }
+        parity_ratchet._validate_dispositions(
+            {"schema_version": 1, "dispositions": [item]}, "test",
+            Path(__file__).resolve().parents[2],
+        )
+        for bad_path in ("Packages/WhoopStore/Sources/Repository.swift",
+                         "Strand/../Data/Repository.swift", "Strand/Data/Missing.swift"):
+            with self.subTest(path=bad_path), self.assertRaises(parity_ratchet.RatchetError):
+                parity_ratchet._validate_dispositions(
+                    {"schema_version": 1, "dispositions": [{**item, "twin_path": bad_path}]},
+                    "test", Path(__file__).resolve().parents[2],
+                )
+
+    def test_only_same_authority_can_be_reclassified(self) -> None:
+        old = {"type": "platform_specific", "kind": "add-unpaired-function",
+               "identity": "kotlin\0X.kt::f/1#1", "identity_sha256": "hash",
+               "platform": "kotlin", "rationale": "Original rationale"}
+        current = {**old, "type": "out_of_scope_twin", "twin_path": "Strand/Data/X.swift"}
+        self.assertTrue(parity_ratchet._is_out_of_scope_reclassification(old, current))
+        self.assertFalse(parity_ratchet._is_out_of_scope_reclassification(
+            old, {**current, "identity": "kotlin\0X.kt::g/1#1"}))
+        self.assertFalse(parity_ratchet._is_out_of_scope_reclassification(
+            old, {**current, "type": "experimental"}))
+
 
 if __name__ == "__main__":
     unittest.main()

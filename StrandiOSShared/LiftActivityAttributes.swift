@@ -23,6 +23,9 @@ public struct LiftActivityAttributes: ActivityAttributes {
         public var isPaused: Bool
         /// The rest target has elapsed and the next set is ready to start.
         public var isReady: Bool
+        /// The program the session runs, for the "Noop · Upper A" kicker. Carried per update rather than in
+        /// the fixed attributes, because upstream's controller starts the activity with no attributes.
+        public var programName: String
         /// The exercise being worked, or rested from.
         public var exercise: String
         /// "Set 2" / "Resting after set 2" — resolved app-side so the wording matches the bar.
@@ -36,6 +39,11 @@ public struct LiftActivityAttributes: ActivityAttributes {
         public var progress: String
         public var setsDone: Int
         public var setsPlanned: Int
+        public var bpm: Int?
+        /// "Next: Set 3 · Bench press", localized APP-SIDE (`LiftSessionController.nextLine`). The widget
+        /// extension ships no string catalog, so every word it renders has to arrive already translated
+        /// — the same reason `status` and `detail` are strings rather than numbers.
+        public var next: String
         /// When the current stage began — the widget counts UP from here while working.
         public var stageStartedAt: Date
         /// When the running rest is due to end; the widget counts DOWN to it. Nil while working.
@@ -43,30 +51,33 @@ public struct LiftActivityAttributes: ActivityAttributes {
         /// The frozen set/rest clock while paused. Nil while the widget can render a live timer.
         public var heldClockSeconds: Int?
 
-        public init(isResting: Bool, isPaused: Bool, isReady: Bool,
-                    exercise: String, status: String, detail: String?, progress: String,
-                    setsDone: Int, setsPlanned: Int, stageStartedAt: Date,
-                    restEndsAt: Date?, heldClockSeconds: Int?) {
+        /// Both call shapes compile: the Aura fields (pause, ready, progress) and upstream's (bpm, next)
+        /// each default when the other side's caller does not pass them.
+        public init(isResting: Bool, isPaused: Bool = false, isReady: Bool = false,
+                    programName: String = "", exercise: String, status: String, detail: String?,
+                    progress: String = "",
+                    setsDone: Int = 0, setsPlanned: Int = 0, bpm: Int? = nil, next: String = "",
+                    stageStartedAt: Date, restEndsAt: Date?, heldClockSeconds: Int? = nil) {
             self.isResting = isResting
             self.isPaused = isPaused
             self.isReady = isReady
+            self.programName = programName
             self.exercise = exercise
             self.status = status
             self.detail = detail
             self.progress = progress
             self.setsDone = setsDone
             self.setsPlanned = setsPlanned
+            self.bpm = bpm
+            self.next = next
             self.stageStartedAt = stageStartedAt
             self.restEndsAt = restEndsAt
             self.heldClockSeconds = heldClockSeconds
         }
     }
 
-    /// The program's name, fixed for the life of the session.
-    public var programName: String
-
-    public init(programName: String) {
-        self.programName = programName
-    }
+    /// Nothing is fixed for the life of a session: everything the banner shows can change mid-session and
+    /// travels in `ContentState`.
+    public init() {}
 }
 #endif

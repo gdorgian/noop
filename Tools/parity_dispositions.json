@@ -1,4 +1,305 @@
 {
   "schema_version": 1,
-  "dispositions": []
+  "dispositions": [
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandImport/Sources/StrandImport/HealthWriteback.swift::openNightMarginSeconds",
+      "identity_sha256": "7f2231de6355adc6b5897cb6f0addc8b708bf08dd0277f465dcb794f4fd29b2a",
+      "platform": "swift",
+      "rationale": "Used only by the iOS HealthKitBridge write-back to hold a still-open night out of Apple Health; the Android Health Connect exporter does not call it (this PR is Swift-only)."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandImport/Sources/StrandImport/HealthWriteback.swift::openNightMaxHoldSeconds",
+      "identity_sha256": "a497335d1554bb0604aa79b1ae05fedaca8d0a812141c038e7e5151d2a8348e5",
+      "platform": "swift",
+      "rationale": "Used only by the iOS HealthKitBridge write-back to hold a still-open night out of Apple Health; the Android Health Connect exporter does not call it (this PR is Swift-only)."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandImport/Sources/StrandImport/HealthWriteback.swift::nightIsStillOpen/3#1",
+      "identity_sha256": "88a1bdfb13c227664f15d962fb6d41a5733fb4c2956e445e42c5e4d495bde0cb",
+      "platform": "swift",
+      "rationale": "Used only by the iOS HealthKitBridge write-back to hold a still-open night out of Apple Health; the Android Health Connect exporter does not call it (this PR is Swift-only)."
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/IntelligenceEngine.kt::computeHabitualSleep/7#1",
+      "identity_sha256": "0f4c9098de75c40d0ed87c6ad6111d259d664e632fe4b34ea7c77fef57fe8484",
+      "platform": "kotlin",
+      "rationale": "Swift IntelligenceEngine.computeHabitualSleep(finishedBefore:) has the same role in the excluded app layer; this disposition does not assert behavioral parity.",
+      "twin_path": "Strand/Data/IntelligenceEngine.swift"
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/IntelligenceEngine.kt::finishedSessions/2#1",
+      "identity_sha256": "8f5d3811a0bc62b7a45c7faadd3a96ba6cd93609fdd023d540b41d19fff6a5d7",
+      "platform": "kotlin",
+      "rationale": "The Swift finished-nights filter is inline in the excluded app layer; the Kotlin function is a separate test seam, so this records a role twin only.",
+      "twin_path": "Strand/Data/IntelligenceEngine.swift"
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/PhysiologicalStepCycleEngine.kt::loadCacheKey/7#1",
+      "identity_sha256": "d975e64811f395077839f35c6797284bac55e6ad3e3b5e049bf826d69d5a2131",
+      "platform": "kotlin",
+      "rationale": "The Swift cycle load cache key is built inline in the excluded app layer; this points to its role twin without claiming byte identity.",
+      "twin_path": "Strand/Data/DayCycleIntelligenceIntegration.swift"
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/data/WhoopRepository.kt::hrUnionFingerprint/3#1",
+      "identity_sha256": "c6879bd0c72d81c059254b85d6826258e1cf3cd97bf81e26bf013559678f415b",
+      "platform": "kotlin",
+      "rationale": "Swift Repository.hrFingerprintUnion computes the same repository witness role, but the implementations encode the facts differently and have no byte-identity contract.",
+      "twin_path": "Strand/Data/Repository.swift"
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-property",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/AnalyticsModels.kt::cacheKey@property#1",
+      "identity_sha256": "44346ba83a628dc53e4f7eb6757d3ece1d98c77c612653df659182d5aceeecf0",
+      "platform": "kotlin",
+      "rationale": "Twin of the Swift UserProfile.cacheKey, which lives with the Swift UserProfile in Packages/StrandAnalytics/Sources/StrandAnalytics/WorkoutDetector.swift; the two types sit in differently named files, so the ledger cannot pair them."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-property",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/WorkoutDetector.swift::cacheKey@property#1",
+      "identity_sha256": "5c7b107d76b7c42ea4a0deb3bbd2bd62dc3d5f267b276af2f521502add2c73a2",
+      "platform": "swift",
+      "rationale": "Twin of the Kotlin UserProfile.cacheKey in android/app/src/main/java/com/noop/analytics/AnalyticsModels.kt; the two types sit in differently named files, so the ledger cannot pair them."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-property",
+      "identity": "swift\u0000Packages/OuraProtocol/Sources/OuraProtocol/OuraEvents.swift::channel@property#1",
+      "identity_sha256": "ecbc737217fc7e501b46226d4560ed9f23d2bd636faeef2f5e59e0a7274821e1",
+      "platform": "swift",
+      "rationale": "Twin of the Kotlin `val OuraSpO2.channel` in android/app/src/main/java/com/noop/oura/OuraEvents.kt. Both are one-line extension properties over OuraSpO2 returning OuraSpO2Channel, added together in the same change. Kotlin declares its copy as a TOP-LEVEL extension property with a dotted receiver, which the ledger's Kotlin property scan does not index, so the Swift side reads as one-sided. The pair is real; only one half is visible to the inventory."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/data/WhoopDao.kt::whoop4RrIntervals/4#1",
+      "identity_sha256": "da665b8f8238c9cabc98bb7e25167413ecad0f21f798a04f2097186f9d708a45",
+      "platform": "kotlin",
+      "rationale": "Room @Query DAO method. The Swift store issues the equivalent SQL inline in WhoopStore Reads.swift / StreamStore.swift rather than through a DAO, so there is no Swift function to pair with; its WHOOP 5 siblings whoop5RrIntervals, hasWhoop5RrSource and promoteWhoop5RrSource are one-sided for the same architectural reason."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/data/WhoopDao.kt::hasWhoop4HistoricalRrSource/1#1",
+      "identity_sha256": "32e0dc3afb5c5dd2f583841b87897e5ab0d5a8803a3ca1a9f5b9950920573d72",
+      "platform": "kotlin",
+      "rationale": "Room @Query DAO method. The Swift store issues the equivalent SQL inline in WhoopStore Reads.swift / StreamStore.swift rather than through a DAO, so there is no Swift function to pair with; its WHOOP 5 siblings whoop5RrIntervals, hasWhoop5RrSource and promoteWhoop5RrSource are one-sided for the same architectural reason."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/data/WhoopDao.kt::promoteWhoop4HistoricalRr/5#1",
+      "identity_sha256": "2269e39a758e4a86bd7f600117d4327370ad9e9fdd894a4e59ec77210419aa1e",
+      "platform": "kotlin",
+      "rationale": "Room @Query DAO method. The Swift store issues the equivalent SQL inline in WhoopStore Reads.swift / StreamStore.swift rather than through a DAO, so there is no Swift function to pair with; its WHOOP 5 siblings whoop5RrIntervals, hasWhoop5RrSource and promoteWhoop5RrSource are one-sided for the same architectural reason."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/data/WhoopDao.kt::flagWhoop5RrFill/3#1",
+      "identity_sha256": "3714e95a3d89ac54d74060d037e14dc39a0c6d2219ecb01065471573d7db12bc",
+      "platform": "kotlin",
+      "rationale": "Room @Query DAO method (#2371). The Swift store runs the same statement inline in WhoopStore StreamStore.swift rather than through a DAO, so there is no Swift function to pair with; the SQL itself is paired, WHOOP5_RR_FILL_FLAG_SQL with WhoopStore.whoop5RrFillFlagSQL, and pinned by the same literal on both platforms."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/data/WhoopDatabase.kt::migrate/1#39",
+      "identity_sha256": "81b9152e7189625064e51189ec7be31e1d1f57662438fe54df4c1f779a6bbe48",
+      "platform": "kotlin",
+      "rationale": "Room Migration.migrate override of MIGRATION_40_41 (#2371). GRDB registers each migration as a closure (`v47-rr-whoop5-fill`), so there is no Swift function to pair with; the two are paired by the migration identifiers pinned in schema_oracle.json and by the SQL constant pair WHOOP5_RR_FILL_MIGRATION_SQL / WhoopStore.whoop5RrFillMigrationSQL."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/data/WhoopDao.kt::WHOOP4_RR_INTERVALS_SQL",
+      "identity_sha256": "f513da8ff8ce9b2a9c8b30b042e82d92821c81bc42612acae1992fe4055f6ddc",
+      "platform": "kotlin",
+      "rationale": "SQL text for a Room @Query, which must be a compile-time constant string and so cannot be inlined at the DAO method. The Swift store writes the same statement inline in WhoopStore Reads.swift / StreamStore.swift, so there is no Swift constant to pair with, exactly as for the existing WHOOP5_RR_INTERVALS_SQL and PROMOTE_WHOOP5_RR_SOURCE_SQL siblings."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/data/WhoopDao.kt::PROMOTE_WHOOP4_HISTORY_SQL",
+      "identity_sha256": "21eb9deea3ff8019c9eff121cf7aa39aee01ee6d390292d65bb02aa667d3a534",
+      "platform": "kotlin",
+      "rationale": "SQL text for a Room @Query, which must be a compile-time constant string and so cannot be inlined at the DAO method. The Swift store writes the same statement inline in WhoopStore Reads.swift / StreamStore.swift, so there is no Swift constant to pair with, exactly as for the existing WHOOP5_RR_INTERVALS_SQL and PROMOTE_WHOOP5_RR_SOURCE_SQL siblings."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NightStandDown.swift::band/4#1",
+      "identity_sha256": "279cb2405461c4c49d765ff8d0bc275876d35952878bbbff5b71d40f1fc602b7",
+      "platform": "swift",
+      "rationale": "Consumed only by the Apple OuraLiveSource screen-off live-HR suspend (Experimental \"All-day heart rate & HRV\"), to stand the daytime-HR hold down for the learned night instead of for every screen-off. Android's OuraLiveSource.kt has no screen-off suspend (#1546), so there is nothing for a Kotlin twin to gate; per review, Android stays without it until that suspend exists, at which point this becomes a twin."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NightStandDown.swift::contains/2#1",
+      "identity_sha256": "b547fe41ab8a4ae2ee20c442b15483dd1b57a3e281b7f464b3c0be65565a13d9",
+      "platform": "swift",
+      "rationale": "Consumed only by the Apple OuraLiveSource screen-off live-HR suspend (Experimental \"All-day heart rate & HRV\"), to stand the daytime-HR hold down for the learned night instead of for every screen-off. Android's OuraLiveSource.kt has no screen-off suspend (#1546), so there is nothing for a Kotlin twin to gate; per review, Android stays without it until that suspend exists, at which point this becomes a twin."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NightStandDown.swift::describe/1#1",
+      "identity_sha256": "3cb014f4bc535d81415fa967a7cd27f25d6e14360ebe0529513231e384c6d38c",
+      "platform": "swift",
+      "rationale": "Consumed only by the Apple OuraLiveSource screen-off live-HR suspend (Experimental \"All-day heart rate & HRV\"), to stand the daytime-HR hold down for the learned night instead of for every screen-off. Android's OuraLiveSource.kt has no screen-off suspend (#1546), so there is nothing for a Kotlin twin to gate; per review, Android stays without it until that suspend exists, at which point this becomes a twin."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NightStandDown.swift::describeSecOfDay/1#1",
+      "identity_sha256": "3e064b9ae741e558ad649c0e57a597cea6a81319faeb00591be05d06a5f5d773",
+      "platform": "swift",
+      "rationale": "Consumed only by the Apple OuraLiveSource screen-off live-HR suspend (Experimental \"All-day heart rate & HRV\"), to stand the daytime-HR hold down for the learned night instead of for every screen-off. Android's OuraLiveSource.kt has no screen-off suspend (#1546), so there is nothing for a Kotlin twin to gate; per review, Android stays without it until that suspend exists, at which point this becomes a twin."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NightStandDown.swift::floorMod/2#1",
+      "identity_sha256": "d984745dfee3f61d2c32f9bb8bcebd3303ae5c8b358a1efa4dac46273ddff4ab",
+      "platform": "swift",
+      "rationale": "Consumed only by the Apple OuraLiveSource screen-off live-HR suspend (Experimental \"All-day heart rate & HRV\"), to stand the daytime-HR hold down for the learned night instead of for every screen-off. Android's OuraLiveSource.kt has no screen-off suspend (#1546), so there is nothing for a Kotlin twin to gate; per review, Android stays without it until that suspend exists, at which point this becomes a twin."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NightStandDown.swift::leadSeconds",
+      "identity_sha256": "cd0107095c358d0068b84578c039015ac9814de60b60bf09adae07ac101c3882",
+      "platform": "swift",
+      "rationale": "Consumed only by the Apple OuraLiveSource screen-off live-HR suspend (Experimental \"All-day heart rate & HRV\"), to stand the daytime-HR hold down for the learned night instead of for every screen-off. Android's OuraLiveSource.kt has no screen-off suspend (#1546), so there is nothing for a Kotlin twin to gate; per review, Android stays without it until that suspend exists, at which point this becomes a twin."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NightStandDown.swift::tailSeconds",
+      "identity_sha256": "c256516b6fd590fb27b3d954aad36a6ae72f1c47681e40d06d0cbf08e3815506",
+      "platform": "swift",
+      "rationale": "Consumed only by the Apple OuraLiveSource screen-off live-HR suspend (Experimental \"All-day heart rate & HRV\"), to stand the daytime-HR hold down for the learned night instead of for every screen-off. Android's OuraLiveSource.kt has no screen-off suspend (#1546), so there is nothing for a Kotlin twin to gate; per review, Android stays without it until that suspend exists, at which point this becomes a twin."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-file",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NightStandDown.swift",
+      "identity_sha256": "c81cc7100101d3ac1d81e244330c66815450899d6194627ad8f0cbfeb48dee5f",
+      "platform": "swift",
+      "rationale": "Consumed only by the Apple OuraLiveSource screen-off live-HR suspend (Experimental \"All-day heart rate & HRV\"), to stand the daytime-HR hold down for the learned night instead of for every screen-off. Android's OuraLiveSource.kt has no screen-off suspend (#1546), so there is nothing for a Kotlin twin to gate; per review, Android stays without it until that suspend exists, at which point this becomes a twin."
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/IntelligenceEngine.kt::analyzeRecent/27#1",
+      "identity_sha256": "3280203fe24402b51232335222f1d77bae103a6528be46084bf03b20f28f0213",
+      "platform": "kotlin",
+      "rationale": "The added preserveUnscoredHistory argument matches the role of analyzeRecent in the excluded Swift app layer. This records the new Kotlin orchestration signature, not a byte-identity claim.",
+      "twin_path": "Strand/Data/IntelligenceEngine.swift"
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/IntelligenceEngine.kt::readDaySkinAndWristOff/12#1",
+      "identity_sha256": "165f046d3448f32d70497da9edc0fe6e9f34d683db81cc2c391e08fbe8212ddb",
+      "platform": "kotlin",
+      "rationale": "The additional HR input feeds offWristIntervals during Android stream preparation; Swift performs the corresponding read and wear reconciliation inline in the excluded app-layer analyzeRecent.",
+      "twin_path": "Strand/Data/IntelligenceEngine.swift"
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/IntelligenceEngine.kt::runEffortRescoreIfNeeded/9#1",
+      "identity_sha256": "0e028f551fdbdfa6a818412f13a977aec4f256e21dedc0db9980aba90285a38d",
+      "platform": "kotlin",
+      "rationale": "The shared repair delegates to the scorer with cached-only preservation. Swift runEffortRescoreIfNeeded/runHistoryRepairIfNeeded perform that role in the excluded app layer; signatures differ by platform dependencies.",
+      "twin_path": "Strand/Data/IntelligenceEngine.swift"
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/IntelligencePersistence.kt::byScoredDay/1#1",
+      "identity_sha256": "d82c9c2042de9c77810f6150fbb89b34cd36c4f4d7fae92cb7ee154b70bbe61a",
+      "platform": "kotlin",
+      "rationale": "Swift groups daily metrics, metric points and provenance by day inline in app-layer analyzeRecent. Kotlin extracts that persistence preparation as a test seam; this is a role twin, not a function parity claim.",
+      "twin_path": "Strand/Data/IntelligenceEngine.swift"
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/IntelligencePersistence.kt::historyRepairIsPending/2#1",
+      "identity_sha256": "b553cdaa03042d3839107a0526e2b89a6af987e0bd38e01cb883d961d004b3fd",
+      "platform": "kotlin",
+      "rationale": "Swift IntelligenceEngine.historyRepairIsPending has the same repair-flag gate in the excluded app layer; both have direct truth-table coverage.",
+      "twin_path": "Strand/Data/IntelligenceEngine.swift"
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/IntelligencePersistence.kt::persistComputedWindow/3#1",
+      "identity_sha256": "2985c2276b70812d00a4f21b31ecc7cc0f96091445a64d26e26a85bdef5bf600",
+      "platform": "kotlin",
+      "rationale": "Swift app-layer analyzeRecent performs the conditional per-day persistence loop inline. Kotlin extracts it to keep the instrumented scoring coroutine below the bytecode budget.",
+      "twin_path": "Strand/Data/IntelligenceEngine.swift"
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/IntelligencePersistence.kt::persistInto/1#1",
+      "identity_sha256": "58d500dc560ff882ce71c532bdc52c92e2652ea6b08e1351e678f9b8b1c52b08",
+      "platform": "kotlin",
+      "rationale": "This Kotlin extension dispatches a computed window to repository persistence. The corresponding persistComputedScores dispatch is inline in the excluded Swift app-layer analyzeRecent; this records its architectural role.",
+      "twin_path": "Strand/Data/IntelligenceEngine.swift"
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-file",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/ProfileWeightSync.kt",
+      "identity_sha256": "66dd123a53a3c929025a41accf93278dad5acc505c0a731791e09818421ff838",
+      "platform": "kotlin",
+      "rationale": "Resolver file for the Android-only 'Use weight from Health Connect' profile sync. Apple platforms have no Health Connect, so the opt-in 'Use weight from Health Connect' profile sync exists only on Android and there is no Swift counterpart to pair with, now or later."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/ProfileWeightSync.kt::newest/1#1",
+      "identity_sha256": "64f21dac4e072f7dbe397260765ac71a0b9998556eede445c6ae7284b0363088",
+      "platform": "kotlin",
+      "rationale": "Picks the newest imported Health Connect weight for both the profile sync and the Today Weight tile. Apple platforms have no Health Connect, so the opt-in 'Use weight from Health Connect' profile sync exists only on Android and there is no Swift counterpart to pair with, now or later."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/analytics/ProfileWeightSync.kt::captionDate/2#1",
+      "identity_sha256": "28fa51ec52e1a418a0c8bd500cceb13c529cf8dc7e8bbe290003fe97602e6dff",
+      "platform": "kotlin",
+      "rationale": "Formats the reading's day for the Settings caption of the Health Connect weight sync. Apple platforms have no Health Connect, so the opt-in 'Use weight from Health Connect' profile sync exists only on Android and there is no Swift counterpart to pair with, now or later."
+    },
+    {
+      "type": "out_of_scope_twin",
+      "kind": "add-unpaired-function",
+      "identity": "kotlin\u0000android/app/src/main/java/com/noop/data/WhoopRepository.kt::importedDailyUnionFlow/3#1",
+      "identity_sha256": "a1b8ac6c0842e6925e91e66bfb292e599945dff1dcb8e5eb3080e17951c16e21",
+      "platform": "kotlin",
+      "rationale": "Swift Repository.refresh reads the same imported daily union (unionDailyMetrics) in the excluded app layer and hands it, still apart from the computed union, to ChargeBaselines.resolve (#2525); this disposition does not assert behavioral parity.",
+      "twin_path": "Strand/Data/Repository.swift"
+    }
+  ]
 }

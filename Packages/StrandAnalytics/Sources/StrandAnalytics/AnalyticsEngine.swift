@@ -18,23 +18,32 @@ public enum AnalyticsEngine {
     /// Pair the strap's WRIST_OFF/WRIST_ON events into off-wrist `[start, end)` intervals for the sleep
     /// detector's fractional wear filter (#500; design credited to j0b-dev's #504). Each WRIST_OFF opens
     /// an interval that closes at the next WRIST_ON, or at `windowEnd` if the strap is still off at the
-    /// end of the read window. Events need not be pre-sorted; kinds are formatted "NAME(n)" (e.g.
+    /// end of the read window. An unmatched tail may end earlier when sustained valid HR resumes;
+    /// explicit OFF/ON pairs are never shortened. Events need not be pre-sorted; kinds are formatted "NAME(n)" (e.g.
     /// "WRIST_OFF(10)"), matched by prefix. Repeated OFFs/ONs without a partner are coalesced.
-    public static func offWristIntervals(events: [WhoopEvent], windowEnd: Int) -> [(start: Int, end: Int)] {
+    /// Kotlin twin: `AnalyticsEngine.offWristIntervals`.
+    public static func offWristIntervals(events: [WhoopEvent], windowEnd: Int,
+                                         hr: [HRSample] = []) -> [(start: Int, end: Int)] {
         let wear = events
             .filter { $0.kind.hasPrefix("WRIST_OFF") || $0.kind.hasPrefix("WRIST_ON") }
             .sorted { $0.ts < $1.ts }
         var intervals: [(start: Int, end: Int)] = []
         var offStart: Int? = nil
-        for e in wear {
+        var lastOff: Int? = nil
+        for e in wear where e.ts <= windowEnd {
             if e.kind.hasPrefix("WRIST_OFF") {
-                if offStart == nil { offStart = e.ts }            // ignore repeated OFFs
+                if offStart == nil { offStart = e.ts }
+                lastOff = e.ts // a repeated OFF invalidates evidence before it
             } else {                                              // WRIST_ON closes an open off-wrist span
                 if let s = offStart, e.ts > s { intervals.append((start: s, end: e.ts)) }
                 offStart = nil
             }
         }
-        if let s = offStart, windowEnd > s { intervals.append((start: s, end: windowEnd)) }
+        if let s = offStart, windowEnd > s {
+            let end = WristWearRecovery.firstSustainedHR(hr, after: lastOff ?? s, before: windowEnd)
+                ?? windowEnd
+            if end > s { intervals.append((start: s, end: end)) }
+        }
         return intervals
     }
 
@@ -110,6 +119,10 @@ public enum AnalyticsEngine {
         /// so the caller persists NULL there rather than a fabricated array. Feeds the H7 re-onset CONFIRM
         /// guard on the NEXT pass; never overrides the derived hypnogram. Empty on a WHOOP 4.0. (#175)
         public let sessionSleepStateByStart: [Int: [Int]]
+        /// The bounds of the day's MAIN-night group, the SAME `mainGroup` the sleep aggregates and the
+        /// refused-main-night HRV rule use; empty when the day has no main night. Exposed so the `hrv diag`
+        /// line can describe the night the #1118 gate actually judged instead of re-deriving it (#2425).
+        public let mainNightBlocks: [SleepStageTotals.NightBlock]
 
         public init(daily: DailyMetric, sleepSessions: [SleepSession],
                     cachedSleep: [CachedSleepSession], workouts: [ExerciseSession],
@@ -122,8 +135,10 @@ public enum AnalyticsEngine {
                     sessionSleepStateByStart: [Int: [Int]] = [:],
                     chargeDrivers: [ChargeDriver] = [],
                     skinTempRelative: SkinTempRelative? = nil,
-                    detectionFunnel: WorkoutDetector.DetectionFunnel? = nil) {
+                    detectionFunnel: WorkoutDetector.DetectionFunnel? = nil,
+                    mainNightBlocks: [SleepStageTotals.NightBlock] = []) {
             self.daily = daily; self.sleepSessions = sleepSessions
+            self.mainNightBlocks = mainNightBlocks
             self.cachedSleep = cachedSleep; self.workouts = workouts
             self.detectionFunnel = detectionFunnel
             self.recovery = recovery; self.strain = strain
@@ -699,7 +714,13 @@ public enum AnalyticsEngine {
         // call site" a scattered filter invites.
         let physiologyOnly = matched.filter { !$0.hrOnly }
         let physiologySessions = physiologyOnly.isEmpty ? matched : physiologyOnly
-        let restingHRDaily = physiologySessions.compactMap { $0.restingHR }.min()
+        // #2522: use the gated lowest five-minute bin from the primary session, not its whole-session
+        // mean. Choosing the session first preserves #2358's nap protection; a shorter nap must not
+        // supply the daily RHR when the main night has no HR. #804's device-provided value still wins.
+        let primarySession = physiologySessions.max(by: { ($0.end - $0.start) < ($1.end - $1.start) })
+        let providedPrimaryRHR = primarySession
+            .flatMap { p in providedSleep.first(where: { $0.start == p.start && $0.end == p.end })?.restingHR }
+        let restingHRDaily: Int? = providedPrimaryRHR ?? primarySession?.restingHR
         // Daily avg HRV = in-bed-weighted mean of per-session avg HRV.
         let avgHRVDaily: Double? = {
             if deepHrvWindow {
@@ -715,7 +736,21 @@ public enum AnalyticsEngine {
                 }
                 return deep.isEmpty ? nil : deep.reduce(0, +) / Double(deep.count)
             }
-            let pairs = physiologySessions.compactMap { s -> (Double, Double)? in
+            // A main night REFUSED by the #1118 over-count gate is not replaced by the day's naps. The
+            // day-wide pool below rests on "the main overnight dominates" (see `physiologySessions`), which
+            // holds only while that night has a value: once the gate makes it nil it carries zero weight,
+            // and a 26-minute nap became 100 % of the day's HRV and was folded into the baseline as a
+            // night. So when a main-group session's HRV is nil BECAUSE the gate refused it, only the main
+            // group is pooled, and the day holds (nil) unless another fragment of that night measured
+            // cleanly. A main night that simply banked no R-R is not refused, so #1884's fill-in from the
+            // day's other sessions is unchanged. Byte-parity twin of Kotlin `avgHRVDaily`.
+            let mainNightRefused = mainGroup.contains { s in
+                s.avgHRV == nil && SleepStager.sessionHrvOverCounted(start: s.start, end: s.end, rr: rr)
+            }
+            let hrvPool = mainNightRefused
+                ? physiologySessions.filter { p in mainGroup.contains { $0.start == p.start && $0.end == p.end } }
+                : physiologySessions
+            let pairs = hrvPool.compactMap { s -> (Double, Double)? in
                 s.avgHRV.map { ($0, Double(s.end - s.start)) }
             }
             guard !pairs.isEmpty else { return nil }
@@ -890,6 +925,28 @@ public enum AnalyticsEngine {
         let strain = StrainScorer.strain(dayHr ?? hr, maxHR: effMaxHR, restingHR: restForStrain,
                                          method: effortMethod, sex: profile.sex,
                                          diag: strainDiag, day: day)
+        // #2438 step 0 asks two things of a contributed log: whether the day was scored against the
+        // user's own setting or against the age formula, and how far the day's own heart rate ran above
+        // that. The `effort score` line above answers neither — it collapses override and Tanaka into
+        // one word, and never reports what the day reached. The branch is only visible HERE, because
+        // `strain` is handed an HRmax with its provenance already gone. Built only when a sink is
+        // attached, and it changes no score.
+        if let strainDiag {
+            let hrForPeak = dayHr ?? hr
+            strainDiag(StrainScorer.dayCalibrationLine(
+                // The value the day was actually scored against, which for an age-less profile is the
+                // one `strain` substitutes internally rather than nil. Reporting nil there would put
+                // this line in direct contradiction with the `effort score` line above it, which prints
+                // that substituted number, about the same day.
+                day: day, hrmax: effMaxHR ?? Double(StrainScorer.defaultMaxHR()),
+                hrmaxSource: maxHROverride != nil ? "override" : (profile.age > 0 ? "tanaka" : "default"),
+                tanaka: profile.age > 0 ? StrainScorer.tanakaHRmax(age: profile.age) : nil,
+                observedPeak: hrForPeak.max(by: { $0.bpm < $1.bpm }).map { Double($0.bpm) },
+                restingHR: restForStrain)
+                // The raw peak is usually one isolated sample on a ring; this is the value held (#2438).
+                + StrainScorer.sustainedPeakField(StrainScorer.sustainedPeak(hrForPeak))
+                + StrainScorer.sustainedPeakSpanField(StrainScorer.sustainedPeakSpan(hrForPeak)))
+        }
 
         // ── Workouts ──────────────────────────────────────────────────────────
         // Detect over the full CALENDAR day (dayHr/dayGravity) when the caller supplies it, so a
@@ -1069,7 +1126,31 @@ public enum AnalyticsEngine {
                          sessionSleepStateByStart: sessionSleepStateByStart,
                          chargeDrivers: chargeDrivers,
                          skinTempRelative: skinTempRelative,
-                         detectionFunnel: detectionFunnel)
+                         detectionFunnel: detectionFunnel,
+                         mainNightBlocks: mainGroup.map { SleepStageTotals.NightBlock(start: $0.start, end: $0.end) })
+    }
+
+    /// The R-R rows the always-on `hrv diag` line describes (#2425). Pure. Byte-parity twin of Kotlin
+    /// `AnalyticsEngine.hrvDiagnosticRows`.
+    ///
+    /// The line used to pool every sleep session of the day and divide their beat-time by first-to-last
+    /// beat, so the hours BETWEEN a night and a nap entered the denominator. On a real day whose main night
+    /// the #1118 gate refused at 1.31 coverage, the pooled line printed `coverage=0.48
+    /// rrIntegrity=underCovered`: the log said "not an over-count" about a night refused for one, and the
+    /// HRV card's over-count flag, read from the same verdict, agreed with the log rather than the gate.
+    ///
+    /// So the line now reads the MAIN-night group (`DayResult.mainNightBlocks`, the same group scoring uses)
+    /// over the gate's own inclusive `[start, end]` window. On a one-block night that is exactly the set of
+    /// beats `SleepStager.sessionHrvOverCounted` judged, so the over-count half of the verdict cannot
+    /// disagree with the gate. A bridged multi-fragment night still spans its short bridge gap, which can
+    /// only pull coverage DOWN. A day with no main night keeps the old pooled set (`fallback`), since there
+    /// is no night to describe.
+    public static func hrvDiagnosticRows(_ rr: [RRInterval], mainNight: [SleepStageTotals.NightBlock],
+                                         fallback: [SleepStageTotals.NightBlock]) -> [RRInterval] {
+        if mainNight.isEmpty {
+            return rr.filter { r in fallback.contains { r.ts >= $0.start && r.ts < $0.end } }
+        }
+        return rr.filter { r in mainNight.contains { r.ts >= $0.start && r.ts <= $0.end } }
     }
 
     // MARK: - Rest composite (Charge/Effort/Rest)

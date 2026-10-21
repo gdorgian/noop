@@ -5,6 +5,12 @@ import StrandDesign
 
 /// Four presentations of one timestamped sensor sample. No inferred trace or stale figure.
 struct NOOPLiveActivity: Widget {
+    /// The heart rate to draw: none once iOS has marked the banner stale (upstream 12.0). Each push is fresh
+    /// for `LiveActivityController.staleAfter`, so a stale banner means the readings stopped.
+    static func shownBpm(_ context: ActivityViewContext<NOOPActivityAttributes>) -> Int? {
+        context.isStale ? nil : context.state.bpm
+    }
+
     private let blue = Color(.sRGB, red: 23 / 255, green: 162 / 255, blue: 230 / 255, opacity: 1)
     private let amber = Color(.sRGB, red: 242 / 255, green: 180 / 255, blue: 92 / 255, opacity: 1)
     private let quiet = Color(.sRGB, red: 127 / 255, green: 138 / 255, blue: 133 / 255, opacity: 1)

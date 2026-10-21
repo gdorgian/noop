@@ -112,6 +112,9 @@ struct RootTabView: View {
             navigation.push(.data)
         case .sleep:
             navigation.reset(to: .rest)
+        // Upstream 12.0's Alarms entry; Aura draws the alarm as Rest → Tonight → alarm.
+        case .alarms:
+            navigation.enter(.alarm, from: .tonight)
         // Upstream's coach route, raised by the Today launcher sheet and the scheduled-brief
         // notification. The Aura shell answers it the same way its own coach notifications do.
         case .coach:

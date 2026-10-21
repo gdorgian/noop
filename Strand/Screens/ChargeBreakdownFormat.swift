@@ -254,6 +254,31 @@ enum ChargeBreakdownFormat {
     }
 }
 
+/// The same legacy R-R explanation on classic and Liquid Today.
+struct ChargeLegacyRRGapNote: View {
+    var body: some View {
+        NoopCard(padding: 14, tint: StrandPalette.chargeColor) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "waveform.path.ecg")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(StrandPalette.chargeColor)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ChargeBreakdownFormat.chargeLegacyRRGapTitle)
+                        .font(StrandFont.headline)
+                        .foregroundStyle(StrandPalette.textPrimary)
+                    Text(ChargeBreakdownFormat.chargeLegacyRRGapDetail)
+                        .font(StrandFont.subhead)
+                        .foregroundStyle(StrandPalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ChargeBreakdownFormat.chargeLegacyRRGapAccessibility)
+    }
+}
+
 // MARK: - A3: confidence dot + tier tag pill
 
 /// A small confidence dot + tier tag pill (CALIBRATING / EST. / REL.) surfaced on score tiles and the

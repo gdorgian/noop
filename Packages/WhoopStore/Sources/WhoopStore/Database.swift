@@ -496,7 +496,12 @@ extension WhoopStore {
                 t.column("fetchedAt", .integer).notNull()    // unix seconds
                 t.primaryKey(["deviceId", "endpoint", "documentId"])
             }
-            // Per-endpoint reads scan (deviceId, endpoint) then walk day in order.
+            // Serves the (deviceId, endpoint) lookup. It no longer serves the ORDER BY: `ouraRaw`
+            // sorts by (fetchedAt, rowid) because page producers leave `day` nil, so an all-nil
+            // `day` made the old `ORDER BY day ASC` degenerate to whatever order SQLite returned.
+            // The trailing `day` column stays useful for day-keyed lookups; the sort happens after
+            // the scan. An index on (deviceId, endpoint, fetchedAt) is the change to make if this
+            // archive ever grows enough for that sort to matter.
             try db.create(index: "idx_ouraRaw_device_endpoint_day",
                           on: "ouraRaw", columns: ["deviceId", "endpoint", "day"])
         }
@@ -1170,6 +1175,13 @@ extension WhoopStore {
             // Replaying one session in order.
             try db.create(index: "idx_liftSet_session_ord", on: "liftSet",
                           columns: ["sessionId", "ord"], options: [.ifNotExists])
+        }
+        // v47 (#2371): mark the WHOOP 5 500 ms fill beats already stored, with the rule `insert` applies to
+        // every new batch (`WhoopStore.whoop5RrFillFlagSQL`). Data only, no schema change, and a MARK in
+        // the v35 form, never a delete: the rows stay on disk. Twin of Room
+        // MIGRATION_40_41.
+        migrator.registerMigration("v47-rr-whoop5-fill") { db in
+            try db.execute(sql: WhoopStore.whoop5RrFillMigrationSQL)
         }
         return migrator
     }

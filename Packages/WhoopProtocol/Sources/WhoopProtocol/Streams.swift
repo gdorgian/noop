@@ -37,7 +37,8 @@ public enum StandardHRContact: String, Equatable, Codable, Sendable {
 /// The sensor channel or transport that produced an R-R interval.
 ///
 /// WHOOP 5 exposes one beat train over multiple transports; codes 5–7 distinguish those observations.
-/// WHOOP 4 and unlabelled legacy rows keep nil. An Oura ring has more than one optical channel:
+/// WHOOP 4 type-40 realtime and standard-BLE rows use codes 9 and 10; legacy data keeps nil.
+/// Its type-47 historical rows use code 8. An Oura ring has more than one optical channel:
 /// the green-quality tag (0x80) and the SpO2 tag (0x6E) both
 /// decode to R-R and both were stored, so the table held roughly TWO complete copies of every night —
 /// not duplicate rows to de-duplicate, but the SAME heartbeats measured twice. Labelling the channel is
@@ -70,15 +71,25 @@ public enum RRSourceChannel: Int, Equatable, Codable, Sendable, CaseIterable {
     case whoop5Realtime = 6
     /// WHOOP 5 standard BLE 0x2A37 live transport, already converted to milliseconds.
     case whoop5Standard = 7
+    /// WHOOP 4.0 type-47 historical R-R intervals. The 4.0 standard BLE feed has no source label,
+    /// so this distinguishes the clock-anchored offload from the overlapping live feed at read time.
+    case whoop4Historical = 8
+    /// WHOOP 4.0 type-40 live R-R intervals, timestamped from the strap's realtime record clock.
+    case whoop4Realtime = 9
+    /// WHOOP 4.0 standard BLE 0x2A37 R-R intervals, timestamped on notification receipt.
+    case whoop4Standard = 10
 
     public var isWhoop5Transport: Bool { (5...7).contains(rawValue) }
+
+    /// The ring's beat trains (0x80, 0x6E, 0x60, 0x44), as opposed to a WHOOP transport.
+    public var isOura: Bool { (1...4).contains(rawValue) }
 }
 
 public struct RRInterval: Equatable, Codable {
     public let ts: Int          // wall-clock unix seconds
     public let rrMs: Int
-    /// The sensor channel this beat came from, or nil when the source does not distinguish one (every
-    /// WHOOP 4 row, and legacy unlabelled rows). See `RRSourceChannel`.
+    /// The sensor channel this beat came from, or nil when the source does not distinguish one (WHOOP 4
+    /// standard BLE and legacy unlabelled rows). See `RRSourceChannel`.
     public let srcChannel: RRSourceChannel?
     /// #1008 diagnostics: this beat's EMISSION ORDER within the batch that delivered it, as stored in
     /// `rrInterval.ord`. nil on a decode (nothing has been stored yet) and on rows written before the
@@ -819,8 +830,13 @@ private func toWall(_ deviceTs: Int?, _ deviceClockRef: Int, _ wallClockRef: Int
 /// carries an HR byte but streams alongside type-40 during raw collection, so routing both
 /// would double-count HR for the same instants. Frames whose integrity verdict is negative are
 /// skipped — no row is derived from a frame that is not intact.
+///
+/// Kotlin twin: `extractStreams`. Adding `family` changed the arity on both sides at once, which
+/// unpaired them in the ledger even though they moved together; the reference says they are one
+/// contract so the next parameter does not have to rediscover that.
 public func extractStreams(_ parsed: [ParsedFrame],
-                           deviceClockRef: Int, wallClockRef: Int) -> Streams {
+                           deviceClockRef: Int, wallClockRef: Int,
+                           family: DeviceFamily? = nil) -> Streams {
     var out = Streams()
     for r in parsed {
         // `ok` is now the FULL verdict — header checksum, payload CRC32 and structural length — so it
@@ -842,7 +858,7 @@ public func extractStreams(_ parsed: [ParsedFrame],
                 // rows whose transport is unknown cannot be told apart later, and telling the live and
                 // historical trains apart is exactly what the R-R transport work needs.
                 let source = p["rr_source_channel"]?.intValue.flatMap(RRSourceChannel.init(rawValue:))
-                    ?? .whoop5Realtime
+                    ?? (family == .whoop4 ? .whoop4Realtime : family == .whoop5 ? .whoop5Realtime : nil)
                 for rr in rrs { out.rr.append(RRInterval(ts: ts, rrMs: rr, srcChannel: source)) }
             }
         case "EVENT":

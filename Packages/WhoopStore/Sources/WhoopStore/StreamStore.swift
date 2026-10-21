@@ -242,6 +242,11 @@ extension WhoopStore {
                     AND ((:source = 5 AND (srcChannel IS NULL OR srcChannel IN (6, 7)))
                       OR (:source = 7 AND (srcChannel IS NULL OR srcChannel = 6)))
                     """)
+                let promoteWhoop4History = try db.cachedStatement(sql: """
+                    UPDATE rrInterval SET srcChannel = :source, ord = :ord
+                    WHERE deviceId = :device AND ts = :ts AND rrMs = :rr AND seq = :seq
+                    AND :source = 8 AND srcChannel IS NULL
+                    """)
                 var seqByTsRr: [RRBatchSecond: [Int: Int]] = [:]
                 var ordByTs: [RRBatchSecond: Int] = [:]
                 for r in streams.rr {
@@ -266,6 +271,24 @@ extension WhoopStore {
                         try promote.execute(arguments: ["source": source.rawValue, "ord": ord,
                             "device": deviceId, "ts": r.ts, "rr": r.rrMs, "seq": seq])
                     }
+                    // The label is the CASE just matched, so name it rather than force-unwrapping the
+                    // optional the match already proved non-nil.
+                    if inserted == 0, r.srcChannel == .whoop4Historical {
+                        try promoteWhoop4History.execute(arguments: [
+                            "source": RRSourceChannel.whoop4Historical.rawValue, "ord": ord,
+                            "device": deviceId, "ts": r.ts, "rr": r.rrMs, "seq": seq])
+                    }
+                }
+                // #2371: mark the strap's 500 ms fill beats in this batch's window. The batch's heart rate
+                // was written above, so the same-second rate the rule reads is already on disk. Only a batch
+                // that carries a 500 ms WHOOP 5 beat pays for the statement. Android runs the same statement
+                // from `WhoopRepository.insertWithinTransaction`.
+                let fillTs = streams.rr.filter {
+                    $0.rrMs == 500 && ($0.srcChannel == .whoop5Historical || $0.srcChannel == .whoop5Standard)
+                }.map(\.ts)
+                if let fromTs = fillTs.min(), let toTs = fillTs.max() {
+                    try db.execute(sql: WhoopStore.whoop5RrFillFlagSQL,
+                                   arguments: ["deviceId": deviceId, "fromTs": fromTs, "toTs": toTs])
                 }
             }
             if !streams.events.isEmpty {
@@ -624,8 +647,12 @@ extension WhoopStore {
         iso.formatOptions = [.withInternetDateTime]
 
         let stamp = Int(Date().timeIntervalSince1970)
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("noop-raw-sensors-\(stamp).csv")
+        // Inside the app's own bundle-named scratch folder; see the note in AppleHealthImporter and #2446.
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent((Bundle.main.bundleIdentifier ?? "com.noopapp.noop") + ".scratch",
+                                    isDirectory: true)
+        try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let url = scratch.appendingPathComponent("raw-sensors-\(stamp).csv")
         FileManager.default.createFile(atPath: url.path, contents: nil)
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }

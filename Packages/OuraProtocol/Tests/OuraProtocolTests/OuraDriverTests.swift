@@ -28,6 +28,7 @@ final class OuraDriverTests: XCTestCase {
         let onReady = d.nextStep(after: .ready)
         XCTAssertEqual(d.phase, .authenticating)
         XCTAssertEqual(onReady.map { $0.label }, ["notify_all", "get_nonce"])
+        XCTAssertEqual(onReady[0].bytes, [0x1C, 0x01, 0x3F])   // the default mask, unchanged
         XCTAssertEqual(onReady[1].bytes, [0x2F, 0x01, 0x2B])
 
         // nonce -> submit proof.
@@ -56,6 +57,46 @@ final class OuraDriverTests: XCTestCase {
         let done = d.nextStep(after: .enableAckReceived)
         XCTAssertTrue(done.isEmpty)
         XCTAssertEqual(d.phase, .streaming)
+    }
+
+    // MARK: - Suspended connect: auth success without the live-HR triplet
+
+    /// With `liveHRWanted` cleared (the app's screen-off suspend is in force), auth success goes straight
+    /// to `.streaming` and writes NOTHING to the daytime-HR feature: no `dhr_read`, no `dhr_enable`, no
+    /// `dhr_subscribe`. The history path still works from that phase, and a stray enable ACK (the ring
+    /// answering something else on the shared sub-op) cannot restart the triplet.
+    func testAuthSuccessSkipsLiveHRTripletWhenNotWanted() {
+        let d = OuraDriver(ringGen: .gen3, authKey: key)
+        d.liveHRWanted = false
+        _ = d.nextStep(after: .ready)
+        _ = d.nextStep(after: .nonceReceived(bytes("0102030405060708090a0b0c0d0e0f")))
+
+        let onAuth = d.nextStep(after: .authCompleted(.success))
+        XCTAssertTrue(onAuth.isEmpty, "a suspended connect must not arm daytime HR")
+        XCTAssertEqual(d.phase, .streaming)
+
+        // A stray enable ACK outside `.enablingLiveHR` is inert — the triplet does not start late.
+        XCTAssertTrue(d.nextStep(after: .enableAckReceived).isEmpty)
+        XCTAssertEqual(d.phase, .streaming)
+
+        // The drain runs from `.streaming` exactly as after a full triplet.
+        let fetch = d.nextStep(after: .startHistoryFetch(cursor: 0))
+        XCTAssertEqual(fetch.map { $0.label }, ["flush_buffer", "get_events"])
+        XCTAssertEqual(d.phase, .fetchingHistory)
+        _ = d.nextStep(after: .historyCursorAdvanced(cursor: 0, moreData: false))
+        XCTAssertEqual(d.phase, .streaming)
+    }
+
+    /// The default is the historical behaviour: `liveHRWanted` is true and auth success starts the
+    /// triplet with `dhr_read` (byte-for-byte the sequence `testFullEnableSequence` pins).
+    func testLiveHRWantedDefaultsToArmingTheTriplet() {
+        let d = OuraDriver(ringGen: .gen3, authKey: key)
+        XCTAssertTrue(d.liveHRWanted)
+        _ = d.nextStep(after: .ready)
+        _ = d.nextStep(after: .nonceReceived(bytes("0102030405060708090a0b0c0d0e0f")))
+        let onAuth = d.nextStep(after: .authCompleted(.success))
+        XCTAssertEqual(onAuth.map { $0.label }, ["dhr_read"])
+        XCTAssertEqual(d.phase, .enablingLiveHR)
     }
 
     // MARK: - Honest pairing path when no key
@@ -728,5 +769,35 @@ final class OuraDriverTests: XCTestCase {
         // The normal command builders never produce a reboot/reset opcode.
         XCTAssertNotEqual(OuraCommands.getBattery().bytes.first, 0x0E)
         XCTAssertNotEqual(OuraCommands.getBattery().bytes.first, 0x1A)
+    }
+
+    // MARK: - SetNotification mask (the packed-notification A/B, OURA_PROTOCOL.md s2.3)
+
+    /// The official app's `ff` mask reaches BOTH handshake paths (`.ready` and the post-install re-auth),
+    /// carries its value in the label so the strap log shows which shape the session ran under, and
+    /// changes nothing else: same nonce request, same phases. The default stays `3f`.
+    func testNotificationMaskFullReachesBothHandshakePaths() throws {
+        XCTAssertEqual(OuraCommands.enableAllNotifications().bytes, [0x1C, 0x01, 0x3F])
+        XCTAssertEqual(OuraCommands.enableAllNotifications().label, "notify_all")
+        XCTAssertEqual(OuraCommands.enableAllNotifications(mask: OuraCommands.notificationMaskFull).bytes,
+                       [0x1C, 0x01, 0xFF])
+        XCTAssertEqual(OuraCommands.enableAllNotifications(mask: OuraCommands.notificationMaskFull).label,
+                       "notify_all(ff)")
+
+        let d = OuraDriver(ringGen: .gen3, authKey: key, notificationMask: OuraCommands.notificationMaskFull)
+        let onReady = d.nextStep(after: .ready)
+        XCTAssertEqual(d.phase, .authenticating)
+        XCTAssertEqual(onReady.map { $0.label }, ["notify_all(ff)", "get_nonce"])
+        XCTAssertEqual(onReady[0].bytes, [0x1C, 0x01, 0xFF])
+        XCTAssertEqual(onReady[1].bytes, [0x2F, 0x01, 0x2B])
+
+        // The post-install re-auth path sends the same mask.
+        let installing = OuraDriver(ringGen: .gen3, authKey: nil, allowKeyInstall: true,
+                                    notificationMask: OuraCommands.notificationMaskFull)
+        XCTAssertEqual(installing.nextStep(after: .ready), [])
+        XCTAssertNotNil(installing.beginKeyInstall(key: key))
+        let onAck = installing.keyInstallAcknowledged()
+        XCTAssertEqual(onAck.map { $0.label }, ["notify_all(ff)", "get_nonce"])
+        XCTAssertEqual(onAck[0].bytes, [0x1C, 0x01, 0xFF])
     }
 }

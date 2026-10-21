@@ -49,7 +49,7 @@ final class BiometricStreamsParityTests: XCTestCase {
             .filter { $0.ok && $0.typeName == "HISTORICAL_DATA" }
         XCTAssertEqual(v24.count, 60, "expected the 60 V24 records from gen_golden.py")
 
-        let s = extractHistoricalStreams(v24, deviceClockRef: deviceClockRef, wallClockRef: wallClockRef)
+        let s = extractHistoricalStreams(v24, deviceClockRef: deviceClockRef, wallClockRef: wallClockRef, family: .whoop5)
 
         XCTAssertEqual(s.hr, gold.hr.map { HRSample(ts: $0.ts, bpm: $0.bpm) })
         XCTAssertEqual(s.rr, gold.rr.map {

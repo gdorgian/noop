@@ -52,6 +52,11 @@ final class Collector {
     /// decoded-only. Injected for tests; backed by UserDefaults in the production init site.
     private let enableRawCapture: Bool
     private let now: () -> Int
+    /// The standard-HR host-received lines, summarised — see `LivePersistTrace.StandardHRHostReceivedTrace`.
+    private var hostReceived = LivePersistTrace.StandardHRHostReceivedTrace()
+    /// Whether the per-sample readout is wanted: the app wires this to the Test Centre's HRV and Connection
+    /// modes, and tests set it directly. Read once per sample, a Bool through a closure.
+    var hostReceivedDetail: () -> Bool = { false }
     private let monotonic: () -> TimeInterval
 
     /// Set once the GET_CLOCK correlation lands (E1). Until then, frames buffer un-persisted.
@@ -110,7 +115,6 @@ final class Collector {
     /// Last contact state buffered, so only transitions are recorded. See `shouldRecordContact`.
     private var lastStdContact: StandardHRContact?
     private var batchStartedAt: TimeInterval
-    var bufferedCount: Int { buffer.count }
 
     /// The per-stream accepted-row counts `StreamStore.insert` returns, named so the closure that carries
     /// them is readable at both ends.
@@ -226,7 +230,8 @@ final class Collector {
 
         let frames = batch.map(\.frame)         // still needed for the raw-capture outbox
         let parsed = batch.map(\.parsed)        // #47: the seam already decoded these — don't re-parse
-        let streams = extractStreams(parsed, deviceClockRef: ref.device, wallClockRef: ref.wall)
+        let streams = extractStreams(parsed, deviceClockRef: ref.device, wallClockRef: ref.wall,
+                                     family: family)
         // #1118: the SECOND live transport. `flushStandardHR` stamps a beat at the second it arrived over
         // 0x2A37; this one stamps it from the strap's own record clock. The same beat reaching both lands
         // on two different seconds, which no same-second de-dup can collapse — the signature every
@@ -286,7 +291,8 @@ final class Collector {
         let acceptedHR = (30...220).contains(hr) ? 1 : 0
         let acceptedRR = rr.filter { (250...3000).contains($0) }
         if acceptedHR == 1 { stdHR.append(HRSample(ts: ts, bpm: hr)) }
-        let source: RRSourceChannel? = family == .whoop5 ? .whoop5Standard : nil
+        let source: RRSourceChannel? = family == .whoop5 ? .whoop5Standard
+            : (family == .whoop4 ? .whoop4Standard : nil)
         stdRR.append(contentsOf: acceptedRR.map { RRInterval(ts: ts, rrMs: $0, srcChannel: source) })
         // Only the CHANGES. Advanced here rather than at flush because the event travels in the buffer
         // until it persists: a failed insert re-inserts it at the front, so nothing has to be unwound.
@@ -296,11 +302,16 @@ final class Collector {
                 fromHR: hr, rr: [], contact: contact, at: ts
             ).events)
         }
-        log?(LivePersistTrace.standardHRHostReceivedLine(
-            hostUnixSeconds: ts,
-            acceptedHRRows: acceptedHR, acceptedRRRows: acceptedRR.count,
-            rejectedHRRows: 1 - acceptedHR, rejectedRRRows: rr.count - acceptedRR.count,
-            pendingHRRows: stdHR.count, pendingRRRows: stdRR.count))
+        // One line a minute, not one a second: a refusal is written at once, the routine ones are counted, and
+        // the full per-sample readout comes back while a Test Centre mode is on (`hostReceivedDetail`).
+        for line in hostReceived.record(
+            .init(hostUnixSeconds: ts,
+                  acceptedHRRows: acceptedHR, acceptedRRRows: acceptedRR.count,
+                  rejectedHRRows: 1 - acceptedHR, rejectedRRRows: rr.count - acceptedRR.count,
+                  pendingHRRows: stdHR.count, pendingRRRows: stdRR.count),
+            detailed: hostReceivedDetail()) {
+            log?(line)
+        }
         if stdHR.count + stdRR.count + stdContact.count >= 30 {
             Task { @MainActor in await self.flushStandardHR(reason: .cadence) }
         }
@@ -308,6 +319,11 @@ final class Collector {
 
     /// Persist the buffered standard HR/RR/contact. Re-buffers on failure so nothing is lost.
     func flushStandardHR(reason: LivePersistTrace.StandardHRFlushReason = .explicit) async {
+        // The stream is ending, not just filling: write the window so far, or the last minute of a session
+        // leaves with the process. A cadence flush is mid-stream and keeps counting.
+        if reason != .cadence, reason != .explicit {
+            for line in hostReceived.close() { log?(line) }
+        }
         guard !stdHR.isEmpty || !stdRR.isEmpty || !stdContact.isEmpty else { return }
         let hr = stdHR, rr = stdRR, contact = stdContact
         stdHR.removeAll(keepingCapacity: true)

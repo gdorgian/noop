@@ -67,6 +67,8 @@ struct TestCentreView: View {
 
     // #1284 residual 3: experimental Oura 0x49-onset keying, only offered when an Oura ring is paired.
     @AppStorage(AppModel.ouraOnsetKeyingKey) private var ouraOnsetKeying = false
+    // Packed-notification A/B: the official app's SetNotification mask `ff` vs NOOP's `3f`, next connect.
+    @AppStorage(AppModel.ouraNotifyMaskFullKey) private var ouraNotifyMaskFull = false
     private var ouraPaired: Bool { model.deviceRegistry?.devices.contains { $0.brand == "Oura" } ?? false }
 
     /// The profile the 0x20 write experiment prefills from. Values are OVERRIDABLE in the field below:
@@ -256,7 +258,7 @@ struct TestCentreView: View {
 
                 Toggle("Protocol probes", isOn: $puffinExperiments)
                     .toggleStyle(.switch).tint(StrandPalette.accent)
-                Text("Sends experimental protocol queries and records the replies in the strap log.")
+                Text("Sends experimental protocol queries and records replies in the strap log. Also enables the experimental 5/MG strap alarm.")
                     .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
 
                 Divider().overlay(StrandPalette.hairline)
@@ -413,6 +415,18 @@ struct TestCentreView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Oura onset keying (experimental)").font(StrandFont.body)
                         Text("Keys each Oura sleep night on its stable 0x49 onset and suppresses duplicate re-serves at the source, instead of the shipped end-anchored persist (#1284). Off by default — a hardware-validation toggle. Watch the strap log for \u{201C}onset-key(#1284)\u{201D} lines.")
+                            .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(StrandPalette.accent)
+
+                // Packed-notification A/B (OURA_PROTOCOL.md s2.3). Takes effect at the NEXT connect only;
+                // nothing is written until then and nothing persists on the ring.
+                Toggle(isOn: $ouraNotifyMaskFull) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Oura notification mask ff (experimental)").font(StrandFont.body)
+                        Text("Sends the official app\u{2019}s SetNotification mask (1c 01 ff) instead of NOOP\u{2019}s 3f at the next connect. The ring packs ~10 packets per notification for the official app and one for NOOP (9\u{00D7} slower drains); this is the first candidate switch. Off by default; the next connect after turning it off is back on 3f. Watch the strap log for \u{201C}-> notify_all(ff)\u{201D} and compare notification sizes in the raw capture.")
                             .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -889,7 +903,7 @@ private struct TestModeRow: View {
     /// The HONEST per-mode captured-day count for a guided row (#965): distinct days THIS mode produced its
     /// own trace on, read from the same shareable log the report exports, so each active mode accumulates
     /// its OWN count instead of every guided row sharing one elapsed-clock number. nil for a toggle mode
-    /// (no "K of N") and when the mode is off. Recomputes with `live.log` (published) so the row updates as
+    /// (no "K of N") and when the mode is off. Recomputes with `live.log`, which the coalesced `logRevision` invalidates (#2547), so the row updates as
     /// new capture days land.
     private var capturedUnits: Int? {
         guard on, case .guided = mode.capture else { return nil }
