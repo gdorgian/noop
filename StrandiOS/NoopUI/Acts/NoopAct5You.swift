@@ -3233,7 +3233,8 @@ private extension NoopAct5Screens {
                             ? "HRV, resting pulse, respiration and skin temperature all rebuild over about four nights. Your history stays where it is."
                             : "Restart the four-night build-up if a bad week — being ill, a flight — set it wrong.",
                         symbol: "gauge.with.dots.needle.50percent",
-                        tint: baselinesRestarting ? Self.green : Self.blush
+                        tint: baselinesRestarting ? Self.green : Self.blush,
+                        titleColor: baselinesRestarting ? Color(hex: 0x8FE3B4) : Color(hex: 0xF6D3DA)
                     ) {
                         // Production runs the real re-anchor the classic screen uses: no day is deleted,
                         // only the day the four baselines re-learn from moves, then a rescore.
@@ -3581,12 +3582,12 @@ private extension NoopAct5Screens {
         }
     }
 
-    func actionRow(_ title: String, detail: String, symbol: String, tint: Color, action: @escaping () -> Void) -> some View {
+    func actionRow(_ title: String, detail: String, symbol: String, tint: Color, titleColor: Color? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 13) {
                 Image(systemName: symbol).font(.system(size: 17, weight: .medium)).foregroundStyle(tint).frame(width: 21)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(tint == NoopHTMLColor.blue ? NoopHTMLColor.blueLight : tint)
+                    Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(titleColor ?? (tint == NoopHTMLColor.blue ? NoopHTMLColor.blueLight : tint))
                     Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
                 }
                 Spacer()
