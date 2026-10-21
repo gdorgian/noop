@@ -103,6 +103,8 @@ struct NoopAct5Screens: View {
     @State private var baselinesRestarting = false
     @State private var settingsSearch = ""
     @State private var actionNotice: String?
+    /// One request to the Aura release page, only when the wearer taps Check for updates.
+    @StateObject private var updates = UpdateChecker()
     @State private var showReleaseNotes = false
     @State private var selectedAppIcon = NoopAppIconChoice.current
 
@@ -129,6 +131,8 @@ struct NoopAct5Screens: View {
             case .onboard: onboardingScreen
             case .pair: if measured { NoopLivePairScreen(navigation: navigation) } else { pairingScreen }
             case .position: positionScreen
+            case .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused:
+                NoopUtilityScreens(navigation: navigation)
             default: youScreen
             }
         }
@@ -3359,11 +3363,15 @@ private extension NoopAct5Screens {
                 }
 
                 settingsGroup("About") {
-                    actionRow("Check for updates", detail: "one request to the release page, when you ask for it", symbol: "arrow.triangle.2.circlepath", tint: NoopHTMLColor.blue) {
-                        actionNotice = "No update check has left this phone in the prototype."
+                    actionRow("Check for updates", detail: updateDetail, symbol: "arrow.triangle.2.circlepath", tint: NoopHTMLColor.blue) {
+                        if case let .available(_, url, _) = updates.state {
+                            UIApplication.shared.open(url)
+                        } else {
+                            updates.check(currentVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")
+                        }
                     }
                     Divider().overlay(NoopHTMLColor.border)
-                    soonRow("How Noop works", detail: "how sleep is sorted, how the scores build, where the numbers come from", glyph: .globe)
+                    canonicalLinkRow("How Noop works", detail: "how sleep is sorted, how the scores build, where the numbers come from", glyph: .globe, tint: Self.blush) { navigation.push(.howItWorks) }
                     Divider().overlay(NoopHTMLColor.border)
                     canonicalLinkRow(
                         "What’s new",
@@ -3374,29 +3382,29 @@ private extension NoopAct5Screens {
                     ) {
                         showReleaseNotes = true
                     }
+                }
+
+                settingsGroup("Tools") {
+                    canonicalLinkRow("Your data, fused", detail: "every source merged onto one record, with the winner named", glyph: .copy, tint: Self.blush) { navigation.push(.fused) }
                     Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Set up Apple Watch", detail: "what it is good at, and where it is lighter than the strap", glyph: .watch)
+                    canonicalLinkRow("Storage", detail: "what Noop keeps on this phone, and what can go", glyph: .grid, tint: Self.blush) { navigation.push(.storage) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    canonicalLinkRow("Nutrition", detail: "bring calories and macros in from a CSV", glyph: .plate, tint: Self.blush) { navigation.enter(.importHistory, from: .data) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    canonicalLinkRow("Weekly digest", detail: "this week against last, in your own numbers", glyph: .file, tint: Self.blush) { navigation.push(.digest) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    canonicalLinkRow("Siri and Shortcuts", detail: "Sync, Buzz, Mark a moment and Ask Svea, hands-free", glyph: .spark, tint: Self.blush) { navigation.push(.siri) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    canonicalLinkRow("Shortcuts export", detail: "the HealthKit-free path, for a sideloaded build", glyph: .upload, tint: Self.blush) { navigation.push(.shortcutExport) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    canonicalLinkRow("Strap limitations", detail: "4.0 against 5.0 against MG — what each band can read", glyph: .watch, tint: Self.blush) { navigation.push(.limitations) }
                 }
 
                 settingsGroup(
                     "Later",
-                    note: "Nine utilities that are decided but not built. They are listed here rather than left out, so you can see the shape of what is coming — and so nothing in this app pretends to do something it cannot."
+                    note: "Decided but not built yet. Listed rather than left out, so nothing in this app pretends to do something it cannot."
                 ) {
-                    soonRow("Your data, fused", detail: "every source merged onto one timeline, with the winner named per day", glyph: .copy)
-                    Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Storage", detail: "what the database is spending, by category", glyph: .grid)
-                    Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Nutrition", detail: "calories and macros on the same timeline as charge and rest, via CSV", glyph: .plate)
-                    Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Weekly digest", detail: "the written summary, Sunday evening", glyph: .file)
-                    Divider().overlay(NoopHTMLColor.border)
                     soonRow("Trends report", detail: "a longer read across a quarter, exportable", glyph: .chart)
-                    Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Siri and Shortcuts", detail: "App Intents and voice — “ask Noop what I have got today”", glyph: .spark)
-                    Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Shortcuts export", detail: "the HealthKit-free path, for a sideloaded build with no account", glyph: .upload)
-                    Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Strap limitations", detail: "4.0 against 5.0 against MG — what each band can actually read", glyph: .watch)
                 }
 
                 Button { navigation.push(.lab) } label: {
@@ -3419,6 +3427,16 @@ private extension NoopAct5Screens {
                 Text("Noop 5.2.0 · WHOOP 5.0 / MG · everything on this phone")
                     .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
+        }
+    }
+
+    var updateDetail: String {
+        switch updates.state {
+        case .idle: "one request to the release page, when you ask for it"
+        case .checking: "asking the release page…"
+        case .upToDate(let version): "you have the newest, \(version)"
+        case .available(let version, _, _): "\(version) is out — tap to open the release"
+        case .failed: "the release page did not answer; try again later"
         }
     }
 

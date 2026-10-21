@@ -623,7 +623,8 @@ struct NoopVerifiedAppShell: View {
 
     /// Act 5's hub: the wearer's own name, photo, usual sleep window and need. The rest of Act 5 is
     /// wired separately, screen by screen.
-    private static let canonicalYouRoutes: Set<NoopRoute> = [.you, .record, .zones, .settings, .lab, .position, .strap, .history, .devices, .notifs, .apple, .widgets, .automations, .pair]
+    private static let canonicalYouRoutes: Set<NoopRoute> = [.you, .record, .zones, .settings, .lab, .position, .strap, .history, .devices, .notifs, .apple, .widgets, .automations, .pair,
+        .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused]
 
     private var usesCanonicalCanvas: Bool {
         navigation.route == .energy
@@ -1216,6 +1217,14 @@ private struct NoopVerifiedRouteScreen: View {
         case .position: "What Noop will not ask you"
         case .settings: "Settings"
         case .widgets: "Widgets"
+        case .howItWorks: "How Noop works"
+        case .limitations: "Strap limitations"
+        case .siri: "Siri and Shortcuts"
+        case .shortcutExport: "Shortcuts export"
+        case .storage: "Storage"
+        case .digest: "Weekly digest"
+        case .report: "Trends report"
+        case .fused: "Your data, fused"
         case .lab: "The Lab"
         case .automations: "Automations"
         case .onboard: "Welcome"

@@ -28,7 +28,12 @@ final class UpdateChecker: ObservableObject {
 
     @Published var state: State = .idle
 
+    #if os(iOS)
+    /// Noop Aura is released from its own fork; asking upstream would offer an Aura wearer plain NOOP.
+    private static let endpoint = URL(string: "https://api.github.com/repos/gdorgian/noop/releases/latest")!
+    #else
     private static let endpoint = URL(string: "https://api.github.com/repos/ryanbr/noop/releases/latest")!
+    #endif
 
     /// One release read. Shared by the button and the automatic check (#1659) so there is exactly one
     /// copy of the endpoint, the headers and the parsing — a second copy is how the two would drift into
@@ -49,7 +54,10 @@ final class UpdateChecker: ObservableObject {
                   let tag = json["tag_name"] as? String,
                   let urlString = json["html_url"] as? String,
                   let url = URL(string: urlString) else { return nil }
-            let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+            let bare = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+            // Aura tags carry their build after the upstream version ("12.0.0-aura.1200"); the version
+            // compared is the upstream one the release tracks.
+            let latest = bare.components(separatedBy: "-").first ?? bare
             return Release(version: latest, url: url, notes: cleanNotes(json["body"] as? String ?? ""))
         } catch {
             return nil
