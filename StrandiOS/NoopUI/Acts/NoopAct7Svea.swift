@@ -1146,7 +1146,7 @@ private struct NoopSveaSetup: View {
                         .font(NoopHTMLFont.sans(11.5))
                         .foregroundStyle(Color(hex: 0x8B958F))
                     HStack(spacing: 10) {
-                        SecureField("", text: $keyDraft, prompt: Text(keyMask).foregroundColor(NoopHTMLColor.inkSoft))
+                        SecureField("", text: $keyDraft, prompt: Text(keyMask).font(coach.hasKey || NoopSveaFixture.enabled ? .system(size: 13, weight: .semibold, design: .monospaced) : NoopHTMLFont.sans(13)).foregroundColor(coach.hasKey || NoopSveaFixture.enabled ? NoopHTMLColor.inkSoft : NoopHTMLColor.faint))
                             .focused($keyFocused)
                             .font(.system(size: 13, weight: .semibold, design: .monospaced))
                             .foregroundStyle(NoopHTMLColor.inkSoft)
@@ -1179,6 +1179,7 @@ private struct NoopSveaSetup: View {
                 }
                 .buttonStyle(NoopSveaTintButtonStyle())
                 .disabled(coach.connectionTest == .testing || missingKey)
+                .opacity(missingKey ? 0.5 : 1)
             }
         }
     }
@@ -1202,9 +1203,13 @@ private struct NoopSveaSetup: View {
                         Text(model.value)
                             .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Color(hex: 0xA9B4E0))
-                            .multilineTextAlignment(.trailing)
-                            .lineLimit(2)
-                            .frame(maxWidth: 118, alignment: .trailing)
+                            // A model ID is one token; wrapping split it at its dashes and still cut
+                            // dated IDs short. One line, shrinking a little before trimming the middle.
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .truncationMode(.middle)
+                            .layoutPriority(1)
+                            .frame(maxWidth: 190, alignment: .trailing)
                     }
                     .frame(minHeight: 62)
                     .padding(.vertical, 13)
