@@ -11,6 +11,7 @@ struct RootTabView: View {
     @EnvironmentObject private var repo: Repository
     @EnvironmentObject private var model: AppModel
     @StateObject private var navigation = NoopNavigation()
+    @StateObject private var liveGlance = NoopLiveGlance()
     @State private var resetInProgress = false
     @State private var resetError: String?
 
@@ -22,6 +23,8 @@ struct RootTabView: View {
                 NoopVerifiedAppShell(navigation: navigation)
             }
         }
+            .environmentObject(liveGlance)
+            .onAppear { liveGlance.bind(to: model.live) }
             .onChange(of: router.requestedDestination) { _, destination in
                 guard let destination else { return }
                 route(destination)

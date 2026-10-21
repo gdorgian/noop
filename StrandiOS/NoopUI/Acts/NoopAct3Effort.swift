@@ -12,7 +12,7 @@ struct NoopAct3Screens: View {
     var effort: NoopEffortRecord? = nil
     var battery: Int? = nil
     @EnvironmentObject private var model: AppModel
-    @EnvironmentObject private var live: LiveState
+    @EnvironmentObject private var live: NoopLiveGlance
     @EnvironmentObject private var profile: ProfileStore
     @EnvironmentObject private var liftSession: LiftSessionController
     /// Production: the running session that refused a start, while its refusal is up.

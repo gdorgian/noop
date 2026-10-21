@@ -220,7 +220,7 @@ private struct NoopCardioLiveBar: View {
     /// Production: the recorder's clock and the strap's pulse instead of the fixture's.
     var measured = false
     @EnvironmentObject private var app: AppModel
-    @EnvironmentObject private var live: LiveState
+    @EnvironmentObject private var live: NoopLiveGlance
 
     private var model: Act3WorkoutModel { navigation.selectedWorkout.act3 }
 
@@ -549,12 +549,17 @@ struct NoopVerifiedAppShell: View {
     /// Gesture state, so a cancelled drag (a call, a system gesture) can never strand it off-zero.
     @GestureState(resetTransaction: Transaction(animation: .spring(response: 0.32, dampingFraction: 0.86)))
     private var swipeOffset: CGFloat = 0
+    /// The key each store last finished loading under. A route change re-runs a `.task(id:)` (its id
+    /// goes nil while the section is off screen), so without this every tab switch and every return to
+    /// Today re-ran the whole load — largely on the main actor, under the arrival animation.
+    @State private var loadedKeys: [String: String] = [:]
     @State private var journalSynced: [NoopDayLogKind: Int] = [:]
     @State private var journalSyncedDay: String?
     @EnvironmentObject private var profile: ProfileStore
     @EnvironmentObject private var model: AppModel
-    /// Observed so the Rest header's battery chip redraws when the strap reports a new charge.
-    @EnvironmentObject private var live: LiveState
+    /// Observed so the Rest header's battery chip redraws when the strap reports a new charge — via the
+    /// glance, not LiveState, whose BLE log and offload counters re-rendered the whole shell.
+    @EnvironmentObject private var live: NoopLiveGlance
 
     /// The four Act 8 screens that are safe to show outside the fixture shell.
     ///
@@ -747,12 +752,10 @@ struct NoopVerifiedAppShell: View {
         .ignoresSafeArea(.container, edges: usesCanonicalCanvas ? .all : [])
         .modifier(NoopRealtimeHRHold())
         .task(id: instrumentLoadKey) {
-            guard instrumentLoadKey != nil else { return }
-            await instrumentStore.load(from: repo)
+            await loadOnce("instrument", instrumentLoadKey.map(String.init)) { await instrumentStore.load(from: repo) }
         }
         .task(id: restLoadKey) {
-            guard restLoadKey != nil else { return }
-            await restStore.load(from: repo)
+            await loadOnce("rest", restLoadKey) { await restStore.load(from: repo) }
         }
         .task(id: "\(repo.loaded)-\(Repository.localDayKey(Date()))") {
             guard repo.loaded else { return }
@@ -770,21 +773,25 @@ struct NoopVerifiedAppShell: View {
             if navigation.route == .history { await historyStore.load(from: repo) }
         }
         .task(id: trendsLoadKey) {
-            guard trendsLoadKey != nil else { return }
-            await trendsStore.load(from: repo)
+            await loadOnce("trends", trendsLoadKey) { await trendsStore.load(from: repo) }
         }
         .task(id: agesLoadKey) {
-            guard agesLoadKey != nil else { return }
-            await agesStore.load(from: repo, profile: profile)
+            await loadOnce("ages", agesLoadKey) { await agesStore.load(from: repo, profile: profile) }
         }
         .task(id: effortLoadKey) {
-            guard effortLoadKey != nil else { return }
-            await effortStore.load(from: repo)
+            await loadOnce("effort", effortLoadKey) { await effortStore.load(from: repo) }
         }
         .task(id: dayLoadKey) {
-            guard dayLoadKey != nil else { return }
-            await dayStore.load(from: repo, profile: profile)
+            await loadOnce("day", dayLoadKey) { await dayStore.load(from: repo, profile: profile) }
         }
+    }
+
+    /// Runs `load` only when `key` differs from the one this store last finished under. A cancelled
+    /// load (the wearer left before it finished) is not recorded, so it runs again next time.
+    private func loadOnce(_ store: String, _ key: String?, _ load: () async -> Void) async {
+        guard let key, loadedKeys[store] != key else { return }
+        await load()
+        if !Task.isCancelled { loadedKeys[store] = key }
     }
 
     private var youLoadKey: String? {
@@ -798,7 +805,12 @@ struct NoopVerifiedAppShell: View {
 
     private var agesLoadKey: String? {
         Self.canonicalAgesRoutes.contains(navigation.route) || navigation.route == .trends
-            ? "\(repo.loaded)-\(repo.refreshSeq)" : nil
+            ? "\(repo.loaded)-\(repo.refreshSeq)-\(profileSignature)" : nil
+    }
+
+    /// The profile facts the Day and Ages engines read; an edit to any of them must reload.
+    private var profileSignature: String {
+        "\(profile.age)-\(profile.sex)-\(profile.weightKg)-\(profile.heightCm)"
     }
 
     private var effortLoadKey: String? {
@@ -806,7 +818,9 @@ struct NoopVerifiedAppShell: View {
     }
 
     private var dayLoadKey: String? {
-        Self.canonicalDayRoutes.contains(navigation.route) ? "\(repo.loaded)-\(repo.refreshSeq)" : nil
+        // The five-minute bucket keeps "the day so far" moving between syncs, as returning to Today did.
+        Self.canonicalDayRoutes.contains(navigation.route)
+            ? "\(repo.loaded)-\(repo.refreshSeq)-\(profileSignature)-\(Int(Date().timeIntervalSince1970) / 300)" : nil
     }
 
     private var restLoadKey: String? {

@@ -426,7 +426,7 @@ private struct NoopInstrumentBackHeader: View {
 private struct NoopInstrumentRawScreen: View {
     @ObservedObject var navigation: NoopNavigation
     @EnvironmentObject private var model: AppModel
-    @EnvironmentObject private var live: LiveState
+    @EnvironmentObject private var live: NoopLiveGlance
     @StateObject private var store = RawDataSessionStore()
     @State private var now = Date()
     @State private var deleteCandidate: RawDataSessionStore.Session?

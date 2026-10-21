@@ -2849,7 +2849,9 @@ private struct Act2SpotReadingCard: View {
     /// Last night's variability, for the "Last night" figure beside the result.
     let lastNight: String
     @EnvironmentObject private var model: AppModel
-    @EnvironmentObject private var live: LiveState
+    /// Bonded state only. The R-R feed is read from `model.live` without observing it: observing
+    /// LiveState re-rendered this card on every BLE log line and offload counter.
+    @EnvironmentObject private var glance: NoopLiveGlance
 
     private enum Phase: Equatable { case idle, run, done, fail }
     @State private var phase: Phase = .idle
@@ -2882,8 +2884,8 @@ private struct Act2SpotReadingCard: View {
                             .strokeBorder((phase == .run ? Color.white : NoopHTMLColor.blue).opacity(0.4), lineWidth: 0.5))
                 }
                 .buttonStyle(.plain)
-                .disabled(!live.bonded && phase != .run)
-                .opacity(!live.bonded && phase != .run ? 0.45 : 1)
+                .disabled(!glance.bonded && phase != .run)
+                .opacity(!glance.bonded && phase != .run ? 0.45 : 1)
             }
             if phase == .run {
                 VStack(alignment: .leading, spacing: 11) {
@@ -2942,7 +2944,7 @@ private struct Act2SpotReadingCard: View {
         .background(phase == .run ? NoopHTMLColor.blue.opacity(0.07) : NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
         .overlay(RoundedRectangle(cornerRadius: 22)
             .stroke(phase == .run ? NoopHTMLColor.blue.opacity(0.24) : NoopHTMLColor.border, lineWidth: 0.5))
-        .onRRPackets(live) { rr in
+        .onRRPackets(model.live) { rr in
             guard phase == .run, let ms = elapsedMs(), HRVSnapshotView.captureWindowOpen(elapsedMs: ms) else { return }
             buffer.append(contentsOf: rr)
             clean = HRVAnalyzer.analyze(rawRR: buffer.map(Double.init),
@@ -2971,7 +2973,7 @@ private struct Act2SpotReadingCard: View {
 
     private func tap() {
         if phase == .run { stop(); return }
-        guard live.bonded else { return }
+        guard glance.bonded else { return }
         buffer = []; clean = 0; value = nil
         left = HRVSnapshotView.captureSeconds
         start = ContinuousClock().now
@@ -4238,7 +4240,6 @@ enum NoopBreatheWords {
 struct NoopBreatheScreens: View {
     @ObservedObject var navigation: NoopNavigation
     @EnvironmentObject private var model: AppModel
-    @EnvironmentObject private var live: LiveState
     @ObservedObject private var session = NoopBreatheSession.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("noop.breathe.protocol") private var protocolID = NoopBreatheCatalog.defaultID
@@ -4267,7 +4268,7 @@ struct NoopBreatheScreens: View {
             }
         }
         .onAppear {
-            session.attach(model: model, live: live)
+            session.attach(model: model, live: model.live)
             arrival = Date()
         }
     }
