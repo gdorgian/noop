@@ -1,5 +1,6 @@
 import Foundation
 import WhoopProtocol
+import WhoopStore
 
 /// Durable persistence for an in-flight, manually-started workout (#529).
 ///
@@ -99,5 +100,41 @@ enum ZoneTrainingPrefs {
         } else {
             defaults.removeObject(forKey: lastTargetZoneKey)
         }
+    }
+}
+
+/// Finished sessions whose database write has not been confirmed yet.
+///
+/// `endWorkout` clears the in-flight snapshot the moment a session ends (a relaunch must not revive a
+/// finished session as running, #529), then writes the row asynchronously. That write was `try?` with
+/// nothing behind it, so a failed write lost the session outright. The row now waits here until the
+/// store confirms it, and anything still waiting is written again on the next launch.
+enum PendingWorkoutSaves {
+    static let defaultsKey = "noop.pendingWorkoutSaves"
+
+    static func all(in defaults: UserDefaults = .standard) -> [WorkoutRow] {
+        guard let data = defaults.data(forKey: defaultsKey),
+              let rows = try? JSONDecoder().decode([WorkoutRow].self, from: data) else { return [] }
+        return rows
+    }
+
+    static func add(_ row: WorkoutRow, to defaults: UserDefaults = .standard) {
+        var rows = all(in: defaults).filter { !same($0, row) }
+        rows.append(row)
+        write(rows, to: defaults)
+    }
+
+    static func remove(_ row: WorkoutRow, from defaults: UserDefaults = .standard) {
+        write(all(in: defaults).filter { !same($0, row) }, to: defaults)
+    }
+
+    /// A session is identified by when it started and what it was; the upsert keys it the same way.
+    private static func same(_ a: WorkoutRow, _ b: WorkoutRow) -> Bool {
+        a.startTs == b.startTs && a.sport == b.sport
+    }
+
+    private static func write(_ rows: [WorkoutRow], to defaults: UserDefaults) {
+        if rows.isEmpty { defaults.removeObject(forKey: defaultsKey); return }
+        if let data = try? JSONEncoder().encode(rows) { defaults.set(data, forKey: defaultsKey) }
     }
 }

@@ -432,6 +432,10 @@ final class AppModel: ObservableObject {
         // Rehydrate a manual workout that was in flight when iOS killed the app, so it can still be ended
         // + saved on relaunch (#529). Restored here alongside the other UserDefaults-backed state.
         rehydrateActiveWorkout()
+        // A session whose save never landed (the store was unavailable, or the write threw) is retried.
+        if !PendingWorkoutSaves.all().isEmpty {
+            Task { [weak self] in await self?.savePendingWorkouts() }
+        }
 
         AppModel.shared = self   // publish for App Intents (Shortcuts) , see the static above (#42)
 
@@ -1024,13 +1028,30 @@ final class AppModel: ObservableObject {
             durationSec: Int(w.elapsed(at: end)),
             gpsPoints: wasGps ? gpsRecorder.pointCount : nil))
         buzz(loops: 2, gate: HapticPrefs.workout)
+        // Held until the store confirms it: the in-flight snapshot is already gone, so a failed write
+        // used to lose the session. A row still pending is written again on the next launch.
+        PendingWorkoutSaves.add(row)
         Task { [weak self] in
-            guard let self else { return }
-            if let store = await self.repo.storeHandle() {
-                _ = try? await store.upsertWorkouts([row], deviceId: self.deviceId)
-                await self.repo.refresh()
+            await self?.savePendingWorkouts()
+        }
+    }
+
+    /// Write every finished session still waiting for the store, dropping each only once its upsert
+    /// succeeds. Called after a session ends and once at launch.
+    func savePendingWorkouts() async {
+        let pending = PendingWorkoutSaves.all()
+        guard !pending.isEmpty, let store = await repo.storeHandle() else { return }
+        var saved = 0
+        for row in pending {
+            do {
+                try await store.upsertWorkouts([row], deviceId: deviceId)
+                PendingWorkoutSaves.remove(row)
+                saved += 1
+            } catch {
+                live.append(log: "Workout save failed, kept to retry: \(row.sport) at \(row.startTs) — \(error.localizedDescription)")
             }
         }
+        if saved > 0 { await repo.refresh() }
     }
 
     /// Append the current smoothed `bpm` to the active workout and recompute its running strain. Called
