@@ -738,6 +738,15 @@ final class NoopNavigation: ObservableObject {
     }
 
     var route: NoopRoute { path.last ?? .today }
+    /// Reports belong to their entry context. Settings remains a valid door; opening one from
+    /// Trends must not switch the selected tab to You just because the page lives in Act 5.
+    var selectedTab: NoopTab {
+        switch route {
+        case .digest, .report: path.dropLast().last?.tab ?? route.tab
+        default: route.tab
+        }
+    }
+
     var canGoBack: Bool { path.count > 1 }
 
     /// Whether an edge swipe has somewhere to go, so the screen may follow the finger. Spec

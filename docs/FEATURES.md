@@ -29,6 +29,11 @@ NOOP is built on community interoperability and protocol-documentation work, wit
 
 ## At a glance
 
+On iPhone, Aura's Trends page links directly to **Weekly digest** and **Trends report** in its
+existing grouped navigation. The same pages remain available from Settings → Tools. A report
+opened from Trends returns there and keeps Trends selected; one opened from Settings returns to
+Settings. Their data, report periods, PDF export and visual styling are unchanged.
+
 NOOP is a `NavigationSplitView`: a left sidebar of screens, a live connection status pill
 pinned to the sidebar's bottom (bonded / connecting / disconnected, with battery %), and a
 detail pane. A menu-bar item gives a glanceable live heart rate from anywhere. The interface follows

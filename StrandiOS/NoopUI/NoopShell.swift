@@ -1632,7 +1632,7 @@ struct NoopBottomNavigation: View {
         .frame(maxWidth: .infinity)
         .modifier(NoopGlassBar(reduceTransparency: reduceTransparency))
         .shadow(color: .black.opacity(0.42), radius: 13, y: 8)
-        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: navigation.route.tab)
+        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: navigation.selectedTab)
     }
 
     private var plusButton: some View {
@@ -1670,7 +1670,7 @@ struct NoopBottomNavigation: View {
 
     private func tab(_ tab: NoopTab) -> some View {
         let sveaSlot = navigation.route.act == .svea && tab == .today
-        let selected = navigation.route.tab == tab
+        let selected = navigation.selectedTab == tab
         let tint = tint(selected: selected)
 
         return Button {

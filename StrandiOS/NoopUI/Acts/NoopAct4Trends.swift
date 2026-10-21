@@ -157,6 +157,10 @@ private struct NoopTrendsScreen: View {
                             Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
                             trendLink("Rhythm", detail: "sleep, and how regular it has been", symbol: "moon", route: .rhythm)
                             Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                            trendLink("Weekly digest", detail: "this week against last, in your own numbers", symbol: "digest", route: .digest)
+                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                            trendLink("Trends report", detail: "a longer read across a window, exportable as a PDF", symbol: "report", route: .report)
+                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
                             // The year's chapters and firsts are written for the example person; no engine
                             // writes them for a real record, so production has no door into an empty page.
                             if live == nil {
@@ -374,6 +378,8 @@ private struct NoopTrendsScreen: View {
         case "lungs": .lungs
         case "moon": .moon
         case "ask": .ask
+        case "digest": .file
+        case "report": .chart
         default: .trends
         }
     }
