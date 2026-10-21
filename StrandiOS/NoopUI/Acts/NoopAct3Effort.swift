@@ -2040,6 +2040,11 @@ private struct Act3LiveScreen: View {
                 Text(paused ? "Tap play, or just start moving" : "Auto-pauses when you stop")
                     .font(NoopHTMLFont.sans(11))
                     .foregroundStyle(NoopHTMLColor.faint)
+            } else if AppModel.isTooShortToSave(elapsedSeconds: TimeInterval(elapsed)) {
+                // The recorder drops a session under a minute; say so before the stop, not after.
+                Text("Under a minute is not kept")
+                    .font(NoopHTMLFont.sans(11))
+                    .foregroundStyle(NoopHTMLColor.faint)
             }
         }
         .frame(width: max(0, canvasWidth - 44), height: max(0, canvasHeight - 80))
