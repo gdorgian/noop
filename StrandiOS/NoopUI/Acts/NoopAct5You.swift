@@ -3391,6 +3391,8 @@ private extension NoopAct5Screens {
                     Divider().overlay(NoopHTMLColor.border)
                     canonicalLinkRow("Nutrition", detail: "bring calories and macros in from a CSV", glyph: .plate, tint: Self.blush) { navigation.enter(.importHistory, from: .data) }
                     Divider().overlay(NoopHTMLColor.border)
+                    canonicalLinkRow("Trends report", detail: "a longer read across a window, exportable as a PDF", glyph: .chart, tint: Self.blush) { navigation.push(.report) }
+                    Divider().overlay(NoopHTMLColor.border)
                     canonicalLinkRow("Weekly digest", detail: "this week against last, in your own numbers", glyph: .file, tint: Self.blush) { navigation.push(.digest) }
                     Divider().overlay(NoopHTMLColor.border)
                     canonicalLinkRow("Siri and Shortcuts", detail: "Sync, Buzz, Mark a moment and Ask Svea, hands-free", glyph: .spark, tint: Self.blush) { navigation.push(.siri) }
@@ -3400,12 +3402,6 @@ private extension NoopAct5Screens {
                     canonicalLinkRow("Strap limitations", detail: "4.0 against 5.0 against MG — what each band can read", glyph: .watch, tint: Self.blush) { navigation.push(.limitations) }
                 }
 
-                settingsGroup(
-                    "Later",
-                    note: "Decided but not built yet. Listed rather than left out, so nothing in this app pretends to do something it cannot."
-                ) {
-                    soonRow("Trends report", detail: "a longer read across a quarter, exportable", glyph: .chart)
-                }
 
                 Button { navigation.push(.lab) } label: {
                     HStack(spacing: 13) {

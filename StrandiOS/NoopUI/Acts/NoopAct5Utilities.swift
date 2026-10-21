@@ -19,6 +19,7 @@ struct NoopUtilityScreens: View {
         case .storage: NoopStoragePage(navigation: navigation)
         case .digest: NoopDigestPage(navigation: navigation)
         case .fused: NoopFusedPage(navigation: navigation)
+        case .report: NoopTrendsReportPage(navigation: navigation)
         default: NoopHowItWorksPage(navigation: navigation)
         }
     }
@@ -26,7 +27,7 @@ struct NoopUtilityScreens: View {
 
 // MARK: - Shared page grammar
 
-private struct NoopUtilityPage<Content: View>: View {
+struct NoopUtilityPage<Content: View>: View {
     let back: String
     let title: String
     let lead: String
@@ -103,7 +104,7 @@ private struct NoopUtilityRow: View {
     }
 }
 
-private struct NoopUtilityNote: View {
+struct NoopUtilityNote: View {
     let text: String
     var body: some View {
         Text(text)
@@ -113,7 +114,7 @@ private struct NoopUtilityNote: View {
     }
 }
 
-private struct NoopUtilityButton: View {
+struct NoopUtilityButton: View {
     let title: String
     var busy = false
     let action: () -> Void
@@ -497,3 +498,157 @@ private struct NoopFusedPage: View {
     }
 }
 #endif
+
+// MARK: - Trends report
+
+/// A longer read across a window, on `RangeReportEngine`, exportable as a one-page PDF drawn in Aura's
+/// own type and ink. Recovery keeps its own name (never Charge); strain is Effort, as everywhere in Aura.
+struct NoopTrendsReportPage: View {
+    @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var repo: Repository
+    @State private var range: ReportRange = .days90
+    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
+    @AppStorage(UnitPrefs.temperatureKey) private var temperatureRaw = ""
+
+    private var report: RangeReport {
+        TrendsReportData.report(for: range, days: repo.days, today: Repository.localDayKey(Date()),
+                                units: ReportDisplayUnits(
+                                    fahrenheit: UnitPrefs.resolveTemperature(system: UnitSystem(rawValue: unitSystemRaw) ?? .metric,
+                                                                             override: temperatureRaw) == .fahrenheit,
+                                    effortFactor: UnitPrefs.currentEffortDisplayFactor()))
+    }
+
+    var body: some View {
+        let report = report
+        NoopUtilityPage(back: "Settings", title: "Trends report",
+                        lead: "How each reading moved across a window you choose, with the first half set against the second. A file you can keep or hand to someone.",
+                        navigation: navigation) {
+            HStack(spacing: 6) {
+                ForEach([ReportRange.days30, .days90, .days180, .days365], id: \.self) { option in
+                    Button { range = option } label: {
+                        Text(option.label)
+                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .foregroundStyle(option == range ? NoopHTMLColor.blushInk : NoopHTMLColor.inkSoft)
+                            .frame(maxWidth: .infinity).frame(height: 36)
+                            .background(option == range ? NoopHTMLColor.blush : Color.white.opacity(0.05),
+                                        in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                }
+            }
+            NoopReportBody(report: report, rangeName: range.longName)
+            NoopUtilityButton(title: "Export as PDF") { export(report) }
+            NoopUtilityNote(text: "The file is made on this phone and goes only where you send it. Readings, not a diagnosis.")
+        }
+    }
+
+    @MainActor private func export(_ report: RangeReport) {
+        let page = NoopReportBody(report: report, rangeName: range.longName, forPrint: true)
+            .padding(28)
+            .frame(width: 612)
+            .background(NoopHTMLColor.canvas)
+            .foregroundStyle(NoopHTMLColor.ink)
+        TrendsReportRenderer.exportPDF(page: page, suggestedName: "Noop Aura report \(report.start) to \(report.end).pdf")
+    }
+}
+
+/// The report's content, shared by the screen and the PDF so the two cannot differ.
+struct NoopReportBody: View {
+    let report: RangeReport
+    let rangeName: String
+    var forPrint = false
+
+    private var shown: [MetricRangeStat] { report.metrics.filter { $0.n > 0 } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            if forPrint {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Noop Aura · Trends report").font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                        .tracking(1.2).textCase(.uppercase).foregroundStyle(NoopHTMLColor.faint)
+                    Text(rangeName).font(NoopHTMLFont.outfit(25)).tracking(-0.6)
+                    Text("\(report.start) → \(report.end) · \(report.totalDays) days")
+                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                }
+            }
+            NoopHTMLCard(radius: 22, padding: 16) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        NoopSectionLabel(forPrint ? "Readings" : rangeName)
+                        Spacer()
+                        Text("first half → second half").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                    }
+                    if shown.isEmpty {
+                        Text("Nothing was measured in this window.")
+                            .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    }
+                    ForEach(Array(shown.enumerated()), id: \.offset) { index, stat in
+                        if index > 0 { Divider().overlay(NoopHTMLColor.border) }
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(Self.label(stat.metric)).font(NoopHTMLFont.sans(13.5))
+                                Text("\(Self.value(stat.min.value, stat.metric)) – \(Self.value(stat.max.value, stat.metric)) · \(stat.n) days")
+                                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                            }
+                            Spacer(minLength: 8)
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text(Self.value(stat.mean, stat.metric)).font(NoopHTMLFont.outfit(17)).monospacedDigit()
+                                Text(Self.trend(stat)).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+                            }
+                        }
+                        .padding(.vertical, 3)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            let headlines = report.headlines.map(Self.auraWords)
+            if !headlines.isEmpty {
+                NoopHTMLCard(radius: 22, padding: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        NoopSectionLabel("Worth noticing")
+                        ForEach(headlines, id: \.self) { line in
+                            Text(line).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                                .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    static func label(_ m: ReportMetric) -> String {
+        switch m {
+        case .strain: "Effort"
+        case .respRate: "Breathing rate"
+        default: m.label
+        }
+    }
+
+    /// The engine's own sentences in Aura's names: Effort for strain, and recovery never as Charge.
+    static func auraWords(_ line: String) -> String {
+        line.replacingOccurrences(of: "Strain", with: "Effort")
+            .replacingOccurrences(of: "strain", with: "effort")
+            .replacingOccurrences(of: "Charge", with: "Recovery")
+    }
+
+    static func value(_ v: Double, _ m: ReportMetric) -> String {
+        switch m {
+        case .sleepHours:
+            let minutes = Int((v * 60).rounded())
+            return "\(minutes / 60)h \(String(format: "%02d", minutes % 60))m"
+        case .skinTempDev: return String(format: "%+.1f°", v)
+        case .workouts: return String(format: "%.1f a day", v)
+        case .respRate, .stress: return String(format: "%.1f", v)
+        default: return "\(Int(v.rounded()))\(m.unit.isEmpty ? "" : " " + m.unit)"
+        }
+    }
+
+    static func trend(_ s: MetricRangeStat) -> String {
+        switch s.trend {
+        case .rising: "rising"
+        case .falling: "falling"
+        case .flat: "steady"
+        }
+    }
+}
