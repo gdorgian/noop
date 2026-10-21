@@ -178,6 +178,16 @@ struct NoopAct1Screens: View {
                                 .font(NoopHTMLFont.sans(13))
                                 .foregroundStyle(Color(hex: 0xB7C3C9))
                                 .noopAct1LineBox(fontSize: 13, ratio: 1.5)
+                            } else if rest != nil && behavior.smartAlarmEnabled {
+                                // No bedtime to show, but an armed alarm is a decision already made.
+                                Text("Wake by \(alarmSetText)")
+                                    .font(NoopHTMLFont.outfit(27, weight: .light))
+                                    .tracking(-0.675)
+                                    .frame(minHeight: 29.7, alignment: .top)
+                                Text("Armed on the strap.")
+                                    .font(NoopHTMLFont.sans(13))
+                                    .foregroundStyle(Color(hex: 0xB7C3C9))
+                                    .noopAct1LineBox(fontSize: 13, ratio: 1.5)
                             }
                             HStack(spacing: 7) {
                                 Text("Decide it")
@@ -1227,7 +1237,10 @@ struct NoopAct1Screens: View {
                         .padding(.bottom, 24)
                     VStack(alignment: .leading, spacing: 11) {
                         alarmWindowPicker
-                        Text("Fifteen minutes is enough to find light sleep on most nights. Exact means exact — it wakes you at \(alarmSetText) whatever stage you are in.")
+                        // The strap's firmware alarm is exact; production has no light-sleep window to offer yet.
+                        Text(rest != nil
+                            ? "Exact means exact — the strap wakes you at \(alarmSetText) whatever stage you are in. An earlier window needs light-sleep timing the strap does not give yet."
+                            : "Fifteen minutes is enough to find light sleep on most nights. Exact means exact — it wakes you at \(alarmSetText) whatever stage you are in.")
                             .font(NoopHTMLFont.sans(11.5))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                             .lineSpacing(NoopSpecType.lineSpacing(size: 11.5, cssLineHeight: 1.55, face: NoopSpecType.Face.sansRegular))
@@ -1434,8 +1447,11 @@ struct NoopAct1Screens: View {
     }
 
     private var alarmStrapCopy: String {
-        guard rest != nil, model.whoop5Detected else {
+        guard rest != nil else {
             return "Noop hands the window to the band before you sleep. It buzzes your wrist even if your phone is off, flat, silenced or in another room. Costs about 2 % of the band’s battery a night."
+        }
+        guard model.whoop5Detected else {
+            return "Noop hands the wake time to the band. It buzzes your wrist even if your phone is off, flat, silenced or in another room."
         }
         return strapAlarm5Allowed
             ? "Your 5.0 is armed with its experimental alarm. Noop has seen a 5.0 accept it, but a wake from the strap is not yet confirmed on one, so the phone’s backup still sounds."
@@ -1445,7 +1461,14 @@ struct NoopAct1Screens: View {
     /// Every failure mode named before it happens. An alarm that silently does not fire is worse
     /// than no alarm, and the honest place to say so is here rather than in tomorrow's read.
     private var alarmFailureCard: some View {
-        let failures = [
+        // Production names its own failure modes: the strap holds one alarm at a time and Noop re-arms
+        // it on open, on reconnect and after it fires. The prototype's bedtime hand-over and the morning
+        // battery line are not built.
+        let failures = rest != nil ? [
+            "The band is not on your wrist when you fall asleep. It cannot buzz an empty strap; only the phone’s backup sounds, and only if Noop may send notifications.",
+            "The band runs flat overnight. A strap with no charge cannot buzz; only the phone’s backup sounds.",
+            "Noop has not run since the last alarm. The strap holds one alarm at a time, and Noop sets the next one when it opens or the strap reconnects."
+        ] : [
             "The band is not on your wrist when you fall asleep. It cannot buzz an empty strap; only the phone’s backup sounds, and only if Noop may send notifications.",
             "The band is below 5 %. It keeps the window armed but drops the buzz — you get one line about it on tomorrow morning’s read.",
             "You never opened Noop before bed. The window is handed over at your bedtime anchor, so an alarm set three days ago and never re-armed does not fire."
