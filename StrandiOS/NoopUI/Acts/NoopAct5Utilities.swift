@@ -20,6 +20,7 @@ struct NoopUtilityScreens: View {
         case .digest: NoopDigestPage(navigation: navigation)
         case .fused: NoopFusedPage(navigation: navigation)
         case .report: NoopTrendsReportPage(navigation: navigation)
+        case .hydration: NoopHydrationPage(navigation: navigation)
         default: NoopHowItWorksPage(navigation: navigation)
         }
     }
@@ -650,5 +651,115 @@ struct NoopReportBody: View {
         case .falling: "falling"
         case .flat: "steady"
         }
+    }
+}
+
+
+// MARK: - Hydration
+
+/// A local water log on `HydrationStore`: what you drank today against a goal from your sex and the
+/// day's Effort (`HydrationGoal`), each drink editable, and the week behind it. Apple Health water is
+/// added in, never double-counted.
+struct NoopHydrationPage: View {
+    @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var repo: Repository
+    @EnvironmentObject private var profile: ProfileStore
+    @State private var total: Double = 0
+    @State private var entries: [HydrationEntry] = []
+    @State private var week: [(day: String, value: Double)] = []
+
+    private var goal: Int { repo.hydrationGoalML(profileSex: profile.sex) }
+
+    var body: some View {
+        NoopUtilityPage(back: "Settings", title: "Hydration",
+                        lead: "A water log kept on this phone. The goal moves with your sex and how hard the day was; it is a guide for a normal day, not a medical target.",
+                        navigation: navigation) {
+            NoopUtilityCard(label: "Today", trailing: "goal \(Self.litres(Double(goal)))") {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(Self.litres(total)).font(NoopHTMLFont.outfit(34, weight: .light)).monospacedDigit()
+                    Text("of \(Self.litres(Double(goal)))").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                }
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.08))
+                        Capsule().fill(NoopHTMLColor.blue)
+                            .frame(width: proxy.size.width * min(1, max(0, total / Double(max(1, goal)))))
+                    }
+                }
+                .frame(height: 6)
+                HStack(spacing: 6) {
+                    ForEach([250, 330, 500], id: \.self) { ml in
+                        Button { Task { await log(ml) } } label: {
+                            Text("+\(ml) ml")
+                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.blueInk)
+                                .frame(maxWidth: .infinity).frame(height: 40)
+                                .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                    }
+                }
+            }
+            if !entries.isEmpty {
+                NoopUtilityCard(label: "Logged today") {
+                    ForEach(Array(entries.reversed().enumerated()), id: \.element.id) { index, entry in
+                        if index > 0 { noopDivider() }
+                        HStack {
+                            Text(entry.loggedAt.formatted(date: .omitted, time: .shortened))
+                                .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                            Spacer()
+                            Text("\(entry.amountMl) ml").font(NoopHTMLFont.outfit(16)).monospacedDigit()
+                            Button { Task { await remove(entry) } } label: {
+                                Image(systemName: "xmark").font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(NoopHTMLColor.faint)
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(NoopHTMLPressStyle())
+                            .accessibilityLabel("Remove \(entry.amountMl) millilitres")
+                        }
+                    }
+                }
+            }
+            if !week.isEmpty {
+                NoopUtilityCard(label: "The last seven days") {
+                    let top = max(Double(goal), week.map(\.value).max() ?? 0, 1)
+                    HStack(alignment: .bottom, spacing: 6) {
+                        ForEach(week, id: \.day) { point in
+                            VStack(spacing: 4) {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(point.value >= Double(goal) ? NoopHTMLColor.blue : Color.white.opacity(0.18))
+                                    .frame(height: max(2, CGFloat(point.value / top) * 70))
+                                Text(String(point.day.suffix(2))).font(NoopHTMLFont.sans(10)).foregroundStyle(NoopHTMLColor.faint)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .frame(height: 90, alignment: .bottom)
+                }
+            }
+            NoopUtilityNote(text: "Water you log in Apple Health is added to the day; Noop never writes your log anywhere else.")
+        }
+        .task { await reload() }
+    }
+
+    private static func litres(_ ml: Double) -> String {
+        ml >= 1000 ? String(format: "%.1f L", ml / 1000) : "\(Int(ml.rounded())) ml"
+    }
+
+    private func reload() async {
+        let day = Repository.localDayKey(Date())
+        total = await repo.hydrationTotal(day: day)
+        entries = repo.hydrationEntries()
+        week = await repo.hydrationHistory(days: 7)
+    }
+
+    private func log(_ ml: Int) async {
+        _ = await repo.logHydration(amountMl: ml)
+        await reload()
+    }
+
+    private func remove(_ entry: HydrationEntry) async {
+        _ = await repo.deleteHydrationEntry(id: entry.id)
+        await reload()
     }
 }

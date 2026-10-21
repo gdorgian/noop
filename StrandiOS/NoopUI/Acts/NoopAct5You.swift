@@ -131,7 +131,7 @@ struct NoopAct5Screens: View {
             case .onboard: onboardingScreen
             case .pair: if measured { NoopLivePairScreen(navigation: navigation) } else { pairingScreen }
             case .position: positionScreen
-            case .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused:
+            case .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration:
                 NoopUtilityScreens(navigation: navigation)
             default: youScreen
             }
@@ -3313,7 +3313,7 @@ private extension NoopAct5Screens {
                 }
 
                 settingsGroup("Features") {
-                    soonRow("Hydration", detail: "a local water log with a goal that follows your sex and the day’s effort", glyph: .drop)
+                    canonicalLinkRow("Hydration", detail: "a local water log with a goal that follows your sex and the day’s effort", glyph: .drop, tint: Self.blush) { navigation.push(.hydration) }
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Offer a workout it spotted", detail: "Sees a probable session in your heart rate and offers to save it. It never creates one for you.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)

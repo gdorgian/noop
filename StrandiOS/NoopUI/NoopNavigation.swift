@@ -101,7 +101,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     // Utilities that left "Later" (21 Oct 2026): each is an Aura page over an engine that already ships.
     case howItWorks = "how-noop-works", limitations = "strap-limitations", siri = "siri-shortcuts"
     case shortcutExport = "shortcut-export", storage, digest = "weekly-digest", report = "trends-report"
-    case fused = "fused-record"
+    case fused = "fused-record", hydration
     // Act 6
     case ages, building, driver, method, health
     // Act 7
@@ -133,7 +133,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
              .widgets, .lab, .automations, .onboard, .pair, .position, .importHistory, .reading,
              .imported, .rejected, .backup,
-             .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused: .plumbing
+             .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration: .plumbing
         case .ages, .building, .driver, .method, .health: .ages
         case .coach, .gate, .setup, .consent, .memory: .svea
         case .goal, .setGoal, .labs, .picker, .review, .marker: .goals
@@ -162,7 +162,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
              .widgets, .lab, .automations, .onboard, .pair, .position, .importHistory, .reading,
              .imported, .rejected, .backup,
-             .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused,
+             .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration,
              .goal, .setGoal, .labs, .picker, .review, .marker:
             .you
         // Act 10 is deliberately not a sixth tab. A lift is an effort, so it lights the same key
@@ -988,7 +988,7 @@ final class NoopNavigation: ObservableObject {
             back(or: .strap)
         case .pair:
             back(or: .devices)
-        case .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused:
+        case .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration:
             back(or: .settings)
         case .widgets, .lab, .automations:
             back(or: .settings)
