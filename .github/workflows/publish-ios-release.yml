@@ -231,9 +231,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Noop-Aura-iOS-${{ env.VERSION }}
-          path: |
-            ${{ env.IPA }}
-            ${{ env.FULL_IPA }}
+          # Only the public IPA: the Full IPA carries the private identity and this repository is public.
+          path: ${{ env.IPA }}
           retention-days: 30
 
       - name: Create or refresh prerelease
@@ -248,7 +247,7 @@ jobs:
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --prerelease --title "Noop Aura $VERSION" --notes-file "$BODY"
           fi
-          gh release upload "$TAG" "$IPA" "$FULL_IPA" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$TAG" "$IPA" --repo "$GITHUB_REPOSITORY" --clobber
 
       - name: Publish to the AltStore and SideStore source
         env:
