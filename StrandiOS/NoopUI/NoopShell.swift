@@ -1690,87 +1690,93 @@ struct NoopCanonicalGlyph: View {
 
 struct NoopBottomNavigation: View {
     @ObservedObject var navigation: NoopNavigation
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Namespace private var pill
 
     var body: some View {
-        GeometryReader { proxy in
-            let tabBudget = max(0, proxy.size.width - 12 - 48 - 12)
-            let unit = tabBudget / 4.7
-
-            HStack(spacing: 3) {
-                tab(.today, unit: unit)
-                tab(.trends, unit: unit)
-
-                Button { navigation.plus() } label: {
-                    Group {
-                        if navigation.route.act == .picture || navigation.route.act == .instrument {
-                            NoopCanonicalGlyph(name: .spark, size: 21, color: NoopHTMLColor.blueInk)
-                        } else {
-                            Text("+")
-                                .font(NoopHTMLFont.outfit(23, weight: .light))
-                                .offset(y: -1)
-                        }
-                    }
-                    .foregroundStyle(NoopHTMLColor.blueInk)
-                    .frame(width: 44, height: 44)
-                    .background(NoopHTMLColor.blue, in: Circle())
-                    .shadow(color: NoopHTMLColor.blue.opacity(0.4), radius: 7, y: 4)
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-                .padding(.horizontal, 2)
-                .accessibilityLabel(navigation.route.act == .picture || navigation.route.act == .instrument ? "Everything you logged" : "Add")
-
-                tab(.rest, unit: unit)
-                tab(.you, unit: unit)
-            }
-            .padding(6)
+        // Owner decision (21 Oct 2026): five equal slots, icons only, so the bar never stretches to
+        // fit a label; the selected tab is a tinted glass pill rather than a solid block of colour.
+        HStack(spacing: 0) {
+            tab(.today)
+            tab(.trends)
+            plusButton
+            tab(.rest)
+            tab(.you)
         }
+        .padding(6)
         .frame(height: 58)
         .frame(maxWidth: .infinity)
-        .background(Color(hex: 0x171C1A, alpha: 0.82), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.5), radius: 13, y: 8)
+        .modifier(NoopGlassBar(reduceTransparency: reduceTransparency))
+        .shadow(color: .black.opacity(0.42), radius: 13, y: 8)
+        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: navigation.route.tab)
     }
 
-    private func tab(_ tab: NoopTab, unit: CGFloat) -> some View {
+    private var plusButton: some View {
+        let spark = navigation.route.act == .picture || navigation.route.act == .instrument
+        return Button { navigation.plus() } label: {
+            Group {
+                if spark {
+                    NoopCanonicalGlyph(name: .spark, size: 21, color: NoopHTMLColor.blueInk)
+                } else {
+                    Text("+")
+                        .font(NoopHTMLFont.outfit(23, weight: .light))
+                        .offset(y: -1)
+                }
+            }
+            .foregroundStyle(NoopHTMLColor.blueInk)
+            .frame(width: 44, height: 44)
+            .background(NoopHTMLColor.blue, in: Circle())
+            .shadow(color: NoopHTMLColor.blue.opacity(0.4), radius: 7, y: 4)
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .frame(maxWidth: .infinity)
+        .accessibilityLabel(spark ? "Everything you logged" : "Add")
+    }
+
+    private func tint(selected: Bool) -> Color {
+        guard selected else { return NoopHTMLColor.copy }
+        switch navigation.route.act {
+        case .night, .svea, .instrument: return NoopHTMLColor.night
+        case .picture, .ages: return NoopHTMLColor.green
+        case .plumbing: return NoopHTMLColor.blush
+        case .goals: return NoopHTMLColor.warm
+        default: return NoopHTMLColor.blue
+        }
+    }
+
+    private func tab(_ tab: NoopTab) -> some View {
         let sveaSlot = navigation.route.act == .svea && tab == .today
         let selected = navigation.route.tab == tab
-        let tint: Color = {
-            guard selected else { return NoopHTMLColor.copy }
-            switch navigation.route.act {
-            case .night: return NoopHTMLColor.night
-            case .picture: return NoopHTMLColor.green
-            case .plumbing: return NoopHTMLColor.blush
-            case .ages: return NoopHTMLColor.green
-            case .svea: return NoopHTMLColor.night
-            // Act 3 keeps the Today key in the shared Aura blue. Amber belongs to the effort
-            // content itself; the prototype never moves the global navigation key into that hue.
-            case .effort: return NoopHTMLColor.blue
-            case .goals: return NoopHTMLColor.warm
-            case .instrument: return NoopHTMLColor.night
-            default: return NoopHTMLColor.blue
-            }
-        }()
+        let tint = tint(selected: selected)
 
         return Button {
             if sveaSlot { navigation.reset(to: .coach) }
             else { navigation.select(tab: tab) }
         } label: {
-            HStack(spacing: 7) {
-                NoopCanonicalGlyph(
-                    name: sveaSlot ? .spark : glyph(for: tab),
-                    size: sveaSlot ? 18 : 19,
-                    color: selected ? selectedInk : Color(hex: 0x7F8A85)
-                )
+            NoopCanonicalGlyph(
+                name: sveaSlot ? .spark : glyph(for: tab),
+                size: 20,
+                color: selected ? tint : Color(hex: 0x7F8A85)
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .background {
                 if selected {
-                    Text(sveaSlot ? "Svea" : tab.rawValue)
-                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                    // Glass, not paint: a tinted wash, a bright top edge, and a hairline rim.
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(LinearGradient(colors: [tint.opacity(0.30), tint.opacity(0.14)],
+                                             startPoint: .top, endPoint: .bottom))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.28), tint.opacity(0.22)],
+                                                             startPoint: .top, endPoint: .bottom),
+                                              lineWidth: 0.6)
+                        )
+                        .shadow(color: tint.opacity(0.35), radius: 10, y: 2)
+                        .matchedGeometryEffect(id: "pill", in: pill)
                 }
             }
-            .foregroundStyle(selected ? selectedInk : Color(hex: 0x7F8A85))
-            .frame(width: unit * (selected ? 1.7 : 1), height: 46)
-            .background(selected ? tint : .clear, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .animation(NoopMotion.arrive, value: navigation.route.act)
+            .contentShape(Rectangle())
         }
         .buttonStyle(NoopHTMLPressStyle())
         .accessibilityLabel(sveaSlot ? "Svea" : tab.rawValue)
@@ -1786,18 +1792,6 @@ struct NoopBottomNavigation: View {
         }
     }
 
-    private var selectedInk: Color {
-        switch navigation.route.act {
-        case .night: Color(hex: 0x0D1120)
-        case .picture: Color(hex: 0x04140C)
-        case .plumbing: NoopHTMLColor.blushInk
-        case .ages: Color(hex: 0x04140C)
-        case .effort: NoopHTMLColor.blueInk
-        case .goals: NoopHTMLColor.warmInk
-        case .instrument: Color(hex: 0x0B0E1A)
-        default: NoopHTMLColor.blueInk
-        }
-    }
 }
 
 // MARK: - Canonical bottom sheets
@@ -2799,6 +2793,40 @@ struct NoopFlowLayout: Layout {
             subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
+        }
+    }
+}
+
+
+/// The tab bar's surface: our own liquid glass, never the system's, so Aura's colours survive. A real
+/// blur of what scrolls underneath, a translucent dark wash in the canvas colour, a light catching the
+/// top edge, and a hairline rim. Opaque when the wearer has asked for reduced transparency.
+private struct NoopGlassBar: ViewModifier {
+    let reduceTransparency: Bool
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
+        if reduceTransparency {
+            content.background(Color(hex: 0x171C1A), in: shape)
+                .overlay(shape.stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+        } else {
+            content
+                .background {
+                    ZStack {
+                        NoopBackdropBlur(style: .systemUltraThinMaterialDark, intensity: 1)
+                        LinearGradient(colors: [Color(hex: 0x1C2220, alpha: 0.55), Color(hex: 0x111514, alpha: 0.70)],
+                                       startPoint: .top, endPoint: .bottom)
+                        // Light catching the upper lip of the glass.
+                        LinearGradient(colors: [Color.white.opacity(0.10), .clear],
+                                       startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.45))
+                    }
+                    .clipShape(shape)
+                }
+                .overlay(
+                    shape.strokeBorder(LinearGradient(colors: [Color.white.opacity(0.22), Color.white.opacity(0.05)],
+                                                      startPoint: .top, endPoint: .bottom),
+                                       lineWidth: 0.6)
+                )
         }
     }
 }
