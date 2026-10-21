@@ -62,7 +62,7 @@ enum PendingIntents {
 /// Record a timestamped "moment" — the iOS analogue of the strap double-tap "mark a moment" action.
 struct MarkMomentIntent: AppIntent {
     static var title: LocalizedStringResource = "Mark a Moment"
-    static var description = IntentDescription("Record a timestamped moment in NOOP.")
+    static var description = IntentDescription("Record a timestamped moment in Noop.")
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         PendingIntents.append(.markMoment, at: Date())
@@ -87,7 +87,7 @@ struct BuzzStrapIntent: AppIntent {
 /// the app handles the actual network call using the user's saved key.
 struct AskCoachIntent: AppIntent {
     static var title: LocalizedStringResource = "Ask Coach"
-    static var description = IntentDescription("Ask your NOOP Coach a question about your recovery, sleep, or training.")
+    static var description = IntentDescription("Ask Svea a question about your recovery, sleep, or training.")
     static var openAppWhenRun = true
 
     /// The question to ask, populated by Siri from the user's spoken phrase.
@@ -104,7 +104,7 @@ struct AskCoachIntent: AppIntent {
 struct RefreshHealthExportIntent: AppIntent {
     static var title: LocalizedStringResource = "Refresh Health Export"
     static var description = IntentDescription(
-        "Update NOOP's Shortcuts export files with any new heart rate, HRV, steps, sleep and workouts.")
+        "Update Noop's Shortcuts export files with any new heart rate, HRV, steps, sleep and workouts.")
     static var openAppWhenRun = true
 
     func perform() async throws -> some IntentResult {
@@ -116,7 +116,7 @@ struct RefreshHealthExportIntent: AppIntent {
 struct ConfirmHealthExportIntent: AppIntent {
     static var title: LocalizedStringResource = "Confirm Health Export"
     static var description = IntentDescription(
-        "Tell NOOP the exported rows have been logged, so it can move on to newer data.")
+        "Tell Noop the exported rows have been logged, so it can move on to newer data.")
     static var openAppWhenRun = true
 
     func perform() async throws -> some IntentResult {

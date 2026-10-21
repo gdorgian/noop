@@ -196,7 +196,7 @@ enum CoachCheckIn {
     static func snooze() {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Your coach has today's brief")
-        content.body = String(localized: "Open NOOP for your readiness and today's plan.")
+        content.body = String(localized: "Open Noop for your readiness and today's plan.")
         content.sound = .default
         content.categoryIdentifier = Action.category
 
@@ -218,7 +218,7 @@ enum CoachCheckIn {
         // does not state figures it can't stand behind. The brief itself is generated on open, where the
         // data is current.
         content.title = String(localized: "Your coach has today's brief")
-        content.body = String(localized: "Open NOOP for your readiness and today's plan.")
+        content.body = String(localized: "Open Noop for your readiness and today's plan.")
         content.sound = .default
         content.categoryIdentifier = Action.category
 

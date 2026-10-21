@@ -3167,8 +3167,12 @@ private struct Act2BreathingOrb: View {
 
     @State private var arrival = Date()
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        NoopAnimatedTimeline(minimumInterval: 1.0 / 60.0) { timeline in
+        // 30 fps like every other ambient loop: the breath is a 16 s cycle whose fastest move is a
+        // 4 s scale, and each frame re-renders two blurs and a 26 pt shadow on the home screen.
+        NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0) { timeline in
             let frame = Act2OrbFrame(
                 elapsed: max(0, timeline.date.timeIntervalSince(arrival)),
                 wakeCharge: wakeCharge,

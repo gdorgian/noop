@@ -55,10 +55,10 @@ final class CoachMetricHistoryTests: XCTestCase {
             .init(day: "2024-12-30", value: 79, source: "apple-health", sourceKey: "weight"),
             .init(day: "2025-01-01", value: 79, source: "my-whoop", sourceKey: "weight")
         ]) { source in
-            source == "apple-health" ? "Apple Health" : "WHOOP / NOOP"
+            source == "apple-health" ? "Apple Health" : "WHOOP / Noop"
         }
 
-        XCTAssertEqual(summary, "Apple Health (2024-01-03 → 2024-12-30; 2 days); WHOOP / NOOP (2025-01-01; 1 days)")
+        XCTAssertEqual(summary, "Apple Health (2024-01-03 → 2024-12-30; 2 days); WHOOP / Noop (2025-01-01; 1 days)")
         XCTAssertFalse(summary.contains("81"), "provenance must not leak individual readings")
     }
 

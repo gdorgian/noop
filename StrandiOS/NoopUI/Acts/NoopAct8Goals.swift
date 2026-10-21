@@ -422,9 +422,7 @@ private struct NoopGoalJourney: View {
                     }.buttonStyle(.plain)
                     Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
-                    Button("Change it") { navigation.push(.setGoal) }
-                        .buttonStyle(NoopHTMLButtonStyle(kind: .secondary))
-                        .frame(height: 30)
+                    NoopGoalChangeButton { navigation.push(.setGoal) }
                 }
                 .padding(.horizontal, -2)
 
@@ -483,7 +481,7 @@ private struct NoopGoalJourney: View {
                                     Text(waypoint.detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(2)
                                 }
                                 Spacer()
-                                NoopPill(text: waypoint.tag, color: waypoint.done ? Color(hex: 0xF6DCB4) : NoopHTMLColor.copy)
+                                NoopGoalTag(text: waypoint.tag, done: waypoint.done)
                             }.padding(.vertical, 14)
                             if index < waypoints.count - 1 { Divider().overlay(NoopHTMLColor.border) }
                         }
@@ -565,9 +563,7 @@ private struct NoopGoalJourney: View {
                     }.buttonStyle(.plain)
                     Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
-                    Button("Change it") { navigation.push(.setGoal) }
-                        .buttonStyle(NoopHTMLButtonStyle(kind: .secondary))
-                        .frame(height: 30)
+                    NoopGoalChangeButton { navigation.push(.setGoal) }
                 }
                 .padding(.horizontal, -2)
 
@@ -633,8 +629,7 @@ private struct NoopGoalJourney: View {
                                         .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(2)
                                 }
                                 Spacer()
-                                NoopPill(text: done ? "reached" : milestone.id == next ? "next" : "ahead",
-                                         color: done ? Color(hex: 0xF6DCB4) : NoopHTMLColor.copy)
+                                NoopGoalTag(text: done ? "reached" : milestone.id == next ? "next" : "ahead", done: done)
                             }.padding(.vertical, 14)
                             if index < goal.milestones.count - 1 { Divider().overlay(NoopHTMLColor.border) }
                         }
@@ -797,6 +792,9 @@ private struct NoopGoalRouteGraphic: View {
                     .frame(width: 300, height: 270)
                     .blur(radius: 18)
                     .opacity(pulse)
+                    // Drawn at full size but laid out at zero: the 270 pt glow made this 252 pt ZStack
+                    // 270 tall, which pushed the date and the caption 9 pt past their HTML positions.
+                    .frame(width: 0, height: 0)
 
                 routeSpecks
                     .rotationEffect(.degrees(spin))
@@ -851,6 +849,9 @@ private struct NoopGoalRouteGraphic: View {
                             Text(progressText)
                                 .font(NoopHTMLFont.outfit200(50))
                                 .tracking(-2.25)
+                                // CSS line-height: 1. Outfit's natural line box is taller and pushed the
+                                // caption ~10 pt below the HTML's.
+                                .frame(height: 50)
                                 .shadow(color: .black.opacity(0.75), radius: 12, y: 2)
                             Text("OF THE ROUTE, RECORDED")
                                 .font(NoopHTMLFont.sans(10.5, weight: .semibold))
@@ -3621,5 +3622,43 @@ final class NoopLabBook: ObservableObject {
             defaults.removeObject(forKey: "noop.html.marker.\(marker.name).value")
             defaults.removeObject(forKey: "noop.html.marker.\(marker.name).date")
         }
+    }
+}
+
+
+/// The journey header's "Change it": the HTML's 30 pt pill, 11.5 pt semibold. The shared secondary
+/// button style is taller than that, so wrapping it in a 30 pt frame let it draw over the countdown row.
+private struct NoopGoalChangeButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text("Change it")
+                .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                .foregroundStyle(Color(hex: 0xC6CEC9))
+                .padding(.horizontal, 12)
+                .frame(height: 30)
+                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+    }
+}
+
+/// A waypoint's state, as the HTML's `tagStyle`: uppercase 10 pt, warm when reached.
+private struct NoopGoalTag: View {
+    let text: String
+    let done: Bool
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(NoopHTMLFont.sans(10, weight: .semibold))
+            .tracking(0.8)
+            .foregroundStyle(done ? Color(hex: 0xF6DCB4) : Color(hex: 0x7F8A85))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(done ? Color(hex: 0xF2B45C).opacity(0.14) : Color.white.opacity(0.05),
+                        in: RoundedRectangle(cornerRadius: 7))
+            .fixedSize()
     }
 }

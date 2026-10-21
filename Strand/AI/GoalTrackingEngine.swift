@@ -220,7 +220,7 @@ enum GoalTrackingEngine {
             nextAction = currentWeek.open > 0 ? "Complete the next planned commitment." : "Keep the next step realistic."
         } else if unmeasurable {
             health = .building
-            reason = "This goal is held, not measured — NOOP has no number that tracks it."
+            reason = "This goal is held, not measured — Noop has no number that tracks it."
             nextAction = currentWeek.planned == 0
                 ? "Plan a concrete step, or talk it through with the coach."
                 : "Keep the planned steps going."

@@ -2887,7 +2887,7 @@ final class IntelligenceEngine: ObservableObject {
 
         results = out
         note = out.isEmpty
-            ? "No scored nights yet. Wear the strap with NOOP connected overnight and the engine will score your charge, effort and rest itself, no WHOOP cloud required."
+            ? "No scored nights yet. Wear the strap with Noop connected overnight and the engine will score your charge, effort and rest itself, no WHOOP cloud required."
             : nil
 
         // Reload the dashboard caches so the freshly computed scores show up immediately. A heal-only

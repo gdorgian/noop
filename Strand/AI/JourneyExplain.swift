@@ -69,7 +69,7 @@ enum JourneyExplain {
         case .weight:
             return SessionRule(
                 noun: "weigh-in", pluralNoun: "weigh-ins",
-                definition: String(localized: "Body weight moves with what you eat, and NOOP has no nutrition data. What's counted here is weigh-ins — training sessions are shown under Planned vs actual instead."),
+                definition: String(localized: "Body weight moves with what you eat, and Noop has no nutrition data. What's counted here is weigh-ins — training sessions are shown under Planned vs actual instead."),
                 countsPlanSessions: false, allowsManualLog: false)
         case .custom:
             // The honest fallback for a goal NOOP cannot categorise at all: anything the user attributed
@@ -77,7 +77,7 @@ enum JourneyExplain {
             // a counter permanently stuck at zero with no explanation.
             return SessionRule(
                 noun: "session", pluralNoun: "sessions",
-                definition: String(localized: "This is your own goal, so NOOP can't know what counts towards it. Anything you log against it counts, as does any session you tick off in Your plan while it's active."),
+                definition: String(localized: "This is your own goal, so Noop can't know what counts towards it. Anything you log against it counts, as does any session you tick off in Your plan while it's active."),
                 countsPlanSessions: true, allowsManualLog: true)
         }
     }

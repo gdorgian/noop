@@ -304,7 +304,7 @@ enum AICoachError: LocalizedError, Equatable {
         case .offline:
             // No CFNetwork prose: the cause is plain, and the coach is the only part of NOOP that needs
             // a connection at all — worth saying, so an offline user doesn't think the app is broken.
-            return String(localized: "You're offline. The coach needs a connection; everything else in NOOP keeps working.")
+            return String(localized: "You're offline. The coach needs a connection; everything else in Noop keeps working.")
         case .server(let code, let detail):
             let extra = detail.isEmpty ? "" : " - \(detail)"
             return String(localized: "The provider returned an error (\(code))\(extra).")
@@ -3499,7 +3499,7 @@ final class AICoachEngine: ObservableObject {
                          + "flagging recovery signals honestly.")
         }
         if goal.kind == .weight {
-            lines.append("NOTE: NOOP holds no nutrition data. Plan TRAINING around this goal and say "
+            lines.append("NOTE: Noop holds no nutrition data. Plan TRAINING around this goal and say "
                          + "plainly that diet is outside what you can see.")
         }
         // The structured WHY (motivation tags): coarse categories the user picked, so the coach can

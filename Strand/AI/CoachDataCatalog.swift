@@ -122,7 +122,7 @@ struct CoachDataCatalog {
 enum CoachLocalSourceLabel {
     static func label(_ source: String) -> String {
         switch source {
-        case Repository.whoopSource: return "WHOOP / NOOP"
+        case Repository.whoopSource: return "WHOOP / Noop"
         case Repository.appleHealthSource: return "Apple Health"
         case Repository.healthConnectSource: return "Health Connect"
         case WhoopStore.labBookSourceId: return "Lab Book"
@@ -133,7 +133,7 @@ enum CoachLocalSourceLabel {
             // Active straps use a durable `whoop-<uuid>` identifier rather than the canonical import
             // id. It is still WHOOP data; never turn that opaque identifier into a misleading generic
             // import label in a coach provenance line.
-            if source.hasPrefix("whoop-") || source.hasSuffix("-noop") { return "WHOOP / NOOP" }
+            if source.hasPrefix("whoop-") || source.hasSuffix("-noop") { return "WHOOP / Noop" }
             return "Another local import"
         }
     }
