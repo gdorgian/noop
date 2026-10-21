@@ -2269,6 +2269,11 @@ private struct NoopLabReview: View {
 
     private var reviewNote: String {
         if confirmedCount == 0 {
+            // A photo review counts what is left to check, as the design's bar does; only the
+            // typed form, which has no rows to check, explains Save instead.
+            if !draft.isManual, pendingCount > 0 {
+                return "\(pendingCount) still to check · \(discardedCount) discarded"
+            }
             return draft.isManual
                 ? "Type a value and use it — Save does nothing until then"
                 : "Confirm or fix a row — Save does nothing until then"

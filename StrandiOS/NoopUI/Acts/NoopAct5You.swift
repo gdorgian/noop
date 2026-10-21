@@ -909,8 +909,8 @@ private extension NoopAct5Screens {
                                 Text("used in the calorie and VO₂max models")
                                     .font(NoopHTMLFont.sans(11))
                                     .foregroundStyle(Color(hex: 0x7F8A85))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.82)
+                                    // Wraps as in the design rather than shrinking into "VO₂ma…".
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                             Spacer(minLength: 4)
                             compactSexControl
@@ -1017,7 +1017,7 @@ private extension NoopAct5Screens {
                         Text("Sex").font(NoopHTMLFont.sans(13.5))
                         Text("used in the calorie and VO₂max models")
                             .font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
-                            .lineLimit(1).minimumScaleFactor(0.82)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 4)
                     liveSexControl
