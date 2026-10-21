@@ -235,7 +235,7 @@ struct NoopEnergyProfileConfirmation: View {
                         .font(NoopHTMLFont.sans(14, weight: .semibold))
                         .frame(maxWidth: .infinity).frame(height: 52)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 .foregroundStyle(canConfirm ? NoopHTMLColor.canvas : NoopHTMLColor.copy)
                 .background(canConfirm ? NoopHTMLColor.blue : NoopHTMLColor.card,
                             in: RoundedRectangle(cornerRadius: 17))
@@ -430,7 +430,7 @@ struct NoopAct2Screens: View {
                         .padding(.horizontal, 2)
                         .padding(.bottom, 8)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                     }
 
                     if day == nil || todayLastSleepLine != nil {
@@ -833,7 +833,7 @@ struct NoopAct2Screens: View {
                     .background(dayRailOpen || isHistorical ? NoopHTMLColor.blue.opacity(0.14) : Color.white.opacity(0.06), in: Capsule())
                     .overlay(Capsule().stroke(dayRailOpen || isHistorical ? NoopHTMLColor.blue.opacity(0.34) : Color.white.opacity(0.1), lineWidth: 0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 }
 
                 Button { navigation.push(.inbox) } label: {
@@ -860,7 +860,7 @@ struct NoopAct2Screens: View {
                     }
                     .frame(width: 32, height: 32)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 .accessibilityLabel(
                     inboxUnreadCount > 0
                         ? "Updates, \(inboxUnreadCount) unread"
@@ -936,7 +936,7 @@ struct NoopAct2Screens: View {
                         .background(selected ? NoopHTMLColor.blue.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
                         .overlay(RoundedRectangle(cornerRadius: 15).stroke(selected ? NoopHTMLColor.blue.opacity(0.42) : NoopHTMLColor.border, lineWidth: 0.5))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                 }
             }
             .padding(.horizontal, 20)
@@ -1134,7 +1134,7 @@ struct NoopAct2Screens: View {
                 .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(tint.opacity(0.34), lineWidth: 0.5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
     }
 
     private var inboxUnreadCount: Int {
@@ -1937,7 +1937,7 @@ struct NoopAct2Screens: View {
                                     .opacity(selected ? 1 : 0.78)
                                     .animation(.easeInOut(duration: 0.18), value: selected)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(NoopPlainHitStyle())
                                 if index < dayContext.marks.count - 1 { Divider().overlay(NoopHTMLColor.border) }
                             }
                         }
@@ -2132,7 +2132,7 @@ struct NoopAct2Screens: View {
                                 .background(selected ? Color.white.opacity(0.07) : Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(selected ? Color.white.opacity(0.16) : Color.white.opacity(0.05), lineWidth: 0.5))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(NoopPlainHitStyle())
                         }
                     }
 
@@ -2490,7 +2490,7 @@ private struct Act2BackBar: View {
                 // CSS width/height are 34px content-box plus a 0.5px border.
                 .frame(width: 35, height: 35)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             Text(label)
                 .font(NoopHTMLFont.sans(13.5))
                 .foregroundStyle(NoopHTMLColor.copy)
@@ -2883,7 +2883,7 @@ private struct Act2SpotReadingCard: View {
                         .overlay(RoundedRectangle(cornerRadius: 11)
                             .strokeBorder((phase == .run ? Color.white : NoopHTMLColor.blue).opacity(0.4), lineWidth: 0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 .disabled(!glance.bonded && phase != .run)
                 .opacity(!glance.bonded && phase != .run ? 0.45 : 1)
             }
@@ -4289,7 +4289,7 @@ struct NoopBreatheScreens: View {
                 .frame(width: 35, height: 35)
                 .contentShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             .accessibilityLabel("Back")
             Text(label)
                 .font(NoopHTMLFont.sans(13.5))
@@ -4312,7 +4312,7 @@ struct NoopBreatheScreens: View {
             .frame(width: 35, height: 35)
             .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
         .accessibilityLabel("Close")
     }
 
@@ -4669,7 +4669,7 @@ struct NoopBreatheScreens: View {
                 if !last { Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5) }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
     }
 
     // MARK: 2.10 bplayer

@@ -135,7 +135,7 @@ struct NoopOnboardingView: View {
                         .background(schedule == option ? Color(hex: 0xE08A9B).opacity(0.1) : NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
                         .overlay(RoundedRectangle(cornerRadius: 20).stroke(schedule == option ? Color(hex: 0xE08A9B).opacity(0.4) : NoopHTMLColor.border, lineWidth: 0.5))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                 }
             }
 

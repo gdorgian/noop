@@ -218,6 +218,14 @@ enum GoalTrackingEngine {
                 ? "Measured progress is ahead of the target-date pace."
                 : "The latest available evidence is on track."
             nextAction = currentWeek.open > 0 ? "Complete the next planned commitment." : "Keep the next step realistic."
+        } else if unmeasurable && goal.kind.isQuantified && goal.target != nil && goal.targetDate != nil {
+            // A measurable goal with nothing recorded yet is waiting for its first reading, not
+            // unmeasurable: saying "no number tracks it" told a runner their run goal was untrackable.
+            health = .building
+            reason = goal.kind == .run
+                ? "No run with a distance is recorded yet. The first one starts the route."
+                : "Nothing is measured for this goal yet. The first reading starts the route."
+            nextAction = currentWeek.planned == 0 ? "Plan one concrete step for this goal." : "Keep the planned steps going."
         } else if unmeasurable {
             health = .building
             reason = "This goal is held, not measured — Noop has no number that tracks it."

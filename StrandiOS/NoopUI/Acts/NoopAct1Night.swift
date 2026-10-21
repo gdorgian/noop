@@ -268,7 +268,7 @@ struct NoopAct1Screens: View {
                                 }
                                 .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(NoopPlainHitStyle())
                             .disabled(night.value <= 0)
                         }
                     }
@@ -329,7 +329,7 @@ struct NoopAct1Screens: View {
                         }
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 .disabled(!restHasTimeline)
                 }
 
@@ -414,7 +414,7 @@ struct NoopAct1Screens: View {
                     .background(selected ? Color.white.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 10))
                     .opacity(dimmed ? 0.45 : 1)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
             }
         }
     }
@@ -511,7 +511,7 @@ struct NoopAct1Screens: View {
                                     .background(selected ? NoopHTMLColor.blue.opacity(0.16) : Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 15))
                                     .overlay(RoundedRectangle(cornerRadius: 15).stroke(selected ? NoopHTMLColor.blue.opacity(0.55) : NoopHTMLColor.border, lineWidth: 0.5))
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(NoopPlainHitStyle())
                             }
                         }
 
@@ -572,7 +572,7 @@ struct NoopAct1Screens: View {
                             }
                             .frame(minHeight: 74)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(NoopPlainHitStyle())
                         Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
                         tonightToggle(
                             glyph: .watch,
@@ -820,7 +820,7 @@ struct NoopAct1Screens: View {
             .background(open ? Color.white.opacity(0.055) : NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(open ? Color.white.opacity(0.13) : NoopHTMLColor.border, lineWidth: 0.5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
     }
 
     // MARK: - Debt
@@ -849,7 +849,7 @@ struct NoopAct1Screens: View {
                                     .background(selected ? NoopHTMLColor.night : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 13))
                                     .overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? .clear : Color.white.opacity(0.07), lineWidth: 0.5))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(NoopPlainHitStyle())
                         }
                     }
 
@@ -1295,7 +1295,7 @@ struct NoopAct1Screens: View {
             }
             .frame(width: 40, height: 40)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
         .accessibilityLabel(later ? "Five minutes later" : "Five minutes earlier")
     }
 
@@ -1338,7 +1338,7 @@ struct NoopAct1Screens: View {
                                         .strokeBorder(on ? NoopHTMLColor.night.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 0.5))
                             )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                     .accessibilityLabel(label)
                     .accessibilityValue(on ? "armed" : "not armed")
                 }
@@ -1375,7 +1375,7 @@ struct NoopAct1Screens: View {
                                 .fill(on ? NoopHTMLColor.night.opacity(0.2) : .clear)
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                     .disabled(unavailable)
                     .opacity(unavailable ? 0.38 : 1)
                 }
@@ -1505,7 +1505,7 @@ struct NoopAct1Screens: View {
                             .strokeBorder(alarmArmed ? NoopHTMLColor.night.opacity(0.36) : .clear, lineWidth: 0.5))
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
     }
     /// Armed means the strap alarm is on, in production; the prototype keeps its own flag.
     private var alarmArmed: Bool { rest != nil ? behavior.smartAlarmEnabled : smartWake }
@@ -1578,7 +1578,7 @@ private struct Act1BackHeader: View {
                 }
                 .frame(width: 34, height: 34)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             Text(label)
                 .font(NoopHTMLFont.sans(13.5))
                 .foregroundStyle(NoopHTMLColor.copy)
@@ -1687,7 +1687,7 @@ private struct Act1Toggle: View {
             }
             .frame(width: 46, height: 28)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
         .animation(.timingCurve(0.34, 1.25, 0.64, 1, duration: 0.24), value: isOn)
     }
 }
@@ -2037,7 +2037,7 @@ private struct Act1DebtChart: View {
                 HStack(spacing: 0) {
                     ForEach(values.indices, id: \.self) { index in
                         Button { onSelect(index) } label: { Color.clear }
-                            .buttonStyle(.plain)
+                            .buttonStyle(NoopPlainHitStyle())
                     }
                 }
 

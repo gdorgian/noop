@@ -410,7 +410,7 @@ private struct NoopInstrumentBackHeader: View {
                 }
                 .frame(width: 34, height: 34)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             Text(label)
                 .font(NoopHTMLFont.sans(13.5))
                 .foregroundStyle(NoopHTMLColor.copy)
@@ -575,7 +575,7 @@ private struct NoopInstrumentRawScreen: View {
                                 }
                                 .frame(minHeight: 68).contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(NoopPlainHitStyle())
                             if session.id != sessions.last?.id {
                                 Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
                             }
@@ -637,7 +637,7 @@ private struct NoopInstrumentRawScreen: View {
                     .overlay(RoundedRectangle(cornerRadius: 18)
                         .strokeBorder(active == nil ? Color.white.opacity(0.16) : Color.clear, lineWidth: 0.5))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
         }
         .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -695,7 +695,7 @@ private struct NoopInstrumentRawScreen: View {
                             .font(NoopHTMLFont.sans(14, weight: .semibold))
                             .frame(maxWidth: .infinity).frame(height: 52)
                     }
-                    .buttonStyle(.plain).disabled(exporting || selected.active)
+                    .buttonStyle(NoopPlainHitStyle()).disabled(exporting || selected.active)
                     .foregroundStyle(NoopHTMLColor.ink)
                     .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 17))
                     .padding(.top, 12)
@@ -703,7 +703,7 @@ private struct NoopInstrumentRawScreen: View {
                         Text("Delete this capture").font(NoopHTMLFont.sans(14))
                             .frame(maxWidth: .infinity).frame(height: 52)
                     }
-                    .buttonStyle(.plain).disabled(selected.active)
+                    .buttonStyle(NoopPlainHitStyle()).disabled(selected.active)
                     .foregroundStyle(NoopHTMLColor.ink)
                     .overlay(RoundedRectangle(cornerRadius: 17)
                         .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))

@@ -287,7 +287,7 @@ private struct NoopSveaCoach: View {
                         Button("Undo") { proposal = "open" }
                             .font(NoopHTMLFont.sans(11.5, weight: .semibold))
                             .foregroundStyle(Color(hex: 0xA9B4E0))
-                            .buttonStyle(.plain)
+                            .buttonStyle(NoopPlainHitStyle())
                     }
                     .padding(.horizontal, 13)
                     .padding(.vertical, 12)
@@ -453,7 +453,7 @@ private struct NoopSveaCoach: View {
             Button("Cancel", action: micCancel)
                 .font(NoopHTMLFont.sans(11.5, weight: .semibold))
                 .foregroundStyle(Color(hex: 0xC6CEC9))
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
             // Waveform and clock tick together off the same clock as the HTML's 100 ms interval.
             NoopAnimatedTimeline(minimumInterval: 0.1) { timeline in
                 let ms = (micStartedAt.map { timeline.date.timeIntervalSince($0) } ?? 0) * 1000
@@ -536,7 +536,7 @@ private struct NoopSveaCoach: View {
                         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
             }
         }
         .padding(.horizontal, 16)
@@ -1156,7 +1156,7 @@ private struct NoopSveaSetup: View {
                         Button(keyAction, action: handleKeyAction)
                             .font(NoopHTMLFont.sans(11.5, weight: .semibold))
                             .foregroundStyle(Color(hex: 0xA9B4E0))
-                            .buttonStyle(.plain)
+                            .buttonStyle(NoopPlainHitStyle())
                     }
                     .padding(.horizontal, 14)
                     .frame(height: 48)
@@ -1583,7 +1583,7 @@ private struct NoopSveaConsent: View {
                     Button(expert ? "Fewer" : "Show all seven") { expert.toggle() }
                         .font(NoopHTMLFont.sans(11.5, weight: .semibold))
                         .foregroundStyle(Color(hex: 0xA9B4E0))
-                        .buttonStyle(.plain)
+                        .buttonStyle(NoopPlainHitStyle())
                 }
                 .padding(.bottom, 4)
 
@@ -1857,7 +1857,7 @@ private struct NoopSveaMemory: View {
                                 Button("Forget") { forget(item) }
                                     .font(NoopHTMLFont.sans(11.5, weight: .semibold))
                                     .foregroundStyle(Color(hex: 0xA9B4E0))
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(NoopPlainHitStyle())
                             }
                             .frame(minHeight: 62)
                             .padding(.vertical, 13)
@@ -2574,6 +2574,7 @@ private struct NoopSveaActionButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
             .foregroundStyle(primary ? Color(hex: 0x0C1024) : NoopHTMLColor.inkSoft)
             .frame(maxWidth: .infinity)
@@ -2587,6 +2588,7 @@ private struct NoopSveaActionButtonStyle: ButtonStyle {
 private struct NoopSveaPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
             .font(NoopHTMLFont.sans(14, weight: .semibold))
             .foregroundStyle(Color(hex: 0x0C1024))
             .frame(maxWidth: .infinity)
@@ -2603,6 +2605,7 @@ private struct NoopSveaSecondaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
             .font(NoopHTMLFont.sans(fontSize, weight: .semibold))
             .foregroundStyle(NoopHTMLColor.inkSoft)
             .frame(maxWidth: .infinity)
@@ -2616,6 +2619,7 @@ private struct NoopSveaSecondaryButtonStyle: ButtonStyle {
 private struct NoopSveaWarmButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
             .foregroundStyle(Color(hex: 0xF3C888))
             .frame(maxWidth: .infinity)
@@ -2629,6 +2633,7 @@ private struct NoopSveaWarmButtonStyle: ButtonStyle {
 private struct NoopSveaTintButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
             .foregroundStyle(Color(hex: 0xC9D0EE))
             .frame(maxWidth: .infinity)

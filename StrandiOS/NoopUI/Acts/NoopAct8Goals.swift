@@ -395,6 +395,7 @@ private struct NoopGoalJourney: View {
     @ObservedObject private var goalStore = CoachGoalStore.shared
     @ObservedObject private var tracking = GoalTrackingStore.shared
     @EnvironmentObject private var repo: Repository
+    @EnvironmentObject private var coach: AICoachEngine
     @AppStorage("noop.html.active-goal-kind") private var activeKind = NoopGoalKind.distance.rawValue
     @AppStorage("noop.html.active-goal-title") private var activeTitle = "Half marathon on 26 October, finishing comfortably."
     @State private var weekState = "open"
@@ -419,7 +420,7 @@ private struct NoopGoalJourney: View {
                             Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                             NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
                         }.frame(width: 34, height: 34)
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(NoopPlainHitStyle())
                     Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
                     NoopGoalChangeButton { navigation.push(.setGoal) }
@@ -549,6 +550,25 @@ private struct NoopGoalJourney: View {
     /// The journey over `GoalTrackingStore`: the route drawn to the measured progress, the tracker's
     /// own verdict and reason, and the goal's dated waypoints. Svea's week proposal and the biomarker
     /// summary have no production source here and are left out.
+    /// Goals committed by builds before 21 Oct 2026 carry no baseline and can never be measured. Give a
+    /// running goal the wearer's longest recent run (0 km with none) and a weight goal the recorded
+    /// weight, once; everything else about the goal is kept.
+    private func repairMissingBaseline(_ goal: CoachGoal) async {
+        guard goal.baseline == nil, goal.target != nil else { return }
+        var repaired = goal
+        switch goal.kind {
+        case .run:
+            repaired.baseline = await coach.goalEvidence().longestRecentRunKm ?? 0
+        case .weight:
+            let recorded = ProfileStore().weightKg
+            guard recorded > 0 else { return }
+            repaired.baseline = recorded
+        default:
+            return
+        }
+        goalStore.commit(repaired, editingId: goal.id)
+    }
+
     private func liveJourney(_ goal: CoachGoal) -> some View {
         let snapshot = tracking.snapshot(for: goal.id)
         let progress = snapshot?.progressFraction
@@ -560,7 +580,7 @@ private struct NoopGoalJourney: View {
                             Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                             NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
                         }.frame(width: 34, height: 34)
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(NoopPlainHitStyle())
                     Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
                     NoopGoalChangeButton { navigation.push(.setGoal) }
@@ -651,7 +671,10 @@ private struct NoopGoalJourney: View {
                     .padding(.top, 6)
             }
         }
-        .task(id: repo.refreshSeq) { await tracking.refresh(repo: repo) }
+        .task(id: repo.refreshSeq) {
+            await repairMissingBaseline(goal)
+            await tracking.refresh(repo: repo)
+        }
     }
 
     private func liveEvidenceNote(for goal: CoachGoal) -> String {
@@ -1107,7 +1130,7 @@ private struct NoopGoalSet: View {
                                             .padding(.horizontal, 13).frame(height: 36)
                                             .background(navigation.selectedGoal == kind ? Color(hex: 0xF2B45C) : Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 11))
                                             .overlay(RoundedRectangle(cornerRadius: 11).stroke(navigation.selectedGoal == kind ? .clear : Color.white.opacity(0.1), lineWidth: 0.5))
-                                    }.buttonStyle(.plain)
+                                    }.buttonStyle(NoopPlainHitStyle())
                                     .disabled(unavailable)
                                     .opacity(unavailable ? 0.38 : 1)
                                 }
@@ -1128,7 +1151,7 @@ private struct NoopGoalSet: View {
                                         RoundedRectangle(cornerRadius: 3)
                                             .fill(index == selectedWeekIndex ? Color(hex: 0xF2B45C) : index < selectedWeekIndex ? Color(hex: 0xF2B45C).opacity(0.32) : Color.white.opacity(0.1))
                                             .frame(height: index == selectedWeekIndex ? 34 : 24)
-                                    }.buttonStyle(.plain)
+                                    }.buttonStyle(NoopPlainHitStyle())
                                 }
                             }
                             HStack { Text("6 weeks"); Spacer(); Text("a year") }.font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
@@ -1333,8 +1356,10 @@ private struct NoopGoalSet: View {
         case .distance:
             let activity = defaults.string(forKey: "\(prefix).activity") ?? "Run"
             kind = activity == "Run" ? .run : .custom
-            // The example person's first 12 km run is not the wearer's baseline; the tracker measures one.
-            baseline = NoopContentPolicy.allowsPrototypeContent ? 12 : nil
+            // The wearer's own starting point: the longest recent run, or 0 km when none is recorded.
+            // A nil baseline left every Aura distance goal "held, not measured" for its whole life,
+            // because the tracker cannot price progress without a start (JourneyExplain.trend).
+            baseline = NoopContentPolicy.allowsPrototypeContent ? 12 : (evidence?.longestRecentRunKm ?? 0)
             let selectedDistance = defaults.string(forKey: "\(prefix).distance") ?? "Half marathon"
             let distance = NoopProductionGoalDetails.distance(selectedDistance,
                 custom: defaults.string(forKey: "\(prefix).custom-distance") ?? "")
@@ -1351,7 +1376,9 @@ private struct NoopGoalSet: View {
             target = Double(defaults.string(forKey: "\(prefix).sleep-nights") ?? "5")
         case .composition:
             kind = (defaults.string(forKey: "\(prefix).composition-metric") ?? "Weight") == "Weight" ? .weight : .custom
-            baseline = nil
+            // Weight starts from the weight in the wearer's record, the same figure Today and You show.
+            let recorded = ProfileStore().weightKg
+            baseline = kind == .weight && recorded > 0 ? recorded : nil
             target = kind == .weight ? Double((defaults.string(forKey: "\(prefix).target-value") ?? "")
                 .replacingOccurrences(of: ",", with: ".")) : nil
         }
@@ -1599,7 +1626,7 @@ private struct NoopLabsHome: View {
                             NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
                         }
                         .frame(width: 34, height: 34)
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(NoopPlainHitStyle())
                     Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
                     // Add results enters the picker. It must not raise a photo-source dialogue:
@@ -1677,7 +1704,7 @@ private struct NoopLabsHome: View {
                             .frame(minHeight: 62)
                             .padding(.vertical, 13)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(NoopPlainHitStyle())
                         if index < markers.count - 1 { Divider().overlay(NoopHTMLColor.border) }
                     }
                 }
@@ -1770,7 +1797,7 @@ private struct NoopLabPicker: View {
                 }
                 .frame(width: 34, height: 34)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             .accessibilityLabel("Biomarkers")
             Text("Biomarkers").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
             Spacer()
@@ -1812,7 +1839,7 @@ private struct NoopLabPicker: View {
                     .fill(NoopHTMLColor.warm)   // #F2B45C — Act 8 lab chrome, not the attention amber
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
     }
 
     // `[bound]` in the spec: recent camera-roll candidates, so a report photographed earlier does
@@ -1859,7 +1886,7 @@ private struct NoopLabPicker: View {
                         .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
         }
     }
 
@@ -1896,7 +1923,7 @@ private struct NoopLabPicker: View {
                     )
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
         .accessibilityLabel("Enter results by hand")
     }
 
@@ -1951,7 +1978,7 @@ private struct NoopLabRecentTileRow: View {
                             .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 .accessibilityLabel("A photo from \(stamp)")
             }
         }
@@ -2124,7 +2151,7 @@ private struct NoopLabReview: View {
                 }
                 .frame(width: 34, height: 34)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             .accessibilityLabel("Biomarkers")
             Text("Biomarkers")
                 .font(NoopHTMLFont.sans(13.5))
@@ -2440,7 +2467,7 @@ private struct NoopLabImageCard: View {
                     Button("Retake", action: retake)
                         .font(NoopHTMLFont.sans(11, weight: .semibold))
                         .foregroundStyle(Color(hex: 0xF6DCB4))
-                        .buttonStyle(.plain)
+                        .buttonStyle(NoopPlainHitStyle())
                 }
                 .padding(.leading, 12)
                 .padding(.trailing, 10)
@@ -2578,7 +2605,7 @@ private struct NoopLabImageViewer: View {
                         .frame(width: 36, height: 36)
                         .background(Color.white.opacity(0.14), in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 .padding(.top, 54)
                 .padding(.trailing, 18)
             }
@@ -2649,7 +2676,7 @@ private struct NoopOCRCandidateCard: View {
                             Button { openSource(rect) } label: {
                                 NoopLabSourceStrip(image: image, rect: rect)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(NoopPlainHitStyle())
                             Text("FROM THE PAGE")
                                 .font(NoopHTMLFont.sans(9.5, weight: .semibold))
                                 .tracking(0.95)
@@ -3351,6 +3378,7 @@ private struct NoopOCRActionStyle: ButtonStyle {
     var enabled = true
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
             .foregroundStyle(primary ? (enabled ? NoopHTMLColor.warmInk : NoopHTMLColor.faint) : NoopHTMLColor.inkSoft)
             .frame(maxWidth: .infinity)
@@ -3374,6 +3402,7 @@ private struct NoopAct8WeekActionStyle: ButtonStyle {
     let primary: Bool
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
             .foregroundStyle(primary ? Color(hex: 0x0C1024) : NoopHTMLColor.inkSoft)
             .frame(maxWidth: .infinity)

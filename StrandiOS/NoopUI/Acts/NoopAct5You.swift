@@ -464,7 +464,7 @@ private extension NoopAct5Screens {
                             .background(selected ? tint.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11))
                             .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? tint.opacity(0.42) : .clear, lineWidth: 0.5))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                     .disabled(disabled)
                     .opacity(disabled ? 0.34 : 1)
                 }
@@ -1118,7 +1118,7 @@ private extension NoopAct5Screens {
                         .background(selected ? Self.blush.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
             }
         }
         .padding(3)
@@ -1161,7 +1161,7 @@ private extension NoopAct5Screens {
                         .background(selected ? Self.blush.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
             }
         }
         .padding(3)
@@ -1215,6 +1215,7 @@ private extension NoopAct5Screens {
 private struct NoopA5StepButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
             .foregroundStyle(NoopHTMLColor.inkSoft)
             .frame(width: 30, height: 30)
             .background(Color.white.opacity(configuration.isPressed ? 0.12 : 0.07), in: RoundedRectangle(cornerRadius: 10))
@@ -1377,7 +1378,7 @@ private extension NoopAct5Screens {
                                 .background(historyFilter == filter ? Self.blush.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(historyFilter == filter ? Self.blush.opacity(0.4) : Color.white.opacity(0.07), lineWidth: 0.5))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(NoopPlainHitStyle())
                     }
                 }
 
@@ -1418,7 +1419,7 @@ private extension NoopAct5Screens {
                             .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5)
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
 
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(filteredHistory) { day in
@@ -2793,7 +2794,7 @@ private extension NoopAct5Screens {
                         .background(choice == selection ? Self.blush.opacity(0.20) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(choice == selection ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
             }
         }
         .padding(4)
@@ -4076,7 +4077,7 @@ struct NoopA5TintToggle: View {
                 }
                 .animation(.timingCurve(0.34, 1.25, 0.64, 1, duration: 0.24), value: isOn)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
     }
 }
 
@@ -4207,7 +4208,7 @@ private extension NoopAct5Screens {
                                 .background(Color.white.opacity(0.06), in: Circle())
                                 .overlay(Circle().stroke(Color.white.opacity(0.09), lineWidth: 0.5))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(NoopPlainHitStyle())
                         Spacer()
                         NoopSectionLabel(paired ? "Paired" : "Looking")
                         Spacer()
@@ -4412,6 +4413,7 @@ private extension NoopAct5Screens {
 private struct NoopA5CompactStepStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
             .foregroundStyle(Color(hex: 0xC6CEC9))
             .background(Color.white.opacity(configuration.isPressed ? 0.12 : 0.07), in: RoundedRectangle(cornerRadius: 9))
             .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.11), lineWidth: 0.5))

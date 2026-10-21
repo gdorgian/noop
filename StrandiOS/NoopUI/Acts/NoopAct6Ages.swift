@@ -595,7 +595,7 @@ private struct NoopAgeBackHeader: View {
                 }
                 .frame(width: 34, height: 34)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
 
             Text(label)
                 .font(NoopHTMLFont.sans(13.5))

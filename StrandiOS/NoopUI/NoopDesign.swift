@@ -228,7 +228,7 @@ struct NoopBackHeader: View {
                 }
                 .frame(width: 34, height: 34)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
 
             Text(label)
                 .font(NoopHTMLFont.sans(13.5))
@@ -305,7 +305,7 @@ struct NoopBatteryChip: View {
                 )
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
     }
 }
 
@@ -525,6 +525,7 @@ struct NoopHTMLButtonStyle: ButtonStyle {
 struct NoopHTMLPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
             .scaleEffect(configuration.isPressed ? 0.988 : 1)
             .opacity(configuration.isPressed ? 0.82 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
@@ -549,7 +550,7 @@ struct NoopHTMLToggle: View {
                         .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
                 }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
     }
 }
 
@@ -570,7 +571,7 @@ struct NoopSegmentedControl: View {
                         .background(item == selection ? NoopHTMLColor.blue.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(item == selection ? NoopHTMLColor.blue.opacity(0.42) : .clear, lineWidth: 0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
             }
         }
         .padding(4)
@@ -1201,5 +1202,15 @@ struct NoopBottomSheet<Content: View>: View {
         // keyboard so goal fields and their save action cannot be covered while editing.
         .ignoresSafeArea(.container, edges: .all)
         .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}
+
+/// `.plain`, but the whole frame takes the tap. A plain button only hit-tests its drawn pixels, so a
+/// row whose title is short could not be tapped in the empty space beside it — on the You page,
+/// "Your journey" ignored every tap that missed its eleven letters.
+struct NoopPlainHitStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(Rectangle())
     }
 }

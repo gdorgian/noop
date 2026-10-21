@@ -1877,7 +1877,7 @@ private struct NoopAddRecordSheet: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 46)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                 }
                 .frame(width: max(0, viewportWidth - 36), alignment: .leading)
                 .padding(.top, 12)
@@ -2043,7 +2043,7 @@ private struct NoopNightJournalSheet: View {
                                     .background(index == mood ? NoopHTMLColor.blue.opacity(0.14) : Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 16))
                                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(index == mood ? NoopHTMLColor.blue.opacity(0.5) : NoopHTMLColor.border, lineWidth: 0.5))
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(NoopPlainHitStyle())
                             }
                         }
                     }
@@ -2067,7 +2067,7 @@ private struct NoopNightJournalSheet: View {
                                         .background(index == drinks ? (index == 0 ? NoopHTMLColor.blue : Color(hex: 0xF2B45C)) : Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 15))
                                         .overlay(RoundedRectangle(cornerRadius: 15).stroke(index == drinks ? .clear : NoopHTMLColor.border, lineWidth: 0.5))
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(NoopPlainHitStyle())
                             }
                         }
                     }
@@ -2089,7 +2089,7 @@ private struct NoopNightJournalSheet: View {
                                 .background(selected ? Color(hex: 0xF2B45C).opacity(0.13) : Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(selected ? Color(hex: 0xF2B45C).opacity(0.45) : NoopHTMLColor.border, lineWidth: 0.5))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(NoopPlainHitStyle())
                         }
                     }
 
@@ -2130,7 +2130,7 @@ private struct NoopNightJournalSheet: View {
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(NoopPlainHitStyle())
                     }
                     .padding(.top, 2)
                 }
@@ -2265,7 +2265,7 @@ private struct NoopDayLogSheet: View {
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 40)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(NoopPlainHitStyle())
                     }
                 }
                 .frame(width: max(0, viewportWidth - 40), alignment: .leading)
@@ -2347,7 +2347,7 @@ private struct NoopDayLogSheet: View {
             )
             .animation(.easeOut(duration: 0.18), value: active)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoopPlainHitStyle())
     }
 
     private func glyph(for kind: NoopDayLogKind) -> NoopCanonicalGlyphName {
@@ -2448,7 +2448,7 @@ private struct NoopLoggedItemsSheet: View {
                                         .background(filter == item ? NoopHTMLColor.green.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 11))
                                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(filter == item ? NoopHTMLColor.green.opacity(0.4) : Color.white.opacity(0.07), lineWidth: 0.5))
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(NoopPlainHitStyle())
                                 .accessibilityAddTraits(filter == item ? .isSelected : [])
                             }
                         }

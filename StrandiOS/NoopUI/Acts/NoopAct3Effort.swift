@@ -131,7 +131,7 @@ struct NoopAct3Screens: View {
                                 .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5)
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
 
                     VStack(alignment: .leading, spacing: 9) {
                         Text("Rather not today?")
@@ -151,7 +151,7 @@ struct NoopAct3Screens: View {
                                 .background(restDay ? NoopHTMLColor.night.opacity(0.22) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(restDay ? NoopHTMLColor.night.opacity(0.45) : Color.white.opacity(0.12), lineWidth: 0.5))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(NoopPlainHitStyle())
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 15)
@@ -440,7 +440,7 @@ struct NoopAct3Screens: View {
                             in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                         )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 .disabled(!range.isAvailable)
             }
         }
@@ -629,7 +629,7 @@ struct NoopAct3Screens: View {
                             }
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                 }
             }
 
@@ -651,7 +651,7 @@ struct NoopAct3Screens: View {
                         .frame(height: 0.5)
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
@@ -774,7 +774,7 @@ struct NoopAct3Screens: View {
                     }
                     .frame(width: 34, height: 34)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 Spacer()
                 NoopSectionLabel("Ready")
                 Spacer()
@@ -1604,7 +1604,7 @@ private struct Act3BackHeader: View {
                 }
                 .frame(width: 34, height: 34)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             Text(label)
                 .font(NoopHTMLFont.sans(13.5))
                 .foregroundStyle(NoopHTMLColor.copy)
@@ -2471,7 +2471,7 @@ private extension NoopAct3Screens {
                         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                 }
                 .padding(.top, 14)
             }
@@ -2579,7 +2579,7 @@ private extension NoopAct3Screens {
                     }
                     .frame(width: 34, height: 34)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 Spacer()
                 NoopSectionLabel("Ready")
                 Spacer()
@@ -2855,7 +2855,7 @@ private extension NoopAct3Screens {
                                     .background(range == option ? NoopHTMLColor.blue.opacity(0.20) : Color.clear,
                                                 in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(NoopPlainHitStyle())
                             .disabled(!available)
                         }
                     }

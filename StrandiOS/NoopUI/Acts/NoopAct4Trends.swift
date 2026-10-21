@@ -192,7 +192,7 @@ private struct NoopTrendsScreen: View {
                         .background(item == window ? NoopA4.green.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(item == window ? NoopA4.green.opacity(0.4) : .clear, lineWidth: 0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
             }
         }
         .padding(4)
@@ -1347,7 +1347,7 @@ private struct NoopA4BackHeader: View {
                 }
                 .frame(width: 34, height: 34)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             Text(label)
                 .font(NoopHTMLFont.sans(13.5))
                 .foregroundStyle(NoopHTMLColor.copy)

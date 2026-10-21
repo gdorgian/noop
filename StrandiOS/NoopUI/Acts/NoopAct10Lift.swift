@@ -263,7 +263,7 @@ private struct NoopLiftBackHeader: View {
                 }
                 .frame(width: 34, height: 34)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
 
             Text(label)
                 .font(NoopHTMLFont.sans(13.5))
@@ -308,7 +308,7 @@ private struct NoopLiftSheetHeader: View {
                     .frame(minHeight: 34)
                     .padding(.horizontal, 4)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             Spacer()
             if let trailing {
                 Text(trailing)
@@ -1053,7 +1053,7 @@ private struct NoopLiftLibraryScreen: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             if showArchived {
                 ForEach(archived, id: \.id) { program in
                     HStack(spacing: 11) {
@@ -1100,7 +1100,7 @@ private struct NoopLiftLibraryScreen: View {
                     }
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             HStack(spacing: 8) {
                 NoopLiftActionButton(title: featured ? "Start it" : "Start", accent: featured) {
                     Task { await start(program) }
@@ -1223,13 +1223,13 @@ private struct NoopLiftProgramScreen: View {
                 HStack {
                     Button("Programs") { navigation.back(or: .liftLibrary) }
                         .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.blueLight)
-                        .buttonStyle(.plain).frame(minHeight: 34)
+                        .buttonStyle(NoopPlainHitStyle()).frame(minHeight: 34)
                     Spacer()
                     if !readOnly {
                         Button(saving ? "Saving…" : "Done") { Task { await save() } }
                             .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                             .foregroundStyle(canSave ? NoopHTMLColor.blueLight : NoopHTMLColor.muted)
-                            .buttonStyle(.plain).disabled(!canSave || saving)
+                            .buttonStyle(NoopPlainHitStyle()).disabled(!canSave || saving)
                     }
                 }
 
@@ -1314,7 +1314,7 @@ private struct NoopLiftProgramScreen: View {
                     .frame(minHeight: 52)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
                 .overlay(alignment: .top) {
                     if index > 0 { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) }
                 }
@@ -1351,7 +1351,7 @@ private struct NoopLiftProgramScreen: View {
                         .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                         .frame(maxWidth: .infinity, alignment: .leading).frame(minHeight: 44)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(NoopPlainHitStyle())
             }
             .padding(.horizontal, 16).padding(.vertical, 15)
             .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -1654,7 +1654,7 @@ private struct NoopLiftDetailScreen: View {
                 }
                 .padding(.horizontal, 2).frame(minHeight: 48)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NoopPlainHitStyle())
             .overlay(alignment: .top) { Rectangle().fill(Color.white.opacity(0.06)).frame(height: 0.5) }
         }
         .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 8)
@@ -1806,13 +1806,13 @@ private struct NoopLiftEditScreen: View {
                 HStack {
                     Button("Cancel") { navigation.back(or: .liftDetail) }
                         .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.blueLight)
-                        .buttonStyle(.plain).frame(minHeight: 34)
+                        .buttonStyle(NoopPlainHitStyle()).frame(minHeight: 34)
                     Spacer()
                     NoopSectionLabel("Correcting")
                     Spacer()
                     Button(saving ? "Saving…" : "Save") { Task { await save() } }
                         .font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
-                        .buttonStyle(.plain).disabled(saving)
+                        .buttonStyle(NoopPlainHitStyle()).disabled(saving)
                 }
                 NoopLiftTitle(title: editTitle,
                               subtitle: "Change what you logged. What the strap measured during the session — your pulse, the minutes, the cost — is not touched by anything here.")
@@ -1853,7 +1853,7 @@ private struct NoopLiftEditScreen: View {
                         }
                         .frame(minHeight: 44)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                     .overlay(alignment: .top) { Rectangle().fill(Color.white.opacity(0.06)).frame(height: 0.5) }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 14)
@@ -1917,7 +1917,7 @@ private struct NoopLiftEditScreen: View {
                     NoopCanonicalGlyph(name: .trash, size: 17, color: NoopHTMLColor.copy.opacity(0.82))
                 }
             }
-            .buttonStyle(.plain).frame(minWidth: 44, minHeight: 44)
+            .buttonStyle(NoopPlainHitStyle()).frame(minWidth: 44, minHeight: 44)
         }
         .frame(minHeight: 48).opacity(isDeleted ? 0.5 : 1)
         .overlay(alignment: .top) {
@@ -2123,7 +2123,7 @@ private struct NoopLiftImportScreen: View {
                         NoopHevyKeyStore.clear(); keySuffix = nil; keyDraft = ""; keyMessage = "Removed from this phone."
                     }
                     .font(NoopHTMLFont.sans(11.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
-                    .buttonStyle(.plain)
+                    .buttonStyle(NoopPlainHitStyle())
                 }
             }
             SecureField("Paste the read-only key", text: $keyDraft)
@@ -2237,7 +2237,7 @@ private struct NoopLiftReviewScreen: View {
                         }
                         Button("Not now") { navigation.back(or: .liftLibrary) }
                             .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                            .buttonStyle(.plain).frame(maxWidth: .infinity).frame(height: 46)
+                            .buttonStyle(NoopPlainHitStyle()).frame(maxWidth: .infinity).frame(height: 46)
                     }
                     Text("Adding uses the dates in the file. Running the same import twice does not double a session already in your record.")
                         .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
