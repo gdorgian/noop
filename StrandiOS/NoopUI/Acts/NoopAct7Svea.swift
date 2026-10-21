@@ -56,6 +56,11 @@ private struct NoopSveaCoach: View {
     @State private var answerKind = ""
     @State private var showUsedMemory = true
     @FocusState private var askFocused: Bool
+    /// Hold-to-speak (Act 7 wave 4a): idle, recording, transcribing, or "did not catch that".
+    @StateObject private var voice = CoachVoiceInput()
+    @State private var micPhase: NoopSveaMicPhase = .idle
+    @State private var micStartedAt: Date?
+    @State private var micNote: String?
 
     var body: some View {
         NoopSveaScrollScreen(bottomInset: 206) {
@@ -308,6 +313,26 @@ private struct NoopSveaCoach: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            if let caption = micCaption {
+                Text(caption)
+                    .font(NoopHTMLFont.sans(11))
+                    .foregroundStyle(Color(hex: 0x8B958F))
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 8)
+            }
+
+            switch micPhase {
+            case .recording: micRecordingBar
+            case .transcribing: micTranscribingBar
+            case .unclear: micUnclearCard
+            case .idle: askBar
+            }
+        }
+    }
+
+    private var askBar: some View {
             HStack(spacing: 10) {
                 TextField("Ask about your own data…", text: $question)
                     .focused($askFocused)
@@ -317,6 +342,9 @@ private struct NoopSveaCoach: View {
                     .textInputAutocapitalization(.sentences)
                     .submitLabel(.send)
                     .onSubmit(sendQuestion)
+                if CoachVoiceInput.isSupported {
+                    micButton
+                }
                 Button(action: sendQuestion) {
                     NoopSveaSendArrow()
                         .frame(width: 13, height: 13)
@@ -334,7 +362,190 @@ private struct NoopSveaCoach: View {
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.10), lineWidth: 0.5))
             .shadow(color: .black.opacity(0.45), radius: 13, y: 8)
+    }
+
+    // MARK: Voice — hold the mic, release to send
+
+    private var micCaption: String? {
+        switch micPhase {
+        case .recording: "Release to send. The words are made here on the phone — the audio is not written to a file."
+        case .transcribing: "Turning it into text on this phone. Nothing has gone out; you read the sentence before it does."
+        case .unclear: "The recording is already gone. It was never a file, and none of it left the phone."
+        case .idle: micNote
         }
+    }
+
+    private var micButton: some View {
+        NoopSveaMicGlyph(color: Color(hex: 0xC6CEC9))
+            .frame(width: 40, height: 40)
+            .background(Color.white.opacity(0.06), in: Circle())
+            .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+            .padding(.vertical, -3)
+            .contentShape(Circle())
+            .gesture(holdToSpeak)
+            .accessibilityLabel("Hold to speak")
+            .accessibilityAddTraits(.isButton)
+    }
+
+    /// Down starts the recording; up ends it, wherever the finger has moved to by then.
+    private var holdToSpeak: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in if micPhase != .recording { micDown() } }
+            .onEnded { _ in micUp() }
+    }
+
+    private func micDown() {
+        micNote = nil
+        switch voice.authorization {
+        case .notDetermined:
+            // The first press only asks; recording starts on the next hold, once allowed.
+            voice.requestAuthorization { state in
+                if state != .authorized {
+                    micNote = "Voice needs Microphone and Speech Recognition, both on this phone. Allow them in Settings, or type instead."
+                }
+            }
+            return
+        case .authorized:
+            guard voice.canUseVoice else {
+                micNote = voice.statusMessage ?? "On-device speech is not available for this language, so voice stays off rather than sending audio anywhere."
+                return
+            }
+        default:
+            micNote = "Voice needs Microphone and Speech Recognition, both on this phone. Allow them in Settings, or type instead."
+            return
+        }
+        askFocused = false
+        micStartedAt = Date()
+        withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.2)) { micPhase = .recording }
+        voice.startTranscribing { _ in }
+    }
+
+    private func micUp() {
+        guard micPhase == .recording, let started = micStartedAt else { return }
+        micStartedAt = nil
+        // Under 0.7 s is a tap, not a question: nothing could have been heard.
+        if Date().timeIntervalSince(started) < 0.7 {
+            voice.stopTranscribing { _ in }
+            withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.2)) { micPhase = .unclear }
+            return
+        }
+        withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.2)) { micPhase = .transcribing }
+        voice.stopTranscribing { text in
+            let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !clean.isEmpty else {
+                withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.2)) { micPhase = .unclear }
+                return
+            }
+            micPhase = .idle
+            question = clean
+            sendQuestion()
+        }
+    }
+
+    private func micCancel() {
+        micStartedAt = nil
+        voice.stopTranscribing { _ in }
+        withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.2)) { micPhase = .idle }
+    }
+
+    private var micRecordingBar: some View {
+        HStack(spacing: 11) {
+            Button("Cancel", action: micCancel)
+                .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                .foregroundStyle(Color(hex: 0xC6CEC9))
+                .buttonStyle(.plain)
+            // Waveform and clock tick together off the same clock as the HTML's 100 ms interval.
+            NoopAnimatedTimeline(minimumInterval: 0.1) { timeline in
+                let ms = (micStartedAt.map { timeline.date.timeIntervalSince($0) } ?? 0) * 1000
+                HStack(spacing: 11) {
+                    HStack(spacing: 3) {
+                        ForEach(0..<20, id: \.self) { i in
+                            let seed = abs(sin(Double(i) * 12.9898 + 4.1))
+                            let h = 4 + abs(sin(Double(i) * 0.8 + ms / 150)) * (7 + seed * 15)
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color(hex: 0xC9D0EE))
+                                .frame(width: 3, height: h.rounded())
+                                .opacity(0.45 + (h / 26) * 0.5)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 28)
+                    Text(String(format: "%.1fs", ms / 1000))
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .monospacedDigit()
+                        .foregroundStyle(Color(hex: 0xDDE3F6))
+                }
+            }
+            NoopSveaMicGlyph(color: Color(hex: 0x0C1024))
+                .frame(width: 40, height: 40)
+                .background(NoopHTMLColor.night, in: Circle())
+                .padding(.vertical, -3)
+                .gesture(holdToSpeak)
+        }
+        .padding(.leading, 15)
+        .padding(.trailing, 9)
+        .padding(.vertical, 9)
+        .background(NoopHTMLColor.night.opacity(0.18), in: RoundedRectangle(cornerRadius: 22))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.night.opacity(0.5), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.45), radius: 13, y: 8)
+    }
+
+    private var micTranscribingBar: some View {
+        HStack(spacing: 12) {
+            Text(voice.partialTranscript.isEmpty ? " " : voice.partialTranscript)
+                .font(NoopHTMLFont.sans(13))
+                .foregroundStyle(Color(hex: 0xC6CEC9))
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            ProgressView()
+                .tint(Color(hex: 0xA9B4E0))
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        .background(Color(hex: 0x171C1A, alpha: 0.92), in: RoundedRectangle(cornerRadius: 22))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.10), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.45), radius: 13, y: 8)
+    }
+
+    private var micUnclearCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("I did not catch that.")
+                .font(NoopHTMLFont.sans(13.5))
+                .foregroundStyle(NoopHTMLColor.ink)
+            Text("Nothing came through clearly enough to be a question. Hold the mic down while you speak — a tap is too short to hear anything.")
+                .font(NoopHTMLFont.sans(11.5))
+                .foregroundStyle(Color(hex: 0x8B958F))
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 7) {
+                Text("Hold to speak")
+                    .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                    .foregroundStyle(Color(hex: 0x0C1024))
+                    .frame(maxWidth: .infinity).frame(height: 42)
+                    .background(NoopHTMLColor.night, in: RoundedRectangle(cornerRadius: 14))
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
+                    .gesture(holdToSpeak)
+                Button(action: micCancel) {
+                    Text("Type it instead")
+                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .foregroundStyle(Color(hex: 0xC6CEC9))
+                        .frame(maxWidth: .infinity).frame(height: 42)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 15)
+        .padding(.bottom, 16)
+        .background(Color(hex: 0x171C1A, alpha: 0.94), in: RoundedRectangle(cornerRadius: 24))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.45), radius: 13, y: 8)
     }
 
     // MARK: Measured conversation (production)
@@ -2469,5 +2680,31 @@ private extension AIProvider {
         case "Custom": self = .custom
         default: return nil
         }
+    }
+}
+
+
+enum NoopSveaMicPhase { case idle, recording, transcribing, unclear }
+
+/// The HTML's mic path (M12 4.2 … v3.1) on its 24 pt grid, stroked.
+private struct NoopSveaMicGlyph: View {
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let k = min(size.width, size.height) / 24
+            let ox = (size.width - 24 * k) / 2, oy = (size.height - 24 * k) / 2
+            func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * k, y: oy + y * k) }
+            var path = Path()
+            path.addRoundedRect(in: CGRect(origin: p(9.4, 4.2), size: CGSize(width: 5.2 * k, height: 9.7 * k)),
+                                cornerSize: CGSize(width: 2.6 * k, height: 2.6 * k))
+            path.move(to: p(6.6, 11.3))
+            path.addQuadCurve(to: p(17.4, 11.3), control: p(12, 22.1))
+            path.move(to: p(12, 16.7))
+            path.addLine(to: p(12, 19.8))
+            context.stroke(path, with: .color(color),
+                           style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round))
+        }
+        .frame(width: 17, height: 17)
     }
 }
