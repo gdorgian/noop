@@ -495,8 +495,7 @@ private struct NoopLiftLiveScreen: View {
                         TimelineView(.periodic(from: .now, by: 1)) { context in
                         Text(presentation.isResting
                              ? liftClock(presentation.heldClockSeconds ?? engine.restRemaining(now: Self.second(context.date)) ?? 0)
-                             : liftClock(liveElapsed(presentation, at: context.date)
-                                         + (isPrototypeSession ? 1_394 : 0), long: true))
+                             : liftClock(liveElapsed(presentation, at: context.date), long: true))
                             .font(NoopHTMLFont.outfit(20, weight: .light))
                             .tracking(-0.5)
                             .monospacedDigit()
@@ -716,11 +715,16 @@ private struct NoopLiftLiveScreen: View {
         .buttonStyle(NoopHTMLPressStyle())
     }
 
+    @State private var prototypeOpenedAt = Date()
+
     private static func second(_ date: Date) -> Int { Int(date.timeIntervalSince1970) }
 
     /// Elapsed session time at `date`: the controller's figure as of its last change, carried forward
     /// by the wall clock unless the session is paused.
     private func liveElapsed(_ presentation: LiftSessionController.Presentation, at date: Date) -> Int {
+        // The prototype is the design's fixture: 23:14 into the session when the screen opens,
+        // however long ago a demo session was started on this device.
+        if isPrototypeSession { return 1_394 + max(0, Self.second(date) - Self.second(prototypeOpenedAt)) }
         guard !live.isPaused else { return presentation.sessionElapsedSeconds }
         return presentation.sessionElapsedSeconds + max(0, Self.second(date) - live.now)
     }
