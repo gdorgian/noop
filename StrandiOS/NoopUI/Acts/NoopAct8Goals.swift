@@ -2012,6 +2012,7 @@ private struct NoopLabReview: View {
     @ObservedObject var draft: NoopLabReviewDraft
     @EnvironmentObject private var repo: Repository
     @State private var errorID: String?
+    @State private var keyboardUp = false
     @State private var saving = false
     @State private var saveError: String?
     @State private var isChoosingSource = false
@@ -2124,6 +2125,16 @@ private struct NoopLabReview: View {
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
             .shadow(color: .black.opacity(0.45), radius: 13, y: 4)
             .padding(.horizontal, 14).padding(.bottom, 92)
+            // Riding up on the keyboard it covered the "Use this value" button of the row being
+            // typed; it steps aside while a value is typed and returns with the keyboard's close.
+            .opacity(keyboardUp ? 0 : 1)
+            .allowsHitTesting(!keyboardUp)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardUp = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardUp = false
         }
         .noopLabPhotoDoor(
             isChoosingSource: $isChoosingSource,
@@ -2263,7 +2274,9 @@ private struct NoopLabReview: View {
                 : "Confirm or fix a row — Save does nothing until then"
         }
         if pendingCount > 0 {
-            return "\(pendingCount) still to check · \(discardedCount) discarded"
+            return draft.isManual
+                ? "\(pendingCount) not filled in · Save keeps only what you typed"
+                : "\(pendingCount) still to check · \(discardedCount) discarded"
         }
         if let date = draft.captionDate {
             return "\(discardedCount) discarded · the rest dated \(date)"
@@ -2630,6 +2643,7 @@ private struct NoopOCRCandidateCard: View {
     let openSource: (CGRect) -> Void
     let beginEditing: () -> Void
     let saveCorrection: () -> Void
+    @FocusState private var fieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -2714,6 +2728,9 @@ private struct NoopOCRCandidateCard: View {
                             text: $candidate.draftValue
                         )
                         .keyboardType(.decimalPad)
+                        .focused($fieldFocused)
+                        // "Type it in" opens the field ready to type; a second tap was needed.
+                        .onAppear { fieldFocused = true }
                         Text(candidate.unit)
                             .font(NoopHTMLFont.sans(12))
                             .foregroundStyle(Color(hex: 0x7F8A85))
@@ -2984,7 +3001,8 @@ private struct NoopLabMarker: Identifiable {
         var parts: [String] = []
         if let reference = live?.referenceText { parts.append("band \(reference)") }
         if let recordedDateText { parts.append(recordedDateText) }
-        return parts.isEmpty ? "not recorded" : parts.joined(separator: " · ")
+        // The tag on the right already says "not recorded"; the line under the name says what adds one.
+        return parts.isEmpty ? "add a result to start" : parts.joined(separator: " · ")
     }
     var bandTag: String {
         guard value != nil else { return "not recorded" }
@@ -3188,8 +3206,8 @@ private enum NoopOCRStatus {
             reportDate.map { "Will be stored, dated \($0)" } ?? "Will be stored once the report date is known"
         case .corrected:
             isManual
-                ? "Stored as \(value) \(unit), as you typed it"
-                : "Stored as \(value) \(unit), corrected by you"
+                ? "Will be stored as \(value) \(unit), as you typed it"
+                : "Will be stored as \(value) \(unit), corrected by you"
         case .discarded:
             isManual
                 ? "Left out. Not stored, and not remembered as declined"
