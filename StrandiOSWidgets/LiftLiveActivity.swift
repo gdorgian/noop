@@ -129,15 +129,19 @@ struct LiftLiveActivity: Widget {
     private func progress(_ state: LiftActivityAttributes.ContentState,
                           showsLabel: Bool) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.12))
+            // No GeometryReader: in some Live Activity regions it is proposed an unbounded width,
+            // the computed fill width was not finite, and SwiftUI's placement assertion killed the
+            // widget extension every time a lift session started — so the activity never appeared.
+            // A leading-anchored scale needs no measured width.
+            Capsule()
+                .fill(Color.white.opacity(0.12))
+                .frame(height: 3)
+                .frame(maxWidth: .infinity)
+                .overlay(alignment: .leading) {
                     Capsule()
                         .fill(stateInk(state))
-                        .frame(width: proxy.size.width * progressFraction(state))
+                        .scaleEffect(x: progressFraction(state), y: 1, anchor: .leading)
                 }
-            }
-            .frame(height: 3)
 
             if showsLabel {
                 Text(state.progress)

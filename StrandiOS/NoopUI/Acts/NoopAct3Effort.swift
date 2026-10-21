@@ -1740,11 +1740,17 @@ private struct Act3HeartbeatOrb: View {
             ZStack {
                 Ellipse()
                     .fill(
+                        // CSS radial-gradient(circle, c, transparent 70%) on 210 x 150: the circle's
+                        // radius is the farthest corner (129 pt) and it is clear by 70% of it, so the
+                        // glow fades well inside the ellipse instead of drawing its rim.
                         RadialGradient(
-                            colors: [(outside ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue).opacity(0.3), .clear],
+                            stops: [
+                                .init(color: (outside ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue).opacity(0.3), location: 0),
+                                .init(color: .clear, location: 0.7)
+                            ],
                             center: .center,
                             startRadius: 0,
-                            endRadius: 115
+                            endRadius: 129.03
                         )
                     )
                     .frame(width: 210, height: 150)
