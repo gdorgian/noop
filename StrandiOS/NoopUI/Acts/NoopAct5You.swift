@@ -56,7 +56,6 @@ struct NoopAct5Screens: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var confirmingProfile = false
     @State private var dailyLogOn = ScheduledDebugExport.isEnabled
-    @State private var showingPairWizard = false
     @EnvironmentObject private var health: HealthKitBridge
     @State private var sex = "Male"
     @State private var birthDay = 12
@@ -128,7 +127,7 @@ struct NoopAct5Screens: View {
             case .lab: labScreen
             case .automations: automationsScreen
             case .onboard: onboardingScreen
-            case .pair: pairingScreen
+            case .pair: if measured { NoopLivePairScreen(navigation: navigation) } else { pairingScreen }
             case .position: positionScreen
             default: youScreen
             }
@@ -1458,7 +1457,15 @@ private extension NoopAct5Screens {
             : item.kind == .sleep ? Self.lavender : NoopHTMLColor.blue
         Button {
             if item.kind == .sleep {
-                navigation.push(.why)
+                if let date = item.date, !NoopContentPolicy.allowsPrototypeContent {
+                    // Release has no "why" engine: open the night itself on Rest, which reads it in full.
+                    let back = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: date),
+                                                               to: Calendar.current.startOfDay(for: Date())).day ?? 0
+                    navigation.selectedRestDay = max(0, back)
+                    navigation.reset(to: .rest)
+                } else {
+                    navigation.push(.why)
+                }
             } else if let workout = item.workout {
                 navigation.detailSession = NoopSessionDetailSelection(
                     workout: workout,
@@ -1506,7 +1513,8 @@ private extension NoopAct5Screens {
                     NoopA5HistoryItem(kind: .session, name: e.name, detail: e.detail, value: e.value,
                                       symbol: Self.glyph(forSport: e.sport))
                 case .sleep:
-                    NoopA5HistoryItem(kind: .sleep, name: e.name, detail: e.detail, value: e.value, symbol: .bed)
+                    NoopA5HistoryItem(kind: .sleep, name: e.name, detail: e.detail, value: e.value, symbol: .bed,
+                                      date: e.date)
                 case .log:
                     NoopA5HistoryItem(kind: .log, name: e.name, detail: e.detail, value: e.value, symbol: .check)
                 }
@@ -1630,6 +1638,8 @@ private struct NoopA5HistoryItem {
     var sessionHeaderLine: String? = nil
     var sessionDurationLabel: String? = nil
     var sessionLoad: Int? = nil
+    /// When the night ended, so a sleep row can open that night on Rest.
+    var date: Date? = nil
 
     var opensSomething: Bool { kind == .sleep || workout != nil }
 }
@@ -2884,7 +2894,7 @@ private extension NoopAct5Screens {
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Self.green.opacity(0.25), lineWidth: 0.5))
                 }
 
-                Button { showingPairWizard = true } label: {
+                Button { navigation.push(.pair) } label: {
                     Label("Pair a new strap", systemImage: "plus")
                         .font(NoopHTMLFont.sans(14.5, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blueInk)
@@ -2907,9 +2917,6 @@ private extension NoopAct5Screens {
                 Text("Forgetting a strap removes the pairing, not the nights. Its history stays in your record and stays in your export.")
                     .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
-        }
-        .sheet(isPresented: $showingPairWizard) {
-            AddDeviceWizard(live: live) { showingPairWizard = false }
         }
     }
 
@@ -4417,5 +4424,148 @@ private struct NoopA5CompactStepStyle: ButtonStyle {
             .foregroundStyle(Color(hex: 0xC6CEC9))
             .background(Color.white.opacity(configuration.isPressed ? 0.12 : 0.07), in: RoundedRectangle(cornerRadius: 9))
             .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.11), lineWidth: 0.5))
+    }
+}
+
+// MARK: - Pair a strap, measured
+
+/// The designed `pair` screen on the real Bluetooth scan. It replaces the classic Add-device wizard in
+/// Release: pick the band's family, see what is advertising nearby, tap one, Connect. Nothing connects
+/// until Connect, and the registry entry is the same one the classic wizard wrote (`registerDevice`).
+struct NoopLivePairScreen: View {
+    @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var glance: NoopLiveGlance
+    @State private var family: WhoopModel = .whoop5mg
+    @State private var picked: (uuid: String, name: String, rssi: Int)?
+    @State private var registered = false
+    @State private var found: [(uuid: String, name: String, rssi: Int)] = []
+
+    var body: some View {
+        NoopScreen(bottomInset: 40, topInset: 56) {
+            VStack(spacing: 22) {
+                HStack {
+                    Button { leave() } label: {
+                        ZStack {
+                            Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+                            NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
+                        }.frame(width: 34, height: 34)
+                    }.buttonStyle(NoopHTMLPressStyle())
+                    Spacer()
+                    Text(registered ? "PAIRED" : "LOOKING")
+                        .font(NoopHTMLFont.sans(10.5, weight: .semibold)).tracking(1.5)
+                        .foregroundStyle(Color(hex: 0x7F8A85))
+                    Spacer()
+                    Color.clear.frame(width: 34, height: 34)
+                }
+
+                HStack(spacing: 6) {
+                    ForEach(WhoopModel.allCases) { option in
+                        Button {
+                            guard option != family else { return }
+                            family = option
+                            picked = nil
+                            model.presentWhoopScan(model: option)
+                        } label: {
+                            Text(option.displayName)
+                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .foregroundStyle(option == family ? NoopHTMLColor.blueInk : NoopHTMLColor.inkSoft)
+                                .frame(maxWidth: .infinity).frame(height: 38)
+                                .background(option == family ? NoopHTMLColor.blue : Color.white.opacity(0.05),
+                                            in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                        .disabled(registered)
+                    }
+                }
+
+                NoopA5PairPulse(paired: registered)
+
+                VStack(spacing: 9) {
+                    Text(registered ? "That is everything." : "Hold the button until it blinks.")
+                        .font(NoopHTMLFont.outfit(27, weight: .light)).tracking(-0.8).multilineTextAlignment(.center)
+                    Text(registered
+                         ? "Noop is connecting and will import what the strap has buffered. It watches for a week before it tells you anything."
+                         : found.isEmpty
+                            ? "Looking for a \(family.displayName) nearby. Nothing is connected until you tap Connect, and pairing does not send anything anywhere."
+                            : "Noop found \(found.count == 1 ? "one strap" : "\(found.count) straps") nearby. Nothing is connected until you tap Connect, and pairing does not send anything anywhere.")
+                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .multilineTextAlignment(.center).lineSpacing(4).frame(maxWidth: 300)
+                }
+
+                VStack(spacing: 8) {
+                    ForEach(found, id: \.uuid) { strap in
+                        let selected = picked?.uuid == strap.uuid
+                        Button { picked = strap } label: {
+                            HStack(spacing: 13) {
+                                NoopCanonicalGlyph(name: .watch, size: 20, color: NoopHTMLColor.blue)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(strap.name.isEmpty ? family.displayName : strap.name)
+                                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                    Text(Self.signal(strap.rssi))
+                                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                                }
+                                Spacer()
+                                NoopPill(text: registered && selected ? "Connected" : selected ? "Chosen" : "Found",
+                                         color: selected ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
+                            }
+                            .padding(.horizontal, 16).padding(.vertical, 15)
+                            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                            .overlay(RoundedRectangle(cornerRadius: 22)
+                                .stroke(selected ? NoopHTMLColor.blue.opacity(0.5) : NoopHTMLColor.border, lineWidth: 0.5))
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                        .disabled(registered)
+                    }
+                }
+
+                VStack(spacing: 8) {
+                    Button { registered ? leave() : connect() } label: {
+                        Text(registered ? "Back to your straps" : "Connect")
+                            .font(NoopHTMLFont.sans(15, weight: .semibold))
+                            .foregroundStyle(canConnect || registered ? NoopHTMLColor.blueInk : NoopHTMLColor.muted)
+                            .frame(maxWidth: .infinity).frame(height: 58)
+                            .background(canConnect || registered ? NoopHTMLColor.blue : Color.white.opacity(0.07),
+                                        in: RoundedRectangle(cornerRadius: 19))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    .disabled(!canConnect && !registered)
+                    Text(registered
+                         ? "You can wear it loosely. Noop would rather have an imperfect night than none."
+                         : "If nothing appears, the strap is asleep — put it on the charger for a moment.")
+                        .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                        .multilineTextAlignment(.center).lineSpacing(3)
+                }
+            }
+        }
+        .onAppear { model.presentWhoopScan(model: family) }
+        .onDisappear { if !registered { model.stopWhoopScan() } }
+        // The scan publishes as straps advertise; the list follows it, strongest first.
+        .onReceive(model.ble.$discoveredWhoops) { found = $0.sorted { $0.rssi > $1.rssi } }
+    }
+
+    private var canConnect: Bool { picked != nil }
+
+    private static func signal(_ rssi: Int) -> String {
+        rssi >= -60 ? "signal strong" : rssi >= -75 ? "signal fair" : "signal weak — bring it closer"
+    }
+
+    private func connect() {
+        guard let picked else { return }
+        model.stopWhoopScan()
+        let modelLabel = family == .whoop4 ? "4.0" : "5.0 MG"
+        let now = Int(Date().timeIntervalSince1970)
+        model.registerDevice(PairedDevice(
+            id: "whoop-\(picked.uuid)", brand: "WHOOP", model: modelLabel,
+            nickname: picked.name.isEmpty ? nil : picked.name,
+            peripheralId: picked.uuid, sourceKind: .liveBLE,
+            capabilities: WhoopLiveCapabilities.metrics(forModel: modelLabel),
+            status: .paired, addedAt: now, lastSeenAt: now), makeActive: true)
+        registered = true
+    }
+
+    private func leave() {
+        if !registered { model.stopWhoopScan() }
+        navigation.back(or: .devices)
     }
 }

@@ -623,7 +623,7 @@ struct NoopVerifiedAppShell: View {
 
     /// Act 5's hub: the wearer's own name, photo, usual sleep window and need. The rest of Act 5 is
     /// wired separately, screen by screen.
-    private static let canonicalYouRoutes: Set<NoopRoute> = [.you, .record, .zones, .settings, .lab, .position, .strap, .history, .devices, .notifs, .apple, .widgets, .automations]
+    private static let canonicalYouRoutes: Set<NoopRoute> = [.you, .record, .zones, .settings, .lab, .position, .strap, .history, .devices, .notifs, .apple, .widgets, .automations, .pair]
 
     private var usesCanonicalCanvas: Bool {
         navigation.route == .energy
