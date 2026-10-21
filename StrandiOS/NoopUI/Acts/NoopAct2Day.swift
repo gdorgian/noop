@@ -1206,7 +1206,7 @@ struct NoopAct2Screens: View {
             return false
         }.count
         let known = max(0, liveInboxItems.count - pending)
-        return "\(pending) to answer, and \(countWord(known)) things to know. A proposal stays here until you say yes or no to it."
+        return "\(pending) to answer, and \(countWord(known)) \(known == 1 ? "thing" : "things") to know. A proposal stays here until you say yes or no to it."
     }
 
     private var inboxGroups: [Act2InboxGroup] {
@@ -2047,6 +2047,24 @@ struct NoopAct2Screens: View {
                             Act2VitalCard(vital: vital)
                         }
                     }
+                    // With nothing measured the page used to hold only the legend for shading it
+                    // did not draw.
+                    if vitalCards.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("No vitals recorded yet")
+                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            Text("Each signal appears here after a night with the strap on, set against your own normal range.")
+                                .font(NoopHTMLFont.sans(12.5))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                    }
 
                     if fitnessAgeFigure != nil {
                         HStack(spacing: 14) {
@@ -2071,12 +2089,14 @@ struct NoopAct2Screens: View {
                         .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
                     }
 
+                    if !vitalCards.isEmpty {
                     Text("The shaded stretch is your own normal zone, the pale line inside it is your baseline. If the dot sits in the shade, there is nothing to read.")
                         .font(NoopHTMLFont.sans(11.5))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(4)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 2)
+                    }
                 }
             }
         }

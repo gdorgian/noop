@@ -2249,11 +2249,14 @@ private struct NoopSveaFlowRow: View {
                     .font(NoopHTMLFont.sans(11.5))
                     .foregroundStyle(Color(hex: 0xB7C3C9))
                     .noopSveaLineBox(fontSize: 11.5, ratio: 1.55)
-                    .frame(height: 35.625, alignment: .top)
+                    // Minimums, not heights: the design's two-line text keeps its rhythm, and the
+                    // longer Release copy grows the row instead of running into the next one.
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(minHeight: 35.625, alignment: .top)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: 53.625, alignment: .top)
+        .frame(minHeight: 53.625, alignment: .top)
     }
 }
 

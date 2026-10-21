@@ -82,7 +82,7 @@ struct NOOPWidgetView: View {
 
     private var inlineText: String {
         var parts: [String] = []
-        if let r = snap.recovery { parts.append("Charge \(r)%") }
+        if let r = snap.recovery { parts.append("Recovery \(r)%") }
         if let b = snap.bpm { parts.append("\(b) bpm") }
         return parts.isEmpty ? "NOOP" : parts.joined(separator: " · ")
     }
@@ -113,7 +113,7 @@ struct NOOPWidgetView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             HStack(alignment: .top, spacing: 0) {
-                accessoryScore("Charge", symbol: "figure.mind.and.body",
+                accessoryScore("Recovery", symbol: "figure.mind.and.body",
                                text: snap.recovery.map { "\($0)%" }, tint: chargeColor)
                 accessoryScore("Effort", symbol: "figure.strengthtraining.traditional",
                                text: effortText, tint: effortColor)
@@ -249,7 +249,7 @@ struct NOOPWidgetView: View {
             WidgetScoreRing(
                 text: snap.recovery.map(String.init),
                 fraction: snap.recovery.map { Double($0) / 100 },
-                label: "Charge",
+                label: "Recovery",
                 color: chargeColor,
                 diameter: diameter,
                 lineWidth: lineWidth,
@@ -431,7 +431,7 @@ struct NOOPWidget: Widget {
             }
         }
         .configurationDisplayName(NoopWidgetFamilyRegistry.family(.glanceable).title)
-        .description("Charge, Effort and Rest as score rings, plus live HR and strap battery at a glance.")
+        .description("Recovery, Effort and Rest as score rings, plus live HR and strap battery at a glance.")
         .supportedFamilies([
             .systemSmall, .systemMedium, .systemLarge,
             .accessoryCircular, .accessoryInline, .accessoryRectangular

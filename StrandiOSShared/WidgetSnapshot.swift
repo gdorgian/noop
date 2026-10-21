@@ -82,7 +82,7 @@ public enum NoopWidgetFamilyRegistry {
         .init(
             id: .rings,
             title: "Rings",
-            detail: "charge, effort and sleep seen at once",
+            detail: "recovery, effort and sleep seen at once",
             configurationKind: "NOOPRingsWidget",
             isNew: true
         ),

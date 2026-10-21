@@ -53,7 +53,7 @@ struct NOOPRingsWidgetView: View {
         switch family {
         case .systemMedium:
             HStack(spacing: 0) {
-                RingGauge(value: snap.recovery, maxValue: 100, tint: StrandPalette.chargeColor, label: "Charge")
+                RingGauge(value: snap.recovery, maxValue: 100, tint: StrandPalette.chargeColor, label: "Recovery")
                     .frame(maxWidth: .infinity)
                 RingGauge(value: snap.effort, maxValue: 100, tint: StrandPalette.effortColor, label: "Effort")
                     .frame(maxWidth: .infinity)
@@ -64,7 +64,7 @@ struct NOOPRingsWidgetView: View {
         default:
             // .systemSmall: Charge alone — the one score that matters most at a glance (matches the
             // lock-screen accessory's headline choice in NOOPWidget).
-            RingGauge(value: snap.recovery, maxValue: 100, tint: StrandPalette.chargeColor, label: "Charge")
+            RingGauge(value: snap.recovery, maxValue: 100, tint: StrandPalette.chargeColor, label: "Recovery")
                 .padding(12)
         }
     }
@@ -85,7 +85,7 @@ struct NOOPRingsWidget: Widget {
             }
         }
         .configurationDisplayName(NoopWidgetFamilyRegistry.family(.rings).title)
-        .description("Charge, Effort and Rest as three rings, just like Today.")
+        .description("Recovery, Effort and Rest as three rings.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
