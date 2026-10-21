@@ -490,6 +490,15 @@ final class NoopNavigation: ObservableObject {
             finishedSession = nil
             defaults.removeObject(forKey: Self.finishedSessionKey)
         }
+        // Upstream 12.0 discards a session under a minute (#2278): there is no row to land on, so the
+        // wearer goes back to Session rather than to an empty detail screen.
+        guard row != nil else {
+            sessionStartedAt = nil
+            sessionPaused = false
+            sessionPausedElapsed = 0
+            reset(to: .session)
+            return
+        }
         finishSessionArrival()
     }
 
