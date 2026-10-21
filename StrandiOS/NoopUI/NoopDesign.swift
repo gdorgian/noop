@@ -215,6 +215,8 @@ extension NoopScreenHeader where Trailing == EmptyView {
 struct NoopBackHeader: View {
     let label: String
     let action: () -> Void
+    /// The screen this back really returns to, when there is history; otherwise the designed label.
+    @Environment(\.noopBackLabel) private var realBackLabel
 
     var body: some View {
         HStack(spacing: 12) {
@@ -230,7 +232,7 @@ struct NoopBackHeader: View {
             }
             .buttonStyle(NoopPlainHitStyle())
 
-            Text(label)
+            Text(realBackLabel ?? label)
                 .font(NoopHTMLFont.sans(13.5))
                 .foregroundStyle(NoopHTMLColor.copy)
             Spacer()
@@ -1195,6 +1197,7 @@ struct NoopBottomSheet<Content: View>: View {
                         .stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5)
                 }
                 .shadow(color: .black.opacity(0.6), radius: 22, y: -8)
+                .noopDragToDismiss(dismiss)
             }
             .frame(width: viewportWidth, height: proxy.size.height)
         }
@@ -1212,5 +1215,44 @@ struct NoopPlainHitStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .contentShape(Rectangle())
+    }
+}
+
+
+/// Drag a sheet down to put it away, as an iOS sheet does: it follows the finger (resisting upward),
+/// and a pull of 110 pt or a downward flick dismisses; anything less springs back. Owner request,
+/// 21 Oct 2026 — the + sheets could only be closed by tapping outside them.
+private struct NoopDragToDismiss: ViewModifier {
+    let dismiss: () -> Void
+    @State private var drag: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .offset(y: drag)
+            .gesture(
+                DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                    .onChanged { value in
+                        let dy = value.translation.height
+                        // Down follows the finger; up gives a little and stops, so the sheet feels held.
+                        drag = dy > 0 ? dy : -sqrt(-dy) * 2
+                    }
+                    .onEnded { value in
+                        if value.translation.height > 110 || value.predictedEndTranslation.height > 260 {
+                            withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.24)) { drag = 900 }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                dismiss()
+                                drag = 0
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { drag = 0 }
+                        }
+                    }
+            )
+    }
+}
+
+extension View {
+    func noopDragToDismiss(_ dismiss: @escaping () -> Void) -> some View {
+        modifier(NoopDragToDismiss(dismiss: dismiss))
     }
 }

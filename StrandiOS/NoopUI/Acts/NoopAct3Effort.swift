@@ -766,7 +766,7 @@ struct NoopAct3Screens: View {
         let canvasHeight = UIScreen.main.bounds.height
         return VStack(spacing: 0) {
             HStack {
-                Button { navigation.reset(to: .session) } label: {
+                Button { navigation.back(or: .session) } label: {
                     ZStack {
                         Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                         NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft)
@@ -2572,7 +2572,7 @@ private extension NoopAct3Screens {
         let zone = workout.targetZone
         return VStack(spacing: 0) {
             HStack {
-                Button { navigation.reset(to: .session) } label: {
+                Button { navigation.back(or: .session) } label: {
                     ZStack {
                         Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                         NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
@@ -2759,7 +2759,7 @@ private extension NoopAct3Screens {
         } else {
             NoopScreen(topInset: 58) {
                 VStack(alignment: .leading, spacing: 16) {
-                    Act3BackHeader(label: "Session") { navigation.reset(to: .session) }
+                    Act3BackHeader(label: "Session") { navigation.back(or: .session) }
                     Text("No session is running")
                         .font(NoopHTMLFont.outfit(27, weight: .light))
                     Text("Choose a session when you are ready. Nothing has been recorded here.")

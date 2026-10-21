@@ -415,7 +415,7 @@ private struct NoopGoalJourney: View {
         NoopScreen(bottomInset: 118, topInset: 56) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 12) {
-                    Button { navigation.reset(to: .you) } label: {
+                    Button { navigation.back(or: .you) } label: {
                         ZStack {
                             Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                             NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
@@ -575,7 +575,7 @@ private struct NoopGoalJourney: View {
         return NoopScreen(bottomInset: 118, topInset: 56) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 12) {
-                    Button { navigation.reset(to: .you) } label: {
+                    Button { navigation.back(or: .you) } label: {
                         ZStack {
                             Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                             NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
@@ -1619,7 +1619,7 @@ private struct NoopLabsHome: View {
                     // chevron reads You and leaves the act. The destination said `goal` — a parent
                     // the user never passed through, and the one case where the button and the
                     // label disagreed.
-                    Button { navigation.reset(to: .you) } label: {
+                    Button { navigation.back(or: .you) } label: {
                         ZStack {
                             Circle().fill(Color.white.opacity(0.06))
                                 .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))

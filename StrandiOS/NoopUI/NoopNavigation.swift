@@ -828,12 +828,12 @@ final class NoopNavigation: ObservableObject {
         overlay = nil
         guard self.route != route else { return }
         arrival = .pushed
+        // Owner decision (21 Oct 2026): back returns to where the wearer actually came from. The
+        // canonical parent is only the fallback for a screen with no history behind it (a deep link,
+        // a fresh launch); it no longer rewrites a real path — Settings → Buzz for notifications used
+        // to come back to Your strap.
         withAnimation(NoopMotion.enter) {
-            if self.route == parent {
-                path.append(route)
-            } else {
-                path = [parent, route]
-            }
+            if path.isEmpty { path = [parent, route] } else { path.append(route) }
         }
     }
 
@@ -1045,5 +1045,125 @@ final class NoopNavigation: ObservableObject {
         )
         guard let data = try? JSONEncoder().encode(stored) else { return }
         defaults.set(data, forKey: Self.dayLogKey)
+    }
+}
+
+
+extension NoopRoute {
+    /// The screen's own name, as its header and a back chevron pointing at it say it.
+    var screenTitle: String {
+        switch self {
+        case .rest: "Last night"
+        case .tonight: "Tonight"
+        case .why: "Why"
+        case .debt: "Sleep debt"
+        case .alarm: "Smart alarm"
+        case .today: "Today"
+        case .inbox: "Updates"
+        case .charge: "Charge"
+        case .day: "The day so far"
+        case .energy: "What today has cost"
+        case .vitals: "Vitals"
+        case .stress: "Stress"
+        case .heart: "Heart"
+        case .breathe: "Breathe"
+        case .bcatalog: "Eighteen ways to breathe"
+        case .bplayer: "Breathing"
+        case .bsweep: "Finding your pace"
+        case .bfound: "Your pace"
+        case .session: "Session"
+        case .pick: "Choose a session"
+        case .ready: "Ready"
+        case .live: "Live session"
+        case .intervals: "Intervals"
+        case .detail: "Session detail"
+        case .across: "Every session"
+        case .trends: "Trends"
+        case .capacity: "Capacity"
+        case .rhythm: "Rhythm"
+        case .year: "The year"
+        case .you: "You"
+        case .record: "Your record"
+        case .zones: "Your zones"
+        case .history: "History"
+        case .strap: "Your strap"
+        case .notifs: "Buzz for notifications"
+        case .devices: "Manage straps"
+        case .apple: "Apple Health"
+        case .data: "Your data"
+        case .importHistory: "Bring your history in"
+        case .reading: "Reading a file"
+        case .imported: "What was written"
+        case .rejected: "The wrong file"
+        case .backup: "Backup and sync"
+        case .position: "What Noop will not ask you"
+        case .settings: "Settings"
+        case .widgets: "Widgets"
+        case .howItWorks: "How Noop works"
+        case .limitations: "Strap limitations"
+        case .siri: "Siri and Shortcuts"
+        case .shortcutExport: "Shortcuts export"
+        case .storage: "Storage"
+        case .digest: "Weekly digest"
+        case .report: "Trends report"
+        case .fused: "Your data, fused"
+        case .hydration: "Hydration"
+        case .lab: "The Lab"
+        case .automations: "Automations"
+        case .onboard: "Welcome"
+        case .pair: "Pair a strap"
+        case .ages: "Your ages"
+        case .building: "Building your ages"
+        case .driver: "Driver"
+        case .method: "How it is figured"
+        case .health: "Health"
+        case .coach: "Svea"
+        case .gate: "Connect a provider"
+        case .setup: "Provider setup"
+        case .consent: "Data access"
+        case .memory: "Memory"
+        case .goal: "Goals"
+        case .setGoal: "Set a goal"
+        case .labs: "Biomarkers"
+        case .picker: "Photograph the report"
+        case .review: "Review lab results"
+        case .marker: "Biomarker"
+        case .instrumentIndex: "Ask it something"
+        case .instrumentMetric: "One signal"
+        case .instrumentCompare: "Two at once"
+        case .instrumentEffects: "What moves you"
+        case .instrumentRaw: "Raw capture"
+        case .instrumentCapture: "Capture"
+        // Act 10 · The Lift.
+        case .liftLive: "Lift session"
+        case .liftLibrary: "Lift Log"
+        case .liftProgram: "Program"
+        case .liftDetail: "Lift detail"
+        case .liftEdit: "Edit session"
+        case .liftImport: "Import a program"
+        case .liftReview: "Review the import"
+        case .liftMuscles: "Muscles"
+        }
+    }
+}
+
+extension NoopNavigation {
+    /// The name of the screen a back would return to, or nil when there is no history behind this one
+    /// (then a header keeps its designed label, which names the canonical parent back(or:) falls to).
+    var previousScreenTitle: String? {
+        guard path.count > 1 else { return nil }
+        return path[path.count - 2].screenTitle
+    }
+}
+
+private struct NoopBackLabelKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    /// Set by the shell: where a back chevron actually leads, so its label matches the real path.
+    var noopBackLabel: String? {
+        get { self[NoopBackLabelKey.self] }
+        set { self[NoopBackLabelKey.self] = newValue }
     }
 }

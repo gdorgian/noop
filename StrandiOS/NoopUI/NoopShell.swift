@@ -93,6 +93,7 @@ struct NoopAppShell: View {
             .preferredColorScheme(.dark)
             .contentShape(Rectangle())
             .simultaneousGesture(backGesture)
+            .environment(\.noopBackLabel, navigation.previousScreenTitle)
             // Content ends above the bar: its 46 pt plus the 6 pt gap.
             .environment(\.noopLiveBarInset,
                          (liftSession.isActive || navigation.sessionRunning)
@@ -752,6 +753,7 @@ struct NoopVerifiedAppShell: View {
         // instead of running under the tab bar as the HTML does.
         .ignoresSafeArea(.container, edges: usesCanonicalCanvas ? .all : [])
         .modifier(NoopRealtimeHRHold())
+        .environment(\.noopBackLabel, navigation.previousScreenTitle)
         .task(id: instrumentLoadKey) {
             await loadOnce("instrument", instrumentLoadKey.map(String.init)) { await instrumentStore.load(from: repo) }
         }
@@ -1015,9 +1017,7 @@ struct NoopVerifiedAppShell: View {
 
                 switch navigation.route {
                 case .labs:
-                    // Labs is an Act 8 root whose drawn chevron leaves the act rather than walking
-                    // an arbitrary history stack.
-                    navigation.reset(to: .you)
+                    navigation.back(or: .you)
                 case .picker, .review, .marker:
                     navigation.back(or: .labs)
                 case .breathe:
@@ -1032,7 +1032,7 @@ struct NoopVerifiedAppShell: View {
                     // These are forward-only states and draw no back control.
                     return
                 case .instrumentIndex:
-                    navigation.reset(to: .trends)
+                    navigation.back(or: .trends)
                 case .instrumentMetric, .instrumentCompare, .instrumentEffects:
                     navigation.back(or: .instrumentIndex)
                 case .instrumentRaw:
@@ -1169,100 +1169,7 @@ private struct NoopVerifiedRouteScreen: View {
         }
     }
 
-    private var title: String {
-        switch route {
-        case .rest: "Last night"
-        case .tonight: "Tonight"
-        case .why: "Why"
-        case .debt: "Sleep debt"
-        case .alarm: "Smart alarm"
-        case .today: "Today"
-        case .inbox: "Updates"
-        case .charge: "Charge"
-        case .day: "The day so far"
-        case .energy: "What today has cost"
-        case .vitals: "Vitals"
-        case .stress: "Stress"
-        case .heart: "Heart"
-        case .breathe: "Breathe"
-        case .bcatalog: "Eighteen ways to breathe"
-        case .bplayer: "Breathing"
-        case .bsweep: "Finding your pace"
-        case .bfound: "Your pace"
-        case .session: "Session"
-        case .pick: "Choose a session"
-        case .ready: "Ready"
-        case .live: "Live session"
-        case .intervals: "Intervals"
-        case .detail: "Session detail"
-        case .across: "Every session"
-        case .trends: "Trends"
-        case .capacity: "Capacity"
-        case .rhythm: "Rhythm"
-        case .year: "The year"
-        case .you: "You"
-        case .record: "Your record"
-        case .zones: "Your zones"
-        case .history: "History"
-        case .strap: "Your strap"
-        case .notifs: "Buzz for notifications"
-        case .devices: "Manage straps"
-        case .apple: "Apple Health"
-        case .data: "Your data"
-        case .importHistory: "Bring your history in"
-        case .reading: "Reading a file"
-        case .imported: "What was written"
-        case .rejected: "The wrong file"
-        case .backup: "Backup and sync"
-        case .position: "What Noop will not ask you"
-        case .settings: "Settings"
-        case .widgets: "Widgets"
-        case .howItWorks: "How Noop works"
-        case .limitations: "Strap limitations"
-        case .siri: "Siri and Shortcuts"
-        case .shortcutExport: "Shortcuts export"
-        case .storage: "Storage"
-        case .digest: "Weekly digest"
-        case .report: "Trends report"
-        case .fused: "Your data, fused"
-        case .hydration: "Hydration"
-        case .lab: "The Lab"
-        case .automations: "Automations"
-        case .onboard: "Welcome"
-        case .pair: "Pair a strap"
-        case .ages: "Your ages"
-        case .building: "Building your ages"
-        case .driver: "Driver"
-        case .method: "How it is figured"
-        case .health: "Health"
-        case .coach: "Svea"
-        case .gate: "Connect a provider"
-        case .setup: "Provider setup"
-        case .consent: "Data access"
-        case .memory: "Memory"
-        case .goal: "Goals"
-        case .setGoal: "Set a goal"
-        case .labs: "Biomarkers"
-        case .picker: "Photograph the report"
-        case .review: "Review lab results"
-        case .marker: "Biomarker"
-        case .instrumentIndex: "Ask it something"
-        case .instrumentMetric: "One signal"
-        case .instrumentCompare: "Two at once"
-        case .instrumentEffects: "What moves you"
-        case .instrumentRaw: "Raw capture"
-        case .instrumentCapture: "Capture"
-        // Act 10 · The Lift.
-        case .liftLive: "Lift session"
-        case .liftLibrary: "Lift Log"
-        case .liftProgram: "Program"
-        case .liftDetail: "Lift detail"
-        case .liftEdit: "Edit session"
-        case .liftImport: "Import a program"
-        case .liftReview: "Review the import"
-        case .liftMuscles: "Muscles"
-        }
-    }
+    private var title: String { route.screenTitle }
 }
 
 enum NoopCanonicalGlyphName {
@@ -1899,6 +1806,7 @@ private struct NoopAddRecordSheet: View {
                         .stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5)
                 }
                 .shadow(color: .black.opacity(0.6), radius: 22, y: -14)
+                .noopDragToDismiss(navigation.dismissOverlay)
             }
             .frame(width: viewportWidth, height: proxy.size.height)
         }
@@ -2152,6 +2060,7 @@ private struct NoopNightJournalSheet: View {
                 .clipShape(UnevenRoundedRectangle(topLeadingRadius: 30, topTrailingRadius: 30))
                 .overlay { NoopDayLogSheetTopBorder().stroke(Color.white.opacity(0.1), lineWidth: 0.5) }
                 .shadow(color: .black.opacity(0.5), radius: 25, y: -20)
+                .noopDragToDismiss(navigation.dismissOverlay)
                 .offset(y: presented ? 0 : proxy.size.height * 1.02)
             }
             .onAppear {
@@ -2289,6 +2198,7 @@ private struct NoopDayLogSheet: View {
                         .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
                 }
                 .shadow(color: .black.opacity(0.5), radius: 25, y: -20)
+                .noopDragToDismiss(navigation.dismissOverlay)
                 .offset(y: presented ? 0 : proxy.size.height * 1.02)
             }
             .onAppear {
@@ -2505,6 +2415,7 @@ private struct NoopLoggedItemsSheet: View {
                         .stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5)
                 }
                 .shadow(color: .black.opacity(0.6), radius: 22, y: -14)
+                .noopDragToDismiss(navigation.dismissOverlay)
             }
         }
         .ignoresSafeArea()
