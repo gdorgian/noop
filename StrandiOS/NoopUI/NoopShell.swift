@@ -545,6 +545,10 @@ struct NoopVerifiedAppShell: View {
     @StateObject private var effortStore = NoopEffortStore()
     @StateObject private var agesStore = NoopAgesStore()
     /// Today's day-log counts as last written to the journal, and the day they belong to.
+    /// How far the current screen follows an edge swipe before it commits or springs back.
+    /// Gesture state, so a cancelled drag (a call, a system gesture) can never strand it off-zero.
+    @GestureState(resetTransaction: Transaction(animation: .spring(response: 0.32, dampingFraction: 0.86)))
+    private var swipeOffset: CGFloat = 0
     @State private var journalSynced: [NoopDayLogKind: Int] = [:]
     @State private var journalSyncedDay: String?
     @EnvironmentObject private var profile: ProfileStore
@@ -691,6 +695,7 @@ struct NoopVerifiedAppShell: View {
                         removal: verifiedRemoval
                     )
                 )
+                .offset(x: swipeOffset)
 
             if !navigation.route.hidesBottomBar {
                 VStack(spacing: 6) {
@@ -972,11 +977,19 @@ struct NoopVerifiedAppShell: View {
     }
 
     private var verifiedBackGesture: some Gesture {
-        DragGesture(minimumDistance: 22, coordinateSpace: .local)
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+            .updating($swipeOffset) { value, offset, _ in
+                // The screen follows the finger from the leading edge, as a native back swipe does,
+                // but only where the swipe has somewhere to go. It used to stay still until release.
+                // On release the state springs back; a committed swipe has already replaced the screen.
+                guard value.startLocation.x <= 32, navigation.overlay == nil, navigation.hasSwipeBack,
+                      abs(value.translation.width) > abs(value.translation.height) else { return }
+                offset = max(0, value.translation.width)
+            }
             .onEnded { value in
                 guard value.startLocation.x <= 32,
-                      value.translation.width > 78,
-                      abs(value.translation.height) < 58 else { return }
+                      abs(value.translation.height) < 58,
+                      value.translation.width > 78 || value.predictedEndTranslation.width > 200 else { return }
 
                 // Sheets always close before the route is considered, even on the three forward-only
                 // import states. This is the same precedence as the primary shell.
@@ -1019,8 +1032,10 @@ struct NoopVerifiedAppShell: View {
                         // The fail-closed placeholder draws its own back control (verifiedBack).
                         verifiedBack()
                     } else {
-                        navigation.handleBackSwipe(startX: value.startLocation.x,
-                                                   translation: value.translation)
+                        navigation.handleBackSwipe(
+                            startX: value.startLocation.x,
+                            translation: CGSize(width: max(value.translation.width, 79),
+                                                height: value.translation.height))
                     }
                 }
             }

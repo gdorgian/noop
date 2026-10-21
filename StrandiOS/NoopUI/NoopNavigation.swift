@@ -705,6 +705,21 @@ final class NoopNavigation: ObservableObject {
 
     var route: NoopRoute { path.last ?? .today }
     var canGoBack: Bool { path.count > 1 }
+
+    /// Whether an edge swipe has somewhere to go, so the screen may follow the finger. Spec
+    /// 30-routes "screens with no back": the act homes have no up, and the forward-only states
+    /// draw no chevron. Every other screen walks the back map. A sheet always closes first.
+    var hasSwipeBack: Bool {
+        if overlay != nil { return true }
+        switch route {
+        case .you, .reading, .imported, .rejected, .onboard, .liftLive:
+            return false   // handleBackSwipe returns without acting on these
+        case .rest, .today, .session, .trends, .ages, .coach:
+            return canGoBack
+        default:
+            return true
+        }
+    }
     var dayLogSaved: Bool { !dayLogCounts.isEmpty }
 
     /// Canonical chip labels for Act 2's Today screen, derived only from observations the user made.

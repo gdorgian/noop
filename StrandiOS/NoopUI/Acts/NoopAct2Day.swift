@@ -3116,9 +3116,14 @@ private struct Act2ScrubbableDayChart: View {
         GeometryReader { proxy in
             Act2FixedHeartChart(values: values, kind: .scrub(selected), resting: resting)
                 .contentShape(Rectangle())
-                .gesture(
+                // Shared with the page's ScrollView: an exclusive zero-distance drag swallowed every
+                // vertical scroll that happened to start on the chart. A mostly-vertical drag is the
+                // page scrolling, so it leaves the selection alone.
+                .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { gesture in
+                            let t = gesture.translation
+                            guard abs(t.height) <= max(8, abs(t.width)) else { return }
                             let fraction = min(1, max(0, gesture.location.x / max(1, proxy.size.width)))
                             selected = Int((fraction * CGFloat(max(0, values.count - 1))).rounded())
                         }
