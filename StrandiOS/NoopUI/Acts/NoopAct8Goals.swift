@@ -3417,10 +3417,6 @@ private struct NoopOCRActionStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.82 : 1)
     }
 }
-private struct NoopGoalActionStyle: ButtonStyle {
-    var primary = false
-    func makeBody(configuration: Configuration) -> some View { configuration.label.font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(primary ? Color(hex: 0x1E1405) : NoopHTMLColor.inkSoft).frame(maxWidth: .infinity).frame(height: 42).background(primary ? Color(hex: 0xF2B45C) : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(primary ? .clear : Color.white.opacity(0.1), lineWidth: 0.5)).opacity(configuration.isPressed ? 0.82 : 1) }
-}
 private struct NoopAct8WeekActionStyle: ButtonStyle {
     let primary: Bool
     func makeBody(configuration: Configuration) -> some View {

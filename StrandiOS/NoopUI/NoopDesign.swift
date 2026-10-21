@@ -511,35 +511,6 @@ struct NoopHTMLRow: View {
     }
 }
 
-struct NoopMetricTile: View {
-    let value: String
-    var unit: String = ""
-    let label: String
-    var color: Color = NoopHTMLColor.ink
-
-    var body: some View {
-        NoopHTMLCard(radius: 18, padding: 14) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(value)
-                        .font(NoopHTMLFont.outfit(25, weight: .light))
-                        .tracking(-0.6)
-                        .monospacedDigit()
-                        .foregroundStyle(color)
-                    if !unit.isEmpty {
-                        Text(unit)
-                            .font(NoopHTMLFont.sans(10.5))
-                            .foregroundStyle(NoopHTMLColor.muted)
-                    }
-                }
-                Text(label)
-                    .font(NoopHTMLFont.sans(11))
-                    .foregroundStyle(NoopHTMLColor.copy)
-            }
-        }
-    }
-}
-
 struct NoopPill: View {
     let text: String
     var color: Color = NoopHTMLColor.blue
@@ -654,55 +625,6 @@ struct NoopSegmentedControl: View {
 }
 
 // MARK: - Graphic primitives
-
-struct NoopOrb: View {
-    var value: String
-    var label: String
-    var color: Color = NoopHTMLColor.blue
-    var diameter: CGFloat = 232
-    var progress: Double = 0.78
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [color.opacity(0.42), color.opacity(0.11), .clear],
-                        center: .center,
-                        startRadius: 8,
-                        endRadius: diameter * 0.68
-                    )
-                )
-                .frame(width: diameter * 1.27, height: diameter * 1.27)
-                .blur(radius: 13)
-            Circle()
-                .stroke(Color.white.opacity(0.06), style: StrokeStyle(lineWidth: 17, lineCap: .round))
-                .frame(width: diameter, height: diameter)
-            Circle()
-                .trim(from: 0.045, to: max(0.046, min(0.96, progress)))
-                .stroke(
-                    AngularGradient(colors: [color.opacity(0.35), color, NoopHTMLColor.blueLight, color.opacity(0.5)], center: .center),
-                    style: StrokeStyle(lineWidth: 14, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .frame(width: diameter, height: diameter)
-                .shadow(color: color.opacity(0.7), radius: 9)
-            VStack(spacing: 8) {
-                Text(value)
-                    .font(NoopHTMLFont.outfit(diameter * 0.198, weight: .ultraLight))
-                    .tracking(-1.8)
-                    .monospacedDigit()
-                    .foregroundStyle(NoopHTMLColor.ink)
-                Text(label.uppercased())
-                    .font(NoopHTMLFont.sans(10.5, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(NoopHTMLColor.copy)
-            }
-        }
-        .frame(height: diameter * 1.08)
-        .accessibilityElement(children: .combine)
-    }
-}
 
 // MARK: - App-icon artwork shared with the live orbs
 
@@ -1113,55 +1035,6 @@ enum NoopAppIconAssetExporter {
     }
 }
 #endif
-
-struct NoopSparkline: View {
-    var values: [Double]
-    var color: Color = NoopHTMLColor.blue
-    var height: CGFloat = 92
-    var band: ClosedRange<Double>? = nil
-
-    var body: some View {
-        GeometryReader { geo in
-            Canvas { context, size in
-                guard values.count > 1,
-                      let low = values.min(), let high = values.max() else { return }
-                let span = max(0.001, high - low)
-                if let band {
-                    let y1 = size.height - CGFloat((band.upperBound - low) / span) * size.height
-                    let y2 = size.height - CGFloat((band.lowerBound - low) / span) * size.height
-                    context.fill(Path(CGRect(x: 0, y: min(y1, y2), width: size.width, height: abs(y2 - y1))), with: .color(color.opacity(0.13)))
-                }
-                var path = Path()
-                for (index, value) in values.enumerated() {
-                    let x = CGFloat(index) / CGFloat(values.count - 1) * size.width
-                    let y = size.height - CGFloat((value - low) / span) * size.height
-                    index == 0 ? path.move(to: CGPoint(x: x, y: y)) : path.addLine(to: CGPoint(x: x, y: y))
-                }
-                context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-            }
-            .frame(width: geo.size.width, height: height)
-        }
-        .frame(height: height)
-    }
-}
-
-struct NoopBarStrip: View {
-    let values: [Double]
-    var color: Color = NoopHTMLColor.blue
-    var height: CGFloat = 92
-
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 5) {
-            ForEach(Array(values.enumerated()), id: \.offset) { _, value in
-                Capsule()
-                    .fill(color.opacity(0.32 + 0.68 * max(0, min(1, value))))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: max(4, height * value))
-            }
-        }
-        .frame(height: height, alignment: .bottom)
-    }
-}
 
 struct NoopProgressBar: View {
     var progress: Double

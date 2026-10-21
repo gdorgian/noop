@@ -1647,33 +1647,6 @@ private struct Act1LinkRow: View {
     }
 }
 
-/// The confidence chip beside the need, in the act's lavender (20-primitives §15). Solid is plain,
-/// so the caller shows it only while building or calibrating.
-private struct Act1ConfidenceChip: View {
-    let record: NoopRestRecord
-
-    var body: some View {
-        let calibrating = record.confidence == .calibrating
-        let hue = Color(hex: 0x8B99D6)
-        HStack(spacing: 6) {
-            Circle()
-                .fill(hue.opacity(calibrating ? 0.42 : 0.75))
-                .frame(width: 5, height: 5)
-            Text(calibrating
-                 ? "\(record.needNights) of \(NoopRestRecord.needSolidNights) nights"
-                 : "Building \u{00B7} \(record.needNights) nights")
-                .font(NoopHTMLFont.sans(10, weight: .semibold))
-                .tracking(0.5)
-                .monospacedDigit()
-                .foregroundStyle(calibrating ? Color(hex: 0x8B958F) : Color(hex: 0xC9D0EE))
-        }
-        .padding(.leading, 8).padding(.trailing, 9).padding(.vertical, 4)
-        .background(hue.opacity(calibrating ? 0.07 : 0.12), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .strokeBorder(hue.opacity(calibrating ? 0.22 : 0.3), lineWidth: 0.5))
-    }
-}
-
 private struct Act1CheckDisc: View {
     let size: CGFloat
 
