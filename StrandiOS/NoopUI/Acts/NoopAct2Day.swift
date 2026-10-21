@@ -39,6 +39,27 @@ struct NoopVerifiedEnergyScreen: View {
     /// The HTML's designed reading for today, or nil (unconfirmed profile, nothing defensible).
     private var reading: NoopEnergyReading? { NoopEnergyReading.make(summary, confirmed: profileConfirmed) }
 
+    private var energyFigure: some View {
+        HStack(alignment: .lastTextBaseline, spacing: 9) {
+            Text(reading?.hero ?? "\u{2014}")
+                .font(NoopHTMLFont.outfit200(50)).tracking(-2)
+                .foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+                .fixedSize()
+            if reading != nil {
+                Text("kcal").font(NoopHTMLFont.sans(13))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .fixedSize()
+            }
+        }
+    }
+
+    @ViewBuilder private var energyChip: some View {
+        if let chip = reading?.chip {
+            NoopEnergyChip(label: chip, calibrating: reading?.chipCalibrating ?? false)
+                .fixedSize()
+        }
+    }
+
     var body: some View {
         NoopScreen(topInset: 58) {
             VStack(alignment: .leading, spacing: 0) {
@@ -46,20 +67,20 @@ struct NoopVerifiedEnergyScreen: View {
                     .padding(.bottom, 18)
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 7) {
-                        HStack(alignment: .lastTextBaseline, spacing: 9) {
-                            Text(reading?.hero ?? "\u{2014}")
-                                .font(NoopHTMLFont.outfit200(50)).tracking(-2)
-                                .foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
-                            if reading != nil {
-                                Text("kcal").font(NoopHTMLFont.sans(13))
-                                    .foregroundStyle(NoopHTMLColor.copy)
+                        // "about 1,780" with its chip is wider than a phone; the figure must never
+                        // truncate, so the chip drops under it when the row cannot hold both.
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .lastTextBaseline, spacing: 9) {
+                                energyFigure
+                                Spacer(minLength: 0)
+                                energyChip
                             }
-                            Spacer(minLength: 0)
-                            if let chip = reading?.chip {
-                                NoopEnergyChip(label: chip, calibrating: reading?.chipCalibrating ?? false)
+                            .frame(height: 50, alignment: .bottom)
+                            VStack(alignment: .leading, spacing: 8) {
+                                energyChip
+                                energyFigure.frame(height: 50, alignment: .bottom)
                             }
                         }
-                        .frame(height: 50, alignment: .bottom)
                         if let lead = reading?.lead {
                             Text(lead).font(NoopHTMLFont.sans(13.5))
                                 .foregroundStyle(NoopHTMLColor.copy)
@@ -198,20 +219,38 @@ struct NoopEnergyProfileConfirmation: View {
                     .textFieldStyle(.plain)
                     .padding(11)
                     .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
-                    Picker("Sex used for the estimate", selection: $sex) {
-                        Text("Choose").tag("")
-                        Text("Female").tag("female")
-                        Text("Male").tag("male")
-                        Text("Other").tag("nonbinary")
+                    // A menu picker outside a Form draws no label; without one "Choose" said nothing.
+                    HStack {
+                        Text("Sex used for the estimate")
+                            .foregroundStyle(sex.isEmpty ? NoopHTMLColor.copy : NoopHTMLColor.ink)
+                        Spacer(minLength: 8)
+                        Picker("Sex used for the estimate", selection: $sex) {
+                            Text("Choose").tag("")
+                            Text("Female").tag("female")
+                            Text("Male").tag("male")
+                            Text("Other").tag("nonbinary")
+                        }
+                        .labelsHidden()
                     }
+                    .padding(.leading, 11)
+                    .padding(.vertical, 2)
+                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
                     TextField("Weight in kg", text: $weight)
                         .keyboardType(.decimalPad)
                         .textFieldStyle(.plain)
+                        .overlay(alignment: .trailing) {
+                            // Once filled, the placeholder is gone; the unit keeps the field named.
+                            if !weight.isEmpty { Text("kg").foregroundStyle(NoopHTMLColor.copy) }
+                        }
                         .padding(11)
                         .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
                     TextField("Height in cm", text: $height)
                         .keyboardType(.decimalPad)
                         .textFieldStyle(.plain)
+                        .overlay(alignment: .trailing) {
+                            // Once filled, the placeholder is gone; the unit keeps the field named.
+                            if !height.isEmpty { Text("cm").foregroundStyle(NoopHTMLColor.copy) }
+                        }
                         .padding(11)
                         .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
                 }
@@ -243,6 +282,8 @@ struct NoopEnergyProfileConfirmation: View {
             }
             .padding(.horizontal, 20).padding(.top, 30).padding(.bottom, 30)
         }
+        // The number pads have no return key; dragging the form down is the way out.
+        .scrollDismissesKeyboard(.interactively)
         .background(NoopHTMLColor.canvas.ignoresSafeArea())
         .preferredColorScheme(.dark)
     }

@@ -1178,7 +1178,7 @@ private struct NoopSveaSetup: View {
                     Task { await coach.testConnection() }
                 }
                 .buttonStyle(NoopSveaTintButtonStyle())
-                .disabled(coach.connectionTest == .testing)
+                .disabled(coach.connectionTest == .testing || missingKey)
             }
         }
     }
@@ -1311,6 +1311,8 @@ private struct NoopSveaSetup: View {
     }
 
     private var keyMask: String {
+        // No key yet: a row of dots would read as a saved key.
+        if !coach.hasKey && !NoopSveaFixture.enabled { return "Paste your key" }
         guard keyEndingVisible else { return "•••• •••• •••• ••••" }
         if let key = AIKeyStore.read(), !key.isEmpty {
             return "•••• •••• •••• \(key.suffix(4))"
@@ -1325,7 +1327,14 @@ private struct NoopSveaSetup: View {
         return "Enter"
     }
 
+    /// A hosted provider cannot answer without a key; a custom endpoint may be local and keyless.
+    private var missingKey: Bool {
+        provider != "Custom" && !coach.hasKey && !NoopSveaFixture.enabled
+            && keyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var connectionTestLabel: String {
+        if missingKey { return "Add a key to test" }
         switch coach.connectionTest {
         case .untested: return "Test the connection"
         case .testing: return "Testing…"
