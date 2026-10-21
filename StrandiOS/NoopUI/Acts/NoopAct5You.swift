@@ -1117,7 +1117,7 @@ private extension NoopAct5Screens {
                         .font(NoopHTMLFont.sans(11.5, weight: selected ? .semibold : .regular))
                         .lineLimit(1).minimumScaleFactor(0.85).fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(selected ? Self.blushLight : NoopHTMLColor.copy)
-                        .frame(maxWidth: .infinity).frame(height: 32)
+                        .padding(.horizontal, 9).frame(height: 32)
                         .background(selected ? Self.blush.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
                 }
@@ -1125,7 +1125,7 @@ private extension NoopAct5Screens {
             }
         }
         .padding(3)
-        .frame(width: 114)
+        .fixedSize()
         .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
     }
 
@@ -1159,7 +1159,7 @@ private extension NoopAct5Screens {
                         .minimumScaleFactor(0.85)
                         .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(selected ? Self.blushLight : NoopHTMLColor.copy)
-                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 9)
                         .frame(height: 32)
                         .background(selected ? Self.blush.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
@@ -1168,7 +1168,7 @@ private extension NoopAct5Screens {
             }
         }
         .padding(3)
-        .frame(width: 114)
+        .fixedSize()
         .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
     }
 

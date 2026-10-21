@@ -234,6 +234,8 @@ private struct NoopTrendsScreen: View {
                 .foregroundStyle(Color(hex: 0xB4C9BE))
                 .noopA4LineBox(fontSize: 13.5, ratio: 1.6)
         }
+        // A short sentence left the card hugging its text, narrower than the cards under it.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 18)
         .padding(.top, 18)
         .padding(.bottom, 17)
