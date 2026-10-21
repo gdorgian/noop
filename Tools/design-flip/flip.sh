@@ -27,7 +27,7 @@ if [[ -z $BROWSER ]]; then
   done
 fi
 [[ -n $BROWSER ]] || { echo "No Chromium browser found; set FLIP_BROWSER" >&2; exit 1; }
-APP=$(find ~/Library/Developer/Xcode/DerivedData -path '*Debug-iphonesimulator/Noop Aura.app' -maxdepth 6 -type d | head -1)
+APP=${FLIP_APP:-}; [[ -n $APP ]] || APP=$(find ~/Library/Developer/Xcode/DerivedData -path '*Debug-iphonesimulator/Noop Aura.app' -maxdepth 6 -type d | head -1)
 [[ -n $APP ]] || { echo "No Debug simulator build of Noop Aura found" >&2; exit 1; }
 BID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Info.plist")
 mkdir -p $OUT

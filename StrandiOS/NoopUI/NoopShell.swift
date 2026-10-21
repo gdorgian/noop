@@ -185,6 +185,9 @@ struct NoopAppShell: View {
                     .offset(y: usesLargeAmbientGeometry ? -170 : -150)
                 Spacer()
             }
+            // Wider than the phone. The zero minimums are what stop the ellipse from widening the
+            // shell: a frame with only maximums never reports narrower than its child.
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .ignoresSafeArea()
             .allowsHitTesting(false)
             .animation(.easeInOut(duration: 0.5), value: navigation.route.rawValue)
@@ -492,7 +495,7 @@ struct NoopNightAmbientGlow: View {
             }
             // The 470 pt ellipse is wider than the phone. A flexible frame lets it draw past the
             // edges without widening the shell, which pushed the + sheets and the terms gate off-screen.
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
@@ -679,10 +682,13 @@ struct NoopVerifiedAppShell: View {
                 }
             }
                 .id(navigation.route.rawValue)
+                // Same arrival grammar as the fixture shell: a push rises 9 pt, a tab arrival
+                // crossfades, and a cover (the finished-session landing) slides up and leaves down.
+                // Release used to rise every change, so covers never read as covers.
                 .transition(
                     .asymmetric(
-                        insertion: reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 9)),
-                        removal: .identity
+                        insertion: verifiedInsertion,
+                        removal: verifiedRemoval
                     )
                 )
 
@@ -712,6 +718,11 @@ struct NoopVerifiedAppShell: View {
                 // Release (day log, night journal, logged items, goal editor); the rest are catalogs,
                 // confirmations of real actions, or navigation.
                 NoopOverlayHost(overlay: overlay, navigation: navigation)
+                    // Sheets are drawn edge to edge like the fixture shell's. Without this the
+                    // bottom safe area stayed out of the layer: every sheet stopped ~34 pt above
+                    // the screen edge with an undimmed strip of the page showing beneath it.
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                    .ignoresSafeArea()
                     .zIndex(20)
             }
         }
@@ -724,9 +735,11 @@ struct NoopVerifiedAppShell: View {
                      (liftSession.isActive || navigation.sessionRunning || model.activeWorkout != nil)
                         && !navigation.route.hidesBottomBar ? 52 : 0)
         // Canonical pages measure their 56 pt header inset from the full 402 x 874 canvas, exactly
-        // like the fixture shell. Without this, SwiftUI first removes the status-bar safe area and
-        // NoopScreen adds 56 pt again, putting every verified Lab/Breathe page about 60 pt too low.
-        .ignoresSafeArea(.container, edges: usesCanonicalCanvas ? .top : [])
+        // like the fixture shell. Without the top edge, SwiftUI first removes the status-bar safe
+        // area and NoopScreen adds 56 pt again, putting every verified Lab/Breathe page about 60 pt
+        // too low. Without the bottom edge, every scroll view stopped ~34 pt above the screen edge
+        // instead of running under the tab bar as the HTML does.
+        .ignoresSafeArea(.container, edges: usesCanonicalCanvas ? .all : [])
         .modifier(NoopRealtimeHRHold())
         .task(id: instrumentLoadKey) {
             guard instrumentLoadKey != nil else { return }
@@ -922,7 +935,7 @@ struct NoopVerifiedAppShell: View {
                 Spacer()
             }
             // Wider than the phone; see NoopNightAmbientGlow.
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .ignoresSafeArea()
             .allowsHitTesting(false)
         }
@@ -942,6 +955,20 @@ struct NoopVerifiedAppShell: View {
         default:
             navigation.reset(to: navigation.route.tab.root)
         }
+    }
+
+    private var verifiedInsertion: AnyTransition {
+        if reduceMotion { return .opacity }
+        switch navigation.arrival {
+        case .coverIn: return .move(edge: .bottom)
+        case .pushed: return .opacity.combined(with: .offset(y: 9))
+        case .arrived, .coverOut: return .opacity
+        }
+    }
+
+    private var verifiedRemoval: AnyTransition {
+        guard !reduceMotion else { return .identity }
+        return navigation.arrival == .coverOut ? .move(edge: .bottom) : .identity
     }
 
     private var verifiedBackGesture: some Gesture {
@@ -985,10 +1012,16 @@ struct NoopVerifiedAppShell: View {
                 case .instrumentCapture:
                     navigation.back(or: .instrumentRaw)
                 default:
-                    // Keep the fail-closed placeholder's existing behaviour until that route gets
-                    // its own verified production screen.
-                    guard navigation.route.hidesBottomBar else { return }
-                    verifiedBack()
+                    // Every other route follows the canonical back map, exactly as its chevron does.
+                    // This used to fall through only when the route hid the tab bar, so swiping back
+                    // silently did nothing on Heart, Vitals, Stress, Tonight, every You page, etc.
+                    if !usesCanonicalCanvas {
+                        // The fail-closed placeholder draws its own back control (verifiedBack).
+                        verifiedBack()
+                    } else {
+                        navigation.handleBackSwipe(startX: value.startLocation.x,
+                                                   translation: value.translation)
+                    }
                 }
             }
     }
