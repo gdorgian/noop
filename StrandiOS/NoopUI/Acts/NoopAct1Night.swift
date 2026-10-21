@@ -11,6 +11,9 @@ struct NoopAct1Screens: View {
     var battery: Int? = nil
     @EnvironmentObject private var behavior: BehaviorStore
     @EnvironmentObject private var model: AppModel
+    /// The firmware alarm on a 5.0/MG is unconfirmed upstream, so `armStrapAlarm` only sends it once the
+    /// wearer allows it. Aura had no control for this and told every 5.0 wearer the strap was armed.
+    @AppStorage(PuffinExperiment.defaultsKey) private var strapAlarm5Allowed = false
 
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     @State private var showHypnogram = NoopContentPolicy.allowsPrototypeContent
@@ -574,7 +577,9 @@ struct NoopAct1Screens: View {
                         tonightToggle(
                             glyph: .watch,
                             title: "Armed on the strap",
-                            detail: "Fires with your phone off, silent, or in another room",
+                            detail: strapAlarmHeld && alarmArmed
+                                ? "Time saved. A 5.0 does not buzz until you allow it on the alarm screen"
+                                : "Fires with your phone off, silent, or in another room",
                             isOn: alarmArmed
                         ) {
                             if rest != nil {
@@ -1390,11 +1395,28 @@ struct NoopAct1Screens: View {
             Text("It runs on the strap, not the phone")
                 .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                 .foregroundStyle(Color(hex: 0xEDF1EF))
-            Text("Noop hands the window to the band before you sleep. It buzzes your wrist even if your phone is off, flat, silenced or in another room. Costs about 2 % of the band’s battery a night.")
+            Text(alarmStrapCopy)
                 .font(NoopHTMLFont.sans(12.5))
                 .foregroundStyle(Color(hex: 0xC9CEE8))
                 .lineSpacing(NoopSpecType.lineSpacing(size: 12.5, cssLineHeight: 1.6, face: NoopSpecType.Face.sansRegular))
                 .fixedSize(horizontal: false, vertical: true)
+            if rest != nil && model.whoop5Detected {
+                Divider().overlay(NoopHTMLColor.night.opacity(0.22)).frame(height: 0.5).padding(.vertical, 3)
+                Toggle(isOn: Binding(
+                    get: { strapAlarm5Allowed },
+                    set: { strapAlarm5Allowed = $0; model.applySmartAlarm() }
+                )) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Let the 5.0 try")
+                            .font(NoopHTMLFont.sans(13, weight: .semibold))
+                            .foregroundStyle(Color(hex: 0xEDF1EF))
+                        Text("Experimental. Keep a phone alarm for anything you cannot miss.")
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                    }
+                }
+                .tint(NoopHTMLColor.night)
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1406,11 +1428,25 @@ struct NoopAct1Screens: View {
         )
     }
 
+    /// True when the wearer has armed a time that a 5.0/MG strap will not buzz for.
+    private var strapAlarmHeld: Bool {
+        rest != nil && model.whoop5Detected && !strapAlarm5Allowed
+    }
+
+    private var alarmStrapCopy: String {
+        guard rest != nil, model.whoop5Detected else {
+            return "Noop hands the window to the band before you sleep. It buzzes your wrist even if your phone is off, flat, silenced or in another room. Costs about 2 % of the band’s battery a night."
+        }
+        return strapAlarm5Allowed
+            ? "Your 5.0 is armed with its experimental alarm. Noop has seen a 5.0 accept it, but a wake from the strap is not yet confirmed on one, so the phone’s backup still sounds."
+            : "On a 5.0 the strap’s own alarm is still experimental, so it is not armed. Your wake time is saved and the phone’s backup will sound. Allow the strap below to let it buzz too."
+    }
+
     /// Every failure mode named before it happens. An alarm that silently does not fire is worse
     /// than no alarm, and the honest place to say so is here rather than in tomorrow's read.
     private var alarmFailureCard: some View {
         let failures = [
-            "The band is not on your wrist when you fall asleep. It cannot buzz an empty strap, and it will not fall back to your phone.",
+            "The band is not on your wrist when you fall asleep. It cannot buzz an empty strap; only the phone’s backup sounds, and only if Noop may send notifications.",
             "The band is below 5 %. It keeps the window armed but drops the buzz — you get one line about it on tomorrow morning’s read.",
             "You never opened Noop before bed. The window is handed over at your bedtime anchor, so an alarm set three days ago and never re-armed does not fire."
         ]
