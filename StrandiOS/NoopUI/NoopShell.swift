@@ -94,6 +94,8 @@ struct NoopAppShell: View {
             .contentShape(Rectangle())
             .simultaneousGesture(backGesture)
             .environment(\.noopBackLabel, navigation.previousScreenTitle)
+        .environment(\.noopScrollKey, navigation.scrollKey)
+        .environment(\.noopScrollMemory, navigation.scrollMemory)
             // Content ends above the bar: its 46 pt plus the 6 pt gap.
             .environment(\.noopLiveBarInset,
                          (liftSession.isActive || navigation.sessionRunning)
@@ -756,6 +758,8 @@ struct NoopVerifiedAppShell: View {
         .ignoresSafeArea(.container, edges: usesCanonicalCanvas ? .all : [])
         .modifier(NoopRealtimeHRHold())
         .environment(\.noopBackLabel, navigation.previousScreenTitle)
+        .environment(\.noopScrollKey, navigation.scrollKey)
+        .environment(\.noopScrollMemory, navigation.scrollMemory)
         .task(id: instrumentLoadKey) {
             await loadOnce("instrument", instrumentLoadKey.map(String.init)) { await instrumentStore.load(from: repo) }
         }

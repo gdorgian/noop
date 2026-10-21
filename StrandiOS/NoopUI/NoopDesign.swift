@@ -153,13 +153,11 @@ struct NoopScreen<Content: View>: View {
                         .id("noop-screen-top")
                 }
                 .scrollIndicators(.hidden)
+                .modifier(NoopScrollRestore(enabled: initialScrollID == nil))
                 .onAppear {
+                    guard let initialScrollID else { return }
                     DispatchQueue.main.async {
-                        if let initialScrollID {
-                            scrollProxy.scrollTo(initialScrollID, anchor: .center)
-                        } else {
-                            scrollProxy.scrollTo("noop-screen-top", anchor: .top)
-                        }
+                        scrollProxy.scrollTo(initialScrollID, anchor: .center)
                     }
                 }
             }
@@ -169,6 +167,79 @@ struct NoopScreen<Content: View>: View {
         }
         .frame(width: UIScreen.main.bounds.width)
         .background(Color.clear)
+    }
+}
+
+/// Where each screen in the navigation path was scrolled to, keyed by its depth and route. A screen
+/// returned to by back opens where it was left; a newly opened one starts at the top, because
+/// `NoopNavigation` forgets the offsets at and beyond any depth a forward move reaches.
+final class NoopScrollMemory {
+    var offsets: [String: CGFloat] = [:]
+}
+
+private struct NoopScrollKeyKey: EnvironmentKey { static let defaultValue: String? = nil }
+private struct NoopScrollMemoryKey: EnvironmentKey { static let defaultValue: NoopScrollMemory? = nil }
+
+extension EnvironmentValues {
+    var noopScrollKey: String? {
+        get { self[NoopScrollKeyKey.self] }
+        set { self[NoopScrollKeyKey.self] = newValue }
+    }
+    var noopScrollMemory: NoopScrollMemory? {
+        get { self[NoopScrollMemoryKey.self] }
+        set { self[NoopScrollMemoryKey.self] = newValue }
+    }
+}
+
+private struct NoopScrollRestore: ViewModifier {
+    let enabled: Bool
+    @Environment(\.noopScrollKey) private var key
+    @Environment(\.noopScrollMemory) private var memory
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *), enabled, let key, let memory {
+            NoopScrollRestoreBody(content: content, key: key, memory: memory)
+        } else {
+            content
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct NoopScrollRestoreBody<C: View>: View {
+    let content: C
+    let key: String
+    let memory: NoopScrollMemory
+    @State private var position = ScrollPosition(edge: .top)
+    /// Read once, as the screen is made: the fresh scroll view reports 0 before it is restored,
+    /// and recording that first would overwrite the offset it is about to return to.
+    @State private var pending: CGFloat?
+
+    init(content: C, key: String, memory: NoopScrollMemory) {
+        self.content = content
+        self.key = key
+        self.memory = memory
+        let saved = memory.offsets[key] ?? 0
+        _pending = State(initialValue: saved > 1 ? saved : nil)
+    }
+
+    var body: some View {
+        content
+            .scrollPosition($position)
+            .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y + $0.contentInsets.top }) { _, y in
+                if let target = pending {
+                    // Recording resumes once the scroll view has reached the offset it was given.
+                    guard abs(y - target) < 2 else { return }
+                    pending = nil
+                }
+                memory.offsets[key] = y
+            }
+            .onAppear {
+                guard let target = pending else { return }
+                DispatchQueue.main.async { position.scrollTo(y: target) }
+                // A page shorter than it was (its content changed) never reaches the target.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { pending = nil }
+            }
     }
 }
 

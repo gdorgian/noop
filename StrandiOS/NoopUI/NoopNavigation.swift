@@ -366,7 +366,22 @@ final class NoopNavigation: ObservableObject {
     private let defaults: UserDefaults
     private var pendingSheetTransition: UUID?
 
-    @Published private(set) var path: [NoopRoute] = [.today]
+    @Published private(set) var path: [NoopRoute] = [.today] {
+        didSet { forgetScroll(from: oldValue) }
+    }
+    let scrollMemory = NoopScrollMemory()
+    /// The current screen's slot in `scrollMemory`.
+    var scrollKey: String { "\(path.count)-\(route.rawValue)" }
+
+    /// Back keeps the offset of the screen returned to; any forward move (push, replace, tab) starts
+    /// the arriving screen at the top and forgets everything deeper.
+    private func forgetScroll(from old: [NoopRoute]) {
+        let goingBack = path.count < old.count && Array(old.prefix(path.count)) == path
+        let keep = goingBack ? path.count : path.count - 1
+        scrollMemory.offsets = scrollMemory.offsets.filter { entry in
+            (Int(entry.key.split(separator: "-").first ?? "") ?? 0) <= keep
+        }
+    }
     @Published var overlay: NoopOverlay?
     @Published var selectedWorkout: NoopWorkout = .steadyRide
     @Published var workoutChosenByUser = false
