@@ -490,15 +490,19 @@ private struct NoopLiftLiveScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 14) {
                     VStack(alignment: .leading, spacing: 3) {
+                        // The session publishes nothing between taps (upstream 12.0), so the clock
+                        // reads the wall clock itself, once a second.
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
                         Text(presentation.isResting
-                             ? liftClock(presentation.heldClockSeconds ?? engine.restRemaining(now: live.now) ?? 0)
-                             : liftClock(presentation.sessionElapsedSeconds
+                             ? liftClock(presentation.heldClockSeconds ?? engine.restRemaining(now: Self.second(context.date)) ?? 0)
+                             : liftClock(liveElapsed(presentation, at: context.date)
                                          + (isPrototypeSession ? 1_394 : 0), long: true))
                             .font(NoopHTMLFont.outfit(20, weight: .light))
                             .tracking(-0.5)
                             .monospacedDigit()
                             .foregroundStyle(live.isPaused ? NoopHTMLColor.copy.opacity(0.8)
                                              : presentation.isResting ? NoopHTMLColor.blueLight : NoopHTMLColor.ink)
+                        }
                         Text(presentation.isResting ? "REST LEFT" : live.isPaused ? "PAUSED" : "IN THE SESSION")
                             .font(NoopHTMLFont.sans(10, weight: .semibold))
                             .tracking(1.1)
@@ -526,7 +530,12 @@ private struct NoopLiftLiveScreen: View {
                         .foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                 }
 
-                reasonCard(item)
+                // A line with weight, reps or effort to aim for and no note of why has nothing for this
+                // card to say; it used to claim "no targets" over a line that had them.
+                if item.note?.isEmpty == false
+                    || (item.targetWeightKg == nil && item.targetRepsLow == nil && item.targetRpe == nil) {
+                    reasonCard(item)
+                }
                 setList(engine: engine, current: slot, isResting: presentation.isResting)
 
                 if presentation.isResting {
@@ -707,9 +716,24 @@ private struct NoopLiftLiveScreen: View {
         .buttonStyle(NoopHTMLPressStyle())
     }
 
+    private static func second(_ date: Date) -> Int { Int(date.timeIntervalSince1970) }
+
+    /// Elapsed session time at `date`: the controller's figure as of its last change, carried forward
+    /// by the wall clock unless the session is paused.
+    private func liveElapsed(_ presentation: LiftSessionController.Presentation, at date: Date) -> Int {
+        guard !live.isPaused else { return presentation.sessionElapsedSeconds }
+        return presentation.sessionElapsedSeconds + max(0, Self.second(date) - live.now)
+    }
+
     private func restCard(engine: LiftSessionEngine, item: LiftPlanItem, slot: LiftSlot) -> some View {
-        let remaining = presentation?.heldClockSeconds ?? engine.restRemaining(now: live.now) ?? 0
-        return VStack(spacing: 12) {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            restCardBody(engine: engine, item: item, slot: slot,
+                         remaining: presentation?.heldClockSeconds ?? engine.restRemaining(now: Self.second(context.date)) ?? 0)
+        }
+    }
+
+    private func restCardBody(engine: LiftSessionEngine, item: LiftPlanItem, slot: LiftSlot, remaining: Int) -> some View {
+        VStack(spacing: 12) {
             Text("REST · \(liftClock(item.restSec)) ASKED FOR")
                 .font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.2).foregroundStyle(NoopHTMLColor.muted)
             Text(liftClock(remaining))
@@ -898,6 +922,9 @@ private struct NoopLiftLiveScreen: View {
             return
         }
         saved = true
+        navigation.recordFinishedLift(sessionID: sessionID, title: live.programName,
+                                      durationSeconds: activeDuration,
+                                      at: Date(timeIntervalSince1970: TimeInterval(end)))
         live.finishedSaving()
         await repo.refresh()
         await flow.refresh(repo: repo)
@@ -905,7 +932,7 @@ private struct NoopLiftLiveScreen: View {
         flow.sessionSets = rows
         navigation.selectedLiftSessionID = sessionID
         navigation.liftDetailReturnRoute = .today
-        navigation.replace(with: .liftDetail)
+        navigation.land(on: .liftDetail, over: .today)
     }
 
     private func setLine(_ slot: LiftSlot) -> String {
@@ -1180,6 +1207,10 @@ private struct NoopLiftLibraryScreen: View {
             }
             return
         }
+        // The Aura session has no warm-up step: set 1 is running when the screen opens, so the first
+        // "Log the set" (or strap double-tap) logs it, as the screen says. Without this the first press
+        // only started the set and nothing on the screen moved.
+        live.advance()
         navigation.replace(with: .liftLive)
     }
 
@@ -1209,6 +1240,7 @@ private struct NoopLiftProgramScreen: View {
     @State private var loaded = false
     @State private var saving = false
     @State private var saveError: String?
+    @FocusState private var focusedTarget: String?
 
     private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
     private var readOnly: Bool { flow.selectedProgram?.archived == true }
@@ -1272,6 +1304,7 @@ private struct NoopLiftProgramScreen: View {
                 modes
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .task { await load() }
         .alert("Program not saved", isPresented: Binding(
             get: { saveError != nil }, set: { if !$0 { saveError = nil } }
@@ -1370,9 +1403,13 @@ private struct NoopLiftProgramScreen: View {
                 .font(NoopHTMLFont.sans(13, weight: text.wrappedValue == "not set" || text.wrappedValue.isEmpty ? .regular : .semibold))
                 .foregroundStyle(disabled || text.wrappedValue == "not set" ? NoopHTMLColor.muted : NoopHTMLColor.ink)
                 .disabled(disabled)
+                .focused($focusedTarget, equals: label)
                 .frame(maxWidth: 178)
         }
         .frame(minHeight: 46)
+        // The field is only the trailing 178 pt; a tap on the label went nowhere.
+        .contentShape(Rectangle())
+        .onTapGesture { if !disabled { focusedTarget = label } }
         .overlay(alignment: .top) { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) }
     }
 
@@ -1577,7 +1614,7 @@ private struct NoopLiftDetailScreen: View {
 
     private func metricGrid(_ record: LiftSessionRow) -> some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 9), GridItem(.flexible(), spacing: 9)], spacing: 9) {
-            metricTile(value: isPrototypeRecord ? "16" : "\(working.count)", unit: "sets", label: "working sets, warm-ups left out")
+            metricTile(value: isPrototypeRecord ? "16" : "\(working.count)", unit: !isPrototypeRecord && working.count == 1 ? "set" : "sets", label: "working sets, warm-ups left out")
             metricTile(value: isPrototypeRecord ? (units == .metric ? "6,280" : "13,840") : volume > 0 ? groupedWeight(volume) : "—",
                        unit: isPrototypeRecord || volume > 0 ? LiftFormat.weightUnit(units) : "",
                        label: volume > 0 ? "lifted altogether" : "volume was not recorded")
@@ -1723,7 +1760,8 @@ private struct NoopLiftDetailScreen: View {
             await flow.loadSession(id: navigation.selectedLiftSessionID, repo: repo)
             return
         }
-        if flow.selectedSession != nil && !flow.sessionSets.isEmpty { return }
+        if let shown = flow.selectedSession, !flow.sessionSets.isEmpty,
+           navigation.selectedLiftSessionID == nil || shown.id == navigation.selectedLiftSessionID { return }
         await flow.refresh(repo: repo)
         let id = navigation.selectedLiftSessionID ?? flow.sessions.first?.id
         navigation.selectedLiftSessionID = id
@@ -1742,7 +1780,8 @@ private struct NoopLiftDetailScreen: View {
 
     private func groupedWeight(_ kg: Double) -> String {
         let display = LiftFormat.display(fromKilograms: kg, system: units)
-        return display.formatted(.number.precision(.fractionLength(0)).grouping(.automatic))
+        // Whole numbers once volume is in the hundreds; below that a 2.5 kg set must not read as 2.
+        return display.formatted(.number.precision(.fractionLength(display < 100 ? 0...1 : 0...0)).grouping(.automatic))
     }
 
     private func setPill(_ row: LiftSetRow) -> String {

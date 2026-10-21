@@ -3016,7 +3016,7 @@ private extension NoopAct3Screens {
 
     /// "42 min · load 48 · 14.8 km".
     static func meta(_ row: WorkoutRow) -> String {
-        var parts = ["\(row.noopMinutes) min"]
+        var parts = [row.noopMinutesLabel]
         if let strain = row.strain { parts.append("load \(Int(strain.rounded()))") }
         if let d = row.distanceM, d > 0 { parts.append(String(format: "%.1f km", d / 1000)) }
         return parts.joined(separator: " \u{00B7} ")
@@ -3025,7 +3025,7 @@ private extension NoopAct3Screens {
     /// "Yesterday, 17:04 · 42 min · 14.8 km".
     static func detailLine(_ row: WorkoutRow) -> String {
         let start = Date(timeIntervalSince1970: TimeInterval(row.startTs))
-        var parts = ["\(dayWord(row.startTs)), \(AppClock.hourMinuteFormatter().string(from: start))", "\(row.noopMinutes) min"]
+        var parts = ["\(dayWord(row.startTs)), \(AppClock.hourMinuteFormatter().string(from: start))", row.noopMinutesLabel]
         if let d = row.distanceM, d > 0 { parts.append(String(format: "%.1f km", d / 1000)) }
         return parts.joined(separator: " \u{00B7} ")
     }

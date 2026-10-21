@@ -346,7 +346,9 @@ struct NoopAct2Screens: View {
     // MARK: - Today
 
     private var sessionCardTitle: String {
-        if let finished = navigation.finishedSessionToday { return finished.workout.act3.name }
+        if let finished = navigation.finishedSessionToday {
+            return finished.liftSessionID != nil ? (finished.liftTitle ?? "Lift") : finished.workout.act3.name
+        }
         if day != nil { return "Choose a session" }
         return restDay ? "Rest" : navigation.selectedWorkout.act3.name
     }
@@ -372,7 +374,8 @@ struct NoopAct2Screens: View {
     }
 
     private var sessionCardRoute: NoopRoute {
-        navigation.finishedSessionToday == nil ? .session : .detail
+        guard let finished = navigation.finishedSessionToday else { return .session }
+        return finished.liftSessionID != nil ? .liftDetail : .detail
     }
 
     private var todayInitialScrollID: String? {
@@ -578,7 +581,13 @@ struct NoopAct2Screens: View {
                     // Change 1, door one. `today` already answers "can I train"; this is the door to
                     // acting on it. Always present — an empty slot where a card was yesterday reads
                     // as a bug — so a rest day changes the copy rather than removing the card.
-                    Button { navigation.reset(to: sessionCardRoute) } label: {
+                    Button {
+                        if let lift = navigation.finishedSessionToday?.liftSessionID {
+                            navigation.selectedLiftSessionID = lift
+                            navigation.liftDetailReturnRoute = .today
+                        }
+                        navigation.reset(to: sessionCardRoute)
+                    } label: {
                         HStack(spacing: 13) {
                             VStack(alignment: .leading, spacing: 4) {
                                 NoopSectionLabel("Today's session", color: Color(hex: 0xC8934B))

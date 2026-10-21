@@ -62,6 +62,11 @@ extension WorkoutRow {
         return max(0, Int((seconds / 60).rounded()))
     }
 
+    /// "42 min", or "Under 1 min" rather than a session that reads as nothing.
+    var noopMinutesLabel: String {
+        noopMinutes == 0 ? "Under 1 min" : "\(noopMinutes) min"
+    }
+
     /// Where the row came from, in the design's three words.
     var noopSourceLabel: String {
         let s = source.lowercased()

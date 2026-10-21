@@ -314,7 +314,7 @@ private struct NoopLiftLiveBar: View {
 
                         Spacer(minLength: 0)
 
-                        Text(clock(presentation))
+                        Text(clock(presentation, at: timeline.date))
                             .font(clockFont(presentation))
                             .tracking(presentation.isPaused || presentation.isReady ? 0 : -0.34)
                             .monospacedDigit()
@@ -392,14 +392,16 @@ private struct NoopLiftLiveBar: View {
         return 0.45 + 0.55 * (0.5 - 0.5 * cos(phase * 2 * .pi))
     }
 
-    private func clock(_ p: LiftSessionController.Presentation) -> String {
+    /// `date` is the timeline's: the controller's `now` only moves on a tap.
+    private func clock(_ p: LiftSessionController.Presentation, at date: Date) -> String {
         if p.isPaused { return "Paused" }
         if p.isReady { return "Ready" }
-        if p.isResting, let remaining = session.engine?.restRemaining(now: session.now) {
+        let now = Int(date.timeIntervalSince1970)
+        if p.isResting, let remaining = session.engine?.restRemaining(now: now) {
             return format(remaining)
         }
         guard let engine = session.engine else { return "0:00" }
-        return format(max(0, session.now - engine.stageStartedAt))
+        return format(max(0, now - engine.stageStartedAt))
     }
 
     private func setLabel(_ p: LiftSessionController.Presentation) -> String {
@@ -2560,7 +2562,7 @@ private struct NoopLoggedDay: Identifiable {
             var items: [NoopLoggedItem] = []
             for workout in workouts.filter({ span.contains($0.startTs) }).sorted(by: { $0.startTs > $1.startTs }) {
                 var detail = clock.string(from: Date(timeIntervalSince1970: TimeInterval(workout.startTs)))
-                    + " · \(workout.noopMinutes) min"
+                    + " · \(workout.noopMinutesLabel)"
                 if let avg = workout.avgHr { detail += " · avg \(avg) bpm" }
                 items.append(.init(kind: .session, name: workout.sport, detail: detail, figure: "",
                                    glyph: workout.sport.localizedCaseInsensitiveContains("cycl") ? .bike : .bolt))

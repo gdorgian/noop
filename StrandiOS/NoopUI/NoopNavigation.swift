@@ -232,6 +232,10 @@ struct NoopFinishedSessionRecord: Codable, Equatable {
     let distanceKilometres: Double?
     let chargeCost: Int?
     let sleepNeedMinutes: Int?
+    /// A saved lift: its stored session id and program name. Absent on cardio (and on records
+    /// written before lifts were recorded here, which decode with both nil).
+    var liftSessionID: String? = nil
+    var liftTitle: String? = nil
 
     var minutes: Int {
         max(0, Int((Double(durationSeconds) / 60).rounded()))
@@ -532,6 +536,21 @@ final class NoopNavigation: ObservableObject {
 
     /// A session-end landing is a cover, not a push. Its back action therefore reveals Today by
     /// dismissing the landing down the same edge it arrived from.
+    /// A lift saved from the Lift Log is today's session too, so Today's card reads it rather than
+    /// an earlier ride.
+    func recordFinishedLift(sessionID: String, title: String?, durationSeconds: Int, at endedAt: Date = Date()) {
+        var record = NoopFinishedSessionRecord(
+            day: Self.dayFormatter.string(from: endedAt), workout: .strength, endedAt: endedAt,
+            durationSeconds: max(0, durationSeconds), distanceKilometres: nil,
+            chargeCost: nil, sleepNeedMinutes: nil)
+        record.liftSessionID = sessionID
+        record.liftTitle = title
+        finishedSession = record
+        if let data = try? JSONEncoder().encode(record) {
+            defaults.set(data, forKey: Self.finishedSessionKey)
+        }
+    }
+
     func dismissFinishedSessionDetail() {
         if canGoBack {
             back()
@@ -835,6 +854,15 @@ final class NoopNavigation: ObservableObject {
         withAnimation(NoopMotion.enter) {
             if path.isEmpty { path = [parent, route] } else { path.append(route) }
         }
+    }
+
+    /// A finished session's summary sits directly on `parent`: back goes there, not through the
+    /// pickers that led into the session.
+    func land(on route: NoopRoute, over parent: NoopRoute) {
+        pendingSheetTransition = nil
+        overlay = nil
+        arrival = .pushed
+        withAnimation(NoopMotion.enter) { path = [parent, route] }
     }
 
     func replace(with route: NoopRoute) {
