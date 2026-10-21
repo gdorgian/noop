@@ -143,15 +143,10 @@ struct NoopOnboardingView: View {
                 VStack(alignment: .leading, spacing: 9) {
                     Text("What Noop will not ask you")
                         .font(NoopHTMLFont.sans(12.5, weight: .semibold))
-                    Text(NoopPositionCopy.inlineList)
+                    Text(NoopPositionCopy.inlineSentence)
                         .font(NoopHTMLFont.sans(12))
-                        .foregroundStyle(NoopHTMLColor.inkSoft)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(NoopPositionCopy.inlineClosing)
-                        .font(NoopHTMLFont.sans(12))
-                        .foregroundStyle(NoopHTMLColor.copy)
-                        .lineSpacing(3)
+                        .foregroundStyle(Color(hex: 0x939C97))
+                        .lineSpacing(4.5)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

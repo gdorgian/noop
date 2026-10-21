@@ -25,7 +25,7 @@ enum NoopPositionCopy {
         ),
         Denial(
             title: "No step count",
-            reason: "Ten thousand is a marketing figure from 1965. Your zones already say what the walk was worth."
+            reason: "Ten thousand is a marketing figure from 1965. Your steps feed the spend estimate and nothing else: no tally on a screen, no target to hit."
         ),
         Denial(
             title: "No daily score",
@@ -45,10 +45,8 @@ enum NoopPositionCopy {
 
     static let foot = "These are positions, not features waiting to be built. If one of them ever arrives, it will arrive with a reason on this screen."
 
-    /// The first-run panel keeps its inline place and renders the same five titles, so the wizard
-    /// and `you/position` cannot drift apart the way the four-, three- and five-item lists already had.
-    static var inlineList: String { denials.map(\.title).joined(separator: " · ") }
-
-    static let inlineClosing = "None of them would change a word of what it tells you."
+    /// The first-run panel's one sentence, as the 11.7 HTML writes it (onboard step 2). The HTML wins
+    /// over the earlier generated list of the five titles.
+    static let inlineSentence = "Your weight goal, a calorie target, a step count to beat, or who you would like to compare yourself with. None of them would change a word of what it tells you."
 }
 #endif

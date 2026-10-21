@@ -1172,13 +1172,17 @@ private extension NoopAct5Screens {
     func compactStepper(value: String, label: String, minus: @escaping () -> Void, plus: @escaping () -> Void) -> some View {
         HStack(spacing: 5) {
             Button(action: minus) { Image(systemName: "minus").font(.system(size: 9, weight: .semibold)).frame(width: 26, height: 26) }
+                .buttonStyle(NoopA5CompactStepStyle())
             VStack(spacing: 1) {
-                Text(value).font(NoopHTMLFont.outfit(15)).lineLimit(1)
+                // The HTML's nowrap value may run a few points into the gap; truncating turned the
+                // year into "19…" on every phone width.
+                Text(value).font(NoopHTMLFont.outfit(15)).monospacedDigit().lineLimit(1).fixedSize()
                 Text(label.uppercased()).font(NoopHTMLFont.sans(8.5, weight: .semibold)).tracking(0.7).foregroundStyle(Color(hex: 0x7F8A85))
                     .lineLimit(1).fixedSize()
             }
             .frame(maxWidth: .infinity)
             Button(action: plus) { Image(systemName: "plus").font(.system(size: 9, weight: .semibold)).frame(width: 26, height: 26) }
+                .buttonStyle(NoopA5CompactStepStyle())
         }
         .foregroundStyle(NoopHTMLColor.inkSoft)
         .padding(.horizontal, 6)
@@ -4114,11 +4118,8 @@ private extension NoopAct5Screens {
 
                         VStack(alignment: .leading, spacing: 9) {
                             Text("What Noop will not ask you").font(NoopHTMLFont.sans(12.5, weight: .semibold))
-                            Text(NoopPositionCopy.inlineList)
-                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(4.5)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Text(NoopPositionCopy.inlineClosing)
-                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4.5)
+                            Text(NoopPositionCopy.inlineSentence)
+                                .font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x939C97)).lineSpacing(4.5)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(.horizontal, 16)
@@ -4403,5 +4404,16 @@ private extension NoopAct5Screens {
                 }
             }
         }
+    }
+}
+
+
+/// The HTML's `stepBtnSm`: 26 pt, radius 9, white 7% with a hairline.
+private struct NoopA5CompactStepStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color(hex: 0xC6CEC9))
+            .background(Color.white.opacity(configuration.isPressed ? 0.12 : 0.07), in: RoundedRectangle(cornerRadius: 9))
+            .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.11), lineWidth: 0.5))
     }
 }
