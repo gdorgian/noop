@@ -881,6 +881,11 @@ struct NoopVerifiedAppShell: View {
                 // The tile's promise: a coffee starts the caffeine clock.
                 for _ in before..<now { CaffeineLogStore.shared.log(at: Date()) }
             }
+            if kind == .water, now > before {
+                // "A glass" lands in the water log too, so Hydration and this tile agree.
+                let glasses = now - before
+                Task { for _ in 0..<glasses { _ = await repo.logHydration(amountMl: 250) } }
+            }
             Task {
                 if now > 0 {
                     await repo.saveJournalNumeric(day: day, question: kind.rawValue, value: Double(now))
