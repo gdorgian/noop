@@ -404,6 +404,10 @@ final class NoopNavigation: ObservableObject {
         }
     }
     @Published var metricSheetPresented = false
+    /// The Fitness detail open as a sheet over the Fitness page (the reference's pattern: swipe down and
+    /// it is gone, the page underneath never left). Nil when none is.
+    @Published var fitnessSheet: NoopRoute?
+    static let fitnessSheetRoutes: Set<NoopRoute> = [.fitnessDetail, .fitnessMuscles]
     /// A metric inspection keeps the presenting page mounted, including its scroll position.
     func dismissMetricSheet() {
         metricSheetPresented = false
@@ -861,6 +865,7 @@ final class NoopNavigation: ObservableObject {
     func reset(to route: NoopRoute) {
         if route == .instrumentMetric { presentMetricSheet(); return }
         metricSheetPresented = false
+        fitnessSheet = nil
         pendingSheetTransition = nil
         overlay = nil
         arrival = .arrived
@@ -912,13 +917,17 @@ final class NoopNavigation: ObservableObject {
         pendingSheetTransition = nil
         overlay = nil
         if route == .instrumentMetric { presentMetricSheet(); return }
+        if Self.fitnessSheetRoutes.contains(route) { fitnessSheet = route; return }
         guard self.route != route else { return }
         let inspectingMetric = metricSheetPresented
+        let fitnessReturn = fitnessSheet
         metricSheetPresented = false
+        fitnessSheet = nil
         arrival = .pushed
         withAnimation(NoopMotion.enter) {
-            // Leave a return point for Compare/Relationships opened from the sheet.
-            path += (inspectingMetric ? [.instrumentMetric] : []) + [route]
+            // Leave a return point for Compare/Relationships opened from the sheet, and for a session
+            // opened from a Fitness sheet, so Back reopens the sheet it came from.
+            path += (inspectingMetric ? [.instrumentMetric] : []) + (fitnessReturn.map { [$0] } ?? []) + [route]
         }
     }
 
@@ -928,6 +937,7 @@ final class NoopNavigation: ObservableObject {
     func enter(_ route: NoopRoute, from parent: NoopRoute) {
         if route == .instrumentMetric { push(route); return }
         metricSheetPresented = false
+        fitnessSheet = nil
         pendingSheetTransition = nil
         overlay = nil
         guard self.route != route else { return }
@@ -945,6 +955,7 @@ final class NoopNavigation: ObservableObject {
     /// pickers that led into the session.
     func land(on route: NoopRoute, over parent: NoopRoute) {
         metricSheetPresented = false
+        fitnessSheet = nil
         pendingSheetTransition = nil
         overlay = nil
         arrival = .pushed
@@ -954,6 +965,7 @@ final class NoopNavigation: ObservableObject {
     func replace(with route: NoopRoute) {
         if route == .instrumentMetric { push(route); return }
         metricSheetPresented = false
+        fitnessSheet = nil
         pendingSheetTransition = nil
         overlay = nil
         arrival = .pushed
@@ -964,6 +976,7 @@ final class NoopNavigation: ObservableObject {
 
     func back() {
         if metricSheetPresented { dismissMetricSheet(); return }
+        if fitnessSheet != nil { fitnessSheet = nil; return }
         pendingSheetTransition = nil
         if overlay != nil {
             withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.32)) { overlay = nil }
@@ -975,6 +988,9 @@ final class NoopNavigation: ObservableObject {
             if returning.last == .instrumentMetric {
                 metricSheetPresented = true
                 returning.removeLast()
+            } else if let last = returning.last, Self.fitnessSheetRoutes.contains(last), returning.count > 1 {
+                fitnessSheet = last
+                returning.removeLast()
             }
             path = returning
         }
@@ -985,6 +1001,7 @@ final class NoopNavigation: ObservableObject {
     /// screen happened to open them.
     func unwind(to route: NoopRoute) {
         metricSheetPresented = false
+        fitnessSheet = nil
         pendingSheetTransition = nil
         overlay = nil
         guard let index = path.lastIndex(of: route) else { replace(with: route); return }

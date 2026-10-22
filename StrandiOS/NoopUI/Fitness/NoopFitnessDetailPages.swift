@@ -403,7 +403,6 @@ struct NoopFitnessLoadPage: View {
         let decimals = kind == .cardio ? 1 : 0
         NoopFitnessPage(navigation: navigation, title: kind == .cardio ? "Cardio load" : "Muscular load") {
             VStack(alignment: .leading, spacing: 16) {
-                kindSwitch
                 if let shown {
                     NoopFitnessInstrumentHeader(
                         value: shown.reading.acute > 0 ? String(format: "%.\(decimals)f", shown.reading.acute) : "–",
@@ -414,6 +413,8 @@ struct NoopFitnessLoadPage: View {
                         trailing: shown.reading.status == .calibrating ? nil
                             : shown.reading.ratio.map { String(format: "%.2f× your normal", $0) })
                 }
+                // Value first, then the sibling pills, the reference's order.
+                kindSwitch
                 VStack(spacing: 8) {
                     if points.contains(where: { $0.reading.acute > 0 }) {
                         chart(points).frame(height: 210)
@@ -474,7 +475,10 @@ struct NoopFitnessLoadPage: View {
             let last = min(cal.date(byAdding: .day, value: -1, to: next) ?? start, today)
             guard last >= start || w.bucket == .day else { return nil }
             guard start <= today else { return nil }
-            return Point(i: i, date: last, reading: history.load(kind, asOf: last))
+            // Today's point is read as of now, like the Fitness card; as of midnight it disagreed with
+            // the card it was opened from (35.9 there, 36.9 here).
+            let asOf = cal.isDate(last, inSameDayAs: today) ? history.now : last
+            return Point(i: i, date: last, reading: history.load(kind, asOf: asOf))
         }
     }
 
@@ -518,7 +522,7 @@ struct NoopFitnessLoadPage: View {
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.white.opacity(0.06))
                 AxisValueLabel {
                     if let d = v.as(Double.self) {
-                        Text(fmt(d)).font(NoopHTMLFont.sans(9.5)).foregroundStyle(NoopHTMLColor.muted)
+                        Text(abs(d - d.rounded()) < 0.01 ? String(format: "%.0f", d) : fmt(d)).font(NoopHTMLFont.sans(9.5)).foregroundStyle(NoopHTMLColor.muted)
                     }
                 }
             }

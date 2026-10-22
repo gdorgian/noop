@@ -111,6 +111,9 @@ struct NoopAppShell: View {
             .container,
             edges: navigation.route.act == .night || navigation.route.act == .day || navigation.route.act == .effort || navigation.route.act == .picture || navigation.route.act == .plumbing || navigation.route.act == .ages || navigation.route.act == .svea || navigation.route.act == .goals || navigation.route.act == .instrument || navigation.route.act == .lift || navigation.route.act == .fitness ? .all : []
         )
+        .sheet(isPresented: Binding(get: { navigation.fitnessSheet != nil }, set: { if !$0 { navigation.fitnessSheet = nil } })) {
+            NoopFitnessSheet(navigation: navigation, fitness: fitnessStore)
+        }
         .sheet(isPresented: Binding(get: { navigation.metricSheetPresented }, set: { if !$0 { navigation.dismissMetricSheet() } })) {
             NoopAct9Screens(navigation: navigation, data: .prototype, metricSheet: true)
                 .presentationDetents([.large])
@@ -775,6 +778,9 @@ struct NoopVerifiedAppShell: View {
         .preferredColorScheme(.dark)
         .contentShape(Rectangle())
         .simultaneousGesture(verifiedBackGesture)
+        .sheet(isPresented: Binding(get: { navigation.fitnessSheet != nil }, set: { if !$0 { navigation.fitnessSheet = nil } })) {
+            NoopFitnessSheet(navigation: navigation, fitness: fitnessStore)
+        }
         .sheet(isPresented: Binding(get: { navigation.metricSheetPresented }, set: { if !$0 { navigation.dismissMetricSheet() } })) {
             NoopAct9Screens(navigation: navigation, data: instrumentStore.data(for: repo.deviceId),
                             loadState: instrumentStore.state(for: repo.deviceId),

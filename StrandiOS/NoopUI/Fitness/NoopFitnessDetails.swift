@@ -50,13 +50,93 @@ struct NoopFitnessScreens: View {
 
 // MARK: - Shared pieces
 
+private struct NoopFitnessInSheetKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    /// True inside the Fitness detail sheet: pages draw the sheet's close header instead of Back.
+    var noopFitnessInSheet: Bool {
+        get { self[NoopFitnessInSheetKey.self] }
+        set { self[NoopFitnessInSheetKey.self] = newValue }
+    }
+}
+
+/// The Fitness detail pages as a native large sheet over the Fitness page, the same container the
+/// metric details use: grabber, swipe down to dismiss, the page underneath stays where it was.
+struct NoopFitnessSheet: View {
+    @ObservedObject var navigation: NoopNavigation
+    @ObservedObject var fitness: NoopFitnessModel
+    @EnvironmentObject private var repo: Repository
+    @EnvironmentObject private var profile: ProfileStore
+    @State private var scrollMemory = NoopScrollMemory()
+
+    var body: some View {
+        Group {
+            switch navigation.fitnessSheet {
+            case .fitnessMuscles: NoopFitnessMuscleGroupsScreen(navigation: navigation, fitness: fitness)
+            default: NoopFitnessDetailScreen(navigation: navigation, fitness: fitness)
+            }
+        }
+        .environment(\.noopFitnessInSheet, true)
+        .environment(\.noopLiveBarInset, 0)
+        // Its own scroll memory, fresh per presentation: the shared one restored the Fitness page's
+        // offset into the sheet, which opened at the bottom of Muscle groups.
+        .environment(\.noopScrollMemory, scrollMemory)
+        .environment(\.noopScrollKey, "fitness-sheet")
+        .task { await fitness.load(repo: repo, profile: profile) }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(NoopHTMLColor.canvas)
+        .preferredColorScheme(.dark)
+    }
+}
+
 struct NoopFitnessPage<Content: View>: View {
     @ObservedObject var navigation: NoopNavigation
     let title: String
     var subtitle: String? = nil
     @ViewBuilder var content: Content
+    @Environment(\.noopFitnessInSheet) private var inSheet
 
     var body: some View {
+        if inSheet { sheetBody } else { pageBody }
+    }
+
+    /// Close button and centred title pinned above the scroll, as in the metric sheet.
+    private var sheetBody: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button { navigation.back() } label: {
+                    Image(systemName: "xmark").font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                        .frame(width: 44, height: 44)
+                        .background(Color.white.opacity(0.07), in: Circle())
+                }
+                .buttonStyle(NoopPlainHitStyle())
+                .accessibilityLabel("Close")
+                Spacer()
+                Text(title).font(NoopHTMLFont.sans(17, weight: .semibold))
+                    .foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
+                Spacer()
+                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+            }
+            .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 8)
+            NoopScreen(bottomInset: 32, topInset: 6) {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(NoopHTMLFont.sans(13.5))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.bottom, 12)
+                    }
+                    content
+                }
+            }
+        }
+        .background(NoopHTMLColor.canvas)
+    }
+
+    private var pageBody: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 0) {
                 NoopBackHeader(label: "Fitness") { navigation.back(or: .fitness) }
