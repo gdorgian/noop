@@ -46,6 +46,49 @@ struct NoopRestRecord: Equatable {
         let slices: [Int]?
         /// Four clock labels across the night for the hypnogram, only when a real timeline exists.
         let axis: [String]?
+        /// The in-bed span and, inside it, when sleep began and when the final waking came. The edges are
+        /// only known from a real timeline; without one they are nil and only the totals are shown.
+        var bed: Bed? = nil
+
+        /// "23:25 – 06:30": first sleep to final waking when the timeline shows them, else the in-bed window.
+        var asleepWindow: String {
+            guard let bed else { return window }
+            let f = AppClock.hourMinuteFormatter()
+            return "\(f.string(from: bed.fellAsleep)) \u{2013} \(f.string(from: bed.finalWake))"
+        }
+    }
+
+    /// In bed against asleep, the split the night is judged on. In-bed is the detected window (wrist
+    /// settled to getting up); asleep is every minute not staged awake inside it.
+    struct Bed: Equatable {
+        let inBedMin: Double
+        let asleepMin: Double
+        let awakeMin: Double
+        /// Before the first sleep, and after the final waking.
+        let latencyMin: Double
+        let afterWakeMin: Double
+        let inBed: Date, fellAsleep: Date, finalWake: Date, outOfBed: Date
+        var efficiency: Double { inBedMin > 0 ? asleepMin / inBedMin : 0 }
+        /// Awake minutes between first sleep and final waking.
+        var interruptionsMin: Double { max(0, awakeMin - latencyMin - afterWakeMin) }
+
+        /// `segments` carry seconds from `start` (the night's onset), as `SleepModel` builds them.
+        init?(segments: [SleepInterval], start: Date, end: Date) {
+            let sleep = segments.filter { $0.stage != .awake }
+            guard let first = sleep.map(\.start).min(), let last = sleep.map(\.end).max(),
+                  end > start else { return nil }
+            let total = end.timeIntervalSince(start) / 60
+            let asleep = sleep.reduce(0) { $0 + ($1.end - $1.start) } / 60
+            inBedMin = total
+            asleepMin = asleep
+            awakeMin = max(0, total - asleep)
+            inBed = start
+            outOfBed = end
+            fellAsleep = start.addingTimeInterval(max(0, first))
+            finalWake = min(end, start.addingTimeInterval(last))
+            latencyMin = max(0, fellAsleep.timeIntervalSince(start) / 60)
+            afterWakeMin = max(0, end.timeIntervalSince(finalWake) / 60)
+        }
     }
 
     let phase: Phase
@@ -130,7 +173,8 @@ struct NoopRestRecord: Equatable {
                 window: "\(night.onsetText) \u{2013} \(night.wakeText)",
                 stages: stages,
                 slices: real.map { slices(of: $0) },
-                axis: real.map { _ in axis(onset: night.onsetDate, wake: end, calendar: calendar) }
+                axis: real.map { _ in axis(onset: night.onsetDate, wake: end, calendar: calendar) },
+                bed: real.flatMap { Bed(segments: $0, start: night.onsetDate, end: end) }
             )
             if latest == nil { latest = built }
             if endDay < windowStart && latest != built { continue }

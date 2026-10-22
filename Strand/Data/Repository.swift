@@ -1976,7 +1976,8 @@ final class Repository: ObservableObject {
                 : SleepStager.stageSession(start: start, end: end, grav: grav, hr: hr, rr: rr, resp: resp)
             // #364 follow-up: motion-aware wake refinement post-pass, same toggle-shaped no-op when off
             // as every other Experimental switch here.
-            return WakeMotionRefinement.apply(staged, grav: grav, steps: steps, enabled: useMotionAwareWake)
+            let refined = WakeMotionRefinement.apply(staged, grav: grav, steps: steps, enabled: useMotionAwareWake)
+            return InBedWake.refine(refined, start: start, end: end, hr: hr, grav: grav)
         }.value
         return AnalyticsEngine.encodeStages(segs)
     }

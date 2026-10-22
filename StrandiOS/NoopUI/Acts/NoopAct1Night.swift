@@ -82,7 +82,7 @@ struct NoopAct1Screens: View {
                             HStack(alignment: .firstTextBaseline) {
                                 NoopSectionLabel("Against your need", color: Color(hex: 0x8B958F))
                                 Spacer()
-                                Text(restNight?.window ?? selectedNight.window)
+                                Text(restNight.map { "asleep \($0.asleepWindow)" } ?? selectedNight.window)
                                     .font(NoopHTMLFont.sans(10.5))
                                     .foregroundStyle(NoopHTMLColor.faint)
                                     .monospacedDigit()
@@ -129,6 +129,9 @@ struct NoopAct1Screens: View {
                     .buttonStyle(NoopHTMLPressStyle())
                     }
 
+                    if let bed = restNight?.bed {
+                        inBedCard(bed)
+                    }
                     sevenNightsCard
                         .opacity(restAbsent ? 0.38 : 1)
                         .allowsHitTesting(!restAbsent)
@@ -318,6 +321,104 @@ struct NoopAct1Screens: View {
         .padding(.bottom, 13)
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
         .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+    }
+
+    /// Time asleep against time in bed. Lying awake before sleep and staying in bed after the final waking
+    /// are shown as what they are, not folded into the night's sleep.
+    private func inBedCard(_ bed: NoopRestRecord.Bed) -> some View {
+        let clock = AppClock.hourMinuteFormatter()
+        let span = max(1, bed.outOfBed.timeIntervalSince(bed.inBed))
+        func x(_ d: Date) -> CGFloat { CGFloat(d.timeIntervalSince(bed.inBed) / span) }
+        let awakeTint = Color.white.opacity(0.16)
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                NoopSectionLabel("In bed and asleep")
+                Spacer()
+                Text("\(Int((bed.efficiency * 100).rounded()))% of it asleep")
+                    .font(NoopHTMLFont.sans(10.5))
+                    .foregroundStyle(NoopHTMLColor.faint)
+            }
+
+            HStack(alignment: .top, spacing: 0) {
+                inBedFigure("Asleep", NoopRestRecord.duration(bed.asleepMin), color: NoopHTMLColor.nightLight)
+                inBedFigure("In bed", NoopRestRecord.duration(bed.inBedMin), color: NoopHTMLColor.ink)
+                inBedFigure("Awake in bed", NoopRestRecord.duration(bed.awakeMin), color: NoopHTMLColor.muted)
+            }
+
+            VStack(spacing: 7) {
+                GeometryReader { proxy in
+                    let w = proxy.size.width
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(awakeTint)
+                        Capsule()
+                            .fill(LinearGradient(colors: [Color(hex: 0xA9B6E8), Color(hex: 0x6E7DB8)],
+                                                 startPoint: .leading, endPoint: .trailing))
+                            .frame(width: max(6, w * (x(bed.finalWake) - x(bed.fellAsleep))))
+                            .offset(x: w * x(bed.fellAsleep))
+                    }
+                }
+                .frame(height: 10)
+                HStack(alignment: .top) {
+                    inBedMoment("In bed", clock.string(from: bed.inBed), alignment: .leading)
+                    Spacer(minLength: 4)
+                    inBedMoment("Asleep", clock.string(from: bed.fellAsleep), alignment: .leading)
+                    Spacer(minLength: 4)
+                    inBedMoment("Woke", clock.string(from: bed.finalWake), alignment: .trailing)
+                    Spacer(minLength: 4)
+                    inBedMoment("Up", clock.string(from: bed.outOfBed), alignment: .trailing)
+                }
+            }
+
+            Text(inBedRead(bed))
+                .font(NoopHTMLFont.sans(12.5))
+                .foregroundStyle(NoopHTMLColor.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 15)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func inBedFigure(_ label: String, _ value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value)
+                .font(NoopHTMLFont.outfit(21, weight: .regular))
+                .foregroundStyle(color)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(label)
+                .font(NoopHTMLFont.sans(11))
+                .foregroundStyle(NoopHTMLColor.faint)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func inBedMoment(_ label: String, _ time: String, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 1) {
+            Text(time)
+                .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                .foregroundStyle(NoopHTMLColor.ink)
+                .monospacedDigit()
+            Text(label)
+                .font(NoopHTMLFont.sans(10))
+                .foregroundStyle(NoopHTMLColor.faint)
+        }
+    }
+
+    /// One plain sentence on where the awake time went.
+    private func inBedRead(_ bed: NoopRestRecord.Bed) -> String {
+        var parts: [String] = []
+        if bed.latencyMin >= 1 { parts.append("\(NoopRestRecord.duration(bed.latencyMin)) to fall asleep") }
+        if bed.interruptionsMin >= 1 { parts.append("\(NoopRestRecord.duration(bed.interruptionsMin)) awake in the night") }
+        if bed.afterWakeMin >= 1 { parts.append("\(NoopRestRecord.duration(bed.afterWakeMin)) in bed after waking") }
+        guard !parts.isEmpty else { return "Asleep from lights out to getting up." }
+        let list = parts.count == 1 ? parts[0]
+            : parts.dropLast().joined(separator: ", ") + " and " + parts.last!
+        return list.prefix(1).uppercased() + list.dropFirst() + ". Only the time asleep counts toward your need."
     }
 
     private var sleepShapeCard: some View {

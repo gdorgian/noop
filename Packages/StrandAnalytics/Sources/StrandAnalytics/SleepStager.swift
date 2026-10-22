@@ -1659,8 +1659,12 @@ public enum SleepStager {
             // (`bandSleepState`) scored "asleep". No-op when the band is absent (WHOOP 4.0) or the flag is
             // off; stager-agnostic (corrects whichever hypnogram V1/V2 produced). Efficiency below is then
             // computed on the corrected stages, so a night NOOP over-called wake on reports true efficiency.
-            let stages = applyBandStateWakeVeto(rawStages, start: p.start, end: p.end,
+            let vetoed = applyBandStateWakeVeto(rawStages, start: p.start, end: p.end,
                                                 bandSleepState: bandSleepState)
+            // Awake in bed at the night's edges (lying awake before sleep, staying in bed after the final
+            // waking) is wake, not light sleep. Interior stages are untouched. See `InBedWake`.
+            let stages = InBedWake.refine(vetoed, start: p.start, end: p.end, hr: hrS, grav: grav,
+                                          bandSleepState: bandSleepState)
             let eff = efficiency(start: p.start, end: p.end, stages: stages)
             let avgHrv = sessionAvgHRV(start: p.start, end: p.end, rr: rrS)
             sessions.append(SleepSession(start: p.start, end: p.end, efficiency: eff,
