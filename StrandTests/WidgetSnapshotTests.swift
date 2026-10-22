@@ -132,6 +132,9 @@ final class WidgetSnapshotTests: XCTestCase {
         snapshot.chargeSource = "morning-recovery"
         XCTAssertNil(snapshot.verifiedForDisplay().recovery)
 
+        snapshot.chargeSource = WidgetSnapshot.morningRecoverySource
+        XCTAssertEqual(snapshot.verifiedForDisplay().recovery, 72)
+
         snapshot.chargeSource = WidgetSnapshot.intradayChargeSource
         XCTAssertEqual(snapshot.verifiedForDisplay().recovery, 72)
     }

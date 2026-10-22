@@ -138,13 +138,15 @@ public struct NoopWidgetEnergySnapshot: Codable, Equatable, Sendable {
 /// via an App Group. The app writes it; the widget reads it. Keeping it tiny avoids any cross-process
 /// database access — the widget never opens SQLite.
 public struct WidgetSnapshot: Codable, Equatable {
-    /// Legacy key retained for compatibility with saved snapshots. The widget labels it Charge,
-    /// so a value is displayable only when its source is the intraday ledger, not morning recovery.
+    /// The ring the widgets label "Recovery". Displayable only with a known source: the morning
+    /// recovery score, or a future intraday ledger. Values saved before sources existed stay masked.
     public var recovery: Int?
     /// Absent on snapshots written before the Charge/Recovery split. Only a real intraday-ledger
     /// publisher may set this to `intradayChargeSource`; old values are masked on every read.
     public var chargeSource: String?
     public static let intradayChargeSource = "intraday-ledger-v1"
+    /// The anchor day's morning recovery score, shown under the "Recovery" label (owner, 22 Oct).
+    public static let morningRecoverySource = "morning-recovery-v1"
     public var bpm: Int?
     public var batteryPct: Int?
     public var bonded: Bool
@@ -350,7 +352,7 @@ public struct WidgetSnapshot: Codable, Equatable {
     /// stress, and other measurements while refusing to render that unverified Charge number.
     func verifiedForDisplay() -> WidgetSnapshot {
         var verified = self
-        if verified.chargeSource != Self.intradayChargeSource {
+        if verified.chargeSource != Self.intradayChargeSource && verified.chargeSource != Self.morningRecoverySource {
             verified.recovery = nil
         }
         return verified

@@ -164,14 +164,15 @@ extension WidgetSnapshot {
             )
         }()
         let snap = WidgetSnapshot(
-            // Every widget labels this field "Charge", and nothing computes an intraday charge yet.
-            // Morning recovery is not allowed to stand in for it (owner decision, 24 Sep), so the
-            // widgets receive no figure and draw their honest-null dash until a ledger exists.
-            recovery: nil,
+            // The morning recovery score for the anchor day, under the ring the widget labels "Recovery".
+            // It is not an intraday charge and is not presented as one (24 Sep); a blank ring for every
+            // wearer was the alternative, and testers read it as broken (owner, 22 Oct).
+            recovery: day?.recovery.map { Int($0.rounded()) },
             bpm: model.bpm ?? model.live.heartRate,
             batteryPct: activeBatteryPct(from: model),
             bonded: model.live.bonded,
             updated: Date(),
+            chargeSource: day?.recovery == nil ? nil : WidgetSnapshot.morningRecoverySource,
             // Stored 0–100 axis for ring fill; display string carries the #313 scale.
             effort: strain.map { Int($0.rounded()) },
             rest: restScore.map { Int($0.rounded()) },
