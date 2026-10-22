@@ -43,6 +43,147 @@ struct NoopFitnessSnapshot {
     var topExercise: (name: String, volume: PeriodTotals.Series)?
     var freshness: [MuscleFreshness.Reading]
     var periodDays: Int
+    /// The records behind every figure, so a detail page can recompute for another day or period.
+    var history: NoopFitnessHistory
+}
+
+/// The adapted records and the questions the detail pages ask of them.
+struct NoopFitnessHistory {
+    struct Workout: Identifiable {
+        let id: String
+        let title: String
+        let start: Date
+        let startTs: Int
+        let endTs: Int
+        let source: String
+        let durationS: Double
+        let kcal: Double?
+        let averageHeartRate: Int?
+        let isStrength: Bool
+        let trimp: Double
+        let zoneMinutes: [Double]
+    }
+
+    struct Recovery: Identifiable {
+        let date: Date
+        let title: String
+        let drop: Double
+        var id: Date { date }
+    }
+
+    var now: Date
+    var zoneSet: HRZoneSet
+    var zoneNames: [String]
+    var bodyMassKg: Double?
+    var workouts: [Workout] = []
+    var liftSessions: [LiftSessionRow] = []
+    var scoredSets: [MuscularLoad.ScoredSet] = []
+    var muscleEvents: [(date: Date, muscleLoad: [String: Double])] = []
+    var cardioDaily: [Date: Double] = [:]
+    var cardioDates: [Date] = []
+    var muscularDaily: [Date: Double] = [:]
+    var muscularDates: [Date] = []
+    var vo2: [(date: Date, value: Double)] = []
+    var recoveries: [Recovery] = []
+    var sessions: [NoopFitnessSession] = []
+
+    enum LoadKind { case cardio, muscular }
+
+    func load(_ kind: LoadKind, asOf day: Date) -> AcuteChronicLoad.Reading {
+        kind == .cardio
+            ? AcuteChronicLoad.reading(dailyLoad: cardioDaily, sessionDates: cardioDates, asOf: day)
+            : AcuteChronicLoad.reading(dailyLoad: muscularDaily, sessionDates: muscularDates, asOf: day)
+    }
+
+    /// One reading per day for the last `days` days, oldest first.
+    func loadHistory(_ kind: LoadKind, days: Int) -> [(date: Date, reading: AcuteChronicLoad.Reading)] {
+        let cal = Calendar.current, today = cal.startOfDay(for: now)
+        return (0..<days).reversed().compactMap { i in
+            cal.date(byAdding: .day, value: -i, to: today).map { ($0, load(kind, asOf: $0)) }
+        }
+    }
+
+    /// The sessions that carried the most load in the seven days ending `day`, heaviest first.
+    func contributors(_ kind: LoadKind, asOf day: Date) -> [(title: String, date: Date, load: Double)] {
+        let start = Calendar.current.date(byAdding: .day, value: -6, to: Calendar.current.startOfDay(for: day)) ?? day
+        var out: [(title: String, date: Date, load: Double)] = []
+        if kind == .cardio {
+            out = workouts.filter { !$0.isStrength && $0.start >= start && $0.start <= now }
+                .map { ($0.title, $0.start, $0.trimp) }
+        } else {
+            for s in liftSessions {
+                let d = Date(timeIntervalSince1970: Double(s.startTs))
+                guard d >= start else { continue }
+                let end = Double(s.endTs ?? s.startTs + 4 * 3600)
+                let load = scoredSets.filter { $0.set.date.timeIntervalSince1970 >= Double(s.startTs) - 60
+                    && $0.set.date.timeIntervalSince1970 <= end + 60 }.reduce(0) { $0 + $1.load }
+                out.append((s.programName ?? "Strength", d, load))
+            }
+            for w in workouts where !w.isStrength && w.start >= start {
+                let legs = MuscularLoad.cardioMuscleLoad(trimp: w.trimp, kind: NoopFitnessModel.kind(w.title))
+                out.append((w.title, w.start, legs.values.reduce(0, +)))
+            }
+        }
+        return out.filter { $0.load > 0 }.sorted { $0.load > $1.load }
+    }
+
+    func freshness(asOf day: Date) -> [MuscleFreshness.Reading] {
+        MuscleFreshness.readings(events: muscleEvents, asOf: day)
+    }
+
+    /// Working weight moved per group in the seven days ending `day`, credited to the primary muscle.
+    func volumeByGroup(asOf day: Date) -> [FitnessMuscleGroup: Double] {
+        var out: [FitnessMuscleGroup: Double] = [:]
+        for s in scoredSets.map(\.set) where inWeek(s.date, ending: day) {
+            if let p = s.primaryMuscleId, let g = FitnessMuscleGroup.forMuscleId(p) {
+                out[g, default: 0] += StrengthTotals.volumeKg(s, bodyMassKg: bodyMassKg)
+            }
+        }
+        return out
+    }
+
+    /// Muscular load per group in the seven days ending `day`, cardio's share included.
+    func loadByGroup(asOf day: Date) -> [FitnessMuscleGroup: Double] {
+        var out: [FitnessMuscleGroup: Double] = [:]
+        for e in muscleEvents where inWeek(e.date, ending: day) {
+            for (id, v) in e.muscleLoad { if let g = FitnessMuscleGroup.forMuscleId(id) { out[g, default: 0] += v } }
+        }
+        return out
+    }
+
+    func setsByGroup(days: Int) -> [FitnessMuscleGroup: Double] {
+        StrengthTotals.setsPerGroup(scoredSets.map(\.set).filter { inPeriod($0.date, days: days) })
+    }
+
+    func volumeByExercise(days: Int) -> [(name: String, kg: Double, sets: Int)] {
+        var kg: [String: Double] = [:], n: [String: Int] = [:]
+        for s in scoredSets.map(\.set) where inPeriod(s.date, days: days) {
+            kg[s.exerciseId, default: 0] += StrengthTotals.volumeKg(s, bodyMassKg: bodyMassKg)
+            n[s.exerciseId, default: 0] += 1
+        }
+        return kg.map { ($0.key, $0.value, n[$0.key] ?? 0) }.sorted { $0.kg > $1.kg }
+    }
+
+    func zoneMinutes(days: Int) -> [Double] {
+        var out = [Double](repeating: 0, count: 5)
+        for w in workouts where inPeriod(w.start, days: days) {
+            for i in 0..<min(5, w.zoneMinutes.count) { out[i] += w.zoneMinutes[i] }
+        }
+        return out
+    }
+
+    func inPeriod(_ d: Date, days: Int) -> Bool {
+        let cal = Calendar.current
+        guard let start = cal.date(byAdding: .day, value: -(days - 1), to: cal.startOfDay(for: now)) else { return false }
+        return d >= start && d <= now
+    }
+
+    private func inWeek(_ d: Date, ending day: Date) -> Bool {
+        let cal = Calendar.current
+        let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: day)) ?? day
+        let start = cal.date(byAdding: .day, value: -7, to: end) ?? day
+        return d >= start && d < end
+    }
 }
 
 /// One workout or lift on the calendar strip and in Today's Activity.
@@ -63,11 +204,18 @@ final class NoopFitnessModel: ObservableObject {
     @Published private(set) var isLoading = false
 
     static let periodDays = 30
-    private static let historyDays = 60
+    private static let historyDays = 120
 
+    private var loadedSeq: Int?
+
+    /// Reads everything again only when the repository has new data since the last load, so stepping
+    /// into a detail page and back does not re-read six weeks of heart rate.
     func load(repo: Repository, profile: ProfileStore, now: Date = Date()) async {
         guard !isLoading else { return }
+        if loadedSeq == repo.refreshSeq, snapshot != nil { return }
         isLoading = true
+        let seq = repo.refreshSeq
+        defer { loadedSeq = seq }
         defer { isLoading = false }
         let cal = Calendar.current
         let nowTs = Int(now.timeIntervalSince1970)
@@ -178,15 +326,15 @@ final class NoopFitnessModel: ObservableObject {
                 return (date, v)
             }
             .sorted { $0.date < $1.date }
-        var hrr: (date: Date, drop: Double)?
-        for c in cardioSessions.sorted(by: { $0.row.startTs > $1.row.startTs }).prefix(5) {
+        var recoveries: [NoopFitnessHistory.Recovery] = []
+        for c in cardioSessions.sorted(by: { $0.row.startTs > $1.row.startTs }).prefix(12) {
             if let r = await repo.workoutHeartRateRecovery(from: c.row.startTs, to: c.row.endTs,
                                                             maxHR: zoneSet.maxHR, source: c.row.source),
                let after = r.after1Minute {
-                hrr = (c.session.start, Double(r.endHR - after))
-                break
+                recoveries.append(.init(date: c.session.start, title: c.row.sport, drop: Double(r.endHR - after)))
             }
         }
+        let hrr = recoveries.first.map { (date: $0.date, drop: $0.drop) }
 
         // The week strip.
         let monday = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)) ?? now
@@ -210,6 +358,27 @@ final class NoopFitnessModel: ObservableObject {
             return .init(date: d, sessions: all.filter { cal.isDate($0.start, inSameDayAs: d) }.sorted { $0.start < $1.start })
         }
 
+        var history = NoopFitnessHistory(now: now, zoneSet: zoneSet,
+                                         zoneNames: ["Resting", "Easy", "Steady", "Hard", "All out"],
+                                         bodyMassKg: phys.bodyMassKg)
+        history.workouts = zip(cardio, trimps).map { c, t in
+            .init(id: c.session.id, title: c.row.sport, start: c.session.start, startTs: c.row.startTs,
+                  endTs: c.row.endTs, source: c.row.source, durationS: c.session.durationS, kcal: c.row.energyKcal,
+                  averageHeartRate: c.row.avgHr, isStrength: CardioModality.of(sport: c.row.sport) == .strength,
+                  trimp: t.load, zoneMinutes: c.zoneMinutes)
+        }
+        history.liftSessions = liftSessions
+        history.scoredSets = scored
+        history.muscleEvents = muscleEvents
+        history.cardioDaily = AcuteChronicLoad.dailyTotals(
+            cardioSessions.map { (date: $0.session.start, load: CardioLoad.trimp($0.session, physiology: phys)) })
+        history.cardioDates = cardioSessions.map(\.session.start)
+        history.muscularDaily = AcuteChronicLoad.dailyTotals(muscularDaily)
+        history.muscularDates = muscularDates
+        history.vo2 = vo2
+        history.recoveries = recoveries
+        history.sessions = all.sorted { $0.start > $1.start }
+
         snapshot = NoopFitnessSnapshot(
             week: week, routines: routines, cardioLoad: cardioReading, muscularLoad: muscularReading,
             activeSeconds: active, activeKcal: kcal, vo2Max: vo2, heartRateRecovery: hrr,
@@ -217,10 +386,10 @@ final class NoopFitnessModel: ObservableObject {
             zoneMinutes: zoneTotals, zoneNames: ["Resting", "Easy", "Steady", "Hard", "All out"],
             totalSets: setSeries, topExercise: top.map { ($0.name, $0.series) },
             freshness: MuscleFreshness.readings(events: muscleEvents, asOf: now),
-            periodDays: period)
+            periodDays: period, history: history)
     }
 
-    static func kind(_ sport: String) -> FitnessCardioKind {
+    nonisolated static func kind(_ sport: String) -> FitnessCardioKind {
         let s = sport.lowercased()
         if s.contains("walk") { return .walking }
         if s.contains("hik") { return .hiking }
@@ -237,7 +406,7 @@ final class NoopFitnessModel: ObservableObject {
 
     /// Movements whose load is the lifter's own body. Matched on the logged name, since the Lift log
     /// stores names as typed.
-    static func isBodyweight(_ exercise: String) -> Bool {
+    nonisolated static func isBodyweight(_ exercise: String) -> Bool {
         let s = exercise.lowercased()
         return ["pull up", "pull-up", "pullup", "chin up", "chin-up", "chinup", "dip", "push up", "push-up",
                 "pushup", "muscle up", "inverted row"].contains { s.contains($0) }

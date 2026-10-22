@@ -123,6 +123,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case liftReview = "lift-review", liftMuscles = "lift-muscles"
     // Fitness (22 Oct 2026): the training home that replaces the Effort and Lift tab-level entry.
     case fitness
+    case fitnessDetail = "fitness-detail", fitnessMuscles = "fitness-muscles", fitnessEdit = "fitness-edit"
+    case fitnessRoutine = "fitness-routine", fitnessCalendar = "fitness-calendar"
 
     var id: String { rawValue }
 
@@ -144,7 +146,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .instrumentRaw, .instrumentCapture: .instrument
         case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles: .lift
-        case .fitness: .fitness
+        case .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit, .fitnessRoutine, .fitnessCalendar: .fitness
         }
     }
 
@@ -172,7 +174,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         // Act 10 is deliberately not a sixth tab. A lift is an effort, so it lights the same key
         // Act 3 does.
         case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
-             .liftReview, .liftMuscles, .fitness:
+             .liftReview, .liftMuscles, .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit,
+             .fitnessRoutine, .fitnessCalendar:
             .fitness
         }
     }
@@ -631,6 +634,9 @@ final class NoopNavigation: ObservableObject {
     /// session does: the shell deliberately recreates a screen whenever its route changes.
     @Published var selectedLiftProgramID: String?
     @Published var selectedLiftSessionID: String?
+    /// Which card a Fitness detail page opens on, and which routine the routine page shows.
+    @Published var fitnessMetric: NoopFitnessMetric = .cardioLoad
+    @Published var fitnessRoutineID: String?
     /// A lift opened from the shared workout history, by its start time (the saved workout row and the
     /// lift session share it). Consumed by `lift-detail` when it loads.
     @Published var liftDetailStartTs: Int?
@@ -1203,6 +1209,11 @@ extension NoopRoute {
         case .liftReview: "Review the import"
         case .liftMuscles: "Muscles"
         case .fitness: "Fitness"
+        case .fitnessDetail: "Fitness"
+        case .fitnessMuscles: "Muscle groups"
+        case .fitnessEdit: "Edit Fitness"
+        case .fitnessRoutine: "Routine"
+        case .fitnessCalendar: "Calendar"
         }
     }
 }

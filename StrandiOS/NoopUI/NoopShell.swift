@@ -23,6 +23,7 @@ struct NoopAppShell: View {
     @StateObject private var labDraft = NoopLabReviewDraft()
     @StateObject private var liftFlow = NoopLiftFlowModel()
     @StateObject private var fitnessStore = NoopFitnessModel()
+    @StateObject private var fitnessSettings = NoopFitnessSettings()
     @State private var dragTranslation: CGSize = .zero
 
     var body: some View {
@@ -146,7 +147,8 @@ struct NoopAppShell: View {
         case .goals: NoopAct8Screens(navigation: navigation, labDraft: labDraft)
         case .instrument: NoopAct9Screens(navigation: navigation, data: .prototype)
         case .lift: NoopAct10Screens(navigation: navigation, flow: liftFlow)
-        case .fitness: NoopFitnessHome(navigation: navigation, fitness: fitnessStore)
+        case .fitness: NoopFitnessScreens(navigation: navigation, fitness: fitnessStore, layout: fitnessSettings)
+                .environmentObject(fitnessSettings)
         }
     }
 
@@ -545,6 +547,7 @@ struct NoopVerifiedAppShell: View {
     @StateObject private var instrumentStore = NoopInstrumentLiveStore()
     @StateObject private var liftFlow = NoopLiftFlowModel()
     @StateObject private var fitnessStore = NoopFitnessModel()
+    @StateObject private var fitnessSettings = NoopFitnessSettings()
     @StateObject private var restStore = NoopRestStore()
     @StateObject private var dayStore = NoopDayStore()
     @StateObject private var trendsStore = NoopTrendsStore()
@@ -658,8 +661,9 @@ struct NoopVerifiedAppShell: View {
             Group {
                 if navigation.route == .energy {
                     NoopVerifiedEnergyScreen(navigation: navigation)
-                } else if navigation.route == .fitness {
-                    NoopFitnessHome(navigation: navigation, fitness: fitnessStore)
+                } else if navigation.route.act == .fitness {
+                    NoopFitnessScreens(navigation: navigation, fitness: fitnessStore, layout: fitnessSettings)
+                        .environmentObject(fitnessSettings)
                 } else if Self.canonicalSveaRoutes.contains(navigation.route) {
                     NoopAct7Screens(navigation: navigation)
                 } else if Self.canonicalYouRoutes.contains(navigation.route) {
@@ -1197,7 +1201,7 @@ enum NoopCanonicalGlyphName {
     case read, scale, alarm, bell, screen, watch, cloud
     case shield, download, upload, trash, globe, ruler, sparkSingle, camera
     case person, sync, link, copy, share, x, flask, search, file
-    case plus, grid, key, chart, gauge, mic, ask, overlay, chat
+    case plus, grid, key, chart, gauge, mic, ask, overlay, chat, calendar
 }
 
 /// The HTML uses one 24 × 24 stroked SVG alphabet throughout. Drawing those paths directly keeps
@@ -1373,6 +1377,11 @@ struct NoopCanonicalGlyph: View {
             path.move(to: CGPoint(x: 12.4, y: 8.6)); path.addLine(to: CGPoint(x: 10, y: 13.2)); path.addLine(to: CGPoint(x: 12.7, y: 14.8)); path.addLine(to: CGPoint(x: 13.3, y: 20))
             path.move(to: CGPoint(x: 10, y: 13.2)); path.addLine(to: CGPoint(x: 8, y: 20))
             path.move(to: CGPoint(x: 14.4, y: 10.2)); path.addLine(to: CGPoint(x: 17.2, y: 12))
+        case .calendar:
+            path.addRoundedRect(in: CGRect(x: 4, y: 5.5, width: 16, height: 14.5), cornerSize: CGSize(width: 2.5, height: 2.5))
+            path.move(to: CGPoint(x: 4, y: 10)); path.addLine(to: CGPoint(x: 20, y: 10))
+            path.move(to: CGPoint(x: 8.5, y: 3.5)); path.addLine(to: CGPoint(x: 8.5, y: 7))
+            path.move(to: CGPoint(x: 15.5, y: 3.5)); path.addLine(to: CGPoint(x: 15.5, y: 7))
         case .run:
             path.addEllipse(in: CGRect(x: 14, y: 3, width: 3, height: 3))
             path.move(to: CGPoint(x: 13.6, y: 8)); path.addLine(to: CGPoint(x: 11, y: 13))

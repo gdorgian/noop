@@ -854,7 +854,7 @@ private struct NoopLiftLiveScreen: View {
             navigation.selectedLiftSessionID = nil
             flow.selectedSession = nil
             flow.sessionSets = []
-            navigation.liftDetailReturnRoute = .today
+            navigation.liftDetailReturnRoute = .fitness
             navigation.replace(with: .liftDetail)
             return
         }
@@ -935,8 +935,8 @@ private struct NoopLiftLiveScreen: View {
         flow.selectedSession = sessionRow
         flow.sessionSets = rows
         navigation.selectedLiftSessionID = sessionID
-        navigation.liftDetailReturnRoute = .today
-        navigation.land(on: .liftDetail, over: .today)
+        navigation.liftDetailReturnRoute = .fitness
+        navigation.land(on: .liftDetail, over: .fitness)
     }
 
     private func setLine(_ slot: LiftSlot) -> String {
@@ -1008,7 +1008,7 @@ private struct NoopLiftLibraryScreen: View {
     var body: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 14) {
-                NoopLiftBackHeader(label: "Today’s session") { navigation.back(or: .session) }
+                NoopLiftBackHeader(label: "Fitness") { navigation.back(or: .fitness) }
                 NoopLiftTitle(
                     title: "Programs",
                     subtitle: programs.isEmpty
@@ -1048,7 +1048,7 @@ private struct NoopLiftLibraryScreen: View {
                     archivedCard
                 }
 
-                Text("Lifting is not a sixth tab. It lives under Today, the way a session does, and a program is something you keep rather than somewhere you go.")
+                Text("A program is something you keep rather than somewhere you go. Start one here, or from Routines on Fitness, where you can also plan it on the calendar.")
                     .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     .lineSpacing(4)
 

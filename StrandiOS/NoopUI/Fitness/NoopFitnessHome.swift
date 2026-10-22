@@ -8,6 +8,7 @@ import StrandFitness
 struct NoopFitnessHome: View {
     @ObservedObject var navigation: NoopNavigation
     @ObservedObject var fitness: NoopFitnessModel
+    @ObservedObject var layout: NoopFitnessSettings
     @EnvironmentObject private var repo: Repository
     @EnvironmentObject private var profile: ProfileStore
     @State private var selectedDay = Calendar.current.startOfDay(for: Date())
@@ -15,7 +16,14 @@ struct NoopFitnessHome: View {
     var body: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 0) {
-                NoopScreenHeader("Fitness", eyebrow: Self.weekTitle)
+                NoopScreenHeader("Fitness", eyebrow: Self.weekTitle) {
+                    HStack(spacing: 8) {
+                        NoopFitnessIconButton(glyph: .calendar) { navigation.push(.fitnessCalendar) }
+                            .accessibilityLabel("Calendar")
+                        NoopFitnessIconButton(glyph: .grid) { navigation.push(.fitnessEdit) }
+                            .accessibilityLabel("Edit Fitness")
+                    }
+                }
                 if let s = fitness.snapshot {
                     content(s)
                 } else {
@@ -26,79 +34,157 @@ struct NoopFitnessHome: View {
                 }
             }
         }
-        .task { await fitness.load(repo: repo, profile: profile) }
     }
 
     @ViewBuilder
     private func content(_ s: NoopFitnessSnapshot) -> some View {
-        NoopFitnessWeekStrip(week: s.week, selected: $selectedDay)
+        NoopFitnessWeekStrip(week: s.week, plans: layout.plans, selected: $selectedDay)
             .padding(.bottom, 22)
-
-        sectionTitle("Activity") {
-            NoopFitnessIconButton(glyph: .plus) { navigation.push(.pick) }
+        ForEach(layout.sections) { section in
+            self.section(section, s)
         }
-        activity(s)
-            .padding(.bottom, 26)
+        Button { navigation.push(.fitnessEdit) } label: {
+            Text("Edit Fitness")
+                .font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                .frame(maxWidth: .infinity).frame(height: 50)
+                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .padding(.top, 6)
+    }
 
-        if !s.routines.isEmpty {
+    private func open(_ metric: NoopFitnessMetric) {
+        navigation.fitnessMetric = metric
+        navigation.push(.fitnessDetail)
+    }
+
+    @ViewBuilder
+    private func section(_ section: NoopFitnessSettings.Section, _ s: NoopFitnessSnapshot) -> some View {
+        switch section {
+        case .activity:
+            sectionTitle("Activity") {
+                NoopFitnessIconButton(glyph: .plus) { navigation.push(.pick) }
+            }
+            activity(s)
+                .padding(.bottom, 26)
+        case .routines:
             sectionTitle("Routines") {
                 NoopFitnessIconButton(glyph: .plus) { navigation.push(.liftLibrary) }
+                    .accessibilityLabel("New routine")
             }
-            ScrollView(.horizontal) {
-                HStack(spacing: 10) {
-                    ForEach(s.routines) { r in
-                        NoopFitnessRoutineCard(routine: r) {
-                            navigation.selectedLiftProgramID = r.id
-                            navigation.push(.liftProgram)
+            if s.routines.isEmpty {
+                Button { navigation.push(.liftLibrary) } label: {
+                    Text("Build a routine to start it in one tap and plan it on the calendar.")
+                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(NoopHTMLColor.borderStrong, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                .padding(.bottom, 26)
+            } else {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 10) {
+                        ForEach(s.routines) { r in
+                            NoopFitnessRoutineCard(routine: r) {
+                                navigation.fitnessRoutineID = r.id
+                                navigation.push(.fitnessRoutine)
+                            }
                         }
                     }
+                    .padding(.horizontal, 20)
                 }
-                .padding(.horizontal, 20)
+                .scrollIndicators(.hidden)
+                .padding(.horizontal, -20)
+                .padding(.bottom, 26)
             }
-            .scrollIndicators(.hidden)
-            .padding(.horizontal, -20)
+        case .load:
+            sectionTitle("Training load")
+            HStack(spacing: 10) {
+                tap(.cardioLoad) { NoopFitnessLoadCard(title: "Cardio", reading: s.cardioLoad, decimals: 1) }
+                tap(.muscularLoad) { NoopFitnessLoadCard(title: "Muscular", reading: s.muscularLoad, decimals: 0) }
+            }
             .padding(.bottom, 26)
-        }
-
-        sectionTitle("Training load")
-        HStack(spacing: 10) {
-            NoopFitnessLoadCard(title: "Cardio", reading: s.cardioLoad, decimals: 1)
-            NoopFitnessLoadCard(title: "Muscular", reading: s.muscularLoad, decimals: 0)
-        }
-        .padding(.bottom, 26)
-
-        sectionTitle("Cardio")
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-            NoopFitnessTotalCard(title: "Active time", value: Self.duration(s.activeSeconds.total),
-                                 caption: "last \(s.periodDays) days", series: s.activeSeconds,
-                                 tint: NoopHTMLColor.blue)
-            NoopFitnessTotalCard(title: "Active energy", value: "\(Int(s.activeKcal.total.rounded()).formatted()) kcal",
-                                 caption: "last \(s.periodDays) days", series: s.activeKcal,
-                                 tint: NoopHTMLColor.blue)
-            NoopFitnessVO2Card(readings: s.vo2Max)
-            NoopFitnessRecoveryCard(reading: s.heartRateRecovery)
-            NoopFitnessFocusCard(breakdown: s.cardioFocus)
-            NoopFitnessZonesCard(minutes: s.zoneMinutes, names: s.zoneNames)
-        }
-        .padding(.bottom, 26)
-
-        sectionTitle("Strength")
-        HStack(spacing: 10) {
-            if s.totalSets.total > 0 {
-                NoopFitnessTotalCard(title: "All muscles", value: "\(Int(s.totalSets.total))",
-                                     caption: "working sets", series: s.totalSets, tint: NoopHTMLColor.blush)
-            } else {
-                NoopFitnessEmptyCard(title: "All muscles", line: "Log a lift to see your sets")
+        case .cardio:
+            let cards = section.cards.filter(layout.isShown)
+            if !cards.isEmpty {
+                sectionTitle("Cardio")
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(cards, id: \.self) { card in cardioCard(card, s) }
+                }
+                .padding(.bottom, 26)
             }
-            if let top = s.topExercise {
-                NoopFitnessTotalCard(title: top.name, value: "\(Int(top.volume.total.rounded()).formatted()) kg",
-                                     caption: "total volume", series: top.volume, tint: NoopHTMLColor.blush)
-            } else {
-                NoopFitnessEmptyCard(title: "Volume", line: "Log a lift to see it here")
+        case .strength:
+            let cards = section.cards.filter(layout.isShown)
+            if !cards.isEmpty {
+                sectionTitle("Strength")
+                let small = cards.filter { $0 != .freshness }
+                if !small.isEmpty {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                        ForEach(small, id: \.self) { card in strengthCard(card, s) }
+                    }
+                    .padding(.bottom, 10)
+                }
+                if cards.contains(.freshness) {
+                    Button { navigation.push(.fitnessMuscles) } label: { NoopFitnessFreshnessCard(readings: s.freshness) }
+                        .buttonStyle(NoopHTMLPressStyle())
+                }
+                Spacer().frame(height: 26)
             }
         }
-        .padding(.bottom, 10)
-        NoopFitnessFreshnessCard(readings: s.freshness)
+    }
+
+    private func tap<C: View>(_ metric: NoopFitnessMetric, @ViewBuilder _ card: () -> C) -> some View {
+        Button { open(metric) } label: { card() }
+            .buttonStyle(NoopHTMLPressStyle())
+    }
+
+    @ViewBuilder
+    private func cardioCard(_ card: NoopFitnessSettings.Card, _ s: NoopFitnessSnapshot) -> some View {
+        switch card {
+        case .activeTime:
+            tap(.activeTime) {
+                NoopFitnessTotalCard(title: "Active time", value: Self.duration(s.activeSeconds.total),
+                                     caption: "last \(s.periodDays) days", series: s.activeSeconds, tint: NoopHTMLColor.blue)
+            }
+        case .activeEnergy:
+            tap(.activeEnergy) {
+                NoopFitnessTotalCard(title: "Active energy", value: "\(Int(s.activeKcal.total.rounded()).formatted()) kcal",
+                                     caption: "last \(s.periodDays) days", series: s.activeKcal, tint: NoopHTMLColor.blue)
+            }
+        case .vo2: tap(.vo2) { NoopFitnessVO2Card(readings: s.vo2Max) }
+        case .recovery: tap(.recovery) { NoopFitnessRecoveryCard(reading: s.heartRateRecovery) }
+        case .focus: tap(.focus) { NoopFitnessFocusCard(breakdown: s.cardioFocus) }
+        case .zones: tap(.zones) { NoopFitnessZonesCard(minutes: s.zoneMinutes, names: s.zoneNames) }
+        default: EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func strengthCard(_ card: NoopFitnessSettings.Card, _ s: NoopFitnessSnapshot) -> some View {
+        switch card {
+        case .sets:
+            tap(.sets) {
+                if s.totalSets.total > 0 {
+                    NoopFitnessTotalCard(title: "All muscles", value: "\(Int(s.totalSets.total))",
+                                         caption: "working sets", series: s.totalSets, tint: NoopHTMLColor.blush)
+                } else {
+                    NoopFitnessEmptyCard(title: "All muscles", line: "Log a lift to see your sets")
+                }
+            }
+        case .volume:
+            tap(.volume) {
+                if let top = s.topExercise {
+                    NoopFitnessTotalCard(title: top.name, value: "\(Int(top.volume.total.rounded()).formatted()) kg",
+                                         caption: "total volume", series: top.volume, tint: NoopHTMLColor.blush)
+                } else {
+                    NoopFitnessEmptyCard(title: "Volume", line: "Log a lift to see it here")
+                }
+            }
+        default: EmptyView()
+        }
     }
 
     @ViewBuilder
@@ -170,6 +256,7 @@ struct NoopFitnessHome: View {
 
 struct NoopFitnessWeekStrip: View {
     let week: [NoopFitnessSnapshot.WeekDay]
+    var plans: [NoopFitnessSettings.Plan] = []
     @Binding var selected: Date
 
     var body: some View {
@@ -204,10 +291,14 @@ struct NoopFitnessWeekStrip: View {
     private func dayMark(_ day: NoopFitnessSnapshot.WeekDay, future: Bool) -> some View {
         let strength = day.sessions.contains { $0.kind == .strength }
         let cardio = day.sessions.contains { $0.kind == .cardio }
+        let planned = plans.contains { Calendar.current.isDate($0.date, inSameDayAs: day.date) }
         ZStack {
             Circle()
                 .fill(day.sessions.isEmpty ? Color.white.opacity(0.04) : NoopHTMLColor.warm.opacity(0.22))
-            if day.sessions.isEmpty {
+            if day.sessions.isEmpty && planned {
+                Circle().strokeBorder(NoopHTMLColor.warm.opacity(0.7), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                NoopCanonicalGlyph(name: .weight, size: 12, color: NoopHTMLColor.warm.opacity(0.8))
+            } else if day.sessions.isEmpty {
                 Circle().strokeBorder(Color.white.opacity(future ? 0.12 : 0.0),
                                       style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
             } else {
