@@ -377,10 +377,14 @@ struct NoopFitnessCalendarScreen: View {
     @EnvironmentObject private var settings: NoopFitnessSettings
     @State private var month = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: Date())) ?? Date()
     @State private var selected = Calendar.current.startOfDay(for: Date())
+    @State private var metric: Metric = .none
+    @State private var sport: String?
+
+    enum Metric: String, CaseIterable { case none = "Sessions", time = "Active time", energy = "Energy", distance = "Distance" }
 
     var body: some View {
         let cal = Calendar.current
-        let sessions = fitness.snapshot?.history.sessions ?? []
+        let sessions = (fitness.snapshot?.history.sessions ?? []).filter { sport == nil || $0.title == sport }
         NoopFitnessPage(navigation: navigation, title: "Calendar") {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
@@ -391,6 +395,21 @@ struct NoopFitnessCalendarScreen: View {
                     step(.right) { month = cal.date(byAdding: .month, value: 1, to: month) ?? month }
                 }
                 let cols = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+                monthSummary(sessions)
+                HStack(spacing: 8) {
+                    Menu {
+                        ForEach(Metric.allCases, id: \.self) { m in
+                            Button { withAnimation(NoopMotion.swap) { metric = m } } label: {
+                                if metric == m { Label(m.rawValue, systemImage: "checkmark") } else { Text(m.rawValue) }
+                            }
+                        }
+                    } label: { filterChip("Show: \(metric.rawValue)") }
+                    Menu {
+                        Button("Every activity") { withAnimation(NoopMotion.swap) { sport = nil } }
+                        ForEach(sportNames, id: \.self) { n in Button(n) { withAnimation(NoopMotion.swap) { sport = n } } }
+                    } label: { filterChip(sport ?? "Every activity") }
+                    Spacer()
+                }
                 LazyVGrid(columns: cols, spacing: 6) {
                     ForEach(Self.weekdayLetters, id: \.self) { l in
                         Text(l).font(NoopHTMLFont.sans(10.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.muted)
@@ -400,10 +419,18 @@ struct NoopFitnessCalendarScreen: View {
                             dayCell(day, done: sessions.filter { cal.isDate($0.start, inSameDayAs: day) },
                                     planned: settings.plans(on: day))
                         } else {
-                            Color.clear.frame(height: 46)
+                            Color.clear.frame(height: 54)
                         }
                     }
                 }
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 24).onEnded { v in
+                    guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                    withAnimation(NoopMotion.swap) {
+                        month = cal.date(byAdding: .month, value: v.translation.width < 0 ? 1 : -1, to: month) ?? month
+                    }
+                })
+                .sensoryFeedback(.selection, trigger: month)
                 NoopSectionLabel(selected.formatted(.dateTime.weekday(.wide).day().month(.wide)))
                     .padding(.top, 6)
                 let done = sessions.filter { cal.isDate($0.start, inSameDayAs: selected) }
@@ -456,23 +483,96 @@ struct NoopFitnessCalendarScreen: View {
     private func dayCell(_ day: Date, done: [NoopFitnessSession], planned: [NoopFitnessSettings.Plan]) -> some View {
         let cal = Calendar.current
         let isSelected = cal.isDate(day, inSameDayAs: selected)
-        return Button { selected = cal.startOfDay(for: day) } label: {
-            VStack(spacing: 4) {
+        let today = cal.isDateInToday(day)
+        return Button { withAnimation(NoopMotion.swap) { selected = cal.startOfDay(for: day) } } label: {
+            VStack(spacing: 3) {
                 Text("\(cal.component(.day, from: day))")
-                    .font(NoopHTMLFont.sans(13.5, weight: cal.isDateInToday(day) ? .bold : .regular))
-                    .foregroundStyle(cal.isDateInToday(day) ? NoopHTMLColor.blueLight : NoopHTMLColor.ink)
-                HStack(spacing: 3) {
-                    if !done.isEmpty { Circle().fill(NoopHTMLColor.warm).frame(width: 6, height: 6) }
-                    if !planned.isEmpty {
-                        Circle().strokeBorder(NoopHTMLColor.warm, lineWidth: 1).frame(width: 6, height: 6)
+                    .font(NoopHTMLFont.sans(12, weight: today ? .bold : .medium))
+                    .foregroundStyle(today ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
+                ZStack {
+                    if let first = done.first {
+                        Circle().fill(NoopFitnessSessionRow.tint(first).opacity(0.2))
+                        NoopCanonicalGlyph(name: NoopFitnessSessionRow.glyph(first), size: 12, color: NoopFitnessSessionRow.tint(first))
+                    } else if !planned.isEmpty {
+                        Circle().strokeBorder(NoopHTMLColor.warm.opacity(0.7), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                        NoopCanonicalGlyph(name: .weight, size: 11, color: NoopHTMLColor.warm.opacity(0.8))
+                    } else {
+                        Circle().fill(Color.white.opacity(day > Date() ? 0 : 0.035))
                     }
                 }
-                .frame(height: 6)
+                .frame(width: 26, height: 26)
+                .overlay(alignment: .topTrailing) {
+                    if done.count > 1 {
+                        Text("\(done.count)").font(NoopHTMLFont.sans(8.5, weight: .bold)).foregroundStyle(NoopHTMLColor.canvas)
+                            .frame(width: 13, height: 13).background(NoopHTMLColor.ink, in: Circle()).offset(x: 4, y: -3)
+                    }
+                }
+                if metric != .none {
+                    Text(value(done) ?? " ").font(NoopHTMLFont.sans(9, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                }
             }
-            .frame(maxWidth: .infinity).frame(height: 46)
+            .frame(maxWidth: .infinity).frame(height: metric == .none ? 54 : 64)
             .background(isSelected ? Color.white.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(isSelected ? NoopHTMLColor.borderStrong : .clear, lineWidth: 0.6))
         }
         .buttonStyle(NoopHTMLPressStyle())
+    }
+
+    private func value(_ done: [NoopFitnessSession]) -> String? {
+        guard !done.isEmpty else { return nil }
+        switch metric {
+        case .none: return nil
+        case .time: return NoopFitnessHome.duration(done.reduce(0) { $0 + $1.durationS })
+        case .energy:
+            let k = done.compactMap(\.kcal).reduce(0, +)
+            return k > 0 ? "\(Int(k.rounded()))" : nil
+        case .distance:
+            let m = done.compactMap { $0.row?.distanceM }.reduce(0, +)
+            return m > 0 ? String(format: "%.1f", m / 1000) : nil
+        }
+    }
+
+    private func monthSummary(_ sessions: [NoopFitnessSession]) -> some View {
+        let cal = Calendar.current
+        let inMonth = sessions.filter { cal.isDate($0.start, equalTo: month, toGranularity: .month) }
+        let time = inMonth.reduce(0) { $0 + $1.durationS }
+        let lifts = inMonth.filter { $0.kind == .strength }.count
+        let days = Set(inMonth.map { cal.startOfDay(for: $0.start) }).count
+        return HStack(spacing: 0) {
+            summaryCell("\(inMonth.count)", "sessions")
+            summaryCell("\(days)", "active days")
+            summaryCell(NoopFitnessHome.duration(time), "active")
+            summaryCell("\(lifts)", lifts == 1 ? "lift" : "lifts")
+        }
+        .padding(.vertical, 12)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+    }
+
+    private func summaryCell(_ v: String, _ l: String) -> some View {
+        VStack(spacing: 2) {
+            Text(v).font(NoopHTMLFont.outfit(19)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+            Text(l).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.copy)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func filterChip(_ t: String) -> some View {
+        HStack(spacing: 5) {
+            Text(t).font(NoopHTMLFont.sans(12, weight: .semibold))
+            Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+        }
+        .foregroundStyle(NoopHTMLColor.inkSoft)
+        .padding(.horizontal, 12).frame(height: 30)
+        .background(Color.white.opacity(0.06), in: Capsule())
+    }
+
+    private var sportNames: [String] {
+        var n: [String: Int] = [:]
+        for s in fitness.snapshot?.history.sessions ?? [] { n[s.title, default: 0] += 1 }
+        return n.sorted { $0.value > $1.value }.map(\.key)
     }
 
     private func step(_ d: NoopFixedChevron.Direction, action: @escaping () -> Void) -> some View {
