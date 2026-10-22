@@ -345,7 +345,7 @@ struct NoopFitnessPlanSheet: View {
                                         .font(.system(size: 19)).foregroundStyle(on ? NoopHTMLColor.warm : NoopHTMLColor.muted)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(r.name).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                                        Text("\(r.exercises) exercises · \(r.sets) sets").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                                        Text("\(r.exercises) exercise\(r.exercises == 1 ? "" : "s") · \(r.sets) set\(r.sets == 1 ? "" : "s")").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
                                     }
                                     Spacer()
                                 }

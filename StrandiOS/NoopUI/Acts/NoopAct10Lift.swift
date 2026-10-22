@@ -392,7 +392,7 @@ private func liftTargetSummary(_ row: LiftProgramItemRow, system: UnitSystem) ->
     var pieces: [String] = []
     if let sets = row.targetSets {
         if let low = row.targetRepsLow { pieces.append("\(sets) × \(low)") }
-        else { pieces.append("\(sets) sets") }
+        else { pieces.append("\(sets) set\(sets == 1 ? "" : "s")") }
     } else if let low = row.targetRepsLow { pieces.append("reps \(low)") }
     if let weight = liftWeight(row.targetWeightKg, system: system) { pieces.append(weight) }
     if let rest = row.restSec { pieces.append("rest \(liftClock(rest))") }
@@ -2631,7 +2631,7 @@ private struct NoopLiftReviewScreen: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.title?.isEmpty == false ? item.title! : "Untitled")
                             .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink)
-                        Text("\(item.exerciseCount) exercises · \(item.setCount) working sets" + (item.durationS.map { " · \(Int($0 / 60)) min" } ?? ""))
+                        Text("\(item.exerciseCount) exercise\(item.exerciseCount == 1 ? "" : "s") · \(item.setCount) working set\(item.setCount == 1 ? "" : "s")" + (item.durationS.map { " · \(Int($0 / 60)) min" } ?? ""))
                             .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     }
                     Spacer()

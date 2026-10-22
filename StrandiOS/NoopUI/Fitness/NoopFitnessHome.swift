@@ -121,30 +121,17 @@ struct NoopFitnessHome: View {
             if section.cards.isEmpty {
                 editPreview(section, s)
             } else {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    ForEach(section.cards, id: \.self) { card in
-                        let shown = layout.isShown(card)
-                        Group {
-                            if section == .cardio { cardioCard(card, s) } else if card == .freshness {
-                                NoopFitnessFreshnessCard(readings: s.freshness, compact: true)
-                            } else { strengthCard(card, s) }
-                        }
-                        .allowsHitTesting(false)
-                        .opacity(shown ? 1 : 0.32)
-                        .overlay(alignment: .topLeading) {
-                            Button {
-                                withAnimation(NoopMotion.swap) {
-                                    if shown { layout.hidden.insert(card) } else { layout.hidden.remove(card) }
-                                }
-                            } label: {
-                                Image(systemName: shown ? "minus.circle.fill" : "plus.circle.fill")
-                                    .font(.system(size: 22)).symbolRenderingMode(.palette)
-                                    .foregroundStyle(.white, shown ? NoopHTMLColor.red : NoopHTMLColor.green)
-                                    .background(Circle().fill(NoopHTMLColor.canvas).padding(2))
+                let small = section.cards.filter { $0 != .freshness }
+                VStack(spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                        ForEach(small, id: \.self) { card in
+                            editableCard(card) {
+                                if section == .cardio { cardioCard(card, s) } else { strengthCard(card, s) }
                             }
-                            .offset(x: -7, y: -7)
-                            .accessibilityLabel(shown ? "Hide \(card.title)" : "Show \(card.title)")
                         }
+                    }
+                    if section.cards.contains(.freshness) {
+                        editableCard(.freshness) { NoopFitnessFreshnessCard(readings: s.freshness) }
                     }
                 }
             }
@@ -165,6 +152,28 @@ struct NoopFitnessHome: View {
     }
 
     /// What a section without cards holds, in one line, so the arranged page stays short.
+    /// A card in edit mode: dimmed when hidden, with a badge to hide or show it.
+    private func editableCard<C: View>(_ card: NoopFitnessSettings.Card, @ViewBuilder _ content: () -> C) -> some View {
+        let shown = layout.isShown(card)
+        return content()
+            .allowsHitTesting(false)
+            .opacity(shown ? 1 : 0.32)
+            .overlay(alignment: .topLeading) {
+                Button {
+                    withAnimation(NoopMotion.swap) {
+                        if shown { layout.hidden.insert(card) } else { layout.hidden.remove(card) }
+                    }
+                } label: {
+                    Image(systemName: shown ? "minus.circle.fill" : "plus.circle.fill")
+                        .font(.system(size: 22)).symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, shown ? NoopHTMLColor.red : NoopHTMLColor.green)
+                        .background(Circle().fill(NoopHTMLColor.canvas).padding(2))
+                }
+                .offset(x: -7, y: -7)
+                .accessibilityLabel(shown ? "Hide \(card.title)" : "Show \(card.title)")
+            }
+    }
+
     private func editPreview(_ section: NoopFitnessSettings.Section, _ s: NoopFitnessSnapshot) -> some View {
         let (symbol, line): (String, String) = switch section {
         case .activity: ("figure.run", "The sessions and plans of the chosen day")
@@ -388,7 +397,7 @@ struct NoopFitnessHome: View {
             tap(.sets) {
                 if s.totalSets.total > 0 {
                     NoopFitnessTotalCard(title: "All muscles", value: "\(Int(s.totalSets.total))",
-                                         caption: "working sets", series: s.totalSets, tint: NoopHTMLColor.blush)
+                                         caption: Int(s.totalSets.total) == 1 ? "working set" : "working sets", series: s.totalSets, tint: NoopHTMLColor.blush)
                 } else {
                     NoopFitnessEmptyCard(title: "All muscles", line: "Log a lift to see your sets")
                 }
@@ -1131,11 +1140,10 @@ private extension Array where Element == String {
 
 struct NoopFitnessFreshnessCard: View {
     let readings: [MuscleFreshness.Reading]
-    var compact = false
 
     var body: some View {
         let sorted = readings.sorted { $0.percent < $1.percent }
-        let shown = Array(sorted.prefix(compact ? 4 : 6))
+        let shown = Array(sorted.prefix(6))
         let ready = readings.filter { $0.provisionalStatus == .recovered }.count
         let tired = readings.filter { $0.provisionalStatus == .fatigued || $0.provisionalStatus == .depleted }.count
         VStack(alignment: .leading, spacing: 14) {
@@ -1146,7 +1154,7 @@ struct NoopFitnessFreshnessCard: View {
                         .font(NoopHTMLFont.outfit(19)).foregroundStyle(NoopHTMLColor.ink)
                 }
                 Spacer()
-                if !compact { NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim) }
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 14) {
                 ForEach(shown, id: \.group) { r in
