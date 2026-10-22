@@ -52,6 +52,18 @@ extension DatedChartSeries {
         return recorded.reduce(0) { $0 + $1 / Double(recorded.count) }
     }
 
+    /// Dense daily inspection includes missing slots. Irregular measurements still use nearestPoint.
+    func nearestSample(to fraction: Double) -> Sample? {
+        guard fraction.isFinite, let first = samples.first, let last = samples.last else { return nil }
+        let duration = last.date.timeIntervalSince(first.date)
+        let target = min(1, max(0, fraction))
+        return samples.min {
+            let a = duration > 0 ? $0.date.timeIntervalSince(first.date) / duration : 1
+            let b = duration > 0 ? $1.date.timeIntervalSince(first.date) / duration : 1
+            return abs(a - target) < abs(b - target)
+        }
+    }
+
     func nearestPoint(to fraction: Double) -> Point? {
         guard fraction.isFinite else { return nil }
         let target = min(1, max(0, fraction))

@@ -12,6 +12,32 @@ final class HistoryDateWindowTests: XCTestCase {
         HistoryDateWindow.date(dayKey: key, timeZone: calendar.timeZone)!
     }
 
+    func testDailySelectionKeepsAnUnrecordedDayInsteadOfBorrowingANeighbour() throws {
+        let dates = [day("2026-10-01"), day("2026-10-02"), day("2026-10-03")]
+        let series = DatedChartSeries(dates: dates, values: [60, nil, 62])
+        let selected = try XCTUnwrap(series.nearestSample(to: 0.5))
+        XCTAssertEqual(selected.date, dates[1])
+        XCTAssertNil(selected.value)
+        XCTAssertNotEqual(series.nearestPoint(to: 0.5)?.date, dates[1])
+    }
+
+    func testDailySelectionClampsAndRejectsInvalidFractions() {
+        let dates = [day("2026-10-01"), day("2026-10-02")]
+        let series = DatedChartSeries(dates: dates, values: [nil, 62])
+        XCTAssertEqual(series.nearestSample(to: -4)?.date, dates[0])
+        XCTAssertEqual(series.nearestSample(to: 4)?.date, dates[1])
+        XCTAssertNil(series.nearestSample(to: .nan))
+        XCTAssertNil(series.nearestSample(to: .infinity))
+        XCTAssertNil(DatedChartSeries(samples: []).nearestSample(to: 0.5))
+    }
+
+    func testDailySelectionUsesElapsedDatesAcrossDST() {
+        let dates = [day("2026-03-28"), day("2026-03-29"), day("2026-03-30")]
+        let series = DatedChartSeries(dates: dates, values: [nil, nil, nil])
+        XCTAssertEqual(series.nearestSample(to: 0.5)?.date, dates[1])
+        XCTAssertNil(series.nearestSample(to: 0.5)?.value)
+    }
+
     func testThirtyDaysIsInclusiveAndExcludesTheNextMidnight() throws {
         let window = try XCTUnwrap(HistoryDateWindow(endingOn: day("2026-10-22"), dayCount: 30,
                                                      firstDay: day("2026-01-01"), calendar: calendar))

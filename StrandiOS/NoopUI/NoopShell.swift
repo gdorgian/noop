@@ -111,6 +111,12 @@ struct NoopAppShell: View {
             .container,
             edges: navigation.route.act == .night || navigation.route.act == .day || navigation.route.act == .effort || navigation.route.act == .picture || navigation.route.act == .plumbing || navigation.route.act == .ages || navigation.route.act == .svea || navigation.route.act == .goals || navigation.route.act == .instrument || navigation.route.act == .lift || navigation.route.act == .fitness ? .all : []
         )
+        .sheet(isPresented: Binding(get: { navigation.metricSheetPresented }, set: { if !$0 { navigation.dismissMetricSheet() } })) {
+            NoopAct9Screens(navigation: navigation, data: .prototype, metricSheet: true)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(NoopHTMLColor.canvas)
+        }
         .onChange(of: navigation.route) { oldRoute, newRoute in
             if oldRoute == .review, newRoute != .review {
                 labDraft.scrub()
@@ -769,6 +775,14 @@ struct NoopVerifiedAppShell: View {
         .preferredColorScheme(.dark)
         .contentShape(Rectangle())
         .simultaneousGesture(verifiedBackGesture)
+        .sheet(isPresented: Binding(get: { navigation.metricSheetPresented }, set: { if !$0 { navigation.dismissMetricSheet() } })) {
+            NoopAct9Screens(navigation: navigation, data: instrumentStore.data(for: repo.deviceId),
+                            loadState: instrumentStore.state(for: repo.deviceId),
+                            retry: { Task { await instrumentStore.load(from: repo, force: true) } }, metricSheet: true)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(NoopHTMLColor.canvas)
+        }
         .environment(\.noopLiveBarInset,
                      (liftSession.isActive || navigation.sessionRunning || model.activeWorkout != nil)
                         && !navigation.route.hidesBottomBar ? 52 : 0)
@@ -959,7 +973,7 @@ struct NoopVerifiedAppShell: View {
     }
 
     private var instrumentLoadKey: String? {
-        Self.canonicalInstrumentRoutes.contains(navigation.route) ? "\(repo.deviceId)-\(repo.loaded)-\(repo.refreshSeq)" : nil
+        (navigation.metricSheetPresented || Self.canonicalInstrumentRoutes.contains(navigation.route)) ? "\(repo.deviceId)-\(repo.loaded)-\(repo.refreshSeq)" : nil
     }
 
     @ViewBuilder

@@ -387,7 +387,7 @@ final class NoopNavigation: ObservableObject {
     @Published private(set) var path: [NoopRoute] = [.today] {
         didSet {
             forgetScroll(from: oldValue)
-            if !path.contains(where: { $0.act == .instrument }) { instrumentOverviewWindow = nil }
+            if !metricSheetPresented && !path.contains(where: { $0.act == .instrument }) { instrumentOverviewWindow = nil }
         }
     }
     let scrollMemory = NoopScrollMemory()
@@ -403,6 +403,13 @@ final class NoopNavigation: ObservableObject {
             (Int(entry.key.split(separator: "-").first ?? "") ?? 0) <= keep
         }
     }
+    @Published var metricSheetPresented = false
+    /// A metric inspection keeps the presenting page mounted, including its scroll position.
+    func dismissMetricSheet() {
+        metricSheetPresented = false
+        if !path.contains(where: { $0.act == .instrument }) { instrumentOverviewWindow = nil }
+    }
+
     @Published var overlay: NoopOverlay?
     @Published var selectedWorkout: NoopWorkout = .steadyRide
     @Published var workoutChosenByUser = false
@@ -693,6 +700,10 @@ final class NoopNavigation: ObservableObject {
            let requestedRoute = NoopRoute(rawValue: arguments[flag + 1]) {
             path = [requestedRoute]
         }
+        if path.last == .instrumentMetric {
+            path = [.instrumentIndex]
+            metricSheetPresented = true
+        }
         if let flag = arguments.firstIndex(of: "--noop-workout"),
            arguments.indices.contains(flag + 1) {
             workoutChosenByUser = true
@@ -848,6 +859,8 @@ final class NoopNavigation: ObservableObject {
     /// and the tab bar's tint travels over the same 200 ms — that tint move is the only signal
     /// that the tab changed, and without it a crossfade reads as a dropped frame.
     func reset(to route: NoopRoute) {
+        if route == .instrumentMetric { presentMetricSheet(); return }
+        metricSheetPresented = false
         pendingSheetTransition = nil
         overlay = nil
         arrival = .arrived
@@ -882,6 +895,15 @@ final class NoopNavigation: ObservableObject {
         }
     }
 
+    /// Every metric opens on the last 30 days, the way the reference does, rather than inheriting whatever
+    /// span the page underneath was showing (six months of daily values is unreadable at phone width).
+    /// The range bar inside the sheet still changes it.
+    private func presentMetricSheet() {
+        instrumentOverviewWindow = nil
+        UserDefaults.standard.set("30", forKey: "noop.act9.range")
+        metricSheetPresented = true
+    }
+
     func select(tab: NoopTab) {
         reset(to: tab.root)
     }
@@ -889,10 +911,14 @@ final class NoopNavigation: ObservableObject {
     func push(_ route: NoopRoute) {
         pendingSheetTransition = nil
         overlay = nil
+        if route == .instrumentMetric { presentMetricSheet(); return }
         guard self.route != route else { return }
+        let inspectingMetric = metricSheetPresented
+        metricSheetPresented = false
         arrival = .pushed
         withAnimation(NoopMotion.enter) {
-            path.append(route)
+            // Leave a return point for Compare/Relationships opened from the sheet.
+            path += (inspectingMetric ? [.instrumentMetric] : []) + [route]
         }
     }
 
@@ -900,6 +926,8 @@ final class NoopNavigation: ObservableObject {
     /// a child from somewhere else, but its visible chevron and the edge swipe must still reveal
     /// the same parent.
     func enter(_ route: NoopRoute, from parent: NoopRoute) {
+        if route == .instrumentMetric { push(route); return }
+        metricSheetPresented = false
         pendingSheetTransition = nil
         overlay = nil
         guard self.route != route else { return }
@@ -916,6 +944,7 @@ final class NoopNavigation: ObservableObject {
     /// A finished session's summary sits directly on `parent`: back goes there, not through the
     /// pickers that led into the session.
     func land(on route: NoopRoute, over parent: NoopRoute) {
+        metricSheetPresented = false
         pendingSheetTransition = nil
         overlay = nil
         arrival = .pushed
@@ -923,6 +952,8 @@ final class NoopNavigation: ObservableObject {
     }
 
     func replace(with route: NoopRoute) {
+        if route == .instrumentMetric { push(route); return }
+        metricSheetPresented = false
         pendingSheetTransition = nil
         overlay = nil
         arrival = .pushed
@@ -932,6 +963,7 @@ final class NoopNavigation: ObservableObject {
     }
 
     func back() {
+        if metricSheetPresented { dismissMetricSheet(); return }
         pendingSheetTransition = nil
         if overlay != nil {
             withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.32)) { overlay = nil }
@@ -939,7 +971,12 @@ final class NoopNavigation: ObservableObject {
         }
         guard path.count > 1 else { return }
         withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) {
-            _ = path.removeLast()
+            var returning = Array(path.dropLast())
+            if returning.last == .instrumentMetric {
+                metricSheetPresented = true
+                returning.removeLast()
+            }
+            path = returning
         }
     }
 
@@ -947,6 +984,7 @@ final class NoopNavigation: ObservableObject {
     /// it in place of the current screen. Breathe's sessions land on its root, not on whatever
     /// screen happened to open them.
     func unwind(to route: NoopRoute) {
+        metricSheetPresented = false
         pendingSheetTransition = nil
         overlay = nil
         guard let index = path.lastIndex(of: route) else { replace(with: route); return }
@@ -958,7 +996,7 @@ final class NoopNavigation: ObservableObject {
 
     /// Follow the real entry path; the canonical parent is only a fallback for a root arrival.
     func back(or fallback: NoopRoute) {
-        if canGoBack || overlay != nil { back() }
+        if metricSheetPresented || canGoBack || overlay != nil { back() }
         else { reset(to: fallback) }
     }
 

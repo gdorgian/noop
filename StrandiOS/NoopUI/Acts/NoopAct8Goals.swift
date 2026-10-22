@@ -3369,7 +3369,7 @@ private struct NoopMarkerTrend: View {
         NoopHistoryPlot(presentation: .init(series: series, showVariability: false), tint: NoopHTMLColor.warm,
                         measurements: true, selectedDate: selectedDate,
                         valueLabel: { $0.formatted(.number.precision(.fractionLength(0...2))) }, onSelect: onSelect)
-            .frame(height: 118)
+            .frame(height: 200)
     }
 }
 

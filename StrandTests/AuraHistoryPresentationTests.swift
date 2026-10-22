@@ -7,6 +7,38 @@ final class AuraHistoryPresentationTests: XCTestCase {
         var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "Europe/Athens")!; return c
     }
     private func date(_ day: Int) -> Date { calendar.date(from: DateComponents(year: 2026, month: 3, day: day))! }
+    func testTrendAnalysisComparesSevenDayMeansWithinTheVisibleWindow() throws {
+        let series = DatedChartSeries(dates: (1...25).map(date), values: (1...25).map { Double($0) })
+        let analysis = AuraHistoryTrendAnalysis(series: series, calendar: calendar)
+        XCTAssertEqual(analysis.asOf, date(25))
+        XCTAssertEqual(analysis.rows.map(\.days), [3, 7, 14, 30, 90])
+        // The means are sums of fractions, so compare within rounding rather than bit-for-bit.
+        XCTAssertEqual(try XCTUnwrap(analysis.rows[0].change), 3, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(analysis.rows[1].change), 7, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(analysis.rows[2].change), 14, accuracy: 1e-9)
+        XCTAssertNil(analysis.rows[3].change)
+        XCTAssertNil(analysis.rows[4].change)
+    }
+    func testTrendAnalysisDoesNotTurnSparseOrMissingDaysIntoZeros() {
+        let values: [Double?] = (1...25).map { [1, 8, 15, 25].contains($0) ? Double($0) : nil }
+        let analysis = AuraHistoryTrendAnalysis(series: .init(dates: (1...25).map(date), values: values), calendar: calendar)
+        XCTAssertTrue(analysis.rows.allSatisfy { $0.change == nil })
+        XCTAssertTrue(analysis.rows.allSatisfy { $0.trend.points.isEmpty })
+    }
+    func testTrendAnalysisPreservesRawGapsInItsSparklines() {
+        let values: [Double?] = (1...25).map { $0 == 23 ? nil : Double($0) }
+        let analysis = AuraHistoryTrendAnalysis(series: .init(dates: (1...25).map(date), values: values), calendar: calendar)
+        XCTAssertEqual(analysis.rows[0].trend.samples.first { $0.date == date(23) }?.value, nil)
+        XCTAssertEqual(analysis.rows[0].currentCount, 6)
+        XCTAssertNotNil(analysis.rows[0].change)
+    }
+    func testTrendAnalysisEmptyAndSingleValueStayUnsupported() {
+        for values: [Double?] in [[nil, nil], [nil, 60]] {
+            let analysis = AuraHistoryTrendAnalysis(series: .init(dates: [date(1), date(2)], values: values), calendar: calendar)
+            XCTAssertTrue(analysis.rows.allSatisfy { $0.change == nil })
+        }
+    }
+
     func testVariabilityRequiresFourteenRecordedDaysAndDoesNotUseFutureData() {
         let series = DatedChartSeries(dates: (1...16).map(date), values: (1...16).map { Double($0) })
         let chart = AuraHistoryPresentation(series: series, calendar: calendar)

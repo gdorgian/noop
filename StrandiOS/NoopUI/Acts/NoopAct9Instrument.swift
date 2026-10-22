@@ -16,18 +16,20 @@ struct NoopAct9Screens: View {
     let data: NoopInstrumentData
     var loadState: NoopInstrumentLoadState = .ready
     var retry: (() -> Void)?
+    var metricSheet = false
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     @AppStorage(UnitPrefs.systemKey) private var bodyUnits = UnitSystem.metric.rawValue
-    @SceneStorage("noop.act9.range") private var rangeRaw = NoopInstrumentRange.ninety.rawValue
+    @AppStorage("noop.act9.range") private var rangeRaw = NoopInstrumentRange.thirty.rawValue
     @SceneStorage("noop.act9.end-day") private var endDayRaw = ""
     @EnvironmentObject private var repo: Repository
     @SceneStorage("noop.act9.filter") private var filterRaw = NoopInstrumentGroupFilter.all.rawValue
 
-    init(navigation: NoopNavigation, data: NoopInstrumentData, loadState: NoopInstrumentLoadState = .ready, retry: (() -> Void)? = nil) {
+    init(navigation: NoopNavigation, data: NoopInstrumentData, loadState: NoopInstrumentLoadState = .ready, retry: (() -> Void)? = nil, metricSheet: Bool = false) {
         self.navigation = navigation
         self.data = data
         self.loadState = loadState
         self.retry = retry
+        self.metricSheet = metricSheet
     }
 
     private var presentedData: NoopInstrumentData {
@@ -136,7 +138,7 @@ struct NoopAct9Screens: View {
     }
 
     @ViewBuilder private var screens: some View {
-        switch navigation.route {
+        switch metricSheet ? NoopRoute.instrumentMetric : navigation.route {
         case .instrumentIndex:
             NoopInstrumentIndexScreen(
                 navigation: navigation,
@@ -321,6 +323,8 @@ private extension EnvironmentValues {
 
 private struct NoopInstrumentDateNavigation: View {
     let window: NoopInstrumentWindowContext
+    var range: Binding<NoopInstrumentRange>?
+    var availableDays = 0
     @State private var choosingDate = false
 
     private var earlier: Date? { Calendar.current.date(byAdding: .day, value: -window.step, to: window.end).map { max($0, window.first) } }
@@ -331,6 +335,59 @@ private struct NoopInstrumentDateNavigation: View {
     }
 
     var body: some View {
+        VStack(spacing: 5) {
+            if let range {
+                HStack(spacing: 2) {
+                    footerStep(.left, enabled: window.end > window.first) {
+                        if let earlier { window.setEnd(earlier) }
+                    }
+                    ForEach(NoopInstrumentRange.allCases.filter { $0 != .overview }) { item in
+                        Button {
+                            withAnimation(NoopMotion.swap) { range.wrappedValue = item }
+                        } label: {
+                            Text(item.label)
+                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .foregroundStyle(item == range.wrappedValue ? NoopHTMLColor.ink : NoopHTMLColor.copy)
+                                .frame(maxWidth: .infinity).frame(minHeight: 44)
+                                .background(item == range.wrappedValue ? Color.white.opacity(0.09) : .clear, in: Capsule())
+                        }
+                        .disabled(!item.isAvailable(total: availableDays))
+                        .opacity(item.isAvailable(total: availableDays) ? 1 : 0.4)
+                        .accessibilityAddTraits(item == range.wrappedValue ? .isSelected : [])
+                    }
+                    footerStep(.right, enabled: window.end < window.last) {
+                        if let later { window.setEnd(later) }
+                    }
+                }
+                .padding(3)
+                .background(Color.white.opacity(0.04), in: Capsule())
+                Button { choosingDate = true } label: {
+                    Label(label, systemImage: "calendar").frame(minHeight: 44)
+                }
+                .accessibilityLabel("Choose dates, \(label)")
+            } else {
+                legacyNavigation
+            }
+        }
+        .font(NoopHTMLFont.sans(11.5))
+        .foregroundStyle(NoopHTMLColor.copy)
+        .buttonStyle(NoopPlainHitStyle())
+        .sheet(isPresented: Binding(get: { choosingDate && range == nil }, set: { choosingDate = $0 })) { calendarSheet }
+        .navigationDestination(isPresented: Binding(get: { choosingDate && range != nil }, set: { choosingDate = $0 })) {
+            calendarSheet.toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    private func footerStep(_ direction: NoopFixedChevron.Direction, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button { withAnimation(NoopMotion.swap) { action() } } label: {
+            NoopFixedChevron(direction: direction, color: enabled ? NoopHTMLColor.inkSoft : NoopHTMLColor.chevronDim)
+                .frame(width: 34, height: 44)
+        }
+        .disabled(!enabled)
+        .accessibilityLabel(direction == .left ? "Previous date window" : "Next date window")
+    }
+
+    private var legacyNavigation: some View {
         HStack(spacing: 4) {
             Button { if let earlier { window.setEnd(earlier) } } label: {
                 Image(systemName: "chevron.left").frame(width: 36, height: 44)
@@ -356,28 +413,29 @@ private struct NoopInstrumentDateNavigation: View {
         .font(NoopHTMLFont.sans(11.5))
         .foregroundStyle(NoopHTMLColor.copy)
         .buttonStyle(NoopPlainHitStyle())
-        .sheet(isPresented: $choosingDate) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Text("Choose dates").font(NoopHTMLFont.outfit(23))
-                    Spacer()
-                    Button("Done") { choosingDate = false }.frame(minWidth: 44, minHeight: 44)
-                }
-                DatePicker("Period ending", selection: Binding(get: { window.end }, set: window.setEnd),
-                           in: window.first...window.last, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                Button("Return to latest") { window.setEnd(window.last); choosingDate = false }
-                    .frame(minHeight: 44)
+    }
+
+    private var calendarSheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Choose dates").font(NoopHTMLFont.outfit(23))
+                Spacer()
+                Button("Done") { choosingDate = false }.frame(minWidth: 44, minHeight: 44)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .foregroundStyle(NoopHTMLColor.ink)
-            .tint(NoopHTMLColor.night)
-            .background(NoopHTMLColor.canvas)
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-            .preferredColorScheme(.dark)
+            DatePicker("Period ending", selection: Binding(get: { window.end }, set: window.setEnd),
+                       in: window.first...window.last, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+            Button("Return to latest") { window.setEnd(window.last); choosingDate = false }
+                .frame(minHeight: 44)
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .foregroundStyle(NoopHTMLColor.ink)
+        .tint(NoopHTMLColor.night)
+        .background(NoopHTMLColor.canvas)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -386,8 +444,19 @@ private struct NoopInstrumentRangeControl: View {
     @Binding var range: NoopInstrumentRange
     let worn: Int
     let availableDays: Int
+    var chartFooter = false
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if chartFooter, let dateWindow {
+                NoopInstrumentDateNavigation(window: dateWindow, range: $range, availableDays: dateWindow.totalDays)
+            } else {
+                rangePicker
+            }
+        }
+    }
+
+    private var rangePicker: some View {
         VStack(alignment: .leading, spacing: 8) {
             if range == .overview {
                 Text("TRENDS PERIOD")
@@ -1079,9 +1148,22 @@ private struct NoopInstrumentMetricScreen: View {
     }
 
     private func select(_ reading: NoopInstrumentReading) {
-        guard selectedDate != reading.date else { return }
-        selectedDate = reading.date
+        selectDate(reading.date)
+    }
+
+    private func selectDate(_ date: Date) {
+        guard selectedDate != date else { return }
+        selectedDate = date
         UISelectionFeedbackGenerator().selectionChanged()
+    }
+    private var selectedMissingDay: Bool { selectedDate != nil && selectedReading == nil }
+    private var hasDisplayValue: Bool { !selectedMissingDay && !model.readings.isEmpty }
+    private var latestAssessment: NoopInstrumentAssessment? {
+        guard !selectedMissingDay, selectedDate == nil || selectedDate == model.readings.last?.date else { return nil }
+        return model.assessment
+    }
+    private var relatedSignals: [NoopInstrumentSignal] {
+        data.signals.filter { $0.group == model.signal.group }
     }
 
     private let model: NoopInstrumentMetricModel
@@ -1095,97 +1177,149 @@ private struct NoopInstrumentMetricScreen: View {
     }
 
     var body: some View {
-        NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 0) {
-                NoopInstrumentBackHeader(label: "All signals") {
-                    navigation.back(or: .instrumentIndex)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(model.signal.name)
-                        .font(NoopHTMLFont.outfit(25))
-                        .tracking(-0.625)
-                        .foregroundStyle(NoopHTMLColor.ink)
-
-                    HStack(alignment: .firstTextBaseline, spacing: 9) {
-                        Text(selectedReading?.value ?? model.value)
-                            .font(NoopHTMLFont.outfit(52, weight: .thin))
-                            .tracking(-2.34)
-                            .monospacedDigit()
+        NavigationStack {
+            VStack(spacing: 0) {
+                HStack {
+                    Button { navigation.dismissMetricSheet() } label: {
+                        Image(systemName: "xmark").font(.system(size: 17, weight: .medium))
                             .foregroundStyle(NoopHTMLColor.ink)
-                        Text(model.unit)
-                            .font(NoopHTMLFont.sans(13))
-                            .foregroundStyle(NoopHTMLColor.copy)
+                            .frame(width: 44, height: 44)
+                            .background(Color.white.opacity(0.07), in: Circle())
                     }
-
-                    if let reading = selectedReading ?? model.readings.last {
-                        Text("\(selectedReading == nil ? "Latest" : "Selected") · \(reading.date.formatted(date: .abbreviated, time: .omitted))")
-                            .font(NoopHTMLFont.sans(12))
-                            .foregroundStyle(NoopHTMLColor.muted)
-                    }
-
-                    if let context = navigation.instrumentOverviewWindow,
-                       context.metricKey == model.signal.key, let summary = context.weeklySummary {
-                        Text(summary)
-                            .font(NoopHTMLFont.sans(12))
-                            .foregroundStyle(NoopHTMLColor.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Text(model.read)
-                        .font(NoopHTMLFont.sans(13.5))
-                        .foregroundStyle(NoopHTMLColor.copy)
-                        .lineSpacing(4.2)
-                        .fixedSize(horizontal: false, vertical: true)
+                    .buttonStyle(NoopPlainHitStyle())
+                    .accessibilityLabel("Close metric details")
+                    Spacer()
+                    Text(model.signal.name).font(NoopHTMLFont.sans(17, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
+                    Spacer()
+                    Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
                 }
-
-                NoopInstrumentRangeControl(
-                    range: $range,
-                    worn: model.worn,
-                    availableDays: data.historyCount
-                )
-                    .padding(.top, 14)
-
-                VStack(alignment: .leading, spacing: 11) {
-                    metricChartCard
-
-
-                    if model.comparison != nil { metricComparisonCard }
-                    if !model.readings.isEmpty { metricReadingsCard }
-                    metricDataContext
-                    if model.thin {
-                        VStack(alignment: .leading, spacing: 9) {
-                            Text(model.readings.isEmpty ? "No recorded values" : "Relationships need more history")
-                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
-                                .foregroundStyle(NoopHTMLColor.ink)
-                            Text(model.thinNote)
-                                .font(NoopHTMLFont.sans(12.5))
-                                .foregroundStyle(Color(hex: 0xC9D0EE))
-                                .lineSpacing(4)
-                                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 12)
+                ScrollViewReader { scroll in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            metricValueHeader.id("metric-top")
+                            relatedMetricPicker
+                            metricSections
                         }
-                        .padding(16)
-                        .background(NoopHTMLColor.night.opacity(0.08), in: RoundedRectangle(cornerRadius: 22))
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.night.opacity(0.22), lineWidth: 0.5))
+                        .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 32)
                     }
-
-                    if !model.moves.isEmpty { metricMovesCard }
-
-                    metricLinksCard
-
-                    Text("Correlations are computed over the nights where both signals exist, at the best of three lags, and shown only above twenty-one nights and 0.22. Association, not cause.")
-                        .font(NoopHTMLFont.sans(11.5))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .lineSpacing(3.9)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 2)
+                    .scrollIndicators(.hidden)
+                    .onChange(of: navigation.instrumentMetricKey) { _ in scroll.scrollTo("metric-top", anchor: .top) }
                 }
-                .padding(.top, 14)
             }
+            .background(NoopHTMLColor.canvas)
+            .toolbar(.hidden, for: .navigationBar)
         }
+        .tint(NoopHTMLColor.night)
+        .preferredColorScheme(.dark)
+        .onChange(of: navigation.instrumentMetricKey) { _ in selectedDate = nil; showAllReadings = false }
         .onChange(of: model.readings) { _ in
             selectedDate = nil
             showAllReadings = false
+        }
+    }
+
+    private var metricSections: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            metricChartCard
+            NoopInstrumentRangeControl(
+                range: $range,
+                worn: model.worn,
+                availableDays: data.historyCount,
+                chartFooter: true
+            )
+
+            if let trendAnalysis { metricTrendAnalysisCard(trendAnalysis) }
+            else if model.comparison != nil { metricComparisonCard }
+            if !model.readings.isEmpty { metricReadingsCard }
+            metricDataContext
+            if model.thin {
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(model.readings.isEmpty ? "No recorded values" : "Relationships need more history")
+                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                    Text(model.thinNote)
+                        .font(NoopHTMLFont.sans(12.5))
+                        .foregroundStyle(Color(hex: 0xC9D0EE))
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(16)
+                .background(NoopHTMLColor.night.opacity(0.08), in: RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.night.opacity(0.22), lineWidth: 0.5))
+            }
+
+            if !model.moves.isEmpty { metricMovesCard }
+
+            metricLinksCard
+
+            Text("Correlations are computed over the nights where both signals exist, at the best of three lags, and shown only above twenty-one nights and 0.22. Association, not cause.")
+                .font(NoopHTMLFont.sans(11.5))
+                .foregroundStyle(NoopHTMLColor.faint)
+                .lineSpacing(3.9)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 2)
+        }
+    }
+
+    private var metricValueHeader: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(hasDisplayValue ? selectedReading?.value ?? model.value : "No data")
+                        .font(NoopHTMLFont.outfit(hasDisplayValue ? 44 : 32, weight: .light))
+                        .monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+                    if hasDisplayValue {
+                        Text(model.unit).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    }
+                }
+                if let date = selectedDate ?? model.readings.last?.date ?? model.plot.series.samples.last?.date {
+                    Text(date.formatted(date: .abbreviated, time: .omitted))
+                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.faint)
+                }
+            }
+            Spacer(minLength: 0)
+            if let assessment = latestAssessment {
+                VStack(alignment: .trailing, spacing: 5) {
+                    Text(assessment.label).font(NoopHTMLFont.sans(13, weight: .semibold))
+                        .foregroundStyle(assessment.outside ? NoopHTMLColor.warm : NoopHTMLColor.inkSoft)
+                    if let range = assessment.personalRange {
+                        Text("\(NoopInstrumentData.chartTickLabel(range.lowerBound, key: model.signal.key))–\(NoopInstrumentData.chartTickLabel(range.upperBound, key: model.signal.key)) \(model.unit)")
+                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                        Text(assessment.rangeCaption).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                    }
+                }
+            } else if !hasDisplayValue {
+                Text("Nothing recorded").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.faint)
+            }
+        }
+    }
+
+    private var relatedMetricPicker: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    ForEach(relatedSignals) { signal in
+                        Button {
+                            navigation.instrumentMetricKey = signal.key
+                            if let window = navigation.instrumentOverviewWindow {
+                                navigation.instrumentOverviewWindow = .init(start: window.start, end: window.end,
+                                    metricKey: signal.key, weeklySummary: nil, deviceId: window.deviceId)
+                            }
+                        } label: {
+                            Text(signal.name).font(NoopHTMLFont.sans(12.5, weight: .medium))
+                                .foregroundStyle(signal.key == model.signal.key ? NoopHTMLColor.ink : NoopHTMLColor.copy)
+                                .padding(.horizontal, 15).frame(minHeight: 44)
+                                .background(signal.key == model.signal.key ? NoopHTMLColor.night.opacity(0.25) : Color.white.opacity(0.04), in: Capsule())
+                        }
+                        .id(signal.key)
+                        .buttonStyle(NoopPlainHitStyle())
+                        .accessibilityAddTraits(signal.key == model.signal.key ? .isSelected : [])
+                    }
+                }
+            }
+            .onAppear { proxy.scrollTo(model.signal.key, anchor: .center) }
         }
     }
 
@@ -1195,26 +1329,24 @@ private struct NoopInstrumentMetricScreen: View {
                 Text(model.span.uppercased())
                     .font(NoopHTMLFont.sans(10, weight: .semibold))
                     .tracking(1.2)
-                    .foregroundStyle(NoopHTMLColor.muted)
+                    .foregroundStyle(NoopHTMLColor.faint)
                 Spacer()
-                NoopInstrumentDeltaChip(text: model.assessment?.label ?? model.delta, style: model.assessment?.outside == true ? .bad : model.style, fontSize: 11, radius: 8, horizontalPadding: 9)
+                // Only a trusted assessment earns a chip here; a bare first-to-last "+5" read as unexplained.
+                if let assessment = model.assessment, assessment.rangeCaption == "Personal range" {
+                    NoopInstrumentDeltaChip(text: assessment.label, style: assessment.outside ? .bad : model.style, fontSize: 11, radius: 8, horizontalPadding: 9)
+                }
             }
 
             NoopHistoryPlot(presentation: model.plot, tint: model.assessment?.outside == true ? NoopHTMLColor.warm : NoopHTMLColor.night,
                             scoreColors: model.signal.key == "recovery", measurements: model.signal.key == "weight",
                             bridgeMissingMeasurements: model.signal.key == "weight",
+                            selectsMissingDays: model.signal.group != .body && !model.signal.behavior,
+                            averageLabel: "Avg. \(model.average) \(model.unit)",
                             selectedDate: selectedDate,
                             valueLabel: { NoopInstrumentData.axisLabel($0, key: model.signal.key) },
-                            onSelect: { date in if let reading = model.readings.first(where: { $0.date == date }) { select(reading) } })
-                .frame(height: 122)
-
-            HStack {
-                Text("Average · \(model.average) \(model.unit)")
-                Spacer()
-                Text("\(model.readings.count) values")
-            }
-            .font(NoopHTMLFont.sans(11.5))
-            .foregroundStyle(NoopHTMLColor.copy)
+                            axisValueLabel: { NoopInstrumentData.chartTickLabel($0, key: model.signal.key) },
+                            onSelect: selectDate)
+                .frame(height: 260)
 
             HStack {
                 ForEach(Array(model.axis.enumerated()), id: \.offset) { index, label in
@@ -1224,12 +1356,25 @@ private struct NoopInstrumentMetricScreen: View {
             }
             .font(NoopHTMLFont.sans(10.5))
             .foregroundStyle(NoopHTMLColor.faint)
+            .padding(.leading, 16)
+            .padding(.trailing, 44)
 
-            Text(model.chartNote)
-                .font(NoopHTMLFont.sans(11.5))
-                .foregroundStyle(Color(hex: 0x7F8A85))
-                .lineSpacing(3.3)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                if model.plot.bandSegments.contains(where: { $0.count > 1 }) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill((model.assessment?.outside == true ? NoopHTMLColor.warm : NoopHTMLColor.night).opacity(0.24))
+                        .frame(width: 12, height: 8)
+                    Text("30-day variability")
+                } else if model.signal.key == "weight" {
+                    Text("Dotted links join recorded measurements")
+                } else {
+                    Text(model.signal.behavior ? "Seven-day rates" : "Recorded daily values")
+                }
+                Spacer(minLength: 4)
+                Text("\(model.readings.count) values").monospacedDigit()
+            }
+            .font(NoopHTMLFont.sans(11))
+            .foregroundStyle(NoopHTMLColor.faint)
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
@@ -1241,13 +1386,22 @@ private struct NoopInstrumentMetricScreen: View {
     private var metricDataContext: some View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 9) {
+                if let window = navigation.instrumentOverviewWindow, window.metricKey == model.signal.key,
+                   let summary = window.weeklySummary { Text(summary) }
+                Text(model.read)
+                Text(model.chartNote)
+                if model.trendAnalysis != nil {
+                    Text("Trends analysis compares seven-day means from your recorded history up to the window's last day. Each mean requires at least four recorded days. A direction is not a health assessment.")
+                }
                 Text("\(model.readings.count) recorded values across \(model.plot.series.samples.count) calendar days shown. Missing values are not zero.")
                 if let assessment = model.assessment {
                     Text("Latest assessment · \(assessment.label) · \(assessment.day)")
                         .foregroundStyle(assessment.outside ? NoopHTMLColor.warm : NoopHTMLColor.inkSoft)
                     if let range = assessment.personalRange {
-                        Text("Personal range · \(NoopInstrumentData.axisLabel(range.lowerBound, key: model.signal.key))–\(NoopInstrumentData.axisLabel(range.upperBound, key: model.signal.key)) \(model.unit)")
-                        Text("From the same trusted baseline used by Aura’s vital assessment. The shaded variability band is separate.")
+                        Text("\(assessment.rangeCaption) · \(NoopInstrumentData.axisLabel(range.lowerBound, key: model.signal.key))–\(NoopInstrumentData.axisLabel(range.upperBound, key: model.signal.key)) \(model.unit)")
+                        Text(assessment.rangeCaption == "Personal range"
+                             ? "From the same trusted baseline used by Aura’s vital assessment. The shaded variability band is separate."
+                             : "No trusted baseline yet, so this is your own last 30 days: mean ± one standard deviation of at least fourteen recorded days, the same band the chart shades. It describes where the latest value sits, not whether it is healthy.")
                     }
                     if assessment.outside {
                         Text("Amber line tint reflects the latest off-range assessment, not a classification of every historical point.")
@@ -1268,7 +1422,79 @@ private struct NoopInstrumentMetricScreen: View {
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
     }
 
+    private var trendAnalysis: AuraHistoryTrendAnalysis? {
+        guard let analysis = model.trendAnalysis,
+              analysis.rows.contains(where: { $0.change != nil }) else { return nil }
+        return analysis
+    }
+
+    private func trendChangeLabel(_ change: Double) -> String {
+        let magnitude = NoopInstrumentData.chartTickLabel(abs(change), key: model.signal.key)
+        let zero = NoopInstrumentData.chartTickLabel(0, key: model.signal.key)
+        let sign = magnitude == zero ? "" : change > 0 ? "+" : "−"
+        return "\(sign)\(magnitude) \(model.unit)".trimmingCharacters(in: .whitespaces)
+    }
+
+    private func metricTrendAnalysisCard(_ analysis: AuraHistoryTrendAnalysis) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Trends analysis").font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+            if let asOf = analysis.asOf {
+                Text("Through \(asOf.formatted(date: .abbreviated, time: .omitted))")
+                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+            }
+            HStack {
+                Text("Period").frame(width: 66, alignment: .leading)
+                Text("Change"); Spacer(); Text("Trend")
+            }
+            .font(NoopHTMLFont.sans(11, weight: .medium)).foregroundStyle(NoopHTMLColor.faint)
+            ForEach(analysis.rows) { row in
+                HStack(spacing: 10) {
+                    Text("\(row.days)-day").frame(width: 66, alignment: .leading)
+                    if let change = row.change {
+                        // Direction only: an arrow in a neutral tint, flat when the change rounds to zero.
+                        // Up is not good and down is not bad for every signal, so neither is coloured as such.
+                        let flat = !trendChangeLabel(change).hasPrefix("+") && !trendChangeLabel(change).hasPrefix("−")
+                        Image(systemName: flat ? "arrow.right" : change > 0 ? "arrow.up" : "arrow.down")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(flat ? NoopHTMLColor.faint : NoopHTMLColor.canvas)
+                            .frame(width: 18, height: 18)
+                            .background(flat ? Color.white.opacity(0.08) : NoopHTMLColor.blueLight, in: Circle())
+                            .accessibilityHidden(true)
+                        Text(trendChangeLabel(change))
+                            .monospacedDigit()
+                        Spacer(minLength: 4)
+                        NoopHistoryPlot(presentation: .init(series: row.trend, showVariability: false),
+                                        tint: NoopHTMLColor.night, compact: true)
+                            .frame(width: 70, height: 26)
+                    } else {
+                        Text("Not enough data").font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+                        Spacer(minLength: 0)
+                    }
+                }
+                .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                .frame(minHeight: 36)
+                if row.days != analysis.rows.last?.days { Divider().overlay(NoopHTMLColor.border) }
+            }
+            Text("Seven-day averages · recorded days only")
+                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
+            if model.comparison != nil {
+                DisclosureGroup {
+                    metricComparisonContent.padding(.top, 10)
+                } label: {
+                    Text("Compare whole periods").font(NoopHTMLFont.sans(12.5, weight: .medium))
+                        .foregroundStyle(NoopHTMLColor.inkSoft).frame(minHeight: 44)
+                }
+                .tint(NoopHTMLColor.inkSoft)
+            }
+        }
+        .padding(16).background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+    }
+
     private var metricComparisonCard: some View {
+        metricComparisonContent.padding(16).background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+    }
+
+    private var metricComparisonContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("PERIOD COMPARISON").font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.2).foregroundStyle(NoopHTMLColor.muted)
             if let comparison = model.comparison {
@@ -1287,7 +1513,6 @@ private struct NoopInstrumentMetricScreen: View {
             }
         }
         .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.ink)
-        .padding(16).background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
     }
 
     private var metricReadingsCard: some View {
@@ -2331,6 +2556,7 @@ private struct NoopInstrumentAssessment: Equatable {
     let label: String
     let outside: Bool
     let personalRange: ClosedRange<Double>?
+    var rangeCaption = "Personal range"
 }
 
 private struct NoopInstrumentReading: Identifiable, Equatable {
@@ -2369,6 +2595,7 @@ private struct NoopInstrumentMetricModel {
     let average: String
     let plot: AuraHistoryPresentation
     let comparison: AuraHistoryComparison?
+    let trendAnalysis: AuraHistoryTrendAnalysis?
     let assessment: NoopInstrumentAssessment?
 }
 
@@ -2845,6 +3072,13 @@ struct NoopInstrumentData {
     static func axisLabel(_ value: Double, key: String) -> String {
         guard let signal = prototype.signal(key: key) else { return value.formatted() }
         return format(value, signal: signal)
+    }
+    // Axis positions can fall between whole-unit readings. Keep that precision on the grid,
+    // while selected readings and records retain the metric's established display precision.
+    static func chartTickLabel(_ value: Double, key: String) -> String {
+        guard let signal = prototype.signal(key: key) else { return value.formatted() }
+        if signal.big || signal.hours || key == "weight" { return format(value, signal: signal) }
+        return value.formatted(.number.precision(.fractionLength(0...max(1, signal.decimals))))
     }
     private static func format(_ value: Double?, signal: NoopInstrumentSignal) -> String {
         guard let value, value.isFinite else { return "—" }
@@ -3336,7 +3570,13 @@ private extension NoopInstrumentData {
                                              source: isPrototype ? "Demo fixture" : sourceNames[metricSignal.key]?[dayKeys.suffix(raw.count).dropFirst(index).first ?? ""])
             },
             average: Self.format(clean.isEmpty ? nil : clean.reduce(0) { $0 + $1 / Double(clean.count) }, signal: metricSignal),
-            plot: plot, comparison: comparison, assessment: assessment
+            plot: plot, comparison: comparison,
+            // Changes are read from the whole recorded history up to the window's last day, so a 30-day
+            // window can still answer "30-day" and "90-day" (it could not when confined to the window).
+            trendAnalysis: !metricSignal.behavior && metricSignal.group != .body
+                ? AuraHistoryTrendAnalysis(series: .init(samples: full.samples.filter { sample in
+                    dated.points.last.map { sample.date <= $0.date } ?? false })) : nil,
+            assessment: assessment ?? Self.observedRange(full, through: dated.points.last?.date, decimals: metricSignal.decimals)
         )
     }
 
@@ -3893,6 +4133,28 @@ private extension NoopInstrumentData {
             withDeviation: deviation(withValues, mean: withMean),
             withoutDeviation: deviation(withoutValues, mean: withoutMean)
         )
+    }
+
+    /// Where the latest value sits against the wearer's own last 30 days, for metrics with no trusted
+    /// vital assessment: mean ± 1 SD of at least fourteen recorded days, the band the chart already
+    /// shades. Worded as position, never as healthy or poor, and never tints the line amber.
+    static func observedRange(_ series: DatedChartSeries, through end: Date?, decimals: Int) -> NoopInstrumentAssessment? {
+        let calendar = Calendar.current
+        guard let end,
+              let latest = series.samples.last(where: { $0.date <= end && $0.value != nil }),
+              let value = latest.value, calendar.isDate(latest.date, inSameDayAs: end),
+              let start = calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: end)) else { return nil }
+        let values = series.samples.filter { $0.date >= start && $0.date <= end }.compactMap(\.value)
+        guard values.count >= 14 else { return nil }
+        let mean = values.reduce(0, +) / Double(values.count)
+        let sd = (values.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(values.count - 1)).squareRoot()
+        guard mean.isFinite, sd.isFinite else { return nil }
+        // Rounded to the signal's own precision, so a whole-number pulse reads 54–60, not 54–59.6.
+        let scale = pow(10, Double(decimals))
+        let range = ((mean - sd) * scale).rounded() / scale...((mean + sd) * scale).rounded() / scale
+        let label = value > range.upperBound ? "Above your usual" : value < range.lowerBound ? "Below your usual" : "Within your usual"
+        return .init(day: Repository.localDayKey(latest.date), value: value, label: label, outside: false,
+                     personalRange: range, rangeCaption: "Last 30 days")
     }
 
     static func signed(_ value: Double, amount: String) -> String {

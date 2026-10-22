@@ -59,8 +59,24 @@ struct AuraHistoryPresentation: Equatable, Sendable {
         let all = series.values + spreads.flatMap { [$0.low, $0.high] } + references.filter(\.isFinite)
         let low = all.min() ?? 0, high = all.max() ?? 1
         let pad = high > low ? (high - low) * 0.08 : max(abs(low) * 0.05, 1)
-        lower = (low - pad).isFinite ? low - pad : low
-        upper = (high + pad).isFinite ? high + pad : high
+        let padded = ((low - pad).isFinite ? low - pad : low, (high + pad).isFinite ? high + pad : high)
+        (lower, upper) = Self.roundDomain(padded.0, padded.1)
+    }
+
+    /// Widens a domain to three equal steps of 1, 2, 2.5 or 5 × 10ⁿ, so the four axis labels are round
+    /// numbers (55, 60, 65, 70) rather than thirds of the data's span (49.9, 55.3, 60.7, 66.1).
+    static func roundDomain(_ low: Double, _ high: Double) -> (Double, Double) {
+        guard low.isFinite, high.isFinite, high > low else { return (low, high) }
+        var exponent = floor(log10((high - low) / 3))
+        for _ in 0..<8 {
+            for m in [1.0, 2, 2.5, 5] {
+                let step = m * pow(10, exponent)
+                let start = floor(low / step) * step
+                if start + 3 * step >= high { return (start, start + 3 * step) }
+            }
+            exponent += 1
+        }
+        return (low, high)
     }
 
     func fraction(_ value: Double) -> Double {
@@ -108,5 +124,51 @@ struct AuraHistoryComparison: Equatable {
             return .init(start: first, end: last, count: chart.values.count, average: chart.average)
         }
         current = period(start, end); previous = period(previousStart, previousEnd)
+    }
+}
+
+/// Changes in recorded seven-day means, confined to the visible calendar window.
+/// No forecasting or health classification; irregular measurements do not opt in.
+struct AuraHistoryTrendAnalysis: Equatable {
+    struct Row: Equatable, Identifiable {
+        let days: Int
+        let change: Double?
+        let currentCount: Int
+        let previousCount: Int
+        let trend: DatedChartSeries
+        var id: Int { days }
+    }
+    let asOf: Date?
+    let rows: [Row]
+
+    init(series: DatedChartSeries, calendar: Calendar = .current) {
+        let asOf = series.points.last?.date
+        self.asOf = asOf
+        let firstDay = series.samples.first.map { calendar.startOfDay(for: $0.date) }
+        var byDay: [Date: Double] = [:]
+        for sample in series.samples {
+            if let value = sample.value { byDay[calendar.startOfDay(for: sample.date)] = value }
+        }
+        func mean(ending date: Date) -> (value: Double?, count: Int) {
+            let end = calendar.startOfDay(for: date)
+            guard let start = calendar.date(byAdding: .day, value: -6, to: end),
+                  let firstDay, start >= firstDay else { return (nil, 0) }
+            let values = byDay.filter { $0.key >= start && $0.key <= end }.map(\.value)
+            guard values.count >= 4 else { return (nil, values.count) }
+            let value = values.reduce(0) { $0 + $1 / Double(values.count) }
+            return (value.isFinite ? value : nil, values.count)
+        }
+        let current = asOf.map(mean) ?? (nil, 0)
+        rows = [3, 7, 14, 30, 90].map { days in
+            let previousEnd = asOf.flatMap { calendar.date(byAdding: .day, value: -days, to: $0) }
+            let previous = previousEnd.map(mean) ?? (nil, 0)
+            let change = current.0.flatMap { a in previous.0.flatMap { b in (a - b).isFinite ? a - b : nil } }
+            let samples = series.samples.compactMap { sample -> DatedChartSeries.Sample? in
+                guard let asOf, let previousEnd, sample.date >= previousEnd, sample.date <= asOf else { return nil }
+                return .init(date: sample.date, value: sample.value == nil ? nil : mean(ending: sample.date).value)
+            }
+            return Row(days: days, change: change, currentCount: current.1, previousCount: previous.1,
+                       trend: .init(samples: samples))
+        }
     }
 }
