@@ -2765,9 +2765,9 @@ struct NoopFlowLayout: Layout {
 }
 
 
-/// The tab bar's surface: our own liquid glass, never the system's, so Aura's colours survive. A real
-/// blur of what scrolls underneath, a translucent dark wash in the canvas colour, a light catching the
-/// top edge, and a hairline rim. Opaque when the wearer has asked for reduced transparency.
+/// Native Liquid Glass is confined to the bar's background: Aura's selection tint and centre
+/// button remain separate foreground layers. Older iOS retains the existing blur; Reduce
+/// Transparency always uses the opaque surface.
 private struct NoopGlassBar: ViewModifier {
     let reduceTransparency: Bool
 
@@ -2776,6 +2776,10 @@ private struct NoopGlassBar: ViewModifier {
         if reduceTransparency {
             content.background(Color(hex: 0x171C1A), in: shape)
                 .overlay(shape.stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+        } else if #available(iOS 26.0, *) {
+            content.background {
+                Color.clear.glassEffect(.regular, in: shape)
+            }
         } else {
             content
                 .background {

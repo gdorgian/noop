@@ -29,6 +29,8 @@ NOOP is built on community interoperability and protocol-documentation work, wit
 
 ## At a glance
 
+Aura’s bottom navigation uses native Liquid Glass on iOS 26 and later. The material is limited to the outer background, preserving the existing coloured selection pill, blue centre action, dimensions and navigation behaviour. Older iOS keeps the previous blur treatment; Reduce Transparency uses an opaque surface.
+
 Aura’s dated history charts share one native plot inside the existing Aura cards. Daily gaps break lines and shading; selection updates the value and date together. Period means, recorded-day counts and equal-length previous-period means use the same dated series. The source and coverage remain available under **About this data**. Read failures are distinguished from an empty history, with available data retained on a failed refresh. Full-history queries keep daily-column measurements: both store reads use the same inclusive date bounds, avoiding the year-10000 overflow that previously made daily-only history disappear.
 
 Chart colours carry distinct meanings: Charge uses Aura’s existing per-score ramp; an existing off-range vital assessment can tint a line amber, without assigning that assessment to historical points. Other metrics keep their own colour. Where at least fourteen recorded days support it, **30-day variability** means the trailing thirty calendar days’ mean ± one sample standard deviation; it is not a normal range or forecast. Body-age shading instead uses the estimate engine’s uncertainty, with a separate label. Weekly aggregates and irregular weight/lab readings do not acquire a daily variability band.
