@@ -25,13 +25,15 @@ struct NoopTrendsRecord: Equatable {
     /// Minutes asleep per recorded night, oldest → newest, for "nights over your need".
     var nights: [Night] = []
     struct Night: Equatable { let day: Date; let minutes: Double }
+    var throughDay: Date?
     var loaded = false
 
     static let weeks = 52
 
     static func build(days: [DailyMetric], capacityDays: [(day: String, value: Double)],
                       sessions: [CachedSleepSession] = [],
-                      now: Date = Date(), calendar: Calendar = .current) -> NoopTrendsRecord {
+                      now: Date = Date(), calendar: Calendar = .current,
+                      resolvedDaily: [String: [String: Double]]? = nil) -> NoopTrendsRecord {
         var cal = calendar
         cal.firstWeekday = 2
         let thisWeek = cal.dateInterval(of: .weekOfYear, for: now)?.start ?? cal.startOfDay(for: now)
@@ -44,22 +46,21 @@ struct NoopTrendsRecord: Equatable {
         parser.dateFormat = "yyyy-MM-dd"
 
         func weekly(_ rows: [(String, Double)]) -> [Double?] {
-            var sums = Array(repeating: 0.0, count: weeks), counts = Array(repeating: 0, count: weeks)
-            for (key, value) in rows where value.isFinite && value > 0 {
-                guard let date = parser.date(from: key), let first = starts.first,
-                      date >= first else { continue }
-                let index = cal.dateComponents([.weekOfYear], from: first, to: date).weekOfYear ?? -1
-                guard (0..<weeks).contains(index) else { continue }
-                sums[index] += value; counts[index] += 1
+            let samples = rows.compactMap { key, value -> DatedChartSeries.Sample? in
+                guard value.isFinite, value > 0, let date = HistoryDateWindow.date(dayKey: key, timeZone: cal.timeZone) else { return nil }
+                return .init(date: date, value: value)
             }
-            return (0..<weeks).map { counts[$0] > 0 ? sums[$0] / Double(counts[$0]) : nil }
+            return DatedChartSeries(samples: samples).weeklyAverages(startingOn: starts, through: now, calendar: cal)
         }
 
         var record = NoopTrendsRecord()
         record.weekStarts = starts
-        record.restingPulse = weekly(days.compactMap { d in d.restingHr.map { (d.day, Double($0)) } })
-        record.variability = weekly(days.compactMap { d in d.avgHrv.map { (d.day, $0) } })
-        record.sleep = weekly(days.compactMap { d in d.totalSleepMin.map { (d.day, $0 / 60) } })
+        record.restingPulse = weekly(resolvedDaily?["rhr"].map { $0.map { ($0.key, $0.value) } }
+            ?? days.compactMap { d in d.restingHr.map { (d.day, Double($0)) } })
+        record.variability = weekly(resolvedDaily?["hrv"].map { $0.map { ($0.key, $0.value) } }
+            ?? days.compactMap { d in d.avgHrv.map { (d.day, $0) } })
+        record.sleep = weekly(resolvedDaily?["sleep_total_min"].map { $0.map { ($0.key, $0.value / 60) } }
+            ?? days.compactMap { d in d.totalSleepMin.map { (d.day, $0 / 60) } })
         record.capacity = weekly(capacityDays.map { ($0.day, $0.value) })
 
         let byDay = Dictionary(days.map { ($0.day, $0) }, uniquingKeysWith: { _, last in last })
@@ -99,6 +100,7 @@ struct NoopTrendsRecord: Equatable {
         } else {
             record.drift = Array(repeating: nil, count: weeks)
         }
+        record.throughDay = today
         record.loaded = true
         return record
     }
@@ -107,13 +109,41 @@ struct NoopTrendsRecord: Equatable {
 @MainActor
 final class NoopTrendsStore: ObservableObject {
     @Published private(set) var record = NoopTrendsRecord()
+    private var loadingDeviceId: String?
+    private var requestId = UUID()
 
     func load(from repo: Repository) async {
         guard repo.loaded else { return }
-        let capacity = await repo.exploreSeries(key: "vo2max_est", source: "my-whoop", days: 400)
+        let device = repo.deviceId
+        if loadingDeviceId != device { record = NoopTrendsRecord() }
+        loadingDeviceId = device
+        let request = UUID()
+        requestId = request
+        let sequence = repo.refreshSeq
+        let resolvedDaily = await NoopTrendDailyHistory.load(from: repo)
+        let capacity = (resolvedDaily["cap"] ?? [:]).map { (day: $0.key, value: $0.value) }
         let sessions = await repo.allSleepSessions()
+        guard !Task.isCancelled, requestId == request, repo.deviceId == device, repo.refreshSeq == sequence else { return }
         record = NoopTrendsRecord.build(days: repo.days, capacityDays: capacity,
-                                        sessions: sessions.isEmpty ? repo.sleeps : sessions)
+                                        sessions: sessions.isEmpty ? repo.sleeps : sessions,
+                                        resolvedDaily: resolvedDaily)
+    }
+}
+/// One source policy for the four metrics shared by Trends and the daily explorer.
+@MainActor
+enum NoopTrendDailyHistory {
+    static func load(from repo: Repository) async -> [String: [String: Double]] {
+        func series(_ key: String, source: String = Repository.whoopSource) async -> [String: Double] {
+            let result = await repo.resolvedSeries(key: key, source: source, fullHistory: true)
+            return Dictionary(result.values.map { ($0.day, $0.value) }, uniquingKeysWith: { _, last in last })
+        }
+        var result: [String: [String: Double]] = [:]
+        for key in ["rhr", "hrv", "sleep_total_min"] { result[key] = await series(key) }
+        result["cap"] = await series("vo2max_est")
+        if result["cap"]?.isEmpty != false {
+            result["cap"] = await series("vo2max", source: Repository.appleHealthSource)
+        }
+        return result
     }
 }
 #endif

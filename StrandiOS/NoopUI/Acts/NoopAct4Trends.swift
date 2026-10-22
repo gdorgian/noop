@@ -150,14 +150,11 @@ private struct NoopTrendsScreen: View {
 
                     sectionLabel("What changed")
                     ForEach(trendRows) { row in
-                        if row.name == "Capacity" {
-                            Button { navigation.push(.capacity) } label: {
-                                NoopTrendSignalCard(row: row, showsDetail: true)
-                            }
-                            .buttonStyle(NoopHTMLPressStyle())
-                        } else {
-                            NoopTrendSignalCard(row: row)
+                        Button { openMetric(row) } label: {
+                            NoopTrendSignalCard(row: row, showsDetail: true)
                         }
+                        .buttonStyle(NoopHTMLPressStyle())
+                        .accessibilityHint("Open interactive history for \(row.name)")
                     }
 
                     sectionLabel("Bloodwork", color: NoopHTMLColor.warm)
@@ -169,11 +166,7 @@ private struct NoopTrendsScreen: View {
                     sectionLabel("Explore")
                     NoopHTMLCard(radius: 22, padding: 0) {
                         VStack(spacing: 0) {
-                            trendLink("Capacity", detail: "the estimate, and the recorded changes", symbol: "lungs", route: .capacity)
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            trendLink("Rhythm", detail: "sleep, and how regular it has been", symbol: "moon", route: .rhythm)
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            trendLink("Ask it something", detail: "explore the signals you keep", symbol: "ask", route: .instrumentIndex)
+                            trendLink("All signals", detail: "browse every metric and open its history", symbol: "ask", route: .instrumentIndex)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
@@ -279,29 +272,7 @@ private struct NoopTrendsScreen: View {
 
     private var trendRows: [NoopTrendSignal] {
         if let live { return liveRows(live) }
-        return [
-            signal(name: "Resting pulse", values: NoopA4.resting, unit: "bpm", digits: 0),
-            signal(name: "Variability", values: NoopA4.variability, unit: "ms", digits: 0),
-            signal(name: "Sleep", values: NoopA4.sleep, unit: "h", digits: 1),
-            signal(name: "Capacity", values: NoopA4.capacity, unit: "ml/kg", digits: 1)
-        ]
-    }
-
-    private func signal(name: String, values: [Double], unit: String, digits: Int) -> NoopTrendSignal {
-        let shown = NoopA4.tail(values, for: window)
-        let first = shown.first ?? 0
-        let current = shown.last ?? 0
-        let scale = pow(10.0, Double(digits))
-        let change = (current * scale).rounded() / scale - (first * scale).rounded() / scale
-        let value = current.formatted(.number.precision(.fractionLength(digits)))
-        let amount = abs(change).formatted(.number.precision(.fractionLength(digits))) + " " + unit
-        let firstText = first.formatted(.number.precision(.fractionLength(digits)))
-        return NoopTrendSignal(
-            name: name, value: value, unit: unit,
-            delta: change == 0 ? "unchanged" : (change > 0 ? "+" : "−") + amount,
-            read: "Recorded weekly average: \(firstText) to \(value) \(unit) across \(shown.count) weeks with data.",
-            values: shown, color: NoopA4.greenLight, flat: true, improved: false
-        )
+        return liveRows(NoopInstrumentData.prototypeOverview)
     }
 
     // MARK: Measured rows
@@ -311,13 +282,14 @@ private struct NoopTrendsScreen: View {
     /// is inferred from the first and last recorded values.
     private func liveRows(_ live: NoopTrendsRecord) -> [NoopTrendSignal] {
         let n = window.count
-        func row(_ name: String, _ series: [Double?], unit: String, digits: Int) -> NoopTrendSignal {
-            let shown = Array(series.suffix(n)).compactMap { $0 }
+        func row(_ key: String, _ name: String, _ series: [Double?], unit: String, digits: Int) -> NoopTrendSignal {
+            let chart = DatedChartSeries(dates: Array(live.weekStarts.suffix(n)), values: Array(series.suffix(n)))
+            let shown = chart.values
             let current = shown.last
             let value = current.map { $0.formatted(.number.precision(.fractionLength(digits))) } ?? "\u{2014}"
             guard let first = shown.first, let last = current, shown.count >= 2 else {
                 let read = shown.isEmpty ? "No recorded weeks in this window." : "One recorded week in this window."
-                return NoopTrendSignal(name: name, value: value, unit: unit, delta: "", read: read, values: shown,
+                return NoopTrendSignal(key: key, name: name, value: value, unit: unit, delta: "", read: read, chart: chart,
                                        color: Color(hex: 0x7F8A85), flat: true, improved: false)
             }
             let scale = pow(10.0, Double(digits))
@@ -327,18 +299,35 @@ private struct NoopTrendsScreen: View {
             let lastText = last.formatted(.number.precision(.fractionLength(digits)))
             let read = "Recorded weekly average: \(firstText) to \(lastText) \(unit) across \(shown.count) weeks with data."
             return NoopTrendSignal(
-                name: name, value: value, unit: unit,
+                key: key, name: name, value: value, unit: unit,
                 delta: displayedChange == 0 ? "unchanged" : (displayedChange > 0 ? "+" : "\u{2212}") + amount,
-                read: read, values: shown,
+                read: read, chart: chart,
                 color: Color(hex: 0x7F8A85),
                 flat: true, improved: false)
         }
         return [
-            row("Resting pulse", live.restingPulse, unit: "bpm", digits: 0),
-            row("Variability", live.variability, unit: "ms", digits: 0),
-            row("Sleep", live.sleep, unit: "h", digits: 1),
-            row("Capacity", live.capacity, unit: "ml/kg", digits: 1)
+            row("rhr", "Resting pulse", live.restingPulse, unit: "bpm", digits: 0),
+            row("hrv", "Variability", live.variability, unit: "ms", digits: 0),
+            row("sleep", "Sleep", live.sleep, unit: "h", digits: 1),
+            row("cap", "Capacity", live.capacity, unit: "ml/kg/min", digits: 1)
         ]
+    }
+
+    private func openMetric(_ row: NoopTrendSignal) {
+        let calendar = Calendar.current
+        let end = live?.throughDay ?? calendar.startOfDay(for: Date())
+        var mondayCalendar = calendar
+        mondayCalendar.firstWeekday = 2
+        let thisWeek = mondayCalendar.dateInterval(of: .weekOfYear, for: end)?.start ?? end
+        let start = live?.weekStarts.suffix(window.count).first
+            ?? calendar.date(byAdding: .day, value: -(window.count - 1) * 7, to: thisWeek)
+            ?? end
+        navigation.instrumentMetricKey = row.key
+        navigation.instrumentOverviewWindow = .init(
+            start: start, end: end, metricKey: row.key,
+            weeklySummary: "Weekly overview · \(row.value) \(row.unit). The chart below shows individual daily values within the same dates.",
+            deviceId: repo.deviceId)
+        navigation.push(.instrumentMetric)
     }
 
     private func trendLink(_ title: String, detail: String?, symbol: String, route: NoopRoute) -> some View {
@@ -794,13 +783,14 @@ private struct NoopPaceScale: View {
 }
 
 private struct NoopTrendSignal: Identifiable {
-    let id = UUID()
+    var id: String { key }
+    let key: String
     let name: String
     let value: String
     let unit: String
     let delta: String
     let read: String
-    let values: [Double]
+    let chart: DatedChartSeries
     let color: Color
     let flat: Bool
     let improved: Bool
@@ -830,7 +820,7 @@ private struct NoopTrendSignalCard: View {
                         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
                 }
             }
-            NoopA4Sparkline(values: row.values, color: NoopA4.greenLight)
+            NoopA4Sparkline(chart: row.chart, color: NoopA4.greenLight)
                 .frame(height: 34)
                 .accessibilityHidden(true)
             if !row.read.isEmpty {
@@ -850,24 +840,29 @@ private struct NoopTrendSignalCard: View {
 }
 
 private struct NoopA4Sparkline: View {
-    let values: [Double]
+    let chart: DatedChartSeries
     let color: Color
 
     var body: some View {
         Canvas { context, size in
-            guard values.count > 1, let low = values.min(), let high = values.max() else { return }
+            guard let low = chart.values.min(), let high = chart.values.max() else { return }
             let span = max(0.001, high - low)
-            let points = values.enumerated().map { index, value in
-                CGPoint(
-                    x: CGFloat(index) / CGFloat(values.count - 1) * max(1, size.width - 6) + 3,
-                    y: size.height - 3 - CGFloat((value - low) / span) * max(1, size.height - 6)
-                )
+            func point(_ value: DatedChartSeries.Point) -> CGPoint {
+                CGPoint(x: CGFloat(value.x) * max(1, size.width - 6) + 3,
+                        y: size.height - 3 - CGFloat((value.value - low) / span) * max(1, size.height - 6))
             }
-            var line = Path()
-            line.move(to: points[0])
-            for point in points.dropFirst() { line.addLine(to: point) }
-            context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: 1.9, lineCap: .round, lineJoin: .round))
-            if let last = points.last {
+            for segment in chart.segments {
+                var line = Path()
+                for (index, item) in segment.enumerated() {
+                    index == 0 ? line.move(to: point(item)) : line.addLine(to: point(item))
+                }
+                context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: 1.9, lineCap: .round, lineJoin: .round))
+                if segment.count == 1, let item = segment.first {
+                    let p = point(item)
+                    context.fill(Path(ellipseIn: CGRect(x: p.x - 2.8, y: p.y - 2.8, width: 5.6, height: 5.6)), with: .color(color))
+                }
+            }
+            if let last = chart.points.last.map(point) {
                 context.fill(Path(ellipseIn: CGRect(x: last.x - 2.8, y: last.y - 2.8, width: 5.6, height: 5.6)), with: .color(color))
             }
         }
@@ -933,22 +928,22 @@ private struct NoopCapacityScreen: View {
     let window: NoopTrendWindow
     var live: NoopTrendsRecord? = nil
 
-    private var values: [Double] {
-        guard let live else { return NoopA4.tail(NoopA4.capacity, for: window) }
-        return Array(live.capacity.suffix(window.count)).compactMap { $0 }
+    private var chart: DatedChartSeries {
+        guard let live else { return .fixture(NoopA4.tail(NoopA4.capacity, for: window)) }
+        return DatedChartSeries(dates: Array(live.weekStarts.suffix(window.count)),
+                                values: Array(live.capacity.suffix(window.count)))
     }
+    private var values: [Double] { chart.values }
 
-    /// "six weeks ago" / "in March" / "last September", from the window's own first week.
+    /// The comparison starts at the first recorded week, not an earlier empty window slot.
     private var inFrom: String {
-        guard let live, let first = live.weekStarts.suffix(window.count).first else {
+        guard live != nil else {
             return window == .year ? "last September" : window == .sixMonths ? "in March" : "six weeks ago"
         }
-        let month = DateFormatter(); month.setLocalizedDateFormatFromTemplate("MMMM")
-        switch window {
-        case .sixWeeks: return "six weeks ago"
-        case .sixMonths: return "in \(month.string(from: first))"
-        case .year: return "last \(month.string(from: first))"
-        }
+        guard let first = chart.points.first?.date else { return "in this window" }
+        let date = DateFormatter()
+        date.setLocalizedDateFormatFromTemplate("d MMM y")
+        return "on \(date.string(from: first))"
     }
 
     /// The HTML's read up to its first full stop; the age clause needs the unresolved age engine.
@@ -993,7 +988,7 @@ private struct NoopCapacityScreen: View {
                         )
                         }
                     }
-                    NoopA4CapacityChart(values: values)
+                    NoopA4CapacityChart(chart: chart)
                         .frame(height: 118)
                     NoopA4Axis(labels: live.map { window.axis(weekStarts: $0.weekStarts) } ?? window.axis)
                 }
@@ -1065,10 +1060,12 @@ private struct NoopRhythmScreen: View {
     var live: NoopTrendsRecord? = nil
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
 
-    private var sleep: [Double] {
-        guard let live else { return NoopA4.tail(NoopA4.sleep, for: window) }
-        return Array(live.sleep.suffix(window.count)).compactMap { $0 }
+    private var sleepChart: DatedChartSeries {
+        guard let live else { return .fixture(NoopA4.tail(NoopA4.sleep, for: window)) }
+        return DatedChartSeries(dates: Array(live.weekStarts.suffix(window.count)),
+                                values: Array(live.sleep.suffix(window.count)))
     }
+    private var sleep: [Double] { sleepChart.values }
     /// Weekly drift; a week with no night stays an empty slot on the bars.
     private var driftSlots: [Double?] {
         guard let live else { return NoopA4.tail(NoopA4.drift, for: window).map { Optional($0) } }
@@ -1104,7 +1101,7 @@ private struct NoopRhythmScreen: View {
                         Text("\(live == nil ? "need" : "target") \(needText)")
                             .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
                     }
-                    NoopA4SleepChart(values: sleep, need: needHours)
+                    NoopA4SleepChart(chart: sleepChart, need: needHours)
                         .frame(height: 112)
                     axis
                     Text(live == nil ? "Dashes are your need. You have been over it more weeks than under it since April, which is the whole reason the other three lines moved." : "Dashes mark the app's sleep planning target.")
@@ -1396,35 +1393,42 @@ private struct NoopA4Axis: View {
 }
 
 private struct NoopA4CapacityChart: View {
-    let values: [Double]
+    let chart: DatedChartSeries
+    private var values: [Double] { chart.values }
 
     var body: some View {
         Canvas { context, size in
-            guard values.count > 1, let minimum = values.min(), let maximum = values.max() else { return }
+            guard let minimum = values.min(), let maximum = values.max() else { return }
             let low = minimum - 0.6
             let high = maximum + 0.6
             let span = max(0.001, high - low)
             let scale = min(size.width / 300, size.height / 118)
             let ox = (size.width - 300 * scale) / 2
             let oy = (size.height - 118 * scale) / 2
-            let points = values.enumerated().map { index, value in
-                CGPoint(
-                    x: ox + CGFloat(index) / CGFloat(values.count - 1) * 300 * scale,
-                    y: oy + (110 - CGFloat((value - low) / span) * 100) * scale
-                )
+            func point(_ item: DatedChartSeries.Point) -> CGPoint {
+                CGPoint(x: ox + CGFloat(item.x) * 300 * scale,
+                        y: oy + (110 - CGFloat((item.value - low) / span) * 100) * scale)
             }
-            var area = Path()
-            area.move(to: CGPoint(x: ox, y: oy + 112 * scale))
-            for point in points { area.addLine(to: point) }
-            area.addLine(to: CGPoint(x: ox + 300 * scale, y: oy + 112 * scale))
-            area.closeSubpath()
-            context.fill(area, with: .color(NoopA4.green.opacity(0.11)))
-
-            var line = Path()
-            line.move(to: points[0])
-            for point in points.dropFirst() { line.addLine(to: point) }
-            context.stroke(line, with: .color(NoopA4.green), style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-            if let last = points.last {
+            for segment in chart.segments {
+                let points = segment.map(point)
+                guard let first = points.first, let last = points.last else { continue }
+                if points.count > 1 {
+                    var area = Path()
+                    area.move(to: CGPoint(x: first.x, y: oy + 112 * scale))
+                    for p in points { area.addLine(to: p) }
+                    area.addLine(to: CGPoint(x: last.x, y: oy + 112 * scale))
+                    area.closeSubpath()
+                    context.fill(area, with: .color(NoopA4.green.opacity(0.11)))
+                }
+                var line = Path()
+                line.move(to: first)
+                for p in points.dropFirst() { line.addLine(to: p) }
+                context.stroke(line, with: .color(NoopA4.green), style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                if points.count == 1 {
+                    context.fill(Path(ellipseIn: CGRect(x: first.x - 4, y: first.y - 4, width: 8, height: 8)), with: .color(NoopA4.green))
+                }
+            }
+            if let last = chart.points.last.map(point) {
                 context.fill(Path(ellipseIn: CGRect(x: last.x - 4, y: last.y - 4, width: 8, height: 8)), with: .color(NoopA4.green))
             }
         }
@@ -1432,12 +1436,13 @@ private struct NoopA4CapacityChart: View {
 }
 
 private struct NoopA4SleepChart: View {
-    let values: [Double]
+    let chart: DatedChartSeries
+    private var values: [Double] { chart.values }
     let need: Double
 
     var body: some View {
         Canvas { context, size in
-            guard values.count > 1, let minimum = values.min(), let maximum = values.max() else { return }
+            guard let minimum = values.min(), let maximum = values.max() else { return }
             let low = minimum - 0.35
             let high = maximum + 0.35
             let span = max(0.001, high - low)
@@ -1453,13 +1458,17 @@ private struct NoopA4SleepChart: View {
             needPath.addLine(to: CGPoint(x: ox + 300 * scale, y: y(need)))
             context.stroke(needPath, with: .color(NoopHTMLColor.ink.opacity(0.3)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
 
-            let points = values.enumerated().map { index, value in
-                CGPoint(x: ox + CGFloat(index) / CGFloat(values.count - 1) * 300 * scale, y: y(value))
+            for segment in chart.segments {
+                let points = segment.map { CGPoint(x: ox + CGFloat($0.x) * 300 * scale, y: y($0.value)) }
+                guard let first = points.first else { continue }
+                var line = Path()
+                line.move(to: first)
+                for p in points.dropFirst() { line.addLine(to: p) }
+                context.stroke(line, with: .color(NoopA4.lavender), style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                if points.count == 1 {
+                    context.fill(Path(ellipseIn: CGRect(x: first.x - 3, y: first.y - 3, width: 6, height: 6)), with: .color(NoopA4.lavender))
+                }
             }
-            var line = Path()
-            line.move(to: points[0])
-            for point in points.dropFirst() { line.addLine(to: point) }
-            context.stroke(line, with: .color(NoopA4.lavender), style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
         }
     }
 }

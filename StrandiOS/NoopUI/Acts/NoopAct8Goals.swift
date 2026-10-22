@@ -2843,7 +2843,7 @@ private struct NoopMarkerDetail: View {
                     Text(marker.name).font(NoopHTMLFont.outfit(25, weight: .regular)).tracking(-0.6)
                     HStack(alignment: .firstTextBaseline, spacing: 9) {
                         Text(marker.valueText).font(NoopHTMLFont.outfit200(54)).tracking(-2.4)
-                        Text(marker.unit).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        Text(marker.shownUnit).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
                         NoopPill(text: marker.detailBandTag, color: marker.color)
                     }
                     Text(marker.readCopy).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
@@ -2944,7 +2944,7 @@ private struct NoopLabMarker: Identifiable {
     /// the source of truth for the value, its date, its unit and whether a range exists at all.
     var live: NoopLabReading? = nil
     /// Every dated reading the Lab Book holds for this marker, ascending. Real points only.
-    var liveSeries: [Double] = []
+    var liveReadings: [NoopLabReading] = []
 
     /// The design's `low`/`high` are demo fixtures. `MarkerDefinition.referenceTextHint` is
     /// documented as "NOT a shipped reference range" and `higherIsBetter` as "ALWAYS nil (NOOP
@@ -3015,16 +3015,21 @@ private struct NoopLabMarker: Identifiable {
     /// The dated series behind the trend chart. Empty when the marker holds nothing — there is no
     /// history to draw for a value that was never recorded, and an invented one is the failure
     /// 00-RULES §0a names.
-    var series: [Double] {
-        // Real dated readings win wherever they exist: the chart draws what was recorded, in the
-        // order it was recorded. The seeded four-point `trend` is a fixture and stays behind the
-        // demo gate; outside it a single reading is a single point, never a manufactured curve.
-        if !liveSeries.isEmpty { return liveSeries }
-        guard let value else { return [] }
-        return NoopContentPolicy.allowsPrototypeContent ? trend : [value]
+    var chart: DatedChartSeries {
+        if !liveReadings.isEmpty {
+            let observations = liveReadings.compactMap { reading -> DatedChartSeries.Observation? in
+                guard let date = reading.chartDate else { return nil }
+                return .init(date: date, value: reading.value, unit: reading.unit)
+            }
+            return DatedChartSeries(observations: observations, unit: shownUnit)
+        }
+        return .fixture(NoopContentPolicy.allowsPrototypeContent ? trend : [])
     }
+    var series: [Double] { chart.values }
     var trendDirection: String {
-        guard series.count > 1 else { return "one recorded result, not yet a trend" }
+        guard series.count > 1 else {
+            return series.isEmpty ? "not enough comparable dated results for a trend" : "one recorded result, not yet a trend"
+        }
         guard let first = series.first, let last = series.last else { return "not yet a trend" }
         let count = series.count
         if last < first { return "the latest is lower than the first of \(count) dated results" }
@@ -3189,7 +3194,7 @@ private struct NoopLabMarker: Identifiable {
             var marker = definition
             let state = book.markers.first { $0.key == definition.storeKey }
             marker.live = state?.latest
-            marker.liveSeries = (state?.history ?? []).map(\.value)
+            marker.liveReadings = state?.history ?? []
             return marker
         }
     }
@@ -3333,28 +3338,23 @@ private struct NoopMarkerTrend: View {
                 context.stroke(boundary, with: .color(NoopHTMLColor.green.opacity(0.32)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
             }
 
-            var line = Path()
-            for (index, value) in marker.series.enumerated() {
-                let denominator = max(1, marker.series.count - 1)
-                let x = marker.series.count == 1
-                    ? size.width
-                    : CGFloat(index) / CGFloat(denominator) * size.width
-                let point = CGPoint(x: x, y: y(value))
-                index == 0 ? line.move(to: point) : line.addLine(to: point)
+            for segment in marker.chart.segments {
+                var line = Path()
+                for (index, item) in segment.enumerated() {
+                    let point = CGPoint(x: CGFloat(item.x) * size.width, y: y(item.value))
+                    index == 0 ? line.move(to: point) : line.addLine(to: point)
+                }
+                context.stroke(line, with: .color(Color(hex: 0xF2B45C)), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             }
-            context.stroke(line, with: .color(Color(hex: 0xF2B45C)), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         }
         // HTML's SVG explicitly uses overflow:visible, so its endpoint circles remain whole even
         // though their centres sit at x=0 and x=300. Canvas clips its own drawing; render the dots
         // as overlay views to preserve that exact behaviour instead of leaving an orange crescent.
         .overlay {
             GeometryReader { proxy in
-                ForEach(Array(marker.series.enumerated()), id: \.offset) { index, value in
-                    let denominator = max(1, marker.series.count - 1)
-                    let x = marker.series.count == 1
-                        ? proxy.size.width
-                        : CGFloat(index) / CGFloat(denominator) * proxy.size.width
-                    let y = CGFloat((maxValue - value) / span) * proxy.size.height
+                ForEach(Array(marker.chart.points.enumerated()), id: \.offset) { _, item in
+                    let x = CGFloat(item.x) * proxy.size.width
+                    let y = CGFloat((maxValue - item.value) / span) * proxy.size.height
                     Circle()
                         .fill(NoopHTMLColor.canvas)
                         .overlay(Circle().stroke(Color(hex: 0xF2B45C), lineWidth: 2))
@@ -3485,6 +3485,9 @@ struct NoopLabReading: Equatable, Identifiable {
             ? row.referenceText
             : nil
     }
+
+    /// Keep collection dates attached to values instead of spacing lab draws by array index.
+    var chartDate: Date? { Self.dayParser.date(from: day) }
 
     /// "14 August" — from the stored day key, never from `Date()`. A reading with an unparseable
     /// day keeps its raw key rather than being given today's date.

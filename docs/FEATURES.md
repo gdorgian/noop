@@ -29,6 +29,8 @@ NOOP is built on community interoperability and protocol-documentation work, wit
 
 ## At a glance
 
+Aura’s Trends, Capacity and Rhythm charts preserve missing weekly slots instead of compressing the line. Bloodwork keeps collection dates and recorded units through plotting; incompatible units are not connected or implicitly converted, and the marker header uses the stored reading’s unit. These are presentation corrections: scoring, raw measurements and the existing page layouts are unchanged.
+
 Widget data sharing resolves the App Group from the installed provisioning profile before consulting AltStore metadata or the build-time setting. This supports SideStore re-signing that rewrites App Groups without adding ALTAppGroups. Both the app and widget extension use the same resolver; existing snapshot data and widget layouts are unchanged.
 
 Today shows an opt-in Possible activity card directly below Today’s session. Review opens the existing workout editor with the detected start/end and an unselected activity type; Cancel does not save or dismiss. Dismiss persists the original span. Confirmed saves validate the edited span, write to the reviewed strap, and retire the offer only after a successful insert. The existing analysis and refresh then enrich the corrected window.
@@ -681,3 +683,7 @@ feed, refresh battery, scan/reconnect, or disconnect.
 - **On-device storage.** All history (imported and live-captured) is stored locally in SQLite
   via GRDB.
 - **Your data is yours.** Imports happen once and stay on this Mac; nothing is uploaded.
+
+Aura metric history supports 30D, 3M, 6M, 1Y and All windows, calendar ending dates and bounded previous/next navigation. Metric charts select actual daily values by tap or horizontal drag, with selection haptics and a VoiceOver adjustment alternative. The selected reading and date share the same formatted value as the daily history list; logged behaviours are explicitly seven-day rates. Window averages count only finite recorded values. Older asynchronous Instrument loads cannot publish after a device or refresh change.
+
+Trends' four metric cards open the existing daily Instrument detail directly. All signals replaces the Ask it something browse label; Capacity and Rhythm explanations remain accessible inside their metric details. Entry carries the exact overview dates, identifies the weekly-to-daily aggregation change and returns to the actual parent. The four shared metrics use NoopTrendDailyHistory's single resolver policy on both paths; empty weeks and the partial current week retain calendar boundaries.

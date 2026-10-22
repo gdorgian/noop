@@ -2,6 +2,15 @@ import Foundation
 import SwiftUI
 import WhoopStore
 
+/// Exact dates carried from a weekly summary into the existing daily metric explorer.
+struct NoopInstrumentOverviewWindow: Equatable {
+    let start: Date
+    let end: Date
+    let metricKey: String
+    let weeklySummary: String?
+    let deviceId: String
+}
+
 enum NoopAct: Int, CaseIterable {
     case night = 1
     case day
@@ -376,7 +385,10 @@ final class NoopNavigation: ObservableObject {
     private var pendingSheetTransition: UUID?
 
     @Published private(set) var path: [NoopRoute] = [.today] {
-        didSet { forgetScroll(from: oldValue) }
+        didSet {
+            forgetScroll(from: oldValue)
+            if !path.contains(where: { $0.act == .instrument }) { instrumentOverviewWindow = nil }
+        }
     }
     let scrollMemory = NoopScrollMemory()
     /// The current screen's slot in `scrollMemory`.
@@ -624,6 +636,7 @@ final class NoopNavigation: ObservableObject {
     /// Act 9 carries the chosen signal above its four routes so a dossier opened from Trends or
     /// Svea survives the shell's deliberate per-route view recreation.
     @Published var instrumentMetricKey = "hrv"
+    @Published var instrumentOverviewWindow: NoopInstrumentOverviewWindow?
     @Published var instrumentRawSessionID: String?
     // Debug-only raw capture fixture state survives the route identity change between the two pages.
     @Published var instrumentDemoRawArmedAt: Date?
@@ -1195,7 +1208,7 @@ extension NoopRoute {
         case .picker: "Photograph the report"
         case .review: "Review lab results"
         case .marker: "Biomarker"
-        case .instrumentIndex: "Ask it something"
+        case .instrumentIndex: "All signals"
         case .instrumentMetric: "One signal"
         case .instrumentCompare: "Two at once"
         case .instrumentEffects: "What moves you"
@@ -1226,7 +1239,9 @@ extension NoopNavigation {
     /// (then a header keeps its designed label, which names the canonical parent back(or:) falls to).
     var previousScreenTitle: String? {
         guard path.count > 1 else { return nil }
-        return path[path.count - 2].screenTitle
+        let parent = path[path.count - 2]
+        if parent == .instrumentMetric { return NoopInstrumentData.title(for: instrumentMetricKey) ?? parent.screenTitle }
+        return parent.screenTitle
     }
 }
 
