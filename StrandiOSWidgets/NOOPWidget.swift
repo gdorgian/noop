@@ -255,10 +255,8 @@ struct NOOPWidgetView: View {
     // MARK: - Shared pieces
 
     private var headerRow: some View {
+        // No wordmark: the rings say whose widget this is, and the owner wants the header clean (23 Oct).
         HStack {
-            Text("Noop Aura")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(StrandPalette.textSecondary)
             Spacer()
             Circle()
                 .fill(snap.bonded ? StrandPalette.statusPositive : StrandPalette.statusCritical)

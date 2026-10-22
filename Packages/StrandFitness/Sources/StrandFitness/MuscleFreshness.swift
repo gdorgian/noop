@@ -87,8 +87,10 @@ public enum FitnessMuscleGroup: String, CaseIterable, Sendable, Codable {
 /// Capacity is personal: 1.5 × the group's mean load per training day over the last 42 days, so a
 /// typical session leaves a muscle tired but not empty, and someone who trains a muscle hard every
 /// week is not shown as wrecked by their normal day. Until a group has been trained on at least
-/// `minimumTrainingDays` days in that window its capacity falls back to `defaultCapacity`
-/// (six hard sets) and the reading is marked calibrating.
+/// `minimumTrainingDays` days in that window its capacity is `defaultCapacity` (ten hard sets) and the
+/// reading is marked calibrating. Capacity never drops below `defaultCapacity`: a muscle whose history is
+/// a few light cardio days would otherwise get a capacity of three sets, and one real session showed it
+/// at 1 % (tester, 23 Oct). Six hard sets on a fresh muscle now read about 40 %.
 ///
 /// Status: recovered at 75 % and above, fatigued from 40 %, depleted below.
 public enum MuscleFreshness {
@@ -108,7 +110,7 @@ public enum MuscleFreshness {
 
     public static let windowDays = 42
     public static let minimumTrainingDays = 3
-    public static let defaultCapacity = 6 * MuscularLoad.pointsPerSet
+    public static let defaultCapacity = 10 * MuscularLoad.pointsPerSet
     public static let capacityMultiple = 1.5
 
     public static func status(percent: Double) -> Status {
@@ -133,7 +135,7 @@ public enum MuscleFreshness {
             let days = dayLoad[g] ?? [:]
             let calibrated = days.count >= minimumTrainingDays
             let capacity = calibrated
-                ? max(defaultCapacity / 2, capacityMultiple * days.values.reduce(0, +) / Double(days.count))
+                ? max(defaultCapacity, capacityMultiple * days.values.reduce(0, +) / Double(days.count))
                 : defaultCapacity
             let pct = min(100, max(1, 100 * (1 - (fatigue[g] ?? 0) / capacity)))
             let provisional = status(percent: pct)

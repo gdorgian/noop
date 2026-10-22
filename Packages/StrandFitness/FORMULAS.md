@@ -12,7 +12,7 @@ published methods; each is pinned by a test in `Tests/StrandFitnessTests`.
 | Calibrating | fewer than 10 sessions in 42 days, or none in the last 28 | — |
 | Set stimulus | clamp(1 − max(0, RIR − 3) / 10, 0.3, 1); RIR reported, else from the lifter's best e1RM (Epley), best reps or best time | Epley 1985 |
 | Muscular load | 10 points × stimulus per set; primary muscle 1.0, secondaries 0.5; cardio adds a per-sport share of its TRIMP to the muscles it works | — |
-| Muscle freshness | fatigue = Σ load × 0.5^(hours / half-life); freshness = clamp(100 × (1 − fatigue / capacity), 1, 100); capacity = 1.5 × mean load per training day over 42 days (6 hard sets until 3 training days) | — |
+| Muscle freshness | fatigue = Σ load × 0.5^(hours / half-life); freshness = clamp(100 × (1 − fatigue / capacity), 1, 100); capacity = max(10 hard sets, 1.5 × mean load per training day over 42 days); 10 hard sets until 3 training days | — |
 | Freshness status | ≥ 75 % recovered · ≥ 40 % fatigued · below depleted | — |
 | Half-lives | 36 h quads, hamstrings, glutes, lower back, adductors · 30 h chest, lats, upper back, traps · 24 h arms, shoulders, hip muscles · 18 h abs, obliques, calves, shins, neck | 48–72 h recovery literature |
 | Cardio focus | share of training time (Resting excluded): low aerobic Easy + Steady, high aerobic Hard, anaerobic All out | — |

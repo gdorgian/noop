@@ -2010,6 +2010,7 @@ public final class BLEManager: NSObject, ObservableObject {
     private func noteGenuineBond(of p: CBPeripheral) {
         lastBondedPeripheralUUID = p.identifier
         pinnedBondRefusals = 0
+        reconcileModelFromLink(p)
         if readoptingTo == p.identifier {
             readoptingTo = nil
             log("Multi-WHOOP (#52): working strap bonded — confirming re-adoption to the registry.")
@@ -5343,6 +5344,23 @@ public final class BLEManager: NSObject, ObservableObject {
         else { return }
         try? rs.setModel(attesting.id, model: "WHOOP 5.0 / MG")
         log("Corrected device model \"\(attesting.model ?? "nil")\" → \"WHOOP 5.0 / MG\" from DIS attestation (variant=\(variant.label))")
+    }
+
+    /// The link itself is evidence of the family: this manager scans for `selectedModel.scanService` and
+    /// speaks its framing, so a 5/MG link that bonds is a 5-generation strap. A registry row still saying
+    /// 4.0 for that peripheral (a wrong pick at pairing, or an older row) made Manage straps call a 5.0 a
+    /// 4.0 (tester, 23 Oct). Same one-way correction as the attestation path above, which in practice
+    /// never fires; this one does, on every bond.
+    private func reconcileModelFromLink(_ p: CBPeripheral) {
+        guard selectedModel.deviceFamily == .whoop5, let rs = registryStore else { return }
+        let devices = (try? rs.all())?.filter { $0.status != .archived } ?? []
+        let id = p.identifier.uuidString
+        let byId = devices.first { $0.peripheralId?.caseInsensitiveCompare(id) == .orderedSame }
+        let soleUnadopted = (devices.count == 1 && devices[0].peripheralId == nil) ? devices[0] : nil
+        guard let row = byId ?? soleUnadopted,
+              DeviceFamily.forRegistryDevice(model: row.model, brand: row.brand) == .whoop4 else { return }
+        try? rs.setModel(row.id, model: "WHOOP 5.0 / MG")
+        log("Corrected device model \"\(row.model ?? "nil")\" → \"WHOOP 5.0 / MG\" from the bonded 5/MG link")
     }
 
     private func requestNotify(_ c: CBCharacteristic, on p: CBPeripheral, reason: String) {

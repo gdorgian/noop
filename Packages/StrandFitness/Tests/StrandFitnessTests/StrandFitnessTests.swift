@@ -96,7 +96,7 @@ final class StrandFitnessTests: XCTestCase {
         let quads = next.first { $0.group == .quads }!, calves = next.first { $0.group == .calves }!
         // Calves (18 h half-life) are further back than quads (36 h) after the same session.
         XCTAssertGreaterThan(calves.percent, quads.percent)
-        XCTAssertEqual(calves.percent, 100 * (1 - 20.0 / 60), accuracy: 0.01)
+        XCTAssertEqual(calves.percent, 100 * (1 - 20.0 / MuscleFreshness.defaultCapacity), accuracy: 0.01)
         XCTAssertEqual(quads.status, .calibrating)
         let later = MuscleFreshness.readings(events: session, asOf: t0.addingTimeInterval(7 * 86_400), calendar: cal)
         XCTAssertGreaterThan(later.first { $0.group == .quads }!.percent, 95)
