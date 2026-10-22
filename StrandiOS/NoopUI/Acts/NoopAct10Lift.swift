@@ -452,6 +452,13 @@ private struct NoopLiftLiveScreen: View {
     @State private var saveError: String?
     @State private var addingExercise = false
     @State private var vocabulary: [LiftExerciseRow] = []
+    @State private var confirmDiscard = false
+    @State private var ratingEffort = false
+    @State private var sessionRpe = 6.0
+    @State private var lastTime: [String: [Int: LiftSetCarry]] = [:]
+    @State private var lastTimeFor: NoopLiftExerciseName?
+    @FocusState private var focused: Field?
+    @EnvironmentObject private var heart: LiveState
 
     private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
     private var presentation: LiftSessionController.Presentation? { live.presentation(system: units) }
@@ -469,13 +476,6 @@ private struct NoopLiftLiveScreen: View {
         .task { await prepare() }
         .onChange(of: slot) { _, _ in syncFields() }
         .onChange(of: live.engine?.sets.count) { _, _ in syncFields() }
-        .confirmationDialog("Finish this lift?", isPresented: $showFinish, titleVisibility: .visible) {
-            Button("Save performed sets") { Task { await finish(includeShownValues: true) } }
-            Button("Save only typed values") { Task { await finish(includeShownValues: false) } }
-            Button("Keep lifting", role: .cancel) { }
-        } message: {
-            Text("Only performed sets are saved. Sets you never reached stay out of your record.")
-        }
         .alert("Lift not saved", isPresented: Binding(
             get: { saveError != nil }, set: { if !$0 { saveError = nil } }
         )) {
@@ -485,274 +485,420 @@ private struct NoopLiftLiveScreen: View {
         }
     }
 
+    private enum Field: Hashable { case weight, reps }
+
     private func session(engine: LiftSessionEngine,
                          presentation: LiftSessionController.Presentation,
                          slot: LiftSlot,
                          item: LiftPlanItem) -> some View {
-        NoopScreen(bottomInset: 26, topInset: 54) {
-            VStack(alignment: .leading, spacing: 14) {
-                // Top bar: end, the session clock, pause. The clock reads the wall clock once a second,
-                // because the session publishes nothing between taps (upstream 12.0).
-                HStack(alignment: .center) {
-                    liveIconButton(glyph: .x, label: "Finish") { showFinish = true }
-                        .disabled(saving)
-                    Spacer()
-                    VStack(spacing: 2) {
-                        Text(live.programName ?? "Lift")
-                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
-                            .foregroundStyle(NoopHTMLColor.warm)
-                            .lineLimit(1)
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            Text(liftClock(liveElapsed(presentation, at: context.date), long: true))
-                                .font(NoopHTMLFont.outfit(26, weight: .light))
-                                .monospacedDigit()
-                                .foregroundStyle(live.isPaused ? NoopHTMLColor.copy : NoopHTMLColor.ink)
-                        }
-                        Text(live.isPaused ? "PAUSED" : "EXERCISE \(slot.exerciseIndex + 1) OF \(engine.plan.count)")
-                            .font(NoopHTMLFont.sans(9.5, weight: .semibold)).tracking(1.1)
-                            .foregroundStyle(NoopHTMLColor.muted)
+        ZStack(alignment: .bottom) {
+            NoopScreen(bottomInset: 120, topInset: 54) {
+                VStack(alignment: .leading, spacing: 14) {
+                    liveHeader(presentation)
+                    ForEach(Array(engine.plan.enumerated()), id: \.offset) { index, line in
+                        exerciseBlock(engine: engine, index: index, line: line, current: slot,
+                                      isResting: presentation.isResting)
                     }
-                    Spacer()
-                    liveIconButton(glyph: live.isPaused ? .play : .pause, label: live.isPaused ? "Resume" : "Pause") {
-                        live.togglePause()
-                    }
-                }
-
-                exerciseStrip(engine: engine, current: slot)
-
-                exerciseCard(engine: engine, slot: slot, item: item, isResting: presentation.isResting)
-
-                if presentation.isResting {
-                    restCard(engine: engine, item: item, slot: slot)
-                } else {
-                    Button {
-                        writeFields(slot: slot)
-                        live.advance()
-                    } label: {
+                    Button { addingExercise = true } label: {
                         HStack(spacing: 8) {
-                            NoopCanonicalGlyph(name: .check, size: 17, color: NoopHTMLColor.warmInk)
-                            Text("Log set \(slot.setIndex)")
-                                .font(NoopHTMLFont.sans(16, weight: .semibold))
+                            NoopCanonicalGlyph(name: .plus, size: 14, color: NoopHTMLColor.inkSoft)
+                            Text("Add exercise").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                         }
-                        .foregroundStyle(NoopHTMLColor.warmInk)
-                        .frame(maxWidth: .infinity).frame(height: 58)
-                        .background(NoopHTMLColor.warm, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .shadow(color: NoopHTMLColor.warm.opacity(0.25), radius: 13, y: 8)
+                        .frame(maxWidth: .infinity).frame(height: 50)
+                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.14), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
-                    .disabled(live.isPaused)
-                    .opacity(live.isPaused ? 0.45 : 1)
-
-                    HStack(spacing: 8) {
-                        NoopCanonicalGlyph(name: .watch, size: 15, color: NoopHTMLColor.copy)
-                        Text("Or double-tap the strap to log it and start the rest.")
-                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
-                    }
-                    .frame(maxWidth: .infinity)
+                    Text("Warm-ups are left out of every figure. Sets you never reach are not saved.")
+                        .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted)
+                        .frame(maxWidth: .infinity).multilineTextAlignment(.center)
                 }
-
-                if let next = nextExercise(after: slot.exerciseIndex, in: engine) {
-                    nextCard(next, engine: engine)
-                }
-
-                Button { addingExercise = true } label: {
-                    HStack(spacing: 8) {
-                        NoopCanonicalGlyph(name: .plus, size: 14, color: NoopHTMLColor.inkSoft)
-                        Text("Add exercise").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                    }
-                    .frame(maxWidth: .infinity).frame(height: 48)
-                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.14), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-
-                Button { showFinish = true } label: {
-                    Text("Finish workout")
-                        .font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                        .frame(maxWidth: .infinity).frame(height: 52)
-                        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-                .disabled(saving)
-
-                Text("Warm-ups are left out of every figure. Nothing here is a target you are behind on.")
-                    .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted)
-                    .frame(maxWidth: .infinity)
-                    .multilineTextAlignment(.center)
             }
+            liveBar(engine: engine, presentation: presentation, slot: slot, item: item)
+                .padding(.horizontal, 14).padding(.bottom, 10)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) { keypadBar(slot: slot) }
         }
         .sheet(isPresented: $addingExercise) {
             NoopFitnessExercisePicker(yours: vocabulary) { choice in
                 _ = live.addExercise(choice.name, primaryMuscle: choice.primary, secondaryMuscles: choice.secondaries)
             }
         }
-    }
-
-    private func liveIconButton(glyph: NoopCanonicalGlyphName, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            NoopCanonicalGlyph(name: glyph, size: 16, color: NoopHTMLColor.inkSoft)
-                .frame(width: 42, height: 42)
-                .background(Color.white.opacity(0.06), in: Circle())
-                .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+        .sheet(item: $lastTimeFor) { target in
+            NoopLiftLastTimeSheet(exercise: target.name, sets: lastTime[target.name] ?? [:], units: units)
+                .presentationDetents([.medium])
         }
-        .buttonStyle(NoopHTMLPressStyle())
-        .accessibilityLabel(label)
+        .sheet(isPresented: $ratingEffort) {
+            NoopLiftEffortSheet(rating: $sessionRpe) {
+                ratingEffort = false
+                Task { await finish(includeShownValues: true) }
+            }
+            .presentationDetents([.large])
+            .interactiveDismissDisabled(saving)
+        }
+        .alert("End the workout?", isPresented: $showFinish) {
+            Button("Keep going", role: .cancel) { }
+            Button("End workout") { ratingEffort = true }
+        } message: {
+            Text("The sets you completed are saved. Sets you never reached stay out of your record.")
+        }
+        .alert("Discard this workout?", isPresented: $confirmDiscard) {
+            Button("Keep it", role: .cancel) { }
+            Button("Discard", role: .destructive) {
+                live.discard()
+                navigation.replace(with: .fitness)
+            }
+        } message: {
+            Text("Nothing from this session will be saved.")
+        }
     }
 
-    /// Every exercise in the session as a tab, with its sets done; tapping one jumps to its next set.
-    private func exerciseStrip(engine: LiftSessionEngine, current: LiftSlot) -> some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 7) {
-                ForEach(Array(engine.plan.enumerated()), id: \.offset) { index, line in
-                    let slots = engine.slots(forExercise: index)
-                    let done = slots.filter { engine.isCompleted($0) }.count
-                    let selected = index == current.exerciseIndex
-                    Button {
-                        guard !live.isPaused,
-                              let target = slots.first(where: { !engine.isCompleted($0) }) else { return }
-                        writeFields(slot: current)
-                        live.start(target)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(line.exercise).font(NoopHTMLFont.sans(12.5, weight: .semibold)).lineLimit(1)
-                            Text("\(done)/\(slots.count)").font(NoopHTMLFont.sans(11)).monospacedDigit()
-                                .foregroundStyle(done == slots.count ? NoopHTMLColor.green : NoopHTMLColor.copy)
-                        }
-                        .foregroundStyle(selected ? NoopHTMLColor.ink : NoopHTMLColor.inkSoft)
-                        .padding(.horizontal, 12).padding(.vertical, 8)
-                        .frame(maxWidth: 150, alignment: .leading)
-                        .background(selected ? NoopHTMLColor.warm.opacity(0.16) : Color.white.opacity(0.05),
-                                    in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .strokeBorder(selected ? NoopHTMLColor.warm.opacity(0.5) : .clear, lineWidth: 0.8))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
+    // MARK: Header
+
+    private func liveHeader(_ presentation: LiftSessionController.Presentation) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 1) {
+                // The clock reads the wall clock once a second, because the session publishes nothing
+                // between taps (upstream 12.0).
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(liftClock(liveElapsed(presentation, at: context.date), long: true))
+                        .font(NoopHTMLFont.outfit(34, weight: .light))
+                        .monospacedDigit()
+                        .foregroundStyle(live.isPaused ? NoopHTMLColor.copy : NoopHTMLColor.ink)
+                }
+                HStack(spacing: 6) {
+                    NoopCanonicalGlyph(name: .weight, size: 13, color: NoopHTMLColor.warm)
+                    Text(live.isPaused ? "Paused" : (live.programName ?? "Lift"))
+                        .font(NoopHTMLFont.sans(13, weight: .semibold))
+                        .foregroundStyle(live.isPaused ? NoopHTMLColor.copy : NoopHTMLColor.warm)
+                        .lineLimit(1)
                 }
             }
-            .padding(.horizontal, 20)
+            Spacer()
+            Button { showFinish = true } label: {
+                Text("Finish").font(NoopHTMLFont.sans(14, weight: .semibold))
+                    .foregroundStyle(NoopHTMLColor.warmInk)
+                    .padding(.horizontal, 18).frame(height: 38)
+                    .background(NoopHTMLColor.warm, in: Capsule())
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+            .disabled(saving)
+            Menu {
+                Button { live.togglePause() } label: {
+                    Label(live.isPaused ? "Resume workout" : "Pause workout", systemImage: live.isPaused ? "play" : "pause")
+                }
+                Button { live.undo() } label: { Label("Undo last step", systemImage: "arrow.uturn.backward") }
+                    .disabled(!(live.engine?.canUndo ?? false))
+                Divider()
+                Button(role: .destructive) { confirmDiscard = true } label: { Label("Discard workout", systemImage: "trash") }
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(NoopHTMLColor.inkSoft)
+                    .frame(width: 38, height: 38)
+                    .background(Color.white.opacity(0.06), in: Circle())
+                    .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+            }
         }
-        .scrollIndicators(.hidden)
-        .padding(.horizontal, -20)
     }
 
-    /// The current exercise as a table: done sets with their numbers and a tick, the active set
-    /// editable in place, the rest waiting. Tapping a waiting set starts it.
-    private func exerciseCard(engine: LiftSessionEngine, slot: LiftSlot, item: LiftPlanItem, isResting: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.exercise)
-                    .font(NoopHTMLFont.outfit(23))
-                    .foregroundStyle(NoopHTMLColor.ink)
-                Text([LiftMuscleSummary.line(primary: item.primaryMuscle, secondaries: item.secondaryMuscles),
-                      targetSummary(item) == "no targets" ? nil : targetSummary(item)].compactMap { $0 }.joined(separator: " · "))
-                    .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
-                if let note = item.note, !note.isEmpty {
-                    Text(note).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.blueLight)
-                        .fixedSize(horizontal: false, vertical: true)
+    // MARK: Exercise
+
+    private func exerciseBlock(engine: LiftSessionEngine, index: Int, line: LiftPlanItem,
+                               current: LiftSlot, isResting: Bool) -> some View {
+        let slots = engine.slots(forExercise: index)
+        let done = slots.filter { engine.isCompleted($0) }.count
+        let isCurrent = current.exerciseIndex == index
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 11) {
+                NoopCanonicalGlyph(name: .weight, size: 16, color: isCurrent ? NoopHTMLColor.warm : NoopHTMLColor.copy)
+                    .frame(width: 36, height: 36)
+                    .background((isCurrent ? NoopHTMLColor.warm : Color.white).opacity(isCurrent ? 0.14 : 0.05),
+                                in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(line.exercise).font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                        .lineLimit(1)
+                    Text(exerciseMeta(line, done: done, of: slots.count))
+                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                HStack(spacing: 4) {
+                    Image(systemName: "timer").font(.system(size: 10.5, weight: .semibold))
+                    Text(liftClock(line.restSec)).font(NoopHTMLFont.sans(11.5, weight: .semibold)).monospacedDigit()
+                }
+                .foregroundStyle(NoopHTMLColor.copy)
+                .padding(.horizontal, 9).frame(height: 26)
+                .background(Color.white.opacity(0.05), in: Capsule())
+                .accessibilityLabel("Rest \(liftClock(line.restSec)) between sets")
+                Menu {
+                    Button { _ = live.addSet(toExercise: index) } label: { Label("Add a set", systemImage: "plus") }
+                    Button { _ = live.removeSet(fromExercise: index) } label: { Label("Remove the last set", systemImage: "minus") }
+                        .disabled(slots.count <= 1 || engine.isCompleted(slots.last ?? current))
+                    if isCurrent {
+                        Button { live.setWarmup(current, !live.isWarmup(current)) } label: {
+                            Label(live.isWarmup(current) ? "Count set \(current.setIndex) as working" : "Mark set \(current.setIndex) as warm-up",
+                                  systemImage: "flame")
+                        }
+                    }
+                    Button { lastTimeFor = .init(name: line.exercise) } label: { Label("Last time", systemImage: "clock.arrow.circlepath") }
+                } label: {
+                    Image(systemName: "ellipsis").font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.copy).frame(width: 30, height: 30)
                 }
             }
             HStack(spacing: 8) {
                 Text("SET").frame(width: 34, alignment: .leading)
                 Text(LiftFormat.weightUnit(units).uppercased()).frame(maxWidth: .infinity)
                 Text("REPS").frame(maxWidth: .infinity)
-                Text("REST").frame(width: 44, alignment: .trailing)
+                Color.clear.frame(width: 38, height: 1)
             }
             .font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(0.8).foregroundStyle(NoopHTMLColor.muted)
-
-            ForEach(engine.slots(forExercise: slot.exerciseIndex), id: \.self) { row in
-                setRow(row, engine: engine, active: row == slot && !isResting)
+            .padding(.top, 4)
+            ForEach(slots, id: \.self) { row in
+                setRow(row, engine: engine, active: row == current && !isResting)
+                restLine(after: row, engine: engine, isLast: row == slots.last)
             }
-
-            HStack(spacing: 8) {
-                Button { _ = live.addSet(toExercise: slot.exerciseIndex) } label: { smallAction("+ Set") }
-                    .buttonStyle(NoopHTMLPressStyle())
-                Button { _ = live.removeSet(fromExercise: slot.exerciseIndex) } label: { smallAction("− Set") }
-                    .buttonStyle(NoopHTMLPressStyle())
-                Spacer()
-                Button { live.setWarmup(slot, !live.isWarmup(slot)) } label: {
-                    smallAction(live.isWarmup(slot) ? "Warm-up ✓" : "Mark warm-up")
+            Button { _ = live.addSet(toExercise: index) } label: {
+                HStack(spacing: 5) {
+                    NoopCanonicalGlyph(name: .plus, size: 11, color: NoopHTMLColor.inkSoft)
+                    Text("Add set").font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                 }
-                .buttonStyle(NoopHTMLPressStyle())
+                .frame(maxWidth: .infinity).frame(height: 34)
+                .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
             }
-            .padding(.top, 2)
+            .buttonStyle(NoopHTMLPressStyle())
+            .padding(.top, 4)
         }
-        .padding(16)
+        .padding(14)
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .strokeBorder(isCurrent ? NoopHTMLColor.warm.opacity(0.28) : NoopHTMLColor.border, lineWidth: isCurrent ? 0.8 : 0.5))
     }
 
-    private func smallAction(_ t: String) -> some View {
-        Text(t).font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-            .padding(.horizontal, 11).frame(height: 30)
-            .background(Color.white.opacity(0.06), in: Capsule())
+    private func exerciseMeta(_ line: LiftPlanItem, done: Int, of total: Int) -> String {
+        var parts = ["\(done) of \(total) sets"]
+        let muscles = LiftMuscleSummary.line(primary: line.primaryMuscle, secondaries: line.secondaryMuscles)
+        if !muscles.isEmpty { parts.append(muscles) }
+        return parts.joined(separator: " · ")
     }
 
     @ViewBuilder
     private func setRow(_ row: LiftSlot, engine: LiftSessionEngine, active: Bool) -> some View {
         let done = engine.isCompleted(row)
         let values = live.values(of: row)
+        let entered = live.enteredValues(for: row)
+        let resting: Bool = {
+            if case .resting(let s, _) = engine.stage { return s == row }
+            return false
+        }()
         HStack(spacing: 8) {
-            ZStack {
-                Circle().fill(done ? NoopHTMLColor.green.opacity(0.18) : active ? NoopHTMLColor.warm : Color.white.opacity(0.06))
-                if done {
-                    NoopCanonicalGlyph(name: .check, size: 13, color: NoopHTMLColor.green)
-                } else {
+            Button { lastTimeFor = .init(name: engine.planItem(for: row)?.exercise ?? "") } label: {
+                ZStack {
+                    Circle().fill(done ? NoopHTMLColor.green.opacity(0.16) : Color.clear)
+                    Circle().strokeBorder(active ? NoopHTMLColor.warm : done ? .clear : Color.white.opacity(0.12), lineWidth: 1.2)
                     Text(live.isWarmup(row) ? "W" : "\(row.setIndex)")
                         .font(NoopHTMLFont.sans(12.5, weight: .semibold))
-                        .foregroundStyle(active ? NoopHTMLColor.warmInk : NoopHTMLColor.inkSoft)
+                        .foregroundStyle(done ? NoopHTMLColor.green : active ? NoopHTMLColor.warm : NoopHTMLColor.inkSoft)
                 }
+                .frame(width: 30, height: 30)
             }
-            .frame(width: 28, height: 28)
+            .buttonStyle(NoopHTMLPressStyle())
             .frame(width: 34, alignment: .leading)
+            .accessibilityLabel("Set \(row.setIndex), see last time")
             if active {
-                activeField(text: $loadText, isWeight: true, slot: row)
-                activeField(text: $repsText, isWeight: false, slot: row)
+                field($loadText, placeholder: values.weightKg.map { LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units)) } ?? "—",
+                      focus: .weight, slot: row)
+                field($repsText, placeholder: values.reps.map(String.init) ?? "—", focus: .reps, slot: row)
             } else {
-                cell(values.weightKg.map { LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units)) } ?? "—", done: done)
-                cell(values.reps.map(String.init) ?? "—", done: done)
+                cell(values.weightKg.map { LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units)) } ?? "—",
+                     done: done, typed: entered.weightKg != nil)
+                cell(values.reps.map(String.init) ?? "—", done: done, typed: entered.reps != nil)
             }
-            Text(displayedRest(for: row, engine: engine) ?? "")
-                .font(NoopHTMLFont.sans(11)).monospacedDigit().foregroundStyle(NoopHTMLColor.copy)
-                .frame(width: 44, alignment: .trailing)
+            Button {
+                guard !live.isPaused else { return }
+                if active {
+                    focused = nil
+                    writeFields(slot: row)
+                    live.advance()
+                } else if !done, !resting, let current = slot {
+                    writeFields(slot: current)
+                    live.start(row)
+                }
+            } label: {
+                ZStack {
+                    Circle().fill(done ? NoopHTMLColor.green : active ? NoopHTMLColor.warm : Color.white.opacity(0.06))
+                    if done {
+                        NoopCanonicalGlyph(name: .check, size: 14, color: NoopHTMLColor.canvas)
+                    } else if active {
+                        NoopCanonicalGlyph(name: .check, size: 14, color: NoopHTMLColor.warmInk)
+                    } else {
+                        NoopCanonicalGlyph(name: .play, size: 12, color: NoopHTMLColor.inkSoft)
+                    }
+                }
+                .frame(width: 34, height: 34)
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+            .disabled(done)
+            .frame(width: 38)
+            .accessibilityLabel(done ? "Done" : active ? "Log set \(row.setIndex)" : "Start set \(row.setIndex)")
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            guard !active, !done, !live.isPaused, let current = slot else { return }
-            writeFields(slot: current)
-            live.start(row)
+        .opacity(done || active ? 1 : 0.86)
+        .animation(NoopMotion.swap, value: done)
+    }
+
+    /// Under a set: the rest running after it, or the rest that was taken.
+    @ViewBuilder
+    private func restLine(after row: LiftSlot, engine: LiftSessionEngine, isLast: Bool) -> some View {
+        if case .resting(let s, _) = engine.stage, s == row {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let remaining = presentation?.heldClockSeconds ?? engine.restRemaining(now: Self.second(context.date)) ?? 0
+                HStack(spacing: 8) {
+                    Capsule().fill(NoopHTMLColor.blueLight.opacity(0.35)).frame(height: 1)
+                    HStack(spacing: 5) {
+                        Image(systemName: "timer").font(.system(size: 10, weight: .bold))
+                        Text(remaining > 0 ? liftClock(remaining) : "Rest done")
+                            .font(NoopHTMLFont.sans(12, weight: .semibold)).monospacedDigit()
+                    }
+                    .foregroundStyle(NoopHTMLColor.blueInk)
+                    .padding(.horizontal, 10).frame(height: 24)
+                    .background(remaining > 0 ? NoopHTMLColor.blueLight : NoopHTMLColor.green, in: Capsule())
+                    Capsule().fill(NoopHTMLColor.blueLight.opacity(0.35)).frame(height: 1)
+                }
+                .padding(.vertical, 2)
+            }
+        } else if let rest = engine.recordedSet(for: row)?.restSec, !isLast {
+            Text("rested \(liftClock(rest))")
+                .font(NoopHTMLFont.sans(10.5)).monospacedDigit().foregroundStyle(NoopHTMLColor.muted)
+                .frame(maxWidth: .infinity)
         }
     }
 
-    private func cell(_ t: String, done: Bool) -> some View {
+    private func cell(_ t: String, done: Bool, typed: Bool) -> some View {
         Text(t).font(NoopHTMLFont.sans(15, weight: done ? .semibold : .regular))
-            .foregroundStyle(done ? NoopHTMLColor.ink : NoopHTMLColor.muted)
+            .foregroundStyle(done ? NoopHTMLColor.ink : typed ? NoopHTMLColor.inkSoft : NoopHTMLColor.muted)
             .monospacedDigit()
             .frame(maxWidth: .infinity).frame(height: 40)
-            .background(Color.white.opacity(done ? 0.05 : 0.03), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .background(done ? NoopHTMLColor.green.opacity(0.08) : Color.white.opacity(0.03),
+                        in: RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 
-    /// The active set's value: tap −/+ at either end, or type.
-    private func activeField(text: Binding<String>, isWeight: Bool, slot: LiftSlot) -> some View {
-        HStack(spacing: 0) {
-            Button { nudge(isWeight: isWeight, amount: -1, slot: slot) } label: {
-                Text("−").font(NoopHTMLFont.outfit(18)).foregroundStyle(NoopHTMLColor.warm).frame(width: 30, height: 40)
+    /// The active set's value, typed on the number pad; the bar above the pad nudges it.
+    private func field(_ text: Binding<String>, placeholder: String, focus: Field, slot: LiftSlot) -> some View {
+        TextField(placeholder, text: text)
+            .keyboardType(focus == .weight ? .decimalPad : .numberPad)
+            .multilineTextAlignment(.center)
+            .font(NoopHTMLFont.sans(16, weight: .semibold))
+            .foregroundStyle(NoopHTMLColor.ink)
+            .monospacedDigit()
+            .focused($focused, equals: focus)
+            .onChange(of: text.wrappedValue) { _, _ in writeFields(slot: slot) }
+            .frame(maxWidth: .infinity).frame(height: 40)
+            .background(NoopHTMLColor.warm.opacity(focused == focus ? 0.16 : 0.08),
+                        in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(NoopHTMLColor.warm.opacity(focused == focus ? 0.8 : 0.4), lineWidth: focused == focus ? 1.2 : 0.8))
+    }
+
+    /// Above the number pad: step the value, read the plates for it, move on.
+    @ViewBuilder
+    private func keypadBar(slot: LiftSlot) -> some View {
+        if let f = focused {
+            Button { nudge(isWeight: f == .weight, amount: -1, slot: slot) } label: { Image(systemName: "minus") }
+            Button { nudge(isWeight: f == .weight, amount: 1, slot: slot) } label: { Image(systemName: "plus") }
+            Spacer()
+            if f == .weight, let plates = plateLine {
+                Text(plates).font(NoopHTMLFont.sans(11.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Spacer()
             }
-            .buttonStyle(NoopHTMLPressStyle())
-            TextField("—", text: text)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.center)
-                .font(NoopHTMLFont.sans(16, weight: .semibold))
-                .foregroundStyle(NoopHTMLColor.ink)
-                .monospacedDigit()
-                .onSubmit { writeFields(slot: slot) }
-            Button { nudge(isWeight: isWeight, amount: 1, slot: slot) } label: {
-                Text("+").font(NoopHTMLFont.outfit(18)).foregroundStyle(NoopHTMLColor.warm).frame(width: 30, height: 40)
+            Button(f == .weight ? "Reps" : "Done") {
+                if f == .weight { focused = .reps } else { focused = nil; writeFields(slot: slot) }
             }
-            .buttonStyle(NoopHTMLPressStyle())
+            .fontWeight(.semibold)
         }
-        .frame(maxWidth: .infinity).frame(height: 40)
-        .background(NoopHTMLColor.warm.opacity(0.10), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(NoopHTMLColor.warm.opacity(0.45), lineWidth: 0.8))
+    }
+
+    /// Plates per side for the typed weight on a standard bar (20 kg or 45 lb).
+    private var plateLine: String? {
+        guard let total = Double(loadText.replacingOccurrences(of: ",", with: ".")) else { return nil }
+        let metric = units == .metric
+        let bar = metric ? 20.0 : 45.0
+        guard total > bar else { return nil }
+        var side = (total - bar) / 2
+        let plates = metric ? [25, 20, 15, 10, 5, 2.5, 1.25] : [45, 35, 25, 10, 5, 2.5]
+        var used: [String] = []
+        for p in plates {
+            var n = 0
+            while side + 0.001 >= p { side -= p; n += 1 }
+            if n > 0 { used.append(n > 1 ? "\(n)×\(LiftFormat.trim(p))" : LiftFormat.trim(p)) }
+        }
+        guard !used.isEmpty else { return nil }
+        return "Each side: " + used.joined(separator: " + ") + (side > 0.01 ? " (+\(LiftFormat.trim(side)))" : "")
+    }
+
+    // MARK: Bottom bar
+
+    private func liveBar(engine: LiftSessionEngine, presentation: LiftSessionController.Presentation,
+                         slot: LiftSlot, item: LiftPlanItem) -> some View {
+        let warmup = engine.stage == .warmup
+        // Only the words tick. The button stays outside the once-a-second redraw, so a press that
+        // spans a tick is never cancelled.
+        return HStack(spacing: 12) {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let nowSec = Self.second(context.date)
+                let remaining = presentation.heldClockSeconds ?? engine.restRemaining(now: nowSec)
+                let inSet = max(0, nowSec - engine.stageStartedAt)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(warmup ? "Warm-up" : item.exercise)
+                        .font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
+                    Group {
+                        if presentation.isResting {
+                            Text((remaining ?? 0) > 0 ? "Rest \(liftClock(remaining ?? 0))" : "Ready for the next set")
+                                .foregroundStyle(NoopHTMLColor.blueLight)
+                        } else if warmup {
+                            Text("Start when you are ready").foregroundStyle(NoopHTMLColor.copy)
+                        } else {
+                            Text("Set \(slot.setIndex) · \(liftClock(inSet))").foregroundStyle(NoopHTMLColor.copy)
+                        }
+                    }
+                    .font(NoopHTMLFont.sans(12, weight: .medium)).monospacedDigit()
+                }
+            }
+            Spacer(minLength: 6)
+            if let bpm = heart.heartRate, bpm > 0 {
+                HStack(spacing: 4) {
+                    Text("\(bpm)").font(NoopHTMLFont.sans(15, weight: .semibold)).monospacedDigit()
+                        .foregroundStyle(NoopHTMLColor.ink)
+                    Image(systemName: "heart.fill").font(.system(size: 11)).foregroundStyle(NoopHTMLColor.red)
+                }
+                .accessibilityLabel("\(bpm) beats per minute")
+            }
+            Button {
+                focused = nil
+                if !presentation.isResting { writeFields(slot: slot) }
+                live.advance()
+            } label: {
+                ZStack {
+                    Circle().fill(presentation.isResting ? NoopHTMLColor.blueLight : NoopHTMLColor.warm)
+                    if presentation.isResting || warmup {
+                        NoopCanonicalGlyph(name: .play, size: 17, color: NoopHTMLColor.blueInk)
+                    } else {
+                        NoopCanonicalGlyph(name: .check, size: 19, color: NoopHTMLColor.warmInk)
+                    }
+                }
+                .frame(width: 54, height: 54)
+                .shadow(color: (presentation.isResting ? NoopHTMLColor.blueLight : NoopHTMLColor.warm).opacity(0.3), radius: 12, y: 6)
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+            .disabled(live.isPaused || saving)
+            .opacity(live.isPaused ? 0.45 : 1)
+            .accessibilityLabel(presentation.isResting ? "Start the next set" : warmup ? "Start the first set" : "Log set \(slot.setIndex)")
+        }
+        .padding(.leading, 18).padding(.trailing, 8).padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        .background(NoopHTMLColor.cardRaised.opacity(0.85), in: Capsule())
+        .overlay(Capsule().strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+        .sensoryFeedback(.success, trigger: engine.completedWorkingSets)
     }
 
     @State private var prototypeOpenedAt = Date()
@@ -769,70 +915,6 @@ private struct NoopLiftLiveScreen: View {
         return presentation.sessionElapsedSeconds + max(0, Self.second(date) - live.now)
     }
 
-    private func restCard(engine: LiftSessionEngine, item: LiftPlanItem, slot: LiftSlot) -> some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            restCardBody(engine: engine, item: item, slot: slot,
-                         remaining: presentation?.heldClockSeconds ?? engine.restRemaining(now: Self.second(context.date)) ?? 0)
-        }
-    }
-
-    private func restCardBody(engine: LiftSessionEngine, item: LiftPlanItem, slot: LiftSlot, remaining: Int) -> some View {
-        let total = max(1, item.restSec)
-        let fraction = min(1, Double(remaining) / Double(total))
-        return VStack(spacing: 12) {
-            ZStack {
-                Circle().stroke(Color.white.opacity(0.08), lineWidth: 8)
-                Circle().trim(from: 0, to: fraction)
-                    .stroke(NoopHTMLColor.blueLight, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 1), value: fraction)
-                VStack(spacing: 2) {
-                    Text("REST").font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.2).foregroundStyle(NoopHTMLColor.muted)
-                    Text(liftClock(remaining))
-                        .font(NoopHTMLFont.outfit200(48)).monospacedDigit()
-                        .foregroundStyle(Color(hex: 0xF6FDFF))
-                    Text("of \(liftClock(item.restSec))").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
-                }
-            }
-            .frame(width: 170, height: 170)
-            Text(nextRestSentence(engine: engine, item: item, slot: slot))
-                .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
-                .multilineTextAlignment(.center).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
-            Button { live.advance() } label: {
-                Text(remaining == 0 ? "Start the next set" : "Skip rest")
-                    .font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueInk)
-                    .frame(maxWidth: .infinity).frame(height: 50)
-                    .background(NoopHTMLColor.blueLight, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-            .buttonStyle(NoopHTMLPressStyle())
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity)
-        .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(NoopHTMLColor.blue.opacity(0.22), lineWidth: 0.5))
-    }
-
-    private func nextCard(_ next: LiftPlanItem, engine: LiftSessionEngine) -> some View {
-        Button {
-            guard let index = engine.plan.firstIndex(of: next),
-                  let nextSlot = engine.slots(forExercise: index).first(where: { !engine.isCompleted($0) }) else { return }
-            live.start(nextSlot)
-        } label: {
-            HStack(spacing: 12) {
-                NoopCanonicalGlyph(name: .weight, size: 19, color: NoopHTMLColor.copy.opacity(0.82))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("NEXT").font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.2).foregroundStyle(NoopHTMLColor.muted)
-                    Text(next.exercise).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
-                }
-                Spacer()
-                Text(targetSummary(next)).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-            }
-            .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-        }
-        .buttonStyle(NoopHTMLPressStyle())
-    }
 
     private var noSession: some View {
         NoopScreen(bottomInset: 26, topInset: 58) {
@@ -878,6 +960,7 @@ private struct NoopLiftLiveScreen: View {
             })
         }
         live.setLastSession(result)
+        lastTime = result
     }
 
     private func syncFields() {
@@ -956,7 +1039,7 @@ private struct NoopLiftLiveScreen: View {
         let sessionRow = LiftSessionRow(
             id: sessionID, deviceId: repo.deviceId, startTs: engine.startTs, endTs: end,
             sport: LiftingImporter.sport, programId: live.programId,
-            programName: live.programName, sessionRpe: nil, note: live.programName
+            programName: live.programName, sessionRpe: sessionRpe, note: live.programName
         )
         let rows = finished.enumerated().map { ord, value -> LiftSetRow in
             let line = engine.planItem(for: value.slot)
@@ -2740,4 +2823,162 @@ private struct NoopLiftMusclesScreen: View {
     }
 }
 
+
+// MARK: - lift-live sheets
+
+struct NoopLiftExerciseName: Identifiable {
+    let name: String
+    var id: String { name }
+}
+
+/// What the last session of an exercise held, set by set.
+private struct NoopLiftLastTimeSheet: View {
+    let exercise: String
+    let sets: [Int: LiftSetCarry]
+    let units: UnitSystem
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("LAST TIME").font(NoopHTMLFont.sans(10.5, weight: .semibold)).tracking(1.2)
+                        .foregroundStyle(NoopHTMLColor.muted)
+                    Text(exercise).font(NoopHTMLFont.outfit(22)).foregroundStyle(NoopHTMLColor.ink)
+                }
+                Spacer()
+                Button("Done") { dismiss() }
+                    .font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.warm)
+            }
+            if sets.isEmpty {
+                Text("No earlier session of this exercise. The numbers you log today become next time's guide.")
+                    .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach(sets.keys.sorted(), id: \.self) { i in
+                    let s = sets[i]!
+                    HStack {
+                        Text("\(i)").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                            .frame(width: 30, height: 30).background(Color.white.opacity(0.06), in: Circle())
+                        Text(s.weightKg.map { "\(LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units))) \(LiftFormat.weightUnit(units))" } ?? "—")
+                            .frame(maxWidth: .infinity)
+                        Text(s.reps.map { "\($0) reps" } ?? "—").frame(maxWidth: .infinity)
+                    }
+                    .font(NoopHTMLFont.sans(15, weight: .medium)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(NoopHTMLColor.canvas)
+    }
+}
+
+/// "How hard was that?" — the session's effort on a 1–10 dial, saved with the lift.
+private struct NoopLiftEffortSheet: View {
+    @Binding var rating: Double
+    let save: () -> Void
+
+    private static let words: [(String, String)] = [
+        ("Barely anything", "Could have done it all again without noticing."),
+        ("Very easy", "Breathing calm the whole way through."),
+        ("Easy", "Comfortable; plenty left in every set."),
+        ("Comfortable", "Some work, nothing that asked much."),
+        ("Moderate", "Noticeable effort, still well in control."),
+        ("Working", "The last reps took some focus."),
+        ("Hard", "A few sets got close to the edge."),
+        ("Very hard", "Most sets ended near failure."),
+        ("Near the limit", "Little or nothing left by the end."),
+        ("Everything you had", "Could not have done another rep."),
+    ]
+
+    private var value: Int { min(10, max(1, Int(rating.rounded()))) }
+
+    private func color(_ v: Double) -> Color {
+        v < 4 ? NoopHTMLColor.blueLight : v < 7 ? NoopHTMLColor.warm : v < 9 ? NoopHTMLColor.amber : NoopHTMLColor.red
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Text("How hard was that?").font(NoopHTMLFont.outfit(24)).foregroundStyle(NoopHTMLColor.ink)
+                .padding(.top, 34)
+            Text("Your own read of the whole session. It sits beside the heart-rate figures, which cannot see a heavy set.")
+                .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                .multilineTextAlignment(.center).padding(.horizontal, 26)
+            dial.frame(width: 280, height: 280).padding(.top, 10)
+            VStack(spacing: 4) {
+                Text(Self.words[value - 1].0).font(NoopHTMLFont.outfit(22)).foregroundStyle(color(rating))
+                Text(Self.words[value - 1].1).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    .multilineTextAlignment(.center)
+            }
+            .animation(NoopMotion.swap, value: value)
+            Spacer()
+            Button(action: save) {
+                Text("Save workout").font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
+                    .frame(maxWidth: .infinity).frame(height: 56)
+                    .background(NoopHTMLColor.warm, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+            .padding(.horizontal, 22).padding(.bottom, 18)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(NoopHTMLColor.canvas)
+        .sensoryFeedback(.selection, trigger: value)
+    }
+
+    /// A 270° arc from bottom-left to bottom-right; drag the knob or anywhere on the ring.
+    private var dial: some View {
+        GeometryReader { g in
+            let size = min(g.size.width, g.size.height)
+            let r = size / 2 - 18
+            let c = CGPoint(x: g.size.width / 2, y: g.size.height / 2)
+            let start = 135.0, sweep = 270.0
+            let frac = (rating - 1) / 9
+            let angle = Angle(degrees: start + sweep * frac)
+            ZStack {
+                Circle().trim(from: 0, to: 0.75)
+                    .stroke(Color.white.opacity(0.07), style: StrokeStyle(lineWidth: 16, lineCap: .round))
+                    .rotationEffect(.degrees(start))
+                    .frame(width: r * 2, height: r * 2)
+                Circle().trim(from: 0, to: 0.75 * frac)
+                    .stroke(AngularGradient(colors: [NoopHTMLColor.blueLight, NoopHTMLColor.warm, NoopHTMLColor.amber, NoopHTMLColor.red],
+                                            center: .center, startAngle: .degrees(0), endAngle: .degrees(270)),
+                            style: StrokeStyle(lineWidth: 16, lineCap: .round))
+                    .rotationEffect(.degrees(start))
+                    .frame(width: r * 2, height: r * 2)
+                ForEach(1...10, id: \.self) { i in
+                    let a = Angle(degrees: start + sweep * Double(i - 1) / 9)
+                    Circle().fill(Color.white.opacity(i <= value ? 0.0 : 0.25)).frame(width: 4, height: 4)
+                        .position(x: c.x + (r) * cos(a.radians), y: c.y + (r) * sin(a.radians))
+                }
+                Circle().fill(NoopHTMLColor.ink).frame(width: 26, height: 26)
+                    .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
+                    .position(x: c.x + r * cos(angle.radians), y: c.y + r * sin(angle.radians))
+                Text("\(value)").font(NoopHTMLFont.outfit200(84)).monospacedDigit().foregroundStyle(color(rating))
+                    .contentTransition(.numericText())
+                HStack {
+                    Text("1"); Spacer(); Text("10")
+                }
+                .font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(NoopHTMLColor.muted)
+                .frame(width: r * 1.3).position(x: c.x, y: c.y + r * 0.92)
+            }
+            .contentShape(Circle())
+            .gesture(DragGesture(minimumDistance: 0).onChanged { v in
+                var deg = atan2(v.location.y - c.y, v.location.x - c.x) * 180 / .pi
+                if deg < 0 { deg += 360 }
+                var rel = deg - start
+                if rel < 0 { rel += 360 }
+                if rel > sweep { rel = rel > sweep + (360 - sweep) / 2 ? 0 : sweep }
+                rating = 1 + 9 * rel / sweep
+            }.onEnded { _ in withAnimation(NoopMotion.swap) { rating = rating.rounded() } })
+            .accessibilityElement()
+            .accessibilityLabel("Effort")
+            .accessibilityValue("\(value) of 10, \(Self.words[value - 1].0)")
+            .accessibilityAdjustableAction { d in
+                rating = d == .increment ? min(10, rating.rounded() + 1) : max(1, rating.rounded() - 1)
+            }
+        }
+    }
+}
 #endif
