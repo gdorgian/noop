@@ -819,12 +819,20 @@ struct NoopDataScreen: View {
 
                 VStack(spacing: 8) {
                     VStack(spacing: 0) {
-                        dataRoute("Bring your history in", "One file, any brand — Noop works out what it is", glyph: .download) {
+                        dataRoute("Bring your history in", "Import supported history files or a nutrition CSV with calories and macros", glyph: .download) {
                             navigation.enter(.importHistory, from: .data)
                         }
                         Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
                         dataRoute("Backup and sync", backupRouteDetail, glyph: .upload) {
                             navigation.enter(.backup, from: .data)
+                        }
+                        Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                        dataRoute("Your data, fused", "Sources combined, with the selected source named", glyph: .copy) {
+                            navigation.enter(.fused, from: .data)
+                        }
+                        Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                        dataRoute("Storage", "What is kept on this phone and how much space it uses", glyph: .grid) {
+                            navigation.enter(.storage, from: .data)
                         }
                     }
                     .padding(.horizontal, 16)

@@ -35,6 +35,16 @@ Today shows an opt-in Possible activity card directly below Today’s session. R
 
 The opt-in activity confirmation detector breaks at heart-rate recording gaps longer than its existing 90-second continuity tolerance. Missing time cannot qualify a workout or rejoin separate recorded bouts during merging. Thirty-second live sampling remains supported; the twelve-minute qualification policy, saved-workout exclusion and user-confirmation boundary remain unchanged. Test Centre traces report the recording-gap breaks.
 
+Trends reads in order: period control, current body-age hero, factual first-to-latest weekly summary, four signal cards, dated bloodwork, a fixed twelve-week recording grid, Explore, and Your summaries. Capacity opens its details from either its chart card or Explore. Bloodwork reads the existing Lab Book independently of the chart window and retains its test dates. Change badges use a neutral style rather than rewarding direction alone.
+
+Biomarkers has one primary entry in the Trends exploration group beside Capacity and Rhythm, using the existing warm orange bloodwork accent. The You and goal-page shortcuts are removed; Settings search still finds bloodwork. Result entry and marker detail screens remain available.
+
+The app philosophy page, What Noop will not ask you, lives under Settings → About rather than the You overview.
+
+Settings consolidates repeated profile, zones, device, data and report shortcuts into their primary homes on You, Your strap, Data and permissions, and Trends. Settings search finds the moved destinations with location labels and filters retained preference groups. Data and permissions includes source fusion, storage, supported-file import, and backup with its dedicated restore action. Existing preferences and backend actions remain available.
+
+The iOS Rest page pairs the sleep overview with a compact seven-night selector, followed by the selected sleep breakdown, debt and consistency links, and next-sleep planning with the evening journal and alarm flow. You keeps the body clock and a compact profile entry, exposes zones, goals and history before app administration, and moves the longer body-reference cards into Your record. Existing records and card styles are preserved.
+
 On iPhone, Aura's Trends page links directly to **Weekly digest** and **Trends report** in its
 existing grouped navigation. The same pages remain available from Settings → Tools. A report
 opened from Trends returns there and keeps Trends selected; one opened from Settings returns to

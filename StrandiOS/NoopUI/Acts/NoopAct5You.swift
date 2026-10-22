@@ -521,6 +521,7 @@ private extension NoopAct5Screens {
                 }
 
                 VStack(alignment: .leading, spacing: 9) {
+                    youSectionLabel("Your body")
                     Button { navigation.push(.record) } label: {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 8) {
@@ -551,6 +552,45 @@ private extension NoopAct5Screens {
                     }
                     .buttonStyle(NoopHTMLPressStyle())
 
+                    dividedCard {
+                        copyRow("Your zones", detail: "five bands for your effort", symbol: "chart.bar", tint: Self.blush, value: "5") { navigation.push(.zones) }
+                    }
+
+                    youSectionLabel("Your journey")
+                        .padding(.top, 8)
+                    dividedCard {
+                        VStack(spacing: 0) {
+                            copyRow("Your journey", detail: you == nil ? "half marathon, 26 October · 46% recorded" : nil, symbol: "sparkles", tint: Self.blush) { navigation.push(.goal) }
+                            Divider().overlay(NoopHTMLColor.border)
+                            copyRow("Everything you logged", detail: "sessions, sleeps, coffees", symbol: "waveform.path.ecg", tint: Self.blush, value: you == nil ? "142" : nil) { navigation.push(.history) }
+                        }
+                    }
+
+                    youSectionLabel("Your app")
+                        .padding(.top, 8)
+                    dividedCard {
+                        VStack(spacing: 0) {
+                            copyRow("Your strap", detail: you == nil ? "WHOOP 5.0 / MG · synced 2 min ago" : liveStrapDetail, symbol: "applewatch", value: you == nil ? "52%" : battery.map { "\($0)%" }) { navigation.push(.strap) }
+                            Divider().overlay(NoopHTMLColor.border)
+                            copyRow("Data and permissions", detail: "what is kept, and what leaves", symbol: "shield", tint: Self.blush) { navigation.push(.data) }
+                            Divider().overlay(NoopHTMLColor.border)
+                            copyRow("Settings", detail: "preferences, alerts and advanced controls", symbol: "ruler", tint: Self.blush) { navigation.push(.settings) }
+                        }
+                    }
+
+                    Text("Noop is told six things about your body and works the rest out.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 2)
+                }
+                .padding(.top, 18)
+            }
+        }
+    }
+
+    var bodyReferenceCards: some View {
+        VStack(alignment: .leading, spacing: 9) {
                     NoopSectionLabel("The three numbers everything runs on")
                         .padding(.horizontal, 2)
                         .padding(.top, 8)
@@ -579,35 +619,13 @@ private extension NoopAct5Screens {
                     }
                     }
 
-                    dividedCard {
-                        VStack(spacing: 0) {
-                            copyRow("Your journey", detail: you == nil ? "half marathon, 26 October · 46% recorded" : nil, symbol: "sparkles", tint: Self.blush) { navigation.push(.goal) }
-                            Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Biomarkers", detail: "your own bloodwork, dated and kept here", symbol: "drop", tint: Self.blush, value: you == nil ? "\(NoopLabCatalog.markerCount)" : nil) { navigation.push(.labs) }
-                            Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Your strap", detail: you == nil ? "WHOOP 5.0 / MG · synced 2 min ago" : liveStrapDetail, symbol: "applewatch", value: you == nil ? "52%" : battery.map { "\($0)%" }) { navigation.push(.strap) }
-                            Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Everything you logged", detail: "sessions, sleeps, coffees", symbol: "waveform.path.ecg", tint: Self.blush, value: you == nil ? "142" : nil) { navigation.push(.history) }
-                            Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Data and permissions", detail: "what is kept, and what leaves", symbol: "shield", tint: Self.blush) { navigation.push(.data) }
-                            Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Settings", detail: "every switch Noop has, in eleven groups", symbol: "ruler", tint: Self.blush) { navigation.push(.settings) }
-                            Divider().overlay(NoopHTMLColor.border)
-                            // 8.2b. The only row here that is a position rather than a place, which is
-                            // why it sits last and why its icon is the one non-neutral glyph on `you`.
-                            copyRow("What Noop will not ask you", detail: "no weight goal, no step target, no score", symbol: "nosign", tint: Self.blushLabel) { navigation.push(.position) }
-                        }
-                    }
-
-                    Text("Noop is told six things about your body and works the rest out.")
-                        .font(NoopHTMLFont.sans(11.5))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .lineSpacing(4)
-                        .padding(.horizontal, 2)
-                }
-                .padding(.top, 18)
-            }
         }
+    }
+
+    func youSectionLabel(_ title: String) -> some View {
+        NoopSectionLabel(title, color: Self.blushLabel)
+            .padding(.horizontal, 2)
+            .padding(.bottom, 4)
     }
 
     func recordFact(_ value: String, _ label: String) -> some View {
@@ -942,6 +960,7 @@ private extension NoopAct5Screens {
                 .background(Self.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
                 .overlay(RoundedRectangle(cornerRadius: 22).stroke(Self.blush.opacity(0.2), lineWidth: 0.5))
                 }
+                bodyReferenceCards
             }
         }
         .sheet(isPresented: $confirmingProfile) {
@@ -3204,7 +3223,7 @@ private extension NoopAct5Screens {
         NoopScreen(topInset: 56, initialScrollID: settingsInitialScrollID) {
             VStack(alignment: .leading, spacing: 12) {
                 act5BackHeader("You") { navigation.back(or: .you) }
-                pageTitle("Settings", copy: "Eleven groups, every switch written with what it costs you. The sharp edges live in the Lab at the foot.")
+                pageTitle("Settings", copy: "Preferences, permissions for interruptions, and advanced controls. Your body and records live on You.")
                     .padding(.bottom, 5)
 
                 HStack(spacing: 10) {
@@ -3221,12 +3240,11 @@ private extension NoopAct5Screens {
                 .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
 
-                settingsGroup("You") {
-                    copyRow("Your record", detail: "photo, birth, sex, height, weight, waist, maximum", symbol: "person", tint: Self.blush) { navigation.push(.record) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    copyRow("Your zones", detail: settingsZoneDetail,
-                            symbol: "chart.bar", tint: Self.blush, value: "5") { navigation.push(.zones) }
-                    Divider().overlay(NoopHTMLColor.border)
+                if !settingsSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    settingsDestinationResults
+                }
+
+                settingsGroup("Baselines") {
                     actionRow(
                         baselinesRestarting ? "Baselines restarting from tonight" : "Recalibrate your baselines",
                         detail: baselinesRestarting
@@ -3294,12 +3312,6 @@ private extension NoopAct5Screens {
                 }
 
                 settingsGroup("Your strap") {
-                    copyRow("Your strap", detail: "battery, sensors, sync, log and Apple Health", symbol: "applewatch", tint: Self.blush,
-                            value: measured ? battery.map { "\($0)%" } : "52%") { navigation.push(.strap) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    copyRow("Manage straps", detail: "pair, switch, forget or rename a band", symbol: "link", tint: Self.blush,
-                            value: measured ? "\(pairedStrapCount)" : (sparePresent ? "2" : "1")) { navigation.push(.devices) }
-                    Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Live heart rate in the Dynamic Island", detail: "Also puts it on the Lock Screen while a session runs.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Battery alerts", detail: "One notice at 15% and one when it finishes charging. Never twice for the same crossing.", tint: Self.blush)
@@ -3351,19 +3363,9 @@ private extension NoopAct5Screens {
                     segmentRow("Svea’s manner", detail: "plain writes a paragraph, quiet writes a line", choices: ["Plain", "Quiet", "Direct", "Off"])
                 }
 
-                settingsGroup("Backup and data") {
-                    actionRow("Back up to a file", detail: "one .noopbak with every night, session and log — yours to keep", symbol: "arrow.down.to.line", tint: NoopHTMLColor.blue) {
-                        navigation.enter(.backup, from: .data)
-                    }
-                    Divider().overlay(NoopHTMLColor.border)
-                    actionRow("Restore from a file", detail: "imports straight back in; nothing is merged silently", symbol: "arrow.up.to.line", tint: NoopHTMLColor.blue) {
-                        navigation.enter(.importHistory, from: .data)
-                    }
-                    Divider().overlay(NoopHTMLColor.border)
-                    copyRow("Data and permissions", detail: "what is recorded, what leaves, and how to delete it", symbol: "shield", tint: Self.blush) { navigation.enter(.data, from: .you) }
-                }
-
                 settingsGroup("About") {
+                    copyRow("What Noop will not ask you", detail: "no weight goal, no step target, no score", symbol: "nosign", tint: Self.blushLabel) { navigation.push(.position) }
+                    Divider().overlay(NoopHTMLColor.border)
                     actionRow("Check for updates", detail: updateDetail, symbol: "arrow.triangle.2.circlepath", tint: NoopHTMLColor.blue) {
                         if case let .available(_, url, _) = updates.state {
                             UIApplication.shared.open(url)
@@ -3386,16 +3388,6 @@ private extension NoopAct5Screens {
                 }
 
                 settingsGroup("Tools") {
-                    canonicalLinkRow("Your data, fused", detail: "every source merged onto one record, with the winner named", glyph: .copy, tint: Self.blush) { navigation.push(.fused) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    canonicalLinkRow("Storage", detail: "what Noop keeps on this phone, and what can go", glyph: .grid, tint: Self.blush) { navigation.push(.storage) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    canonicalLinkRow("Nutrition", detail: "bring calories and macros in from a CSV", glyph: .plate, tint: Self.blush) { navigation.enter(.importHistory, from: .data) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    canonicalLinkRow("Trends report", detail: "a longer read across a window, exportable as a PDF", glyph: .chart, tint: Self.blush) { navigation.push(.report) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    canonicalLinkRow("Weekly digest", detail: "this week against last, in your own numbers", glyph: .file, tint: Self.blush) { navigation.push(.digest) }
-                    Divider().overlay(NoopHTMLColor.border)
                     canonicalLinkRow("Siri and Shortcuts", detail: "Sync, Buzz, Mark a moment and Ask Svea, hands-free", glyph: .spark, tint: Self.blush) { navigation.push(.siri) }
                     Divider().overlay(NoopHTMLColor.border)
                     canonicalLinkRow("Shortcuts export", detail: "the HealthKit-free path, for a sideloaded build", glyph: .upload, tint: Self.blush) { navigation.push(.shortcutExport) }
@@ -3427,6 +3419,76 @@ private extension NoopAct5Screens {
         }
     }
 
+    // Search aliases preserve discoverability after shortcuts move to their primary homes.
+    var movedSettingsDestinations: [(title: String, home: String, aliases: String, route: NoopRoute, parent: NoopRoute)] {
+        [
+            ("Your record", "You · Your body", "profile photo birth sex height weight waist maximum", .record, .you),
+            ("Your zones", "You · Your body", "heart rate training bands", .zones, .you),
+            ("Biomarkers", "Trends", "bloodwork blood tests lab results markers", .labs, .trends),
+            ("Your strap", "You · Your strap", "battery sensors sync apple health", .strap, .you),
+            ("Manage straps", "You · Your strap", "pair switch forget rename band devices", .devices, .strap),
+            ("Data and permissions", "You · Data and permissions", "privacy recorded delete", .data, .you),
+            ("Backup and restore", "Data and permissions · Backup and sync", "back up restore file noopbak export", .backup, .data),
+            ("Import a file", "Data and permissions · Bring your history in", "nutrition calories macros csv history import", .importHistory, .data),
+            ("Your data, fused", "Data and permissions", "source winner merged", .fused, .data),
+            ("Storage", "Data and permissions", "phone space database", .storage, .data),
+            ("Weekly digest", "Trends", "week summary", .digest, .trends),
+            ("Trends report", "Trends", "pdf export window report", .report, .trends)
+        ]
+    }
+
+    func settingsSearchMatches(_ text: String) -> Bool {
+        let words = settingsSearch.lowercased().split(whereSeparator: { $0.isWhitespace })
+        return words.allSatisfy { text.localizedCaseInsensitiveContains(String($0)) }
+    }
+
+    func settingsGroupMatches(_ title: String) -> Bool {
+        settingsSearchMatches(title + " " + (settingsSearchKeywords[title] ?? ""))
+    }
+
+    var settingsSearchKeywords: [String: String] {
+        [
+        "Units": "units units stored in si either way metric imperial temperature independent of the rest °c °f effort display only — effort is stored 0–100 0–100 0–21",
+        "Appearance": "appearance widgets \\(widgetfamilycountword) families, and what each one answers square.grid.2x2 appearance dark only in this build — light is drawn but not coloured yet dark light system light system language english only in this build; the strings are written but not translated system english deutsch system deutsch reduce motion in noop poses every looping graphic still without needing the system switch. chart colours a second palette for the data, leaving the chrome alone sleep chart the hypnogram drawn as rows or as a ribbon instead card surface frosted and clear cards, so the sky shows through day-cycle sky a backdrop that moves with the hour settings-app-icon",
+        "Your strap": "your strap your strap battery, sensors, sync, log and apple health applewatch \\($0)% 52% manage straps pair, switch, forget or rename a band link \\(pairedstrapcount) 2 1 live heart rate in the dynamic island also puts it on the lock screen while a session runs. battery alerts one notice at 15% and one when it finishes charging. never twice for the same crossing.",
+        "Power saving": "power saving power saving syncs every 45 minutes instead of 15 once the strap is low and discharging. never while charging. power saving at the strap battery that starts it 10% 20% 30% pause the hrv stream when low releases the always-on stream too. costs overnight variability detail on that night only.",
+        "Features": "features hydration a local water log with a goal that follows your sex and the day’s effort offer a workout it spotted sees a probable session in your heart rate and offers to save it. it never creates one for you. journal reminder the seven-day strip on today. off removes it entirely. keep the screen on in a workout holds the screen awake while a manual recording runs.",
+        "What may interrupt you": "what may interrupt you buzz for phone notifications which apps reach your wrist, and how bell 5 bedtime nudge one buzz thirty minutes before your anchor, and nothing after it. session offer one notification a day, in the morning, with today’s recommendation. weekly read sunday evening summary. off by default because most weeks do not need one. quiet hours nothing buzzes between your anchor and your usual wake, whatever else is on.",
+        "Automations": "automations automations what the strap does on its own, and what a tap on it does sparkles 3 on rhythm needs reading and ticking a page first. no alarms, no red, no condition names.",
+        "Svea": "svea provider and key anthropic · your key · 5 of 7 grants key what she may read purpose by purpose, revocable shield memory what she keeps between conversations sparkles svea’s manner plain writes a paragraph, quiet writes a line plain quiet direct off",
+        "About": "what noop will not ask you no weight goal no step target no score about check for updates arrow.triangle.2.circlepath cfbundleshortversionstring 0 how noop works how sleep is sorted, how the scores build, where the numbers come from what’s new the four readings in 11.7, and every version before it",
+        "Tools": "tools your data, fused every source merged onto one record, with the winner named storage what noop keeps on this phone, and what can go nutrition bring calories and macros in from a csv trends report a longer read across a window, exportable as a pdf weekly digest this week against last, in your own numbers siri and shortcuts sync, buzz, mark a moment and ask svea, hands-free shortcuts export the healthkit-free path, for a sideloaded build strap limitations 4.0 against 5.0 against mg — what each band can read flask the lab experimental readings, protocol probes and every diagnostic. nothing in here is needed to use noop. noop 5.2.0 · whoop 5.0 / mg · everything on this phone",
+        "Baselines": "recalibrate baselines recovery hrv resting pulse respiration skin temperature restart",
+        ]
+    }
+
+    var settingsDestinationResults: some View {
+        let results = movedSettingsDestinations.filter {
+            settingsSearchMatches($0.title + " " + $0.home + " " + $0.aliases)
+        }
+        return VStack(alignment: .leading, spacing: 8) {
+            if !results.isEmpty {
+                NoopSectionLabel("Elsewhere in Noop").padding(.horizontal, 2)
+                dividedCard {
+                    VStack(spacing: 0) {
+                        ForEach(results.indices, id: \.self) { index in
+                            let result = results[index]
+                            if index > 0 { Divider().overlay(NoopHTMLColor.border) }
+                            copyRow(result.title, detail: result.home, tint: Self.blush) {
+                                navigation.enter(result.route, from: result.parent)
+                            }
+                        }
+                    }
+                }
+            } else if !settingsSearchKeywords.keys.contains(where: settingsGroupMatches) {
+                Text("No matching setting or destination. Try profile, backup, units or alerts.")
+                    .font(NoopHTMLFont.sans(12.5))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .padding(.vertical, 12)
+            }
+        }
+    }
+
     var updateDetail: String {
         switch updates.state {
         case .idle: "one request to the release page, when you ask for it"
@@ -3442,6 +3504,8 @@ private extension NoopAct5Screens {
         note: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
+        Group {
+        if settingsGroupMatches(title) {
         VStack(alignment: .leading, spacing: 8) {
             NoopSectionLabel(title).padding(.horizontal, 2).padding(.top, 8)
             if let note {
@@ -3454,6 +3518,8 @@ private extension NoopAct5Screens {
                     .padding(.bottom, 2)
             }
             dividedCard { content() }
+        }
+        }
         }
     }
 

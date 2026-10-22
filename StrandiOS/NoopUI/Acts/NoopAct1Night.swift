@@ -73,6 +73,7 @@ struct NoopAct1Screens: View {
                 .padding(.bottom, 20)
 
                 VStack(spacing: 10) {
+                    restSectionLabel("Your sleep")
                     if let rest, rest.phase != .ready {
                         restAbsentCard(rest.phase)
                     } else {
@@ -126,7 +127,6 @@ struct NoopAct1Screens: View {
                         }
                     }
                     .buttonStyle(NoopHTMLPressStyle())
-                    .padding(.top, -14)
                     }
 
                     sevenNightsCard
@@ -150,6 +150,9 @@ struct NoopAct1Screens: View {
                         .allowsHitTesting(!restAbsent)
                     }
 
+                    restSectionLabel("Over time")
+                        .padding(.top, 8)
+
                     Act1LinkRow(
                         title: "Sleep debt",
                         detail: rest != nil ? nil : selectedNightOffset == 0
@@ -160,7 +163,23 @@ struct NoopAct1Screens: View {
                     .opacity(restAbsent ? 0.38 : 1)
                     .allowsHitTesting(!restAbsent)
 
-                    if navigation.nightJournalSaved { savedJournalRow }
+                    Act1LinkRow(
+                        title: "Sleep consistency",
+                        detail: "Your sleep timing across nights",
+                        glyph: .read
+                    ) { navigation.push(.rhythm) }
+                    .opacity(restAbsent ? 0.38 : 1)
+                    .allowsHitTesting(!restAbsent)
+
+                    restSectionLabel("Your next sleep")
+                        .padding(.top, 8)
+                    if navigation.nightJournalSaved {
+                        savedJournalRow
+                    } else {
+                        Act1LinkRow(title: "Evening journal", detail: "Add context before your next sleep", glyph: .read) {
+                            navigation.show(.nightJournal)
+                        }
+                    }
 
                     Button { navigation.push(.tonight) } label: {
                         VStack(alignment: .leading, spacing: 11) {
@@ -219,8 +238,15 @@ struct NoopAct1Screens: View {
         }
     }
 
+    private func restSectionLabel(_ title: String) -> some View {
+        NoopSectionLabel(title, color: NoopHTMLColor.nightLight)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 2)
+            .padding(.bottom, 4)
+    }
+
     private var sevenNightsCard: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 NoopSectionLabel(isNightWorker ? "Your last seven sleeps" : "Your last seven")
                 Spacer()
@@ -241,7 +267,7 @@ struct NoopAct1Screens: View {
                 ZStack(alignment: .bottom) {
                     Canvas { context, size in
                         var need = Path()
-                        let y = size.height - (22 + 92 * min(8.4, restNeedHours) / 8.4)
+                        let y = size.height - (22 + 44 * min(8.4, restNeedHours) / 8.4)
                         need.move(to: CGPoint(x: 0, y: y))
                         need.addLine(to: CGPoint(x: size.width, y: y))
                         context.stroke(need, with: .color(NoopHTMLColor.night.opacity(0.55)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
@@ -270,7 +296,7 @@ struct NoopAct1Screens: View {
                                                 ? LinearGradient(colors: [Color(hex: 0xA9B6E8), Color(hex: 0x6E7DB8)], startPoint: .top, endPoint: .bottom)
                                                 : LinearGradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom)
                                         )
-                                        .frame(height: 92 * min(8.4, night.value) / 8.4)
+                                        .frame(height: 44 * min(8.4, night.value) / 8.4)
                                         .shadow(color: selected ? Color(hex: 0x6E7DB8).opacity(0.35) : .clear, radius: 9, y: 5)
                                     Text(night.day)
                                         .font(NoopHTMLFont.sans(11.5, weight: selected ? .semibold : .medium))
@@ -283,9 +309,9 @@ struct NoopAct1Screens: View {
                         }
                     }
                 }
-                .frame(width: proxy.size.width, height: 132, alignment: .bottom)
+                .frame(width: proxy.size.width, height: 84, alignment: .bottom)
             }
-            .frame(height: 132)
+            .frame(height: 84)
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)

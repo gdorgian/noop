@@ -535,8 +535,6 @@ private struct NoopGoalJourney: View {
                 }
                 .padding(.top, 10)
 
-                NoopAct8BiomarkerLink(detail: biomarkersSummary) { navigation.push(.labs) }
-                    .padding(.top, 10)
                 Text("Progress is counted from sessions that were actually recorded on your wrist. Noop will not credit you for a week it did not see, and it will not invent a streak to keep you going.")
                     .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                     .padding(.horizontal, 2)
@@ -663,8 +661,6 @@ private struct NoopGoalJourney: View {
                     .padding(.top, 10)
                 }
 
-                NoopAct8BiomarkerLink(detail: nil) { navigation.push(.labs) }
-                    .padding(.top, 10)
                 Text(liveEvidenceNote(for: goal))
                     .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                     .padding(.horizontal, 2)
@@ -1615,11 +1611,8 @@ private struct NoopLabsHome: View {
         NoopScreen(bottomInset: 118, topInset: 56) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 12) {
-                    // 47-act8-goals.md §8.3: `labs` is a second root, not a child of `goal`. Its
-                    // chevron reads You and leaves the act. The destination said `goal` — a parent
-                    // the user never passed through, and the one case where the button and the
-                    // label disagreed.
-                    Button { navigation.back(or: .you) } label: {
+                    // Bloodwork is entered from Trends; search and deep links retain their origin.
+                    Button { navigation.back(or: .trends) } label: {
                         ZStack {
                             Circle().fill(Color.white.opacity(0.06))
                                 .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
@@ -1627,7 +1620,7 @@ private struct NoopLabsHome: View {
                         }
                         .frame(width: 34, height: 34)
                     }.buttonStyle(NoopPlainHitStyle())
-                    Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(navigation.previousScreenTitle ?? "Trends").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
                     // Add results enters the picker. It must not raise a photo-source dialogue:
                     // the picker is where the privacy sentence lives, and where the by-hand route

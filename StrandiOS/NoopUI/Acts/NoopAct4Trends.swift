@@ -113,6 +113,8 @@ private enum NoopA4 {
 
 private struct NoopTrendsScreen: View {
     @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var repo: Repository
+    @StateObject private var labBook = NoopLabBook()
     @Binding var window: NoopTrendWindow
     var live: NoopTrendsRecord? = nil
     var battery: Int? = nil
@@ -124,6 +126,9 @@ private struct NoopTrendsScreen: View {
                 NoopA4Header(title: "Trends", eyebrow: window.span) {
                     NoopBatteryChip(percent: live == nil ? 52 : battery) { navigation.push(.strap) }
                 }
+
+                windowControl
+                    .padding(.top, 14)
 
                 Button { navigation.reset(to: .ages) } label: {
                     NoopBodyAgeHero(
@@ -137,51 +142,119 @@ private struct NoopTrendsScreen: View {
                 .padding(.top, 10)
 
                 VStack(alignment: .leading, spacing: 9) {
-                    windowControl
-                    // Six weeks always says "too early"; the longer verdicts assert the lines moved,
-                    // and have no designed form for when they did not, so production shows only the
-                    // six-week card (listed for design).
-                    if live == nil || window == .sixWeeks {
-                    verdictCard
-                    }
+                    Text("Body age is the latest estimate. The period above applies to the signal charts below.")
+                        .font(NoopHTMLFont.sans(11.5))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                    progressSummaryCard
 
+                    sectionLabel("What changed")
                     ForEach(trendRows) { row in
-                        NoopTrendSignalCard(row: row)
+                        if row.name == "Capacity" {
+                            Button { navigation.push(.capacity) } label: {
+                                NoopTrendSignalCard(row: row, showsDetail: true)
+                            }
+                            .buttonStyle(NoopHTMLPressStyle())
+                        } else {
+                            NoopTrendSignalCard(row: row)
+                        }
                     }
 
+                    sectionLabel("Bloodwork", color: NoopHTMLColor.warm)
+                    bloodworkCard
+
+                    sectionLabel("Your consistency")
                     NoopAttendanceCard(live: live?.attendance)
 
+                    sectionLabel("Explore")
                     NoopHTMLCard(radius: 22, padding: 0) {
                         VStack(spacing: 0) {
-                            trendLink("Capacity", detail: live == nil ? "the estimate, and what moved it" : nil, symbol: "lungs", route: .capacity)
+                            trendLink("Capacity", detail: "the estimate, and the recorded changes", symbol: "lungs", route: .capacity)
                             Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
                             trendLink("Rhythm", detail: "sleep, and how regular it has been", symbol: "moon", route: .rhythm)
                             Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            trendLink("Weekly digest", detail: "this week against last, in your own numbers", symbol: "digest", route: .digest)
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            trendLink("Trends report", detail: "a longer read across a window, exportable as a PDF", symbol: "report", route: .report)
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            // The year's chapters and firsts are written for the example person; no engine
-                            // writes them for a real record, so production has no door into an empty page.
-                            if live == nil {
-                            trendLink("The year so far", detail: "eight months in four chapters", symbol: "chart.bar.xaxis", route: .year)
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            }
-                            trendLink("Ask it something", detail: "every signal you keep, and what moves it", symbol: "ask", route: .instrumentIndex)
+                            trendLink("Ask it something", detail: "explore the signals you keep", symbol: "ask", route: .instrumentIndex)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
                     }
 
-                    Text("Four lines and a grid. Noop will not show you a trend it cannot defend — on a short window it says so instead of drawing an arrow.")
-                        .font(NoopHTMLFont.sans(11.5))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .noopA4LineBox(fontSize: 11.5, ratio: 1.6)
-                        .padding(.horizontal, 2)
+                    sectionLabel("Your summaries")
+                    NoopHTMLCard(radius: 22, padding: 0) {
+                        VStack(spacing: 0) {
+                            trendLink("Weekly digest", detail: "this week against last, in your own numbers", symbol: "digest", route: .digest)
+                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                            trendLink("Trends report", detail: "a longer read across a window, exportable as a PDF", symbol: "report", route: .report)
+                            if live == nil {
+                                Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                                trendLink("The year so far", detail: "eight months in four chapters", symbol: "chart.bar.xaxis", route: .year)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 6)
+                    }
                 }
                 .padding(.top, 14)
             }
         }
+        .task(id: repo.deviceId) {
+            guard live != nil else { return }
+            await labBook.load(store: await repo.storeHandle(), deviceId: repo.deviceId)
+        }
+    }
+
+    private func sectionLabel(_ title: String, color: Color = NoopHTMLColor.muted) -> some View {
+        NoopSectionLabel(title, color: color)
+            .padding(.horizontal, 2)
+            .padding(.top, 12)
+            .padding(.bottom, 3)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var progressSummaryCard: some View {
+        let changes = trendRows.filter { !$0.delta.isEmpty }.map { "\($0.name) \($0.delta)" }
+        return NoopHTMLCard(radius: 22, padding: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                NoopSectionLabel("In this window", color: NoopA4.greenLight)
+                Text(changes.isEmpty ? "More recorded weeks are needed to compare this period." : changes.joined(separator: " · "))
+                    .font(NoopHTMLFont.sans(13.5))
+                    .foregroundStyle(NoopHTMLColor.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Comparing the first and latest recorded weekly averages. Missing weeks are left out.")
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var bloodworkSummary: String {
+        if live == nil { return "9 markers recorded · latest 14 August" }
+        guard labBook.hasLoaded else { return "Opening your recorded results…" }
+        guard !labBook.unavailable else { return "Results could not be refreshed. Open the Lab Book to check." }
+        guard labBook.recordedCount > 0 else { return "No results recorded yet. Add a report or enter results by hand." }
+        return "\(labBook.recordedCount) markers recorded" + (labBook.latestDateLabel.map { " · \($0)" } ?? "")
+    }
+
+    private var bloodworkCard: some View {
+        Button { navigation.push(.labs) } label: {
+            NoopHTMLCard(radius: 22, padding: 16) {
+                HStack(alignment: .top, spacing: 13) {
+                    NoopCanonicalGlyph(name: .drop, size: 20, color: NoopHTMLColor.warm)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Biomarkers").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                        Text(bloodworkSummary).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                        Text("Lab results keep their own dates, independent of the chart period.")
+                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.chevronDim)
+                }
+            }
+        }
+        .buttonStyle(NoopHTMLPressStyle())
     }
 
     private var windowControl: some View {
@@ -204,115 +277,30 @@ private struct NoopTrendsScreen: View {
         .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.white.opacity(0.07), lineWidth: 0.5))
     }
 
-    private var verdictCard: some View {
-        let isShort = window == .sixWeeks
-        let kicker = isShort ? "Six weeks in" : window == .sixMonths ? "Six months in" : "Twelve months in"
-        let headline = isShort ? "Too early to say." : window == .sixMonths ? "Yes — slowly." : "Yes, and you can see where."
-        let restingChange = abs(change(in: NoopA4.resting))
-        let variabilityChange = abs(change(in: NoopA4.variability))
-        let capacityChange = abs(change(in: NoopA4.capacity))
-        let restingText = String(format: "%.0f", restingChange)
-        let variabilityText = String(format: "%.0f", variabilityChange)
-        let capacityText = String(format: "%.1f", capacityChange)
-        let body = isShort
-            ? (live == nil
-                ? "Nothing here has cleared its own noise yet. Every line on this window moves as much on a warm room or a late dinner as it does on training. Ask again at three months — the app would rather say nothing than draw you an arrow it cannot defend."
-                : "The recorded weekly averages are below. Six weeks alone cannot establish whether a change will last.")
-            : window == .sixMonths
-                ? "Resting pulse down \(restingText) beats, variability up \(variabilityText) milliseconds, capacity up \(capacityText) points. All three followed the sleep line, and the sleep line followed one decision: going to bed at roughly the same hour."
-                : "The change is not spread evenly across the year — it starts in March and holds. Four chapters, one of which did most of the work."
-        let tint = isShort ? NoopA4.lavender : NoopA4.green
-
-        return VStack(alignment: .leading, spacing: 9) {
-            Text(kicker.uppercased())
-                .font(NoopHTMLFont.sans(10, weight: .semibold))
-                .tracking(1.4)
-                .foregroundStyle(isShort ? Color(hex: 0xC9D0EE) : NoopA4.green)
-            Text(headline)
-                .font(NoopHTMLFont.outfit(32, weight: .light))
-                .tracking(-1.024)
-                .foregroundStyle(NoopHTMLColor.ink)
-                .frame(minHeight: 34.56, alignment: .top)
-            Text(body)
-                .font(NoopHTMLFont.sans(13.5))
-                .foregroundStyle(Color(hex: 0xB4C9BE))
-                .noopA4LineBox(fontSize: 13.5, ratio: 1.6)
-        }
-        // A short sentence left the card hugging its text, narrower than the cards under it.
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 18)
-        .padding(.top, 18)
-        .padding(.bottom, 17)
-        .background {
-            NoopCSSLinearGradient(
-                colors: [tint.opacity(isShort ? 0.14 : 0.16), tint.opacity(0.03)]
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-        }
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(tint.opacity(0.3), lineWidth: 0.5))
-    }
-
-    private func change(in values: [Double]) -> Double {
-        let shown = NoopA4.tail(values, for: window)
-        return (shown.last ?? 0) - (shown.first ?? 0)
-    }
-
     private var trendRows: [NoopTrendSignal] {
         if let live { return liveRows(live) }
         return [
-            signal(name: "Resting pulse", values: NoopA4.resting, unit: "bpm", digits: 0, lowerIsBetter: true,
-                   short: "Six weeks is not enough to call this. It moves two beats either way with a warm room or a late meal.",
-                   good: "{d} down since {from}, and it has held at this level for eleven weeks. The clearest thing on the screen.",
-                   bad: "Up {d} over the window. Usually sleep before fitness — check Rhythm first."),
-            signal(name: "Variability", values: NoopA4.variability, unit: "ms", digits: 0, lowerIsBetter: false,
-                   short: "Too noisy at this length to mean anything. It swings ten milliseconds on a glass of wine.",
-                   good: "Up {d} since {from}. Your body is absorbing effort better than it was in spring.",
-                   bad: "Down {d} over the window, which usually follows a stretch of short nights."),
-            signal(name: "Sleep", values: NoopA4.sleep, unit: "h", digits: 1, lowerIsBetter: false,
-                   short: "Six weeks of sleep tells you about six weeks, not about you.",
-                   good: "{m} a night more than {inFrom}. Every other line on this screen follows from that one.",
-                   bad: "Down {m} a night. This is the line to fix first; the others follow it."),
-            signal(name: "Capacity", values: NoopA4.capacity, unit: "ml/kg", digits: 1, lowerIsBetter: false,
-                   short: "Capacity moves too slowly to show up in six weeks. Ask again in three months.",
-                   good: "Up {d} since {from}. Ordinary walking and steady rides did that, not intervals.",
-                   bad: "Down {d}, which after a quiet stretch is expected rather than alarming.")
+            signal(name: "Resting pulse", values: NoopA4.resting, unit: "bpm", digits: 0),
+            signal(name: "Variability", values: NoopA4.variability, unit: "ms", digits: 0),
+            signal(name: "Sleep", values: NoopA4.sleep, unit: "h", digits: 1),
+            signal(name: "Capacity", values: NoopA4.capacity, unit: "ml/kg", digits: 1)
         ]
     }
 
-    private func signal(
-        name: String,
-        values: [Double],
-        unit: String,
-        digits: Int,
-        lowerIsBetter: Bool,
-        short: String,
-        good: String,
-        bad: String
-    ) -> NoopTrendSignal {
+    private func signal(name: String, values: [Double], unit: String, digits: Int) -> NoopTrendSignal {
         let shown = NoopA4.tail(values, for: window)
+        let first = shown.first ?? 0
         let current = shown.last ?? 0
-        let change = current - (shown.first ?? current)
-        let threshold = name == "Variability" ? 3.4 : name == "Resting pulse" ? 1.3 : name == "Sleep" ? 0.34 : 0.5
-        let flat = window == .sixWeeks || abs(change) < threshold
-        let improved = lowerIsBetter ? change < 0 : change > 0
+        let scale = pow(10.0, Double(digits))
+        let change = (current * scale).rounded() / scale - (first * scale).rounded() / scale
         let value = current.formatted(.number.precision(.fractionLength(digits)))
         let amount = abs(change).formatted(.number.precision(.fractionLength(digits))) + " " + unit
-        let minutes = "\(Int((abs(change) * 60).rounded())) minutes"
-        let copy = (window == .sixWeeks ? short : improved ? good : bad)
-            .replacingOccurrences(of: "{d}", with: amount)
-            .replacingOccurrences(of: "{m}", with: minutes)
-            .replacingOccurrences(of: "{from}", with: window.from)
-            .replacingOccurrences(of: "{inFrom}", with: window == .sixMonths ? "in March" : window == .year ? "last September" : "six weeks ago")
+        let firstText = first.formatted(.number.precision(.fractionLength(digits)))
         return NoopTrendSignal(
-            name: name,
-            value: value,
-            unit: unit,
-            delta: flat ? "no real change" : (change > 0 ? "+" : "−") + amount,
-            read: copy,
-            values: shown,
-            color: flat ? Color(hex: 0x7F8A85) : improved ? NoopA4.green : NoopA4.warm,
-            flat: flat,
-            improved: improved
+            name: name, value: value, unit: unit,
+            delta: change == 0 ? "unchanged" : (change > 0 ? "+" : "−") + amount,
+            read: "Recorded weekly average: \(firstText) to \(value) \(unit) across \(shown.count) weeks with data.",
+            values: shown, color: NoopA4.greenLight, flat: true, improved: false
         )
     }
 
@@ -354,7 +342,7 @@ private struct NoopTrendsScreen: View {
     }
 
     private func trendLink(_ title: String, detail: String?, symbol: String, route: NoopRoute) -> some View {
-        let tint = symbol == "ask" ? NoopA4.lavender : NoopA4.green
+        let tint = symbol == "biomarkers" ? NoopHTMLColor.warm : symbol == "ask" ? NoopA4.lavender : NoopA4.green
         return Button { navigation.push(route) } label: {
             HStack(spacing: 13) {
                 NoopCanonicalGlyph(name: glyph(for: symbol), size: 20, color: tint)
@@ -380,6 +368,7 @@ private struct NoopTrendsScreen: View {
         case "ask": .ask
         case "digest": .file
         case "report": .chart
+        case "biomarkers": .drop
         default: .trends
         }
     }
@@ -819,47 +808,36 @@ private struct NoopTrendSignal: Identifiable {
 
 private struct NoopTrendSignalCard: View {
     let row: NoopTrendSignal
+    var showsDetail = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(row.name)
-                        .font(NoopHTMLFont.sans(13))
-                        .foregroundStyle(NoopHTMLColor.inkSoft)
-                    HStack(alignment: .firstTextBaseline, spacing: 5) {
-                        Text(row.value)
-                            .font(NoopHTMLFont.outfit(26, weight: .light))
-                            .tracking(-0.78)
-                            .monospacedDigit()
-                            .frame(height: 26)
-                        Text(row.unit)
-                            .font(NoopHTMLFont.sans(11))
-                            .foregroundStyle(NoopHTMLColor.muted)
-                    }
-                }
+            HStack {
+                Text(row.name).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.inkSoft)
                 Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
-                    if !row.delta.isEmpty {
+                if showsDetail { NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.chevronDim) }
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(row.value).font(NoopHTMLFont.outfit(26, weight: .light)).tracking(-0.78).monospacedDigit()
+                Text(row.unit).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted)
+                Spacer()
+                if !row.delta.isEmpty {
                     Text(row.delta)
                         .font(NoopHTMLFont.sans(11, weight: .semibold))
-                        .foregroundStyle(row.flat ? NoopHTMLColor.inkSoft : row.improved ? NoopA4.greenLight : Color(hex: 0xF3C888))
+                        .foregroundStyle(NoopHTMLColor.inkSoft)
                         .padding(.horizontal, 9)
-                        .frame(height: 25)
-                        .background(
-                            row.flat ? Color.white.opacity(0.06) : row.improved ? NoopA4.green.opacity(0.13) : NoopA4.warm.opacity(0.13),
-                            in: RoundedRectangle(cornerRadius: 8)
-                        )
-                    }
-                    NoopA4Sparkline(values: row.values, color: row.color)
-                        .frame(width: 108, height: 34)
+                        .frame(minHeight: 25)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
                 }
             }
+            NoopA4Sparkline(values: row.values, color: NoopA4.greenLight)
+                .frame(height: 34)
+                .accessibilityHidden(true)
             if !row.read.isEmpty {
-            Text(row.read)
-                .font(NoopHTMLFont.sans(11.5))
-                .foregroundStyle(row.flat ? Color(hex: 0x7F8A85) : NoopHTMLColor.copy)
-                .noopA4LineBox(fontSize: 11.5, ratio: 1.5)
+                Text(row.read)
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .noopA4LineBox(fontSize: 11.5, ratio: 1.5)
             }
         }
         .padding(.horizontal, 16)
@@ -881,8 +859,8 @@ private struct NoopA4Sparkline: View {
             let span = max(0.001, high - low)
             let points = values.enumerated().map { index, value in
                 CGPoint(
-                    x: CGFloat(index) / CGFloat(values.count - 1) * 108,
-                    y: 30 - CGFloat((value - low) / span) * 30 + 2
+                    x: CGFloat(index) / CGFloat(values.count - 1) * max(1, size.width - 6) + 3,
+                    y: size.height - 3 - CGFloat((value - low) / span) * max(1, size.height - 6)
                 )
             }
             var line = Path()
@@ -893,7 +871,7 @@ private struct NoopA4Sparkline: View {
                 context.fill(Path(ellipseIn: CGRect(x: last.x - 2.8, y: last.y - 2.8, width: 5.6, height: 5.6)), with: .color(color))
             }
         }
-        .frame(width: 108, height: 34)
+        .frame(height: 34)
     }
 }
 
@@ -907,7 +885,7 @@ private struct NoopAttendanceCard: View {
         NoopHTMLCard(radius: 22, padding: 16) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    NoopSectionLabel("Showing up")
+                    NoopSectionLabel("Recorded days")
                     Spacer()
                     Text("12 weeks \u{00B7} \(recordedDays) of 84 days")
                         .font(NoopHTMLFont.sans(11))
@@ -930,17 +908,14 @@ private struct NoopAttendanceCard: View {
                     }
                 }
                 NoopFlowLayout(spacing: 12) {
-                    key("Slept, worn", color: NoopA4.green.opacity(0.28))
-                    key("Moved as well", color: NoopA4.green)
-                    key("Nothing recorded", color: Color.white.opacity(0.06))
+                    key("Sleep recorded", color: NoopA4.green.opacity(0.28))
+                    key("Activity recorded", color: NoopA4.green)
+                    key("No record", color: Color.white.opacity(0.06))
                 }
-                // The read names the example person's missing week; production has no template for it.
-                if live == nil {
-                Text("Five days missing in twelve weeks, and four of them were one week in June. Attendance is the only number Noop counts, because it predicts every other one.")
+                Text("A fixed twelve-week view of the available record. Gaps mean no data was recorded.")
                     .font(NoopHTMLFont.sans(11.5))
-                    .foregroundStyle(Color(hex: 0x7F8A85))
+                    .foregroundStyle(NoopHTMLColor.copy)
                     .noopA4LineBox(fontSize: 11.5, ratio: 1.55)
-                }
             }
         }
     }
@@ -1109,7 +1084,7 @@ private struct NoopRhythmScreen: View {
     var body: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 0) {
-                NoopA4BackHeader(label: "Trends", action: navigation.back)
+                NoopA4BackHeader(label: navigation.previousScreenTitle ?? "Trends", action: navigation.back)
                 VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Rhythm").font(NoopHTMLFont.outfit(25)).tracking(-0.6)

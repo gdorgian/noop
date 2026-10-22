@@ -765,11 +765,11 @@ final class NoopNavigation: ObservableObject {
     }
 
     var route: NoopRoute { path.last ?? .today }
-    /// Reports belong to their entry context. Settings remains a valid door; opening one from
-    /// Trends must not switch the selected tab to You just because the page lives in Act 5.
+    /// Shared reports and sleep consistency retain the tab from which they were opened.
     var selectedTab: NoopTab {
         switch route {
-        case .digest, .report: path.dropLast().last?.tab ?? route.tab
+        case .digest, .report, .rhythm: path.dropLast().last?.tab ?? route.tab
+        case .labs, .picker, .review, .marker: path.first?.tab ?? route.tab
         default: route.tab
         }
     }
