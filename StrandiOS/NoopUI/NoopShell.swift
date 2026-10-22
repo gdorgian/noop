@@ -300,7 +300,7 @@ private struct NoopLiftLiveBar: View {
 
     var body: some View {
         NoopAnimatedTimeline(minimumInterval: 1.0 / 30.0,
-                                paused: reduceMotion || session.isPaused) { timeline in
+                                paused: reduceMotion || session.isPaused || isStale(at: Date())) { timeline in
             if let presentation = session.presentation(system: unitSystem) {
                 Button {
                     session.isPresented = true
@@ -310,7 +310,7 @@ private struct NoopLiftLiveBar: View {
                         Circle()
                             .fill(dotColor(presentation))
                             .frame(width: 8, height: 8)
-                            .opacity(dotOpacity(at: timeline.date, presentation: presentation))
+                            .opacity(isStale(at: timeline.date) ? 0.5 : dotOpacity(at: timeline.date, presentation: presentation))
 
                         Text(presentation.exercise)
                             .font(NoopHTMLFont.sans(13.5, weight: .semibold))
@@ -322,7 +322,7 @@ private struct NoopLiftLiveBar: View {
                         Spacer(minLength: 0)
 
                         Text(clock(presentation, at: timeline.date))
-                            .font(clockFont(presentation))
+                            .font(isStale(at: timeline.date) ? NoopHTMLFont.sans(13, weight: .semibold) : clockFont(presentation))
                             .tracking(presentation.isPaused || presentation.isReady ? 0 : -0.34)
                             .monospacedDigit()
                             .foregroundStyle(clockColor(presentation))
@@ -399,9 +399,17 @@ private struct NoopLiftLiveBar: View {
         return 0.45 + 0.55 * (0.5 - 0.5 * cos(phase * 2 * .pi))
     }
 
+    /// Two hours on one set or rest means the session was left running, not that someone is still on
+    /// set 3. The bar stops counting up a clock that only grows and asks instead, until it is opened.
+    private func isStale(at date: Date) -> Bool {
+        guard let engine = session.engine, !session.isPaused else { return false }
+        return Int(date.timeIntervalSince1970) - engine.stageStartedAt > 2 * 3600
+    }
+
     /// `date` is the timeline's: the controller's `now` only moves on a tap.
     private func clock(_ p: LiftSessionController.Presentation, at date: Date) -> String {
         if p.isPaused { return "Paused" }
+        if isStale(at: date) { return "Still training?" }
         if p.isReady { return "Ready" }
         let now = Int(date.timeIntervalSince1970)
         if p.isResting, let remaining = session.engine?.restRemaining(now: now) {

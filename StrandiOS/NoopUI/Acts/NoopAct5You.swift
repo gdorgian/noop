@@ -1700,7 +1700,7 @@ private extension NoopAct5Screens {
                 NoopHTMLCard(radius: 24, padding: 18) {
                     VStack(spacing: 16) {
                         HStack(spacing: 18) {
-                            NoopStrapBatteryRing(percent: battery,
+                            NoopStrapBatteryRing(percent: battery, connected: connected,
                                                  daysLeft: live.batteryEstimate.map { BatteryEstimator.label(hours: $0.remainingHours) })
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 8) {
@@ -2840,6 +2840,7 @@ private extension NoopAct5Screens {
 
 private struct NoopStrapBatteryRing: View {
     let percent: Int?
+    var connected = true
     var daysLeft: String? = "~6.2 days"
 
     var body: some View {
@@ -2850,11 +2851,19 @@ private struct NoopStrapBatteryRing: View {
                 .stroke(NoopHTMLColor.blue, style: StrokeStyle(lineWidth: 9, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 1) {
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text(percent.map(String.init) ?? "\u{2014}").font(NoopHTMLFont.outfit(38, weight: .ultraLight)).tracking(-1.5).foregroundStyle(NoopHTMLColor.blue)
-                    Text("%").font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x8B958F))
+                if let percent {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("\(percent)").font(NoopHTMLFont.outfit(38, weight: .ultraLight)).tracking(-1.5).foregroundStyle(NoopHTMLColor.blue)
+                        Text("%").font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x8B958F))
+                    }
+                } else {
+                    // A linked strap answers the battery read late while it sends its history; say that
+                    // rather than draw "—%" beside a days-left figure, which reads as a broken gauge.
+                    Text(connected ? "Checking" : "\u{2014}")
+                        .font(connected ? NoopHTMLFont.sans(13, weight: .medium) : NoopHTMLFont.outfit(38, weight: .ultraLight))
+                        .foregroundStyle(Color(hex: 0x8B958F))
                 }
-                if let daysLeft {
+                if percent != nil, let daysLeft {
                     Text(daysLeft).font(NoopHTMLFont.sans(10)).foregroundStyle(Color(hex: 0x7F8A85))
                 }
             }
