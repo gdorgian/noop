@@ -13,12 +13,13 @@ enum NoopAct: Int, CaseIterable {
     case goals
     case instrument
     case lift
+    case fitness
 }
 
 enum NoopTab: String, CaseIterable, Identifiable {
     case today = "Today"
     case trends = "Trends"
-    case rest = "Rest"
+    case fitness = "Fitness"
     case you = "You"
 
     var id: String { rawValue }
@@ -27,7 +28,7 @@ enum NoopTab: String, CaseIterable, Identifiable {
         switch self {
         case .today: "sun.max"
         case .trends: "chart.bar.xaxis"
-        case .rest: "moon"
+        case .fitness: "figure.run"
         case .you: "person"
         }
     }
@@ -36,7 +37,7 @@ enum NoopTab: String, CaseIterable, Identifiable {
         switch self {
         case .today: .today
         case .trends: .trends
-        case .rest: .rest
+        case .fitness: .fitness
         case .you: .you
         }
     }
@@ -120,6 +121,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case liftLive = "lift-live", liftLibrary = "lift-library", liftProgram = "lift-program"
     case liftDetail = "lift-detail", liftEdit = "lift-edit", liftImport = "lift-import"
     case liftReview = "lift-review", liftMuscles = "lift-muscles"
+    // Fitness (22 Oct 2026): the training home that replaces the Effort and Lift tab-level entry.
+    case fitness
 
     var id: String { rawValue }
 
@@ -141,15 +144,16 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .instrumentRaw, .instrumentCapture: .instrument
         case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles: .lift
+        case .fitness: .fitness
         }
     }
 
     /// The highlighted destination follows the cross-Act grammar of the HTML.
     var tab: NoopTab {
         switch self {
-        case .rest, .tonight, .why, .debt, .alarm:
-            .rest
-        case .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart,
+        // Rest left the tab bar for Fitness (22 Oct 2026); last night is a row on Today.
+        case .rest, .tonight, .why, .debt, .alarm,
+             .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound,
              .session, .pick, .ready, .live, .intervals, .detail, .across,
              .coach, .gate, .setup, .consent, .memory:
@@ -168,8 +172,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         // Act 10 is deliberately not a sixth tab. A lift is an effort, so it lights the same key
         // Act 3 does.
         case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
-             .liftReview, .liftMuscles:
-            .today
+             .liftReview, .liftMuscles, .fitness:
+            .fitness
         }
     }
 
@@ -997,6 +1001,9 @@ final class NoopNavigation: ObservableObject {
         case .lift:
             // Act 10's canonical + destination is the program library.
             push(.liftLibrary)
+        case .fitness:
+            // On Fitness the + starts a session, like Effort's.
+            push(.pick)
         }
     }
 
@@ -1195,6 +1202,7 @@ extension NoopRoute {
         case .liftImport: "Import a program"
         case .liftReview: "Review the import"
         case .liftMuscles: "Muscles"
+        case .fitness: "Fitness"
         }
     }
 }

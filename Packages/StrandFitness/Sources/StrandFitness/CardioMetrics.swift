@@ -47,6 +47,11 @@ public enum PeriodTotals {
         public let current: [Double]
         /// Cumulative value at the end of each day of the previous period.
         public let previous: [Double]
+        public init(current: [Double], previous: [Double]) {
+            self.current = current
+            self.previous = previous
+        }
+
         public var total: Double { current.last ?? 0 }
         public var previousTotal: Double { previous.last ?? 0 }
     }

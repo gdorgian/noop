@@ -631,6 +631,16 @@ struct NoopAct2Screens: View {
                         liveBPM: liveBPM
                     ) { navigation.push(.heart) }
 
+                    // Rest left the tab bar for Fitness (22 Oct 2026); last night is one tap from here.
+                    act2DestinationRow(
+                        title: "Rest",
+                        detail: "Last night, tonight and sleep debt",
+                        glyph: .moon,
+                        tint: NoopHTMLColor.night,
+                        value: nil,
+                        valueColor: NoopHTMLColor.nightLight
+                    ) { navigation.push(.rest) }
+
                     act2DestinationRow(
                         title: "Vitals",
                         detail: "Five signals, each against your own zone",

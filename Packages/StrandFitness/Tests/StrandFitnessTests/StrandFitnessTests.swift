@@ -12,7 +12,7 @@ final class StrandFitnessTests: XCTestCase {
 
     func testTrimpRisesSteeplyWithIntensity() {
         func session(_ hr: Double) -> FitnessCardioSession {
-            FitnessCardioSession(id: "x", start: t0, durationS: 3600, modality: .running, averageHeartRate: hr)
+            FitnessCardioSession(id: "x", start: t0, durationS: 3600, kind: .running, averageHeartRate: hr)
         }
         let easy = CardioLoad.trimp(session(120), physiology: phys)
         let hard = CardioLoad.trimp(session(176), physiology: phys)
@@ -23,10 +23,10 @@ final class StrandFitnessTests: XCTestCase {
     }
 
     func testTrainingLoadStatusesTrackTheRatio() {
-        XCTAssertEqual(TrainingLoad.status(acute: 70, chronic: 100), .detraining)
-        XCTAssertEqual(TrainingLoad.status(acute: 90, chronic: 100), .maintaining)
-        XCTAssertEqual(TrainingLoad.status(acute: 120, chronic: 100), .productive)
-        XCTAssertEqual(TrainingLoad.status(acute: 140, chronic: 100), .fatigued)
+        XCTAssertEqual(AcuteChronicLoad.status(acute: 70, chronic: 100), .detraining)
+        XCTAssertEqual(AcuteChronicLoad.status(acute: 90, chronic: 100), .maintaining)
+        XCTAssertEqual(AcuteChronicLoad.status(acute: 120, chronic: 100), .productive)
+        XCTAssertEqual(AcuteChronicLoad.status(acute: 140, chronic: 100), .fatigued)
     }
 
     func testTrainingLoadCalibratesOnlyWithEnoughRecentHistory() {
@@ -34,16 +34,16 @@ final class StrandFitnessTests: XCTestCase {
         func days(_ offsets: [Int]) -> [Date] { offsets.map { cal.date(byAdding: .day, value: -$0, to: today)! } }
         let steady = days(Array(stride(from: 0, to: 42, by: 4)))   // 11 sessions, latest today
         let load = Dictionary(uniqueKeysWithValues: steady.map { ($0, 40.0) })
-        let r = TrainingLoad.reading(dailyLoad: load, sessionDates: steady, asOf: today, calendar: cal)
+        let r = AcuteChronicLoad.reading(dailyLoad: load, sessionDates: steady, asOf: today, calendar: cal)
         XCTAssertNotEqual(r.status, .calibrating)
         XCTAssertEqual(r.optimal.lowerBound, 0.8 * r.chronic, accuracy: 1e-9)
         XCTAssertEqual(r.gaugeMax, 1.4 * r.optimal.upperBound, accuracy: 1e-9)
 
         let thin = days([0, 5, 10])
-        XCTAssertEqual(TrainingLoad.reading(dailyLoad: load, sessionDates: thin, asOf: today, calendar: cal).status,
+        XCTAssertEqual(AcuteChronicLoad.reading(dailyLoad: load, sessionDates: thin, asOf: today, calendar: cal).status,
                        .calibrating)
         let stale = days(Array(30..<42))   // plenty of sessions, none in the last four weeks
-        XCTAssertEqual(TrainingLoad.reading(dailyLoad: load, sessionDates: stale, asOf: today, calendar: cal).status,
+        XCTAssertEqual(AcuteChronicLoad.reading(dailyLoad: load, sessionDates: stale, asOf: today, calendar: cal).status,
                        .calibrating)
     }
 
@@ -51,9 +51,9 @@ final class StrandFitnessTests: XCTestCase {
         let today = cal.startOfDay(for: t0)
         var load: [Date: Double] = [:]
         for i in 0..<42 { load[cal.date(byAdding: .day, value: -i, to: today)!] = 20 }
-        let base = TrainingLoad.reading(dailyLoad: load, sessionDates: [], asOf: today, calendar: cal)
+        let base = AcuteChronicLoad.reading(dailyLoad: load, sessionDates: [], asOf: today, calendar: cal)
         for i in 0..<7 { load[cal.date(byAdding: .day, value: -i, to: today)!] = 40 }
-        let block = TrainingLoad.reading(dailyLoad: load, sessionDates: [], asOf: today, calendar: cal)
+        let block = AcuteChronicLoad.reading(dailyLoad: load, sessionDates: [], asOf: today, calendar: cal)
         XCTAssertEqual(base.acute, 20, accuracy: 1e-9)
         XCTAssertEqual(block.acute, 40, accuracy: 1e-9)
         XCTAssertEqual(block.chronic, (35 * 20 + 7 * 40) / 42, accuracy: 1e-9)
@@ -118,6 +118,8 @@ final class StrandFitnessTests: XCTestCase {
     func testCatalogueIdsFoldIntoGroups() {
         XCTAssertEqual(FitnessMuscleGroup.forMuscleId("side_delts"), .shoulders)
         XCTAssertEqual(FitnessMuscleGroup.forMuscleId("outer_quadriceps"), .quads)
+        XCTAssertEqual(FitnessMuscleGroup.forMuscleId("rearDelts"), .shoulders)   // Lift log vocabulary
+        XCTAssertEqual(FitnessMuscleGroup.forMuscleId("lowerBack"), .lowerBack)
         XCTAssertNil(FitnessMuscleGroup.forMuscleId("unknown"))
     }
 

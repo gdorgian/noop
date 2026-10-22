@@ -7,7 +7,7 @@ published methods; each is pinned by a test in `Tests/StrandFitnessTests`.
 |---|---|---|
 | Max heart rate, zones | the app's own (You → Your zones, `StrandAnalytics.HRZones`), so Fitness and Your zones agree | Tanaka 2001 |
 | Session cardio load | r = (HR − rest) / (max − rest) (Karvonen); TRIMP = Σ minutes × r × k·e^(b·r); k, b = 0.64, 1.92 (male), 0.86, 1.67 (female), mean if unknown | Banister 1991 |
-| Cardio / Muscular Load | ATL = mean daily load, 7 days; CTL = mean daily load, 42 days; optimal 0.8–1.3 × CTL; gauge top 1.4 × optimal top | acute:chronic ratio, Gabbett 2016 |
+| Cardio / Muscular Load (`AcuteChronicLoad`) | ATL = mean daily load, 7 days; CTL = mean daily load, 42 days; optimal 0.8–1.3 × CTL; gauge top 1.4 × optimal top | acute:chronic ratio, Gabbett 2016 |
 | Load status | ATL/CTL < 0.8 detraining · < 1.0 maintaining · ≤ 1.3 productive · above fatigued | — |
 | Calibrating | fewer than 10 sessions in 42 days, or none in the last 28 | — |
 | Set stimulus | clamp(1 − max(0, RIR − 3) / 10, 0.3, 1); RIR reported, else from the lifter's best e1RM (Epley), best reps or best time | Epley 1985 |

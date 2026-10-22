@@ -70,9 +70,9 @@ public enum MuscularLoad {
     }
 
     /// Share of a cardio session's TRIMP that becomes muscular load, per muscle. Weights sum to the
-    /// modality's total share: running puts half its TRIMP on the legs, swimming a quarter on the back
+    /// kind's total share: running puts half its TRIMP on the legs, swimming a quarter on the back
     /// and shoulders, and so on. Mapped to `TrainingMuscleCatalog` ids.
-    public static func cardioMuscleShare(_ m: CardioModality) -> [String: Double] {
+    public static func cardioMuscleShare(_ m: FitnessCardioKind) -> [String: Double] {
         switch m {
         case .running: ["quadriceps": 0.15, "hamstrings": 0.12, "glutes": 0.1, "calves": 0.13]
         case .cycling: ["quadriceps": 0.2, "glutes": 0.12, "hamstrings": 0.06, "calves": 0.07]
@@ -86,7 +86,7 @@ public enum MuscularLoad {
     }
 
     /// Muscular load of one cardio session, per muscle.
-    public static func cardioMuscleLoad(trimp: Double, modality: CardioModality) -> [String: Double] {
-        cardioMuscleShare(modality).mapValues { $0 * trimp }
+    public static func cardioMuscleLoad(trimp: Double, kind: FitnessCardioKind) -> [String: Double] {
+        cardioMuscleShare(kind).mapValues { $0 * trimp }
     }
 }

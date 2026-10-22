@@ -47,21 +47,22 @@ public enum FitnessMuscleGroup: String, CaseIterable, Sendable, Codable {
         }
     }
 
-    /// The group a `TrainingMuscleCatalog` id belongs to.
+    /// The group a muscle id belongs to: a `TrainingMuscleCatalog` id or a Lift log `LiftMuscle` raw value.
     public static func forMuscleId(_ id: String) -> FitnessMuscleGroup? {
         switch id {
         case "chest", "upper_chest", "lower_chest": .chest
-        case "shoulders", "front_delts", "side_delts", "rear_delts", "rotator_cuff": .shoulders
+        case "shoulders", "front_delts", "side_delts", "rear_delts", "rotator_cuff",
+             "frontDelts", "sideDelts", "rearDelts": .shoulders
         case "biceps": .biceps
         case "triceps": .triceps
         case "forearms": .forearms
         case "lats": .lats
-        case "back", "upper_back", "rhomboids": .upperBack
+        case "back", "upper_back", "rhomboids", "upperBack": .upperBack
         case "traps", "upper_traps", "lower_traps": .traps
-        case "lower_back": .lowerBack
-        case "core", "abdominals", "upper_abs", "lower_abs", "serratus": .abs
+        case "lower_back", "lowerBack": .lowerBack
+        case "core", "abdominals", "upper_abs", "lower_abs", "serratus", "abs": .abs
         case "obliques": .obliques
-        case "legs", "quadriceps", "inner_quadriceps", "outer_quadriceps": .quads
+        case "legs", "quadriceps", "inner_quadriceps", "outer_quadriceps", "quads": .quads
         case "hamstrings": .hamstrings
         case "glutes": .glutes
         case "adductors": .adductors

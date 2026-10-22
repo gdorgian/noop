@@ -22,6 +22,7 @@ struct NoopAppShell: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var labDraft = NoopLabReviewDraft()
     @StateObject private var liftFlow = NoopLiftFlowModel()
+    @StateObject private var fitnessStore = NoopFitnessModel()
     @State private var dragTranslation: CGSize = .zero
 
     var body: some View {
@@ -145,6 +146,7 @@ struct NoopAppShell: View {
         case .goals: NoopAct8Screens(navigation: navigation, labDraft: labDraft)
         case .instrument: NoopAct9Screens(navigation: navigation, data: .prototype)
         case .lift: NoopAct10Screens(navigation: navigation, flow: liftFlow)
+        case .fitness: NoopFitnessHome(navigation: navigation, fitness: fitnessStore)
         }
     }
 
@@ -542,6 +544,7 @@ struct NoopVerifiedAppShell: View {
     @StateObject private var labDraft = NoopLabReviewDraft()
     @StateObject private var instrumentStore = NoopInstrumentLiveStore()
     @StateObject private var liftFlow = NoopLiftFlowModel()
+    @StateObject private var fitnessStore = NoopFitnessModel()
     @StateObject private var restStore = NoopRestStore()
     @StateObject private var dayStore = NoopDayStore()
     @StateObject private var trendsStore = NoopTrendsStore()
@@ -655,6 +658,8 @@ struct NoopVerifiedAppShell: View {
             Group {
                 if navigation.route == .energy {
                     NoopVerifiedEnergyScreen(navigation: navigation)
+                } else if navigation.route == .fitness {
+                    NoopFitnessHome(navigation: navigation, fitness: fitnessStore)
                 } else if Self.canonicalSveaRoutes.contains(navigation.route) {
                     NoopAct7Screens(navigation: navigation)
                 } else if Self.canonicalYouRoutes.contains(navigation.route) {
@@ -1177,6 +1182,7 @@ private struct NoopVerifiedRouteScreen: View {
         case .goals: "Goals and labs"
         case .instrument: "The instrument"
         case .lift: "The lift"
+        case .fitness: "Fitness"
         }
     }
 
@@ -1186,7 +1192,7 @@ private struct NoopVerifiedRouteScreen: View {
 enum NoopCanonicalGlyphName {
     case today, trends, moon, you, spark
     case cup, drop, plate, glass, heart, bed
-    case lungs, bolt, clock, check, bike, walk, weight, wave, timer
+    case lungs, bolt, clock, check, bike, walk, run, weight, wave, timer
     case pause, play, stop
     case read, scale, alarm, bell, screen, watch, cloud
     case shield, download, upload, trash, globe, ruler, sparkSingle, camera
@@ -1367,6 +1373,13 @@ struct NoopCanonicalGlyph: View {
             path.move(to: CGPoint(x: 12.4, y: 8.6)); path.addLine(to: CGPoint(x: 10, y: 13.2)); path.addLine(to: CGPoint(x: 12.7, y: 14.8)); path.addLine(to: CGPoint(x: 13.3, y: 20))
             path.move(to: CGPoint(x: 10, y: 13.2)); path.addLine(to: CGPoint(x: 8, y: 20))
             path.move(to: CGPoint(x: 14.4, y: 10.2)); path.addLine(to: CGPoint(x: 17.2, y: 12))
+        case .run:
+            path.addEllipse(in: CGRect(x: 14, y: 3, width: 3, height: 3))
+            path.move(to: CGPoint(x: 13.6, y: 8)); path.addLine(to: CGPoint(x: 11, y: 13))
+            path.addLine(to: CGPoint(x: 14.2, y: 15.4)); path.addLine(to: CGPoint(x: 13.2, y: 20.5))
+            path.move(to: CGPoint(x: 11, y: 13)); path.addLine(to: CGPoint(x: 8.6, y: 16.4)); path.addLine(to: CGPoint(x: 4.8, y: 16.8))
+            path.move(to: CGPoint(x: 13.6, y: 8)); path.addLine(to: CGPoint(x: 16.4, y: 11.2)); path.addLine(to: CGPoint(x: 19.4, y: 10.6))
+            path.move(to: CGPoint(x: 13.6, y: 8)); path.addLine(to: CGPoint(x: 10, y: 9)); path.addLine(to: CGPoint(x: 7.8, y: 11.8))
         case .weight:
             path.move(to: CGPoint(x: 4, y: 9)); path.addLine(to: CGPoint(x: 4, y: 15))
             path.move(to: CGPoint(x: 7, y: 6.5)); path.addLine(to: CGPoint(x: 7, y: 17.5))
@@ -1628,7 +1641,7 @@ struct NoopBottomNavigation: View {
             tab(.today)
             tab(.trends)
             plusButton
-            tab(.rest)
+            tab(.fitness)
             tab(.you)
         }
         .padding(6)
@@ -1715,7 +1728,7 @@ struct NoopBottomNavigation: View {
         switch tab {
         case .today: .today
         case .trends: .trends
-        case .rest: .moon
+        case .fitness: .run
         case .you: .you
         }
     }

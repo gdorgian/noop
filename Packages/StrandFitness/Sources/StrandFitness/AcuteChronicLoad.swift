@@ -49,7 +49,7 @@ public enum CardioLoad {
 ///
 /// The figure stays `calibrating` until the history can support a chronic baseline: at least
 /// `minimumSessions` sessions in the 42 days, and at least one in the last 28.
-public enum TrainingLoad {
+public enum AcuteChronicLoad {
     public enum Status: String, Sendable, CaseIterable {
         case calibrating, detraining, maintaining, productive, fatigued
     }

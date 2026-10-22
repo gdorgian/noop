@@ -38,7 +38,7 @@ public struct FitnessPhysiology: Equatable, Sendable {
 
 /// How a workout loads the legs when it has no logged sets. Running and cycling load the lower body;
 /// most other sports spread a smaller share across it.
-public enum CardioModality: String, Sendable, CaseIterable {
+public enum FitnessCardioKind: String, Sendable, CaseIterable {
     case running, cycling, rowing, walking, hiking, swimming, elliptical, stairs, mixed, other
 }
 
@@ -47,19 +47,19 @@ public struct FitnessCardioSession: Equatable, Sendable {
     public let id: String
     public let start: Date
     public let durationS: Double
-    public let modality: CardioModality
+    public let kind: FitnessCardioKind
     public let activeEnergyKcal: Double?
     /// The session's own heart-rate stream. When empty, `averageHeartRate` is scored as if held flat.
     public let heartRate: [FitnessHeartRateSample]
     public let averageHeartRate: Double?
 
-    public init(id: String, start: Date, durationS: Double, modality: CardioModality,
+    public init(id: String, start: Date, durationS: Double, kind: FitnessCardioKind,
                 activeEnergyKcal: Double? = nil, heartRate: [FitnessHeartRateSample] = [],
                 averageHeartRate: Double? = nil) {
         self.id = id
         self.start = start
         self.durationS = max(0, durationS)
-        self.modality = modality
+        self.kind = kind
         self.activeEnergyKcal = activeEnergyKcal
         self.heartRate = heartRate
         self.averageHeartRate = averageHeartRate
