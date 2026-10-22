@@ -171,7 +171,9 @@ private struct NoopFitnessMeasurePage<Top: View, Bottom: View>: View {
         case "time": { v in v >= 3600 ? String(format: "%.0fh", v / 3600) : String(format: "%.0fm", v / 60) }
         case "distance": { v in String(format: "%.0f", v / 1000) }
         case "volume", "heaviestVolume": { v in v >= 1000 ? String(format: "%.0fk", v / 1000) : String(format: "%.0f", v) }
-        default: { v in v >= 1000 ? String(format: "%.1fk", v / 1000) : String(format: "%.0f", v) }
+        // Fractional ticks keep a decimal, or a 0–1 axis reads "0, 0, 1" and VO₂ 45.5 reads as 46 twice.
+        default: { v in v >= 1000 ? String(format: "%.1fk", v / 1000)
+                        : abs(v - v.rounded()) < 0.01 ? String(format: "%.0f", v) : String(format: "%.1f", v) }
         }
     }
 }
@@ -401,16 +403,26 @@ struct NoopFitnessLoadPage: View {
                 kindSwitch
                 if let shown {
                     NoopFitnessInstrumentHeader(
-                        value: String(format: "%.\(decimals)f", shown.reading.acute),
+                        value: shown.reading.acute > 0 ? String(format: "%.\(decimals)f", shown.reading.acute) : "–",
                         caption: shown.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day().year()),
-                        comparison: shown.reading.status == .calibrating ? nil
+                        comparison: shown.reading.status == .calibrating ? "Needs a few weeks of sessions"
                             : "Optimal \(fmt(shown.reading.optimal.lowerBound))–\(fmt(shown.reading.optimal.upperBound))",
                         status: (shown.reading.status.title, shown.reading.status.color),
-                        trailing: shown.reading.ratio.map { String(format: "%.2f× your normal", $0) })
+                        trailing: shown.reading.status == .calibrating ? nil
+                            : shown.reading.ratio.map { String(format: "%.2f× your normal", $0) })
                 }
                 VStack(spacing: 8) {
-                    chart(points).frame(height: 210)
-                    statusStrip(points)
+                    if points.contains(where: { $0.reading.acute > 0 }) {
+                        chart(points).frame(height: 210)
+                        statusStrip(points)
+                    } else {
+                        VStack(spacing: 5) {
+                            Text("No load in this period").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                            Text(kind == .cardio ? "Workouts with heart rate build it up." : "Logged sets and cardio build it up.")
+                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.muted)
+                        }
+                        .frame(maxWidth: .infinity).frame(height: 210)
+                    }
                     NoopFitnessChartCaption(text: "Seven-day load each \(window.unitWord == "day" ? "day" : "\(window.unitWord)'s end"), inside the band it was judged against")
                 }
                 .padding(16)
@@ -669,13 +681,11 @@ struct NoopFitnessFocusPage: View {
                     trailing: total > 0 ? NoopFitnessFormat.duration(total * 60) : nil)
                 VStack(spacing: 10) {
                     Chart(bars) { b in
-                        BarMark(x: .value("Bucket", b.i), y: .value("Minutes", b.minutes), width: .ratio(0.62))
-                            .foregroundStyle(by: .value("Band", b.band.title))
+                        BarMark(x: .value("Bucket", b.i), y: .value("Minutes", b.minutes), width: .fixed(NoopFitnessMeasureChart.barWidth(window.buckets.count)))
+                            // Coloured per mark: the by-value style scale drew no bars at all.
+                            .foregroundStyle(NoopFitnessDetailScreen.focusColor(b.band))
                             .opacity(selection == nil || selection == b.i ? 1 : 0.35)
                     }
-                    .chartForegroundStyleScale(domain: CardioFocus.Band.allCases.map(\.title),
-                                               range: CardioFocus.Band.allCases.map(NoopFitnessDetailScreen.focusColor))
-                    .chartLegend(.hidden)
                     .chartXScale(domain: -0.5...Double(window.buckets.count) - 0.5)
                     .chartXAxis {
                         AxisMarks(values: Array(stride(from: 0, to: window.buckets.count, by: max(1, window.buckets.count / 4)))) { v in

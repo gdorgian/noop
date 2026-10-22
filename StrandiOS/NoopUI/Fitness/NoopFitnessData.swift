@@ -223,6 +223,16 @@ final class NoopFitnessModel: ObservableObject {
     /// A year and a bit, so the detail pages can show a year and the year before it starts.
     static let historyDays = 400
 
+    /// DEBUG `--noop-fitness-days N`: read only the last N days (0 = a fresh install), so the empty and
+    /// early states can be checked on a simulator full of data without wiping it.
+    static let debugHistoryDays: Int? = {
+        #if DEBUG
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--noop-fitness-days"), args.indices.contains(i + 1) { return Int(args[i + 1]) }
+        #endif
+        return nil
+    }()
+
     private var loadedSeq: Int?
     private var changeObserver: NSObjectProtocol?
 
@@ -250,7 +260,7 @@ final class NoopFitnessModel: ObservableObject {
         defer { isLoading = false }
         let cal = Calendar.current
         let nowTs = Int(now.timeIntervalSince1970)
-        let fromTs = nowTs - Self.historyDays * 86_400
+        let fromTs = nowTs - (Self.debugHistoryDays ?? Self.historyDays) * 86_400
 
         let restingSamples = repo.days.suffix(14).compactMap(\.restingHr).sorted()
         let resting = restingSamples.isEmpty ? 60 : Double(restingSamples[restingSamples.count / 2])
@@ -294,7 +304,7 @@ final class NoopFitnessModel: ObservableObject {
         if let store = await repo.storeHandle() {
             let programs = ((try? await store.liftPrograms(deviceId: repo.deviceId)) ?? [])
                 .sorted { $0.updatedAt > $1.updatedAt }
-            for p in programs {
+            for p in programs where Self.debugHistoryDays != 0 {
                 let items = (try? await store.liftProgramItems(programId: p.id)) ?? []
                 routines.append(.init(id: p.id, name: p.name, exercises: Set(items.map(\.exercise)).count,
                                       sets: items.reduce(0) { $0 + ($1.targetSets ?? 1) }))
@@ -356,6 +366,7 @@ final class NoopFitnessModel: ObservableObject {
                 guard let v = d.vo2max, let date = Self.dayFormatter.date(from: d.day) else { return nil }
                 return (date, v)
             }
+            .filter { $0.date.timeIntervalSince1970 >= Double(fromTs) }
             .sorted { $0.date < $1.date }
         var recoveries: [NoopFitnessHistory.Recovery] = []
         for c in cardioSessions.sorted(by: { $0.row.startTs > $1.row.startTs }).prefix(12) {

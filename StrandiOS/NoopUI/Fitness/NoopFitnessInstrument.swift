@@ -83,7 +83,8 @@ struct NoopFitnessWindow: Equatable {
     }
 
     var title: String {
-        let last = end.addingTimeInterval(-1)
+        // The current week, month or year runs past today; the range shown stops at today.
+        let last = min(end.addingTimeInterval(-1), Date())
         let sameYear = Calendar.current.isDate(start, equalTo: last, toGranularity: .year)
         let a = start.formatted(sameYear ? .dateTime.month(.abbreviated).day() : .dateTime.month(.abbreviated).day().year())
         let b = last.formatted(.dateTime.month(.abbreviated).day().year())
@@ -461,6 +462,10 @@ struct NoopFitnessMeasureChart: View {
     var format: (Double) -> String = { String(format: "%.0f", $0) }
     @Binding var selection: Int?
 
+    /// A ratio width on this integer bucket axis resolves to nothing and the bars vanish, so bars get a
+    /// fixed width: about 60% of a bucket's share of a phone-width chart.
+    static func barWidth(_ buckets: Int) -> CGFloat { max(1.5, 180 / CGFloat(max(buckets, 1))) }
+
     private struct Point: Identifiable {
         let i: Int
         let v: Double
@@ -502,7 +507,8 @@ struct NoopFitnessMeasureChart: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-            } else if cur.isEmpty && prev.isEmpty {
+            } else if !(cur + prev).contains(where: { $0.v != 0 }) {
+                // A running total over nothing is a flat line at zero: say so instead of drawing it.
                 VStack(spacing: 5) {
                     Text("No data in this period").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                     Text("Step back with the arrows, or pick a longer span.")
@@ -534,7 +540,7 @@ struct NoopFitnessMeasureChart: View {
                         }
                     } else if style == .bars {
                         ForEach(cur) { p in
-                            BarMark(x: .value("Bucket", p.i), y: .value("Value", p.v), width: .ratio(0.62))
+                            BarMark(x: .value("Bucket", p.i), y: .value("Value", p.v), width: .fixed(Self.barWidth(n)))
                                 .foregroundStyle(LinearGradient(colors: [tint, tint.opacity(0.55)], startPoint: .top, endPoint: .bottom))
                                 .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                                 .opacity(selection == nil || selection == p.i ? 1 : 0.35)

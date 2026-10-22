@@ -374,13 +374,21 @@ struct NoopFitnessHome: View {
         switch card {
         case .activeTime:
             tap(.activeTime) {
-                NoopFitnessTotalCard(title: "Active time", value: Self.duration(s.activeSeconds.total),
-                                     caption: "last \(s.periodDays) days", series: s.activeSeconds, tint: NoopHTMLColor.blue)
+                if s.activeSeconds.total > 0 || s.activeSeconds.previousTotal > 0 {
+                    NoopFitnessTotalCard(title: "Active time", value: Self.duration(s.activeSeconds.total),
+                                         caption: "last \(s.periodDays) days", series: s.activeSeconds, tint: NoopHTMLColor.blue)
+                } else {
+                    NoopFitnessEmptyCard(title: "Active time", line: "No workouts in the last \(s.periodDays) days")
+                }
             }
         case .activeEnergy:
             tap(.activeEnergy) {
-                NoopFitnessTotalCard(title: "Active energy", value: "\(Int(s.activeKcal.total.rounded()).formatted()) kcal",
-                                     caption: "last \(s.periodDays) days", series: s.activeKcal, tint: NoopHTMLColor.blue)
+                if s.activeKcal.total > 0 || s.activeKcal.previousTotal > 0 {
+                    NoopFitnessTotalCard(title: "Active energy", value: "\(Int(s.activeKcal.total.rounded()).formatted()) kcal",
+                                         caption: "last \(s.periodDays) days", series: s.activeKcal, tint: NoopHTMLColor.blue)
+                } else {
+                    NoopFitnessEmptyCard(title: "Active energy", line: "Comes from your workouts' energy")
+                }
             }
         case .vo2: tap(.vo2) { NoopFitnessVO2Card(readings: s.vo2Max) }
         case .recovery: tap(.recovery) { NoopFitnessRecoveryCard(reading: s.heartRateRecovery) }
@@ -859,8 +867,11 @@ struct NoopFitnessLoadCard: View {
             NoopFitnessGauge(reading: reading, decimals: decimals)
                 .frame(height: 118)
                 .padding(.top, 8)
-            Text("Optimal \(fmt(reading.optimal.lowerBound))–\(fmt(reading.optimal.upperBound))")
+            // Calibrating has no baseline yet, so its optimal band is 0–0: say what it is waiting for instead.
+            Text(reading.status == .calibrating ? "Needs a few weeks of sessions"
+                 : "Optimal \(fmt(reading.optimal.lowerBound))–\(fmt(reading.optimal.upperBound))")
                 .font(NoopHTMLFont.sans(11.5))
+                .multilineTextAlignment(.center)
                 .foregroundStyle(NoopHTMLColor.copy)
                 .frame(maxWidth: .infinity)
         }
@@ -884,16 +895,20 @@ struct NoopFitnessGauge: View {
             let f = { (v: Double) in min(1, max(0, v / top)) }
             ZStack {
                 arc(c, r, 0, 1).stroke(Color.white.opacity(0.08), style: StrokeStyle(lineWidth: 9, lineCap: .round))
-                arc(c, r, f(reading.optimal.lowerBound), f(reading.optimal.upperBound))
-                    .stroke(NoopHTMLColor.green.opacity(0.55), style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                if reading.status != .calibrating {
+                    arc(c, r, f(reading.optimal.lowerBound), f(reading.optimal.upperBound))
+                        .stroke(NoopHTMLColor.green.opacity(0.55), style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                }
                 arc(c, r, 0, f(reading.acute))
                     .stroke(reading.status.color.opacity(0.9), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                let a = angle(f(reading.acute))
-                Circle()
-                    .fill(NoopHTMLColor.ink)
-                    .frame(width: 11, height: 11)
-                    .position(x: c.x + cos(a) * r, y: c.y + sin(a) * r)
-                Text(String(format: "%.\(decimals)f", reading.acute))
+                if reading.acute > 0 {
+                    let a = angle(f(reading.acute))
+                    Circle()
+                        .fill(NoopHTMLColor.ink)
+                        .frame(width: 11, height: 11)
+                        .position(x: c.x + cos(a) * r, y: c.y + sin(a) * r)
+                }
+                Text(reading.acute > 0 ? String(format: "%.\(decimals)f", reading.acute) : "–")
                     .font(NoopHTMLFont.outfit(26))
                     .foregroundStyle(NoopHTMLColor.ink)
                     .position(c)
@@ -1156,11 +1171,11 @@ struct NoopFitnessFreshnessCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Muscle freshness").font(NoopHTMLFont.sans(13, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
                     Text(tracked.isEmpty ? "Log a lift to see it"
-                         : calibrated.isEmpty ? "Still learning your muscles"
+                         : calibrated.isEmpty ? "Still calibrating your muscles"
                          : tired == 0 ? "Everything is ready" : "\(tired) still recovering · \(ready) ready")
                         .font(NoopHTMLFont.outfit(19)).foregroundStyle(NoopHTMLColor.ink)
                     if learning > 0 {
-                        Text("\(learning) \(learning == 1 ? "muscle" : "muscles") still learning. Estimated from the sets and cardio you log, it settles after three training days.")
+                        Text("\(learning) \(learning == 1 ? "muscle" : "muscles") still calibrating. Estimated from the sets and cardio you log, it settles after three training days.")
                             .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -1204,7 +1219,7 @@ struct NoopFitnessDotMeter: View {
     let color: Color
 
     var body: some View {
-        let filled = max(1, Int((percent / 10).rounded()))
+        let filled = percent <= 0 ? 0 : max(1, Int((percent / 10).rounded()))
         HStack(spacing: 4) {
             ForEach(0..<10, id: \.self) { i in
                 Capsule()

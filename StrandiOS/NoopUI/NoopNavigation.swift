@@ -704,6 +704,11 @@ final class NoopNavigation: ObservableObject {
             default: selectedWorkout = .steadyRide
             }
         }
+        if let flag = arguments.firstIndex(of: "--noop-fitness-metric"), arguments.indices.contains(flag + 1) {
+            let all: [NoopFitnessMetric] = [.cardioLoad, .muscularLoad, .activeTime, .activeEnergy, .vo2,
+                                            .recovery, .focus, .zones, .sets, .volume]
+            if let m = all.first(where: { "\($0)" == arguments[flag + 1] }) { fitnessMetric = m }
+        }
         if let flag = arguments.firstIndex(of: "--noop-data"),
            arguments.indices.contains(flag + 1),
            let requested = NoopDataState(rawValue: arguments[flag + 1]) {
