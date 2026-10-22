@@ -24,7 +24,7 @@ final class DetectedWorkoutReconciliationTests: XCTestCase {
             RescoreBackgroundScheduler.lastPassSecondsKey, DayCycleMode.storageKey,
             PuffinExperiment.experimentalSleepV2Key, PuffinExperiment.motionAwareWakeKey,
             PuffinExperiment.autoDetectWorkoutsKey,
-            WorkoutSource.dismissedDefaultsKey,
+            WorkoutSource.dismissedDefaultsKey, "workouts.autoDetectDismissed",
             "testcentre.active.workouts", "testcentre.active.master",
         ]
         let saved = keys.map { ($0, defaults.object(forKey: $0)) }
@@ -79,6 +79,51 @@ final class DetectedWorkoutReconciliationTests: XCTestCase {
                 autoDismissedTokens: ["3000:3900"],
                 detectedDismissedTokens: ["990:1910"]),
             "a candidate dismissed through either historical contract must never reappear")
+    }
+
+    func testReviewedOfferPersistsCorrectedTimesAndTypeBeforeDismissingOriginal() async throws {
+        try await withPreferences {
+            let store = try await WhoopStore.inMemory()
+            let repo = Repository(deviceId: deviceId)
+            repo.setStoreForTesting(store)
+            let end = Int(Date().timeIntervalSince1970) - 3600
+            let candidate = DetectedWorkout(startSec: end - 1800, endSec: end,
+                                             avgBpm: 125, peakBpm: 150, durationMin: 30)
+            let row = try XCTUnwrap(WorkoutSource.buildManualRowFromSpan(
+                start: Date(timeIntervalSince1970: Double(candidate.startSec + 120)),
+                end: Date(timeIntervalSince1970: Double(end - 60)), sport: "Running",
+                avgHr: nil, energyKcal: nil))
+            let saved = await repo.saveReviewedDetectedWorkout(candidate, row: row, expectedDeviceId: deviceId)
+            XCTAssertTrue(saved)
+            let rows = try await store.workouts(deviceId: deviceId, from: end - 3600, to: end + 1, limit: 10)
+            XCTAssertEqual(rows.count, 1)
+            XCTAssertEqual(rows.first?.startTs, candidate.startSec + 120)
+            XCTAssertEqual(rows.first?.endTs, end - 60)
+            XCTAssertEqual(rows.first?.sport, "Running")
+            XCTAssertNil(rows.first?.avgHr, "An adjusted span must not inherit the proposal's old average")
+            XCTAssertTrue((UserDefaults.standard.stringArray(forKey: "workouts.autoDetectDismissed") ?? [])
+                .contains("\(candidate.startSec):\(candidate.endSec)"))
+        }
+    }
+
+    func testStaleStrapReviewCannotWriteOrDismiss() async throws {
+        try await withPreferences {
+            let store = try await WhoopStore.inMemory()
+            let repo = Repository(deviceId: deviceId)
+            repo.setStoreForTesting(store)
+            let end = Int(Date().timeIntervalSince1970) - 3600
+            let candidate = DetectedWorkout(startSec: end - 1800, endSec: end,
+                                             avgBpm: 125, peakBpm: 150, durationMin: 30)
+            let row = try XCTUnwrap(WorkoutSource.buildManualRowFromSpan(
+                start: Date(timeIntervalSince1970: Double(candidate.startSec)),
+                end: Date(timeIntervalSince1970: Double(end)), sport: "Running", avgHr: nil, energyKcal: nil))
+            let before = UserDefaults.standard.stringArray(forKey: "workouts.autoDetectDismissed")
+            let saved = await repo.saveReviewedDetectedWorkout(candidate, row: row, expectedDeviceId: "previous-strap")
+            XCTAssertFalse(saved)
+            let rows = try await store.workouts(deviceId: deviceId, from: end - 3600, to: end + 1, limit: 10)
+            XCTAssertTrue(rows.isEmpty)
+            XCTAssertEqual(UserDefaults.standard.stringArray(forKey: "workouts.autoDetectDismissed"), before)
+        }
     }
 
     func testLegacyRowsAreRemovedFromTheirArchivedComputedOwner() async throws {

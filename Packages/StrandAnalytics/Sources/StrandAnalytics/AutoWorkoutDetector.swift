@@ -12,7 +12,8 @@ import WhoopProtocol
 // is the lightweight, OPT-IN, NON-DESTRUCTIVE confirmation detector that only ever SUGGESTS a
 // workout via a dismissible Today card — it never writes a row on its own. The user taps "Save"
 // to turn a suggestion into a manual workout, or X to dismiss it forever. Its published policy
-// remains frozen while the duration alternatives collect local shadow evidence.
+// keeps its duration thresholds while the alternatives collect local shadow evidence. Missing-data
+// boundaries are enforced independently: an unrecorded interval is not sustained exertion.
 //
 // The published thresholds here are intentionally CONSERVATIVE (low sensitivity): a sustained ≥ 12-min
 // elevation of HR ≥ resting + 30 bpm, brief (≤ 90 s) dips tolerated, near windows merged. Tuned
@@ -71,6 +72,9 @@ public enum AutoWorkoutDetector {
     public static let shadowSustainedMinutes: [Double] = [10.0, 15.0]
     /// A dip below the gate no longer than this does NOT break the span (a red light, a sip of water).
     public static let maxDipS = 90
+    /// Missing HR is not measured exertion. Allow the existing 90-second tolerance for normal
+    /// sparse live sampling, but never qualify or merge a workout across a longer recording gap.
+    public static let maxSampleGapS = maxDipS
     /// Two detected windows whose gap is strictly less than this are merged into one (5 min).
     public static let mergeGapS = 5 * 60
     /// When an OPTIONAL continuous motion series is supplied, a window must ALSO show elevated motion
@@ -127,12 +131,12 @@ public enum AutoWorkoutDetector {
     /// Algorithm (kept byte-identical with the Kotlin twin):
     ///  1. Sort HR ascending. Floor = restingHR + `elevatedMarginBPM`. A sample is "elevated" when
     ///     bpm >= floor.
-    ///  2. Grow a contiguous span across elevated samples. A run of NON-elevated samples is tolerated
+    ///  2. Split at recording gaps above `maxSampleGapS`, then grow a contiguous span across elevated samples. A run of NON-elevated samples is tolerated
     ///     (does not end the span) ONLY while the dip's wall-clock duration (from the first sub-threshold
     ///     sample) stays <= `maxDipS`; a longer dip closes the span. The span's [start, end] are the
     ///     first/last ELEVATED sample timestamps.
     ///  3. Keep a span only when it lasts >= `minimumSustainedMinutes` (applied per-span, BEFORE merge).
-    ///  4. Merge two kept spans when the gap between them is strictly < `mergeGapS`.
+    ///  4. Merge two kept spans when the gap is strictly < `mergeGapS`, within the same recorded run.
     ///  5. If a motion series is supplied, drop a window unless its mean motion intensity over the
     ///     window is >= `motionConfirmMean` (confirmation). With no motion series, HR-only — keep it.
     ///  6. Drop a window that OVERLAPS any saved span (touching endpoints count) — never re-suggest one.
@@ -158,20 +162,27 @@ public enum AutoWorkoutDetector {
         // --- 1 + 2 + 3: grow sustained spans tolerating brief dips ---
         // A span is [spanStart, spanEnd] over ELEVATED-sample timestamps. `dipStart` marks where the
         // current sub-threshold run began (nil = not in a dip); a dip longer than maxDipS closes the span.
-        var spans: [(start: Int, end: Int)] = []
+        var spans: [(start: Int, end: Int, continuity: Int)] = []
         var spanStart: Int? = nil
         var spanEnd = 0
+        var continuity = 0
+        var previousTimestamp: Int?
         var dipStart: Int? = nil
 
         func closeSpan() {
             if let s = spanStart, Double(spanEnd - s) >= minimumSustainedMinutes * 60.0 {
-                spans.append((s, spanEnd))
+                spans.append((s, spanEnd, continuity))
             }
             spanStart = nil
             dipStart = nil
         }
 
         for sample in seg {
+            if let previousTimestamp, sample.ts - previousTimestamp > maxSampleGapS {
+                closeSpan()
+                continuity += 1
+            }
+            previousTimestamp = sample.ts
             if sample.bpm >= floor {
                 if spanStart == nil { spanStart = sample.ts }
                 spanEnd = sample.ts
@@ -191,14 +202,16 @@ public enum AutoWorkoutDetector {
         var merged: [(start: Int, end: Int)] = []
         var curStart = spans[0].start
         var curEnd = spans[0].end
+        var curContinuity = spans[0].continuity
         for k in 1..<spans.count {
             let next = spans[k]
-            if next.start - curEnd < mergeGapS {
+            if next.continuity == curContinuity && next.start - curEnd < mergeGapS {
                 curEnd = max(curEnd, next.end)
             } else {
                 merged.append((curStart, curEnd))
                 curStart = next.start
                 curEnd = next.end
+                curContinuity = next.continuity
             }
         }
         merged.append((curStart, curEnd))

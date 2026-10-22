@@ -26,6 +26,38 @@ final class AutoWorkoutDetectorTests: XCTestCase {
 
     // resting 60 → floor = 90. Workout bpm 120 is elevated; rest bpm 65 is not.
 
+    func testIsolatedElevatedReadingsDoNotInventAWorkoutAcrossMissingData() {
+        let hr = [(ts: 1_000, bpm: 120), (ts: 2_200, bpm: 120)]
+        XCTAssertTrue(AutoWorkoutDetector.detect(hr: hr, restingBpm: 60).isEmpty)
+    }
+
+    func testShortFragmentsCannotUseMissingTimeToQualify() {
+        let hr = block(1_000, 5 * 60, 120) + block(1_000 + 8 * 60, 5 * 60, 120)
+        XCTAssertTrue(AutoWorkoutDetector.detect(hr: hr, restingBpm: 60).isEmpty)
+    }
+
+    func testMissingDataBoundaryIsNotRejoinedByNearWindowMerge() {
+        let first = block(1_000, 15 * 60, 120)
+        let second = block(1_000 + 17 * 60, 15 * 60, 125)
+        let results = AutoWorkoutDetector.detect(hr: first + second, restingBpm: 60)
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results.map(\.startSec), [1_000, 2_020])
+        XCTAssertEqual(results.map(\.endSec), [1_899, 2_919])
+    }
+
+    func testThirtySecondSamplingStillDetectsSustainedActivity() {
+        let hr = stride(from: 1_000, through: 2_200, by: 30).map { (ts: $0, bpm: 120) }
+        XCTAssertEqual(AutoWorkoutDetector.detect(hr: hr, restingBpm: 60).count, 1)
+    }
+
+    func testTraceRespectsMissingDataBoundaries() {
+        let hr = block(1_000, 15 * 60, 120) + block(2_020, 15 * 60, 125)
+        let (results, trace) = AutoWorkoutDetector.detectTrace(hr: hr, restingBpm: 60)
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(trace.filter { $0.contains("verdict=offered") }.count, results.count)
+        XCTAssertTrue(trace.contains { $0.contains("hrGapBreaks=1") })
+    }
+
     func testElevatedSpanIsDetected() {
         // 20 min sustained at 120 bpm, embedded in rest. One workout, ~20 min, avg/peak 120.
         let start = 1_000_000

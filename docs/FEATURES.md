@@ -31,6 +31,10 @@ NOOP is built on community interoperability and protocol-documentation work, wit
 
 Widget data sharing resolves the App Group from the installed provisioning profile before consulting AltStore metadata or the build-time setting. This supports SideStore re-signing that rewrites App Groups without adding ALTAppGroups. Both the app and widget extension use the same resolver; existing snapshot data and widget layouts are unchanged.
 
+Today shows an opt-in Possible activity card directly below Today’s session. Review opens the existing workout editor with the detected start/end and an unselected activity type; Cancel does not save or dismiss. Dismiss persists the original span. Confirmed saves validate the edited span, write to the reviewed strap, and retire the offer only after a successful insert. The existing analysis and refresh then enrich the corrected window.
+
+The opt-in activity confirmation detector breaks at heart-rate recording gaps longer than its existing 90-second continuity tolerance. Missing time cannot qualify a workout or rejoin separate recorded bouts during merging. Thirty-second live sampling remains supported; the twelve-minute qualification policy, saved-workout exclusion and user-confirmation boundary remain unchanged. Test Centre traces report the recording-gap breaks.
+
 On iPhone, Aura's Trends page links directly to **Weekly digest** and **Trends report** in its
 existing grouped navigation. The same pages remain available from Settings → Tools. A report
 opened from Trends returns there and keeps Trends selected; one opened from Settings returns to

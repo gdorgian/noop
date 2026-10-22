@@ -621,6 +621,8 @@ struct NoopAct2Screens: View {
                     .buttonStyle(NoopHTMLPressStyle())
                     .id("noop-today-session")
 
+                    if !isHistorical { NoopActivityOffer() }
+
                     Act2TodayHeartRow(
                         anchor: todayPulseAnchor,
                         wakeCharge: dayContext.wakeCharge,

@@ -61,7 +61,7 @@ extension AutoWorkoutDetector {
         // calibration the windows were judged against.
         lines.append("autoDetect thresholds elevatedMargin=\(elevatedMarginBPM)bpm "
             + "minSustainedMin=\(minimumSustainedMinutes) maxDipS=\(maxDipS) mergeGapS=\(mergeGapS) "
-            + "motionConfirmMean=\(motionConfirmMean)")
+            + "motionConfirmMean=\(motionConfirmMean) maxSampleGapS=\(maxSampleGapS)")
 
         // Rebuild the SAME merged windows the detector forms (sustained spans tolerating dips, then merge),
         // so we can name why each survived or dropped WITHOUT changing the returned `results`. This mirrors
@@ -72,18 +72,25 @@ extension AutoWorkoutDetector {
             return (results, lines)
         }
 
-        var spans: [(start: Int, end: Int)] = []
+        var spans: [(start: Int, end: Int, continuity: Int)] = []
         var spanStart: Int? = nil
         var spanEnd = 0
+        var continuity = 0
+        var previousTimestamp: Int?
         var dipStart: Int? = nil
         func closeSpan() {
             if let s = spanStart, Double(spanEnd - s) >= minimumSustainedMinutes * 60.0 {
-                spans.append((s, spanEnd))
+                spans.append((s, spanEnd, continuity))
             }
             spanStart = nil
             dipStart = nil
         }
         for sample in seg {
+            if let previousTimestamp, sample.ts - previousTimestamp > maxSampleGapS {
+                closeSpan()
+                continuity += 1
+            }
+            previousTimestamp = sample.ts
             if sample.bpm >= floor {
                 if spanStart == nil { spanStart = sample.ts }
                 spanEnd = sample.ts
@@ -94,6 +101,7 @@ extension AutoWorkoutDetector {
             }
         }
         closeSpan()
+        lines.append("autoDetect coverage hrGapBreaks=\(continuity) maxSampleGapS=\(maxSampleGapS)")
 
         if spans.isEmpty {
             lines.append("autoDetect why=noSustainedSpan "
@@ -106,14 +114,16 @@ extension AutoWorkoutDetector {
         var merged: [(start: Int, end: Int)] = []
         var curStart = spans[0].start
         var curEnd = spans[0].end
+        var curContinuity = spans[0].continuity
         for k in 1..<spans.count {
             let next = spans[k]
-            if next.start - curEnd < mergeGapS {
+            if next.continuity == curContinuity && next.start - curEnd < mergeGapS {
                 curEnd = max(curEnd, next.end)
             } else {
                 merged.append((curStart, curEnd))
                 curStart = next.start
                 curEnd = next.end
+                curContinuity = next.continuity
             }
         }
         merged.append((curStart, curEnd))

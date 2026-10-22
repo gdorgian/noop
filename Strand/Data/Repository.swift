@@ -3540,6 +3540,26 @@ final class Repository: ObservableObject {
         return true
     }
 
+    /// Confirm a reviewed offer only after the corrected row is durable. A stale review must never
+    /// write into a newly selected strap, and a failed write must not retire the original offer.
+    @discardableResult
+    func saveReviewedDetectedWorkout(_ candidate: DetectedWorkout, row: WorkoutRow,
+                                     expectedDeviceId: String) async -> Bool {
+        guard deviceId == expectedDeviceId,
+              let validated = WorkoutSource.buildManualRowFromSpan(
+                start: Date(timeIntervalSince1970: TimeInterval(row.startTs)),
+                end: Date(timeIntervalSince1970: TimeInterval(row.endTs)), sport: row.sport,
+                avgHr: row.avgHr, energyKcal: row.energyKcal, distanceM: row.distanceM
+              ), let store = await ensureStore(), deviceId == expectedDeviceId else { return false }
+        do {
+            _ = try await store.upsertWorkouts([validated], deviceId: expectedDeviceId)
+        } catch {
+            return false
+        }
+        if deviceId == expectedDeviceId { dismissDetectedSuggestion(candidate) }
+        return true
+    }
+
     /// DISMISS a suggested window: record its span durably so it never re-prompts. Idempotent.
     /// Prunes the stored list on every add (drop spans older than ~30 days + hard-cap to 200 most-recent)
     /// so it can never grow unbounded. Byte-mirrored in the Android `AutoWorkoutPrefs.dismiss`.
