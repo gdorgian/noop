@@ -108,7 +108,7 @@ struct NoopAppShell: View {
         // own HTML paddings place content at y=58/56 and the nav 26pt from the true bottom.
         .ignoresSafeArea(
             .container,
-            edges: navigation.route.act == .night || navigation.route.act == .day || navigation.route.act == .effort || navigation.route.act == .picture || navigation.route.act == .plumbing || navigation.route.act == .ages || navigation.route.act == .svea || navigation.route.act == .goals || navigation.route.act == .instrument || navigation.route.act == .lift ? .all : []
+            edges: navigation.route.act == .night || navigation.route.act == .day || navigation.route.act == .effort || navigation.route.act == .picture || navigation.route.act == .plumbing || navigation.route.act == .ages || navigation.route.act == .svea || navigation.route.act == .goals || navigation.route.act == .instrument || navigation.route.act == .lift || navigation.route.act == .fitness ? .all : []
         )
         .onChange(of: navigation.route) { oldRoute, newRoute in
             if oldRoute == .review, newRoute != .review {
@@ -454,13 +454,15 @@ enum NoopAmbient {
         // PROVISIONAL, and the same value the default would have given. Stated explicitly so the
         // act's ambient is a named decision design can change rather than an inherited accident.
         case .lift: NoopHTMLColor.blue
+        // Fitness is the training tab: the warm accent its cards, routines and live screen carry.
+        case .fitness: NoopHTMLColor.warm
         default: NoopHTMLColor.blue
         }
     }
 
     static func opacity(for route: NoopRoute, warmEffort: Bool) -> Double {
         switch route.act {
-        case .picture, .ages, .goals: 0.15
+        case .picture, .ages, .goals, .fitness: 0.15
         case .instrument: 0.16
         case .svea: 0.16
         case .effort: warmEffort ? 0.15 : 0.17
@@ -651,6 +653,7 @@ struct NoopVerifiedAppShell: View {
             || Self.canonicalDataRoutes.contains(navigation.route)
             || Self.canonicalInstrumentRoutes.contains(navigation.route)
             || Self.canonicalLiftRoutes.contains(navigation.route)
+            || navigation.route.act == .fitness
     }
 
     var body: some View {
@@ -1689,7 +1692,7 @@ struct NoopBottomNavigation: View {
         case .night, .svea, .instrument: return NoopHTMLColor.night
         case .picture, .ages: return NoopHTMLColor.green
         case .plumbing: return NoopHTMLColor.blush
-        case .goals: return NoopHTMLColor.warm
+        case .goals, .fitness: return NoopHTMLColor.warm
         default: return NoopHTMLColor.blue
         }
     }

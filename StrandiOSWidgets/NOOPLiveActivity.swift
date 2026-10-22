@@ -15,6 +15,15 @@ struct NOOPLiveActivity: Widget {
     private let amber = Color(.sRGB, red: 242 / 255, green: 180 / 255, blue: 92 / 255, opacity: 1)
     private let quiet = Color(.sRGB, red: 127 / 255, green: 138 / 255, blue: 133 / 255, opacity: 1)
     private let secondary = Color(.sRGB, red: 198 / 255, green: 206 / 255, blue: 201 / 255, opacity: 1)
+    private let heartRed = Color(.sRGB, red: 255 / 255, green: 69 / 255, blue: 86 / 255, opacity: 1)
+    /// Zone colours, Resting/Zone 1 to Zone 5, as the Fitness zones show them.
+    private let zoneColors: [Color] = [
+        Color(.sRGB, red: 143 / 255, green: 211 / 255, blue: 245 / 255, opacity: 1),
+        Color(.sRGB, red: 23 / 255, green: 162 / 255, blue: 230 / 255, opacity: 1),
+        Color(.sRGB, red: 46 / 255, green: 204 / 255, blue: 128 / 255, opacity: 1),
+        Color(.sRGB, red: 242 / 255, green: 180 / 255, blue: 92 / 255, opacity: 1),
+        Color(.sRGB, red: 240 / 255, green: 116 / 255, blue: 44 / 255, opacity: 1),
+    ]
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: NOOPActivityAttributes.self) { context in
@@ -23,20 +32,26 @@ struct NOOPLiveActivity: Widget {
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
+                // The top corners of the expanded island are curved: wide labels there are clipped
+                // (a reported "Below Zone ." and "'Ipdated"). The brand and zone sit inset and drop
+                // below the camera when they do not fit beside it; the bottom row keeps a side margin.
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: 8) {
-                        mark(context, size: 7)
-                        Text("Live heart rate")
-                            .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 11.5))
+                    HStack(spacing: 6) {
+                        heart(context, size: 13)
+                        Text("Noop Aura")
+                            .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 12))
                             .foregroundStyle(secondary)
                             .lineLimit(1)
                     }
+                    .padding(.leading, 6)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Text(zoneLabel(context))
                         .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 12))
-                        .foregroundStyle(ink(context))
+                        .foregroundStyle(zoneInk(context))
                         .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.trailing, 6)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 9) {
@@ -45,30 +60,48 @@ struct NOOPLiveActivity: Widget {
                         status(context)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 3)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 2)
+                    .padding(.bottom, 4)
                 }
             } compactLeading: {
-                mark(context, size: 7).frame(width: 18, height: 18)
+                heart(context, size: 14)
+                    .padding(.leading, 2)
             } compactTrailing: {
                 if let bpm = freshBPM(context) {
                     Text(bpm.formatted())
-                        .font(.custom(NoopSpecType.Face.outfitRegular, fixedSize: 13.5))
+                        .font(.custom(NoopSpecType.Face.outfitRegular, fixedSize: 14))
                         .tracking(-0.27)
                         .monospacedDigit()
-                        .foregroundStyle(ink(context))
+                        .foregroundStyle(.white)
                         .lineLimit(1)
+                        .padding(.trailing, 2)
+                } else {
+                    Text("–")
+                        .font(.custom(NoopSpecType.Face.outfitRegular, fixedSize: 14))
+                        .foregroundStyle(quiet)
                 }
             } minimal: {
                 minimalMark(context)
             }
+            .keylineTint(heartRed)
         }
+    }
+
+    /// The Noop Aura heart: red while readings arrive, an outline once they stop.
+    @ViewBuilder
+    private func heart(_ context: ActivityViewContext<NOOPActivityAttributes>, size: CGFloat) -> some View {
+        Image(systemName: freshBPM(context) == nil ? "heart" : "heart.fill")
+            .font(.system(size: size, weight: .semibold))
+            .foregroundStyle(freshBPM(context) == nil ? quiet : heartRed)
+            .shadow(color: freshBPM(context) == nil ? .clear : heartRed.opacity(0.55), radius: 4)
     }
 
     private func lockScreen(_ context: ActivityViewContext<NOOPActivityAttributes>) -> some View {
         VStack(alignment: .leading, spacing: 11) {
-            HStack(spacing: 8) {
-                mark(context, size: 7)
-                Text("Noop · Live heart rate")
+            HStack(spacing: 7) {
+                heart(context, size: 12)
+                Text("Noop Aura · Live heart rate")
                     .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 10))
                     .tracking(1.3)
                     .textCase(.uppercase)
@@ -79,7 +112,7 @@ struct NOOPLiveActivity: Widget {
                 Spacer(minLength: 0)
                 Text(zoneLabel(context))
                     .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 12))
-                    .foregroundStyle(freshBPM(context) == nil ? quiet : overCeiling(context) ? amber : secondary)
+                    .foregroundStyle(zoneInk(context))
                     .lineLimit(1)
             }
             VStack(alignment: .leading, spacing: 8) {
@@ -102,7 +135,7 @@ struct NOOPLiveActivity: Widget {
                 Text("bpm")
                     .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 13))
             }
-            .foregroundStyle(ink(context))
+            .foregroundStyle(overCeiling(context) ? amber : .white)
             .fixedSize(horizontal: true, vertical: false)
         }
     }
@@ -111,8 +144,9 @@ struct NOOPLiveActivity: Widget {
         HStack(spacing: 4) {
             ForEach(1...5, id: \.self) { zone in
                 Capsule()
-                    .fill(freshBPM(context) != nil && context.state.zoneNumber == zone
-                          ? ink(context) : Color.white.opacity(0.12))
+                    .fill(freshBPM(context) != nil && (context.state.zoneNumber ?? 0) >= zone
+                          ? zoneColors[zone - 1].opacity(context.state.zoneNumber == zone ? 1 : 0.45)
+                          : Color.white.opacity(0.12))
                     .frame(maxWidth: .infinity)
                     .frame(height: 4)
             }
@@ -148,18 +182,6 @@ struct NOOPLiveActivity: Widget {
     }
 
     @ViewBuilder
-    private func mark(_ context: ActivityViewContext<NOOPActivityAttributes>, size: CGFloat) -> some View {
-        if freshBPM(context) == nil {
-            Circle().stroke(quiet, lineWidth: 1.4).frame(width: size, height: size)
-        } else {
-            Circle()
-                .fill(ink(context))
-                .shadow(color: ink(context).opacity(0.7), radius: 4.5)
-                .frame(width: size, height: size)
-        }
-    }
-
-    @ViewBuilder
     private func minimalMark(_ context: ActivityViewContext<NOOPActivityAttributes>) -> some View {
         if freshBPM(context) == nil {
             Circle()
@@ -167,9 +189,9 @@ struct NOOPLiveActivity: Widget {
                 .overlay(Capsule().fill(quiet).frame(width: 9, height: 2.5))
                 .frame(width: 26, height: 26)
         } else {
-            Circle()
-                .fill(ink(context))
-                .frame(width: 26, height: 26)
+            Image(systemName: "heart.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(heartRed)
         }
     }
 
@@ -185,9 +207,11 @@ struct NOOPLiveActivity: Widget {
         return bpm > ceiling
     }
 
-    private func ink(_ context: ActivityViewContext<NOOPActivityAttributes>) -> Color {
-        if freshBPM(context) == nil { return quiet }
-        return overCeiling(context) ? amber : blue
+    private func zoneInk(_ context: ActivityViewContext<NOOPActivityAttributes>) -> Color {
+        guard freshBPM(context) != nil else { return quiet }
+        if overCeiling(context) { return amber }
+        guard let z = context.state.zoneNumber, (1...5).contains(z) else { return secondary }
+        return zoneColors[z - 1]
     }
 
     private func zoneLabel(_ context: ActivityViewContext<NOOPActivityAttributes>) -> String {

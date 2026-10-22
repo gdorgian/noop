@@ -615,6 +615,9 @@ private struct iOSRootView: View {
         // combined terms+version update. Gate on terms being current, and re-check when they're
         // accepted (onAppear already fired before acceptance), so What's New shows right after.
         .onAppear {
+            #if DEBUG
+            LiveHRIslandPreview.startIfRequested()
+            #endif
             showWhatsNewIfDue()
             // Seed the current What's New into the Updates inbox (idempotent per version) so the bell
             // collects it even if the user dismisses the auto sheet.

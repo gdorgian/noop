@@ -279,3 +279,28 @@ final class LiveActivityController {
     }
 }
 #endif
+
+#if DEBUG
+/// Simulator check for the heart-rate island: `--noop-live-hr-preview` starts one with a sample reading,
+/// since a simulator has no strap. Debug builds only; never in a release.
+enum LiveHRIslandPreview {
+    @MainActor static func startIfRequested() {
+        guard CommandLine.arguments.contains("--noop-live-hr-preview") else { return }
+        let now = Date()
+        let state = NOOPActivityAttributes.ContentState(
+            bpm: 132, recovery: nil, bonded: true, sampledAt: now.addingTimeInterval(-13),
+            zoneNumber: 3, ceilingBPM: nil)
+        let content = ActivityContent(state: state, staleDate: now.addingTimeInterval(600))
+        // After the app's own controller has settled (it pushes "no reading" with no strap attached).
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(4))
+            let open = Activity<NOOPActivityAttributes>.activities
+            if open.isEmpty {
+                _ = try? Activity.request(attributes: NOOPActivityAttributes(title: "Live HR"),
+                                          content: content, pushType: nil)
+            }
+            for act in open { await act.update(content) }
+        }
+    }
+}
+#endif

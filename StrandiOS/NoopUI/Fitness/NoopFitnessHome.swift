@@ -15,7 +15,7 @@ struct NoopFitnessHome: View {
     @State private var selectedDay = Calendar.current.startOfDay(for: Date())
 
     var body: some View {
-        NoopScreen(topInset: 56) {
+        NoopScreen(topInset: 58) {
             VStack(alignment: .leading, spacing: 0) {
                 NoopScreenHeader("Fitness", eyebrow: Self.weekTitle) {
                     HStack(spacing: 8) {
@@ -223,15 +223,15 @@ struct NoopFitnessHome: View {
         sectionTitle(text) { EmptyView() }
     }
 
+    /// The app's section label: small, uppercase, muted — as Today, Trends and You label theirs.
     private func sectionTitle<T: View>(_ text: String, @ViewBuilder trailing: () -> T) -> some View {
         HStack {
-            Text(text)
-                .font(NoopHTMLFont.outfit(19))
-                .foregroundStyle(NoopHTMLColor.ink)
+            NoopSectionLabel(text)
             Spacer()
             trailing()
         }
-        .padding(.bottom, 10)
+        .frame(minHeight: 32)
+        .padding(.bottom, 6)
     }
 
     static var weekTitle: String {

@@ -29,12 +29,17 @@ struct LiftLiveActivity: Widget {
                             .foregroundStyle(bodyInk)
                             .lineLimit(1)
                     }
+                    // Inset from the island's curved top corners, which clip anything flush to them.
+                    .padding(.leading, 6)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     clock(context.state, compact: false)
+                        .padding(.trailing, 6)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     expandedBottom(context.state)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 4)
                 }
             } compactLeading: {
                 stateMark(context.state, size: 7)
@@ -55,7 +60,7 @@ struct LiftLiveActivity: Widget {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 stateMark(state, size: 8)
-                Text("Noop · \(context.state.programName)")
+                Text("Noop Aura · \(context.state.programName)")
                     .font(NoopSpecType.captionMicro)
                     .tracking(NoopSpecType.Tracking.captionMicro)
                     .textCase(.uppercase)
