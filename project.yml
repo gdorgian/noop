@@ -75,6 +75,10 @@ packages:
   # WhoopStore's native-training tables decode into its value types, so it sits below the store.
   StrandTraining:
     path: Packages/StrandTraining
+  # Pure fitness maths behind the Fitness page: zones, cardio and muscular load, muscle freshness,
+  # cardio focus, heart-rate recovery. No UI, no HealthKit, no store.
+  StrandFitness:
+    path: Packages/StrandFitness
   StrandImport:
     path: Packages/StrandImport
   StrandDesign:
@@ -452,6 +456,7 @@ targets:
       - package: WhoopStore
       - package: StrandAnalytics
       - package: StrandTraining
+      - package: StrandFitness
       - package: StrandImport
       - package: StrandDesign
       - package: SemanticMemory
