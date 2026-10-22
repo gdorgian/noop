@@ -13,11 +13,12 @@ struct NoopFitnessHome: View {
     @EnvironmentObject private var repo: Repository
     @EnvironmentObject private var profile: ProfileStore
     @State private var selectedDay = Calendar.current.startOfDay(for: Date())
+    @State private var weekOffset = 0
 
     var body: some View {
         NoopScreen(topInset: 58) {
             VStack(alignment: .leading, spacing: 0) {
-                NoopScreenHeader("Fitness", eyebrow: Self.weekTitle) {
+                NoopScreenHeader("Fitness", eyebrow: Self.dayTitle(selectedDay)) {
                     HStack(spacing: 8) {
                         NoopFitnessIconButton(glyph: .calendar) { navigation.push(.fitnessCalendar) }
                             .accessibilityLabel("Calendar")
@@ -39,8 +40,23 @@ struct NoopFitnessHome: View {
 
     @ViewBuilder
     private func content(_ s: NoopFitnessSnapshot) -> some View {
-        NoopFitnessWeekStrip(week: s.week, plans: layout.plans, selected: $selectedDay)
-            .padding(.bottom, 22)
+        NoopFitnessWeekStrip(week: week(s), plans: layout.plans, selected: $selectedDay)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 24).onEnded { v in
+                guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                withAnimation(NoopMotion.swap) { shiftWeek(v.translation.width < 0 ? 1 : -1) }
+            })
+            .sensoryFeedback(.selection, trigger: weekOffset)
+            .padding(.bottom, weekOffset == 0 ? 22 : 10)
+        if weekOffset != 0 {
+            Button { withAnimation(NoopMotion.swap) { weekOffset = 0; selectedDay = Calendar.current.startOfDay(for: Date()) } } label: {
+                Text(weekOffset < 0 ? "Back to this week ›" : "‹ Back to this week")
+                    .font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+            .padding(.bottom, 16)
+        }
         ForEach(layout.sections) { section in
             self.section(section, s)
         }
@@ -70,15 +86,28 @@ struct NoopFitnessHome: View {
     private func section(_ section: NoopFitnessSettings.Section, _ s: NoopFitnessSnapshot) -> some View {
         switch section {
         case .activity:
-            sectionTitle("Activity") {
-                NoopFitnessIconButton(glyph: .plus) { navigation.push(.pick) }
+            sectionTitle(Calendar.current.isDateInToday(selectedDay) ? "Today" : Self.dayTitle(selectedDay)) {
+                Menu {
+                    Button { navigation.push(.pick) } label: { Label("Start or log an activity", systemImage: "figure.run") }
+                    Button { navigation.push(.liftLibrary) } label: { Label("Start a routine", systemImage: "dumbbell") }
+                    Button { navigation.push(.fitnessCalendar) } label: { Label("Plan a routine", systemImage: "calendar.badge.plus") }
+                } label: {
+                    NoopFitnessIconGlyph(glyph: .plus)
+                }
+                .accessibilityLabel("Add")
             }
             activity(s)
                 .padding(.bottom, 26)
         case .routines:
             sectionTitle("Routines") {
-                NoopFitnessIconButton(glyph: .plus) { newRoutine() }
-                    .accessibilityLabel("New routine")
+                Menu {
+                    Button { newRoutine() } label: { Label("New routine", systemImage: "plus") }
+                    Button { navigation.push(.liftLibrary) } label: { Label("All routines", systemImage: "list.bullet") }
+                    Button { navigation.push(.liftImport) } label: { Label("Import from another app", systemImage: "square.and.arrow.down") }
+                } label: {
+                    NoopFitnessIconGlyph(glyph: .plus)
+                }
+                .accessibilityLabel("Routines")
             }
             if s.routines.isEmpty {
                 Button { newRoutine() } label: {
@@ -99,7 +128,26 @@ struct NoopFitnessHome: View {
                                 navigation.fitnessRoutineID = r.id
                                 navigation.push(.fitnessRoutine)
                             }
+                            .contextMenu {
+                                Button { navigation.fitnessRoutineID = r.id; navigation.push(.fitnessRoutine) } label: {
+                                    Label("Open", systemImage: "list.bullet.rectangle")
+                                }
+                                Button { navigation.fitnessRoutineID = r.id; navigation.push(.fitnessRoutineEdit) } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                Button { navigation.push(.fitnessCalendar) } label: { Label("Plan on the calendar", systemImage: "calendar") }
+                            }
                         }
+                        Button { navigation.push(.liftLibrary) } label: {
+                            VStack(spacing: 8) {
+                                NoopFixedChevron(direction: .right, color: NoopHTMLColor.inkSoft)
+                                    .frame(width: 38, height: 38).background(Color.white.opacity(0.06), in: Circle())
+                                Text("All routines").font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                            }
+                            .frame(width: 112).frame(maxHeight: .infinity)
+                            .fitnessCard()
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
                     }
                     .padding(.horizontal, 20)
                 }
@@ -110,8 +158,9 @@ struct NoopFitnessHome: View {
         case .load:
             sectionTitle("Training load")
             HStack(spacing: 10) {
-                tap(.cardioLoad) { NoopFitnessLoadCard(title: "Cardio", reading: s.cardioLoad, decimals: 1) }
-                tap(.muscularLoad) { NoopFitnessLoadCard(title: "Muscular", reading: s.muscularLoad, decimals: 0) }
+                let day = min(selectedDay, Date())
+                tap(.cardioLoad) { NoopFitnessLoadCard(title: "Cardio", reading: s.history.load(.cardio, asOf: day), decimals: 1) }
+                tap(.muscularLoad) { NoopFitnessLoadCard(title: "Muscular", reading: s.history.load(.muscular, asOf: day), decimals: 0) }
             }
             .padding(.bottom, 26)
         case .cardio:
@@ -196,9 +245,34 @@ struct NoopFitnessHome: View {
 
     @ViewBuilder
     private func activity(_ s: NoopFitnessSnapshot) -> some View {
-        let day = s.week.first { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) }
+        let day = week(s).first { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) }
         let sessions = day?.sessions ?? []
-        if sessions.isEmpty {
+        let planned = layout.plans.filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) }
+        if sessions.isEmpty, !planned.isEmpty {
+            VStack(spacing: 8) {
+                ForEach(planned) { plan in
+                    Button {
+                        navigation.fitnessRoutineID = plan.routineID
+                        navigation.push(.fitnessRoutine)
+                    } label: {
+                        HStack(spacing: 13) {
+                            NoopCanonicalGlyph(name: .weight, size: 17, color: NoopHTMLColor.warm)
+                                .frame(width: 42, height: 42)
+                                .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                    .strokeBorder(NoopHTMLColor.warm.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("PLANNED").font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.1).foregroundStyle(NoopHTMLColor.warm)
+                                Text(plan.routineName).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            }
+                            Spacer()
+                            NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
+                        }
+                        .fitnessCard()
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                }
+            }
+        } else if sessions.isEmpty {
             HStack(spacing: 13) {
                 NoopCanonicalGlyph(name: .moon, size: 18, color: NoopHTMLColor.copy)
                     .frame(width: 38, height: 38)
@@ -233,6 +307,34 @@ struct NoopFitnessHome: View {
         }
         .frame(minHeight: 32)
         .padding(.bottom, 6)
+    }
+
+    /// The seven days of the week `weekOffset` weeks from this one, Monday first, from the full history.
+    private func week(_ s: NoopFitnessSnapshot) -> [NoopFitnessSnapshot.WeekDay] {
+        guard weekOffset != 0 else { return s.week }
+        var cal = Calendar.current
+        cal.firstWeekday = 2
+        let base = cal.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+        let monday = cal.date(byAdding: .weekOfYear, value: weekOffset, to: base) ?? base
+        return (0..<7).compactMap { i in
+            guard let d = cal.date(byAdding: .day, value: i, to: monday) else { return nil }
+            return .init(date: d, sessions: s.history.sessions.filter { cal.isDate($0.start, inSameDayAs: d) }.sorted { $0.start < $1.start })
+        }
+    }
+
+    private func shiftWeek(_ by: Int) {
+        let next = weekOffset + by
+        guard next <= 4, next >= -56 else { return }
+        weekOffset = next
+        let cal = Calendar.current
+        selectedDay = cal.date(byAdding: .weekOfYear, value: by, to: selectedDay) ?? selectedDay
+        if weekOffset == 0 { selectedDay = cal.startOfDay(for: Date()) }
+    }
+
+    static func dayTitle(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("EEEEdMMMM")
+        return f.string(from: d)
     }
 
     static var weekTitle: String {
@@ -292,18 +394,26 @@ struct NoopFitnessWeekStrip: View {
         let planned = plans.contains { Calendar.current.isDate($0.date, inSameDayAs: day.date) }
         ZStack {
             Circle()
-                .fill(day.sessions.isEmpty ? Color.white.opacity(0.04) : NoopHTMLColor.warm.opacity(0.22))
+                .fill(day.sessions.first.map { NoopFitnessSessionRow.tint($0).opacity(0.2) } ?? Color.white.opacity(0.04))
             if day.sessions.isEmpty && planned {
                 Circle().strokeBorder(NoopHTMLColor.warm.opacity(0.7), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
                 NoopCanonicalGlyph(name: .weight, size: 12, color: NoopHTMLColor.warm.opacity(0.8))
             } else if day.sessions.isEmpty {
                 Circle().strokeBorder(Color.white.opacity(future ? 0.12 : 0.0),
                                       style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
-            } else {
-                NoopCanonicalGlyph(name: strength && !cardio ? .weight : .run, size: 14, color: NoopHTMLColor.warm)
+            } else if let first = day.sessions.first {
+                NoopCanonicalGlyph(name: NoopFitnessSessionRow.glyph(first), size: 14, color: NoopFitnessSessionRow.tint(first))
             }
         }
         .frame(width: 26, height: 26)
+        .overlay(alignment: .topTrailing) {
+            if day.sessions.count > 1 {
+                Text("\(day.sessions.count)")
+                    .font(NoopHTMLFont.sans(9, weight: .bold)).foregroundStyle(NoopHTMLColor.canvas)
+                    .frame(width: 14, height: 14).background(NoopHTMLColor.ink, in: Circle())
+                    .offset(x: 5, y: -4)
+            }
+        }
     }
 
     static func letter(_ d: Date) -> String {
@@ -328,6 +438,17 @@ struct NoopFitnessCardBackground: ViewModifier {
 
 extension View {
     func fitnessCard() -> some View { modifier(NoopFitnessCardBackground()) }
+}
+
+struct NoopFitnessIconGlyph: View {
+    let glyph: NoopCanonicalGlyphName
+
+    var body: some View {
+        NoopCanonicalGlyph(name: glyph, size: 15, color: NoopHTMLColor.inkSoft)
+            .frame(width: 32, height: 32)
+            .background(Color.white.opacity(0.06), in: Circle())
+            .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+    }
 }
 
 struct NoopFitnessIconButton: View {
@@ -412,31 +533,52 @@ struct NoopFitnessSessionRow: View {
     var showsDate = false
 
     var body: some View {
+        let tint = Self.tint(session)
         HStack(spacing: 13) {
-            NoopCanonicalGlyph(name: Self.glyph(session), size: 18, color: NoopHTMLColor.warm)
-                .frame(width: 38, height: 38)
-                .background(NoopHTMLColor.warm.opacity(0.14), in: Circle())
-            VStack(alignment: .leading, spacing: 3) {
+            NoopCanonicalGlyph(name: Self.glyph(session), size: 18, color: tint)
+                .frame(width: 44, height: 44)
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(when).font(NoopHTMLFont.sans(11.5, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
+                    if session.detected {
+                        Text("detected")
+                            .font(NoopHTMLFont.sans(10, weight: .semibold)).foregroundStyle(NoopHTMLColor.warm)
+                            .padding(.horizontal, 6).frame(height: 17)
+                            .background(NoopHTMLColor.warm.opacity(0.12), in: Capsule())
+                    }
+                }
                 Text(session.title)
-                    .font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                    .font(NoopHTMLFont.sans(15, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.ink)
-                Text(detail)
-                    .font(NoopHTMLFont.sans(12))
-                    .foregroundStyle(NoopHTMLColor.copy)
+                    .lineLimit(1)
+                HStack(spacing: 10) {
+                    chip("clock", NoopFitnessHome.duration(session.durationS))
+                    if let e = session.row?.strain, e > 0 { chip("bolt.fill", String(format: "%.1f", e), tint: NoopHTMLColor.warm) }
+                    if let k = session.kcal, k > 0 { chip("flame.fill", "\(Int(k.rounded()))", tint: NoopHTMLColor.amber) }
+                    if let hr = session.row?.avgHr, hr > 0 { chip("heart.fill", "\(hr)", tint: NoopHTMLColor.red) }
+                }
             }
-            Spacer()
-            if session.detected {
-                Text("detected")
-                    .font(NoopHTMLFont.sans(10.5, weight: .semibold))
-                    .foregroundStyle(NoopHTMLColor.warm)
-                    .padding(.horizontal, 8).frame(height: 22)
-                    .background(NoopHTMLColor.warm.opacity(0.12), in: Capsule())
-            }
+            Spacer(minLength: 4)
             if session.liftSessionID != nil || session.editable {
                 NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
         }
         .fitnessCard()
+        .accessibilityElement(children: .combine)
+    }
+
+    private func chip(_ symbol: String, _ text: String, tint: Color = NoopHTMLColor.copy) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: symbol).font(.system(size: 9.5, weight: .semibold)).foregroundStyle(tint)
+            Text(text).font(NoopHTMLFont.sans(12, weight: .medium)).foregroundStyle(NoopHTMLColor.inkSoft).monospacedDigit()
+        }
+    }
+
+    private var when: String {
+        showsDate
+            ? session.start.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
+            : session.start.formatted(date: .omitted, time: .shortened)
     }
 
     static func glyph(_ session: NoopFitnessSession) -> NoopCanonicalGlyphName {
@@ -448,13 +590,15 @@ struct NoopFitnessSessionRow: View {
         return .run
     }
 
-    private var detail: String {
-        let time = showsDate
-            ? session.start.formatted(.dateTime.weekday(.abbreviated).day().hour().minute())
-            : session.start.formatted(date: .omitted, time: .shortened)
-        var parts = [time, NoopFitnessHome.duration(session.durationS)]
-        if let k = session.kcal { parts.append("\(Int(k.rounded())) kcal") }
-        return parts.joined(separator: " · ")
+    /// One colour per kind of session, the same on the strip, the rows and the calendar.
+    static func tint(_ session: NoopFitnessSession) -> Color {
+        switch glyph(session) {
+        case .weight: NoopHTMLColor.warm
+        case .wave: NoopHTMLColor.blueLight
+        case .bike: NoopHTMLColor.blue
+        case .walk: NoopHTMLColor.green
+        default: NoopHTMLColor.blush
+        }
     }
 }
 
