@@ -278,7 +278,7 @@ private struct NoopTrendsScreen: View {
                         .font(NoopHTMLFont.sans(12.5, weight: item == window ? .semibold : .regular))
                         .foregroundStyle(item == window ? Color(hex: 0x9FE2FB) : NoopHTMLColor.copy)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 34)
+                        .frame(minHeight: 34)
                         .background(item == window ? NoopA4.green.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(item == window ? NoopA4.green.opacity(0.4) : .clear, lineWidth: 0.5))
                 }
@@ -399,7 +399,7 @@ private struct NoopA4Header<Trailing: View>: View {
                     .font(NoopHTMLFont.outfit(23))
                     .tracking(-0.46)
                     .foregroundStyle(NoopHTMLColor.ink)
-                    .frame(height: 26.45, alignment: .top)
+                    .frame(minHeight: 26.45, alignment: .top)
             }
             Spacer(minLength: 0)
             trailing
@@ -446,7 +446,7 @@ private struct NoopBodyAgeHero: View {
                         .font(NoopHTMLFont.sans(11, weight: .semibold))
                         .foregroundStyle(NoopA4.greenLight)
                         .padding(.horizontal, 9)
-                        .frame(height: 25)
+                        .frame(minHeight: 25)
                         .background(NoopA4.green.opacity(0.13), in: RoundedRectangle(cornerRadius: 8))
                 }
 
@@ -569,7 +569,7 @@ private struct NoopA4AnimatedAgeAura: View {
                         .font(NoopHTMLFont.outfit200(68))
                         .tracking(-3.4)
                         .monospacedDigit()
-                        .frame(height: 68)
+                        .frame(minHeight: 68)
                         .shadow(color: .black.opacity(0.6), radius: 13, y: 2)
                     Text("BODY AGE")
                         .font(NoopHTMLFont.sans(10.5, weight: .semibold))
@@ -788,6 +788,8 @@ private struct NoopPaceScale: View {
                 }
             }
             .frame(height: 52)
+            // The readout is placed on the gauge's own geometry, so it keeps the design size.
+            .dynamicTypeSize(.large)
 
             HStack {
                 Text("−1.0×")
@@ -964,7 +966,7 @@ private struct NoopCapacityScreen: View {
                     HStack(alignment: .firstTextBaseline, spacing: 9) {
                         Text(values.last.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? (live == nil ? "44.4" : "\u{2014}"))
                             .font(NoopHTMLFont.outfit200(54)).tracking(-2.43)
-                            .frame(height: 54)
+                            .frame(minHeight: 54)
                         Text("ml/kg/min, estimated").font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
                     }
                     if let read {
@@ -1249,7 +1251,7 @@ private struct NoopYearScreen: View {
                                     Text(chapter.1).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
                                 }
                                 Text(chapter.2).font(NoopHTMLFont.outfit(19)).tracking(-0.38)
-                                    .frame(height: 22.8, alignment: .top)
+                                    .frame(minHeight: 22.8, alignment: .top)
                                 Text(chapter.3).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
                                     .noopA4LineBox(fontSize: 12.5, ratio: 1.6)
                         }

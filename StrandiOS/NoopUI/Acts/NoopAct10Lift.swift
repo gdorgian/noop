@@ -332,7 +332,7 @@ private struct NoopLiftActionButton: View {
                 .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                 .foregroundStyle(warm ? Color(hex: 0xF3C888) : accent ? NoopHTMLColor.blueInk : NoopHTMLColor.inkSoft)
                 .frame(maxWidth: .infinity)
-                .frame(height: 48)
+                .frame(minHeight: 48)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(warm ? NoopHTMLColor.warm.opacity(0.10) : accent ? NoopHTMLColor.blue : Color.white.opacity(0.05))
@@ -580,7 +580,7 @@ private struct NoopLiftLiveScreen: View {
             Button { showFinish = true } label: {
                 Text("Finish").font(NoopHTMLFont.sans(14, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.warmInk)
-                    .padding(.horizontal, 18).frame(height: 38)
+                    .padding(.horizontal, 18).frame(minHeight: 38)
                     .background(NoopHTMLColor.warm, in: Capsule())
             }
             .buttonStyle(NoopHTMLPressStyle())
@@ -648,7 +648,7 @@ private struct NoopLiftLiveScreen: View {
                 }
             }
             HStack(spacing: 8) {
-                Text("SET").frame(width: 34, alignment: .leading)
+                Text("SET").lineLimit(1).frame(width: 34, alignment: .leading)
                 Text(LiftFormat.weightUnit(units).uppercased()).frame(maxWidth: .infinity)
                 Text("REPS").frame(maxWidth: .infinity)
                 Color.clear.frame(width: 38, height: 1)
@@ -778,7 +778,7 @@ private struct NoopLiftLiveScreen: View {
         Text(t).font(NoopHTMLFont.sans(15, weight: done ? .semibold : .regular))
             .foregroundStyle(done ? NoopHTMLColor.ink : typed ? NoopHTMLColor.inkSoft : NoopHTMLColor.muted)
             .monospacedDigit()
-            .frame(maxWidth: .infinity).frame(height: 40)
+            .frame(maxWidth: .infinity).frame(minHeight: 40)
             .background(done ? NoopHTMLColor.green.opacity(0.08) : Color.white.opacity(0.03),
                         in: RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
@@ -1284,7 +1284,7 @@ private struct NoopLiftLibraryScreen: View {
                 Button { open(program) } label: {
                     Text("Open")
                         .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.inkSoft)
-                        .padding(.horizontal, 16).frame(height: 44)
+                        .padding(.horizontal, 16).frame(minHeight: 44)
                         .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
                         .overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
                 }
@@ -1964,7 +1964,7 @@ private struct NoopLiftDetailScreen: View {
                         }
                     }
                     HStack {
-                        Text("SET").frame(width: 34, alignment: .leading)
+                        Text("SET").lineLimit(1).frame(width: 34, alignment: .leading)
                         Text(LiftFormat.weightUnit(units).uppercased()).frame(maxWidth: .infinity)
                         Text("REPS").frame(maxWidth: .infinity)
                         Text("REST").frame(width: 52, alignment: .trailing)
@@ -3071,7 +3071,7 @@ struct NoopLiftEffortSheet: View {
             Spacer()
             Button(action: save) {
                 Text("Save workout").font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
-                    .frame(maxWidth: .infinity).frame(height: 56)
+                    .frame(maxWidth: .infinity).frame(minHeight: 56)
                     .background(NoopHTMLColor.warm, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(NoopHTMLPressStyle())

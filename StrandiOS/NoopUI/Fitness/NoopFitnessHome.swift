@@ -28,7 +28,7 @@ struct NoopFitnessHome: View {
                         if editing {
                             Button { withAnimation(NoopMotion.swap) { editing = false } } label: {
                                 Text("Done").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.canvas)
-                                    .padding(.horizontal, 18).frame(height: 34).background(NoopHTMLColor.ink, in: Capsule())
+                                    .padding(.horizontal, 18).frame(minHeight: 34).background(NoopHTMLColor.ink, in: Capsule())
                             }
                             .buttonStyle(NoopHTMLPressStyle())
                         } else {
@@ -81,7 +81,7 @@ struct NoopFitnessHome: View {
         Button { withAnimation(NoopMotion.swap) { editing = true } } label: {
             Text("Edit Fitness")
                 .font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                .frame(maxWidth: .infinity).frame(height: 50)
+                .frame(maxWidth: .infinity).frame(minHeight: 50)
                 .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
         }
@@ -116,7 +116,7 @@ struct NoopFitnessHome: View {
             .contentShape(Rectangle())
             .draggable(section.rawValue) {
                 Text(section.title).font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                    .padding(.horizontal, 16).frame(height: 40).background(NoopHTMLColor.cardRaised, in: Capsule())
+                    .padding(.horizontal, 16).frame(minHeight: 40).background(NoopHTMLColor.cardRaised, in: Capsule())
             }
             if section.cards.isEmpty {
                 editPreview(section, s)
@@ -214,13 +214,13 @@ struct NoopFitnessHome: View {
                     }
                 } label: {
                     Text("Reset to default").font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                        .frame(maxWidth: .infinity).frame(height: 46)
+                        .frame(maxWidth: .infinity).frame(minHeight: 46)
                         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(NoopHTMLPressStyle())
                 Button { navigation.push(.fitnessEdit) } label: {
                     Text("More settings").font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                        .frame(maxWidth: .infinity).frame(height: 46)
+                        .frame(maxWidth: .infinity).frame(minHeight: 46)
                         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(NoopHTMLPressStyle())

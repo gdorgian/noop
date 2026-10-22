@@ -219,7 +219,7 @@ private struct NoopInstrumentIndexScreen: View {
                                 .font(NoopHTMLFont.sans(11.5, weight: .medium))
                                 .foregroundStyle(item == filter ? Color(hex: 0xC6CEE8) : NoopHTMLColor.copy)
                                 .padding(.horizontal, 12)
-                                .frame(height: 36)
+                                .frame(minHeight: 36)
                                 .background(
                                     item == filter ? NoopHTMLColor.night.opacity(0.20) : Color.white.opacity(0.05),
                                     in: RoundedRectangle(cornerRadius: 11)
@@ -445,7 +445,7 @@ private struct NoopInstrumentRangeTabs: View {
                         .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                         .foregroundStyle(item == range ? Color(hex: 0xC6CEE8) : item.isAvailable(total: availableDays) ? NoopHTMLColor.copy : NoopHTMLColor.ink.opacity(0.38))
                         .frame(maxWidth: .infinity)
-                        .frame(height: 38)
+                        .frame(minHeight: 38)
                         .background(item == range ? NoopHTMLColor.night.opacity(0.20) : .clear, in: RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(NoopHTMLPressStyle())
@@ -509,7 +509,7 @@ private struct NoopInstrumentGroupCard: View {
                                     .font(NoopHTMLFont.sans(10.5, weight: .semibold))
                                     .foregroundStyle(row.style.chipInk)
                                     .padding(.horizontal, 8)
-                                    .frame(height: 23)
+                                    .frame(minHeight: 23)
                                     .background(row.style.chipFill, in: RoundedRectangle(cornerRadius: 7))
                                     .lineLimit(1)
                                     .fixedSize(horizontal: true, vertical: false)
@@ -831,7 +831,7 @@ private struct NoopInstrumentRawScreen: View {
                 Text(active == nil ? "Arm capture" : "Stop recording")
                     .font(NoopHTMLFont.sans(15, weight: .semibold))
                     .foregroundStyle(active == nil ? NoopHTMLColor.ink : Color(hex: 0x1A0705))
-                    .frame(maxWidth: .infinity).frame(height: 56)
+                    .frame(maxWidth: .infinity).frame(minHeight: 56)
                     .background(active == nil ? Color.white.opacity(0.07) : Color(hex: 0xE3574E),
                                 in: RoundedRectangle(cornerRadius: 18))
                     .overlay(RoundedRectangle(cornerRadius: 18)
@@ -893,7 +893,7 @@ private struct NoopInstrumentRawScreen: View {
                     Button { Task { await export(selected) } } label: {
                         Text(exporting ? "Preparing export…" : "Export capture")
                             .font(NoopHTMLFont.sans(14, weight: .semibold))
-                            .frame(maxWidth: .infinity).frame(height: 52)
+                            .frame(maxWidth: .infinity).frame(minHeight: 52)
                     }
                     .buttonStyle(NoopPlainHitStyle()).disabled(exporting || selected.active)
                     .foregroundStyle(NoopHTMLColor.ink)
@@ -901,7 +901,7 @@ private struct NoopInstrumentRawScreen: View {
                     .padding(.top, 12)
                     Button { deleteCandidate = selected } label: {
                         Text("Delete this capture").font(NoopHTMLFont.sans(14))
-                            .frame(maxWidth: .infinity).frame(height: 52)
+                            .frame(maxWidth: .infinity).frame(minHeight: 52)
                     }
                     .buttonStyle(NoopPlainHitStyle()).disabled(selected.active)
                     .foregroundStyle(NoopHTMLColor.ink)
@@ -1361,7 +1361,7 @@ private struct NoopInstrumentMetricScreen: View {
                                     .tracking(0.4)
                                     .foregroundStyle(move.lag == 0 ? NoopHTMLColor.copy : Color(hex: 0xB7C0E8))
                                     .padding(.horizontal, 7)
-                                    .frame(height: 20)
+                                    .frame(minHeight: 20)
                                     .background(move.lag == 0 ? Color.white.opacity(0.05) : NoopHTMLColor.night.opacity(0.14), in: RoundedRectangle(cornerRadius: 6))
                                     .fixedSize(horizontal: true, vertical: false)
                                 Text(move.coefficient)
@@ -2065,7 +2065,7 @@ private struct NoopInstrumentEffectsScreen: View {
                     .tracking(0.8)
                     .foregroundStyle(model.dose.chipInk)
                     .padding(.horizontal, 8)
-                    .frame(height: 22)
+                    .frame(minHeight: 22)
                     .background(model.dose.chipFill, in: RoundedRectangle(cornerRadius: 6))
             }
 

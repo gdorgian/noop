@@ -94,7 +94,7 @@ struct NoopVerifiedEnergyScreen: View {
                             Text("Confirm your body profile")
                                 .font(NoopHTMLFont.sans(14, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.ink)
-                                .frame(maxWidth: .infinity).frame(height: 52)
+                                .frame(maxWidth: .infinity).frame(minHeight: 52)
                                 .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 17))
                                 .overlay(RoundedRectangle(cornerRadius: 17)
                                     .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5))
@@ -272,7 +272,7 @@ struct NoopEnergyProfileConfirmation: View {
                 } label: {
                     Text("Save profile and show Energy")
                         .font(NoopHTMLFont.sans(14, weight: .semibold))
-                        .frame(maxWidth: .infinity).frame(height: 52)
+                        .frame(maxWidth: .infinity).frame(minHeight: 52)
                 }
                 .buttonStyle(NoopPlainHitStyle())
                 .foregroundStyle(canConfirm ? NoopHTMLColor.canvas : NoopHTMLColor.copy)
@@ -468,7 +468,7 @@ struct NoopAct2Screens: View {
                                 // native 13.5pt line is 16.47pt; center the remaining leading.
                                 .lineSpacing(4.455)
                                 .fixedSize(horizontal: false, vertical: true)
-                                .frame(height: 41.85, alignment: .leading)
+                                .frame(minHeight: 41.85, alignment: .leading)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 2)
@@ -516,7 +516,7 @@ struct NoopAct2Screens: View {
                                     // CSS 12px / 1.5 = two 18pt line boxes.
                                     .lineSpacing(3.36)
                                     .fixedSize(horizontal: false, vertical: true)
-                                    .frame(height: 36, alignment: .leading)
+                                    .frame(minHeight: 36, alignment: .leading)
                             }
                             Spacer(minLength: 4)
                             Act2CSSChevron(size: 8, color: Color(hex: 0xA9B4E0))
@@ -872,7 +872,7 @@ struct NoopAct2Screens: View {
                     // bell, so flexbox gives the copy the remaining width and wraps it there.
                     .lineSpacing(-2.53)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(height: 52.9, alignment: .leading)
+                    .frame(minHeight: 52.9, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -1192,7 +1192,7 @@ struct NoopAct2Screens: View {
                 .font(NoopHTMLFont.sans(11.5, weight: .semibold))
                 .foregroundStyle(ink)
                 .padding(.horizontal, 12)
-                .frame(height: 29)
+                .frame(minHeight: 29)
                 .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(tint.opacity(0.34), lineWidth: 0.5))
         }
@@ -1466,7 +1466,7 @@ struct NoopAct2Screens: View {
                                         .tracking(-1.56)
                                         .foregroundStyle(chargeColor)
                                         .monospacedDigit()
-                                        .frame(height: 52)
+                                        .frame(minHeight: 52)
                                     Text("of \(dayContext.wakeCharge)")
                                         .font(NoopHTMLFont.sans(13))
                                         .foregroundStyle(Color(hex: 0x7F8A85))
@@ -1916,7 +1916,7 @@ struct NoopAct2Screens: View {
                                 .font(NoopHTMLFont.outfit200(52))
                                 .tracking(-2.08)
                                 .monospacedDigit()
-                                .frame(height: 52)
+                                .frame(minHeight: 52)
                             Text(series.map { "bpm at \(AppClock.hourMinuteFormatter().string(from: $0[point].time))" }
                                  ?? (day == nil ? "bpm at \(point == values.count - 1 ? dayContext.endTime : nearest.time)" : "bpm"))
                                 .font(NoopHTMLFont.sans(13))
@@ -2181,7 +2181,7 @@ struct NoopAct2Screens: View {
                             .font(NoopHTMLFont.outfit200(44))
                             .tracking(-1.54)
                             .foregroundStyle(shown == nil ? NoopHTMLColor.faint : level.color)
-                            .frame(height: 44)
+                            .frame(minHeight: 44)
                             .animation(.easeInOut(duration: 0.18), value: shown)
                         Text(day == nil ? level.read : stressMeasuredRead)
                             .font(NoopHTMLFont.sans(13.5))
@@ -2262,7 +2262,7 @@ struct NoopAct2Screens: View {
                             Text("Breathe with the orb")
                                 .font(NoopHTMLFont.outfit(22, weight: .light))
                                 .tracking(-0.44)
-                                .frame(height: 25.3)
+                                .frame(minHeight: 25.3)
                             Text(day == nil
                                  ? "Your home screen is already pacing it — four in, four held, four out, four held. Watch the pulse inside the orb come down as you go."
                                  : "The orb paces four in, four held, four out, four held. Open Breathe to follow it.")
@@ -2895,7 +2895,7 @@ private struct Act2HeartHero: View {
                             .font(NoopHTMLFont.outfit200(64))
                             .tracking(-2.88)
                             .monospacedDigit()
-                            .frame(height: 64)
+                            .frame(minHeight: 64)
                             .scaleEffect(beat.scale)
                             .background {
                                 Ellipse()
@@ -2959,7 +2959,7 @@ private struct Act2SpotReadingCard: View {
                     Text(buttonText)
                         .font(NoopHTMLFont.sans(12, weight: .semibold))
                         .foregroundStyle(phase == .run ? Color(hex: 0xC6CEC9) : NoopHTMLColor.blueLight)
-                        .padding(.horizontal, 14).frame(height: 32)
+                        .padding(.horizontal, 14).frame(minHeight: 32)
                         .background((phase == .run ? Color.white : NoopHTMLColor.blue).opacity(0.16),
                                     in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11)
@@ -3109,7 +3109,7 @@ private struct Act2LiveHeartHero: View {
                     .font(NoopHTMLFont.outfit200(64))
                     .tracking(-2.88)
                     .monospacedDigit()
-                    .frame(height: 64)
+                    .frame(minHeight: 64)
                     .scaleEffect(beat.scale)
                     .background {
                         Ellipse()
@@ -3391,7 +3391,7 @@ private struct Act2BreathingOrb: View {
                     .foregroundStyle(Color(hex: 0xF6FDFF))
                     .monospacedDigit()
                     .shadow(color: Color(hex: 0x041E30).opacity(0.55), radius: 8, y: 2)
-                    .frame(height: 52)
+                    .frame(minHeight: 52)
                 }
                 Text(frame.label.uppercased())
                     .font(NoopHTMLFont.sans(12.5, weight: .semibold))
@@ -3679,7 +3679,7 @@ private struct Act2VitalCard: View {
                         .tracking(-0.7)
                         .foregroundStyle(vital.outside ? Color(hex: 0xF3C888) : NoopHTMLColor.ink)
                         .monospacedDigit()
-                        .frame(height: 25)
+                        .frame(minHeight: 25)
                     Text(vital.unit).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.muted)
                 }
                 Spacer()
@@ -4417,7 +4417,7 @@ struct NoopBreatheScreens: View {
                 .font(NoopHTMLFont.sans(15, weight: .semibold))
                 .foregroundStyle(NoopHTMLColor.blueInk)
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
+                .frame(minHeight: 54)
                 .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(NoopHTMLPressStyle())
@@ -4429,7 +4429,7 @@ struct NoopBreatheScreens: View {
                 .font(NoopHTMLFont.sans(14.5, weight: .medium))
                 .foregroundStyle(NoopHTMLColor.inkSoft)
                 .frame(maxWidth: .infinity)
-                .frame(height: 52)
+                .frame(minHeight: 52)
                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.14), lineWidth: 0.5))
                 .contentShape(RoundedRectangle(cornerRadius: 18))
         }
@@ -4571,7 +4571,7 @@ struct NoopBreatheScreens: View {
                         .monospacedDigit()
                         .foregroundStyle(Color(hex: 0xF6FDFF))
                         .shadow(color: Color(hex: 0x041E30).opacity(0.55), radius: 8, y: 2)
-                        .frame(height: 38)
+                        .frame(minHeight: 38)
                     Text((foundPace == nil ? "generic pace" : "your pace").uppercased())
                         .font(NoopHTMLFont.sans(10.5, weight: .semibold))
                         .tracking(1.05)

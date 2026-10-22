@@ -64,7 +64,7 @@ struct NoopAct1Screens: View {
                         Text("Rest")
                             .font(NoopHTMLFont.outfit(23, weight: .regular))
                             .tracking(-0.46)
-                            .frame(height: 26.45, alignment: .top)
+                            .frame(minHeight: 26.45, alignment: .top)
                     }
                     Spacer(minLength: 8)
                     NoopBatteryChip(percent: rest == nil ? 52 : battery) { navigation.push(.strap) }
@@ -269,7 +269,7 @@ struct NoopAct1Screens: View {
                             .foregroundStyle(NoopHTMLColor.faint)
                     }
                 }
-                .fixedSize()
+                .multilineTextAlignment(.trailing)
             }
 
             GeometryReader { proxy in
@@ -321,6 +321,8 @@ struct NoopAct1Screens: View {
                 .frame(width: proxy.size.width, height: 84, alignment: .bottom)
             }
             .frame(height: 84)
+            // Bar labels sit on the chart's own geometry, so they keep the design size.
+            .dynamicTypeSize(.large)
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
@@ -619,7 +621,7 @@ struct NoopAct1Screens: View {
                             .font(NoopHTMLFont.act1Outfit200(82))
                             .tracking(-3.69)
                             .monospacedDigit()
-                            .frame(height: 77.08, alignment: .top)
+                            .frame(minHeight: 77.08, alignment: .top)
                             .offset(y: -13)
                         Text("\(activeBedtimes[selectedBedtime].length) before your \(alarmTime) alarm")
                             .font(NoopHTMLFont.sans(14))
@@ -988,7 +990,7 @@ struct NoopAct1Screens: View {
                                     .font(NoopHTMLFont.sans(12.5, weight: selected ? .semibold : .medium))
                                     .foregroundStyle(selected ? Color(hex: 0x0D1120) : NoopHTMLColor.copy)
                                     .frame(maxWidth: .infinity)
-                                    .frame(height: 38)
+                                    .frame(minHeight: 38)
                                     .background(selected ? NoopHTMLColor.night : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 13))
                                     .overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? .clear : Color.white.opacity(0.07), lineWidth: 0.5))
                             }
@@ -1425,7 +1427,7 @@ struct NoopAct1Screens: View {
                 .foregroundStyle(NoopHTMLColor.ink)
                 // CSS line-height .94 on 82 is a 77 pt box. SwiftUI's own line box for an 82 pt
                 // face is nearer 98, which pushed everything below the hero down by 20 pt.
-                .frame(height: 77)
+                .frame(minHeight: 77)
                 .fixedSize()
             alarmStep(later: true) { setAlarm(alarmSetMinutes + 5) }
         }
@@ -1476,7 +1478,7 @@ struct NoopAct1Screens: View {
                             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                             .foregroundStyle(on ? Color(hex: 0xC9CEE8) : NoopHTMLColor.muted)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 42)
+                            .frame(minHeight: 42)
                             .background(
                                 RoundedRectangle(cornerRadius: 13, style: .continuous)
                                     .fill(on ? NoopHTMLColor.night.opacity(0.18) : NoopHTMLColor.card)
@@ -1653,7 +1655,7 @@ struct NoopAct1Screens: View {
                 .font(NoopHTMLFont.sans(15, weight: .semibold))
                 .foregroundStyle(alarmArmed ? Color(hex: 0xC9CEE8) : Color(hex: 0x12142B))
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
+                .frame(minHeight: 54)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(alarmArmed ? Color.clear : Color(hex: 0x8B99D6))
@@ -1889,7 +1891,7 @@ private struct Act1SleepRing: View {
                         .font(NoopHTMLFont.act1Outfit200(46))
                         .tracking(-1.84)
                         .monospacedDigit()
-                        .frame(height: 46, alignment: .top)
+                        .frame(minHeight: 46, alignment: .top)
                         .offset(y: -8)
                         .shadow(color: .black.opacity(0.6), radius: 12, y: 2)
                     Text("ASLEEP")

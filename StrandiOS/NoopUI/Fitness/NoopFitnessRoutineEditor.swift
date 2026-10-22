@@ -171,7 +171,7 @@ struct NoopFitnessExercisePicker: View {
                     Button { newPrimary = m } label: {
                         Text(m.displayName).font(NoopHTMLFont.sans(12, weight: .semibold))
                             .foregroundStyle(newPrimary == m ? NoopHTMLColor.warmInk : NoopHTMLColor.inkSoft)
-                            .padding(.horizontal, 10).frame(height: 28)
+                            .padding(.horizontal, 10).frame(minHeight: 28)
                             .background(newPrimary == m ? NoopHTMLColor.warm : Color.white.opacity(0.06), in: Capsule())
                     }
                     .buttonStyle(NoopHTMLPressStyle())
@@ -182,7 +182,7 @@ struct NoopFitnessExercisePicker: View {
                 dismiss()
             } label: {
                 Text("Add \(name)").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
-                    .frame(maxWidth: .infinity).frame(height: 42)
+                    .frame(maxWidth: .infinity).frame(minHeight: 42)
                     .background(NoopHTMLColor.warm, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(NoopHTMLPressStyle())
@@ -242,7 +242,7 @@ struct NoopFitnessRoutineEditor: View {
                     Button { Task { await save() } } label: {
                         Text(saving ? "Saving…" : "Save")
                             .font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
-                            .padding(.horizontal, 18).frame(height: 34)
+                            .padding(.horizontal, 18).frame(minHeight: 34)
                             .background(NoopHTMLColor.warm.opacity(canSave ? 1 : 0.4), in: Capsule())
                     }
                     .buttonStyle(NoopHTMLPressStyle())
@@ -303,7 +303,7 @@ struct NoopFitnessRoutineEditor: View {
                 if !isNew {
                     Button { confirmDelete = true } label: {
                         Text("Delete routine").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.red)
-                            .frame(maxWidth: .infinity).frame(height: 46)
+                            .frame(maxWidth: .infinity).frame(minHeight: 46)
                     }
                     .buttonStyle(NoopHTMLPressStyle())
                     .padding(.top, 8)

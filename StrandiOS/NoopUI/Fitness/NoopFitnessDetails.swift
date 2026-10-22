@@ -90,7 +90,7 @@ struct NoopFitnessPeriodPicker: View {
                         .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                         .foregroundStyle(days == d ? NoopHTMLColor.ink : NoopHTMLColor.copy)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 34)
+                        .frame(minHeight: 34)
                         .background(days == d ? Color.white.opacity(0.09) : .clear,
                                     in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 }

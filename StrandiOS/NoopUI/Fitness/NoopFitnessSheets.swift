@@ -117,7 +117,7 @@ struct NoopFitnessAddSheet: View {
                     }
                     Button { showAll = true } label: {
                         Text("Every other sport").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
-                            .frame(maxWidth: .infinity).frame(height: 40)
+                            .frame(maxWidth: .infinity).frame(minHeight: 40)
                     }
                     .buttonStyle(NoopHTMLPressStyle())
                 }
@@ -180,7 +180,7 @@ struct NoopFitnessAddSheet: View {
                 Spacer(minLength: 6)
                 if let trailing {
                     Text(trailing).font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
-                        .padding(.horizontal, 14).frame(height: 32).background(NoopHTMLColor.warm, in: Capsule())
+                        .padding(.horizontal, 14).frame(minHeight: 32).background(NoopHTMLColor.warm, in: Capsule())
                 } else {
                     NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                 }
@@ -260,7 +260,7 @@ struct NoopFitnessRepeatEditor: View {
                             Text(String(Calendar.current.veryShortWeekdaySymbols[d % 7]))
                                 .font(NoopHTMLFont.sans(14, weight: .semibold))
                                 .foregroundStyle(on ? NoopHTMLColor.warmInk : NoopHTMLColor.inkSoft)
-                                .frame(maxWidth: .infinity).frame(height: 42)
+                                .frame(maxWidth: .infinity).frame(minHeight: 42)
                                 .background(on ? NoopHTMLColor.warm : Color.white.opacity(0.06), in: Circle())
                         }
                         .buttonStyle(NoopHTMLPressStyle())
@@ -276,7 +276,7 @@ struct NoopFitnessRepeatEditor: View {
                         Button { plan.weeks = w } label: {
                             Text("\(w) wk").font(NoopHTMLFont.sans(12.5, weight: .semibold))
                                 .foregroundStyle(plan.weeks == w ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
-                                .padding(.horizontal, 11).frame(height: 30)
+                                .padding(.horizontal, 11).frame(minHeight: 30)
                                 .background(plan.weeks == w ? NoopHTMLColor.ink : Color.white.opacity(0.06), in: Capsule())
                         }
                         .buttonStyle(NoopHTMLPressStyle())
@@ -301,7 +301,7 @@ struct NoopFitnessRepeatEditor: View {
         Button { withAnimation(NoopMotion.swap) { action() } } label: {
             Text(t).font(NoopHTMLFont.sans(13, weight: .semibold))
                 .foregroundStyle(on ? NoopHTMLColor.ink : NoopHTMLColor.copy)
-                .frame(maxWidth: .infinity).frame(height: 34)
+                .frame(maxWidth: .infinity).frame(minHeight: 34)
                 .background(on ? Color.white.opacity(0.1) : .clear, in: Capsule())
         }
         .buttonStyle(NoopHTMLPressStyle())
@@ -366,7 +366,7 @@ struct NoopFitnessPlanSheet: View {
                 }
                 Button(action: save) {
                     Text("Add to calendar").font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
-                        .frame(maxWidth: .infinity).frame(height: 54)
+                        .frame(maxWidth: .infinity).frame(minHeight: 54)
                         .background(NoopHTMLColor.warm.opacity(canSave ? 1 : 0.4), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .buttonStyle(NoopHTMLPressStyle())

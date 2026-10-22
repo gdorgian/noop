@@ -78,28 +78,52 @@ struct NoopCSSLinearGradient: View {
 }
 
 enum NoopHTMLFont {
+    /// Text follows the iPhone's Text Size the way system text does: each design size grows with the
+    /// text style nearest to it, so captions and titles keep their proportions. Hero numerals
+    /// (34 pt and up) stay fixed, since they are already sized to their rings and cards; the app
+    /// clamps the range and lets lines shrink before they truncate (see `StrandiOSApp`).
     static func outfit(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .custom("Outfit", size: size).weight(weight)
+        scaled("Outfit", size).weight(weight)
     }
 
     /// CSS `font-weight: 200` for the variable Outfit face.
     /// SwiftUI's `.thin` is weight 200; `.ultraLight` would incorrectly select 100.
     static func outfit200(_ size: CGFloat) -> Font {
-        .custom("Outfit", size: size).weight(.thin)
+        scaled("Outfit", size).weight(.thin)
     }
 
     /// Act 1's large numerals use CSS Outfit 200. Select the variable font's named
     /// ExtraLight instance directly so CoreText does not resolve it to Outfit Thin (100).
     static func act1Outfit200(_ size: CGFloat) -> Font {
-        .custom("Outfit-Thin_ExtraLight", size: size)
+        scaled("Outfit-Thin_ExtraLight", size)
     }
 
     static func sans(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .custom("Instrument Sans", size: size).weight(weight)
+        scaled("Instrument Sans", size).weight(weight)
     }
 
     static func serif(_ size: CGFloat, italic: Bool = false) -> Font {
-        .custom(italic ? "Instrument Serif Italic" : "Instrument Serif", size: size)
+        scaled(italic ? "Instrument Serif Italic" : "Instrument Serif", size)
+    }
+
+    private static func scaled(_ name: String, _ size: CGFloat) -> Font {
+        guard let style = textStyle(for: size) else { return .custom(name, fixedSize: size) }
+        return .custom(name, size: size, relativeTo: style)
+    }
+
+    static func textStyle(for size: CGFloat) -> Font.TextStyle? {
+        switch size {
+        case ..<11.5: .caption2
+        case ..<12.5: .caption
+        case ..<14.5: .footnote
+        case ..<16: .subheadline
+        case ..<17: .callout
+        case ..<19: .body
+        case ..<21.5: .title3
+        case ..<26: .title2
+        case ..<34: .title
+        default: nil
+        }
     }
 }
 
@@ -419,6 +443,9 @@ struct NoopSectionLabel: View {
             .font(NoopHTMLFont.sans(10, weight: .semibold))
             .tracking(1.2)
             .foregroundStyle(color)
+            // A label is one line: at large text it shrinks before it gives way to the row's detail.
+            .lineLimit(1)
+            .layoutPriority(1)
     }
 }
 
@@ -521,7 +548,7 @@ struct NoopPill: View {
             .font(NoopHTMLFont.sans(11, weight: .semibold))
             .foregroundStyle(filled ? NoopHTMLColor.blueInk : color)
             .padding(.horizontal, 11)
-            .frame(height: 28)
+            .frame(minHeight: 28)
             .background(filled ? color : color.opacity(0.11), in: Capsule())
             .overlay(Capsule().stroke(color.opacity(filled ? 0 : 0.26), lineWidth: 0.5))
     }
@@ -611,7 +638,7 @@ struct NoopSegmentedControl: View {
                         .font(NoopHTMLFont.sans(11.5, weight: item == selection ? .semibold : .regular))
                         .foregroundStyle(item == selection ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 32)
+                        .frame(minHeight: 32)
                         .background(item == selection ? NoopHTMLColor.blue.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(item == selection ? NoopHTMLColor.blue.opacity(0.42) : .clear, lineWidth: 0.5))
                 }

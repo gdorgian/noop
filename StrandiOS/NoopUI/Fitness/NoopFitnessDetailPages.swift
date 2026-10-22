@@ -435,7 +435,7 @@ struct NoopFitnessLoadPage: View {
                     Text(k == .cardio ? "Cardio" : "Muscular")
                         .font(NoopHTMLFont.sans(13, weight: .semibold))
                         .foregroundStyle(kind == k ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
-                        .padding(.horizontal, 16).frame(height: 32)
+                        .padding(.horizontal, 16).frame(minHeight: 32)
                         .background(kind == k ? NoopHTMLColor.ink : Color.white.opacity(0.06), in: Capsule())
                 }
                 .buttonStyle(NoopHTMLPressStyle())

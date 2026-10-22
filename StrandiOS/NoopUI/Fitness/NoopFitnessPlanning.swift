@@ -151,7 +151,7 @@ struct NoopFitnessEditScreen: View {
                 } label: {
                     Text("Reset to the standard layout")
                         .font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
-                        .frame(maxWidth: .infinity).frame(height: 46)
+                        .frame(maxWidth: .infinity).frame(minHeight: 46)
                 }
                 .buttonStyle(NoopHTMLPressStyle())
             }
@@ -201,7 +201,7 @@ struct NoopFitnessRoutineScreen: View {
                     Spacer()
                     Button { navigation.push(.fitnessRoutineEdit) } label: {
                         Text("Edit").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                            .padding(.horizontal, 14).frame(height: 32)
+                            .padding(.horizontal, 14).frame(minHeight: 32)
                             .background(Color.white.opacity(0.06), in: Capsule())
                     }
                     .buttonStyle(NoopHTMLPressStyle())
@@ -256,7 +256,7 @@ struct NoopFitnessRoutineScreen: View {
                     Button { scheduling = true } label: {
                         Text("Plan")
                             .font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                            .frame(maxWidth: .infinity).frame(height: 52)
+                            .frame(maxWidth: .infinity).frame(minHeight: 52)
                             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
@@ -309,7 +309,7 @@ struct NoopFitnessRoutineScreen: View {
                 Spacer()
             }
             HStack {
-                Text("SET").frame(width: 34, alignment: .leading)
+                Text("SET").lineLimit(1).frame(width: 34, alignment: .leading)
                 Text("KG").frame(maxWidth: .infinity)
                 Text("REPS").frame(maxWidth: .infinity)
             }
@@ -328,7 +328,7 @@ struct NoopFitnessRoutineScreen: View {
 
     private func cell(_ t: String) -> some View {
         Text(t).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
-            .frame(maxWidth: .infinity).frame(height: 34)
+            .frame(maxWidth: .infinity).frame(minHeight: 34)
             .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 

@@ -463,7 +463,7 @@ private extension NoopAct5Screens {
                             .font(NoopHTMLFont.sans(11.5, weight: selected ? .semibold : .regular))
                             .foregroundStyle(selected ? Self.blushLight : NoopHTMLColor.copy)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 32)
+                            .frame(minHeight: 32)
                             .background(selected ? tint.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11))
                             .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? tint.opacity(0.42) : .clear, lineWidth: 0.5))
                     }
@@ -633,6 +633,7 @@ private extension NoopAct5Screens {
             Text(value).font(NoopHTMLFont.outfit(17)).foregroundStyle(Self.blushLight).monospacedDigit()
             if !label.isEmpty { Text(label).font(NoopHTMLFont.sans(10.5)).foregroundStyle(Color(hex: 0x8B958F)) }
         }
+        .lineLimit(1)
     }
 
     // MARK: You, measured
@@ -1010,7 +1011,7 @@ private extension NoopAct5Screens {
                                 .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                                 .foregroundStyle(Self.blushLight)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 40)
+                                .frame(minHeight: 40)
                                 .background(Self.blush.opacity(0.11), in: RoundedRectangle(cornerRadius: 13))
                                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(Self.blush.opacity(0.3), lineWidth: 0.5))
                         }
@@ -1396,7 +1397,7 @@ private extension NoopAct5Screens {
                                 .font(NoopHTMLFont.sans(12, weight: .medium))
                                 .foregroundStyle(historyFilter == filter ? Self.blushLight : NoopHTMLColor.copy)
                                 .padding(.horizontal, 13)
-                                .frame(height: 37)
+                                .frame(minHeight: 37)
                                 .background(historyFilter == filter ? Self.blush.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(historyFilter == filter ? Self.blush.opacity(0.4) : Color.white.opacity(0.07), lineWidth: 0.5))
                         }
@@ -1742,7 +1743,7 @@ private extension NoopAct5Screens {
                                     .font(NoopHTMLFont.sans(10.5, weight: .medium))
                                     .foregroundStyle(NoopHTMLColor.inkSoft)
                                     .padding(.horizontal, 10)
-                                    .frame(height: 27)
+                                    .frame(minHeight: 27)
                                     .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
                                     .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
                             }
@@ -1755,7 +1756,7 @@ private extension NoopAct5Screens {
                             Text(!authorized ? "Turn on Apple Health to sync" : "Sync Apple Health now")
                                 .font(NoopHTMLFont.sans(13, weight: .semibold))
                                 .foregroundStyle(authorized ? Color(hex: 0x8FE3B4) : NoopHTMLColor.faint)
-                                .frame(maxWidth: .infinity).frame(height: 46)
+                                .frame(maxWidth: .infinity).frame(minHeight: 46)
                                 .background(authorized ? Self.green.opacity(0.13) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(authorized ? Self.green.opacity(0.36) : Color.white.opacity(0.08), lineWidth: 0.5))
                         }
@@ -1808,7 +1809,7 @@ private extension NoopAct5Screens {
                             Text(pinged ? "Buzzing now — follow the sound" : "Buzz the strap to find it")
                                 .font(NoopHTMLFont.sans(13, weight: .semibold))
                                 .foregroundStyle(pinged ? NoopHTMLColor.blueLight : NoopHTMLColor.inkSoft)
-                                .frame(maxWidth: .infinity).frame(height: 46)
+                                .frame(maxWidth: .infinity).frame(minHeight: 46)
                                 .background(pinged ? NoopHTMLColor.blue.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(pinged ? NoopHTMLColor.blue.opacity(0.45) : Color.white.opacity(0.12), lineWidth: 0.5))
                         }
@@ -1966,7 +1967,7 @@ private extension NoopAct5Screens {
                                     .font(NoopHTMLFont.sans(10.5, weight: .medium))
                                     .foregroundStyle(NoopHTMLColor.inkSoft)
                                     .padding(.horizontal, 10)
-                                    .frame(height: 27)
+                                    .frame(minHeight: 27)
                                     .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
                                     .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
                             }
@@ -1978,7 +1979,7 @@ private extension NoopAct5Screens {
                             Text(!isEnabled("Apple Health") ? "Turn on Apple Health to sync" : healthSyncStage == 0 ? "Sync Apple Health now" : "Written — 6 kinds, 221 nights")
                                 .font(NoopHTMLFont.sans(13, weight: .semibold))
                                 .foregroundStyle(isEnabled("Apple Health") ? Color(hex: 0x8FE3B4) : NoopHTMLColor.faint)
-                                .frame(maxWidth: .infinity).frame(height: 46)
+                                .frame(maxWidth: .infinity).frame(minHeight: 46)
                                 .background(isEnabled("Apple Health") ? Self.green.opacity(healthSyncStage == 0 ? 0.13 : 0.2) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(isEnabled("Apple Health") ? Self.green.opacity(0.36) : Color.white.opacity(0.08), lineWidth: 0.5))
                         }
@@ -2039,7 +2040,7 @@ private extension NoopAct5Screens {
                             Text(pinged ? "Buzzing now — follow the sound" : "Buzz the strap to find it")
                                 .font(NoopHTMLFont.sans(13, weight: .semibold))
                                 .foregroundStyle(pinged ? NoopHTMLColor.blueLight : NoopHTMLColor.inkSoft)
-                                .frame(maxWidth: .infinity).frame(height: 46)
+                                .frame(maxWidth: .infinity).frame(minHeight: 46)
                                 .background(pinged ? NoopHTMLColor.blue.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(pinged ? NoopHTMLColor.blue.opacity(0.45) : Color.white.opacity(0.12), lineWidth: 0.5))
                         }
@@ -2170,7 +2171,7 @@ private extension NoopAct5Screens {
                         .tracking(0.5)
                         .foregroundStyle(NoopHTMLColor.muted)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 44)
+                        .frame(minHeight: 44)
                         .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 15))
                         .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
                 }
@@ -2231,7 +2232,7 @@ private extension NoopAct5Screens {
                                 .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.inkSoft)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 44)
+                                .frame(minHeight: 44)
                                 .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.white.opacity(0.10), lineWidth: 0.5))
                         }
@@ -2264,7 +2265,7 @@ private extension NoopAct5Screens {
             .tracking(0.6)
             .foregroundStyle(NoopHTMLColor.muted)
             .padding(.horizontal, 10)
-            .frame(height: 24)
+            .frame(minHeight: 24)
             .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.10), lineWidth: 0.5))
     }
@@ -2618,7 +2619,7 @@ private extension NoopAct5Screens {
                             .font(NoopHTMLFont.sans(11.5, weight: .semibold))
                             .foregroundStyle(NoopHTMLColor.warm)
                             .padding(.horizontal, 12)
-                            .frame(height: 29)
+                            .frame(minHeight: 29)
                             .background(NoopHTMLColor.warm.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(NoopHTMLColor.warm.opacity(0.34), lineWidth: 0.5))
                     }
@@ -2812,7 +2813,7 @@ private extension NoopAct5Screens {
                         .font(NoopHTMLFont.sans(11.5, weight: choice == selection ? .semibold : .regular))
                         .foregroundStyle(choice == selection ? Self.blushLight : NoopHTMLColor.copy)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 32)
+                        .frame(minHeight: 32)
                         .background(choice == selection ? Self.blush.opacity(0.20) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(choice == selection ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
                 }
@@ -2961,7 +2962,7 @@ private extension NoopAct5Screens {
                         Text(active ? "Disconnect" : "Switch to this")
                             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                             .foregroundStyle(active ? NoopHTMLColor.inkSoft : NoopHTMLColor.blueLight)
-                            .frame(maxWidth: .infinity).frame(height: 44)
+                            .frame(maxWidth: .infinity).frame(minHeight: 44)
                             .background(active ? Color.white.opacity(0.05) : NoopHTMLColor.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
                             .overlay(RoundedRectangle(cornerRadius: 14).stroke(active ? Color.white.opacity(0.11) : NoopHTMLColor.blue.opacity(0.34), lineWidth: 0.5))
                     }
@@ -2977,7 +2978,7 @@ private extension NoopAct5Screens {
                         Text("Forget")
                             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                             .foregroundStyle(Color(hex: 0xF3A472))
-                            .padding(.horizontal, 18).frame(height: 44)
+                            .padding(.horizontal, 18).frame(minHeight: 44)
                             .background(NoopHTMLColor.amber.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
                             .overlay(RoundedRectangle(cornerRadius: 14).stroke(NoopHTMLColor.amber.opacity(0.26), lineWidth: 0.5))
                     }
@@ -3107,7 +3108,7 @@ private extension NoopAct5Screens {
                         Text(active ? "Disconnect" : "Switch to this")
                             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                             .foregroundStyle(active ? NoopHTMLColor.inkSoft : NoopHTMLColor.blueLight)
-                            .frame(maxWidth: .infinity).frame(height: 44)
+                            .frame(maxWidth: .infinity).frame(minHeight: 44)
                             .background(active ? Color.white.opacity(0.05) : NoopHTMLColor.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
                             .overlay(RoundedRectangle(cornerRadius: 14).stroke(active ? Color.white.opacity(0.11) : NoopHTMLColor.blue.opacity(0.34), lineWidth: 0.5))
                     }
@@ -3127,7 +3128,7 @@ private extension NoopAct5Screens {
                         Text("Forget")
                             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                             .foregroundStyle(Color(hex: 0xF3A472))
-                            .padding(.horizontal, 18).frame(height: 44)
+                            .padding(.horizontal, 18).frame(minHeight: 44)
                             .background(NoopHTMLColor.amber.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
                             .overlay(RoundedRectangle(cornerRadius: 14).stroke(NoopHTMLColor.amber.opacity(0.26), lineWidth: 0.5))
                     }
@@ -4086,7 +4087,7 @@ private extension NoopAct5Screens {
                                 .font(NoopHTMLFont.sans(9.5, weight: .semibold))
                                 .tracking(0.6)
                                 .foregroundStyle(badge == "writes to strap" ? Color(hex: 0xF6DCB4) : Color(hex: 0xC9D0EE))
-                                .padding(.horizontal, 7).frame(height: 21)
+                                .padding(.horizontal, 7).frame(minHeight: 21)
                                 .background((badge == "writes to strap" ? Self.warm : Self.lavender).opacity(0.14), in: RoundedRectangle(cornerRadius: 6))
                         }
                     }
@@ -4216,7 +4217,7 @@ private extension NoopAct5Screens {
                             Text(selectedShift == nil ? "Pick one to continue" : "Continue")
                                 .font(NoopHTMLFont.sans(15, weight: .semibold))
                                 .foregroundStyle(selectedShift == nil ? NoopHTMLColor.muted : Self.blushDark)
-                                .frame(maxWidth: .infinity).frame(height: 56)
+                                .frame(maxWidth: .infinity).frame(minHeight: 56)
                                 .background(selectedShift == nil ? Color.white.opacity(0.07) : Self.blush, in: RoundedRectangle(cornerRadius: 18))
                                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(selectedShift == nil ? Color.white.opacity(0.1) : .clear, lineWidth: 0.5))
                         }
@@ -4332,7 +4333,7 @@ private extension NoopAct5Screens {
                             Text(paired ? "Back to your straps" : "Connect")
                                 .font(NoopHTMLFont.sans(15, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.blueInk)
-                                .frame(maxWidth: .infinity).frame(height: 58)
+                                .frame(maxWidth: .infinity).frame(minHeight: 58)
                                 .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 19))
                                 .shadow(color: NoopHTMLColor.blue.opacity(0.28), radius: 13, y: 8)
                         }
@@ -4540,7 +4541,7 @@ struct NoopLivePairScreen: View {
                             Text(option.displayName)
                                 .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                                 .foregroundStyle(option == family ? NoopHTMLColor.blueInk : NoopHTMLColor.inkSoft)
-                                .frame(maxWidth: .infinity).frame(height: 38)
+                                .frame(maxWidth: .infinity).frame(minHeight: 38)
                                 .background(option == family ? NoopHTMLColor.blue : Color.white.opacity(0.05),
                                             in: RoundedRectangle(cornerRadius: 13))
                         }
@@ -4594,7 +4595,7 @@ struct NoopLivePairScreen: View {
                         Text(registered ? "Back to your straps" : "Connect")
                             .font(NoopHTMLFont.sans(15, weight: .semibold))
                             .foregroundStyle(canConnect || registered ? NoopHTMLColor.blueInk : NoopHTMLColor.muted)
-                            .frame(maxWidth: .infinity).frame(height: 58)
+                            .frame(maxWidth: .infinity).frame(minHeight: 58)
                             .background(canConnect || registered ? NoopHTMLColor.blue : Color.white.opacity(0.07),
                                         in: RoundedRectangle(cornerRadius: 19))
                     }

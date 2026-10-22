@@ -553,7 +553,7 @@ struct NoopDataScreen: View {
                     .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                     .foregroundStyle(Self.blushInk)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 46)
+                    .frame(minHeight: 46)
                     .background(Self.blush.opacity(0.92), in: RoundedRectangle(cornerRadius: 16))
             }
             .buttonStyle(NoopHTMLPressStyle())
@@ -983,7 +983,7 @@ struct NoopDataScreen: View {
                             .font(NoopHTMLFont.sans(13.5, weight: .medium))
                             .foregroundStyle(NoopHTMLColor.inkSoft)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 47)
+                            .frame(minHeight: 47)
                             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
@@ -1069,7 +1069,7 @@ struct NoopDataScreen: View {
                                 .font(NoopHTMLFont.sans(13.5, weight: .medium))
                                 .foregroundStyle(NoopHTMLColor.inkSoft)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 47)
+                                .frame(minHeight: 47)
                                 .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5))
                         }
                         .buttonStyle(NoopHTMLPressStyle())
@@ -1174,7 +1174,7 @@ struct NoopDataScreen: View {
                             .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                             .foregroundStyle(Self.blushInk)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 46)
+                            .frame(minHeight: 46)
                             .background(Self.blush.opacity(0.92), in: RoundedRectangle(cornerRadius: 16))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
@@ -1184,7 +1184,7 @@ struct NoopDataScreen: View {
                             .font(NoopHTMLFont.sans(13.5, weight: .medium))
                             .foregroundStyle(NoopHTMLColor.inkSoft)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 47)
+                            .frame(minHeight: 47)
                             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
@@ -1262,7 +1262,7 @@ struct NoopDataScreen: View {
                             .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                             .foregroundStyle(Self.blushInk)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 46)
+                            .frame(minHeight: 46)
                             .background(Self.blush.opacity(0.92), in: RoundedRectangle(cornerRadius: 16))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
@@ -1350,7 +1350,7 @@ struct NoopDataScreen: View {
                     .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                     .foregroundStyle(Self.blushInk)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 46)
+                    .frame(minHeight: 46)
                     .background(Self.blush.opacity(0.92), in: RoundedRectangle(cornerRadius: 16))
             }
             .buttonStyle(NoopHTMLPressStyle())
@@ -1363,7 +1363,7 @@ struct NoopDataScreen: View {
                     .font(NoopHTMLFont.sans(13.5, weight: .medium))
                     .foregroundStyle(NoopHTMLColor.inkSoft)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 47)
+                    .frame(minHeight: 47)
                     .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5))
             }
             .buttonStyle(NoopHTMLPressStyle())
@@ -1428,7 +1428,7 @@ struct NoopDataScreen: View {
                             .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                             .foregroundStyle(Self.blushInk)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 46)
+                            .frame(minHeight: 46)
                             .background(Self.blush.opacity(0.92), in: RoundedRectangle(cornerRadius: 16))
                     }
                     .buttonStyle(NoopHTMLPressStyle())

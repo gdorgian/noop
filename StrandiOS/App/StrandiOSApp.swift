@@ -290,10 +290,13 @@ struct StrandiOSApp: App {
                     Task { try? await health.writeWeight(kg: kg) }
                 }
                 .noopAccent(accentRaw, customHex: accentCustomHex)
-                // The Aura screens are drawn to the design's point sizes (402 × 874 canvas), so text is
-                // held at the standard size whatever the iPhone's Text Size is set to (owner decision,
-                // 25 Sep 2026).
-                .dynamicTypeSize(.large)
+                // Text follows the iPhone's Text Size, from the design's standard size up to xxxLarge
+                // (the largest non-accessibility step). Below standard the 402 × 874 design reads too
+                // small; above xxxLarge the cards' fixed geometry stops working. Any line that still
+                // does not fit (larger text, or a 375 pt wide iPhone) shrinks a little before it
+                // truncates. Replaces the fixed `.large` of 25 Sep 2026.
+                .dynamicTypeSize(.large ... .xxxLarge)
+                .minimumScaleFactor(0.8)
                 // `hr` is the value being written: this runs in willSet, when `live.heartRate` still holds the old one.
                 .onReceive(model.live.$heartRate) { hr in
                     // The gym banner's own cheap path: no presentation is built here, and a heart rate moves

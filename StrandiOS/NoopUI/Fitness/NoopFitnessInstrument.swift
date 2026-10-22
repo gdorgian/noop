@@ -272,7 +272,7 @@ struct NoopFitnessRangeBar: View {
                     Text(r.rawValue)
                         .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                         .foregroundStyle(range == r ? NoopHTMLColor.ink : NoopHTMLColor.copy)
-                        .frame(maxWidth: .infinity).frame(height: 32)
+                        .frame(maxWidth: .infinity).frame(minHeight: 32)
                         .background(range == r ? Color.white.opacity(0.09) : .clear, in: Capsule())
                 }
                 .buttonStyle(NoopHTMLPressStyle())
@@ -313,7 +313,7 @@ struct NoopFitnessFilterChips: View {
         Button { withAnimation(NoopMotion.swap) { action() } } label: {
             Text(t).font(NoopHTMLFont.sans(12, weight: .semibold))
                 .foregroundStyle(on ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
-                .padding(.horizontal, 12).frame(height: 30)
+                .padding(.horizontal, 12).frame(minHeight: 30)
                 .background(on ? NoopHTMLColor.ink : Color.white.opacity(0.06), in: Capsule())
         }
         .buttonStyle(NoopHTMLPressStyle())

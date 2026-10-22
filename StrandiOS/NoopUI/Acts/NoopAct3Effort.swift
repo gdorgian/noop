@@ -147,7 +147,7 @@ struct NoopAct3Screens: View {
                                 .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                                 .foregroundStyle(restDay ? Color(hex: 0xC9D0EE) : NoopHTMLColor.inkSoft)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 44)
+                                .frame(minHeight: 44)
                                 .background(restDay ? NoopHTMLColor.night.opacity(0.22) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(restDay ? NoopHTMLColor.night.opacity(0.45) : Color.white.opacity(0.12), lineWidth: 0.5))
                         }
@@ -1587,7 +1587,7 @@ private struct Act3HomeHeader<Trailing: View>: View {
                 Text(title)
                     .font(NoopHTMLFont.outfit(23))
                     .tracking(-0.46)
-                    .frame(height: 26.45, alignment: .top)
+                    .frame(minHeight: 26.45, alignment: .top)
             }
             Spacer(minLength: 0)
             trailing

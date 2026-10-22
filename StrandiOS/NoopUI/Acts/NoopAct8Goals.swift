@@ -870,7 +870,7 @@ private struct NoopGoalRouteGraphic: View {
                                 .tracking(-2.25)
                                 // CSS line-height: 1. Outfit's natural line box is taller and pushed the
                                 // caption ~10 pt below the HTML's.
-                                .frame(height: 50)
+                                .frame(minHeight: 50)
                                 .shadow(color: .black.opacity(0.75), radius: 12, y: 2)
                             Text("OF THE ROUTE, RECORDED")
                                 .font(NoopHTMLFont.sans(10.5, weight: .semibold))
@@ -1123,7 +1123,7 @@ private struct NoopGoalSet: View {
                                     } label: {
                                         Text(kind.rawValue).font(NoopHTMLFont.sans(12, weight: .semibold))
                                             .foregroundStyle(navigation.selectedGoal == kind ? Color(hex: 0x1E1405) : NoopHTMLColor.inkSoft)
-                                            .padding(.horizontal, 13).frame(height: 36)
+                                            .padding(.horizontal, 13).frame(minHeight: 36)
                                             .background(navigation.selectedGoal == kind ? Color(hex: 0xF2B45C) : Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 11))
                                             .overlay(RoundedRectangle(cornerRadius: 11).stroke(navigation.selectedGoal == kind ? .clear : Color.white.opacity(0.1), lineWidth: 0.5))
                                     }.buttonStyle(NoopPlainHitStyle())
@@ -1470,7 +1470,7 @@ struct NoopGoalEditorSheet: View {
     private func textField(_ label: String, text: Binding<String>, keyboard: UIKeyboardType = .default) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(label).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
-            TextField(label, text: text).keyboardType(keyboard).font(NoopHTMLFont.sans(13.5)).padding(.horizontal, 14).frame(height: 48)
+            TextField(label, text: text).keyboardType(keyboard).font(NoopHTMLFont.sans(13.5)).padding(.horizontal, 14).frame(minHeight: 48)
                 .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.white.opacity(0.11), lineWidth: 0.5))
         }
@@ -2672,7 +2672,7 @@ private struct NoopOCRCandidateCard: View {
                             .font(NoopHTMLFont.sans(11, weight: .semibold))
                             .foregroundStyle(Color(hex: 0xF3C888))
                             .padding(.horizontal, 7)
-                            .frame(height: 22)
+                            .frame(minHeight: 22)
                             .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(hex: 0xF3C888).opacity(0.45), lineWidth: 0.5))
                     } else {
                         Text("clear read")
@@ -3686,7 +3686,7 @@ private struct NoopGoalChangeButton: View {
                 .font(NoopHTMLFont.sans(11.5, weight: .semibold))
                 .foregroundStyle(Color(hex: 0xC6CEC9))
                 .padding(.horizontal, 12)
-                .frame(height: 30)
+                .frame(minHeight: 30)
                 .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
         }

@@ -125,7 +125,7 @@ struct NoopUtilityButton: View {
             Text(busy ? "Working…" : title)
                 .font(NoopHTMLFont.sans(14, weight: .semibold))
                 .foregroundStyle(NoopHTMLColor.inkSoft)
-                .frame(maxWidth: .infinity).frame(height: 50)
+                .frame(maxWidth: .infinity).frame(minHeight: 50)
                 .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.11), lineWidth: 0.5))
         }
@@ -530,7 +530,7 @@ struct NoopTrendsReportPage: View {
                         Text(option.label)
                             .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                             .foregroundStyle(option == range ? NoopHTMLColor.blushInk : NoopHTMLColor.inkSoft)
-                            .frame(maxWidth: .infinity).frame(height: 36)
+                            .frame(maxWidth: .infinity).frame(minHeight: 36)
                             .background(option == range ? NoopHTMLColor.blush : Color.white.opacity(0.05),
                                         in: RoundedRectangle(cornerRadius: 12))
                     }
@@ -693,7 +693,7 @@ struct NoopHydrationPage: View {
                             Text("+\(ml) ml")
                                 .font(NoopHTMLFont.sans(12.5, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.blueInk)
-                                .frame(maxWidth: .infinity).frame(height: 40)
+                                .frame(maxWidth: .infinity).frame(minHeight: 40)
                                 .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 13))
                         }
                         .buttonStyle(NoopHTMLPressStyle())

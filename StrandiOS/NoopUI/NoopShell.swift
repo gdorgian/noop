@@ -1830,7 +1830,7 @@ private struct NoopAddRecordSheet: View {
                             .font(.custom("Instrument Sans", fixedSize: 13.5))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                             .frame(maxWidth: .infinity)
-                            .frame(height: 46)
+                            .frame(minHeight: 46)
                     }
                     .buttonStyle(NoopPlainHitStyle())
                 }
@@ -2019,7 +2019,7 @@ private struct NoopNightJournalSheet: View {
                                         .font(.custom("Instrument Sans", fixedSize: 13.5).weight(index == drinks ? .semibold : .medium))
                                         .foregroundStyle(index == drinks ? NoopHTMLColor.blueInk : NoopHTMLColor.copy)
                                         .frame(maxWidth: .infinity)
-                                        .frame(height: 48)
+                                        .frame(minHeight: 48)
                                         .background(index == drinks ? (index == 0 ? NoopHTMLColor.blue : Color(hex: 0xF2B45C)) : Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 15))
                                         .overlay(RoundedRectangle(cornerRadius: 15).stroke(index == drinks ? .clear : NoopHTMLColor.border, lineWidth: 0.5))
                                 }
@@ -2063,7 +2063,7 @@ private struct NoopNightJournalSheet: View {
                                 .font(NoopHTMLFont.sans(15, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.blueInk)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 54)
+                                .frame(minHeight: 54)
                                 .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 18))
                         }
                         .buttonStyle(NoopHTMLPressStyle())
@@ -2084,7 +2084,7 @@ private struct NoopNightJournalSheet: View {
                                 .font(.custom("Instrument Sans", fixedSize: 13.5))
                                 .foregroundStyle(navigation.nightJournalSaved ? NoopHTMLColor.red : Color(hex: 0x7F8A85))
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 44)
+                                .frame(minHeight: 44)
                         }
                         .buttonStyle(NoopPlainHitStyle())
                     }
@@ -2200,7 +2200,7 @@ private struct NoopDayLogSheet: View {
                             .foregroundStyle(NoopHTMLColor.faint)
                             .lineSpacing(4.6)
                             .fixedSize(horizontal: false, vertical: true)
-                            .frame(height: 37, alignment: .top)
+                            .frame(minHeight: 37, alignment: .top)
                     }
 
                     VStack(spacing: 8) {
@@ -2220,7 +2220,7 @@ private struct NoopDayLogSheet: View {
                                 .font(NoopHTMLFont.sans(13))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 40)
+                                .frame(minHeight: 40)
                         }
                         .buttonStyle(NoopPlainHitStyle())
                     }
@@ -2277,7 +2277,7 @@ private struct NoopDayLogSheet: View {
                             .monospacedDigit()
                             .frame(minWidth: 22)
                             .padding(.horizontal, 7)
-                            .frame(height: 22)
+                            .frame(minHeight: 22)
                             .background(NoopHTMLColor.blue, in: Capsule())
                     }
                 }
@@ -2402,7 +2402,7 @@ private struct NoopLoggedItemsSheet: View {
                                         .font(.custom("Instrument Sans", fixedSize: 11.5).weight(.medium))
                                         .foregroundStyle(filter == item ? Color(hex: 0x8FEFC0) : NoopHTMLColor.copy)
                                         .padding(.horizontal, 13)
-                                        .frame(height: 35)
+                                        .frame(minHeight: 35)
                                         .background(filter == item ? NoopHTMLColor.green.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 11))
                                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(filter == item ? NoopHTMLColor.green.opacity(0.4) : Color.white.opacity(0.07), lineWidth: 0.5))
                                 }
