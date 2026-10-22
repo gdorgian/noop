@@ -99,6 +99,7 @@ final class NoopFitnessSettings: ObservableObject {
 struct NoopFitnessEditScreen: View {
     @ObservedObject var navigation: NoopNavigation
     @ObservedObject var layout: NoopFitnessSettings
+    @AppStorage(Repository.autoLogActivitiesKey) private var autoLog = true
 
     var body: some View {
         NoopFitnessPage(navigation: navigation, title: "Edit Fitness",
@@ -122,6 +123,17 @@ struct NoopFitnessEditScreen: View {
                             .tint(NoopHTMLColor.blue)
                         }
                     }
+                }
+                NoopFitnessPanel(label: "Activity detection") {
+                    Toggle(isOn: $autoLog) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Log detected activities").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("When your strap records a workout you did not start, it is added as a detected activity you can rename, correct or delete.")
+                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .tint(NoopHTMLColor.warm)
                 }
                 Button {
                     layout.sections = NoopFitnessSettings.Section.allCases
@@ -401,13 +413,7 @@ struct NoopFitnessCalendarScreen: View {
                         .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 ForEach(done) { s in
-                    Button {
-                        guard let lift = s.liftSessionID else { return }
-                        navigation.selectedLiftSessionID = lift
-                        navigation.liftDetailReturnRoute = .fitnessCalendar
-                        navigation.push(.liftDetail)
-                    } label: { NoopFitnessSessionRow(session: s) }
-                    .buttonStyle(NoopHTMLPressStyle())
+                    NoopFitnessSessionButton(session: s, navigation: navigation, returnRoute: .fitnessCalendar)
                 }
                 ForEach(planned) { p in
                     Button {

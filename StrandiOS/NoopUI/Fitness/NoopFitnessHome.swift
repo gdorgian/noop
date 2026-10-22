@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import StrandFitness
+import WhoopStore
 
 // MARK: - Fitness home
 
@@ -212,16 +213,7 @@ struct NoopFitnessHome: View {
         } else {
             VStack(spacing: 8) {
                 ForEach(sessions) { session in
-                    Button {
-                        guard let lift = session.liftSessionID else { return }
-                        navigation.selectedLiftSessionID = lift
-                        navigation.liftDetailReturnRoute = .fitness
-                        navigation.push(.liftDetail)
-                    } label: {
-                        NoopFitnessSessionRow(session: session)
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    .disabled(session.liftSessionID == nil)
+                    NoopFitnessSessionButton(session: session, navigation: navigation, returnRoute: .fitness)
                 }
             }
         }
@@ -352,6 +344,67 @@ struct NoopFitnessIconButton: View {
     }
 }
 
+/// A session in a list: a lift opens its record; a manual or detected session opens the editor, and a
+/// long press offers to delete it. Imported history is read-only.
+struct NoopFitnessSessionButton: View {
+    let session: NoopFitnessSession
+    @ObservedObject var navigation: NoopNavigation
+    let returnRoute: NoopRoute
+    @EnvironmentObject private var repo: Repository
+    @EnvironmentObject private var model: AppModel
+    @State private var editing: WorkoutRow?
+    @State private var confirmDelete = false
+
+    var body: some View {
+        Button {
+            if let lift = session.liftSessionID {
+                navigation.selectedLiftSessionID = lift
+                navigation.liftDetailReturnRoute = returnRoute
+                navigation.push(.liftDetail)
+            } else if session.editable {
+                editing = session.row
+            }
+        } label: {
+            NoopFitnessSessionRow(session: session)
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .disabled(session.liftSessionID == nil && !session.editable)
+        .contextMenu {
+            if session.editable {
+                Button("Edit details") { editing = session.row }
+                Button("Delete", role: .destructive) { confirmDelete = true }
+            }
+        }
+        .confirmationDialog(session.detected ? "Delete this detected activity?" : "Delete this session?",
+                            isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                guard let row = session.row else { return }
+                Task {
+                    await repo.deleteWorkout(row)
+                    await repo.refresh()
+                }
+            }
+        } message: {
+            Text(session.detected ? "It will not be detected again." : "This removes it from your record.")
+        }
+        .sheet(item: Binding(get: { editing.map(NoopEditTarget.init) }, set: { editing = $0?.row })) { target in
+            ManualWorkoutSheet(editing: target.row, reviewingSuggestion: session.detected) { row, replacing in
+                Task {
+                    await repo.saveManualWorkout(row, replacing: replacing)
+                    await model.intelligence.analyzeRecent()
+                    await repo.refresh()
+                }
+            }
+            .environmentObject(repo)
+        }
+    }
+}
+
+private struct NoopEditTarget: Identifiable {
+    let row: WorkoutRow
+    var id: String { "\(row.source):\(row.startTs):\(row.sport)" }
+}
+
 struct NoopFitnessSessionRow: View {
     let session: NoopFitnessSession
 
@@ -369,7 +422,14 @@ struct NoopFitnessSessionRow: View {
                     .foregroundStyle(NoopHTMLColor.copy)
             }
             Spacer()
-            if session.liftSessionID != nil {
+            if session.detected {
+                Text("detected")
+                    .font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                    .foregroundStyle(NoopHTMLColor.warm)
+                    .padding(.horizontal, 8).frame(height: 22)
+                    .background(NoopHTMLColor.warm.opacity(0.12), in: Capsule())
+            }
+            if session.liftSessionID != nil || session.editable {
                 NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
         }

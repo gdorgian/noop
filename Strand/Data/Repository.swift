@@ -139,7 +139,7 @@ final class Repository: ObservableObject {
     /// Source id for on-device computed scores (recovery/strain/sleep derived from the raw strap
     /// streams by IntelligenceEngine). Merged UNDER the imported `deviceId` rows at read time, so a
     /// real WHOOP import always wins and the strap-only user still gets a populated dashboard.
-    private var computedDeviceId: String { deviceId + "-noop" }
+    var computedDeviceId: String { deviceId + "-noop" }
 
     /// The CANONICAL imported/computed id ("my-whoop" + its "-noop" sibling). The WHOOP-IMPORT and the
     /// engine's computed write target stay STABLE here forever (they never follow the active strap), so a
@@ -3405,7 +3405,7 @@ final class Repository: ObservableObject {
     /// Dismissed AUTO-DETECT spans ("startSec:endSec"). The key remains distinct for backup compatibility;
     /// candidate selection also honors the legacy `dismissedDetected` intervals during the transition.
     private static let autoDetectDismissedKey = "workouts.autoDetectDismissed"
-    private var autoDetectDismissedSpans: [String] {
+    var autoDetectDismissedSpans: [String] {
         get { UserDefaults.standard.stringArray(forKey: Self.autoDetectDismissedKey) ?? [] }
         set { UserDefaults.standard.set(newValue, forKey: Self.autoDetectDismissedKey) }
     }

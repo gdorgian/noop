@@ -196,6 +196,16 @@ struct NoopFitnessSession: Identifiable {
     let kind: Kind
     let kcal: Double?
     let liftSessionID: String?
+    /// The stored workout behind a non-lift session, so it can be edited or deleted.
+    var row: WorkoutRow? = nil
+    /// Found by the detector rather than started or imported.
+    var detected = false
+    /// Manual and detected sessions can be corrected; imported history is read-only.
+    var editable: Bool {
+        guard let row else { return false }
+        let kind = WorkoutSource.classify(row.source)
+        return kind == .manual || kind == .detected
+    }
 }
 
 @MainActor
@@ -345,9 +355,10 @@ final class NoopFitnessModel: ObservableObject {
                     || !liftSessions.contains { abs($0.startTs - c.row.startTs) < 15 * 60 }
             }
             .map { NoopFitnessSession(id: $0.session.id, start: $0.session.start, durationS: $0.session.durationS,
-                                      title: $0.row.sport,
+                                      title: WorkoutSource.displaySport($0.row.sport),
                                       kind: CardioModality.of(sport: $0.row.sport) == .strength ? .strength : .cardio,
-                                      kcal: $0.row.energyKcal, liftSessionID: nil) }
+                                      kcal: $0.row.energyKcal, liftSessionID: nil, row: $0.row,
+                                      detected: WorkoutSource.classify($0.row.source) == .detected) }
         all += liftSessions.map {
             NoopFitnessSession(id: $0.id, start: Date(timeIntervalSince1970: Double($0.startTs)),
                                durationS: Double(($0.endTs ?? $0.startTs) - $0.startTs),

@@ -851,6 +851,10 @@ final class IntelligenceEngine: ObservableObject {
         defer {
             computing = false
             runningPassStart = nil
+            // Each pass is a chance new heart rate has landed: log any activity it finished.
+            Task { @MainActor in
+                if await self.repo.autoLogDetectedActivities() > 0 { await self.repo.refresh() }
+            }
             if pendingForcedRescore {
                 pendingForcedRescore = false
                 // A forced update queued during the upgrade repair owes a normal recent pass,
