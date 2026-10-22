@@ -59,6 +59,10 @@ struct NoopFitnessHistory {
         let durationS: Double
         let kcal: Double?
         let averageHeartRate: Int?
+        let maxHeartRate: Int?
+        let distanceM: Double?
+        /// The session's Effort on the app's 0–21 scale, when the source scored one.
+        let effort: Double?
         let isStrength: Bool
         let trimp: Double
         let zoneMinutes: [Double]
@@ -214,7 +218,8 @@ final class NoopFitnessModel: ObservableObject {
     @Published private(set) var isLoading = false
 
     static let periodDays = 30
-    private static let historyDays = 120
+    /// A year and a bit, so the detail pages can show a year and the year before it starts.
+    static let historyDays = 400
 
     private var loadedSeq: Int?
 
@@ -375,7 +380,8 @@ final class NoopFitnessModel: ObservableObject {
         history.workouts = zip(cardio, trimps).map { c, t in
             .init(id: c.session.id, title: c.row.sport, start: c.session.start, startTs: c.row.startTs,
                   endTs: c.row.endTs, source: c.row.source, durationS: c.session.durationS, kcal: c.row.energyKcal,
-                  averageHeartRate: c.row.avgHr, isStrength: CardioModality.of(sport: c.row.sport) == .strength,
+                  averageHeartRate: c.row.avgHr, maxHeartRate: c.row.maxHr, distanceM: c.row.distanceM,
+                  effort: c.row.strain, isStrength: CardioModality.of(sport: c.row.sport) == .strength,
                   trimp: t.load, zoneMinutes: c.zoneMinutes)
         }
         history.liftSessions = liftSessions

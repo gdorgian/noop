@@ -62,6 +62,7 @@ struct NoopFitnessHome: View {
 
     private func open(_ metric: NoopFitnessMetric) {
         navigation.fitnessMetric = metric
+        navigation.fitnessExercise = metric == .volume ? fitness.snapshot?.topExercise?.name : nil
         navigation.push(.fitnessDetail)
     }
 
@@ -314,7 +315,7 @@ struct NoopFitnessWeekStrip: View {
 
 // MARK: - Cards
 
-private struct NoopFitnessCardBackground: ViewModifier {
+struct NoopFitnessCardBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(15)
@@ -326,7 +327,7 @@ private struct NoopFitnessCardBackground: ViewModifier {
 }
 
 extension View {
-    fileprivate func fitnessCard() -> some View { modifier(NoopFitnessCardBackground()) }
+    func fitnessCard() -> some View { modifier(NoopFitnessCardBackground()) }
 }
 
 struct NoopFitnessIconButton: View {
@@ -350,6 +351,7 @@ struct NoopFitnessSessionButton: View {
     let session: NoopFitnessSession
     @ObservedObject var navigation: NoopNavigation
     let returnRoute: NoopRoute
+    var showsDate = false
     @EnvironmentObject private var repo: Repository
     @EnvironmentObject private var model: AppModel
     @State private var editing: WorkoutRow?
@@ -365,7 +367,7 @@ struct NoopFitnessSessionButton: View {
                 editing = session.row
             }
         } label: {
-            NoopFitnessSessionRow(session: session)
+            NoopFitnessSessionRow(session: session, showsDate: showsDate)
         }
         .buttonStyle(NoopHTMLPressStyle())
         .disabled(session.liftSessionID == nil && !session.editable)
@@ -407,6 +409,7 @@ private struct NoopEditTarget: Identifiable {
 
 struct NoopFitnessSessionRow: View {
     let session: NoopFitnessSession
+    var showsDate = false
 
     var body: some View {
         HStack(spacing: 13) {
@@ -446,7 +449,9 @@ struct NoopFitnessSessionRow: View {
     }
 
     private var detail: String {
-        let time = session.start.formatted(date: .omitted, time: .shortened)
+        let time = showsDate
+            ? session.start.formatted(.dateTime.weekday(.abbreviated).day().hour().minute())
+            : session.start.formatted(date: .omitted, time: .shortened)
         var parts = [time, NoopFitnessHome.duration(session.durationS)]
         if let k = session.kcal { parts.append("\(Int(k.rounded())) kcal") }
         return parts.joined(separator: " · ")
@@ -679,7 +684,7 @@ struct NoopFitnessVO2Card: View {
                 Text("VO₂ max").font(NoopHTMLFont.sans(13, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
                 Text(String(format: "%.1f", last.value)).font(NoopHTMLFont.outfit(21)).foregroundStyle(NoopHTMLColor.ink)
                 Text("ml/kg/min · from Health").font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.muted)
-                NoopFitnessLineChart(values: readings.map(\.value), tint: NoopHTMLColor.green)
+                NoopFitnessLineChart(values: Self.weekly(readings), tint: NoopHTMLColor.green)
                     .frame(height: 46)
                     .padding(.top, 12)
             }
@@ -688,6 +693,19 @@ struct NoopFitnessVO2Card: View {
         } else {
             NoopFitnessEmptyCard(title: "VO₂ max", line: "Comes from Apple Health")
         }
+    }
+
+    /// One mean per week over the last half year: daily estimates jump by a point or more from walk
+    /// to walk, which drew as noise rather than a trend.
+    static func weekly(_ readings: [(date: Date, value: Double)]) -> [Double] {
+        let cal = Calendar.current
+        let from = cal.date(byAdding: .weekOfYear, value: -26, to: Date()) ?? .distantPast
+        var weeks: [(Date, [Double])] = []
+        for r in readings where r.date >= from {
+            let w = cal.dateInterval(of: .weekOfYear, for: r.date)?.start ?? r.date
+            if weeks.last?.0 == w { weeks[weeks.count - 1].1.append(r.value) } else { weeks.append((w, [r.value])) }
+        }
+        return weeks.map { $0.1.reduce(0, +) / Double($0.1.count) }
     }
 }
 

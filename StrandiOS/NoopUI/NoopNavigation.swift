@@ -652,6 +652,8 @@ final class NoopNavigation: ObservableObject {
     /// Which card a Fitness detail page opens on, and which routine the routine page shows.
     @Published var fitnessMetric: NoopFitnessMetric = .cardioLoad
     @Published var fitnessRoutineID: String?
+    /// The exercise a strength detail page opens on; nil shows every muscle.
+    @Published var fitnessExercise: String?
     /// A lift opened from the shared workout history, by its start time (the saved workout row and the
     /// lift session share it). Consumed by `lift-detail` when it loads.
     @Published var liftDetailStartTs: Int?
