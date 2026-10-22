@@ -413,7 +413,7 @@ struct NoopFitnessHome: View {
         case .volume:
             tap(.volume) {
                 if let top = s.topExercise {
-                    NoopFitnessTotalCard(title: top.name, value: "\(Int(top.volume.total.rounded()).formatted()) kg",
+                    NoopFitnessTotalCard(title: top.name, value: NoopFitnessFormat.kg(top.volume.total),
                                          caption: "total volume", series: top.volume, tint: NoopHTMLColor.blush)
                 } else {
                     NoopFitnessEmptyCard(title: "Volume", line: "Log a lift to see it here")

@@ -323,7 +323,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
             let status = r.status == .calibrating ? "Calibrating" : r.status.rawValue.capitalized
             return "\(status) · \(Int(r.percent.rounded()))%"
         case .load: return String(format: "%.0f load", values[g] ?? 0)
-        case .volume: return "\(Int((values[g] ?? 0).rounded()).formatted()) kg"
+        case .volume: return NoopFitnessFormat.kg(values[g] ?? 0)
         }
     }
 

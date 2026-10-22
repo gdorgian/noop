@@ -256,7 +256,7 @@ struct NOOPWidgetView: View {
 
     private var headerRow: some View {
         HStack {
-            Text("NOOP")
+            Text("Noop Aura")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(StrandPalette.textSecondary)
             Spacer()

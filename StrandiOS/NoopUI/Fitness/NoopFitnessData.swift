@@ -317,7 +317,9 @@ final class NoopFitnessModel: ObservableObject {
                         exerciseId: set.exercise, primaryMuscleId: set.primaryMuscle?.rawValue,
                         secondaryMuscleIds: set.secondaryMuscles.map(\.rawValue),
                         weightKg: set.weightKg, reps: set.reps,
-                        includesBodyweight: Self.isBodyweight(set.exercise),
+                        // Volume is the weight as logged, the same figure the Lift log shows for the set.
+                        // Adding the whole body mass made a push-up set read 78 kg here and 2.5 kg there.
+                        includesBodyweight: false,
                         reportedRepsInReserve: set.rpe.map { max(0, 10 - $0) }))
                 }
             }
@@ -447,14 +449,6 @@ final class NoopFitnessModel: ObservableObject {
         case .rowing: return .rowing
         case .other, .unknown, .strength: return .other
         }
-    }
-
-    /// Movements whose load is the lifter's own body. Matched on the logged name, since the Lift log
-    /// stores names as typed.
-    nonisolated static func isBodyweight(_ exercise: String) -> Bool {
-        let s = exercise.lowercased()
-        return ["pull up", "pull-up", "pullup", "chin up", "chin-up", "chinup", "dip", "push up", "push-up",
-                "pushup", "muscle up", "inverted row"].contains { s.contains($0) }
     }
 
     private static let dayFormatter: DateFormatter = {

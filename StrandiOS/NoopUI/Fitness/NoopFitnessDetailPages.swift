@@ -47,7 +47,10 @@ enum NoopFitnessFormat {
     static func count(_ v: Double) -> String { Int(v.rounded()).formatted() }
     static func kcal(_ v: Double) -> String { "\(Int(v.rounded()).formatted()) kcal" }
     static func kg(_ v: Double) -> String {
-        v >= 10_000 ? String(format: "%.1f t", v / 1000) : "\(Int(v.rounded()).formatted()) kg"
+        // Under 100 kg keep the half kilo the Lift log shows (2.5 kg, not 3).
+        v >= 10_000 ? String(format: "%.1f t", v / 1000)
+            : v < 100 && abs(v - v.rounded()) > 0.01 ? "\(v.formatted(.number.precision(.fractionLength(1)))) kg"
+            : "\(Int(v.rounded()).formatted()) kg"
     }
     static func km(_ m: Double) -> String { m >= 100_000 ? String(format: "%.0f km", m / 1000) : String(format: "%.1f km", m / 1000) }
     static func bpm(_ v: Double) -> String { "\(Int(v.rounded())) bpm" }
