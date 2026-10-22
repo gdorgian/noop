@@ -278,7 +278,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
                 .buttonStyle(NoopHTMLPressStyle())
             }
             let groups = FitnessMuscleGroup.allCases
-                .filter { filter == nil || fresh[$0]?.provisionalStatus == filter }
+                .filter { filter == nil || fresh[$0]?.shownStatus == filter }
                 .sorted { a, b in
                     let va = values[a] ?? 0, vb = values[b] ?? 0
                     let asc = mode == .freshness ? leastFirst : !leastFirst
@@ -295,7 +295,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
                         }
                         Spacer()
                         if mode == .freshness, let r = fresh[g] {
-                            NoopFitnessDotMeter(percent: r.percent, color: NoopFitnessFreshnessCard.color(r.provisionalStatus))
+                            NoopFitnessDotMeter(percent: r.untracked ? 0 : r.percent, color: NoopFitnessFreshnessCard.color(r.shownStatus))
                         }
                     }
                     .padding(14)
@@ -317,6 +317,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
         switch mode {
         case .freshness:
             guard let r = fresh[g] else { return "" }
+            if r.untracked { return "No sets logged yet" }
             let status = r.status == .calibrating ? "Calibrating" : r.status.rawValue.capitalized
             return "\(status) · \(Int(r.percent.rounded()))%"
         case .load: return String(format: "%.0f load", values[g] ?? 0)
@@ -326,10 +327,10 @@ struct NoopFitnessMuscleGroupsScreen: View {
 
     private func color(_ g: FitnessMuscleGroup, mode: Mode, values: [FitnessMuscleGroup: Double],
                        fresh: [FitnessMuscleGroup: MuscleFreshness.Reading], top: Double) -> Color {
-        if let filter, fresh[g]?.provisionalStatus != filter { return Color.white.opacity(0.08) }
+        if let filter, fresh[g]?.shownStatus != filter { return Color.white.opacity(0.08) }
         switch mode {
         case .freshness:
-            return NoopFitnessFreshnessCard.color(fresh[g]?.provisionalStatus ?? .recovered).opacity(0.85)
+            return NoopFitnessFreshnessCard.color(fresh[g]?.shownStatus ?? .calibrating).opacity(0.85)
         case .load, .volume:
             let v = (values[g] ?? 0) / top
             return v <= 0 ? Color.white.opacity(0.1) : (mode == .load ? NoopHTMLColor.warm : NoopHTMLColor.blush).opacity(0.25 + 0.7 * v)

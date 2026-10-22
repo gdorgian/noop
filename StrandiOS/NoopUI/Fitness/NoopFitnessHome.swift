@@ -1144,29 +1144,41 @@ struct NoopFitnessFreshnessCard: View {
     var body: some View {
         let sorted = readings.sorted { $0.percent < $1.percent }
         let shown = Array(sorted.prefix(6))
-        let ready = readings.filter { $0.provisionalStatus == .recovered }.count
-        let tired = readings.filter { $0.provisionalStatus == .fatigued || $0.provisionalStatus == .depleted }.count
+        let tracked = readings.filter { !$0.untracked }
+        // Only muscles with three training days have a reading worth calling ready or tired; the rest are
+        // still a guess from a set or two, so they are counted as learning and drawn grey.
+        let calibrated = tracked.filter { $0.status != .calibrating }
+        let learning = tracked.count - calibrated.count
+        let ready = calibrated.filter { $0.status == .recovered }.count
+        let tired = calibrated.filter { $0.status == .fatigued || $0.status == .depleted }.count
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Muscle freshness").font(NoopHTMLFont.sans(13, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
-                    Text(readings.isEmpty ? "Log a lift to see it" : tired == 0 ? "Everything is ready" : "\(tired) still recovering · \(ready) ready")
+                    Text(tracked.isEmpty ? "Log a lift to see it"
+                         : calibrated.isEmpty ? "Still learning your muscles"
+                         : tired == 0 ? "Everything is ready" : "\(tired) still recovering · \(ready) ready")
                         .font(NoopHTMLFont.outfit(19)).foregroundStyle(NoopHTMLColor.ink)
+                    if learning > 0 {
+                        Text("\(learning) \(learning == 1 ? "muscle" : "muscles") still learning. Estimated from the sets and cardio you log, it settles after three training days.")
+                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 Spacer()
                 NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 14) {
                 ForEach(shown, id: \.group) { r in
-                    let tint = Self.color(r.provisionalStatus)
+                    let tint = Self.color(r.status)
                     HStack(spacing: 10) {
                         NoopFitnessMuscleThumb(group: r.group, tint: tint)
                             .frame(width: 30, height: 46)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(r.group.title).font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                                 .lineLimit(1)
-                            Text("\(Int(r.percent.rounded()))%").font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(tint)
-                            NoopFitnessDotMeter(percent: r.percent, color: tint)
+                            Text(r.untracked ? "No data" : "\(Int(r.percent.rounded()))%").font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(tint)
+                            NoopFitnessDotMeter(percent: r.untracked ? 0 : r.percent, color: tint)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

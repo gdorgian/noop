@@ -100,6 +100,13 @@ public enum MuscleFreshness {
         public let status: Status
         /// The underlying 0…100 status ignoring calibration, for colouring a still-calibrating map.
         public let provisionalStatus: Status
+
+        /// Nothing logged has ever loaded this muscle, so 100% is a default, not a reading. Shown as
+        /// "no data" rather than recovered, or a fresh install paints the whole body green.
+        public var untracked: Bool { status == .calibrating && percent >= 100 }
+
+        /// The status to colour by: the provisional one once any load exists, calibrating before that.
+        public var shownStatus: Status { untracked ? .calibrating : provisionalStatus }
     }
 
     public static let windowDays = 42
