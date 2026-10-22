@@ -1714,20 +1714,9 @@ private extension NoopAct5Screens {
                                 strapFact("On wrist", connected ? (live.worn ? "Yes" : "No") : "\u{2014}")
                             }
                         }
-                        Button {
-                            if connected { model.ble.syncNow() } else { model.ble.connectFromSystem() }
-                        } label: {
-                            HStack(spacing: 9) {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                Text(connected ? "Sync now" : "Reconnect")
-                            }
-                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
-                            .foregroundStyle(NoopHTMLColor.blueInk)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 17))
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
+                        NoopStrapSyncButton(connected: connected,
+                                            sync: { model.ble.syncNow() },
+                                            reconnect: { model.ble.connectFromSystem() })
                     }
                 }
 
@@ -4648,5 +4637,157 @@ struct NoopLivePairScreen: View {
     private func leave() {
         if !registered { model.stopWhoopScan() }
         navigation.back(or: .devices)
+    }
+}
+
+/// The strap screen's sync control. "Sync now" used to fire and show nothing; it now follows the offload
+/// it started: starting, syncing (with the time it has run), then synced or failed, and at rest it says
+/// when the strap last synced. A tap the strap ignores because it is already caught up reads "Up to date".
+struct NoopStrapSyncButton: View {
+    let connected: Bool
+    let sync: () -> Void
+    let reconnect: () -> Void
+
+    @EnvironmentObject private var live: LiveState
+    @State private var requestedAt: Date?
+    @State private var sawSyncing = false
+    @State private var outcome: Outcome?
+
+    enum Outcome: Equatable { case synced, upToDate, failed(String) }
+    private enum Phase { case idle, starting, syncing, done(Outcome) }
+
+    private static let green = Color(hex: 0x8FE3B4)
+
+    private var phase: Phase {
+        if live.backfilling { return .syncing }
+        if requestedAt != nil { return .starting }
+        if let outcome { return .done(outcome) }
+        return .idle
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Button {
+                guard connected else { reconnect(); return }
+                guard !live.backfilling, requestedAt == nil else { return }
+                outcome = nil
+                sawSyncing = false
+                requestedAt = Date()
+                sync()
+            } label: {
+                HStack(spacing: 9) {
+                    icon
+                    Text(title).contentTransition(.opacity)
+                }
+                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                .foregroundStyle(ink)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(fill, in: RoundedRectangle(cornerRadius: 17))
+                .overlay(RoundedRectangle(cornerRadius: 17).stroke(stroke, lineWidth: 0.5))
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+            .animation(.easeInOut(duration: 0.25), value: title)
+
+            TimelineView(.periodic(from: .now, by: 30)) { _ in
+                Text(caption)
+                    .font(NoopHTMLFont.sans(11.5))
+                    .foregroundStyle(captionColor)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .onChange(of: live.backfilling) { _, now in
+            if now {
+                sawSyncing = true
+                requestedAt = nil
+            } else if sawSyncing {
+                sawSyncing = false
+                finish(live.lastSyncError.map(Outcome.failed) ?? .synced)
+            }
+        }
+        .task(id: requestedAt) {
+            // The strap ignores a tap when it is already caught up or another sync just ran: no offload
+            // starts. Give it a few seconds to begin before saying so.
+            guard requestedAt != nil else { return }
+            try? await Task.sleep(for: .seconds(6))
+            guard requestedAt != nil, !live.backfilling else { return }
+            requestedAt = nil
+            finish(.upToDate)
+        }
+        .task(id: outcome) {
+            guard outcome != nil else { return }
+            try? await Task.sleep(for: .seconds(8))
+            outcome = nil
+        }
+    }
+
+    private func finish(_ o: Outcome) {
+        outcome = o
+        #if os(iOS)
+        UINotificationFeedbackGenerator().notificationOccurred({
+            if case .failed = o { return .error } else { return .success }
+        }())
+        #endif
+    }
+
+    private var title: String {
+        guard connected else { return "Reconnect" }
+        switch phase {
+        case .idle: return "Sync now"
+        case .starting: return "Starting sync…"
+        case .syncing: return "Syncing…"
+        case .done(.synced): return "Synced"
+        case .done(.upToDate): return "Already up to date"
+        case .done(.failed): return "Sync didn't finish"
+        }
+    }
+
+    @ViewBuilder private var icon: some View {
+        switch connected ? phase : .idle {
+        case .starting, .syncing:
+            ProgressView().controlSize(.small).tint(NoopHTMLColor.blueLight)
+        case .done(.failed):
+            Image(systemName: "exclamationmark.triangle.fill")
+        case .done:
+            Image(systemName: "checkmark")
+        case .idle:
+            Image(systemName: "arrow.triangle.2.circlepath")
+        }
+    }
+
+    private var tone: Int {   // 0 primary, 1 working, 2 good, 3 bad
+        guard connected else { return 0 }
+        switch phase {
+        case .idle: return 0
+        case .starting, .syncing: return 1
+        case .done(.failed): return 3
+        case .done: return 2
+        }
+    }
+
+    private var ink: Color {
+        [NoopHTMLColor.blueInk, NoopHTMLColor.blueLight, Self.green, Color(hex: 0xFF9A8A)][tone]
+    }
+    private var fill: Color {
+        [NoopHTMLColor.blue, NoopHTMLColor.blue.opacity(0.16), Self.green.opacity(0.12), Color(hex: 0xFF6B57).opacity(0.12)][tone]
+    }
+    private var stroke: Color {
+        [.clear, NoopHTMLColor.blue.opacity(0.4), Self.green.opacity(0.36), Color(hex: 0xFF6B57).opacity(0.4)][tone]
+    }
+
+    private var caption: String {
+        if case .done(.failed(let why)) = phase, connected { return why }
+        if live.backfilling { return "Pulling stored history from the strap. Keep it close." }
+        guard let ts = live.lastSyncedAt else { return connected ? "Not synced yet" : "Strap not connected" }
+        let when = Date(timeIntervalSince1970: ts)
+        if Date().timeIntervalSince(when) < 60 { return "Last synced just now" }
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .full
+        return "Last synced \(f.localizedString(for: when, relativeTo: Date()))"
+    }
+
+    private var captionColor: Color {
+        if case .done(.failed) = phase, connected { return Color(hex: 0xFF9A8A) }
+        return NoopHTMLColor.faint
     }
 }
