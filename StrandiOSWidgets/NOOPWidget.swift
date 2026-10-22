@@ -82,44 +82,69 @@ struct NOOPWidgetView: View {
 
     private var inlineText: String {
         var parts: [String] = []
-        if let r = snap.recovery { parts.append("Recovery \(r)%") }
-        if let b = snap.bpm { parts.append("\(b) bpm") }
-        return parts.isEmpty ? "NOOP" : parts.joined(separator: " · ")
+        if let b = liveBpm { parts.append("\u{2665}\u{FE0E} \(b) bpm") }
+        if let r = snap.rest { parts.append("Rest \(r)%") }
+        if parts.count < 2, let e = effortText { parts.append("Effort \(e)") }
+        return parts.isEmpty ? "Noop Aura" : parts.joined(separator: " · ")
+    }
+
+    /// Heart rate is only worth showing while it is recent: the snapshot keeps the last reading after the
+    /// strap goes out of range, and a pulse from hours ago presented as "now" is wrong.
+    private var liveBpm: Int? {
+        guard let bpm = snap.bpm, entry.date.timeIntervalSince(snap.updated) < 30 * 60 else { return nil }
+        return bpm
     }
 
     // MARK: - Lock Screen accessories
 
+    /// The small round accessory. It used to be a Charge gauge, but no intraday Charge is published (the
+    /// app sends none rather than pass morning recovery off as one), so it sat on a dash for everyone.
+    /// It now shows what the strap measures continuously, the pulse, like the Dynamic Island, and falls
+    /// back to last night's Rest score when no recent reading exists.
+    @ViewBuilder
     private var recoveryGauge: some View {
-        Gauge(value: Double(snap.recovery ?? 0), in: 0...100) {
-            Image(systemName: "heart.fill")
-        } currentValueLabel: {
-            Text(snap.recovery.map { "\($0)" } ?? "–")
+        if let bpm = liveBpm {
+            VStack(spacing: -1) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(renderingMode == .fullColor
+                                     ? AnyShapeStyle(Color(red: 1, green: 69 / 255, blue: 86 / 255))
+                                     : AnyShapeStyle(HierarchicalShapeStyle.secondary))
+                Text("\(bpm)")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.6)
+                Text("bpm")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .widgetAccentable()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("Heart rate"))
+            .accessibilityValue(Text("\(bpm) beats per minute"))
+        } else {
+            Gauge(value: Double(snap.rest ?? 0), in: 0...100) {
+                Image(systemName: "moon.fill")
+            } currentValueLabel: {
+                Text(snap.rest.map { "\($0)" } ?? "–")
+            }
+            .gaugeStyle(.accessoryCircular)
+            .tint(restColor)
+            .accessibilityLabel(Text("Rest"))
         }
-        .gaugeStyle(.accessoryCircular)
-        .tint(chargeColor)
     }
 
-    /// Lock-Screen rectangular accessory: Charge · Effort · Rest, same trio as the Home Screen rings.
+    /// Lock-Screen rectangular accessory: heart rate, Effort and Rest.
     private var rectangular: some View {
-        // The lock screen gives this family roughly 72pt of height for everything. A "NOOP" title spent
-        // a whole row of that restating which widget the user chose to add, leaving the three scores —
-        // the only reason to add it — squeezed underneath. The title is gone and the heart-rate line is
-        // now conditional, so with no live HR the scores get the entire area.
-        VStack(spacing: 2) {
-            if let bpm = snap.bpm {
-                Text("\(bpm) bpm")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-            HStack(alignment: .top, spacing: 0) {
-                accessoryScore("Recovery", symbol: "figure.mind.and.body",
-                               text: snap.recovery.map { "\($0)%" }, tint: chargeColor)
-                accessoryScore("Effort", symbol: "figure.strengthtraining.traditional",
-                               text: effortText, tint: effortColor)
-                accessoryScore("Rest", symbol: "moon.fill",
-                               text: snap.rest.map { "\($0)%" }, tint: restColor)
-            }
+        // The lock screen gives this family roughly 72pt of height for everything, so no title row: the
+        // glyphs name the three values. Heart rate replaces the Charge cell, which no figure feeds.
+        HStack(alignment: .top, spacing: 0) {
+            accessoryScore("Heart rate", symbol: "heart.fill",
+                           text: liveBpm.map(String.init), tint: Color(red: 1, green: 69 / 255, blue: 86 / 255))
+            accessoryScore("Effort", symbol: "figure.strengthtraining.traditional",
+                           text: effortText, tint: effortColor)
+            accessoryScore("Rest", symbol: "moon.fill",
+                           text: snap.rest.map { "\($0)%" }, tint: restColor)
         }
     }
 
