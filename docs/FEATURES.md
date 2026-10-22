@@ -29,6 +29,8 @@ NOOP is built on community interoperability and protocol-documentation work, wit
 
 ## At a glance
 
+Widget data sharing resolves the App Group from the installed provisioning profile before consulting AltStore metadata or the build-time setting. This supports SideStore re-signing that rewrites App Groups without adding ALTAppGroups. Both the app and widget extension use the same resolver; existing snapshot data and widget layouts are unchanged.
+
 On iPhone, Aura's Trends page links directly to **Weekly digest** and **Trends report** in its
 existing grouped navigation. The same pages remain available from Settings → Tools. A report
 opened from Trends returns there and keeps Trends selected; one opened from Settings returns to

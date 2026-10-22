@@ -45,6 +45,57 @@ final class WidgetSnapshotTests: XCTestCase {
         )
     }
 
+    func testSideStoreProfileWorksWithoutAltAppGroupsMetadata() throws {
+        let groups = ["group.example.noop.TEAM123456"]
+        let plist: [String: Any] = ["Entitlements": ["com.apple.security.application-groups": groups]]
+        var cms = Data([0x30, 0x82, 0x00, 0x00])
+        cms.append(try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0))
+        cms.append(Data([0x00, 0xFF]))
+        let extracted = WidgetSnapshot.applicationGroups(inProfile: cms)
+        XCTAssertEqual(extracted, groups)
+        XCTAssertEqual(WidgetSnapshot.resolveSuiteName(
+            infoDictionary: ["AppGroupIdentifier": "group.example.noop"], provisionedGroups: extracted
+        ), groups[0])
+    }
+
+    func testProfileWinsOverStaleAltStoreMetadata() {
+        XCTAssertEqual(WidgetSnapshot.resolveSuiteName(
+            infoDictionary: ["AppGroupIdentifier": "group.example.noop",
+                             "ALTAppGroups": ["group.example.noop.OLDTEAM"]],
+            provisionedGroups: ["group.example.noop.NEWTEAM"]
+        ), "group.example.noop.NEWTEAM")
+    }
+
+    func testHostAndWidgetSelectSameGroupWithDifferentProfileOrdering() {
+        let shared = "group.example.noop.TEAM123456"
+        let info: [String: Any] = ["AppGroupIdentifier": "group.example.noop"]
+        XCTAssertEqual(WidgetSnapshot.resolveSuiteName(infoDictionary: info,
+            provisionedGroups: ["group.other.service", shared]), shared)
+        XCTAssertEqual(WidgetSnapshot.resolveSuiteName(infoDictionary: info,
+            provisionedGroups: [shared]), shared)
+    }
+
+    func testProfilePrefersExactGroupOverPrefixMatches() {
+        XCTAssertEqual(WidgetSnapshot.resolveSuiteName(
+            infoDictionary: ["AppGroupIdentifier": "group.example.noop"],
+            provisionedGroups: ["group.example.noop.TEAM", "group.example.noop"]
+        ), "group.example.noop")
+    }
+
+    func testAmbiguousProfileDoesNotTrustStaleSignerMetadata() {
+        XCTAssertEqual(WidgetSnapshot.resolveSuiteName(
+            infoDictionary: ["AppGroupIdentifier": "group.example.noop",
+                             "ALTAppGroups": ["group.example.noop.OLDTEAM"]],
+            provisionedGroups: ["group.example.noop.TEAM1", "group.example.noop.TEAM2"]
+        ), "group.example.noop")
+    }
+
+    func testMissingOrMalformedProfilePreservesMetadataFallback() {
+        XCTAssertNil(WidgetSnapshot.applicationGroups(inProfile: nil))
+        XCTAssertNil(WidgetSnapshot.applicationGroups(inProfile: Data("not a profile".utf8)))
+        XCTAssertNil(WidgetSnapshot.applicationGroups(inProfile: Data("<?xml broken </plist>".utf8)))
+    }
+
     func testRuntimeUnavailableSnapshotContainsNoDemoValues() {
         let snapshot = WidgetSnapshot.unavailable
 

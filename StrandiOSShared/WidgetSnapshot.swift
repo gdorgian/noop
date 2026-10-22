@@ -242,46 +242,66 @@ public struct WidgetSnapshot: Codable, Equatable {
     /// App Group suite the app and widget both use. Injected from the `APP_GROUP_ID` build setting
     /// (see project.yml) via the `AppGroupIdentifier` Info.plist key, so the value lives in exactly
     /// one place rather than being duplicated here. Must match the `com.apple.security.application-groups`
-    /// entitlement on both targets (which also reads `$(APP_GROUP_ID)`). If the entitlement is missing on
-    /// either side, `UserDefaults(suiteName:)` returns nil and every consumer (PendingIntents,
-    /// WidgetSnapshot.publish, Live Activity) silently no-ops — see `assertGroupProvisioned` for the
-    /// debug-time canary. The fallback is the canonical upstream group and only applies if the Info.plist
-    /// key is somehow absent (each process reads its OWN bundle, so the app and the widget extension
-    /// each carry the key in their generated Info.plist).
+    /// entitlement on both targets (which also reads `$(APP_GROUP_ID)`). Re-signing may change the
+    /// provisioned name without changing that Info.plist value, so the installed profile is consulted
+    /// first. A named defaults object alone does not prove that app and widget share a container.
+    /// Each process reads its own bundle and profile; no signing identifiers are logged.
     public static let suiteName: String = {
-        resolveSuiteName(infoDictionary: Bundle.main.infoDictionary ?? [:])
+        let profileData = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision")
+            .flatMap { try? Data(contentsOf: $0) }
+        return resolveSuiteName(
+            infoDictionary: Bundle.main.infoDictionary ?? [:],
+            provisionedGroups: applicationGroups(inProfile: profileData)
+        )
     }()
     public static let storageKey = "noop.widget.snapshot"
 
-    /// Resolve the App Group the current signature actually grants.
-    ///
-    /// AltStore / SideStore must make every App Group unique to the user's signing team. During
-    /// re-signing they append the team identifier to the group requested by the downloaded app and
-    /// publish the resulting, provisioned identifiers in `ALTAppGroups` in each bundle's Info.plist.
-    /// Reading only the build-time `AppGroupIdentifier` therefore points at an unprovisioned container
-    /// in a sideloaded build, even though the host app and widget extension were both signed correctly.
-    ///
-    /// Normal Xcode builds don't carry `ALTAppGroups`, so they keep using `AppGroupIdentifier`.
-    static func resolveSuiteName(infoDictionary: [String: Any]) -> String {
+    /// Read the App Groups granted by the installed bundle's provisioning profile.
+    /// SideStore can rewrite the group without adding ALTAppGroups to Info.plist. Both the host
+    /// and its extension must therefore consult their own profile rather than the build-time name.
+    /// No profile (App Store / simulator) or an unreadable profile preserves the metadata fallback.
+    static func applicationGroups(inProfile data: Data?) -> [String]? {
+        guard let data,
+              let start = data.range(of: Data("<?xml".utf8)),
+              let end = data.range(of: Data("</plist>".utf8), in: start.lowerBound..<data.endIndex),
+              let plist = try? PropertyListSerialization.propertyList(
+                from: data.subdata(in: start.lowerBound..<end.upperBound), options: [], format: nil
+              ) as? [String: Any],
+              let entitlements = plist["Entitlements"] as? [String: Any],
+              let groups = entitlements["com.apple.security.application-groups"] as? [String]
+        else { return nil }
+        return groups
+    }
+
+    /// A provisioned name takes precedence over stale build-time or signer metadata. Older
+    /// AltStore builds still use ALTAppGroups; ordinary Xcode builds retain their configured name.
+    /// Never guess between several unrelated groups or several possible remappings.
+    static func resolveSuiteName(infoDictionary: [String: Any], provisionedGroups: [String]? = nil) -> String {
         let configured = (infoDictionary["AppGroupIdentifier"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let altGroups = (infoDictionary["ALTAppGroups"] as? [String])?
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.hasPrefix("group.") && !$0.isEmpty } ?? []
-
-        if let configured, !configured.isEmpty,
-           let provisioned = altGroups.first(where: {
-               $0 == configured || $0.hasPrefix(configured + ".")
-           }) {
-            return provisioned
+        func validGroups(_ groups: [String]) -> [String] {
+            Array(Set(groups.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { $0.hasPrefix("group.") && $0.count > "group.".count })).sorted()
         }
-        if altGroups.count == 1, let provisioned = altGroups.first {
-            return provisioned
+        func matchingGroup(in groups: [String]) -> String? {
+            let groups = validGroups(groups)
+            if let configured, !configured.isEmpty {
+                if groups.contains(configured) { return configured }
+                let remapped = groups.filter { $0.hasPrefix(configured + ".") }
+                if remapped.count == 1 { return remapped[0] }
+            }
+            return groups.count == 1 ? groups[0] : nil
         }
-        if let configured, !configured.isEmpty {
-            return configured
+        if let provisionedGroups {
+            // If the profile is explicit but ambiguous, do not use stale ALTAppGroups to select a
+            // different team's container. The configured fallback retains existing failure behavior.
+            return matchingGroup(in: provisionedGroups) ?? configured.flatMap { $0.isEmpty ? nil : $0 }
+                ?? "group.com.noopapp.noop"
         }
-        return "group.com.noopapp.noop"
+        if let group = matchingGroup(in: infoDictionary["ALTAppGroups"] as? [String] ?? []) {
+            return group
+        }
+        return configured.flatMap { $0.isEmpty ? nil : $0 } ?? "group.com.noopapp.noop"
     }
 
     /// Debug-only canary: trips on the first run after a misprovisioning so the silent no-op gets
