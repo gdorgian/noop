@@ -80,6 +80,10 @@ final class BehaviorStore: ObservableObject {
     /// batteryAlerts (both must be on). Default ON so pre-toggle behavior is unchanged.
     @Published var batteryPredictiveAlerts: Bool { didSet { d.set(batteryPredictiveAlerts, forKey: K.batteryPredictiveAlerts) } }
 
+    // MARK: Off-wrist reminder
+    /// One notification when the strap has been off the wrist for ten minutes. Default ON.
+    @Published var wearAlerts: Bool { didSet { d.set(wearAlerts, forKey: K.wearAlerts) } }
+
     // MARK: Strain target nudge (#593)
     /// Once-a-day "optimal strain reached" nudge when the day's Effort hits the low end of today's
     /// recovery-derived optimal band. Default OFF like every other automation.
@@ -111,6 +115,7 @@ final class BehaviorStore: ObservableObject {
         // preserved should a real light-sleep watcher ever land.
         static let illness = "behavior.illnessWatch"
         static let batteryAlerts = "behavior.batteryAlerts"
+        static let wearAlerts = "behavior.wearAlerts"
         static let batteryPredictiveAlerts = "behavior.batteryPredictiveAlerts"
         static let strainTargetNudge = "behavior.strainTargetNudge"
     }
@@ -141,6 +146,7 @@ final class BehaviorStore: ObservableObject {
         smartAlarmWeekdays = Set((d.array(forKey: K.alarmWeekdays) as? [Int] ?? []).filter { (1...7).contains($0) })
         illnessWatch = d.object(forKey: K.illness) as? Bool ?? false
         batteryAlerts = d.object(forKey: K.batteryAlerts) as? Bool ?? true
+        wearAlerts = d.object(forKey: K.wearAlerts) as? Bool ?? true
         batteryPredictiveAlerts = d.object(forKey: K.batteryPredictiveAlerts) as? Bool ?? true
         strainTargetNudge = d.object(forKey: K.strainTargetNudge) as? Bool ?? false
     }

@@ -342,6 +342,10 @@ final class AppModel: ObservableObject {
         // Physical-input + wear hooks (fired live by FrameRouter).
         live.onDoubleTap = { [weak self] in self?.handleDoubleTap() }
         live.onWristChange = { [weak self] worn in self?.handleWristChange(worn) }
+        // On the charger is not "forgot to put it back on": withdraw a pending off-wrist reminder.
+        live.$charging.removeDuplicates().sink { charging in
+            if charging == true { WearNotifier.withdraw() }
+        }.store(in: &hrCancellables)
         // Re-arm the next day's firmware alarm the moment the strap reports it fired (if/when the
         // firmware pushes STRAP_DRIVEN_ALARM_EXECUTED). Gated on enabled inside applySmartAlarm.
         live.onSmartAlarmFired = { [weak self] in
@@ -1943,6 +1947,7 @@ final class AppModel: ObservableObject {
     }
 
     private func handleWristChange(_ worn: Bool) {
+        WearNotifier.wristChanged(worn: worn, charging: live.charging, enabled: behavior.wearAlerts)
         if worn {
             if !behavior.wristOnShortcut.isEmpty { MacActions.runShortcut(behavior.wristOnShortcut) }
         } else {

@@ -73,7 +73,7 @@ struct NoopAct5Screens: View {
     @State private var buzz = "Normal"
     @State private var enabled: Set<String> = [
         "Continuous pulse", "Temperature", "Blood oxygen", "Stay connected in the background",
-        "Apple Health", "Bedtime nudge", "Session offer", "Battery alerts", "Journal reminder",
+        "Apple Health", "Bedtime nudge", "Session offer", "Battery alerts", "Off-wrist reminder", "Journal reminder",
         "Day-cycle sky", "Sky behind cards", "Pause the HRV stream when low", "Sleep staging V2",
         "Overnight only", "Messages", "Phone calls", "Calendar", "WhatsApp", "Reminders",
         "Only when the phone is locked", "Follow iPhone Focus", "Hold them during quiet hours",
@@ -223,6 +223,7 @@ private extension NoopAct5Screens {
         case "Reduce motion in Noop": $quietMotionOn
         case "Live heart rate in the Dynamic Island": $liveActivityOn
         case "Battery alerts": $behavior.batteryAlerts
+        case "Off-wrist reminder": $behavior.wearAlerts
         case "Power saving": $powerSavingOn
         // Stored as "pause disabled"; the switch asks the positive question.
         case "Pause the HRV stream when low": Binding(get: { !pauseHrvDisabled }, set: { pauseHrvDisabled = !$0 })
@@ -3314,6 +3315,8 @@ private extension NoopAct5Screens {
                     toggleRow("Live heart rate in the Dynamic Island", detail: "Also puts it on the Lock Screen while a session runs.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Battery alerts", detail: "One notice at 15% and one when it finishes charging. Never twice for the same crossing.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Off-wrist reminder", detail: "One notice when the strap has been off your wrist for ten minutes. Not while it charges.", tint: Self.blush)
                 }
 
                 settingsGroup("Power saving") {

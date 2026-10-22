@@ -500,7 +500,10 @@ targets:
     info:
       path: StrandiOSWidgets/Info.plist
       properties:
-        CFBundleDisplayName: "Noop Aura"
+        # U+2800 (blank Braille cell): the Home Screen label under a widget reads as nothing, for a cleaner
+        # look (owner, 23 Oct). Not whitespace, so iOS cannot trim it back to a fallback name. The widget
+        # gallery still names each widget through its configurationDisplayName.
+        CFBundleDisplayName: "\u2800"
         # Version keys MUST live here in the generated-Info.plist properties — NOT hand-edited into the
         # file — because xcodegen regenerates StrandiOSWidgets/Info.plist on every `xcodegen generate`
         # (which every release runs for the version bump) and would otherwise rewrite them to its
