@@ -177,10 +177,7 @@ struct NoopFitnessRoutineScreen: View {
                 HStack {
                     NoopBackHeader(label: "Fitness") { navigation.back(or: .fitness) }
                     Spacer()
-                    Button {
-                        navigation.selectedLiftProgramID = navigation.fitnessRoutineID
-                        navigation.push(.liftProgram)
-                    } label: {
+                    Button { navigation.push(.fitnessRoutineEdit) } label: {
                         Text("Edit").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                             .padding(.horizontal, 14).frame(height: 32)
                             .background(Color.white.opacity(0.06), in: Capsule())
@@ -273,7 +270,7 @@ struct NoopFitnessRoutineScreen: View {
                 .padding(.top, 16)
             }
         }
-        .task(id: navigation.fitnessRoutineID) { await load() }
+        .task(id: "\(navigation.fitnessRoutineID ?? "")-\(repo.refreshSeq)") { await load() }
     }
 
     private var exerciseCount: Int { Set(items.map(\.exercise)).count }
@@ -294,7 +291,7 @@ struct NoopFitnessRoutineScreen: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.exercise).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                    Text("\(n) \(n == 1 ? "set" : "sets")\(item.restSec.map { " · \($0)s rest" } ?? "")")
+                    Text("\(n) \(n == 1 ? "set" : "sets")\(item.restSec.map { " · \(LiftFormat.duration($0)) rest" } ?? "")")
                         .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 Spacer()

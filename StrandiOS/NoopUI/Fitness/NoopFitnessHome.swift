@@ -54,6 +54,11 @@ struct NoopFitnessHome: View {
         .padding(.top, 6)
     }
 
+    private func newRoutine() {
+        navigation.fitnessRoutineID = nil
+        navigation.push(.fitnessRoutineEdit)
+    }
+
     private func open(_ metric: NoopFitnessMetric) {
         navigation.fitnessMetric = metric
         navigation.push(.fitnessDetail)
@@ -70,11 +75,11 @@ struct NoopFitnessHome: View {
                 .padding(.bottom, 26)
         case .routines:
             sectionTitle("Routines") {
-                NoopFitnessIconButton(glyph: .plus) { navigation.push(.liftLibrary) }
+                NoopFitnessIconButton(glyph: .plus) { newRoutine() }
                     .accessibilityLabel("New routine")
             }
             if s.routines.isEmpty {
-                Button { navigation.push(.liftLibrary) } label: {
+                Button { newRoutine() } label: {
                     Text("Build a routine to start it in one tap and plan it on the calendar.")
                         .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
                         .frame(maxWidth: .infinity, alignment: .leading)

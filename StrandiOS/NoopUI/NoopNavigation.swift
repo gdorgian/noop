@@ -125,6 +125,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case fitness
     case fitnessDetail = "fitness-detail", fitnessMuscles = "fitness-muscles", fitnessEdit = "fitness-edit"
     case fitnessRoutine = "fitness-routine", fitnessCalendar = "fitness-calendar"
+    case fitnessRoutineEdit = "fitness-routine-edit"
 
     var id: String { rawValue }
 
@@ -146,7 +147,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .instrumentRaw, .instrumentCapture: .instrument
         case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles: .lift
-        case .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit, .fitnessRoutine, .fitnessCalendar: .fitness
+        case .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit, .fitnessRoutine, .fitnessCalendar,
+             .fitnessRoutineEdit: .fitness
         }
     }
 
@@ -175,7 +177,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         // Act 3 does.
         case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles, .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit,
-             .fitnessRoutine, .fitnessCalendar:
+             .fitnessRoutine, .fitnessCalendar, .fitnessRoutineEdit:
             .fitness
         }
     }
@@ -1214,6 +1216,7 @@ extension NoopRoute {
         case .fitnessEdit: "Edit Fitness"
         case .fitnessRoutine: "Routine"
         case .fitnessCalendar: "Calendar"
+        case .fitnessRoutineEdit: "Edit routine"
         }
     }
 }
