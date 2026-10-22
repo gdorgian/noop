@@ -101,6 +101,7 @@ final class NoopLiftFlowModel: ObservableObject {
         }
         do {
             try await store.upsertWorkouts(rows, deviceId: LiftingImporter.sourceId)
+            NoopFitnessModel.markChanged()
             importCommitted = true
             await repo.refresh()
             await refresh(repo: repo)
@@ -1064,6 +1065,7 @@ private struct NoopLiftLiveScreen: View {
             // partial attempt. The in-flight controller remains intact until all writes succeed.
             _ = try await store.replaceLiftSessionSets(sessionId: sessionID, rows: rows)
             _ = try await store.upsertWorkouts([workout], deviceId: repo.deviceId)
+            NoopFitnessModel.markChanged()
         } catch {
             saveError = "The session could not be written. Your session and its sets are still here. Try saving again."
             return
@@ -1643,6 +1645,7 @@ private struct NoopLiftProgramScreen: View {
             }
         do {
             try await store.saveLiftProgram(row, items: cleanItems)
+            NoopFitnessModel.markChanged()
         } catch {
             saveError = "The program and its lines could not be written. Your changes are still here."
             return
@@ -1881,7 +1884,7 @@ private struct NoopLiftDetailScreen: View {
     private func saveRpe() async {
         guard var row = flow.selectedSession, let store = await repo.storeHandle() else { return }
         row.sessionRpe = newRpe.rounded()
-        if (try? await store.upsertLiftSessions([row])) != nil { flow.selectedSession = row }
+        if (try? await store.upsertLiftSessions([row])) != nil { flow.selectedSession = row; NoopFitnessModel.markChanged() }
     }
 
     // MARK: Muscles
@@ -2326,6 +2329,7 @@ private struct NoopLiftEditScreen: View {
         }
         do {
             try await store.replaceLiftSessionSets(sessionId: sessionID, rows: survivors)
+            NoopFitnessModel.markChanged()
         } catch {
             saveError = "The corrected sets could not be written. Your original session is unchanged."
             return

@@ -14,6 +14,9 @@ struct NoopFitnessHome: View {
     @EnvironmentObject private var profile: ProfileStore
     @State private var selectedDay = Calendar.current.startOfDay(for: Date())
     @State private var weekOffset = 0
+    @State private var adding = false
+    @State private var editing = false
+    @State private var planning = false
 
     var body: some View {
         NoopScreen(topInset: 58) {
@@ -22,12 +25,22 @@ struct NoopFitnessHome: View {
                     HStack(spacing: 8) {
                         NoopFitnessIconButton(glyph: .calendar) { navigation.push(.fitnessCalendar) }
                             .accessibilityLabel("Calendar")
-                        NoopFitnessIconButton(glyph: .grid) { navigation.push(.fitnessEdit) }
-                            .accessibilityLabel("Edit Fitness")
+                        if editing {
+                            Button { withAnimation(NoopMotion.swap) { editing = false } } label: {
+                                Text("Done").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.canvas)
+                                    .padding(.horizontal, 18).frame(height: 34).background(NoopHTMLColor.ink, in: Capsule())
+                            }
+                            .buttonStyle(NoopHTMLPressStyle())
+                        } else {
+                            NoopFitnessIconButton(glyph: .grid) { withAnimation(NoopMotion.swap) { editing = true } }
+                                .accessibilityLabel("Edit Fitness")
+                        }
                     }
                 }
                 if let s = fitness.snapshot {
                     content(s)
+                        .sheet(isPresented: $adding) { NoopFitnessAddSheet(navigation: navigation, routines: s.routines) }
+                        .sheet(isPresented: $planning) { NoopFitnessPlanSheet(routines: s.routines).environmentObject(layout) }
                 } else {
                     Text(fitness.isLoading ? "Reading your training…" : "")
                         .font(NoopHTMLFont.sans(13))
@@ -58,9 +71,14 @@ struct NoopFitnessHome: View {
             .padding(.bottom, 16)
         }
         ForEach(layout.sections) { section in
-            self.section(section, s)
+            if editing {
+                editableSection(section, s)
+            } else {
+                self.section(section, s)
+            }
         }
-        Button { navigation.push(.fitnessEdit) } label: {
+        if editing { editFooter } else {
+        Button { withAnimation(NoopMotion.swap) { editing = true } } label: {
             Text("Edit Fitness")
                 .font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                 .frame(maxWidth: .infinity).frame(height: 50)
@@ -69,6 +87,156 @@ struct NoopFitnessHome: View {
         }
         .buttonStyle(NoopHTMLPressStyle())
         .padding(.top, 6)
+        }
+    }
+
+    // MARK: Edit in place
+
+    /// A section as it looks while the page is being arranged: a handle to drag it by, arrows,
+    /// a way to take it off the page, and every card with a badge to hide or show it.
+    @ViewBuilder
+    private func editableSection(_ section: NoopFitnessSettings.Section, _ s: NoopFitnessSnapshot) -> some View {
+        let i = layout.sections.firstIndex(of: section) ?? 0
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "line.3.horizontal").font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                Text(section.title.uppercased()).font(NoopHTMLFont.sans(11.5, weight: .semibold)).tracking(1.2)
+                    .foregroundStyle(NoopHTMLColor.inkSoft)
+                Spacer()
+                editArrow("chevron.up", enabled: i > 0) { moveSection(i, to: i - 1) }
+                editArrow("chevron.down", enabled: i < layout.sections.count - 1) { moveSection(i, to: i + 1) }
+                Button {
+                    withAnimation(NoopMotion.swap) { layout.sections.removeAll { $0 == section } }
+                } label: {
+                    Image(systemName: "minus.circle.fill").font(.system(size: 20)).foregroundStyle(NoopHTMLColor.red)
+                }
+                .accessibilityLabel("Remove \(section.title)")
+            }
+            .contentShape(Rectangle())
+            .draggable(section.rawValue) {
+                Text(section.title).font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    .padding(.horizontal, 16).frame(height: 40).background(NoopHTMLColor.cardRaised, in: Capsule())
+            }
+            if section.cards.isEmpty {
+                editPreview(section, s)
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(section.cards, id: \.self) { card in
+                        let shown = layout.isShown(card)
+                        Group {
+                            if section == .cardio { cardioCard(card, s) } else if card == .freshness {
+                                NoopFitnessFreshnessCard(readings: s.freshness, compact: true)
+                            } else { strengthCard(card, s) }
+                        }
+                        .allowsHitTesting(false)
+                        .opacity(shown ? 1 : 0.32)
+                        .overlay(alignment: .topLeading) {
+                            Button {
+                                withAnimation(NoopMotion.swap) {
+                                    if shown { layout.hidden.insert(card) } else { layout.hidden.remove(card) }
+                                }
+                            } label: {
+                                Image(systemName: shown ? "minus.circle.fill" : "plus.circle.fill")
+                                    .font(.system(size: 22)).symbolRenderingMode(.palette)
+                                    .foregroundStyle(.white, shown ? NoopHTMLColor.red : NoopHTMLColor.green)
+                                    .background(Circle().fill(NoopHTMLColor.canvas).padding(2))
+                            }
+                            .offset(x: -7, y: -7)
+                            .accessibilityLabel(shown ? "Hide \(card.title)" : "Show \(card.title)")
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.white.opacity(0.025), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .strokeBorder(Color.white.opacity(0.14), style: StrokeStyle(lineWidth: 1, dash: [6, 5])))
+        .padding(.bottom, 14)
+        .dropDestination(for: String.self) { items, _ in
+            guard let raw = items.first, let moving = NoopFitnessSettings.Section(rawValue: raw),
+                  let from = layout.sections.firstIndex(of: moving), let to = layout.sections.firstIndex(of: section),
+                  from != to else { return false }
+            moveSection(from, to: to)
+            return true
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+    }
+
+    /// What a section without cards holds, in one line, so the arranged page stays short.
+    private func editPreview(_ section: NoopFitnessSettings.Section, _ s: NoopFitnessSnapshot) -> some View {
+        let (symbol, line): (String, String) = switch section {
+        case .activity: ("figure.run", "The sessions and plans of the chosen day")
+        case .routines: ("dumbbell", s.routines.isEmpty ? "Your routines, once you build one"
+                                                         : "\(s.routines.count) \(s.routines.count == 1 ? "routine" : "routines"), to start in one tap")
+        case .load: ("gauge.with.needle", "Cardio and muscular load against your normal")
+        default: ("square.grid.2x2", section.title)
+        }
+        return HStack(spacing: 12) {
+            Image(systemName: symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                .frame(width: 36, height: 36).background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            Text(line).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+            Spacer()
+        }
+    }
+
+    private var editFooter: some View {
+        VStack(spacing: 10) {
+            let missing = NoopFitnessSettings.Section.allCases.filter { !layout.sections.contains($0) }
+            ForEach(missing) { m in
+                Button { withAnimation(NoopMotion.swap) { layout.sections.append(m) } } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 19)).foregroundStyle(NoopHTMLColor.green)
+                        Text("Add \(m.title)").font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16).frame(height: 52)
+                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.16), style: StrokeStyle(lineWidth: 1, dash: [6, 5])))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+            }
+            HStack(spacing: 10) {
+                Button {
+                    withAnimation(NoopMotion.swap) {
+                        layout.sections = NoopFitnessSettings.Section.allCases
+                        layout.hidden = []
+                    }
+                } label: {
+                    Text("Reset to default").font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                        .frame(maxWidth: .infinity).frame(height: 46)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                Button { navigation.push(.fitnessEdit) } label: {
+                    Text("More settings").font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                        .frame(maxWidth: .infinity).frame(height: 46)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+            }
+            Text("Drag a section by its handle, or use the arrows. Hidden cards stay one tap away here.")
+                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.muted).multilineTextAlignment(.center)
+        }
+    }
+
+    private func editArrow(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 12, weight: .bold))
+                .foregroundStyle(enabled ? NoopHTMLColor.inkSoft : NoopHTMLColor.chevronDim)
+                .frame(width: 30, height: 28).background(Color.white.opacity(enabled ? 0.07 : 0.03), in: Capsule())
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .disabled(!enabled)
+    }
+
+    private func moveSection(_ from: Int, to: Int) {
+        guard layout.sections.indices.contains(from), layout.sections.indices.contains(to) else { return }
+        withAnimation(NoopMotion.swap) {
+            let item = layout.sections.remove(at: from)
+            layout.sections.insert(item, at: to)
+        }
     }
 
     private func newRoutine() {
@@ -87,14 +255,8 @@ struct NoopFitnessHome: View {
         switch section {
         case .activity:
             sectionTitle(Calendar.current.isDateInToday(selectedDay) ? "Today" : Self.dayTitle(selectedDay)) {
-                Menu {
-                    Button { navigation.push(.pick) } label: { Label("Start or log an activity", systemImage: "figure.run") }
-                    Button { navigation.push(.liftLibrary) } label: { Label("Start a routine", systemImage: "dumbbell") }
-                    Button { navigation.push(.fitnessCalendar) } label: { Label("Plan a routine", systemImage: "calendar.badge.plus") }
-                } label: {
-                    NoopFitnessIconGlyph(glyph: .plus)
-                }
-                .accessibilityLabel("Add")
+                NoopFitnessIconButton(glyph: .plus) { adding = true }
+                    .accessibilityLabel("Start or log")
             }
             activity(s)
                 .padding(.bottom, 26)
@@ -102,6 +264,7 @@ struct NoopFitnessHome: View {
             sectionTitle("Routines") {
                 Menu {
                     Button { newRoutine() } label: { Label("New routine", systemImage: "plus") }
+                    Button { planning = true } label: { Label("Plan a routine", systemImage: "calendar.badge.plus") }
                     Button { navigation.push(.liftLibrary) } label: { Label("All routines", systemImage: "list.bullet") }
                     Button { navigation.push(.liftImport) } label: { Label("Import from another app", systemImage: "square.and.arrow.down") }
                 } label: {
@@ -135,7 +298,7 @@ struct NoopFitnessHome: View {
                                 Button { navigation.fitnessRoutineID = r.id; navigation.push(.fitnessRoutineEdit) } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                Button { navigation.push(.fitnessCalendar) } label: { Label("Plan on the calendar", systemImage: "calendar") }
+                                Button { planning = true } label: { Label("Plan on the calendar", systemImage: "calendar") }
                             }
                         }
                         Button { navigation.push(.liftLibrary) } label: {
@@ -247,7 +410,9 @@ struct NoopFitnessHome: View {
     private func activity(_ s: NoopFitnessSnapshot) -> some View {
         let day = week(s).first { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) }
         let sessions = day?.sessions ?? []
-        let planned = layout.plans.filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) }
+        let planned = layout.plans.filter { p in
+            Calendar.current.isDate(p.date, inSameDayAs: selectedDay) && !sessions.contains { $0.routineID == p.routineID }
+        }
         if sessions.isEmpty, !planned.isEmpty {
             VStack(spacing: 8) {
                 ForEach(planned) { plan in
@@ -504,6 +669,7 @@ struct NoopFitnessSessionButton: View {
                 guard let row = session.row else { return }
                 Task {
                     await repo.deleteWorkout(row)
+                    NoopFitnessModel.markChanged()
                     await repo.refresh()
                 }
             }
@@ -514,6 +680,7 @@ struct NoopFitnessSessionButton: View {
             ManualWorkoutSheet(editing: target.row, reviewingSuggestion: session.detected) { row, replacing in
                 Task {
                     await repo.saveManualWorkout(row, replacing: replacing)
+                    NoopFitnessModel.markChanged()
                     await model.intelligence.analyzeRecent()
                     await repo.refresh()
                 }
@@ -964,18 +1131,35 @@ private extension Array where Element == String {
 
 struct NoopFitnessFreshnessCard: View {
     let readings: [MuscleFreshness.Reading]
+    var compact = false
 
     var body: some View {
-        let shown = Array(readings.sorted { $0.percent < $1.percent }.prefix(6))
+        let sorted = readings.sorted { $0.percent < $1.percent }
+        let shown = Array(sorted.prefix(compact ? 4 : 6))
+        let ready = readings.filter { $0.provisionalStatus == .recovered }.count
+        let tired = readings.filter { $0.provisionalStatus == .fatigued || $0.provisionalStatus == .depleted }.count
         VStack(alignment: .leading, spacing: 14) {
-            Text("Muscle freshness").font(NoopHTMLFont.sans(13, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 16) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Muscle freshness").font(NoopHTMLFont.sans(13, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(readings.isEmpty ? "Log a lift to see it" : tired == 0 ? "Everything is ready" : "\(tired) still recovering · \(ready) ready")
+                        .font(NoopHTMLFont.outfit(19)).foregroundStyle(NoopHTMLColor.ink)
+                }
+                Spacer()
+                if !compact { NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim) }
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 14) {
                 ForEach(shown, id: \.group) { r in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(r.group.title).font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                        Text("\(Int(r.percent.rounded()))% recovered").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
-                        NoopFitnessDotMeter(percent: r.percent, color: Self.color(r.provisionalStatus))
-                            .padding(.top, 4)
+                    let tint = Self.color(r.provisionalStatus)
+                    HStack(spacing: 10) {
+                        NoopFitnessMuscleThumb(group: r.group, tint: tint)
+                            .frame(width: 30, height: 46)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(r.group.title).font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                                .lineLimit(1)
+                            Text("\(Int(r.percent.rounded()))%").font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(tint)
+                            NoopFitnessDotMeter(percent: r.percent, color: tint)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }

@@ -1135,6 +1135,8 @@ final class AppModel: ObservableObject {
                 try await store.upsertWorkouts([row], deviceId: deviceId)
                 PendingWorkoutSaves.remove(row)
                 saved += 1
+                // Fitness re-reads on this; the name is shared with the iOS Fitness model.
+                NotificationCenter.default.post(name: Notification.Name("noop.fitness.changed"), object: nil)
             } catch {
                 live.append(log: "Workout save failed, kept to retry: \(row.sport) at \(row.startTs) — \(error.localizedDescription)")
             }

@@ -133,4 +133,29 @@ struct NoopFitnessBodyMap: View {
         Shape(.calves, [(32.5, 148), (43, 148), (44.2, 164), (40.4, 182), (35.4, 180), (31.4, 163)]),
     ]
 }
+
+/// One small figure with a single muscle group lit, front or back as the group is best seen.
+struct NoopFitnessMuscleThumb: View {
+    let group: FitnessMuscleGroup
+    let tint: Color
+
+    private var back: Bool {
+        !NoopFitnessBodyMap.frontMuscles.contains { $0.group == group }
+    }
+
+    var body: some View {
+        Canvas { ctx, size in
+            let s = min(size.width / 100, size.height / 212)
+            let dx = (size.width - 100 * s) / 2
+            let t = CGAffineTransform(translationX: dx, y: 0).scaledBy(x: s, y: s)
+            for part in NoopFitnessBodyMap.silhouette {
+                for path in part.paths() { ctx.fill(path.applying(t), with: .color(Color.white.opacity(0.1))) }
+            }
+            for m in (back ? NoopFitnessBodyMap.backMuscles : NoopFitnessBodyMap.frontMuscles) where m.group == group {
+                for path in m.paths() { ctx.fill(path.applying(t), with: .color(tint)) }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
 #endif

@@ -903,11 +903,20 @@ struct NoopAct3Screens: View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let elapsed = liveElapsed(at: timeline.date)
             let bpm = liveBPM(elapsed: elapsed)
-            Act3LiveScreen(
-                model: workoutModel,
-                elapsed: navigation.sessionElapsedDisplay(at: timeline.date),
-                bpm: bpm,
-                paused: navigation.sessionPaused,
+            // The design fixture draws through the same view as a recorded session.
+            let shownElapsed = navigation.sessionElapsedDisplay(at: timeline.date)
+            NoopFitnessCardioLive(
+                sport: workoutModel.name, symbol: NoopFitnessCardioLive.symbol(for: workoutModel.name),
+                elapsed: shownElapsed, bpm: bpm, paused: navigation.sessionPaused,
+                zone: max(1, min(5, (bpm - 80) / 20)), zoneNames: Self.zoneNames,
+                zoneRanges: [(98, 117), (117, 137), (137, 156), (156, 175), (175, 195)],
+                target: 2,
+                recent: (0..<90).map { i in bpm - 6 + Int(5 * sin(Double(i) / 6)) + (i % 7) / 3 },
+                figures: [.init(label: "km", value: String(format: "%.2f", Double(shownElapsed) / 60 * 0.35)),
+                          .init(label: "pace /km", value: "5:48"), .init(label: "avg bpm", value: "\(bpm - 3)"),
+                          .init(label: "Effort", value: String(format: "%.1f", Double(shownElapsed) / 240)),
+                          .init(label: "peak bpm", value: "\(bpm + 9)"), .init(label: "in zone", value: "91%")],
+                footnote: nil,
                 pauseAction: { togglePause(at: timeline.date) },
                 endAction: { navigation.endSession(navigation.selectedWorkout) }
             )
@@ -2710,6 +2719,20 @@ private extension NoopAct3Screens {
         }
     }
 
+    private func liveFigures(_ active: AppModel.ActiveWorkout, inZone: String, hasBand: Bool) -> [NoopFitnessCardioLive.Figure] {
+        var figures: [NoopFitnessCardioLive.Figure] = []
+        if model.gpsRecorder.isRecording {
+            figures.append(.init(label: "km", value: String(format: "%.2f", model.gpsRecorder.distanceM / 1000)))
+            figures.append(.init(label: "pace /km", value: model.gpsRecorder.paceSecPerKm.map {
+                String(format: "%d:%02d", Int($0) / 60, Int($0) % 60) } ?? "—"))
+        }
+        figures.append(.init(label: "avg bpm", value: active.avgHr > 0 ? "\(active.avgHr)" : "—"))
+        figures.append(.init(label: "Effort", value: String(format: "%.1f", active.liveStrain)))
+        figures.append(.init(label: "peak bpm", value: active.peakHr > 0 ? "\(active.peakHr)" : "—"))
+        if hasBand { figures.append(.init(label: "in zone", value: inZone)) }
+        return figures
+    }
+
     // MARK: Live
 
     @ViewBuilder var liveSession: some View {
@@ -2740,11 +2763,16 @@ private extension NoopAct3Screens {
                 return "\(Int((Double(inside) / Double(samples.count) * 100).rounded()))%"
             }()
             let zoneNumber = bpm.map { profile.hrZoneSet.zoneNumber(forBPM: Double($0)) } ?? 0
-            Act3LiveScreen(
-                model: shown,
-                elapsed: elapsed,
-                bpm: bpm ?? 0,
-                paused: active.isPaused,
+            let figures = liveFigures(active, inZone: inZone, hasBand: band != nil)
+            NoopFitnessCardioLive(
+                sport: active.sport, symbol: NoopFitnessCardioLive.symbol(for: active.sport),
+                elapsed: elapsed, bpm: bpm, paused: active.isPaused,
+                zone: zonesTrusted ? zoneNumber : 0, zoneNames: Self.zoneNames,
+                zoneRanges: zones.map { (Int($0.lower.rounded()), Int($0.upper.rounded())) },
+                target: zonesTrusted ? target : nil,
+                recent: samples.suffix(300).map(\.bpm),
+                figures: figures,
+                footnote: AppModel.isTooShortToSave(elapsedSeconds: TimeInterval(elapsed)) ? "Under a minute is not kept" : nil,
                 pauseAction: {
                     model.toggleWorkoutPause()
                     navigation.toggleSessionPause(at: timeline.date)
@@ -2753,13 +2781,8 @@ private extension NoopAct3Screens {
                     model.endWorkout()
                     let saved = model.lastWorkout
                     navigation.endRecordedSession(workout: matched, row: saved)
-                },
-                measured: true,
-                hasPulse: bpm != nil,
-                stats: ["\u{2014}", active.avgHr > 0 ? "\(active.avgHr)" : "\u{2014}", inZone],
-                zoneLabel: bpm == nil ? "" : (zonesTrusted && zoneNumber > 0 ? Self.zoneNames[zoneNumber - 1] : ""),
-                hasBand: band != nil
-            )
+                    NoopFitnessModel.markChanged()
+                })
             }
         } else {
             NoopScreen(topInset: 58) {

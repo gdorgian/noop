@@ -86,7 +86,17 @@ final class NoopFitnessSettings: ObservableObject {
         plans.append(Plan(routineID: routineID, routineName: name, date: date))
     }
 
+    /// Several dates at once, saved in one write.
+    func schedule(routineID: String, name: String, dates: [Date]) {
+        plans += dates.map { Plan(routineID: routineID, routineName: name, date: $0) }
+    }
+
     func remove(_ plan: Plan) { plans.removeAll { $0.id == plan.id } }
+
+    /// Every future plan of a routine, for "stop repeating".
+    func removeUpcoming(routineID: String) {
+        plans.removeAll { $0.routineID == routineID && $0.date > Date() }
+    }
 
     private func save() {
         let s = Stored(sections: sections, hidden: Array(hidden), plans: plans)
@@ -221,6 +231,7 @@ struct NoopFitnessRoutineScreen: View {
                 }
 
                 let upcoming = settings.plans.filter { $0.routineID == navigation.fitnessRoutineID && $0.date > Date() }
+                    .sorted { $0.date < $1.date }
                 if !upcoming.isEmpty {
                     NoopFitnessPanel(label: "Scheduled") {
                         ForEach(upcoming) { p in
@@ -232,35 +243,18 @@ struct NoopFitnessRoutineScreen: View {
                                     .font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.red)
                             }
                         }
-                    }
-                    .padding(.top, 12)
-                }
-
-                if scheduling {
-                    NoopFitnessPanel(label: "Schedule") {
-                        DatePicker("When", selection: $when, in: Date()..., displayedComponents: [.date, .hourAndMinute])
-                            .datePickerStyle(.graphical)
-                            .tint(NoopHTMLColor.warm)
-                            .colorScheme(.dark)
-                        Button {
-                            if let id = navigation.fitnessRoutineID {
-                                settings.schedule(routineID: id, name: program?.name ?? "Routine", at: when)
-                            }
-                            withAnimation(NoopMotion.swap) { scheduling = false }
-                        } label: {
-                            Text("Add to calendar")
-                                .font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
-                                .frame(maxWidth: .infinity).frame(height: 46)
-                                .background(NoopHTMLColor.warm, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        if upcoming.count > 1, let id = navigation.fitnessRoutineID {
+                            Button("Stop repeating") { settings.removeUpcoming(routineID: id) }
+                                .font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.red)
+                                .padding(.top, 4)
                         }
-                        .buttonStyle(NoopHTMLPressStyle())
                     }
                     .padding(.top, 12)
                 }
 
                 HStack(spacing: 10) {
-                    Button { withAnimation(NoopMotion.swap) { scheduling.toggle() } } label: {
-                        Text(scheduling ? "Cancel" : "Schedule")
+                    Button { scheduling = true } label: {
+                        Text("Plan")
                             .font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                             .frame(maxWidth: .infinity).frame(height: 52)
                             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -283,6 +277,12 @@ struct NoopFitnessRoutineScreen: View {
             }
         }
         .task(id: "\(navigation.fitnessRoutineID ?? "")-\(repo.refreshSeq)") { await load() }
+        .sheet(isPresented: $scheduling) {
+            NoopFitnessPlanSheet(routines: [.init(id: program?.id ?? "", name: program?.name ?? "Routine",
+                                                  exercises: exerciseCount, sets: setCount)],
+                                 fixedRoutineID: navigation.fitnessRoutineID)
+                .environmentObject(settings)
+        }
     }
 
     private var exerciseCount: Int { Set(items.map(\.exercise)).count }
@@ -340,32 +340,11 @@ struct NoopFitnessRoutineScreen: View {
 
     /// Starts the routine as a Lift session, under the same one-session rule the Lift screens keep.
     private func start() async {
-        guard let program, !items.isEmpty else { return }
-        if let running = NoopRunningSession.current(app: app, lift: live, navigation: navigation) {
-            withAnimation(NoopMotion.swap) { refusal = running }
-            return
+        guard let id = navigation.fitnessRoutineID, !items.isEmpty else { return }
+        if let blocked = await NoopFitnessRoutineStarter.start(routineID: id, repo: repo, live: live, app: app,
+                                                               navigation: navigation) {
+            withAnimation(NoopMotion.swap) { refusal = blocked }
         }
-        var vocabulary: [LiftExerciseRow] = []
-        if let store = await repo.storeHandle() {
-            vocabulary = (try? await store.liftExercises(deviceId: repo.deviceId)) ?? []
-        }
-        let plan = items.map { row in
-            let known = vocabulary.first { $0.name == row.exercise }
-            return LiftPlanItem(
-                exercise: row.exercise, primaryMuscle: known?.primaryMuscle,
-                secondaryMuscles: known?.secondaryMuscles ?? [], targetSets: row.targetSets,
-                restSec: row.restSec, targetRepsLow: row.targetRepsLow,
-                targetRepsHigh: row.targetRepsHigh, targetRpe: row.targetRpe,
-                targetWeightKg: row.targetWeightKg, note: row.note, programItemId: row.id)
-        }
-        if let running = NoopRunningSession.current(app: app, lift: live, navigation: navigation) {
-            withAnimation(NoopMotion.swap) { refusal = running }
-            return
-        }
-        guard live.start(plan: plan, programId: program.id, programName: program.name) else { return }
-        live.advance()
-        navigation.liftDetailReturnRoute = .fitness
-        navigation.push(.liftLive)
     }
 }
 
@@ -378,6 +357,7 @@ struct NoopFitnessCalendarScreen: View {
     @State private var month = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: Date())) ?? Date()
     @State private var selected = Calendar.current.startOfDay(for: Date())
     @State private var metric: Metric = .none
+    @State private var planningDay = false
     @State private var sport: String?
 
     enum Metric: String, CaseIterable { case none = "Sessions", time = "Active time", energy = "Energy", distance = "Distance" }
@@ -387,6 +367,10 @@ struct NoopFitnessCalendarScreen: View {
         let sessions = (fitness.snapshot?.history.sessions ?? []).filter { sport == nil || $0.title == sport }
         NoopFitnessPage(navigation: navigation, title: "Calendar") {
             VStack(alignment: .leading, spacing: 14) {
+                Color.clear.frame(height: 0)
+                    .sheet(isPresented: $planningDay) {
+                        NoopFitnessPlanSheet(routines: fitness.snapshot?.routines ?? [], day: selected).environmentObject(settings)
+                    }
                 HStack {
                     step(.left) { month = cal.date(byAdding: .month, value: -1, to: month) ?? month }
                     Text(month.formatted(.dateTime.month(.wide).year()))
@@ -431,10 +415,17 @@ struct NoopFitnessCalendarScreen: View {
                     }
                 })
                 .sensoryFeedback(.selection, trigger: month)
-                NoopSectionLabel(selected.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                    .padding(.top, 6)
+                HStack {
+                    NoopSectionLabel(selected.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                    Spacer()
+                    if Calendar.current.startOfDay(for: selected) >= Calendar.current.startOfDay(for: Date()) {
+                        NoopFitnessIconButton(glyph: .plus) { planningDay = true }
+                            .accessibilityLabel("Plan a routine on this day")
+                    }
+                }
+                .padding(.top, 6)
                 let done = sessions.filter { cal.isDate($0.start, inSameDayAs: selected) }
-                let planned = settings.plans(on: selected)
+                let planned = settings.plans(on: selected).filter { p in !done.contains { $0.routineID == p.routineID } }
                 if done.isEmpty && planned.isEmpty {
                     Text(selected > Date() ? "Nothing planned." : "Rest day.")
                         .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
@@ -464,6 +455,12 @@ struct NoopFitnessCalendarScreen: View {
                             .strokeBorder(NoopHTMLColor.warm.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
+                    .contextMenu {
+                        Button(role: .destructive) { settings.remove(p) } label: { Label("Remove this one", systemImage: "trash") }
+                        Button(role: .destructive) { settings.removeUpcoming(routineID: p.routineID) } label: {
+                            Label("Remove every upcoming one", systemImage: "calendar.badge.minus")
+                        }
+                    }
                 }
             }
         }

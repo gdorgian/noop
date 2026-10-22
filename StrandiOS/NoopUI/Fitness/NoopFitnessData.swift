@@ -204,6 +204,8 @@ struct NoopFitnessSession: Identifiable {
     var row: WorkoutRow? = nil
     /// Found by the detector rather than started or imported.
     var detected = false
+    /// The routine a lift was started from, so a plan for it can count as done.
+    var routineID: String? = nil
     /// Manual and detected sessions can be corrected; imported history is read-only.
     var editable: Bool {
         guard let row else { return false }
@@ -222,12 +224,26 @@ final class NoopFitnessModel: ObservableObject {
     static let historyDays = 400
 
     private var loadedSeq: Int?
+    private var changeObserver: NSObjectProtocol?
+
+    /// Posted after a lift, a manual session or a routine is saved, edited or deleted. Those writes
+    /// sit outside the repository's refresh diff, so its sequence number does not move for them.
+    static let changed = Notification.Name("noop.fitness.changed")
+
+    init() {
+        changeObserver = NotificationCenter.default.addObserver(forName: Self.changed, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.loadedSeq = nil }
+        }
+    }
+
+    static func markChanged() { NotificationCenter.default.post(name: changed, object: nil) }
 
     /// Reads everything again only when the repository has new data since the last load, so stepping
     /// into a detail page and back does not re-read six weeks of heart rate.
     func load(repo: Repository, profile: ProfileStore, now: Date = Date()) async {
         guard !isLoading else { return }
         if loadedSeq == repo.refreshSeq, snapshot != nil { return }
+        // Re-read when a session or routine changed even if the repository's sequence did not.
         isLoading = true
         let seq = repo.refreshSeq
         defer { loadedSeq = seq }
@@ -367,7 +383,8 @@ final class NoopFitnessModel: ObservableObject {
         all += liftSessions.map {
             NoopFitnessSession(id: $0.id, start: Date(timeIntervalSince1970: Double($0.startTs)),
                                durationS: Double(($0.endTs ?? $0.startTs) - $0.startTs),
-                               title: $0.programName ?? "Strength", kind: .strength, kcal: nil, liftSessionID: $0.id)
+                               title: $0.programName ?? "Strength", kind: .strength, kcal: nil, liftSessionID: $0.id,
+                               routineID: $0.programId)
         }
         let week = (0..<7).compactMap { i -> NoopFitnessSnapshot.WeekDay? in
             guard let d = cal.date(byAdding: .day, value: i, to: monday) else { return nil }

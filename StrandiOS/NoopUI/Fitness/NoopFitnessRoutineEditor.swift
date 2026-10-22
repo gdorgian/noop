@@ -226,6 +226,9 @@ struct NoopFitnessRoutineEditor: View {
     @State private var error: String?
     @State private var confirmDelete = false
     @State private var loaded = false
+    @State private var planIt = false
+    @State private var repeatPlan = NoopFitnessRepeatPlan()
+    @EnvironmentObject private var settings: NoopFitnessSettings
 
     private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
     private var isNew: Bool { navigation.fitnessRoutineID == nil }
@@ -276,6 +279,23 @@ struct NoopFitnessRoutineEditor: View {
                 }
                 .buttonStyle(NoopHTMLPressStyle())
 
+                VStack(alignment: .leading, spacing: 12) {
+                    Toggle(isOn: $planIt.animation(NoopMotion.swap)) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Put it on the calendar").font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("Plan the days you will do it; Fitness shows it on those days.")
+                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                        }
+                    }
+                    .tint(NoopHTMLColor.warm)
+                    if planIt {
+                        NoopFitnessRepeatEditor(plan: $repeatPlan)
+                    }
+                }
+                .padding(16)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+
                 if let error {
                     Text(error).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.red)
                 }
@@ -303,7 +323,9 @@ struct NoopFitnessRoutineEditor: View {
         .task { await load() }
     }
 
-    private var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && !lines.isEmpty && (!planIt || repeatPlan.isValid)
+    }
 
     private func lineCard(_ line: Binding<Line>) -> some View {
         let index = lines.firstIndex { $0.id == line.wrappedValue.id } ?? 0
@@ -425,6 +447,8 @@ struct NoopFitnessRoutineEditor: View {
         do {
             if !newExercises.isEmpty { _ = try await store.upsertLiftExercises(newExercises) }
             try await store.saveLiftProgram(row, items: items)
+            NoopFitnessModel.markChanged()
+            if planIt { settings.schedule(routineID: id, name: trimmed, dates: repeatPlan.dates) }
         } catch {
             self.error = "The routine could not be saved. Your edits are still here; try again."
             return
@@ -441,6 +465,7 @@ struct NoopFitnessRoutineEditor: View {
         row.updatedAt = Int(Date().timeIntervalSince1970)
         let items = (try? await store.liftProgramItems(programId: row.id)) ?? []
         try? await store.saveLiftProgram(row, items: items)
+        NoopFitnessModel.markChanged()
         await repo.refresh()
         await fitness.load(repo: repo, profile: profile)
         navigation.fitnessRoutineID = nil
