@@ -27,6 +27,7 @@ struct NoopTrendsRecord: Equatable {
     struct Night: Equatable { let day: Date; let minutes: Double }
     var throughDay: Date?
     var loaded = false
+    var readFailed = false
 
     static let weeks = 52
 
@@ -112,6 +113,8 @@ final class NoopTrendsStore: ObservableObject {
     private var loadingDeviceId: String?
     private var requestId = UUID()
 
+    func record(for deviceId: String) -> NoopTrendsRecord { loadingDeviceId == deviceId ? record : NoopTrendsRecord() }
+
     func load(from repo: Repository) async {
         guard repo.loaded else { return }
         let device = repo.deviceId
@@ -120,30 +123,52 @@ final class NoopTrendsStore: ObservableObject {
         let request = UUID()
         requestId = request
         let sequence = repo.refreshSeq
-        let resolvedDaily = await NoopTrendDailyHistory.load(from: repo)
+        let payload = await NoopTrendDailyHistory.loadWithSources(from: repo)
+        let resolvedDaily = payload.values
         let capacity = (resolvedDaily["cap"] ?? [:]).map { (day: $0.key, value: $0.value) }
         let sessions = await repo.allSleepSessions()
         guard !Task.isCancelled, requestId == request, repo.deviceId == device, repo.refreshSeq == sequence else { return }
-        record = NoopTrendsRecord.build(days: repo.days, capacityDays: capacity,
+        // A failed refresh must not replace the same device's visible history with an empty chart.
+        if payload.readFailed && resolvedDaily.values.allSatisfy(\.isEmpty) && record.loaded {
+            record.readFailed = true
+            return
+        }
+        var next = NoopTrendsRecord.build(days: repo.days, capacityDays: capacity,
                                         sessions: sessions.isEmpty ? repo.sleeps : sessions,
                                         resolvedDaily: resolvedDaily)
+        next.readFailed = payload.readFailed
+        record = next
     }
 }
 /// One source policy for the four metrics shared by Trends and the daily explorer.
 @MainActor
 enum NoopTrendDailyHistory {
     static func load(from repo: Repository) async -> [String: [String: Double]] {
-        func series(_ key: String, source: String = Repository.whoopSource) async -> [String: Double] {
+        await loadWithSources(from: repo).values
+    }
+    static func sourceLabel(_ source: String) -> String {
+        if source == Repository.appleHealthSource { return "Apple Health" }
+        if source.hasSuffix("-noop") { return "Noop computed" }
+        if source == Repository.whoopSource { return "WHOOP import" }
+        if Repository.wearableImportSources.contains(source) { return "Wearable import" }
+        return "Recorded strap source"
+    }
+    static func loadWithSources(from repo: Repository) async -> (values: [String: [String: Double]], sources: [String: [String: String]], readFailed: Bool) {
+        var sources: [String: [String: String]] = [:]
+        var readFailed = false
+        func series(_ key: String, alias: String? = nil, source: String = Repository.whoopSource) async -> [String: Double] {
             let result = await repo.resolvedSeries(key: key, source: source, fullHistory: true)
+            readFailed = readFailed || result.readFailed
+            sources[alias ?? key] = Dictionary(result.points.map { ($0.day, sourceLabel($0.source)) }, uniquingKeysWith: { _, last in last })
             return Dictionary(result.values.map { ($0.day, $0.value) }, uniquingKeysWith: { _, last in last })
         }
         var result: [String: [String: Double]] = [:]
         for key in ["rhr", "hrv", "sleep_total_min"] { result[key] = await series(key) }
-        result["cap"] = await series("vo2max_est")
+        result["cap"] = await series("vo2max_est", alias: "cap")
         if result["cap"]?.isEmpty != false {
-            result["cap"] = await series("vo2max", source: Repository.appleHealthSource)
+            result["cap"] = await series("vo2max", alias: "cap", source: Repository.appleHealthSource)
         }
-        return result
+        return (result, sources, readFailed)
     }
 }
 #endif

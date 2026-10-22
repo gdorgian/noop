@@ -38,6 +38,7 @@ struct NoopAgesRecord {
     /// Each factor's engine input per week, oldest → newest, over 26 weeks (the six-month average and
     /// the driver's ten-week line), keyed like `Contribution.key`. Nil for a week without that input.
     var weeklyInputs: [String: [Double?]] = [:]
+    var weeklyInputDates: [Date] = []
     var loaded = false
 
     /// A factor's input in the unit its driver screen prints.
@@ -162,9 +163,8 @@ final class NoopAgesStore: ObservableObject {
                   let r = result(endingOn: end) else { return nil }
             return (end, r.bodyAge)
         }
-        let weeks: [VitalityEngine.Inputs?] = (0..<26).reversed().map { weeksBack in
-            calendar.date(byAdding: .day, value: -7 * weeksBack, to: now).flatMap(inputs(endingOn:))
-        }
+        next.weeklyInputDates = (0..<26).reversed().compactMap { calendar.date(byAdding: .day, value: -7 * $0, to: now) }
+        let weeks: [VitalityEngine.Inputs?] = next.weeklyInputDates.map(inputs(endingOn:))
         for key in next.drivers.map(\.key) {
             next.weeklyInputs[key] = weeks.map { $0.flatMap { NoopAgesRecord.value(of: key, in: $0) } }
         }

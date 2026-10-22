@@ -9,22 +9,30 @@ import WhoopStore
 /// The Instrument is entered from Trends; it deliberately does not add a sixth tab. The fixture
 /// below is the prototype's deterministic 258-night record and is visible only through the
 /// Debug-only `--demo-seed` shell. Release data is supplied by the verified app shell instead.
+enum NoopInstrumentLoadState { case waiting, loading, ready, empty, partial, unavailable }
+
 struct NoopAct9Screens: View {
     @ObservedObject var navigation: NoopNavigation
     let data: NoopInstrumentData
+    var loadState: NoopInstrumentLoadState = .ready
+    var retry: (() -> Void)?
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
+    @AppStorage(UnitPrefs.systemKey) private var bodyUnits = UnitSystem.metric.rawValue
     @SceneStorage("noop.act9.range") private var rangeRaw = NoopInstrumentRange.ninety.rawValue
     @SceneStorage("noop.act9.end-day") private var endDayRaw = ""
     @EnvironmentObject private var repo: Repository
     @SceneStorage("noop.act9.filter") private var filterRaw = NoopInstrumentGroupFilter.all.rawValue
 
-    init(navigation: NoopNavigation, data: NoopInstrumentData) {
+    init(navigation: NoopNavigation, data: NoopInstrumentData, loadState: NoopInstrumentLoadState = .ready, retry: (() -> Void)? = nil) {
         self.navigation = navigation
         self.data = data
+        self.loadState = loadState
+        self.retry = retry
     }
 
     private var presentedData: NoopInstrumentData {
-        data.adjustedForSchedule(
+        let _ = bodyUnits
+        return data.adjustedForSchedule(
             isNightWorker: NoopScheduleInference.isNightWorker(kind: scheduleKind)
         )
     }
@@ -89,7 +97,37 @@ struct NoopAct9Screens: View {
     }
 
     var body: some View {
-        screens
+        Group {
+            if data.historyCount == 0 && (loadState == .waiting || loadState == .loading || loadState == .unavailable) {
+                NoopScreen(topInset: 56) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        NoopInstrumentBackHeader(label: "Trends") { navigation.back(or: .trends) }
+                        Text(loadState == .unavailable ? "History could not be loaded" : "Loading recorded history")
+                            .font(NoopHTMLFont.outfit(25)).foregroundStyle(NoopHTMLColor.ink)
+                        if loadState == .unavailable {
+                            Text("Your saved history has not been changed. Try again to read it.")
+                                .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                            Button("Try again") { retry?() }.frame(minHeight: 44).buttonStyle(NoopPlainHitStyle())
+                        } else { ProgressView().tint(NoopHTMLColor.night) }
+                    }
+                }
+            } else {
+                screens
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        if loadState == .partial {
+                            HStack(spacing: 12) {
+                                Text("Some history could not be refreshed. Available readings are shown.")
+                                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.warm)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Button("Try again") { retry?() }
+                                    .font(NoopHTMLFont.sans(12, weight: .semibold))
+                                    .frame(minWidth: 44, minHeight: 44).buttonStyle(NoopPlainHitStyle())
+                            }
+                            .padding(.horizontal, 12).frame(maxWidth: .infinity).background(NoopHTMLColor.card)
+                        }
+                    }
+            }
+        }
             .environment(\.noopInstrumentWindow, windowContext)
             .onChange(of: repo.deviceId) { _ in
                 endDayRaw = ""
@@ -110,7 +148,7 @@ struct NoopAct9Screens: View {
             NoopInstrumentMetricScreen(
                 navigation: navigation,
                 range: range,
-                data: windowData
+                data: windowData, windowStart: windowContext?.start
             )
         case .instrumentCompare:
             NoopInstrumentCompareScreen(navigation: navigation, range: range, data: windowData)
@@ -212,7 +250,7 @@ private struct NoopInstrumentIndexScreen: View {
                     VStack(spacing: 0) {
                         NoopInstrumentDoor(
                             title: "Two at once",
-                            detail: "put any two on the same axis",
+                            detail: "compare two patterns and their timing",
                             glyph: .overlay,
                             action: { navigation.push(.instrumentCompare) }
                         )
@@ -224,12 +262,18 @@ private struct NoopInstrumentIndexScreen: View {
                             action: { navigation.push(.instrumentEffects) }
                         )
                         Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                        DisclosureGroup {
                         NoopInstrumentDoor(
                             title: "Raw capture",
                             detail: "record the 100 Hz motion stream to this phone",
                             glyph: .bolt,
                             action: { navigation.push(.instrumentRaw) }
                         )
+                        } label: {
+                            Text("Advanced tools").font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink).frame(minHeight: 44)
+                        }
+                        .tint(NoopHTMLColor.night)
+
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 6)
@@ -373,15 +417,15 @@ private struct NoopInstrumentRangeControl: View {
         case .overview:
             "recorded days within the dates opened from Trends"
         case .all:
-            "nights actually behind this answer, of \(availableDays) on record"
+            "recorded days across \(availableDays) calendar days"
         case .year:
             if range.isAvailable(total: availableDays) {
-                "nights actually behind this answer. You asked for 365."
+                "recorded days in this 365-day window"
             } else {
-                "nights on record — there is no more history than this"
+                "recorded days in the available history"
             }
         case .thirty, .ninety, .halfYear:
-            "nights actually behind this answer. You asked for \(range.requestedDayCount ?? availableDays)."
+            "recorded days in this \(range.requestedDayCount ?? availableDays)-day window"
         }
     }
 }
@@ -1042,12 +1086,12 @@ private struct NoopInstrumentMetricScreen: View {
 
     private let model: NoopInstrumentMetricModel
 
-    init(navigation: NoopNavigation, range: Binding<NoopInstrumentRange>, data: NoopInstrumentData) {
+    init(navigation: NoopNavigation, range: Binding<NoopInstrumentRange>, data: NoopInstrumentData, windowStart: Date? = nil) {
         self.navigation = navigation
         self._range = range
         self.data = data
         // Build once per parent input update; scrubbing must not rerun every correlation.
-        self.model = data.metric(key: navigation.instrumentMetricKey, range: range.wrappedValue)
+        self.model = data.metric(key: navigation.instrumentMetricKey, range: range.wrappedValue, windowStart: windowStart)
     }
 
     var body: some View {
@@ -1105,9 +1149,13 @@ private struct NoopInstrumentMetricScreen: View {
                 VStack(alignment: .leading, spacing: 11) {
                     metricChartCard
 
+
+                    if model.comparison != nil { metricComparisonCard }
+                    if !model.readings.isEmpty { metricReadingsCard }
+                    metricDataContext
                     if model.thin {
                         VStack(alignment: .leading, spacing: 9) {
-                            Text("Not enough of it yet")
+                            Text(model.readings.isEmpty ? "No recorded values" : "Relationships need more history")
                                 .font(NoopHTMLFont.sans(13.5, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text(model.thinNote)
@@ -1121,11 +1169,7 @@ private struct NoopInstrumentMetricScreen: View {
                         .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.night.opacity(0.22), lineWidth: 0.5))
                     }
 
-                    if !model.moves.isEmpty {
-                        metricMovesCard
-                    }
-
-                    if !model.readings.isEmpty { metricReadingsCard }
+                    if !model.moves.isEmpty { metricMovesCard }
 
                     metricLinksCard
 
@@ -1153,34 +1197,16 @@ private struct NoopInstrumentMetricScreen: View {
                     .tracking(1.2)
                     .foregroundStyle(NoopHTMLColor.muted)
                 Spacer()
-                NoopInstrumentDeltaChip(text: model.delta, style: model.style, fontSize: 11, radius: 8, horizontalPadding: 9)
+                NoopInstrumentDeltaChip(text: model.assessment?.label ?? model.delta, style: model.assessment?.outside == true ? .bad : model.style, fontSize: 11, radius: 8, horizontalPadding: 9)
             }
 
-            GeometryReader { geometry in
-                NoopInstrumentMetricChart(chart: model.chart, selectedPoint: selectedReading?.point)
-                    .contentShape(Rectangle())
-                    .onTapGesture { location in
-                        selectNearest(x: location.x, width: geometry.size.width)
-                    }
-                    .simultaneousGesture(DragGesture(minimumDistance: 12).onChanged { value in
-                        guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                        selectNearest(x: value.location.x, width: geometry.size.width)
-                    })
-                    .accessibilityElement()
-                    .accessibilityLabel("\(model.signal.name) history")
-                    .accessibilityValue(selectionDescription)
-                    .accessibilityAdjustableAction { direction in
-                        let rows = model.readings
-                        guard !rows.isEmpty else { return }
-                        let index = rows.firstIndex { $0.date == selectedDate } ?? rows.count - 1
-                        switch direction {
-                        case .increment: select(rows[min(rows.count - 1, index + 1)])
-                        case .decrement: select(rows[max(0, index - 1)])
-                        @unknown default: break
-                        }
-                    }
-            }
-            .frame(height: 122)
+            NoopHistoryPlot(presentation: model.plot, tint: model.assessment?.outside == true ? NoopHTMLColor.warm : NoopHTMLColor.night,
+                            scoreColors: model.signal.key == "recovery", measurements: model.signal.key == "weight",
+                            bridgeMissingMeasurements: model.signal.key == "weight",
+                            selectedDate: selectedDate,
+                            valueLabel: { NoopInstrumentData.axisLabel($0, key: model.signal.key) },
+                            onSelect: { date in if let reading = model.readings.first(where: { $0.date == date }) { select(reading) } })
+                .frame(height: 122)
 
             HStack {
                 Text("Average · \(model.average) \(model.unit)")
@@ -1191,9 +1217,9 @@ private struct NoopInstrumentMetricScreen: View {
             .foregroundStyle(NoopHTMLColor.copy)
 
             HStack {
-                ForEach(Array(model.chart.axis.enumerated()), id: \.offset) { index, label in
+                ForEach(Array(model.axis.enumerated()), id: \.offset) { index, label in
                     Text(label)
-                    if index < model.chart.axis.count - 1 { Spacer() }
+                    if index < model.axis.count - 1 { Spacer() }
                 }
             }
             .font(NoopHTMLFont.sans(10.5))
@@ -1212,15 +1238,56 @@ private struct NoopInstrumentMetricScreen: View {
         .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
     }
 
-    private var selectionDescription: String {
-        guard let reading = selectedReading ?? model.readings.last else { return "No recorded values" }
-        return "\(reading.value) \(model.unit), \(reading.date.formatted(date: .complete, time: .omitted))"
+    private var metricDataContext: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 9) {
+                Text("\(model.readings.count) recorded values across \(model.plot.series.samples.count) calendar days shown. Missing values are not zero.")
+                if let assessment = model.assessment {
+                    Text("Latest assessment · \(assessment.label) · \(assessment.day)")
+                        .foregroundStyle(assessment.outside ? NoopHTMLColor.warm : NoopHTMLColor.inkSoft)
+                    if let range = assessment.personalRange {
+                        Text("Personal range · \(NoopInstrumentData.axisLabel(range.lowerBound, key: model.signal.key))–\(NoopInstrumentData.axisLabel(range.upperBound, key: model.signal.key)) \(model.unit)")
+                        Text("From the same trusted baseline used by Aura’s vital assessment. The shaded variability band is separate.")
+                    }
+                    if assessment.outside {
+                        Text("Amber line tint reflects the latest off-range assessment, not a classification of every historical point.")
+                    }
+                }
+                if model.signal.key == "recovery" {
+                    Text("Line colours follow Aura’s Charge scale for each recorded score.")
+                }
+                Text("Source · \((selectedReading ?? model.readings.last)?.source ?? (model.signal.behavior ? "Recorded journal answers" : "Source details unavailable"))")
+                Text(model.signal.key == "weight" ? "The source supplies a daily aggregate. This list does not claim to show every individual weigh-in. Body-measurement unit preferences apply throughout this view." : "The period average uses recorded daily values, not a time-weighted average.")
+                Text(model.signal.behavior ? "Frequencies use recorded answers. A missing journal answer does not mean the behaviour did not happen." : "The shaded band, when available, shows observed 30-day variability. It does not classify a result as normal, poor or optimal.")
+            }
+            .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy).padding(.top, 10)
+        } label: {
+            Text("About this data").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink).frame(minHeight: 44)
+        }
+        .tint(NoopHTMLColor.night).padding(.horizontal, 16).padding(.vertical, 5)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
     }
 
-    private func selectNearest(x: CGFloat, width: CGFloat) {
-        let plotX = x - max(0, (width - 300) / 2)
-        guard let reading = model.readings.min(by: { abs($0.point.x - plotX) < abs($1.point.x - plotX) }) else { return }
-        select(reading)
+    private var metricComparisonCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("PERIOD COMPARISON").font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.2).foregroundStyle(NoopHTMLColor.muted)
+            if let comparison = model.comparison {
+                ForEach([("This period", comparison.current), ("Previous equal period", comparison.previous)], id: \.0) { label, period in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(label); Spacer()
+                            Text(period.average.map { NoopInstrumentData.axisLabel($0, key: model.signal.key) + " " + model.unit } ?? "Not enough data")
+                        }
+                        Text("\(period.start.formatted(date: .abbreviated, time: .omitted)) – \(period.end.formatted(date: .abbreviated, time: .omitted)) · \(period.count) recorded values")
+                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted)
+                    }
+                }
+                Text("Means of recorded daily values. Different coverage can affect the comparison.")
+                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
+            }
+        }
+        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.ink)
+        .padding(16).background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
     }
 
     private var metricReadingsCard: some View {
@@ -1340,7 +1407,7 @@ private struct NoopInstrumentMetricScreen: View {
                 }
                 Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
             }
-            NoopInstrumentDoor(title: "Put it against something", detail: "two on one axis, with the day-shift", glyph: .overlay) {
+            NoopInstrumentDoor(title: "Put it against something", detail: "compare patterns, with the day-shift", glyph: .overlay) {
                 navigation.instrumentCompareAKey = model.signal.key
                 navigation.instrumentCompareBKey = model.signal.key == "hrv" ? "reg" : "hrv"
                 navigation.instrumentCompareShift = 0
@@ -1378,65 +1445,6 @@ private struct NoopInstrumentDeltaChip: View {
             .background(style.chipFill, in: RoundedRectangle(cornerRadius: radius))
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
-    }
-}
-
-private struct NoopInstrumentMetricChart: View {
-    let chart: NoopInstrumentMetricChartModel
-    var selectedPoint: CGPoint? = nil
-
-    var body: some View {
-        Canvas { context, size in
-            let xOffset = max(0, (size.width - 300) / 2)
-            func point(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x + xOffset, y: p.y) }
-
-            if let first = chart.bandTop.first {
-                var band = Path()
-                band.move(to: point(first))
-                for item in chart.bandTop.dropFirst() { band.addLine(to: point(item)) }
-                for item in chart.bandBottom { band.addLine(to: point(item)) }
-                band.closeSubpath()
-                context.fill(band, with: .color(NoopHTMLColor.night.opacity(0.13)))
-            }
-
-            var line = Path()
-            var previousWasMeasured = false
-            for item in chart.line {
-                guard let item else {
-                    previousWasMeasured = false
-                    continue
-                }
-                if previousWasMeasured {
-                    line.addLine(to: point(item))
-                } else {
-                    line.move(to: point(item))
-                }
-                previousWasMeasured = true
-            }
-            context.stroke(line, with: .color(NoopHTMLColor.night), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-
-            if let fitStart = chart.fitStart, let fitEnd = chart.fitEnd {
-                var fit = Path()
-                fit.move(to: point(fitStart))
-                fit.addLine(to: point(fitEnd))
-                context.stroke(fit, with: .color(NoopHTMLColor.ink.opacity(0.42)), style: StrokeStyle(lineWidth: 1.2, dash: [4, 5]))
-            }
-
-            if let selectedPoint {
-                let center = point(selectedPoint)
-                var rule = Path()
-                rule.move(to: CGPoint(x: center.x, y: 0))
-                rule.addLine(to: CGPoint(x: center.x, y: size.height))
-                context.stroke(rule, with: .color(NoopHTMLColor.ink.opacity(0.25)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-                context.fill(Path(ellipseIn: CGRect(x: center.x - 5, y: center.y - 5, width: 10, height: 10)), with: .color(NoopHTMLColor.ink))
-            }
-            if let last = chart.line.compactMap({ $0 }).last {
-                let center = point(last)
-                context.fill(Path(ellipseIn: CGRect(x: center.x - 3.6, y: center.y - 3.6, width: 7.2, height: 7.2)), with: .color(NoopHTMLColor.night))
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 122)
     }
 }
 
@@ -1560,7 +1568,7 @@ private struct NoopInstrumentCompareScreen: View {
                 .tracking(-0.78)
                 .monospacedDigit()
                 .foregroundStyle(NoopHTMLColor.ink)
-            Text(model.fitRead)
+            Text("Each signal uses its own value scale; line height compares patterns, not equal units. " + model.fitRead)
                 .font(NoopHTMLFont.sans(12.5))
                 .foregroundStyle(Color(hex: 0xC9D0EE))
                 .lineSpacing(4)
@@ -2317,21 +2325,19 @@ private struct NoopInstrumentSnapshot: Identifiable {
     var id: String { signal.key }
 }
 
+private struct NoopInstrumentAssessment: Equatable {
+    let day: String
+    let value: Double
+    let label: String
+    let outside: Bool
+    let personalRange: ClosedRange<Double>?
+}
+
 private struct NoopInstrumentReading: Identifiable, Equatable {
     let date: Date
     let value: String
-    let point: CGPoint
+    var source: String? = nil
     var id: Date { date }
-}
-
-private struct NoopInstrumentMetricChartModel {
-    /// Nil splits the line at an unmeasured day instead of synthesizing a point.
-    let line: [CGPoint?]
-    let bandTop: [CGPoint]
-    let bandBottom: [CGPoint]
-    let fitStart: CGPoint?
-    let fitEnd: CGPoint?
-    let axis: [String]
 }
 
 private struct NoopInstrumentMove: Identifiable {
@@ -2357,10 +2363,13 @@ private struct NoopInstrumentMetricModel {
     let thin: Bool
     let thinNote: String
     let chartNote: String
-    let chart: NoopInstrumentMetricChartModel
+    let axis: [String]
     let moves: [NoopInstrumentMove]
     let readings: [NoopInstrumentReading]
     let average: String
+    let plot: AuraHistoryPresentation
+    let comparison: AuraHistoryComparison?
+    let assessment: NoopInstrumentAssessment?
 }
 
 private struct NoopInstrumentShiftOption: Identifiable {
@@ -2534,6 +2543,11 @@ struct NoopInstrumentData {
     fileprivate let signals: [NoopInstrumentSignal]
     let historyCount: Int
     private let values: [String: [Double?]]
+    private let contextValues: [String: [Double?]]
+    private let contextDates: [Date?]
+    private let sourceNames: [String: [String: String]]
+    let hadReadFailure: Bool
+    private let assessments: [String: NoopInstrumentAssessment]
     private let drinkDoses: [Double?]
     private let dayKeys: [String]
     fileprivate let historyDates: [Date?]
@@ -2598,10 +2612,15 @@ struct NoopInstrumentData {
         generated["b_walk"] = make { walk[$0] }
         generated["b_hard"] = make { hard[$0] }
         values = generated
+        contextValues = generated
+        sourceNames = [:]
+        hadReadFailure = false
+        assessments = [:]
         drinkDoses = drinks.map(Optional.some)
         dayKeys = (0..<Self.count).map { "prototype-\($0)" }
         let anchor = Calendar.current.startOfDay(for: Date())
         historyDates = (0..<Self.count).map { Calendar.current.date(byAdding: .day, value: $0 - (Self.count - 1), to: anchor) }
+        contextDates = historyDates
         historyCount = Self.count
         isPrototype = true
 
@@ -2637,11 +2656,21 @@ struct NoopInstrumentData {
         drinkDoses: [Double?],
         signals: [NoopInstrumentSignal]? = nil,
         isPrototype: Bool = false,
-        historyDates: [Date?]? = nil
+        historyDates: [Date?]? = nil,
+        contextValues: [String: [Double?]]? = nil,
+        contextDates: [Date?]? = nil,
+        sourceNames: [String: [String: String]] = [:],
+        hadReadFailure: Bool = false,
+        assessments: [String: NoopInstrumentAssessment] = [:]
     ) {
         self.signals = signals ?? Self.prototype.signals
         self.dayKeys = dayKeys
         self.historyDates = historyDates ?? dayKeys.map { HistoryDateWindow.date(dayKey: $0) }
+        self.contextValues = contextValues ?? values
+        self.contextDates = contextDates ?? self.historyDates
+        self.sourceNames = sourceNames
+        self.hadReadFailure = hadReadFailure
+        self.assessments = assessments
         historyCount = dayKeys.count
         self.values = values
         self.drinkDoses = drinkDoses
@@ -2671,7 +2700,8 @@ struct NoopInstrumentData {
             drinkDoses: drinkDoses,
             signals: renamed,
             isPrototype: isPrototype,
-            historyDates: historyDates
+            historyDates: historyDates, contextValues: contextValues, contextDates: contextDates, sourceNames: sourceNames,
+            hadReadFailure: hadReadFailure, assessments: assessments
         )
     }
 
@@ -2697,13 +2727,23 @@ struct NoopInstrumentData {
     }
 
     fileprivate func between(start: Date, end: Date) -> NoopInstrumentData {
-        let prefix = ending(on: end)
-        let indices = prefix.historyDates.indices.filter { prefix.historyDates[$0].map { $0 >= start } ?? false }
-        func select(_ rows: [Double?]) -> [Double?] { indices.map { rows.indices.contains($0) ? rows[$0] : nil } }
-        return NoopInstrumentData(dayKeys: indices.map { prefix.dayKeys[$0] },
-                                  values: prefix.values.mapValues(select), drinkDoses: select(prefix.drinkDoses),
+        let calendar = Calendar.current
+        guard let window = HistoryDateWindow(endingOn: end, dayCount: nil, firstDay: start, calendar: calendar) else { return .empty }
+        let dates = window.calendarDays(calendar: calendar)
+        let indexByDay = Dictionary(historyDates.enumerated().compactMap { index, date in
+            date.map { (calendar.startOfDay(for: $0), index) }
+        }, uniquingKeysWith: { _, last in last })
+        func select(_ rows: [Double?]) -> [Double?] {
+            dates.map { date in
+                guard let index = indexByDay[date], rows.indices.contains(index) else { return nil }
+                return rows[index]
+            }
+        }
+        return NoopInstrumentData(dayKeys: dates.map(Repository.localDayKey),
+                                  values: values.mapValues(select), drinkDoses: select(drinkDoses),
                                   signals: signals, isPrototype: isPrototype,
-                                  historyDates: indices.map { prefix.historyDates[$0] })
+                                  historyDates: dates.map(Optional.some), contextValues: contextValues, contextDates: contextDates,
+                                  sourceNames: sourceNames, hadReadFailure: hadReadFailure, assessments: assessments)
     }
 
     fileprivate func ending(on date: Date) -> NoopInstrumentData {
@@ -2714,7 +2754,7 @@ struct NoopInstrumentData {
         return NoopInstrumentData(dayKeys: indices.map { dayKeys[$0] },
                                   values: values.mapValues(select), drinkDoses: select(drinkDoses),
                                   signals: signals, isPrototype: isPrototype,
-                                  historyDates: indices.map { historyDates[$0] })
+                                  historyDates: indices.map { historyDates[$0] }, contextValues: contextValues, contextDates: contextDates, sourceNames: sourceNames, hadReadFailure: hadReadFailure, assessments: assessments)
     }
 
     fileprivate func signal(key: String) -> NoopInstrumentSignal? { signals.first { $0.key == key } }
@@ -2767,32 +2807,26 @@ struct NoopInstrumentData {
         } else {
             value = Self.format(last, signal: signal)
             let movement = (last ?? 0) - (first ?? last ?? 0)
-            let flat = thin || abs(movement) < signal.threshold
-            let good = signal.better != 0 && (signal.better < 0 ? movement < 0 : movement > 0)
-            if thin {
-                delta = "\(clean.count) nights so far"
-                style = .thin
-            } else if flat {
-                delta = "no real change"
-                style = .flat
+            if clean.count < 2 {
+                delta = "\(clean.count) recorded values"
+            } else if movement == 0 {
+                delta = "unchanged"
             } else {
                 let amount: String
                 if signal.hours {
                     amount = "\(Int((abs(movement) * 60).rounded())) min"
-                } else if signal.big {
-                    amount = Self.integerFormatter.string(from: NSNumber(value: Int(abs(movement).rounded()))) ?? "\(Int(abs(movement).rounded()))"
                 } else {
-                    amount = String(format: "%.*f", signal.decimals, abs(movement))
+                    amount = Self.format(abs(movement), signal: signal)
                 }
                 delta = (movement > 0 ? "+" : "−") + amount
-                style = signal.better == 0 ? .neutral : good ? .good : .bad
             }
+            style = thin ? .thin : .neutral
         }
 
         return NoopInstrumentSnapshot(
             signal: signal,
             value: value,
-            unit: signal.hours ? "" : signal.behavior ? "days a week" : signal.unit,
+            unit: signal.hours ? "" : signal.key == "weight" ? UnitFormatter.massUnit(UnitSystem(rawValue: UserDefaults.standard.string(forKey: UnitPrefs.systemKey) ?? "") ?? .metric) : signal.behavior ? "days a week" : signal.unit,
             delta: delta,
             style: style,
             points: Self.sparkPoints(shown, interpolate: isPrototype)
@@ -2808,16 +2842,25 @@ struct NoopInstrumentData {
         return raw - floor(raw)
     }
 
+    static func axisLabel(_ value: Double, key: String) -> String {
+        guard let signal = prototype.signal(key: key) else { return value.formatted() }
+        return format(value, signal: signal)
+    }
     private static func format(_ value: Double?, signal: NoopInstrumentSignal) -> String {
-        guard let value else { return "—" }
+        guard let value, value.isFinite else { return "—" }
+        if signal.key == "weight" {
+            let system = UnitSystem(rawValue: UserDefaults.standard.string(forKey: UnitPrefs.systemKey) ?? "") ?? .metric
+            return decimal(system == .imperial ? UnitFormatter.kgToPounds(value) : value, places: 1)
+        }
         if signal.big {
-            return integerFormatter.string(from: NSNumber(value: Int(value.rounded()))) ?? "\(Int(value.rounded()))"
+            return integerFormatter.string(from: NSNumber(value: value.rounded())) ?? String(format: "%.0f", value)
         }
         if signal.hours {
+            guard value >= 0, value < Double(Int.max / 60) else { return "—" }
             let minutes = Int((value * 60).rounded())
             return "\(minutes / 60)h \(String(format: "%02d", minutes % 60))m"
         }
-        return signal.decimals == 0 ? "\(Int(value.rounded()))" : String(format: "%.*f", signal.decimals, value)
+        return String(format: "%.*f", signal.decimals, value)
     }
 
     private static let integerFormatter: NumberFormatter = {
@@ -2868,27 +2911,48 @@ struct NoopInstrumentData {
 final class NoopInstrumentLiveStore: ObservableObject {
     @Published private(set) var data = NoopInstrumentData.empty
     @Published private(set) var isLoading = false
+    @Published private(set) var state: NoopInstrumentLoadState = .waiting
 
     private var loadedRefreshSequence: Int?
     private var loadedDeviceId: String?
     private var loadingDeviceId: String?
     private var requestId = UUID()
 
-    func load(from repo: Repository) async {
-        let sequence = repo.refreshSeq
+    func data(for deviceId: String) -> NoopInstrumentData { loadingDeviceId == deviceId ? data : .empty }
+    func state(for deviceId: String) -> NoopInstrumentLoadState { loadingDeviceId == deviceId ? state : .waiting }
+
+    func load(from repo: Repository, force: Bool = false) async {
         let deviceId = repo.deviceId
-        guard loadedDeviceId != deviceId || loadedRefreshSequence != sequence else { return }
+        if loadingDeviceId != deviceId {
+            requestId = UUID()
+            data = .empty
+            loadingDeviceId = deviceId
+            isLoading = false
+        }
+        guard repo.loaded else { state = .waiting; return }
+        let sequence = repo.refreshSeq
+        guard force || loadedDeviceId != deviceId || loadedRefreshSequence != sequence else { return }
         let request = UUID()
         requestId = request
         if loadingDeviceId != deviceId { data = .empty }
         loadingDeviceId = deviceId
         isLoading = true
+        state = .loading
+        let storeAvailable = await repo.storeHandle() != nil
+        guard requestId == request, repo.deviceId == deviceId else { return }
+        guard storeAvailable else { state = .unavailable; isLoading = false; return }
         let loaded = await NoopInstrumentData.load(from: repo)
         // A superseded request must not publish another device's history or end its loading state.
         guard requestId == request else { return }
         defer { isLoading = false }
         guard !Task.isCancelled, repo.deviceId == deviceId, repo.refreshSeq == sequence else { return }
+        if loaded.hadReadFailure {
+            if loaded.historyCount > 0 { data = loaded }
+            state = data.historyCount > 0 ? .partial : .unavailable
+            return
+        }
         data = loaded
+        state = loaded.historyCount > 0 ? .ready : .empty
         loadedDeviceId = deviceId
         loadedRefreshSequence = sequence
     }
@@ -2899,6 +2963,8 @@ private extension NoopInstrumentData {
     static func load(from repo: Repository) async -> NoopInstrumentData {
         typealias DaySeries = [String: Double]
 
+        var otherSources: [String: [String: String]] = [:]
+        var hadReadFailure = false
         func resolved(_ key: String, source: String = Repository.whoopSource) async -> DaySeries {
             let result = await repo.resolvedSeries(
                 key: key,
@@ -2906,11 +2972,17 @@ private extension NoopInstrumentData {
                 days: 4_000,
                 fullHistory: true
             )
+            hadReadFailure = hadReadFailure || result.readFailed
+            otherSources[key] = Dictionary(result.points.map { ($0.day, NoopTrendDailyHistory.sourceLabel($0.source)) }, uniquingKeysWith: { _, last in last })
             return Dictionary(result.values.map { ($0.day, $0.value) }, uniquingKeysWith: { _, latest in latest })
         }
 
         var bySignal: [String: DaySeries] = [:]
-        let trendDaily = await NoopTrendDailyHistory.load(from: repo)
+        let trendPayload = await NoopTrendDailyHistory.loadWithSources(from: repo)
+        let trendDaily = trendPayload.values
+        hadReadFailure = hadReadFailure || trendPayload.readFailed
+        var sourceNames = trendPayload.sources
+        sourceNames["sleep"] = sourceNames["sleep_total_min"]
         bySignal["rhr"] = trendDaily["rhr"]
         bySignal["hrv"] = trendDaily["hrv"]
         bySignal["breath"] = await resolved("resp_rate")
@@ -2971,15 +3043,11 @@ private extension NoopInstrumentData {
 
         var allDays = Set(bySignal.values.flatMap(\.keys))
         allDays.formUnion(journal.map(\.day))
-        if !allDays.isEmpty {
-            let calendar = Calendar.current
-            let today = calendar.dateComponents([.year, .month, .day], from: Date())
-            if let year = today.year, let month = today.month, let day = today.day {
-                allDays.insert(String(format: "%04d-%02d-%02d", year, month, day))
-            }
-        }
+        let today = Repository.localDayKey(Date())
+        allDays = Set(allDays.filter { $0 <= today && HistoryDateWindow.date(dayKey: $0) != nil })
+        if !allDays.isEmpty { allDays.insert(today) }
         let dayKeys = continuousDays(from: allDays)
-        guard !dayKeys.isEmpty else { return .empty }
+        guard !dayKeys.isEmpty else { return .init(dayKeys: [], values: [:], drinkDoses: [], hadReadFailure: hadReadFailure) }
 
         var aligned: [String: [Double?]] = [:]
         for signal in Self.prototype.signals {
@@ -3017,7 +3085,27 @@ private extension NoopInstrumentData {
             return alcoholDoseByDay[day] ?? 0
         }
 
-        return NoopInstrumentData(dayKeys: dayKeys, values: aligned, drinkDoses: doses)
+        for (key, sourceKey) in [("breath", "resp_rate"), ("spo2", "spo2"), ("recovery", "recovery"), ("weight", "weight"), ("age", "body_age"), ("temp", "skin_temp")] {
+            sourceNames[key] = otherSources[sourceKey]
+        }
+        var assessments: [String: NoopInstrumentAssessment] = [:]
+        let readings = BodyVitalSigns.readings(sourceRows: repo.vitalMetricRows, temperatureUnit: .celsius)
+        for reading in readings {
+            guard let day = reading.day, let value = reading.value, value.isFinite,
+                  reading.caveat == nil, reading.banding.band != .noData else { continue }
+            let key = reading.key == "resp" ? "breath" : reading.key
+            let range: ClosedRange<Double>?
+            if reading.banding.basis == .personal, let personal = reading.personal, personal.trusted {
+                let width = Baselines.sigma(personal) * VitalBands.sigmaK
+                range = (personal.baseline - width)...(personal.baseline + width)
+            } else { range = nil }
+            assessments[key] = .init(day: day, value: value,
+                                     label: reading.banding.basis == .personal
+                                        ? (reading.banding.band == .outOfRange ? "Off personal range" : "Within personal range")
+                                        : (reading.banding.band == .outOfRange ? "Outside typical range" : "Within typical range"),
+                                     outside: reading.banding.band == .outOfRange, personalRange: range)
+        }
+        return NoopInstrumentData(dayKeys: dayKeys, values: aligned, drinkDoses: doses, sourceNames: sourceNames, hadReadFailure: hadReadFailure, assessments: assessments)
     }
 
     static func ratioSeries(part: [String: Double], total: [String: Double]) -> [String: Double] {
@@ -3144,7 +3232,7 @@ private extension NoopInstrumentData {
         .init(key: "b_walk", name: "A walk over 8k steps", onPhrase: "on the days you walked")
     ]
 
-    func metric(key: String, range: NoopInstrumentRange) -> NoopInstrumentMetricModel {
+    func metric(key: String, range: NoopInstrumentRange, windowStart: Date? = nil) -> NoopInstrumentMetricModel {
         let metricSignal = signal(key: key) ?? signals.first(where: { $0.key == "hrv" })!
         let raw = tail(values[metricSignal.key] ?? [], count: range.dayCount(total: historyCount))
         let series = metricSignal.behavior ? tail(trailingWeeklyRate(values[metricSignal.key] ?? []), count: raw.count) : raw
@@ -3152,51 +3240,41 @@ private extension NoopInstrumentData {
         let ends = firstAndLast(series)
         let thin = clean.count < 21
         let change = (ends.last ?? 0) - (ends.first ?? ends.last ?? 0)
-        let flat = thin || abs(change) < metricSignal.threshold
-        let good = metricSignal.better != 0 && (metricSignal.better < 0 ? change < 0 : change > 0)
-        let style: NoopInstrumentChangeStyle = thin
-            ? .thin
-            : flat
-                ? .flat
-                : metricSignal.better == 0
-                    ? .neutral
-                    : good ? .good : .bad
-
-        let changeAmount: String = {
-            if metricSignal.hours { return "\(Int((abs(change) * 60).rounded())) minutes" }
-            return "\(Self.decimal(abs(change), places: metricSignal.decimals)) \(metricSignal.unit)"
-        }()
         let read: String = {
-            if thin {
-                if !isPrototype, clean.isEmpty {
-                    return "No recorded value falls inside this window. Noop leaves it blank rather than filling the gap."
-                }
-                return "There are \(clean.count) recorded days of this. Noop will keep it on the list and say nothing else about it until there are twenty-one."
-            }
-            if flat {
-                return "Flat across this window, inside the wobble your own days produce. Nothing to read into it."
-            }
-            let ending = metricSignal.better == 0
-                ? "."
-                : good ? ", in the direction you would want." : ", which is the direction you would not."
-            return "\(change > 0 ? "Up" : "Down") \(changeAmount) over \(clean.count) recorded days\(ending)"
+            guard !clean.isEmpty else { return "No recorded value falls inside this window." }
+            if thin { return "\(clean.count) recorded values in this period." }
+            return "First recorded value \(Self.format(ends.first, signal: metricSignal)); latest \(Self.format(ends.last, signal: metricSignal)). Direction alone is not a health assessment."
         }()
 
+        let displayChange = metricSignal.key == "weight" && UnitFormatter.massUnit(UnitSystem(rawValue: UserDefaults.standard.string(forKey: UnitPrefs.systemKey) ?? "") ?? .metric) == "lb"
+            ? UnitFormatter.kgToPounds(change) : change
         let deltaAmount = metricSignal.hours
             ? "\(Int((abs(change) * 60).rounded())) min"
-            : Self.decimal(abs(change), places: metricSignal.decimals)
-        let delta = thin ? "\(clean.count) days" : flat ? "no real change" : Self.signed(change, amount: deltaAmount)
+            : Self.decimal(abs(displayChange), places: metricSignal.decimals)
+        let delta = clean.count < 2 ? "\(clean.count) values" : change == 0 ? "unchanged" : Self.signed(change, amount: deltaAmount)
 
-        let sampled = sampledMeasured(series, maximum: 60)
-        let dates = Array(historyDates.suffix(raw.count))
-        let hasGaps = sampled.contains { $0 == nil }
-        let scale = chartScale(values: sampled.compactMap { $0 }, count: sampled.count,
-                               width: 300, height: 122, padding: 8)
-        let line = sampled.enumerated().map { index, value in value.map { scale.point(value: $0, index: index) } }
-        let rolling = hasGaps ? [] : rollingRange(sampled.compactMap { $0 }, radius: 3)
-        let bandTop = rolling.enumerated().map { scale.point(value: $0.element.upperBound, index: $0.offset) }
-        let bandBottom = rolling.enumerated().reversed().map { scale.point(value: $0.element.lowerBound, index: $0.offset) }
-        let fit = (!thin && !flat) ? regressionMeasured(values: sampled, scale: scale) : nil
+        let plotDates = Array(historyDates.suffix(raw.count))
+        let dated = DatedChartSeries(samples: series.enumerated().compactMap { index, value in
+            guard plotDates.indices.contains(index), let date = plotDates[index] else { return nil }
+            return .init(date: date, value: value)
+        })
+        let full = DatedChartSeries(samples: (contextValues[metricSignal.key] ?? []).enumerated().compactMap { index, value in
+            guard contextDates.indices.contains(index), let date = contextDates[index] else { return nil }
+            return .init(date: date, value: value)
+        })
+        let assessment = assessments[metricSignal.key].flatMap { item -> NoopInstrumentAssessment? in
+            guard let last = dated.points.last,
+                  let day = HistoryDateWindow.date(dayKey: item.day),
+                  Calendar.current.isDate(day, inSameDayAs: last.date), abs(last.value - item.value) < 0.000001 else { return nil }
+            return item
+        }
+        let plot = AuraHistoryPresentation(series: dated, context: full,
+                                           showVariability: !metricSignal.behavior && metricSignal.key != "weight")
+        let comparison = (!metricSignal.behavior && range != .all)
+            ? plotDates.last.flatMap { $0 }.flatMap { end in
+                HistoryDateWindow(endingOn: end, dayCount: range.requestedDayCount, firstDay: windowStart ?? end, calendar: .current)
+                    .flatMap { AuraHistoryComparison(series: full, start: windowStart ?? $0.start, end: end) }
+            } : nil
 
         let moves = signals
             .filter { $0.key != metricSignal.key }
@@ -3218,7 +3296,7 @@ private extension NoopInstrumentData {
                     let day = result.lag == 0 ? "same day" : result.lag == 1 ? "morning after" : "second day after"
                     relation = "On the \(day) \(other.name.lowercased()), your \(metricSignal.name.lowercased()) runs \(positive ? "higher" : "lower") than on days without it."
                 } else {
-                    relation = "A \(positive ? "higher" : "lower") \(other.name.lowercased()) comes with a \(positive ? "higher" : "lower") \(metricSignal.name.lowercased()), strongest \(lagDescription)."
+                    relation = "A higher \(other.name.lowercased()) comes with a \(positive ? "higher" : "lower") \(metricSignal.name.lowercased()), strongest \(lagDescription)."
                 }
                 return NoopInstrumentMove(
                     signal: other,
@@ -3233,38 +3311,32 @@ private extension NoopInstrumentData {
         return NoopInstrumentMetricModel(
             signal: metricSignal,
             value: Self.format(ends.last, signal: metricSignal),
-            unit: metricSignal.hours ? "" : metricSignal.behavior ? "days a week" : metricSignal.unit,
+            unit: metricSignal.hours ? "" : metricSignal.key == "weight" ? UnitFormatter.massUnit(UnitSystem(rawValue: UserDefaults.standard.string(forKey: UnitPrefs.systemKey) ?? "") ?? .metric) : metricSignal.behavior ? "days a week" : metricSignal.unit,
             read: read,
             worn: clean.count,
-            span: range == .overview ? "Daily readings · Trends period" : range == .all ? "All \(historyCount) days in window" : "\(range.requestedDayCount ?? historyCount)-day window",
+            span: range == .overview ? "Trends period" : range == .all ? "All \(historyCount) days in window" : "\(range.requestedDayCount ?? historyCount)-day window",
             delta: delta,
-            style: style,
+            style: thin ? .thin : .neutral,
             thin: thin,
             thinNote: clean.isEmpty
                     ? "No recorded days fall inside this window. Noop keeps the signal on the list and waits for a real measurement instead of filling the gap."
-                    : "Only \(clean.count) recorded day\(clean.count == 1 ? "" : "s") \(clean.count == 1 ? "falls" : "fall") inside this window. Noop needs twenty-one to say anything about direction, so it says this instead of drawing you an arrow.",
-            chartNote: clean.isEmpty
-                ? "There is no line, spread, or fit to draw until this signal has a recorded value."
-                : hasGaps
-                    ? "Only recorded points are drawn. Missing days are left as gaps, and no spread band is drawn across them."
-                : thin
-                    ? "The band is the day-to-day spread. With this few nights it is most of the picture, which is the honest reading."
-                    : "The band is the spread across each point and up to three recorded days on either side. The dashed line is the fit, and it is only drawn when the change clears the noise at this length.",
-            chart: .init(
-                line: line,
-                bandTop: bandTop,
-                bandBottom: bandBottom,
-                fitStart: fit?.start,
-                fitEnd: fit?.end,
-                axis: axisLabels(for: range)
-            ),
+                    : "Only \(clean.count) recorded day\(clean.count == 1 ? "" : "s") \(clean.count == 1 ? "falls" : "fall") inside this window. Relationship analysis needs at least twenty-one paired days. Recorded values remain available.",
+            chartNote: metricSignal.key == "weight"
+                ? "Daily weight values from the recorded source. Dotted connectors guide the eye between measurements; they do not imply continuous measurement."
+                : metricSignal.behavior
+                    ? "Seven-day frequency derived from recorded answers. Missing answers remain unknown."
+                    : plot.bands.isEmpty
+                        ? "Recorded values · not enough recent data for a variability band."
+                        : "Shading · 30-day variability, mean ±1 SD. Not a normal range.",
+            axis: axisLabels(for: range),
             moves: Array(moves),
             readings: series.enumerated().compactMap { index, value in
-                guard let value, dates.indices.contains(index), let date = dates[index],
-                      line.indices.contains(index), let point = line[index] else { return nil }
-                return NoopInstrumentReading(date: date, value: Self.format(value, signal: metricSignal), point: point)
+                guard let value, plotDates.indices.contains(index), let date = plotDates[index] else { return nil }
+                return NoopInstrumentReading(date: date, value: Self.format(value, signal: metricSignal),
+                                             source: isPrototype ? "Demo fixture" : sourceNames[metricSignal.key]?[dayKeys.suffix(raw.count).dropFirst(index).first ?? ""])
             },
-            average: Self.format(clean.isEmpty ? nil : clean.reduce(0) { $0 + $1 / Double(clean.count) }, signal: metricSignal)
+            average: Self.format(clean.isEmpty ? nil : clean.reduce(0) { $0 + $1 / Double(clean.count) }, signal: metricSignal),
+            plot: plot, comparison: comparison, assessment: assessment
         )
     }
 

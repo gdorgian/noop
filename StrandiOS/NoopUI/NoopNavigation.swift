@@ -783,8 +783,9 @@ final class NoopNavigation: ObservableObject {
     /// Shared reports and sleep consistency retain the tab from which they were opened.
     var selectedTab: NoopTab {
         switch route {
-        case .digest, .report, .rhythm: path.dropLast().last?.tab ?? route.tab
-        case .labs, .picker, .review, .marker: path.first?.tab ?? route.tab
+        case .digest, .report, .rhythm, .capacity: path.first?.tab ?? route.tab
+        case .labs, .picker, .review, .marker, .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects:
+            path.first?.tab ?? route.tab
         default: route.tab
         }
     }

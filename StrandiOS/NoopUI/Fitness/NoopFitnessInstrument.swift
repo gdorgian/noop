@@ -469,12 +469,40 @@ struct NoopFitnessMeasureChart: View {
     }
 
     var body: some View {
-        let cur = current.enumerated().compactMap { i, v in v.map { Point(i: i, v: $0, series: "now") } }
-        let prev = previous.enumerated().compactMap { i, v in v.map { Point(i: i, v: $0, series: "before") } }
+        func points(_ values: [Double?], name: String) -> [Point] {
+            var segment = 0
+            return values.enumerated().compactMap { i, value in
+                guard let value, value.isFinite else { segment += 1; return nil }
+                return Point(i: i, v: value, series: "\(name)-\(segment)")
+            }
+        }
+        let cur = points(current, name: "now")
+        let prev = points(previous, name: "before")
         let n = max(window.buckets.count, 1)
         let tickEvery = max(1, n / 4)
-        Group {
-            if cur.isEmpty && prev.isEmpty {
+        return Group {
+            if style == .line {
+                let dated = DatedChartSeries(dates: window.buckets, values: current)
+                VStack(spacing: 8) {
+                    NoopHistoryPlot(presentation: .init(series: dated, showVariability: false), tint: tint,
+                                    selectedDate: selection.flatMap { window.buckets.indices.contains($0) ? window.buckets[$0] : nil },
+                                    valueLabel: format,
+                                    onSelect: { date in selection = window.buckets.firstIndex(of: date) })
+                    HStack {
+                        let indices = Array(Set([0, n / 3, n * 2 / 3, n - 1])).sorted().filter { window.buckets.indices.contains($0) }
+                        ForEach(indices, id: \.self) { index in
+                            Text(window.tick(index))
+                            if index != indices.last { Spacer() }
+                        }
+                    }
+                    .font(NoopHTMLFont.sans(10)).foregroundStyle(NoopHTMLColor.muted)
+                    if let average {
+                        Text("Average · \(format(average))")
+                            .font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.copy)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            } else if cur.isEmpty && prev.isEmpty {
                 VStack(spacing: 5) {
                     Text("No data in this period").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                     Text("Step back with the arrows, or pick a longer span.")
@@ -485,17 +513,17 @@ struct NoopFitnessMeasureChart: View {
                 Chart {
                     if style == .running {
                         ForEach(prev) { p in
-                            LineMark(x: .value("Bucket", p.i), y: .value("Value", p.v), series: .value("Series", "before"))
+                            LineMark(x: .value("Bucket", p.i), y: .value("Value", p.v), series: .value("Series", p.series))
                                 .foregroundStyle(NoopHTMLColor.muted.opacity(0.7))
                                 .lineStyle(StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round))
                                 .interpolationMethod(.monotone)
                         }
                         ForEach(cur) { p in
-                            AreaMark(x: .value("Bucket", p.i), y: .value("Value", p.v))
+                            AreaMark(x: .value("Bucket", p.i), y: .value("Value", p.v), series: .value("Series", p.series))
                                 .foregroundStyle(LinearGradient(colors: [tint.opacity(0.28), tint.opacity(0)],
                                                                 startPoint: .top, endPoint: .bottom))
                                 .interpolationMethod(.monotone)
-                            LineMark(x: .value("Bucket", p.i), y: .value("Value", p.v), series: .value("Series", "now"))
+                            LineMark(x: .value("Bucket", p.i), y: .value("Value", p.v), series: .value("Series", p.series))
                                 .foregroundStyle(tint)
                                 .lineStyle(StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
                                 .interpolationMethod(.monotone)

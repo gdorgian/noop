@@ -9,7 +9,8 @@ import StrandDesign
 enum NoopContentPolicy {
     static var allowsPrototypeContent: Bool {
         #if DEBUG
-        CommandLine.arguments.contains("--demo-seed")
+        // Test the production presentation against the seeded SQLite store without authored cards.
+        CommandLine.arguments.contains("--demo-seed") && !CommandLine.arguments.contains("--noop-live-data")
         #else
         false
         #endif
@@ -679,7 +680,7 @@ struct NoopVerifiedAppShell: View {
                     NoopAct3Screens(navigation: navigation, effort: effortStore.record,
                                     battery: WidgetSnapshot.activeBatteryPct(from: model))
                 } else if Self.canonicalPictureRoutes.contains(navigation.route) {
-                    NoopAct4Screens(navigation: navigation, trends: trendsStore.record,
+                    NoopAct4Screens(navigation: navigation, trends: trendsStore.record(for: repo.deviceId),
                                     battery: WidgetSnapshot.activeBatteryPct(from: model),
                                     ages: agesStore.record)
                 } else if Self.canonicalDayRoutes.contains(navigation.route) {
@@ -697,7 +698,8 @@ struct NoopVerifiedAppShell: View {
                 } else if Self.canonicalDataRoutes.contains(navigation.route) {
                     NoopDataScreen(navigation: navigation)
                 } else if Self.canonicalInstrumentRoutes.contains(navigation.route) {
-                    NoopAct9Screens(navigation: navigation, data: instrumentStore.data)
+                    NoopAct9Screens(navigation: navigation, data: instrumentStore.data(for: repo.deviceId), loadState: instrumentStore.state(for: repo.deviceId),
+                                      retry: { Task { await instrumentStore.load(from: repo, force: true) } })
                 } else if Self.canonicalLiftRoutes.contains(navigation.route) {
                     NoopAct10Screens(navigation: navigation, flow: liftFlow)
                 } else {
@@ -773,7 +775,7 @@ struct NoopVerifiedAppShell: View {
         .environment(\.noopScrollKey, navigation.scrollKey)
         .environment(\.noopScrollMemory, navigation.scrollMemory)
         .task(id: instrumentLoadKey) {
-            await loadOnce("instrument", instrumentLoadKey.map(String.init)) { await instrumentStore.load(from: repo) }
+            await loadOnce("instrument", instrumentLoadKey) { await instrumentStore.load(from: repo) }
         }
         .task(id: restLoadKey) {
             await loadOnce("rest", restLoadKey) { await restStore.load(from: repo) }
@@ -948,8 +950,8 @@ struct NoopVerifiedAppShell: View {
         }
     }
 
-    private var instrumentLoadKey: Int? {
-        Self.canonicalInstrumentRoutes.contains(navigation.route) ? repo.refreshSeq : nil
+    private var instrumentLoadKey: String? {
+        Self.canonicalInstrumentRoutes.contains(navigation.route) ? "\(repo.deviceId)-\(repo.loaded)-\(repo.refreshSeq)" : nil
     }
 
     @ViewBuilder

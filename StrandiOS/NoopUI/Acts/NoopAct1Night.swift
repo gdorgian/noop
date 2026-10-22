@@ -174,6 +174,12 @@ struct NoopAct1Screens: View {
                     .opacity(restAbsent ? 0.38 : 1)
                     .allowsHitTesting(!restAbsent)
 
+                    Act1LinkRow(title: "Sleep history", detail: "daily values, periods and recorded nights", glyph: .read) {
+                        navigation.instrumentOverviewWindow = nil
+                        navigation.instrumentMetricKey = "sleep"
+                        navigation.push(.instrumentMetric)
+                    }
+
                     restSectionLabel("Your next sleep")
                         .padding(.top, 8)
                     if navigation.nightJournalSaved {

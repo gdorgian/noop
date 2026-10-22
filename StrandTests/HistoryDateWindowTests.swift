@@ -69,4 +69,21 @@ final class HistoryDateWindowTests: XCTestCase {
                                             through: day("2026-03-30"), calendar: calendar), [15, 30])
     }
 
+    func testCalendarSlotsKeepUnrecordedLeadingDaysAcrossDST() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Athens")!
+        let start = try XCTUnwrap(HistoryDateWindow.date(dayKey: "2026-03-27", timeZone: calendar.timeZone))
+        let end = try XCTUnwrap(HistoryDateWindow.date(dayKey: "2026-03-31", timeZone: calendar.timeZone))
+        let window = try XCTUnwrap(HistoryDateWindow(endingOn: end, dayCount: nil, firstDay: start, calendar: calendar))
+        let slots = window.calendarDays(calendar: calendar)
+        XCTAssertEqual(slots.count, 5)
+        XCTAssertEqual(slots.first, start)
+        XCTAssertEqual(slots.last, end)
+        XCTAssertEqual(slots[3].timeIntervalSince(slots[2]), 23 * 3600)
+        let chart = DatedChartSeries(dates: slots, values: [nil, nil, nil, nil, 52])
+        XCTAssertEqual(chart.samples.count, 5)
+        XCTAssertEqual(chart.points.count, 1)
+        XCTAssertEqual(chart.points.first?.x, 1)
+    }
+
 }

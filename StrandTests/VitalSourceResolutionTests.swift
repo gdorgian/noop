@@ -260,6 +260,28 @@ final class VitalSourceResolutionTests: XCTestCase {
         XCTAssertEqual(resp?.day, "2026-08-12")
     }
 
+    @MainActor
+    func testResolvedDailyFallbackKeepsFullHistoryAndHonoursInclusiveEndDay() async throws {
+        let path = NSTemporaryDirectory() + "aura-resolution-\(UUID().uuidString).sqlite"
+        defer {
+            for suffix in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: path + suffix) }
+        }
+        let store = try await WhoopStore(path: path)
+        _ = try await store.upsertDailyMetrics([
+            daily(day: "2026-10-20", totalSleepMin: 420),
+            daily(day: "2026-10-21", totalSleepMin: 430)
+        ], deviceId: "test-strap")
+        let repo = Repository(deviceId: "test-strap")
+        let candidate = MetricSourceCandidate(source: "test-strap", key: "sleep_total_min")
+        let full = await repo.resolvedRows(store: store, candidate: candidate, from: "0000-01-01", to: "9999-12-31")
+        XCTAssertFalse(full.failed)
+        XCTAssertEqual(full.rows.map(\.day), ["2026-10-20", "2026-10-21"])
+        XCTAssertEqual(full.rows.map(\.value), [420, 430])
+        let bounded = await repo.resolvedRows(store: store, candidate: candidate, from: "2026-10-20", to: "2026-10-20")
+        XCTAssertFalse(bounded.failed)
+        XCTAssertEqual(bounded.rows.map(\.day), ["2026-10-20"])
+    }
+
     // MARK: - Fixtures
 
     private func daily(

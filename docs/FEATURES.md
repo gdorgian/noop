@@ -29,7 +29,15 @@ NOOP is built on community interoperability and protocol-documentation work, wit
 
 ## At a glance
 
-Aura’s Trends, Capacity and Rhythm charts preserve missing weekly slots instead of compressing the line. Bloodwork keeps collection dates and recorded units through plotting; incompatible units are not connected or implicitly converted, and the marker header uses the stored reading’s unit. These are presentation corrections: scoring, raw measurements and the existing page layouts are unchanged.
+Aura’s dated history charts share one native plot inside the existing Aura cards. Daily gaps break lines and shading; selection updates the value and date together. Period means, recorded-day counts and equal-length previous-period means use the same dated series. The source and coverage remain available under **About this data**. Read failures are distinguished from an empty history, with available data retained on a failed refresh. Full-history queries keep daily-column measurements: both store reads use the same inclusive date bounds, avoiding the year-10000 overflow that previously made daily-only history disappear.
+
+Chart colours carry distinct meanings: Charge uses Aura’s existing per-score ramp; an existing off-range vital assessment can tint a line amber, without assigning that assessment to historical points. Other metrics keep their own colour. Where at least fourteen recorded days support it, **30-day variability** means the trailing thirty calendar days’ mean ± one sample standard deviation; it is not a normal range or forecast. Body-age shading instead uses the estimate engine’s uncertainty, with a separate label. Weekly aggregates and irregular weight/lab readings do not acquire a daily variability band.
+
+Trends reads in order: period control and current body-age hero, factual weekly changes and four tappable signal cards, dated bloodwork, Explore, then summaries. **All signals** is the primary catalogue; **Compare signals** and **Explore relationships** retain their existing analyses. **Recording history** expands under summaries. Capacity and Rhythm explanations remain contextual links from their canonical metric details. Technical capture remains under **Advanced tools**. Rest’s **Sleep history** opens the same metric detail, preserving the originating tab.
+
+Metric details place the chart before period comparison, recorded daily values, and contextual explanations/relationships. Weight follows the body-measurement unit preference throughout; daily source aggregates are labelled as such, not presented as every individual weigh-in. Dotted weight connectors do not imply continuous measurement. Bloodwork keeps each result’s collection date, original unit, source and report reference text. A result can be selected from the chart or list; incompatible units are not joined or implicitly converted. Result entry, report review and import remain available.
+
+The shared plot also serves appropriate scalar Fitness charts and the recorded body-age/driver histories. Load bands, sleep stages, body composition and task-specific diagrams retain their specialised meanings and layouts. The live age-driver chart uses recorded weekly engine inputs rather than interpolating a curve from summary text. This is an iOS presentation update: scoring, stored measurements, source precedence, BLE and export formats are unchanged.
 
 Widget data sharing resolves the App Group from the installed provisioning profile before consulting AltStore metadata or the build-time setting. This supports SideStore re-signing that rewrites App Groups without adding ALTAppGroups. Both the app and widget extension use the same resolver; existing snapshot data and widget layouts are unchanged.
 
@@ -37,9 +45,7 @@ Today shows an opt-in Possible activity card directly below Today’s session. R
 
 The opt-in activity confirmation detector breaks at heart-rate recording gaps longer than its existing 90-second continuity tolerance. Missing time cannot qualify a workout or rejoin separate recorded bouts during merging. Thirty-second live sampling remains supported; the twelve-minute qualification policy, saved-workout exclusion and user-confirmation boundary remain unchanged. Test Centre traces report the recording-gap breaks.
 
-Trends reads in order: period control, current body-age hero, factual first-to-latest weekly summary, four signal cards, dated bloodwork, a fixed twelve-week recording grid, Explore, and Your summaries. Capacity opens its details from either its chart card or Explore. Bloodwork reads the existing Lab Book independently of the chart window and retains its test dates. Change badges use a neutral style rather than rewarding direction alone.
-
-Biomarkers has one primary entry in the Trends exploration group beside Capacity and Rhythm, using the existing warm orange bloodwork accent. The You and goal-page shortcuts are removed; Settings search still finds bloodwork. Result entry and marker detail screens remain available.
+Biomarkers has one primary home in Trends, with its existing warm orange accent. You and goal-page shortcuts are consolidated there; Settings search still finds bloodwork. Lab dates stay independent of the Trends period.
 
 The app philosophy page, What Noop will not ask you, lives under Settings → About rather than the You overview.
 

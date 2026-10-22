@@ -2826,12 +2826,25 @@ private struct NoopOCRCandidateCard: View {
 }
 
 private struct NoopMarkerDetail: View {
+    @State private var selectedResultID: String?
+    @State private var selectedResultDate: Date?
     @ObservedObject var navigation: NoopNavigation
     @EnvironmentObject private var repo: Repository
     @StateObject private var book = NoopLabBook()
     private var marker: NoopLabMarker {
         let all = NoopLabMarker.all(attaching: book)
         return all.first { $0.name == navigation.selectedMarker } ?? all[0]
+    }
+    private var selectedResult: NoopLabReading? {
+        marker.liveReadings.first { $0.id == selectedResultID }
+    }
+    private func selectDate(_ date: Date) {
+        let unit = DatedChartSeries.unitKey(selectedResult?.unit ?? marker.shownUnit)
+        guard let reading = marker.liveReadings.last(where: { $0.chartDate == date && DatedChartSeries.unitKey($0.unit) == unit }) else { return }
+        guard selectedResultID != reading.id else { return }
+        selectedResultDate = date
+        selectedResultID = reading.id
+        UISelectionFeedbackGenerator().selectionChanged()
     }
     var body: some View {
         NoopScreen(bottomInset: 118, topInset: 56) {
@@ -2842,11 +2855,14 @@ private struct NoopMarkerDetail: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(marker.name).font(NoopHTMLFont.outfit(25, weight: .regular)).tracking(-0.6)
                     HStack(alignment: .firstTextBaseline, spacing: 9) {
-                        Text(marker.valueText).font(NoopHTMLFont.outfit200(54)).tracking(-2.4)
-                        Text(marker.shownUnit).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
-                        NoopPill(text: marker.detailBandTag, color: marker.color)
+                        Text(selectedResult.map { $0.value.formatted(.number.precision(.fractionLength(0...2))) } ?? marker.valueText).font(NoopHTMLFont.outfit200(54)).tracking(-2.4)
+                        Text(selectedResult?.unit ?? marker.shownUnit).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        NoopPill(text: selectedResult == nil ? marker.detailBandTag : "recorded", color: NoopHTMLColor.warm)
                     }
-                    Text(marker.readCopy).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
+                    if let selectedResult {
+                        Text("Selected · \(selectedResult.dayLabel)").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                    }
+                    Text(selectedResult.map { "Recorded result dated \($0.dayLabel). Its original source and reference text appear with the entry below." } ?? marker.readCopy).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
                 }
 
                 NoopHTMLCard(radius: 24, padding: 16) {
@@ -2855,10 +2871,10 @@ private struct NoopMarkerDetail: View {
                             NoopSectionLabel(NoopContentPolicy.allowsPrototypeContent ? "Four draws" : "Recorded result")
                             Spacer()
                             // The eyebrow may only promise shading where a band is actually drawn.
-                            Text(marker.chartBand == nil ? "dated results" : "shaded — the lab's band")
+                            Text("dated results · original units")
                                 .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
                         }
-                        NoopMarkerTrend(marker: marker)
+                        NoopMarkerTrend(marker: marker, unit: selectedResult?.unit, selectedDate: selectedResultDate, onSelect: selectDate)
                         if NoopContentPolicy.allowsPrototypeContent {
                             HStack { Text("Jun 25"); Spacer(); Text("Nov 25"); Spacer(); Text("Mar 26"); Spacer(); Text("14 Aug") }
                                 .font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
@@ -2866,12 +2882,45 @@ private struct NoopMarkerDetail: View {
                             HStack { Spacer(); Text(date) }
                                 .font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
                         }
-                        Text(marker.bandNote)
+                        Text("Reference ranges belong to each report. No personal daily variability band is applied to bloodwork.")
                             .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
                     }
                     .padding(.bottom, 5)
                 }
                 .padding(.top, 6)
+
+                if !marker.liveReadings.isEmpty {
+                    NoopHTMLCard(radius: 24, padding: 16) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            NoopSectionLabel("Recorded results", color: NoopHTMLColor.warm)
+                            ForEach(marker.liveReadings.reversed()) { reading in
+                                Button {
+                                    selectedResultID = reading.id
+                                    selectedResultDate = reading.chartDate
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Text(reading.dayLabel); Spacer()
+                                            Text("\(reading.value.formatted(.number.precision(.fractionLength(0...2)))) \(reading.unit)").monospacedDigit()
+                                        }
+                                        Text(reading.source.isEmpty ? "Source not recorded" : reading.source)
+                                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted)
+                                        if let range = reading.referenceText {
+                                            Text("Report reference · \(range)").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                                        }
+                                        if DatedChartSeries.unitKey(reading.unit) != DatedChartSeries.unitKey(selectedResult?.unit ?? marker.shownUnit) {
+                                            Text("Different unit · retained here, excluded from the comparable chart")
+                                                .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.warm)
+                                        }
+                                    }
+                                    .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.ink)
+                                    .frame(minHeight: 44)
+                                }.buttonStyle(NoopPlainHitStyle())
+                            }
+                        }
+                    }
+                }
+
 
                 if NoopContentPolicy.allowsPrototypeContent {
                     NoopHTMLCard(radius: 24, padding: 16) {
@@ -2887,7 +2936,7 @@ private struct NoopMarkerDetail: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    NoopSectionLabel("Worth a retest", color: Color(hex: 0xF3C888))
+                    NoopSectionLabel(NoopContentPolicy.allowsPrototypeContent ? "Worth a retest" : "Latest result context", color: Color(hex: 0xF3C888))
                     Text(marker.retestCopy)
                         .font(NoopHTMLFont.sans(12.5))
                         .foregroundStyle(Color(hex: 0xDCE3E0))
@@ -2903,7 +2952,9 @@ private struct NoopMarkerDetail: View {
                     .padding(.top, -10)
             }
         }
+        .onChange(of: navigation.selectedMarker) { _ in selectedResultID = nil; selectedResultDate = nil }
         .task(id: repo.deviceId) {
+            selectedResultID = nil; selectedResultDate = nil
             await book.load(store: await repo.storeHandle(), deviceId: repo.deviceId)
         }
     }
@@ -3303,68 +3354,22 @@ private struct NoopOCRCandidate: Identifiable {
 
 private struct NoopMarkerTrend: View {
     let marker: NoopLabMarker
+    var unit: String?
+    private var series: DatedChartSeries {
+        guard let unit else { return marker.chart }
+        let observations = marker.liveReadings.compactMap { row -> DatedChartSeries.Observation? in
+            guard let date = row.chartDate else { return nil }
+            return .init(date: date, value: row.value, unit: row.unit)
+        }
+        return .init(observations: observations, unit: unit)
+    }
+    var selectedDate: Date?
+    var onSelect: ((Date) -> Void)?
     var body: some View {
-        let minValue = marker.chartMinimum
-        let maxValue = marker.chartMaximum
-        let span = max(0.001, maxValue - minValue)
-        Canvas { context, size in
-            func y(_ value: Double) -> CGFloat { CGFloat((maxValue - value) / span) * size.height }
-            // Only a band NOOP actually has may be drawn. Outside the seeded fixture there is no
-            // reference range, so the chart plots the dated points on their own rather than
-            // shading a range the user was never given.
-            let band = marker.chartBand
-            let topVisible = band.map { $0.high <= maxValue } ?? false
-            let bottomVisible = band.map { $0.low >= minValue } ?? false
-            if let band {
-                let bandTop = topVisible ? y(band.high) : 0
-                let bandBottom = bottomVisible ? y(band.low) : size.height
-                context.fill(
-                    Path(CGRect(x: 0, y: bandTop, width: size.width, height: max(2, bandBottom - bandTop))),
-                    with: .color(NoopHTMLColor.green.opacity(0.10))
-                )
-            }
-            let bandTop = topVisible ? y(band?.high ?? 0) : 0
-            let bandBottom = bottomVisible ? y(band?.low ?? 0) : size.height
-            if topVisible {
-                var boundary = Path()
-                boundary.move(to: CGPoint(x: 0, y: bandTop))
-                boundary.addLine(to: CGPoint(x: size.width, y: bandTop))
-                context.stroke(boundary, with: .color(NoopHTMLColor.green.opacity(0.32)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-            }
-            if bottomVisible {
-                var boundary = Path()
-                boundary.move(to: CGPoint(x: 0, y: bandBottom))
-                boundary.addLine(to: CGPoint(x: size.width, y: bandBottom))
-                context.stroke(boundary, with: .color(NoopHTMLColor.green.opacity(0.32)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-            }
-
-            for segment in marker.chart.segments {
-                var line = Path()
-                for (index, item) in segment.enumerated() {
-                    let point = CGPoint(x: CGFloat(item.x) * size.width, y: y(item.value))
-                    index == 0 ? line.move(to: point) : line.addLine(to: point)
-                }
-                context.stroke(line, with: .color(Color(hex: 0xF2B45C)), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-            }
-        }
-        // HTML's SVG explicitly uses overflow:visible, so its endpoint circles remain whole even
-        // though their centres sit at x=0 and x=300. Canvas clips its own drawing; render the dots
-        // as overlay views to preserve that exact behaviour instead of leaving an orange crescent.
-        .overlay {
-            GeometryReader { proxy in
-                ForEach(Array(marker.chart.points.enumerated()), id: \.offset) { _, item in
-                    let x = CGFloat(item.x) * proxy.size.width
-                    let y = CGFloat((maxValue - item.value) / span) * proxy.size.height
-                    Circle()
-                        .fill(NoopHTMLColor.canvas)
-                        .overlay(Circle().stroke(Color(hex: 0xF2B45C), lineWidth: 2))
-                        .frame(width: 7.2, height: 7.2)
-                        .position(x: x, y: y)
-                }
-            }
-            .allowsHitTesting(false)
-        }
-        .frame(height: 118)
+        NoopHistoryPlot(presentation: .init(series: series, showVariability: false), tint: NoopHTMLColor.warm,
+                        measurements: true, selectedDate: selectedDate,
+                        valueLabel: { $0.formatted(.number.precision(.fractionLength(0...2))) }, onSelect: onSelect)
+            .frame(height: 118)
     }
 }
 
@@ -3487,7 +3492,7 @@ struct NoopLabReading: Equatable, Identifiable {
     }
 
     /// Keep collection dates attached to values instead of spacing lab draws by array index.
-    var chartDate: Date? { Self.dayParser.date(from: day) }
+    var chartDate: Date? { HistoryDateWindow.date(dayKey: day) }
 
     /// "14 August" — from the stored day key, never from `Date()`. A reading with an unparseable
     /// day keeps its raw key rather than being given today's date.

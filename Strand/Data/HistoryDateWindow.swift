@@ -21,6 +21,13 @@ struct HistoryDateWindow: Equatable {
 
     func contains(_ date: Date) -> Bool { date >= start && date < endExclusive }
 
+    /// Complete calendar slots, including time before the first recorded observation.
+    func calendarDays(calendar: Calendar) -> [Date] {
+        guard let count = calendar.dateComponents([.day], from: start, to: endDay).day,
+              (0..<40_000).contains(count) else { return [] }
+        return (0...count).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    }
+
     func indices(in dates: [Date?]) -> [Int] {
         dates.indices.filter { index in dates[index].map(contains) ?? false }
     }

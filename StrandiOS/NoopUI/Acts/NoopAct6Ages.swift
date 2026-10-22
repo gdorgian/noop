@@ -923,44 +923,12 @@ private enum NoopAgeHistoryData {
 
 private struct NoopBodyAgeHistoryChart: View {
     let values: [Double]
-
+    var recorded: DatedChartSeries? = nil
+    var bandYears: Double = 5
     var body: some View {
-        Canvas { context, size in
-            guard values.count > 1,
-                  let smallest = values.min(),
-                  let largest = values.max() else { return }
-
-            let lowerBound = smallest - 6.4
-            let upperBound = largest + 6.4
-            let span = max(upperBound - lowerBound, 1)
-            let scale = min(size.width / 300, size.height / 104)
-            let origin = CGPoint(x: (size.width - 300 * scale) / 2, y: (size.height - 104 * scale) / 2)
-            func point(_ index: Int, offset: Double = 0) -> CGPoint {
-                let x = origin.x + 300 * scale * CGFloat(index) / CGFloat(values.count - 1)
-                let y = origin.y + 104 * scale * CGFloat((upperBound - (values[index] + offset)) / span)
-                return CGPoint(x: x, y: y)
-            }
-
-            var ribbon = Path()
-            ribbon.move(to: point(0, offset: 5))
-            for index in values.indices.dropFirst() { ribbon.addLine(to: point(index, offset: 5)) }
-            for index in values.indices.reversed() { ribbon.addLine(to: point(index, offset: -5)) }
-            ribbon.closeSubpath()
-            context.fill(ribbon, with: .color(NoopHTMLColor.green.opacity(0.10)))
-
-            var line = Path()
-            line.move(to: point(0))
-            for index in values.indices.dropFirst() { line.addLine(to: point(index)) }
-            context.stroke(line, with: .color(NoopHTMLColor.green), style: StrokeStyle(lineWidth: 1.9 * scale, lineCap: .round, lineJoin: .round))
-
-            let end = point(values.count - 1)
-            let radius = 3.4 * scale
-            let dot = Path(ellipseIn: CGRect(x: end.x - radius, y: end.y - radius, width: radius * 2, height: radius * 2))
-            context.fill(dot, with: .color(NoopHTMLColor.canvas))
-            context.stroke(dot, with: .color(NoopHTMLColor.green), lineWidth: 1.9 * scale)
-        }
-        .frame(height: 104)
-        .accessibilityLabel("Body age over ten weeks with a five-year uncertainty ribbon")
+        let series = recorded ?? .fixture(NoopContentPolicy.allowsPrototypeContent ? values : [])
+        NoopHistoryPlot(presentation: .init(series: series, showVariability: false, estimateHalfWidth: bandYears), tint: NoopHTMLColor.green)
+            .frame(height: 104)
     }
 }
 
@@ -1219,70 +1187,12 @@ private struct NoopDriverScale: View {
 
 private struct NoopAgeDriverTrendChart: View {
     let item: NoopAgeDriver
-
-    private var minimum: Double { number(in: item.minimum) }
-    private var maximum: Double { number(in: item.maximum) }
-    private var current: Double { number(in: item.current) }
-    private var average: Double { number(in: item.average) }
-
-    private var values: [Double] {
-        var result = (0..<10).map { index -> Double in
-            let i = Double(index)
-            let t = i / 9
-            return average + (current - average) * t + sin(i * 1.6) * (maximum - minimum) * 0.012
-        }
-        result[9] = current
-        return result
-    }
-
+    var recorded: DatedChartSeries? = nil
     var body: some View {
-        Canvas { context, size in
-            let points = values
-            guard points.count > 1,
-                  let smallest = points.min(),
-                  let largest = points.max() else { return }
-
-            let padding = (largest - smallest) * 0.5 + 0.3
-            let span = max(largest - smallest + padding * 2, 0.001)
-            let scale = min(size.width / 300, size.height / 84)
-            let origin = CGPoint(
-                x: (size.width - 300 * scale) / 2,
-                y: (size.height - 84 * scale) / 2
-            )
-            func point(_ index: Int) -> CGPoint {
-                CGPoint(
-                    x: origin.x + 300 * scale * CGFloat(index) / CGFloat(points.count - 1),
-                    y: origin.y + 84 * scale * CGFloat((largest + padding - points[index]) / span)
-                )
-            }
-
-            var line = Path()
-            line.move(to: point(0))
-            for index in points.indices.dropFirst() { line.addLine(to: point(index)) }
-            context.stroke(
-                line,
-                with: .color(item.color),
-                style: StrokeStyle(lineWidth: 1.9 * scale, lineCap: .round, lineJoin: .round)
-            )
-
-            let end = point(points.count - 1)
-            let radius = 3.2 * scale
-            let dot = Path(ellipseIn: CGRect(
-                x: end.x - radius,
-                y: end.y - radius,
-                width: radius * 2,
-                height: radius * 2
-            ))
-            context.fill(dot, with: .color(NoopHTMLColor.canvas))
-            context.stroke(dot, with: .color(item.color), lineWidth: 1.9 * scale)
-        }
-        .frame(height: 84)
-        .accessibilityLabel("Ten-week trend for \(item.name)")
-    }
-
-    private func number(in label: String) -> Double {
-        let token = label.split(whereSeparator: { $0.isWhitespace }).first ?? Substring(label)
-        return Double(token.filter { "0123456789.-".contains($0) }) ?? 0
+        let series = recorded ?? .fixture(NoopContentPolicy.allowsPrototypeContent ? item.trend : [])
+        NoopHistoryPlot(presentation: .init(series: series, showVariability: false), tint: item.color)
+            .frame(height: 84)
+            .accessibilityLabel("Recorded weekly inputs for \(item.name)")
     }
 }
 
@@ -1614,10 +1524,13 @@ private extension NoopAct6Screens {
                     }
                 }
 
-                if r.history.count >= 2, let first = r.history.first, let last = r.history.last {
+                if !r.history.isEmpty, let first = r.history.first, let last = r.history.last {
                     let change = last.age - first.age
                     let fmt: DateFormatter = { let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("d MMM"); return f }()
-                    let axis = [0, 1, 2, 3].map { r.history[min(r.history.count - 1, $0 * (r.history.count - 1) / 3)].end }
+                    let dates = r.weeklyInputDates.isEmpty ? r.history.map(\.end) : Array(r.weeklyInputDates.suffix(10))
+                    let byDate = Dictionary(r.history.map { ($0.end, $0.age) }, uniquingKeysWith: { _, last in last })
+                    let dated = DatedChartSeries(dates: dates, values: dates.map { byDate[$0] })
+                    let axis = [0, 1, 2, 3].map { dates[min(dates.count - 1, $0 * (dates.count - 1) / 3)] }
                     NoopHTMLCard(radius: 24, padding: 16) {
                         VStack(alignment: .leading, spacing: 13) {
                             HStack {
@@ -1625,7 +1538,9 @@ private extension NoopAct6Screens {
                                 Spacer()
                                 NoopAgeChangeChip(text: "\(change < 0 ? "\u{2212}" : "+")\(abs(change).formatted(.number.precision(.fractionLength(1)))) yr since \(fmt.string(from: first.end))")
                             }
-                            NoopBodyAgeHistoryChart(values: r.history.map(\.age))
+                            NoopBodyAgeHistoryChart(values: r.history.map(\.age), recorded: dated, bandYears: r.band)
+                            Text("Shading · the model’s ±\(r.band.formatted(.number.precision(.fractionLength(0...1)))) year estimate band, not observed variability.")
+                                .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
                             HStack {
                                 ForEach(Array(axis.enumerated()), id: \.offset) { index, date in
                                     Text(fmt.string(from: date))
@@ -1726,7 +1641,7 @@ private extension NoopAct6Screens {
                         }
                     }
                 }
-                if item.trend.count >= 2 {
+                if !item.trend.isEmpty {
                     NoopHTMLCard(radius: 24, padding: 16) {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
@@ -1734,9 +1649,24 @@ private extension NoopAct6Screens {
                                 Spacer()
                                 Text(item.trendNote).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
                             }
-                            NoopAgeDriverTrendChart(item: item)
+                            NoopAgeDriverTrendChart(item: item, recorded: .init(dates: Array(r.weeklyInputDates.suffix(10)), values: Array(weeks.suffix(10))))
                         }
                     }
+                }
+                if let key = ["rhr": "rhr", "vo2max": "cap", "hrv": "hrv", "sleep": "sleep", "steps": "steps"][d.key] {
+                    Button {
+                        navigation.instrumentOverviewWindow = nil
+                        navigation.instrumentMetricKey = key
+                        navigation.push(.instrumentMetric)
+                    } label: {
+                        HStack {
+                            Text("Explore \(NoopInstrumentData.title(for: key) ?? d.name)")
+                            Spacer(); Image(systemName: "chevron.right")
+                        }
+                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink)
+                        .padding(16).frame(minHeight: 44)
+                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                    }.buttonStyle(NoopHTMLPressStyle())
                 }
                 NoopAgeDisclaimer("Estimates from a wrist sensor, not a diagnosis. No part of this screen is a medical device.")
             }

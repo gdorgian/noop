@@ -43,6 +43,8 @@ struct MetricSeriesResolution: Equatable, Sendable {
     let requestedSource: String
     let candidates: [MetricSourceCandidate]
     let points: [ResolvedMetricPoint]
+    /// Some source reads failed. Available fallback points remain valid but are not complete coverage.
+    var readFailed = false
 
     /// Plain `(day, value)` rows , the shape the chart/correlation code already consumes.
     var values: [(day: String, value: Double)] { points.map { ($0.day, $0.value) } }
@@ -2459,20 +2461,22 @@ final class Repository: ObservableObject {
         let candidates = Self.sourceCandidates(forKey: key, preferredSource: preferredSource,
                                                actualWhoopSource: deviceId)
         guard let store = await ensureStore() else {
-            return MetricSeriesResolution(requestedSource: preferredSource, candidates: candidates, points: [])
+            return MetricSeriesResolution(requestedSource: preferredSource, candidates: candidates, points: [], readFailed: true)
         }
 
         // First candidate wins per day; later candidates only fill days no earlier one covered.
         var byDay: [String: ResolvedMetricPoint] = [:]
+        var readFailed = false
         for candidate in candidates {
-            let rows = await resolvedRows(store: store, candidate: candidate, from: from, to: to)
-            for row in rows where byDay[row.day] == nil {
+            let read = await resolvedRows(store: store, candidate: candidate, from: from, to: to)
+            readFailed = readFailed || read.failed
+            for row in read.rows where byDay[row.day] == nil {
                 byDay[row.day] = ResolvedMetricPoint(day: row.day, value: row.value,
                                                      source: candidate.source, sourceKey: candidate.key)
             }
         }
         let points = byDay.values.sorted { $0.day < $1.day }
-        return MetricSeriesResolution(requestedSource: preferredSource, candidates: candidates, points: points)
+        return MetricSeriesResolution(requestedSource: preferredSource, candidates: candidates, points: points, readFailed: readFailed)
     }
 
     /// Resolve a displayed score back to the provider that supplied its inputs. Direct imported points
@@ -2519,18 +2523,20 @@ final class Repository: ObservableObject {
     /// historical Rest (#614). The buffer only WIDENS the daily read; `byDay`'s metricSeries-first
     /// precedence is unchanged, so an imported series point still wins its day. Mirrors Android
     /// WhoopRepository.resolvedRows.
-    private func resolvedRows(store: WhoopStore, candidate: MetricSourceCandidate,
-                             from: String, to: String) async -> [(day: String, value: Double)] {
-        let metricRows = (try? await store.metricSeries(deviceId: candidate.source, key: candidate.key,
-                                                        from: from, to: to)) ?? []
-        var byDay = Dictionary(metricRows.map { ($0.day, $0.value) }, uniquingKeysWith: { _, last in last })
-        if let dailyRows = try? await store.dailyMetrics(deviceId: candidate.source,
-                                                         from: from, to: Self.dayAfter(to)) {
+    func resolvedRows(store: WhoopStore, candidate: MetricSourceCandidate,
+                             from: String, to: String) async -> (rows: [(day: String, value: Double)], failed: Bool) {
+        let metricRows = try? await store.metricSeries(deviceId: candidate.source, key: candidate.key,
+                                                        from: from, to: to)
+        var byDay = Dictionary((metricRows ?? []).map { ($0.day, $0.value) }, uniquingKeysWith: { _, last in last })
+        // Both store queries use inclusive day bounds. Advancing 9999-12-31 yields a five-digit
+        // year, which sorts before every modern YYYY-MM-DD key and hides all daily-column history.
+        let dailyRead = try? await store.dailyMetrics(deviceId: candidate.source, from: from, to: to)
+        if let dailyRows = dailyRead {
             for row in dailyRows where byDay[row.day] == nil {
                 if let value = Self.dailyColumn(key: candidate.key, day: row) { byDay[row.day] = value }
             }
         }
-        return byDay.keys.sorted().compactMap { day in byDay[day].map { (day, $0) } }
+        return (byDay.keys.sorted().compactMap { day in byDay[day].map { (day, $0) } }, metricRows == nil || dailyRead == nil)
     }
 
     /// The candidate (source, key) pairs to try for `key`, in precedence order, given the user's
