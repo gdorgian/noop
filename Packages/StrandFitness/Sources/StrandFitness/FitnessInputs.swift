@@ -11,34 +11,28 @@ public struct FitnessHeartRateSample: Equatable, Sendable {
     }
 }
 
-/// What the engines need to know about the wearer. Everything optional is estimated from what is
-/// present, and the estimate is reported rather than hidden (see `HeartRateZones.Method`).
+/// What the engines need to know about the wearer. The app supplies max heart rate from the same
+/// source its zones use (measured, set by hand, or age), so the Fitness page and Your zones agree.
 public struct FitnessPhysiology: Equatable, Sendable {
     public enum Sex: String, Sendable { case male, female, unspecified }
 
     /// Resting heart rate baseline for the day being scored.
     public var restingHeartRate: Double
-    /// Highest heart rate actually measured, when the wearer has one.
-    public var measuredMaxHeartRate: Double?
-    public var ageYears: Double?
+    public var maxHeartRate: Double
     public var sex: Sex
     public var bodyMassKg: Double?
 
-    public init(restingHeartRate: Double, measuredMaxHeartRate: Double? = nil, ageYears: Double? = nil,
-                sex: Sex = .unspecified, bodyMassKg: Double? = nil) {
+    public init(restingHeartRate: Double, maxHeartRate: Double, sex: Sex = .unspecified, bodyMassKg: Double? = nil) {
         self.restingHeartRate = restingHeartRate
-        self.measuredMaxHeartRate = measuredMaxHeartRate
-        self.ageYears = ageYears
+        self.maxHeartRate = maxHeartRate
         self.sex = sex
         self.bodyMassKg = bodyMassKg
     }
 
-    /// Measured maximum when there is one; otherwise Tanaka, Monahan & Seals (2001): 208 − 0.7 × age.
-    /// With neither, 190 — a deliberately middling figure that the zone method reports as a guess.
-    public var maxHeartRate: Double {
-        if let measuredMaxHeartRate, measuredMaxHeartRate > restingHeartRate + 20 { return measuredMaxHeartRate }
-        if let ageYears { return 208 - 0.7 * ageYears }
-        return 190
+    /// Heart-rate reserve fraction (Karvonen): (HR − resting) / (max − resting).
+    public func reserveFraction(_ bpm: Double) -> Double {
+        let span = maxHeartRate - restingHeartRate
+        return span > 0 ? (bpm - restingHeartRate) / span : 0
     }
 }
 

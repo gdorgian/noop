@@ -1,10 +1,11 @@
 import Foundation
 
-/// Where the aerobic work went: the share of training time (zones 1–5; zone 0 is not training) spent
+/// Where the aerobic work went, over the app's five zones (Resting, Easy, Steady, Hard, All out).
+/// Resting is not training, so the shares are of the other four:
 ///
-///   low aerobic  — zones 1–2, the base most endurance fitness is built on,
-///   high aerobic — zones 3–4, threshold and tempo work,
-///   anaerobic    — zone 5, short hard efforts above threshold.
+///   low aerobic  — Easy and Steady, the base most endurance fitness is built on,
+///   high aerobic — Hard, threshold and tempo work,
+///   anaerobic    — All out, short efforts above threshold.
 public enum CardioFocus {
     public enum Band: String, Sendable, CaseIterable {
         case lowAerobic, highAerobic, anaerobic
@@ -28,39 +29,13 @@ public enum CardioFocus {
         }
     }
 
+    /// - Parameter z: time in each of the five zones, lowest first.
     public static func breakdown(secondsInZones z: [Double]) -> Breakdown {
-        let low = z[safe: 1] + z[safe: 2], high = z[safe: 3] + z[safe: 4], ana = z[safe: 5]
+        let low = z[safe: 1] + z[safe: 2], high = z[safe: 3], ana = z[safe: 4]
         let total = low + high + ana
         guard total > 0 else { return Breakdown(shares: [:], trainingSeconds: 0) }
         return Breakdown(shares: [.lowAerobic: low / total, .highAerobic: high / total, .anaerobic: ana / total],
                          trainingSeconds: total)
-    }
-}
-
-/// Heart-rate recovery: how far heart rate falls in the first minute after a session ends.
-///
-///     HRR₁ = HR at the end of the session − HR 60 s later
-///
-/// Each reading is the sample nearest to its instant within ±`toleranceS`; with no sample close enough
-/// the session has no recovery reading rather than an interpolated one. Bands follow the clinical
-/// cut-off (Cole et al., NEJM 1999: under 12 bpm is abnormal) and the ranges reported for trained
-/// adults above it.
-public enum HeartRateRecovery {
-    public enum Band: String, Sendable, CaseIterable { case low, fair, good, excellent }
-
-    public static let toleranceS = 10.0
-
-    public static func oneMinute(end: Date, samples: [FitnessHeartRateSample]) -> Double? {
-        let t0 = end.timeIntervalSince1970
-        func nearest(_ t: Double) -> Double? {
-            samples.filter { abs($0.ts - t) <= toleranceS }.min { abs($0.ts - t) < abs($1.ts - t) }?.bpm
-        }
-        guard let a = nearest(t0), let b = nearest(t0 + 60) else { return nil }
-        return a - b
-    }
-
-    public static func band(_ drop: Double) -> Band {
-        drop < 12 ? .low : drop < 20 ? .fair : drop < 30 ? .good : .excellent
     }
 }
 

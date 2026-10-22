@@ -7,38 +7,8 @@ final class StrandFitnessTests: XCTestCase {
         c.timeZone = TimeZone(identifier: "UTC")!
         return c
     }()
-    let phys = FitnessPhysiology(restingHeartRate: 50, measuredMaxHeartRate: 190, sex: .male)
+    let phys = FitnessPhysiology(restingHeartRate: 50, maxHeartRate: 190, sex: .male)
     let t0 = Date(timeIntervalSince1970: 1_760_000_000)
-
-    // MARK: Zones
-
-    func testZonesFollowHeartRateReserve() {
-        // Reserve span is 140, so 50 % of reserve is 120 bpm and 90 % is 176 bpm.
-        XCTAssertEqual(HeartRateZones.zone(for: 119, physiology: phys), 0)
-        XCTAssertEqual(HeartRateZones.zone(for: 120, physiology: phys), 1)
-        XCTAssertEqual(HeartRateZones.zone(for: 150, physiology: phys), 3)
-        XCTAssertEqual(HeartRateZones.zone(for: 176, physiology: phys), 5)
-        // A lower resting rate moves every boundary down with it.
-        let fitter = FitnessPhysiology(restingHeartRate: 40, measuredMaxHeartRate: 190)
-        XCTAssertEqual(HeartRateZones.zone(for: 115, physiology: fitter), 1)
-        XCTAssertEqual(HeartRateZones.zone(for: 115, physiology: phys), 0)
-    }
-
-    func testMaxHeartRateFallsBackToAgeThenDefault() {
-        XCTAssertEqual(FitnessPhysiology(restingHeartRate: 55, ageYears: 40).maxHeartRate, 180, accuracy: 0.001)
-        XCTAssertEqual(FitnessPhysiology(restingHeartRate: 55).maxHeartRate, 190)
-        XCTAssertEqual(HeartRateZones.method(for: FitnessPhysiology(restingHeartRate: 55)), .defaultMax)
-    }
-
-    func testSecondsInZonesCapsGaps() {
-        let s = [FitnessHeartRateSample(ts: 0, bpm: 145), FitnessHeartRateSample(ts: 10, bpm: 145),
-                 FitnessHeartRateSample(ts: 300, bpm: 180)]
-        let z = HeartRateZones.secondsInZones(s, physiology: phys)
-        XCTAssertEqual(z[2], 25)   // 10 s, then a 290 s gap capped at 15 s
-        XCTAssertEqual(z[5], 1)
-    }
-
-    // MARK: Cardio load
 
     func testTrimpRisesSteeplyWithIntensity() {
         func session(_ hr: Double) -> FitnessCardioSession {
@@ -151,23 +121,18 @@ final class StrandFitnessTests: XCTestCase {
         XCTAssertNil(FitnessMuscleGroup.forMuscleId("unknown"))
     }
 
-    // MARK: Cardio focus, recovery, totals
+    // MARK: Cardio focus, totals
 
     func testCardioFocusIgnoresZoneZero() {
-        let b = CardioFocus.breakdown(secondsInZones: [9999, 60, 60, 30, 30, 20])
+        // Resting time never counts; Easy + Steady are low aerobic, Hard high, All out anaerobic.
+        let b = CardioFocus.breakdown(secondsInZones: [9999, 60, 60, 60, 20])
         XCTAssertEqual(b.trainingSeconds, 200)
         XCTAssertEqual(b.shares[.lowAerobic]!, 0.6, accuracy: 1e-9)
+        XCTAssertEqual(b.shares[.anaerobic]!, 0.1, accuracy: 1e-9)
         XCTAssertEqual(b.dominant, .lowAerobic)
-        XCTAssertNil(CardioFocus.breakdown(secondsInZones: [100, 0, 0, 0, 0, 0]).dominant)
-    }
-
-    func testHeartRateRecoveryNeedsBothReadings() {
-        let end = t0
-        let s = [FitnessHeartRateSample(ts: end.timeIntervalSince1970 + 2, bpm: 160),
-                 FitnessHeartRateSample(ts: end.timeIntervalSince1970 + 58, bpm: 135)]
-        XCTAssertEqual(HeartRateRecovery.oneMinute(end: end, samples: s), 25)
-        XCTAssertEqual(HeartRateRecovery.band(25), .good)
-        XCTAssertNil(HeartRateRecovery.oneMinute(end: end, samples: Array(s.prefix(1))))
+        let hard = CardioFocus.breakdown(secondsInZones: [0, 10, 10, 200, 0])
+        XCTAssertEqual(hard.dominant, .highAerobic)
+        XCTAssertNil(CardioFocus.breakdown(secondsInZones: [100, 0, 0, 0, 0]).dominant)
     }
 
     func testPeriodTotalsAlignCurrentAndPrevious() {

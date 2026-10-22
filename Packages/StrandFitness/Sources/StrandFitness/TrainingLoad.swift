@@ -12,7 +12,7 @@ public enum CardioLoad {
                              maxGapS: Double = 15) -> Double {
         let (k, b) = coefficients(physiology.sex)
         func perMinute(_ bpm: Double) -> Double {
-            let r = min(1, max(0, HeartRateZones.reserveFraction(bpm, physiology: physiology)))
+            let r = min(1, max(0, physiology.reserveFraction(bpm)))
             return r * k * exp(b * r)
         }
         if session.heartRate.isEmpty {
