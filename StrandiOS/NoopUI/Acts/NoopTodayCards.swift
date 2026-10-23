@@ -148,10 +148,13 @@ struct NoopTodayDayRibbon: View {
         guard let sleep else { return nil }
         return points.filter { $0.time >= sleep.start && $0.time <= sleep.end }.map(\.bpm).min()
     }
+    /// The plot's top is the day's highest reading (to the next 5 bpm), so the line fills the
+    /// height and the sleep and session bands' top edge sits right above it, as a ceiling.
     private var yDomain: ClosedRange<Double> {
         let values = points.map(\.bpm) + [resting].compactMap { $0 }
-        let lo = (values.min() ?? 50) - 6, hi = (values.max() ?? 120) + 10
-        return max(30, lo.rounded(.down))...max(lo + 30, hi.rounded(.up))
+        let lo = ((values.min() ?? 50) - 2) / 5, hi = ((values.max() ?? 120) + 1) / 5
+        let floor = lo.rounded(.down) * 5, ceil = hi.rounded(.up) * 5
+        return max(30, floor)...max(floor + 15, ceil)
     }
     private var selectedPoint: (time: Date, bpm: Double)? {
         guard let selected else { return nil }
@@ -249,7 +252,7 @@ struct NoopTodayDayRibbon: View {
                 PointMark(x: .value("Time", peak.time), y: .value("bpm", peak.bpm))
                     .symbolSize(22)
                     .foregroundStyle(NoopHTMLColor.warm)
-                    .annotation(position: .top, spacing: 3) {
+                    .annotation(position: .trailing, spacing: 3) {
                         Text("\(Int(peak.bpm.rounded()))").font(NoopHTMLFont.sans(10, weight: .semibold))
                             .foregroundStyle(NoopHTMLColor.warm)
                     }
@@ -276,7 +279,7 @@ struct NoopTodayDayRibbon: View {
         .chartXScale(domain: start...max(now, start.addingTimeInterval(3600)))
         .chartYScale(domain: yDomain)
         .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { _ in
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.white.opacity(0.05))
                 AxisValueLabel().font(NoopHTMLFont.sans(9)).foregroundStyle(NoopHTMLColor.faint)
             }
