@@ -103,6 +103,9 @@ struct NoopAct5Screens: View {
     @State private var baselinesRestarting = false
     @State private var settingsSearch = ""
     @State private var actionNotice: String?
+    @State private var labExportBusy = false
+    @State private var showPhasePicker = false
+    @State private var showTestCentre = false
     /// One request to the Aura release page, only when the wearer taps Check for updates.
     @StateObject private var updates = UpdateChecker()
     @State private var showReleaseNotes = false
@@ -152,6 +155,18 @@ struct NoopAct5Screens: View {
             Button("Leave it stored", role: .cancel) { labFlagToClear = nil }
         } message: {
             Text("Turning the switch off only stops Noop sending it. Clear the value already stored on the strap as well?")
+        }
+        .confirmationDialog("Mark an experiment phase", isPresented: $showPhasePicker, titleVisibility: .visible) {
+            ForEach(PuffinOpticalExperimentPhase.allCases, id: \.self) { phase in
+                Button(phase.displayName) {
+                    actionNotice = model.ble.markWhoop5OpticalPhase(phase)
+                        ? "\(phase.displayName) marked in the local capture file."
+                        : "Nothing was marked: turn on Record protocol frames first, so there is a capture file to mark."
+                }
+            }
+        }
+        .sheet(isPresented: $showTestCentre) {
+            NavigationStack { TestCentreView() }
         }
         .alert("Noop", isPresented: Binding(
             get: { actionNotice != nil },
@@ -4123,10 +4138,52 @@ private extension NoopAct5Screens {
         .padding(.vertical, 14)
     }
 
+    /// The Lab's diagnostic actions, wired to the same exports the classic Settings and Live screens use.
+    /// They used to show "… is ready." and do nothing (tester, 23 Oct).
+    func runLabAction(_ title: String) {
+        switch title {
+        case "Copy the strap log":
+            PlatformPasteboard.copy(live.exportableLogText())
+            actionNotice = "Strap log copied. Paste it into a message or a note."
+        case "Export raw sensor data", "Export raw and log together":
+            guard !labExportBusy else { return }
+            labExportBusy = true
+            let withLog = title == "Export raw and log together"
+            Task { @MainActor in
+                defer { labExportBusy = false }
+                guard let store = await model.repo.storeHandle() else {
+                    actionNotice = "Export failed: the local store could not be opened."
+                    return
+                }
+                do {
+                    let url = try await store.exportRawCSV(deviceId: model.repo.deviceId,
+                                                           since: Date().timeIntervalSince1970 - 24 * 60 * 60)
+                    if withLog {
+                        let extra = await DebugDataDiagnostics.dynamicLines(repo: model.repo)
+                        await FileExport.exportPair(file: url, fileSuggestedName: url.lastPathComponent,
+                                                    text: live.exportableLogText(extraHeaderLines: extra),
+                                                    textSuggestedName: FileExport.timestampedName("noop-strap-log", ext: "txt"))
+                    } else {
+                        FileExport.exportFile(at: url)
+                    }
+                } catch {
+                    actionNotice = "Export failed: \(error.localizedDescription)"
+                }
+            }
+        case "Mark an experiment phase":
+            showPhasePicker = true
+        case "This phone’s environment":
+            FileExport.exportText(IOSDiagnostics.capture().summaryLines().joined(separator: "\n"),
+                                  suggestedName: FileExport.timestampedName("noop-environment", ext: "txt"))
+        case "Test Centre":
+            showTestCentre = true
+        default:
+            break
+        }
+    }
+
     func labAction(_ title: String, detail: String, symbol: String) -> some View {
-        Button {
-            actionNotice = title == "Mark an experiment phase" ? "Experiment phase marked in the local capture file." : "\(title) is ready."
-        } label: {
+        Button { runLabAction(title) } label: {
             HStack(spacing: 13) {
                 Image(systemName: symbol).font(.system(size: 17, weight: .medium)).foregroundStyle(NoopHTMLColor.blue).frame(width: 21)
                 VStack(alignment: .leading, spacing: 2) {
