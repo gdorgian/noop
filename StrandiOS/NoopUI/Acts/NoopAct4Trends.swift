@@ -166,17 +166,21 @@ private struct NoopTrendsScreen: View {
                         .accessibilityHint("Open interactive history for \(row.name)")
                     }
 
+                    NoopHTMLCard(radius: 22, padding: 0) {
+                        trendLink("All signals", detail: "browse every metric and open its history", symbol: "ask", route: .instrumentIndex)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                    }
+
                     sectionLabel("Bloodwork", color: NoopHTMLColor.warm)
                     bloodworkCard
 
                     sectionLabel("Explore")
                     NoopHTMLCard(radius: 22, padding: 0) {
                         VStack(spacing: 0) {
-                            trendLink("All signals", detail: "browse every metric and open its history", symbol: "ask", route: .instrumentIndex)
+                            trendLink(NoopRoute.instrumentCompare.screenTitle, detail: "two patterns, their timing and paired days", symbol: "chart", route: .instrumentCompare)
                             Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            trendLink("Compare signals", detail: "two patterns, their timing and paired days", symbol: "chart", route: .instrumentCompare)
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            trendLink("Explore relationships", detail: "associations in your own recorded history", symbol: "ask", route: .instrumentEffects)
+                            trendLink(NoopRoute.instrumentEffects.screenTitle, detail: "associations in your own recorded history", symbol: "ask", route: .instrumentEffects)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)

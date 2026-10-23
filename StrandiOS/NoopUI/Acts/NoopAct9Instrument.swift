@@ -251,14 +251,14 @@ private struct NoopInstrumentIndexScreen: View {
                 VStack(alignment: .leading, spacing: 9) {
                     VStack(spacing: 0) {
                         NoopInstrumentDoor(
-                            title: "Two at once",
+                            title: NoopRoute.instrumentCompare.screenTitle,
                             detail: "compare two patterns and their timing",
                             glyph: .overlay,
                             action: { navigation.push(.instrumentCompare) }
                         )
                         Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
                         NoopInstrumentDoor(
-                            title: "What actually moves you",
+                            title: NoopRoute.instrumentEffects.screenTitle,
                             detail: "the ranking, the lag, and what one more costs",
                             glyph: .bolt,
                             action: { navigation.push(.instrumentEffects) }
@@ -1142,6 +1142,7 @@ private struct NoopInstrumentMetricScreen: View {
     let data: NoopInstrumentData
     @State private var selectedDate: Date?
     @State private var showAllReadings = false
+    @State private var showingDataContext = false
 
     private var selectedReading: NoopInstrumentReading? {
         model.readings.first { $0.date == selectedDate }
@@ -1213,7 +1214,7 @@ private struct NoopInstrumentMetricScreen: View {
         }
         .tint(NoopHTMLColor.night)
         .preferredColorScheme(.dark)
-        .onChange(of: navigation.instrumentMetricKey) { _ in selectedDate = nil; showAllReadings = false }
+        .onChange(of: navigation.instrumentMetricKey) { _ in selectedDate = nil; showAllReadings = false; showingDataContext = false }
         .onChange(of: model.readings) { _ in
             selectedDate = nil
             showAllReadings = false
@@ -1384,11 +1385,15 @@ private struct NoopInstrumentMetricScreen: View {
     }
 
     private var metricDataContext: some View {
-        DisclosureGroup {
+        DisclosureGroup(isExpanded: $showingDataContext) {
             VStack(alignment: .leading, spacing: 9) {
                 if let window = navigation.instrumentOverviewWindow, window.metricKey == model.signal.key,
                    let summary = window.weeklySummary { Text(summary) }
                 Text(model.read)
+                if model.signal.key == "cap" {
+                    Text("Capacity is an estimate of aerobic fitness, expressed as ml/kg/min. It is not a laboratory measurement.")
+                    Text("Aura uses its recorded VO₂ max estimates when available, falling back to Apple Health when that history is empty. The source below identifies the selected reading; the chart and recorded values share the same history.")
+                }
                 Text(model.chartNote)
                 if model.trendAnalysis != nil {
                     Text("Trends analysis compares seven-day means from your recorded history up to the window's last day. Each mean requires at least four recorded days. A direction is not a health assessment.")
@@ -1416,7 +1421,11 @@ private struct NoopInstrumentMetricScreen: View {
             }
             .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy).padding(.top, 10)
         } label: {
-            Text("About this data").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink).frame(minHeight: 44)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("About this signal").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                Text("Sources, coverage and method").font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
+            }
+            .frame(minHeight: 44)
         }
         .tint(NoopHTMLColor.night).padding(.horizontal, 16).padding(.vertical, 5)
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
@@ -1625,14 +1634,13 @@ private struct NoopInstrumentMetricScreen: View {
 
     private var metricLinksCard: some View {
         VStack(spacing: 0) {
-            if model.signal.key == "cap" || model.signal.key == "sleep" {
-                NoopInstrumentDoor(title: model.signal.key == "cap" ? "Understand capacity" : "Sleep rhythm",
-                                   detail: model.signal.key == "cap" ? "the estimate and its recorded changes" : "regularity, timing and your sleep need", glyph: .clock) {
-                    navigation.push(model.signal.key == "cap" ? .capacity : .rhythm)
+            if model.signal.key == "sleep" {
+                NoopInstrumentDoor(title: "Sleep rhythm", detail: "regularity, timing and your sleep need", glyph: .clock) {
+                    navigation.push(.rhythm)
                 }
                 Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
             }
-            NoopInstrumentDoor(title: "Put it against something", detail: "compare patterns, with the day-shift", glyph: .overlay) {
+            NoopInstrumentDoor(title: NoopRoute.instrumentCompare.screenTitle, detail: "compare patterns, with the day-shift", glyph: .overlay) {
                 navigation.instrumentCompareAKey = model.signal.key
                 navigation.instrumentCompareBKey = model.signal.key == "hrv" ? "reg" : "hrv"
                 navigation.instrumentCompareShift = 0
@@ -1641,10 +1649,6 @@ private struct NoopInstrumentMetricScreen: View {
             Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
             NoopInstrumentDoor(title: "Ask Svea about this", detail: "she gets this dossier, not just the number", glyph: .chat) {
                 navigation.reset(to: .coach)
-            }
-            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-            NoopInstrumentDoor(title: "Where it comes from", detail: "the sensor, the window, and the gaps", glyph: .clock) {
-                navigation.reset(to: .data)
             }
         }
         .padding(.horizontal, 16)
@@ -1695,7 +1699,7 @@ private struct NoopInstrumentCompareScreen: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Two at once")
+                    Text(NoopRoute.instrumentCompare.screenTitle)
                         .font(NoopHTMLFont.outfit(25))
                         .tracking(-0.625)
                         .foregroundStyle(NoopHTMLColor.ink)
@@ -2092,7 +2096,7 @@ private struct NoopInstrumentEffectsScreen: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(data.isPrototype ? "What actually moves you" : "Patterns in your record")
+                    Text(NoopRoute.instrumentEffects.screenTitle)
                         .font(NoopHTMLFont.outfit(25))
                         .tracking(-0.625)
                         .foregroundStyle(NoopHTMLColor.ink)

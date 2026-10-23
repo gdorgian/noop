@@ -37,10 +37,12 @@ enum NoopFitnessRoutineStarter {
 
 // MARK: - Add sheet
 
-/// The Fitness "+": start a routine, start any cardio session, or write down one already done.
+/// The one "+" (tab bar and Fitness): log something already done, start a routine, or start
+/// any cardio session. `routines` is nil when opened outside Fitness; the sheet reads them itself.
 struct NoopFitnessAddSheet: View {
     @ObservedObject var navigation: NoopNavigation
-    let routines: [NoopFitnessSnapshot.Routine]
+    var routines: [NoopFitnessSnapshot.Routine]? = nil
+    @State private var loadedRoutines: [NoopFitnessSnapshot.Routine] = []
     @EnvironmentObject private var repo: Repository
     @EnvironmentObject private var live: LiftSessionController
     @EnvironmentObject private var app: AppModel
@@ -60,7 +62,7 @@ struct NoopFitnessAddSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 HStack {
-                    Text("Start or log").font(NoopHTMLFont.outfit(26)).foregroundStyle(NoopHTMLColor.ink)
+                    Text("Add").font(NoopHTMLFont.outfit(26)).foregroundStyle(NoopHTMLColor.ink)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(NoopHTMLColor.inkSoft)
@@ -73,16 +75,39 @@ struct NoopFitnessAddSheet: View {
                         .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.warm)
                 }
 
+                section("Log") {
+                    row(symbol: "square.and.pencil", tint: NoopHTMLColor.green, title: "A workout you did",
+                        detail: "Sport, start and end. Noop scores it from your strap's heart rate") { logging = true }
+                    row(symbol: "cup.and.saucer.fill", tint: NoopHTMLColor.blueLight, title: "Coffee, drinks and more",
+                        detail: "One tap each, counted into today") {
+                        navigation.afterAddSheet { navigation.show(.dayLog) }
+                    }
+                    row(symbol: "moon.stars.fill", tint: NoopHTMLColor.night, title: "Evening journal",
+                        detail: "How the day went, read against tonight's sleep") {
+                        navigation.afterAddSheet { navigation.show(.nightJournal) }
+                    }
+                    row(symbol: "scalemass.fill", tint: NoopHTMLColor.blush, title: "Weight and measurements",
+                        detail: "Height, weight and the optional waist") {
+                        navigation.afterAddSheet { navigation.reset(to: .record) }
+                    }
+                    row(symbol: "drop.fill", tint: NoopHTMLColor.warm, title: "Bloodwork",
+                        detail: "Photograph a lab report or type the results") {
+                        navigation.afterAddSheet { navigation.enterLabPicker() }
+                    }
+                }
+
                 section("Strength") {
-                    if routines.isEmpty {
+                    if allRoutines.isEmpty {
                         row(symbol: "plus", tint: NoopHTMLColor.warm, title: "Build your first routine",
                             detail: "Exercises, sets and rest, then start it in one tap") {
-                            dismiss()
-                            navigation.fitnessRoutineID = nil
-                            navigation.push(.fitnessRoutineEdit)
+                            navigation.afterAddSheet {
+                                navigation.fitnessRoutineID = nil
+                                if navigation.route.tab != .fitness { navigation.reset(to: .fitness) }
+                                navigation.push(.fitnessRoutineEdit)
+                            }
                         }
                     }
-                    ForEach(routines) { r in
+                    ForEach(allRoutines) { r in
                         row(symbol: "dumbbell.fill", tint: NoopHTMLColor.warm, title: r.name,
                             detail: "\(r.exercises) \(r.exercises == 1 ? "exercise" : "exercises") · \(r.sets) sets",
                             trailing: "Start") {
@@ -122,14 +147,22 @@ struct NoopFitnessAddSheet: View {
                     .buttonStyle(NoopHTMLPressStyle())
                 }
 
-                section("Already done") {
-                    row(symbol: "square.and.pencil", tint: NoopHTMLColor.green, title: "Log a past session",
-                        detail: "Sport, start and end, energy and heart rate if you have them") { logging = true }
-                }
             }
             .padding(20)
         }
         .background(NoopHTMLColor.canvas.ignoresSafeArea())
+        .task {
+            guard routines == nil, let store = await repo.storeHandle() else { return }
+            let programs = ((try? await store.liftPrograms(deviceId: repo.deviceId)) ?? [])
+                .sorted { $0.updatedAt > $1.updatedAt }
+            var out: [NoopFitnessSnapshot.Routine] = []
+            for p in programs {
+                let items = (try? await store.liftProgramItems(programId: p.id)) ?? []
+                out.append(.init(id: p.id, name: p.name, exercises: Set(items.map(\.exercise)).count,
+                                 sets: items.reduce(0) { $0 + ($1.targetSets ?? 1) }))
+            }
+            loadedRoutines = out
+        }
         .sheet(isPresented: $logging) {
             ManualWorkoutSheet { row, replacing in
                 Task {
@@ -148,6 +181,8 @@ struct NoopFitnessAddSheet: View {
             }
         }
     }
+
+    private var allRoutines: [NoopFitnessSnapshot.Routine] { routines ?? loadedRoutines }
 
     private func startCardio(_ sport: String) {
         if let running = NoopRunningSession.current(app: app, lift: live, navigation: navigation) {

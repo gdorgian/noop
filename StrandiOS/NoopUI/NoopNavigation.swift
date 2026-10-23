@@ -407,6 +407,7 @@ final class NoopNavigation: ObservableObject {
     /// The Fitness detail open as a sheet over the Fitness page (the reference's pattern: swipe down and
     /// it is gone, the page underneath never left). Nil when none is.
     @Published var fitnessSheet: NoopRoute?
+    @Published var addSheetPresented = false
     static let fitnessSheetRoutes: Set<NoopRoute> = [.fitnessDetail, .fitnessMuscles]
     /// A metric inspection keeps the presenting page mounted, including its scroll position.
     func dismissMetricSheet() {
@@ -1051,44 +1052,20 @@ final class NoopNavigation: ObservableObject {
         }
     }
 
+    /// The tab-bar + (23 Oct 2026): one Add sheet from every screen. It used to do ten different
+    /// things by act, so the same key started a session on one page and opened a journal on the
+    /// next, and from Today's session it led to a fixed list with no way to log a workout.
     func plus() {
-        switch route.act {
-        case .night:
-            show(.nightJournal)
-        case .day:
-            refreshDayLogIfNeeded()
-            show(.dayLog)
-        case .effort:
-            push(.pick)
-        case .picture:
-            show(.loggedItems)
-        case .plumbing:
-            show(.addRecord)
-        case .ages:
-            // 30-routes.md §The +: Act 6 has no add sheet of its own, so the + navigates to
-            // `plumbing/record` — "a measurement the estimate needs". It is one of the four rows
-            // that navigate, not one of the four that present in place.
-            // `record`'s visible chevron says You. Make that its actual stack parent too; pushing
-            // it on top of Ages made an edge swipe return to Ages while the chevron returned to You.
-            reset(to: .record)
-        case .svea:
-            reset(to: .coach)
-            askFocusRequest += 1
-        case .goals:
-            // 30-routes.md §The +: from either of Act 8's two roots the + enters `goal/picker`.
-            // It must not raise a photo-source dialogue — the picker is the screen carrying the
-            // privacy sentence and the by-hand route.
-            //
-            enterLabPicker()
-        case .instrument:
-            reset(to: .history)
-        case .lift:
-            // Act 10's canonical + destination is the program library.
-            push(.liftLibrary)
-        case .fitness:
-            // On Fitness the + starts a session, like Effort's.
-            push(.pick)
-        }
+        pendingSheetTransition = nil
+        withAnimation(NoopMotion.swap) { overlay = nil }
+        addSheetPresented = true
+    }
+
+    /// Runs `action` once the Add sheet has finished sliding away, so an in-shell overlay or a push
+    /// doesn't animate underneath a sheet that is still on screen.
+    func afterAddSheet(_ action: @escaping () -> Void) {
+        addSheetPresented = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: action)
     }
 
     func consumeLabPhotoRequest() {
@@ -1273,8 +1250,8 @@ extension NoopRoute {
         case .marker: "Biomarker"
         case .instrumentIndex: "All signals"
         case .instrumentMetric: "One signal"
-        case .instrumentCompare: "Two at once"
-        case .instrumentEffects: "What moves you"
+        case .instrumentCompare: "Compare signals"
+        case .instrumentEffects: "Relationships"
         case .instrumentRaw: "Raw capture"
         case .instrumentCapture: "Capture"
         // Act 10 · The Lift.

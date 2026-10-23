@@ -33,12 +33,13 @@ struct NoopUtilityPage<Content: View>: View {
     let title: String
     let lead: String
     @ObservedObject var navigation: NoopNavigation
+    var fallback: NoopRoute = .settings
     @ViewBuilder var content: Content
 
     var body: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 13) {
-                NoopBackHeader(label: back) { navigation.back(or: .settings) }
+                NoopBackHeader(label: back) { navigation.back(or: fallback) }
                     .padding(.horizontal, -2)
                     .padding(.bottom, -10)
                 VStack(alignment: .leading, spacing: 6) {
@@ -389,9 +390,9 @@ private struct NoopDigestPage: View {
         let digest = WeeklyDigestSource.digest(from: repo.days, anchorDay: Repository.localDayKey(Date()))
         let metrics = digest.metrics.filter { $0.metric != .charge && $0.thisWeek.n > 0 }
         let focal = digest.focalPoints.filter { !$0.localizedCaseInsensitiveContains("charge") }
-        return NoopUtilityPage(back: "Settings", title: "Weekly digest",
+        return NoopUtilityPage(back: "Trends", title: "Weekly digest",
                                lead: "This week against last, in your own numbers. Written from what was measured; a day without a reading is left out, not counted as zero.",
-                               navigation: navigation) {
+                               navigation: navigation, fallback: .trends) {
             NoopUtilityCard(label: "This week", trailing: "\(digest.daysWithData) of 7 days measured") {
                 if metrics.isEmpty {
                     Text("Nothing measured this week yet.")
@@ -521,9 +522,9 @@ struct NoopTrendsReportPage: View {
 
     var body: some View {
         let report = report
-        NoopUtilityPage(back: "Settings", title: "Trends report",
+        NoopUtilityPage(back: "Trends", title: "Trends report",
                         lead: "How each reading moved across a window you choose, with the first half set against the second. A file you can keep or hand to someone.",
-                        navigation: navigation) {
+                        navigation: navigation, fallback: .trends) {
             HStack(spacing: 6) {
                 ForEach([ReportRange.days30, .days90, .days180, .days365], id: \.self) { option in
                     Button { range = option } label: {

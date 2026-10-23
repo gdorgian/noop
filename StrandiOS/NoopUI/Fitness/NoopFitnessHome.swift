@@ -14,7 +14,6 @@ struct NoopFitnessHome: View {
     @EnvironmentObject private var profile: ProfileStore
     @State private var selectedDay = Calendar.current.startOfDay(for: Date())
     @State private var weekOffset = 0
-    @State private var adding = false
     @State private var editing = false
     @State private var planning = false
 
@@ -39,7 +38,6 @@ struct NoopFitnessHome: View {
                 }
                 if let s = fitness.snapshot {
                     content(s)
-                        .sheet(isPresented: $adding) { NoopFitnessAddSheet(navigation: navigation, routines: s.routines) }
                         .sheet(isPresented: $planning) { NoopFitnessPlanSheet(routines: s.routines).environmentObject(layout) }
                 } else {
                     Text(fitness.isLoading ? "Reading your training…" : "")
@@ -264,7 +262,7 @@ struct NoopFitnessHome: View {
         switch section {
         case .activity:
             sectionTitle(Calendar.current.isDateInToday(selectedDay) ? "Today" : Self.dayTitle(selectedDay)) {
-                NoopFitnessIconButton(glyph: .plus) { adding = true }
+                NoopFitnessIconButton(glyph: .plus) { navigation.plus() }
                     .accessibilityLabel("Start or log")
             }
             activity(s)

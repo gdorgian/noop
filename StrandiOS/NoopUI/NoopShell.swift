@@ -114,6 +114,12 @@ struct NoopAppShell: View {
         .sheet(isPresented: Binding(get: { navigation.fitnessSheet != nil }, set: { if !$0 { navigation.fitnessSheet = nil } })) {
             NoopFitnessSheet(navigation: navigation, fitness: fitnessStore)
         }
+        .sheet(isPresented: $navigation.addSheetPresented) {
+            NoopFitnessAddSheet(navigation: navigation)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(NoopHTMLColor.canvas)
+        }
         .sheet(isPresented: Binding(get: { navigation.metricSheetPresented }, set: { if !$0 { navigation.dismissMetricSheet() } })) {
             NoopAct9Screens(navigation: navigation, data: .prototype, metricSheet: true)
                 .presentationDetents([.large])
@@ -780,6 +786,12 @@ struct NoopVerifiedAppShell: View {
         .simultaneousGesture(verifiedBackGesture)
         .sheet(isPresented: Binding(get: { navigation.fitnessSheet != nil }, set: { if !$0 { navigation.fitnessSheet = nil } })) {
             NoopFitnessSheet(navigation: navigation, fitness: fitnessStore)
+        }
+        .sheet(isPresented: $navigation.addSheetPresented) {
+            NoopFitnessAddSheet(navigation: navigation)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(NoopHTMLColor.canvas)
         }
         .sheet(isPresented: Binding(get: { navigation.metricSheetPresented }, set: { if !$0 { navigation.dismissMetricSheet() } })) {
             NoopAct9Screens(navigation: navigation, data: instrumentStore.data(for: repo.deviceId),
@@ -1695,25 +1707,18 @@ struct NoopBottomNavigation: View {
     }
 
     private var plusButton: some View {
-        let spark = navigation.route.act == .picture || navigation.route.act == .instrument
-        return Button { navigation.plus() } label: {
-            Group {
-                if spark {
-                    NoopCanonicalGlyph(name: .spark, size: 21, color: NoopHTMLColor.blueInk)
-                } else {
-                    Text("+")
-                        .font(NoopHTMLFont.outfit(23, weight: .light))
-                        .offset(y: -1)
-                }
-            }
-            .foregroundStyle(NoopHTMLColor.blueInk)
-            .frame(width: 44, height: 44)
-            .background(NoopHTMLColor.blue, in: Circle())
-            .shadow(color: NoopHTMLColor.blue.opacity(0.4), radius: 7, y: 4)
+        Button { navigation.plus() } label: {
+            Text("+")
+                .font(NoopHTMLFont.outfit(23, weight: .light))
+                .offset(y: -1)
+                .foregroundStyle(NoopHTMLColor.blueInk)
+                .frame(width: 44, height: 44)
+                .background(NoopHTMLColor.blue, in: Circle())
+                .shadow(color: NoopHTMLColor.blue.opacity(0.4), radius: 7, y: 4)
         }
         .buttonStyle(NoopHTMLPressStyle())
         .frame(maxWidth: .infinity)
-        .accessibilityLabel(spark ? "Everything you logged" : "Add")
+        .accessibilityLabel("Add")
     }
 
     private func tint(selected: Bool) -> Color {
@@ -1979,32 +1984,6 @@ private struct NoopNightJournalSheet: View {
                             .foregroundStyle(Color(hex: 0x7F8A85))
                     }
 
-                    Button { navigation.dismissSheetThenArrive(at: .session) } label: {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Start a session")
-                                    .font(NoopHTMLFont.sans(14, weight: .semibold))
-                                    .foregroundStyle(NoopHTMLColor.ink)
-                                if NoopContentPolicy.allowsPrototypeContent {
-                                    Text("Today’s recommendation, from wherever you are")
-                                        .font(.custom("Instrument Sans", fixedSize: 11.5))
-                                        .foregroundStyle(Color(hex: 0x7F8A85))
-                                }
-                            }
-                            Spacer(minLength: 4)
-                            NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.chevronDim)
-                        }
-                        .padding(.horizontal, 2)
-                        .padding(.bottom, 16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .overlay(alignment: .bottom) {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.08))
-                                .frame(height: 0.5)
-                        }
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
 
                     VStack(alignment: .leading, spacing: 10) {
                         Text("HOW WAS IT")
@@ -2182,36 +2161,6 @@ private struct NoopDayLogSheet: View {
                     }
                     .frame(height: 48, alignment: .top)
 
-                    // Change 1, door two. The global shortcut: reachable from all five tabs without
-                    // going home first. The + still opens this sheet — it does not become a session
-                    // button. `reset` makes it a tab-level arrival, and clears this overlay on the way.
-                    Button { navigation.dismissSheetThenArrive(at: .session) } label: {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Start a session")
-                                    .font(NoopHTMLFont.sans(14, weight: .semibold))
-                                    .foregroundStyle(NoopHTMLColor.ink)
-                                if NoopContentPolicy.allowsPrototypeContent {
-                                    Text("Today’s recommendation, from wherever you are")
-                                        .font(NoopHTMLFont.sans(11.5))
-                                        .foregroundStyle(Color(hex: 0x7F8A85))
-                                }
-                            }
-                            Spacer(minLength: 4)
-                            NoopChevron()
-                        }
-                        .padding(.horizontal, 2)
-                        .padding(.top, 2)
-                        .padding(.bottom, 14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .overlay(alignment: .bottom) {
-                            Rectangle()
-                                .fill(NoopHTMLColor.border)
-                                .frame(height: 0.5)
-                        }
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
 
                     LazyVGrid(
                         columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 0)],
