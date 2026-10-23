@@ -578,49 +578,7 @@ struct NoopAct2Screens: View {
 
                     if let day { NoopTodayEnergyCard(record: day) { navigation.push(.energy) } } else { energyCard }
 
-                    // Change 1, door one. `today` already answers "can I train"; this is the door to
-                    // acting on it. Always present — an empty slot where a card was yesterday reads
-                    // as a bug — so a rest day changes the copy rather than removing the card.
-                    Button {
-                        if let lift = navigation.finishedSessionToday?.liftSessionID {
-                            navigation.selectedLiftSessionID = lift
-                            navigation.liftDetailReturnRoute = .today
-                        }
-                        navigation.reset(to: sessionCardRoute)
-                    } label: {
-                        HStack(spacing: 13) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                NoopSectionLabel("Today's session", color: Color(hex: 0xC8934B))
-                                // Three states, one card. Title and line crossfade; the card, its
-                                // tint, its eyebrow and its chevron never move, and it is never absent.
-                                Text(sessionCardTitle)
-                                    .font(NoopHTMLFont.sans(14.5, weight: .semibold))
-                                    .foregroundStyle(NoopHTMLColor.ink)
-                                Text(sessionCardLine)
-                                    .font(NoopHTMLFont.sans(12))
-                                    .foregroundStyle(NoopHTMLColor.copy)
-                                    .lineSpacing(3.36)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            .id(sessionCardTitle + sessionCardLine)
-                            .transition(.opacity)
-                            .animation(NoopMotion.swap, value: sessionCardTitle + sessionCardLine)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            Act2CSSChevron(size: 8, color: NoopHTMLColor.chevronDim)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 15)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5)
-                        )
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    .id("noop-today-session")
-
+                    // Today's session moved to Fitness on 23 Oct 2026; training has one home there.
                     if !isHistorical { NoopActivityOffer() }
 
                     Act2TodayHeartRow(

@@ -266,7 +266,20 @@ struct NoopFitnessHome: View {
                     .accessibilityLabel("Start or log")
             }
             activity(s)
-                .padding(.bottom, 26)
+            Button { navigation.push(.across) } label: {
+                HStack(spacing: 6) {
+                    Text("Every session").font(NoopHTMLFont.sans(13, weight: .semibold))
+                    Text("· all of them, in aggregate").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                    Spacer()
+                    NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
+                }
+                .foregroundStyle(NoopHTMLColor.ink)
+                .padding(.horizontal, 4)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+            .padding(.bottom, 20)
         case .routines:
             sectionTitle("Routines") {
                 Menu {

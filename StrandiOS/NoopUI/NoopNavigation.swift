@@ -169,7 +169,6 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .rest, .tonight, .why, .debt, .alarm,
              .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound,
-             .session, .pick, .ready, .live, .intervals, .detail, .across,
              .coach, .gate, .setup, .consent, .memory:
             .today
         case .trends, .capacity, .rhythm, .year,
@@ -184,8 +183,9 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .goal, .setGoal, .labs, .picker, .review, .marker:
             .you
         // Act 10 is deliberately not a sixth tab. A lift is an effort, so it lights the same key
-        // Act 3 does.
-        case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
+        // Act 3 does. Act 3's sessions moved here from Today on 23 Oct 2026: training has one home.
+        case .session, .pick, .ready, .live, .intervals, .detail, .across,
+             .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles, .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit,
              .fitnessRoutine, .fitnessCalendar, .fitnessRoutineEdit:
             .fitness
@@ -555,7 +555,7 @@ final class NoopNavigation: ObservableObject {
             sessionStartedAt = nil
             sessionPaused = false
             sessionPausedElapsed = 0
-            reset(to: .session)
+            reset(to: .fitness)
             return
         }
         finishSessionArrival()
@@ -1128,7 +1128,7 @@ final class NoopNavigation: ObservableObject {
         case .liftLive:
             return
         case .liftLibrary:
-            back(or: .session)
+            back(or: .fitness)
         case .liftProgram:
             back(or: .liftLibrary)
         case .liftDetail:

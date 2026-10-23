@@ -503,6 +503,23 @@ private extension NoopAct5Screens {
     var youScreen: some View {
         NoopScreen(topInset: 52) {
             VStack(alignment: .leading, spacing: 0) {
+                // You is the person (23 Oct 2026); everything about the app is one tap away in Settings.
+                HStack(spacing: 8) {
+                    Spacer()
+                    NoopBatteryChip(percent: you == nil ? 52 : battery) { navigation.push(.strap) }
+                    Button { navigation.push(.settings) } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(NoopHTMLColor.inkSoft)
+                            .frame(width: 38, height: 38)
+                            .background(Color.white.opacity(0.06), in: Circle())
+                            .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    .accessibilityLabel("Settings")
+                }
+                .padding(.bottom, -30)
+                .zIndex(1)
                 VStack(spacing: 2) {
                     if let you {
                         NoopBodyClock(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour,
@@ -581,18 +598,8 @@ private extension NoopAct5Screens {
                             copyRow("Your journey", detail: you == nil ? "half marathon, 26 October · 46% recorded" : nil, symbol: "sparkles", tint: Self.blush) { navigation.push(.goal) }
                             Divider().overlay(NoopHTMLColor.border)
                             copyRow("Everything you logged", detail: "sessions, sleeps, coffees", symbol: "waveform.path.ecg", tint: Self.blush, value: you == nil ? "142" : nil) { navigation.push(.history) }
-                        }
-                    }
-
-                    youSectionLabel("Your app")
-                        .padding(.top, 8)
-                    dividedCard {
-                        VStack(spacing: 0) {
-                            copyRow("Your strap", detail: you == nil ? "WHOOP 5.0 / MG · synced 2 min ago" : liveStrapDetail, symbol: "applewatch", value: you == nil ? "52%" : battery.map { "\($0)%" }) { navigation.push(.strap) }
                             Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Data and permissions", detail: "what is kept, and what leaves", symbol: "shield", tint: Self.blush) { navigation.push(.data) }
-                            Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Settings", detail: "preferences, alerts and advanced controls", symbol: "ruler", tint: Self.blush) { navigation.push(.settings) }
+                            copyRow("Bloodwork", detail: "your lab results, each with its own date", symbol: "drop", tint: NoopHTMLColor.warm) { navigation.push(.labs) }
                         }
                     }
 

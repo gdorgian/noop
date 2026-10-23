@@ -130,7 +130,8 @@ struct RootTabView: View {
         case .liveHeartRate:
             navigation.push(.heart)
         case .startWorkout:
-            navigation.push(.session)
+            navigation.reset(to: .fitness)
+            navigation.plus()
         case .logJournal:
             navigation.show(.dayLog)
         case .breathe:
