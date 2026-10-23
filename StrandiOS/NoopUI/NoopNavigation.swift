@@ -106,6 +106,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 4
     case trends, capacity, rhythm, year
     // Act 5
+    case diagnostics = "lab-diagnostics"
     case you, record, zones, history, strap, notifs, devices, apple, data, settings, widgets, lab, automations, onboard, pair, position
     case importHistory = "import", reading, imported, rejected, backup
     // Utilities that left "Later" (21 Oct 2026): each is an Aura page over an engine that already ships.
@@ -146,7 +147,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .session, .pick, .ready, .live, .intervals, .detail, .across: .effort
         case .trends, .capacity, .rhythm, .year: .picture
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
-             .widgets, .lab, .automations, .onboard, .pair, .position, .importHistory, .reading,
+             .widgets, .lab, .diagnostics, .automations, .onboard, .pair, .position, .importHistory, .reading,
              .imported, .rejected, .backup,
              .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration: .plumbing
         case .ages, .building, .driver, .method, .health: .ages
@@ -177,7 +178,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .instrumentRaw, .instrumentCapture:
             .trends
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
-             .widgets, .lab, .automations, .onboard, .pair, .position, .importHistory, .reading,
+             .widgets, .lab, .diagnostics, .automations, .onboard, .pair, .position, .importHistory, .reading,
              .imported, .rejected, .backup,
              .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration,
              .goal, .setGoal, .labs, .picker, .review, .marker:
@@ -1110,7 +1111,7 @@ final class NoopNavigation: ObservableObject {
             back(or: .devices)
         case .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration:
             back(or: .settings)
-        case .widgets, .lab, .automations:
+        case .widgets, .lab, .diagnostics, .automations:
             back(or: .settings)
         case .importHistory, .backup:
             back(or: .data)
@@ -1229,6 +1230,7 @@ extension NoopRoute {
         case .fused: "Your data, fused"
         case .hydration: "Hydration"
         case .lab: "The Lab"
+        case .diagnostics: "Diagnostics"
         case .automations: "Automations"
         case .onboard: "Welcome"
         case .pair: "Pair a strap"

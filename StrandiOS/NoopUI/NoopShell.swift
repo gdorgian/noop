@@ -468,7 +468,7 @@ enum NoopAmbient {
         case .plumbing:
             switch route {
             case .strap, .devices, .pair: NoopHTMLColor.blue
-            case .lab: NoopHTMLColor.night
+            case .lab, .diagnostics: NoopHTMLColor.night
             default: NoopHTMLColor.blush
             }
         case .svea: NoopHTMLColor.night
@@ -660,7 +660,7 @@ struct NoopVerifiedAppShell: View {
 
     /// Act 5's hub: the wearer's own name, photo, usual sleep window and need. The rest of Act 5 is
     /// wired separately, screen by screen.
-    private static let canonicalYouRoutes: Set<NoopRoute> = [.you, .record, .zones, .settings, .lab, .position, .strap, .history, .devices, .notifs, .apple, .widgets, .automations, .pair,
+    private static let canonicalYouRoutes: Set<NoopRoute> = [.you, .record, .zones, .settings, .lab, .diagnostics, .position, .strap, .history, .devices, .notifs, .apple, .widgets, .automations, .pair,
         .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration]
 
     private var usesCanonicalCanvas: Bool {

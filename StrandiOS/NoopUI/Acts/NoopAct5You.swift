@@ -102,6 +102,7 @@ struct NoopAct5Screens: View {
     ]
     @State private var baselinesRestarting = false
     @State private var settingsSearch = ""
+    @State private var showingComingLater = false
     @State private var actionNotice: String?
     @State private var labExportBusy = false
     @State private var showPhasePicker = false
@@ -130,6 +131,7 @@ struct NoopAct5Screens: View {
             case .settings: settingsScreen
             case .widgets: widgetsScreen
             case .lab: labScreen
+            case .diagnostics: diagnosticsScreen
             case .automations: automationsScreen
             case .onboard: onboardingScreen
             case .pair: if measured { NoopLivePairScreen(navigation: navigation) } else { pairingScreen }
@@ -3238,7 +3240,7 @@ private extension NoopAct5Screens {
         NoopScreen(topInset: 56, initialScrollID: settingsInitialScrollID) {
             VStack(alignment: .leading, spacing: 12) {
                 act5BackHeader("You") { navigation.back(or: .you) }
-                pageTitle("Settings", copy: "Preferences, permissions for interruptions, and advanced controls. Your body and records live on You.")
+                pageTitle("Settings", copy: "How Noop behaves. Your body and records live on You.")
                     .padding(.bottom, 5)
 
                 HStack(spacing: 10) {
@@ -3259,7 +3261,44 @@ private extension NoopAct5Screens {
                     settingsDestinationResults
                 }
 
-                settingsGroup("Baselines") {
+                // Grouped by what a person is deciding about (23 Oct 2026). Nothing was removed:
+                // unbuilt options sit together under Coming later instead of between live switches.
+                settingsGroup("Strap") {
+                    copyRow("Your strap", detail: "connection, battery, sensors and sync", symbol: "applewatch", tint: NoopHTMLColor.blue) { navigation.push(.strap) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    copyRow("Manage straps", detail: "pair, switch or forget a strap", symbol: "arrow.left.arrow.right", tint: NoopHTMLColor.blue) { navigation.enter(.devices, from: .strap) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    copyRow("Automations", detail: "what the strap does on its own, and what a tap on it does", symbol: "sparkles", tint: NoopHTMLColor.blue) { navigation.push(.automations) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Live heart rate in the Dynamic Island", detail: "Also puts it on the Lock Screen while a session runs.", tint: Self.blush)
+                }
+                .padding(.top, 3)
+
+                settingsGroup("Alerts") {
+                    toggleRow("Battery alerts", detail: "One notice at 15% and one when it finishes charging. Never twice for the same crossing.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Off-wrist reminder", detail: "One notice when the strap has been off your wrist for ten minutes. Not while it charges.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Offer a workout it spotted", detail: "Sees a probable session in your heart rate and offers to save it. It never creates one for you.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Quiet hours", detail: "Nothing buzzes between your anchor and your usual wake, whatever else is on.", tint: Self.blush)
+                }
+
+                settingsGroup("Battery") {
+                    toggleRow("Power saving", detail: "Syncs every 45 minutes instead of 15 once the strap is low and discharging. Never while charging.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    segmentRow("Power saving at", detail: "the strap battery that starts it", choices: ["10%", "20%", "30%"])
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Pause the HRV stream when low", detail: "Releases the always-on stream too. Costs overnight variability detail on that night only.", tint: Self.blush)
+                }
+
+                settingsGroup("Workouts and Today") {
+                    toggleRow("Keep the screen on in a workout", detail: "Holds the screen awake while a manual recording runs.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Journal reminder", detail: "The seven-day strip on Today. Off removes it entirely.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    canonicalLinkRow("Hydration", detail: "a water log with a goal that follows your sex and the day’s effort", glyph: .drop, tint: Self.blush) { navigation.push(.hydration) }
+                    Divider().overlay(NoopHTMLColor.border)
                     actionRow(
                         baselinesRestarting ? "Baselines restarting from tonight" : "Recalibrate your baselines",
                         detail: baselinesRestarting
@@ -3267,7 +3306,7 @@ private extension NoopAct5Screens {
                             : "Restart the four-night build-up if a bad week — being ill, a flight — set it wrong.",
                         symbol: "gauge.with.dots.needle.50percent",
                         tint: baselinesRestarting ? Self.green : Self.blush,
-                        titleColor: baselinesRestarting ? Color(hex: 0x8FE3B4) : Color(hex: 0xF6D3DA)
+                        titleColor: baselinesRestarting ? Color(hex: 0x8FE3B4) : nil
                     ) {
                         // Production runs the real re-anchor the classic screen uses: no day is deleted,
                         // only the day the four baselines re-learn from moves, then a rescore.
@@ -3280,98 +3319,31 @@ private extension NoopAct5Screens {
                         }
                     }
                 }
-                .padding(.top, 3)
 
-                settingsGroup("Units") {
+                settingsGroup("Health and data") {
+                    copyRow("Apple Health", detail: "what Noop writes and reads", symbol: "heart", tint: Self.blush) { navigation.enter(.apple, from: .strap) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    copyRow("Data and permissions", detail: "what is kept, what leaves, and importing history", symbol: "lock.shield", tint: Self.blush) { navigation.push(.data) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    copyRow("Backup and restore", detail: "one file you keep, restored the same way", symbol: "externaldrive", tint: Self.blush) { navigation.enter(.backup, from: .data) }
+                }
+
+                settingsGroup("Units and display") {
                     segmentRow("Units", detail: "stored in SI either way", choices: ["Metric", "Imperial"])
                     Divider().overlay(NoopHTMLColor.border)
                     segmentRow("Temperature", detail: "independent of the rest", choices: ["°C", "°F"])
                     Divider().overlay(NoopHTMLColor.border)
                     segmentRow("Effort", detail: "display only — Effort is stored 0–100", choices: ["0–100", "0–21"])
-                }
-
-                settingsGroup("Appearance") {
-                    copyRow(
-                        "Widgets",
-                        detail: "\(widgetFamilyCountWord) families, and what each one answers",
-                        symbol: "square.grid.2x2",
-                        tint: Self.blush,
-                        value: String(NoopWidgetFamilyRegistry.count)
-                    ) { navigation.push(.widgets) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    segmentRow(
-                        "Appearance",
-                        detail: "dark only in this build — light is drawn but not coloured yet",
-                        choices: ["Dark", "Light", "System"],
-                        disabledChoices: ["Light", "System"]
-                    )
-                    Divider().overlay(NoopHTMLColor.border)
-                    segmentRow(
-                        "Language",
-                        detail: "English only in this build; the strings are written but not translated",
-                        choices: ["System", "English", "Deutsch"],
-                        disabledChoices: ["System", "Deutsch"]
-                    )
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Reduce motion in Noop", detail: "Poses every looping graphic still without needing the system switch.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Chart colours", detail: "a second palette for the data, leaving the chrome alone", glyph: .chart)
-                    Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Sleep chart", detail: "the hypnogram drawn as rows or as a ribbon instead", glyph: .moon)
-                    Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Card surface", detail: "frosted and clear cards, so the sky shows through", glyph: .grid)
-                    Divider().overlay(NoopHTMLColor.border)
-                    soonRow("Day-cycle sky", detail: "a backdrop that moves with the hour", glyph: .today)
+                    copyRow("Widgets", detail: "\(widgetFamilyCountWord) families, and what each one answers", symbol: "square.grid.2x2", tint: Self.blush) { navigation.push(.widgets) }
                     Divider().overlay(NoopHTMLColor.border)
                     appIconPickerRow.id("settings-app-icon")
                 }
 
-                settingsGroup("Your strap") {
-                    toggleRow("Live heart rate in the Dynamic Island", detail: "Also puts it on the Lock Screen while a session runs.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Battery alerts", detail: "One notice at 15% and one when it finishes charging. Never twice for the same crossing.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Off-wrist reminder", detail: "One notice when the strap has been off your wrist for ten minutes. Not while it charges.", tint: Self.blush)
-                }
-
-                settingsGroup("Power saving") {
-                    toggleRow("Power saving", detail: "Syncs every 45 minutes instead of 15 once the strap is low and discharging. Never while charging.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    segmentRow("Power saving at", detail: "the strap battery that starts it", choices: ["10%", "20%", "30%"])
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Pause the HRV stream when low", detail: "Releases the always-on stream too. Costs overnight variability detail on that night only.", tint: Self.blush)
-                }
-
-                settingsGroup("Features") {
-                    canonicalLinkRow("Hydration", detail: "a local water log with a goal that follows your sex and the day’s effort", glyph: .drop, tint: Self.blush) { navigation.push(.hydration) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Offer a workout it spotted", detail: "Sees a probable session in your heart rate and offers to save it. It never creates one for you.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Journal reminder", detail: "The seven-day strip on Today. Off removes it entirely.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Keep the screen on in a workout", detail: "Holds the screen awake while a manual recording runs.", tint: Self.blush)
-                }
-
-                settingsGroup("What may interrupt you") {
-                    copyRow("Buzz for phone notifications", detail: "which apps reach your wrist, and how", symbol: "bell", tint: Self.blush, value: "5") { navigation.enter(.notifs, from: .strap) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Bedtime nudge", detail: "One buzz thirty minutes before your anchor, and nothing after it.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Session offer", detail: "One notification a day, in the morning, with today’s recommendation.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Weekly read", detail: "Sunday evening summary. Off by default because most weeks do not need one.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Quiet hours", detail: "Nothing buzzes between your anchor and your usual wake, whatever else is on.", tint: Self.blush)
-                }
-
-                settingsGroup("Automations") {
-                    copyRow("Automations", detail: "what the strap does on its own, and what a tap on it does", symbol: "sparkles", tint: Self.blush, value: "3 on") { navigation.push(.automations) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Rhythm", detail: "Needs reading and ticking a page first. No alarms, no red, no condition names.", tint: Self.blush)
-                }
-
                 settingsGroup("Svea") {
-                    copyRow("Provider and key", detail: "Anthropic · your key · 5 of 7 grants", symbol: "key", tint: Self.blush) { navigation.push(.setup) }
+                    copyRow("Provider and key", detail: "which model answers, with your own key", symbol: "key", tint: Self.blush) { navigation.push(.setup) }
                     Divider().overlay(NoopHTMLColor.border)
                     copyRow("What she may read", detail: "purpose by purpose, revocable", symbol: "shield", tint: Self.blush) { navigation.push(.consent) }
                     Divider().overlay(NoopHTMLColor.border)
@@ -3380,9 +3352,13 @@ private extension NoopAct5Screens {
                     segmentRow("Svea’s manner", detail: "plain writes a paragraph, quiet writes a line", choices: ["Plain", "Quiet", "Direct", "Off"])
                 }
 
-                settingsGroup("About") {
-                    copyRow("What Noop will not ask you", detail: "no weight goal, no step target, no score", symbol: "nosign", tint: Self.blushLabel) { navigation.push(.position) }
+                settingsGroup("Siri and Shortcuts") {
+                    canonicalLinkRow("Siri and Shortcuts", detail: "Sync, Buzz, Mark a moment and Ask Svea, hands-free", glyph: .spark, tint: Self.blush) { navigation.push(.siri) }
                     Divider().overlay(NoopHTMLColor.border)
+                    canonicalLinkRow("Shortcuts export", detail: "the HealthKit-free path, for a sideloaded build", glyph: .upload, tint: Self.blush) { navigation.push(.shortcutExport) }
+                }
+
+                settingsGroup("About") {
                     actionRow("Check for updates", detail: updateDetail, symbol: "arrow.triangle.2.circlepath", tint: NoopHTMLColor.blue) {
                         if case let .available(_, url, _) = updates.state {
                             UIApplication.shared.open(url)
@@ -3391,46 +3367,69 @@ private extension NoopAct5Screens {
                         }
                     }
                     Divider().overlay(NoopHTMLColor.border)
-                    canonicalLinkRow("How Noop works", detail: "how sleep is sorted, how the scores build, where the numbers come from", glyph: .globe, tint: Self.blush) { navigation.push(.howItWorks) }
-                    Divider().overlay(NoopHTMLColor.border)
-                    canonicalLinkRow(
-                        "What’s new",
-                        detail: "the four readings in 11.7, and every version before it",
-                        glyph: .file,
-                        tint: Self.blush,
-                        value: currentChangelogDisplayVersion
-                    ) {
+                    canonicalLinkRow("What’s new", detail: "this version, and every one before it", glyph: .file, tint: Self.blush, value: currentChangelogDisplayVersion) {
                         showReleaseNotes = true
                     }
-                }
-
-                settingsGroup("Tools") {
-                    canonicalLinkRow("Siri and Shortcuts", detail: "Sync, Buzz, Mark a moment and Ask Svea, hands-free", glyph: .spark, tint: Self.blush) { navigation.push(.siri) }
                     Divider().overlay(NoopHTMLColor.border)
-                    canonicalLinkRow("Shortcuts export", detail: "the HealthKit-free path, for a sideloaded build", glyph: .upload, tint: Self.blush) { navigation.push(.shortcutExport) }
+                    canonicalLinkRow("How Noop works", detail: "how sleep is sorted, how the scores build, where the numbers come from", glyph: .globe, tint: Self.blush) { navigation.push(.howItWorks) }
                     Divider().overlay(NoopHTMLColor.border)
                     canonicalLinkRow("Strap limitations", detail: "4.0 against 5.0 against MG — what each band can read", glyph: .watch, tint: Self.blush) { navigation.push(.limitations) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    copyRow("What Noop will not ask you", detail: "no weight goal, no step target, no score", symbol: "nosign", tint: Self.blushLabel) { navigation.push(.position) }
                 }
 
+                settingsGroup("Advanced") {
+                    copyRow("The Lab", detail: "readings still being worked out, and probes that touch the strap", symbol: "flask", tint: Self.lavender) { navigation.push(.lab) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    copyRow("Diagnostics", detail: "strap log, raw data and the files a bug report needs", symbol: "stethoscope", tint: Self.lavender) { navigation.push(.diagnostics) }
+                }
 
-                Button { navigation.push(.lab) } label: {
-                    HStack(spacing: 13) {
-                        Image(systemName: "flask").font(.system(size: 21, weight: .medium)).foregroundStyle(Self.lavender)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("The Lab").font(NoopHTMLFont.sans(14, weight: .semibold))
-                            Text("Experimental readings, protocol probes and every diagnostic. Nothing in here is needed to use Noop.")
-                                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0xA9B0CE)).lineSpacing(2)
-                        }
-                        Spacer()
-                        NoopChevron(color: Self.lavender)
+                if settingsGroupMatches("Coming later") {
+                DisclosureGroup(isExpanded: Binding(
+                    get: { showingComingLater || !settingsSearch.trimmingCharacters(in: .whitespaces).isEmpty },
+                    set: { showingComingLater = $0 })) {
+                    VStack(spacing: 0) {
+                        copyRow("Buzz for phone notifications", detail: "which apps reach your wrist, and how", symbol: "bell", tint: Self.blush) { navigation.enter(.notifs, from: .strap) }
+                    Divider().overlay(NoopHTMLColor.border)
+                        toggleRow("Bedtime nudge", detail: "One buzz thirty minutes before your anchor, and nothing after it.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                        toggleRow("Session offer", detail: "One notification a day, in the morning, with today’s recommendation.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                        toggleRow("Weekly read", detail: "Sunday evening summary. Off by default because most weeks do not need one.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                        toggleRow("Rhythm", detail: "Needs reading and ticking a page first. No alarms, no red, no condition names.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                        segmentRow("Appearance", detail: "dark only in this build — light is drawn but not coloured yet", choices: ["Dark", "Light", "System"], disabledChoices: ["Light", "System"])
+                    Divider().overlay(NoopHTMLColor.border)
+                        segmentRow("Language", detail: "English only in this build; the strings are written but not translated", choices: ["System", "English", "Deutsch"], disabledChoices: ["System", "Deutsch"])
+                    Divider().overlay(NoopHTMLColor.border)
+                        soonRow("Chart colours", detail: "a second palette for the data, leaving the chrome alone", glyph: .chart)
+                    Divider().overlay(NoopHTMLColor.border)
+                        soonRow("Sleep chart", detail: "the hypnogram drawn as rows or as a ribbon instead", glyph: .moon)
+                    Divider().overlay(NoopHTMLColor.border)
+                        soonRow("Card surface", detail: "frosted and clear cards, so the sky shows through", glyph: .grid)
+                    Divider().overlay(NoopHTMLColor.border)
+                        soonRow("Day-cycle sky", detail: "a backdrop that moves with the hour", glyph: .today)
                     }
-                    .padding(16)
-                    .background(Self.lavender.opacity(0.08), in: RoundedRectangle(cornerRadius: 22))
-                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Self.lavender.opacity(0.24), lineWidth: 0.5))
+                    .padding(.top, 4)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Coming later").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                        Text("Designed, not built yet. Shown so you know they're planned.")
+                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                            .multilineTextAlignment(.leading)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 }
-                .buttonStyle(NoopHTMLPressStyle())
+                .tint(NoopHTMLColor.copy)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 5)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                .padding(.top, 8)
+                }
 
-                Text("Noop 5.2.0 · WHOOP 5.0 / MG · everything on this phone")
+                Text("Noop Aura \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · everything on this phone")
                     .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
         }
@@ -3465,17 +3464,17 @@ private extension NoopAct5Screens {
 
     var settingsSearchKeywords: [String: String] {
         [
-        "Units": "units units stored in si either way metric imperial temperature independent of the rest °c °f effort display only — effort is stored 0–100 0–100 0–21",
-        "Appearance": "appearance widgets \\(widgetfamilycountword) families, and what each one answers square.grid.2x2 appearance dark only in this build — light is drawn but not coloured yet dark light system light system language english only in this build; the strings are written but not translated system english deutsch system deutsch reduce motion in noop poses every looping graphic still without needing the system switch. chart colours a second palette for the data, leaving the chrome alone sleep chart the hypnogram drawn as rows or as a ribbon instead card surface frosted and clear cards, so the sky shows through day-cycle sky a backdrop that moves with the hour settings-app-icon",
-        "Your strap": "your strap your strap battery, sensors, sync, log and apple health applewatch \\($0)% 52% manage straps pair, switch, forget or rename a band link \\(pairedstrapcount) 2 1 live heart rate in the dynamic island also puts it on the lock screen while a session runs. battery alerts one notice at 15% and one when it finishes charging. never twice for the same crossing.",
-        "Power saving": "power saving power saving syncs every 45 minutes instead of 15 once the strap is low and discharging. never while charging. power saving at the strap battery that starts it 10% 20% 30% pause the hrv stream when low releases the always-on stream too. costs overnight variability detail on that night only.",
-        "Features": "features hydration a local water log with a goal that follows your sex and the day’s effort offer a workout it spotted sees a probable session in your heart rate and offers to save it. it never creates one for you. journal reminder the seven-day strip on today. off removes it entirely. keep the screen on in a workout holds the screen awake while a manual recording runs.",
-        "What may interrupt you": "what may interrupt you buzz for phone notifications which apps reach your wrist, and how bell 5 bedtime nudge one buzz thirty minutes before your anchor, and nothing after it. session offer one notification a day, in the morning, with today’s recommendation. weekly read sunday evening summary. off by default because most weeks do not need one. quiet hours nothing buzzes between your anchor and your usual wake, whatever else is on.",
-        "Automations": "automations automations what the strap does on its own, and what a tap on it does sparkles 3 on rhythm needs reading and ticking a page first. no alarms, no red, no condition names.",
-        "Svea": "svea provider and key anthropic · your key · 5 of 7 grants key what she may read purpose by purpose, revocable shield memory what she keeps between conversations sparkles svea’s manner plain writes a paragraph, quiet writes a line plain quiet direct off",
-        "About": "what noop will not ask you no weight goal no step target no score about check for updates arrow.triangle.2.circlepath cfbundleshortversionstring 0 how noop works how sleep is sorted, how the scores build, where the numbers come from what’s new the four readings in 11.7, and every version before it",
-        "Tools": "tools your data, fused every source merged onto one record, with the winner named storage what noop keeps on this phone, and what can go nutrition bring calories and macros in from a csv trends report a longer read across a window, exportable as a pdf weekly digest this week against last, in your own numbers siri and shortcuts sync, buzz, mark a moment and ask svea, hands-free shortcuts export the healthkit-free path, for a sideloaded build strap limitations 4.0 against 5.0 against mg — what each band can read flask the lab experimental readings, protocol probes and every diagnostic. nothing in here is needed to use noop. noop 5.2.0 · whoop 5.0 / mg · everything on this phone",
-        "Baselines": "recalibrate baselines recovery hrv resting pulse respiration skin temperature restart",
+        "Strap": "your strap connection battery sensors sync manage straps pair switch forget rename band automations double tap move reminder stress check-ins illness live heart rate dynamic island lock screen",
+        "Alerts": "battery alerts charging off-wrist reminder wrist wear notification offer a workout spotted detect auto quiet hours buzz anchor wake",
+        "Battery": "power saving sync 45 minutes low battery pause hrv stream",
+        "Workouts and Today": "keep the screen on workout journal reminder today strip hydration water recalibrate baselines recovery hrv resting pulse respiration skin temperature restart",
+        "Health and data": "apple health healthkit data permissions privacy import history nutrition backup restore noopbak export",
+        "Units and display": "units metric imperial temperature celsius fahrenheit effort 0–21 0–100 reduce motion widgets app icon",
+        "Svea": "svea provider key model anthropic what she may read consent memory manner plain quiet direct",
+        "Siri and Shortcuts": "siri shortcuts sync buzz mark a moment ask svea shortcuts export healthkit-free sideloaded",
+        "About": "check for updates version what’s new release notes how noop works strap limitations 4.0 5.0 mg what noop will not ask you",
+        "Advanced": "lab experiments sleep staging v2 motion-aware wake continuous hrv overnight spo2 broadcast heart rate r22 deep data ecg protocol frames diagnostics strap log raw sensor data export zip experiment phase environment test centre",
+        "Coming later": "later planned buzz for phone notifications mirror bedtime nudge session offer weekly read rhythm appearance light language deutsch chart colours sleep chart card surface day-cycle sky",
         ]
     }
 
@@ -4030,11 +4029,36 @@ private extension NoopAct5Screens {
         }
     }
 
+    /// The bug-report exports, out of the Lab (23 Oct 2026): they are tools, not experiments.
+    var diagnosticsScreen: some View {
+        NoopScreen(topInset: 56) {
+            VStack(alignment: .leading, spacing: 12) {
+                act5BackHeader("Settings", action: navigation.back)
+                pageTitle("Diagnostics", copy: "The exports that make a problem answerable. All local, all plain files; nothing leaves the phone unless you send it.")
+                    .padding(.bottom, 8)
+                labGroup("Exports", blurb: "Send the zip with a note of what went wrong and roughly when.") {
+                    labAction("Copy the strap log", detail: "the connection and protocol trace, as text", symbol: "doc.on.doc")
+                    Divider().overlay(NoopHTMLColor.border)
+                    labAction("Export raw sensor data", detail: "the decoded per-sample streams for the last 24 hours, as CSV", symbol: "arrow.down.to.line")
+                    Divider().overlay(NoopHTMLColor.border)
+                    labAction("Export raw and log together", detail: "one zip, for when the two need reading side by side", symbol: "archivebox")
+                    Divider().overlay(NoopHTMLColor.border)
+                    labAction("Mark an experiment phase", detail: "timestamps the local capture file — sends nothing to the strap", symbol: "clock")
+                    Divider().overlay(NoopHTMLColor.border)
+                    labAction("This phone’s environment", detail: "model, iOS build, data protection, background refresh, certificate expiry", symbol: "doc.text")
+                    Divider().overlay(NoopHTMLColor.border)
+                    labAction("Test Centre", detail: "run a reading against a known input and see where it disagrees", symbol: "flask")
+                }
+
+            }
+        }
+    }
+
     var labScreen: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
                 act5BackHeader("Settings", action: navigation.back)
-                pageTitle("The Lab", copy: "Things that are still being worked out, and the tools for telling someone when they go wrong. Every switch here says what it can and cannot reach.")
+                pageTitle("The Lab", copy: "Readings still being worked out, and probes that touch the strap. Every switch here says what it can and cannot reach. Bug-report exports are in Settings → Diagnostics.")
                     .padding(.bottom, 8)
 
                 VStack(alignment: .leading, spacing: 9) {
@@ -4068,20 +4092,6 @@ private extension NoopAct5Screens {
                     labToggle("ECG raw data", detail: "Stores the raw-ECG config key on an attested MG. One tap writes it, then Noop reads it back rather than trusting the write.", badge: "writes to strap", gate: "Waiting for your strap to identify itself as an MG. Only an MG has the electrodes, so Noop will not write this to anything else.", persistent: true)
                     Divider().overlay(NoopHTMLColor.border)
                     labToggle("Record protocol frames", detail: "Captures raw frames to a file for working out what an undocumented packet means. Local, and large.")
-                }
-
-                labGroup("Diagnostics", blurb: "The exports that make a bug report answerable. All local, all plain files.") {
-                    labAction("Copy the strap log", detail: "the connection and protocol trace, as text", symbol: "doc.on.doc")
-                    Divider().overlay(NoopHTMLColor.border)
-                    labAction("Export raw sensor data", detail: "the decoded per-sample streams for the last 24 hours, as CSV", symbol: "arrow.down.to.line")
-                    Divider().overlay(NoopHTMLColor.border)
-                    labAction("Export raw and log together", detail: "one zip, for when the two need reading side by side", symbol: "archivebox")
-                    Divider().overlay(NoopHTMLColor.border)
-                    labAction("Mark an experiment phase", detail: "timestamps the local capture file — sends nothing to the strap", symbol: "clock")
-                    Divider().overlay(NoopHTMLColor.border)
-                    labAction("This phone’s environment", detail: "model, iOS build, data protection, background refresh, certificate expiry", symbol: "doc.text")
-                    Divider().overlay(NoopHTMLColor.border)
-                    labAction("Test Centre", detail: "run a reading against a known input and see where it disagrees", symbol: "flask")
                 }
 
                 Text("If a probe here changes a reading you care about, it belongs in Settings and not in the Lab. Say so and it will move.")
