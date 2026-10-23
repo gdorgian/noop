@@ -135,7 +135,7 @@ struct NoopTodayDayRibbon: View {
     let sessions: [(start: Date, end: Date, sport: String)]
     let resting: Double?
     let liveBPM: Int?
-    /// Today's stress on the 0–3 scale, drawn as a strip under the line on the same clock.
+    /// Today's stress on the 0–3 scale, summarised in a row under the stats that opens the Stress sheet.
     var stress: [(time: Date, level: Double?, masked: Bool)] = []
     var onStress: (() -> Void)? = nil
     let action: () -> Void
@@ -143,19 +143,6 @@ struct NoopTodayDayRibbon: View {
     @State private var selected: Date?
 
     private var hasStress: Bool { stress.contains { $0.level != nil } }
-    /// The plot runs below the heart-rate floor by one strip's height when there is stress to draw,
-    /// so the strip shares the line's time axis without ever sitting under the line.
-    private var plotDomain: ClosedRange<Double> {
-        guard hasStress else { return yDomain }
-        let span = yDomain.upperBound - yDomain.lowerBound
-        return (yDomain.lowerBound - span * 0.16)...yDomain.upperBound
-    }
-    private var yTicks: [Double] {
-        let span = yDomain.upperBound - yDomain.lowerBound
-        let step = span <= 30 ? 10.0 : span <= 60 ? 20.0 : span <= 120 ? 40.0 : 50.0
-        let first = (yDomain.lowerBound / step).rounded(.up) * step
-        return Array(stride(from: first, through: yDomain.upperBound, by: step))
-    }
 
     private var start: Date { sleep?.start ?? points.first?.time ?? Date() }
     private var now: Date { Date() }
@@ -199,7 +186,7 @@ struct NoopTodayDayRibbon: View {
             .buttonStyle(NoopHTMLPressStyle())
 
             if points.count >= 2 {
-                chart.frame(height: hasStress ? 190 : 176)
+                chart.frame(height: 176)
                 stats
                 if hasStress, let onStress { stressRow(onStress) }
             } else {
@@ -241,18 +228,6 @@ struct NoopTodayDayRibbon: View {
             ForEach(Array(sessions.enumerated()), id: \.offset) { _, s in
                 band(from: s.start, to: max(s.end, s.start.addingTimeInterval(600)), tint: NoopHTMLColor.warm,
                      symbol: NoopFitnessCardioLive.symbol(for: s.sport))
-            }
-            if hasStress {
-                let span = yDomain.upperBound - yDomain.lowerBound
-                ForEach(Array(stress.enumerated()), id: \.offset) { _, p in
-                    if p.level != nil || p.masked {
-                        RectangleMark(xStart: .value("From", p.time.addingTimeInterval(-900)),
-                                      xEnd: .value("To", p.time.addingTimeInterval(900)),
-                                      yStart: .value("Strip", plotDomain.lowerBound + span * 0.015),
-                                      yEnd: .value("Strip", plotDomain.lowerBound + span * 0.075))
-                            .foregroundStyle(p.level.map(NoopStressPalette.color) ?? Color.white.opacity(0.12))
-                    }
-                }
             }
             if let resting {
                 RuleMark(y: .value("Resting", resting))
@@ -309,9 +284,9 @@ struct NoopTodayDayRibbon: View {
         }
         .padding(.top, 22)
         .chartXScale(domain: start...max(now, start.addingTimeInterval(3600)))
-        .chartYScale(domain: plotDomain)
+        .chartYScale(domain: yDomain)
         .chartYAxis {
-            AxisMarks(position: .trailing, values: yTicks) { _ in
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.white.opacity(0.05))
                 AxisValueLabel().font(NoopHTMLFont.sans(9)).foregroundStyle(NoopHTMLColor.faint)
             }

@@ -29,6 +29,7 @@ enum StressDayCurve {
         let maxTs: Int
         let day: Int
         let personalBaseline: Bool
+        let asleep: ClosedRange<Int>?
         let result: DaytimeStress.Result
     }
 
@@ -55,7 +56,8 @@ enum StressDayCurve {
     @MainActor
     static func today(repo: Repository, now: Date = Date(),
                       calendar: Calendar = .current,
-                      personalBaseline: Bool = false) async -> (result: DaytimeStress.Result, day: Int)? {
+                      personalBaseline: Bool = false,
+                      asleep: ClosedRange<Int>? = nil) async -> (result: DaytimeStress.Result, day: Int)? {
         let startOfDay = calendar.startOfDay(for: now)
         let from = Int(startOfDay.timeIntervalSince1970)
         let to = Int(now.timeIntervalSince1970)
@@ -67,11 +69,13 @@ enum StressDayCurve {
         // serve yesterday's curve as today's.
         // Foreground Today and the widget publisher can call in either order. Include the requested
         // lens so an unchanged HR fingerprint can never replay one surface's result into the other.
-        if let memo = memos[personalBaseline], memo.day == day,
+        if let memo = memos[personalBaseline], memo.day == day, memo.asleep == asleep,
            memo.count == fingerprint.count, memo.maxTs == fingerprint.maxTs {
             return (memo.result, day)
         }
 
+        // `asleep`: the night's sleep window, when the caller knows it. Its hours are scored (the
+        // night's stress is drawn) but kept out of the day's calm reference; see `DaytimeStress`.
         let hr = await repo.hrSamples(from: from, to: to, limit: 200_000)
         var scored: DaytimeStress.Result = .empty
         if hr.count >= DaytimeStress.minHourHRSamples {
@@ -107,13 +111,13 @@ enum StressDayCurve {
             scored = await runUnescalated {
                 DaytimeStress.analyze(hr: hr, rr: rr, gravity: gravity,
                                       tzOffsetSeconds: tz, mode: mode,
-                                      includeTimeline: true)
+                                      includeTimeline: true, asleep: asleep.map { [$0] } ?? [])
             }
         }
         // Too little signal leaves an EMPTY result, which is a real answer about today rather than a
         // refusal: a reader should drop yesterday's line rather than keep drawing it.
         memos[personalBaseline] = Memo(count: fingerprint.count, maxTs: fingerprint.maxTs, day: day,
-                                       personalBaseline: personalBaseline, result: scored)
+                                       personalBaseline: personalBaseline, asleep: asleep, result: scored)
         return (scored, day)
     }
 

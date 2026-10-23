@@ -546,7 +546,8 @@ struct NoopAct2Screens: View {
                             .sheet(isPresented: $showingStress) {
                                 NoopStressSheet(timeline: day.stressTimeline, scoredHours: day.stressScoredHours,
                                                 sleep: day.ribbonSleep, sessions: day.ribbonSessions,
-                                                personal: day.stressPersonal)
+                                                personal: day.stressPersonal,
+                                                onBreathe: { navigation.push(.breathe) })
                                     .presentationDetents([.large])
                                     .presentationDragIndicator(.visible)
                                     .presentationBackground(NoopHTMLColor.canvas)

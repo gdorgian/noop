@@ -346,7 +346,8 @@ public enum DaytimeStress {
                                gravity: [GravitySample] = [],
                                tzOffsetSeconds: Int = 0,
                                mode: ScoringMode = .dayRelative,
-                               includeTimeline: Bool = false) -> Result {
+                               includeTimeline: Bool = false,
+                               asleep: [ClosedRange<Int>] = []) -> Result {
         // v7.0.2 perf (#707): buckets the day's full HR + R-R streams into per-hour aggregates and runs an
         // RMSSD per hour — invoked from the Stress view, so a `body` re-evaluation re-buckets the whole day.
         // Memoize on the streams' fingerprint + tz offset + scoring mode; result is a small `Result`, raw
@@ -372,16 +373,18 @@ public enum DaytimeStress {
             // The flag is part of the KEY, not just the call. Without it a screen read (false)
             // would seed the cache with a hourly-only result and the next widget read (true) would be
             // handed it, silently losing the sliding series with nothing to show why.
-            tz: tzOffsetSeconds, mode: modeKey, includeTimeline: includeTimeline)
+            tz: tzOffsetSeconds, mode: modeKey, includeTimeline: includeTimeline,
+            asleep: asleep.map { [$0.lowerBound, $0.upperBound] })
         return analyzeCache.value(key) {
             analyzeUncached(hr: hr, rr: rr, gravity: gravity, tzOffsetSeconds: tzOffsetSeconds,
-                            mode: mode, includeTimeline: includeTimeline)
+                            mode: mode, includeTimeline: includeTimeline, asleep: asleep)
         }
     }
 
     private struct StressKey: Hashable {
         let hr: StreamFingerprint; let rr: StreamFingerprint; let gravity: StreamFingerprint
         let tz: Int; let mode: ModeKey; let includeTimeline: Bool
+        let asleep: [[Int]]
     }
 
     /// Hashable fingerprint of `ScoringMode` for the memo cache — `BaselineState` itself isn't
@@ -397,8 +400,21 @@ public enum DaytimeStress {
     private static func analyzeUncached(hr: [HRSample], rr: [RRInterval],
                                         gravity: [GravitySample],
                                         tzOffsetSeconds: Int, mode: ScoringMode,
-                                        includeTimeline: Bool) -> Result {
+                                        includeTimeline: Bool,
+                                        asleep: [ClosedRange<Int>] = []) -> Result {
         guard !hr.isEmpty else { return .empty }
+
+        // `asleep` (wall-clock unix ranges): the caller's known sleep. An hour at least half inside
+        // it is SCORED whatever the clock says, so the night's stress can be drawn, but it never
+        // builds the day's calm reference: sleeping heart rate is the lowest of the day, and a
+        // reference built on it reads every waking hour as high. Empty keeps the clock window alone.
+        func isAsleep(_ bucket: Int) -> Bool {
+            guard !asleep.isEmpty else { return false }
+            let start = bucket - tzOffsetSeconds, end = start + bucketSeconds
+            return asleep.contains { r in
+                min(end, r.upperBound) - max(start, r.lowerBound) >= bucketSeconds / 2
+            }
+        }
 
         // 1) Bucket HR + R-R into LOCAL hour-of-day buckets, keyed by the bucket start
         //    (floored to the hour on the local clock).
@@ -489,7 +505,7 @@ public enum DaytimeStress {
             // Ambulatory hours are excluded from the day's OWN calm reference too (the motion
             // gate): an exertion hour's elevated HR / suppressed HRV must not pull the calm
             // anchor up or inflate the across-hour spread the z-scores divide by.
-            let referenceAggs = aggs.filter { isWakingHour($0.bucket) && !isAmbulatory($0.bucket) }
+            let referenceAggs = aggs.filter { isWakingHour($0.bucket) && !isAsleep($0.bucket) && !isAmbulatory($0.bucket) }
             let hrMeans = referenceAggs.compactMap { $0.meanHR }
             let rmssdVals = referenceAggs.compactMap { $0.rmssd }
             refHR = calmReference(hrMeans, calmIsLow: true)         // calm HR is LOW
@@ -541,7 +557,7 @@ public enum DaytimeStress {
             var points: [HourPoint] = []
             points.reserveCapacity(gridAggs.count)
             for a in gridAggs {
-            guard isWakingHour(a.bucket) else { continue }
+            guard isWakingHour(a.bucket) || isAsleep(a.bucket) else { continue }
             let hourOfDay = floorDiv(a.bucket, bucketSeconds) % 24
             // The wall-clock bucket start (undo the local shift applied above).
             let wallStart = a.bucket - tzOffsetSeconds

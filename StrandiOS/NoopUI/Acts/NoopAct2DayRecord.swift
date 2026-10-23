@@ -127,7 +127,9 @@ final class NoopDayStore: ObservableObject {
         let stressMode = await DaytimeStressMode.selected(repo: repo, startOfToday: midnight,
                                                           calendar: calendar, personalBaseline: true)
         if case .baselineRelative = stressMode { next.stressPersonal = true }
-        if let stress = await StressDayCurve.today(repo: repo, now: now, calendar: calendar, personalBaseline: true) {
+        let asleep = next.ribbonSleep.map { Int($0.start.timeIntervalSince1970)...Int($0.end.timeIntervalSince1970) }
+        if let stress = await StressDayCurve.today(repo: repo, now: now, calendar: calendar, personalBaseline: true,
+                                                   asleep: asleep) {
             next.stressTimeline = stress.result.timeline.map {
                 (Date(timeIntervalSince1970: TimeInterval($0.startTs + DaytimeStress.bucketSeconds / 2)), $0.level, $0.maskedForActivity)
             }
