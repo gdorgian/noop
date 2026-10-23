@@ -218,7 +218,8 @@ struct NOOPLiveActivity: Widget {
         guard freshBPM(context) != nil else { return "No reading" }
         if overCeiling(context) { return "Over your ceiling" }
         guard let zone = context.state.zoneNumber else { return "Zone unavailable" }
-        if zone == 0 { return "Below Zone 1" }
+        // Under Zone 1 (50% of maximum) is ordinary resting and daily-life heart rate, not a zone.
+        if zone == 0 { return "Resting" }
         guard (1...5).contains(zone) else { return "Zone unavailable" }
         switch zone {
         case 1: return "Zone 1 · easy"

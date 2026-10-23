@@ -1047,7 +1047,19 @@ private extension NoopAct5Screens {
                         }
                     }
                 }
-                Text("Optional. It stays on this phone and is never uploaded — Noop has no account to upload it to.")
+                Divider().overlay(NoopHTMLColor.border)
+                HStack(spacing: 12) {
+                    Text("Name").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                    TextField("What Today greets you by", text: $profile.name)
+                        .font(NoopHTMLFont.sans(13.5))
+                        .foregroundStyle(NoopHTMLColor.inkSoft)
+                        .multilineTextAlignment(.trailing)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .submitLabel(.done)
+                }
+                .frame(minHeight: 36)
+                Text("Optional, like the photo. Both stay on this phone and are never uploaded — Noop has no account to upload them to.")
                     .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
             }
             .padding(.vertical, 3.5)

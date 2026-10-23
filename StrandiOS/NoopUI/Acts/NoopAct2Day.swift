@@ -828,25 +828,15 @@ struct NoopAct2Screens: View {
     }
 
     private var todayHeader: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                // The greeting names the wearer from their own record; with no name set the line is
-                // left out rather than greeting the example person.
-                if let greeting = todayGreeting {
-                Text(greeting)
-                    .font(NoopHTMLFont.sans(13.5))
-                    .foregroundStyle(NoopHTMLColor.copy)
-                }
-                Text(isHistorical ? dayContext.header : "Take four breaths first")
-                    .font(NoopHTMLFont.outfit(23))
-                    .tracking(-0.46)
-                    // CSS: Outfit 23px / 1.15. The final header also carries the Updates
-                    // bell, so flexbox gives the copy the remaining width and wraps it there.
-                    .lineSpacing(-2.53)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(minHeight: 52.9, alignment: .leading)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        // One row for the greeting and the controls, centred on each other; the line under it has
+        // the full width (23 Oct 2026).
+        VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .center, spacing: 14) {
+            Text(todayGreeting ?? "")
+                .font(NoopHTMLFont.sans(14.5, weight: .medium))
+                .foregroundStyle(NoopHTMLColor.copy)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 9) {
                 NoopBatteryChip(percent: day == nil ? 52 : battery) { navigation.push(.strap) }
@@ -873,12 +863,9 @@ struct NoopAct2Screens: View {
                 Button { navigation.push(.inbox) } label: {
                     ZStack(alignment: .topTrailing) {
                         NoopCanonicalGlyph(name: .bell, size: 15, color: NoopHTMLColor.inkSoft)
-                            .frame(width: 32, height: 32)
-                            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 11))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 11)
-                                    .stroke(Color.white.opacity(0.09), lineWidth: 0.5)
-                            )
+                            .frame(width: 34, height: 34)
+                            .background(Color.white.opacity(0.06), in: Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 0.5))
 
                         if inboxUnreadCount > 0 {
                             Text("\(min(inboxUnreadCount, 99))")
@@ -892,7 +879,7 @@ struct NoopAct2Screens: View {
                                 .offset(x: 4, y: -4)
                         }
                     }
-                    .frame(width: 32, height: 32)
+                    .frame(width: 34, height: 34)
                 }
                 .buttonStyle(NoopPlainHitStyle())
                 .accessibilityLabel(
@@ -901,8 +888,13 @@ struct NoopAct2Screens: View {
                         : "Updates"
                 )
             }
-            .padding(.top, 4)
             .fixedSize(horizontal: true, vertical: false)
+        }
+            Text(isHistorical ? dayContext.header : "Take four breaths first")
+                .font(NoopHTMLFont.outfit(25))
+                .tracking(-0.5)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.bottom, 4)
     }
@@ -1062,6 +1054,14 @@ struct NoopAct2Screens: View {
         .onAppear {
             if !NoopContentPolicy.allowsPrototypeContent {
                 updateStore.pruneExpired()
+                // Opening Updates is reading them. Only a proposal still waiting on a yes or no
+                // keeps the bell counting.
+                for item in updateStore.items where !item.read {
+                    let waiting = item.category == .actionable
+                        && inboxDecision(for: item.id.uuidString) == nil
+                        && storedDecision(for: item.planProposalId) == nil
+                    if !waiting { updateStore.markRead(item.id) }
+                }
             }
         }
     }
