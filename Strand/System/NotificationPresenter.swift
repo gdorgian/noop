@@ -23,6 +23,9 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     /// root has wired it.
     var onCoachBriefTapped: (() -> Void)?
 
+    /// Posted with the session's start (unix seconds) when a detected-activity notification is tapped.
+    static let activityTapped = Notification.Name("noop.activityNotificationTapped")
+
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -41,6 +44,12 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     ) {
         if response.notification.request.content.categoryIdentifier == CoachBriefScheduler.notificationCategoryId {
             onCoachBriefTapped?()
+        }
+        // A detected-activity notice opens that session's sheet.
+        if let start = response.notification.request.content.userInfo["activityStart"] as? Int {
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Self.activityTapped, object: start)
+            }
         }
         completionHandler()
     }

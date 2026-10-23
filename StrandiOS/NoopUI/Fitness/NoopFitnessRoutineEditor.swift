@@ -436,12 +436,7 @@ struct NoopFitnessRoutineEditor: View {
                     integerField("Rest", value: Binding(get: { set.wrappedValue.restSeconds ?? value.plan.restSeconds },
                                                         set: { set.wrappedValue.restSeconds = $0 }))
                 }
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 30).onEnded { drag in
-                    if drag.translation.width < -70 && abs(drag.translation.height) < 40 {
-                        removeSet(set.wrappedValue.id, from: value.id)
-                    }
-                })
+                .modifier(NoopSwipeToDelete { removeSet(set.wrappedValue.id, from: value.id) })
                 .contextMenu { Button("Delete set", role: .destructive) { removeSet(set.wrappedValue.id, from: value.id) } }
                 .accessibilityAction(named: "Delete set") { removeSet(set.wrappedValue.id, from: value.id) }
             }
@@ -693,3 +688,56 @@ struct NoopFitnessProgressionEditor: View {
     }
 }
 #endif
+
+/// Swipe a row left to delete it, the way Mail and Reminders do: the row follows the finger over a red
+/// strip with a trash symbol, a long enough swipe sends it off and deletes, a short one springs back.
+/// Only a clearly horizontal drag is taken, so the page still scrolls.
+struct NoopSwipeToDelete: ViewModifier {
+    let onDelete: () -> Void
+    @State private var offset: CGFloat = 0
+    @State private var tracking = false
+    private let trigger: CGFloat = 96
+
+    func body(content: Content) -> some View {
+        content
+            .background(NoopHTMLColor.card)
+            .offset(x: offset)
+            .background(alignment: .trailing) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(NoopHTMLColor.red.opacity(min(1, 0.35 + Double(-offset / trigger) * 0.65)))
+                    .overlay(alignment: .trailing) {
+                        Image(systemName: "trash.fill").font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .scaleEffect(-offset >= trigger ? 1.15 : 1)
+                            .padding(.trailing, 16)
+                    }
+                    .opacity(offset < -4 ? 1 : 0)
+            }
+            .contentShape(Rectangle())
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 16)
+                    .onChanged { drag in
+                        if !tracking {
+                            guard abs(drag.translation.width) > abs(drag.translation.height) * 1.6 else { return }
+                            tracking = true
+                        }
+                        offset = min(0, drag.translation.width)
+                    }
+                    .onEnded { drag in
+                        defer { tracking = false }
+                        guard tracking else { return }
+                        if -drag.translation.width >= trigger || drag.predictedEndTranslation.width < -trigger * 2 {
+                            withAnimation(.easeIn(duration: 0.18)) { offset = -500 }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { onDelete() }
+                                offset = 0
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { offset = 0 }
+                        }
+                    }
+            )
+            .sensoryFeedback(.impact(weight: .medium), trigger: -offset >= trigger)
+            .clipped()
+    }
+}

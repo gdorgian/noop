@@ -299,8 +299,10 @@ struct NoopFitnessHome: View {
             .padding(.bottom, 20)
         case .routines:
             sectionTitle("Routines") {
-                Button("See all") { allRoutines = true }
-                    .font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                if !s.routines.isEmpty {
+                    Button("See all") { allRoutines = true }
+                        .font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                }
                 Menu {
                     Button { newRoutine() } label: { Label("New routine", systemImage: "plus") }
                     Button { planning = true } label: { Label("Plan a routine", systemImage: "calendar.badge.plus") }

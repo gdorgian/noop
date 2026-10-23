@@ -570,6 +570,7 @@ struct NoopVerifiedAppShell: View {
     @StateObject private var liftFlow = NoopLiftFlowModel()
     @StateObject private var fitnessStore = NoopFitnessModel()
     @StateObject private var fitnessSettings = NoopFitnessSettings()
+    @State private var tappedActivity: WorkoutRow?
     @StateObject private var restStore = NoopRestStore()
     @StateObject private var dayStore = NoopDayStore()
     @StateObject private var trendsStore = NoopTrendsStore()
@@ -784,6 +785,20 @@ struct NoopVerifiedAppShell: View {
         .simultaneousGesture(verifiedBackGesture)
         .sheet(isPresented: Binding(get: { navigation.fitnessSheet != nil }, set: { if !$0 { navigation.fitnessSheet = nil } })) {
             NoopFitnessSheet(navigation: navigation, fitness: fitnessStore)
+        }
+        .sheet(item: Binding(get: { tappedActivity.map(NoopTappedActivity.init) }, set: { tappedActivity = $0?.row })) { item in
+            NoopActivityConfirmSheet(row: item.row)
+                .environmentObject(repo)
+                .noopSheet()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NotificationPresenter.activityTapped)) { note in
+            guard let start = note.object as? Int else { return }
+            Task { @MainActor in
+                // The row may be renamed or moved by a minute since the notice; take the closest one.
+                tappedActivity = (await repo.workoutRows(days: 3))
+                    .filter { abs($0.startTs - start) <= 20 * 60 }
+                    .min { abs($0.startTs - start) < abs($1.startTs - start) }
+            }
         }
         .sheet(isPresented: $navigation.addSheetPresented) {
             NoopFitnessAddSheet(navigation: navigation)
@@ -2757,4 +2772,10 @@ private struct NoopGlassBar: ViewModifier {
                 )
         }
     }
+}
+
+/// A tapped detected-activity notification's session, as a sheet item.
+private struct NoopTappedActivity: Identifiable {
+    let row: WorkoutRow
+    var id: String { "\(row.source):\(row.startTs)" }
 }

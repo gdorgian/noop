@@ -195,6 +195,7 @@ struct NoopSessionHeart: View {
     @State private var minutes: [Double] = []
     @State private var loaded = false
     @State private var selected: Date?
+    @State private var recovery: HeartRateRecovery.Result?
 
     static let zoneColors: [Color] = [Color(hex: 0x7C8C96), Color(hex: 0x4FB8E8), Color(hex: 0x6FCFB4),
                                       NoopHTMLColor.volt, Color(hex: 0xF2B45C), Color(hex: 0xEF7A5A)]
@@ -207,6 +208,11 @@ struct NoopSessionHeart: View {
                 NoopSessionHeading(title: "Heart")
                 rateCard
                 if !minutes.isEmpty { zonesCard }
+                recoveryCard
+            } else if loaded {
+                NoopSessionHeading(title: "Heart")
+                Text("No heart rate was recorded during this session.")
+                    .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
             }
         }
         .task(id: "\(start):\(end)") { await load() }
@@ -369,6 +375,57 @@ struct NoopSessionHeart: View {
         }
     }
 
+    /// How far the pulse fell in the first minute after the session ended — the standard recovery read.
+    /// It needs the session to end hard (Zone 3 or above) and the strap on for the minutes after.
+    private var recoveryCard: some View {
+        let drop1 = recovery.flatMap { r in r.after1Minute.map { r.endHR - $0 } }
+        let bands: [(String, Int)] = [("Poor", 0), ("Fair", 12), ("Good", 20), ("Great", 30), ("Superior", 40)]
+        return NoopSessionCard {
+            VStack(alignment: .leading, spacing: 14) {
+                NoopSessionCardTitle(symbol: "arrow.down.heart.fill", title: "Heart rate recovery")
+                if let r = recovery, r.hasMeasurement {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(drop1.map { "−\($0)" } ?? "—").font(NoopHTMLFont.outfit(34, weight: .medium))
+                            .foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+                        Text("bpm in the first minute").font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    }
+                    HStack(spacing: 18) {
+                        step("End", r.endHR)
+                        if let v = r.after1Minute { step("1 min", v) }
+                        if let v = r.after2Minutes { step("2 min", v) }
+                        if let v = r.after5Minutes { step("5 min", v) }
+                    }
+                } else {
+                    Text("Shown when a session ends at Zone 3 or above and the strap stays on for a few minutes after.")
+                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                VStack(spacing: 6) {
+                    HStack(spacing: 3) {
+                        ForEach(Array(bands.enumerated()), id: \.offset) { i, b in
+                            let next = i + 1 < bands.count ? bands[i + 1].1 : Int.max
+                            let here = drop1.map { $0 >= b.1 && $0 < next } ?? false
+                            Capsule().fill(here ? Self.zoneColors[min(i + 1, 5)] : Color.white.opacity(0.07)).frame(height: 7)
+                        }
+                    }
+                    HStack(spacing: 3) {
+                        ForEach(bands, id: \.0) { b in
+                            Text(b.0).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func step(_ label: String, _ bpm: Int) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
+            Text("\(bpm)").font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+        }
+    }
+
     private func clock(_ minutes: Double) -> String {
         let s = Int((minutes * 60).rounded())
         return String(format: "%d:%02d", s / 60, s % 60)
@@ -386,6 +443,7 @@ struct NoopSessionHeart: View {
         } else {
             minutes = []
         }
+        recovery = await repo.workoutHeartRateRecovery(from: start, to: end, maxHR: zoneSet.maxHR, source: source)
         loaded = true
     }
 }

@@ -33,7 +33,8 @@ enum ActivityNotifier {
             ? String(localized: "\(minutes) min of \(row.sport) logged")
             : String(localized: "\(minutes) min activity logged")
         post(id: "activity-logged-\(row.startTs)", title: title,
-             body: String(localized: "\(clock(row.startTs))–\(clock(row.endTs)). Open Noop to confirm what it was, so detection keeps getting better."))
+             body: String(localized: "\(clock(row.startTs))–\(clock(row.endTs)). Open Noop to confirm what it was, so detection keeps getting better."),
+             start: row.startTs)
     }
 
     /// True the first time a bout near `start` is seen for this notification; remembers the last few.
@@ -50,7 +51,7 @@ enum ActivityNotifier {
         AppClock.hourMinuteFormatter().string(from: Date(timeIntervalSince1970: TimeInterval(ts)))
     }
 
-    private static func post(id: String, title: String, body: String) {
+    private static func post(id: String, title: String, body: String, start: Int? = nil) {
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { settings in
             let send = {
@@ -58,7 +59,9 @@ enum ActivityNotifier {
                 content.title = title
                 content.body = body
                 content.sound = .default
-                content.userInfo = ["route": "fitness"]
+                var info: [String: Any] = ["route": "fitness"]
+                if let start { info["activityStart"] = start }
+                content.userInfo = info
                 center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
             }
             switch settings.authorizationStatus {

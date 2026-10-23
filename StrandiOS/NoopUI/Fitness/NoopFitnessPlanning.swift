@@ -107,6 +107,7 @@ struct NoopFitnessEditScreen: View {
     @ObservedObject var navigation: NoopNavigation
     @ObservedObject var layout: NoopFitnessSettings
     @AppStorage(Repository.autoLogActivitiesKey) private var autoLog = true
+    @AppStorage(ActivityNotifier.enabledKey) private var activityNotices = true
 
     var body: some View {
         NoopFitnessPage(navigation: navigation, title: "Edit Fitness",
@@ -141,6 +142,16 @@ struct NoopFitnessEditScreen: View {
                         }
                     }
                     .tint(NoopHTMLColor.volt)
+                    Toggle(isOn: $activityNotices) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Notify me").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("While a session is under way, and once it has been logged, so you can confirm what it was.")
+                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .tint(NoopHTMLColor.volt)
+                    .disabled(!autoLog)
                 }
                 Button {
                     layout.sections = NoopFitnessSettings.Section.allCases

@@ -2054,6 +2054,7 @@ struct NoopInstrumentSignalPickerSheet: View {
                         .stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5)
                 }
                 .shadow(color: .black.opacity(0.6), radius: 22, y: -14)
+                .noopDragToDismiss(navigation.dismissOverlay)
             }
             .frame(width: viewportWidth, height: proxy.size.height)
         }
