@@ -477,7 +477,11 @@ struct NoopAct2Screens: View {
                     .buttonStyle(NoopPlainHitStyle())
                     }
 
-                    if day == nil || todayLastSleepLine != nil {
+                    if let day, let night = day.rest.latest, day.rest.needMin > 0 {
+                        NoopTodayNightCard(night: night, needMin: day.rest.needMin,
+                                           debtMin: day.rest.debt.last?.minutes,
+                                           nightWorker: isNightWorker) { navigation.push(.rest) }
+                    } else if day == nil || todayLastSleepLine != nil {
                     HStack(spacing: 12) {
                         Act2Glyph(.moon, size: 19, color: NoopHTMLColor.night)
                         VStack(alignment: .leading, spacing: 2) {
@@ -534,6 +538,11 @@ struct NoopAct2Screens: View {
                     }
                     .buttonStyle(NoopHTMLPressStyle())
 
+                    if let day {
+                        NoopTodayDayRibbon(points: day.ribbonPoints, sleep: day.ribbonSleep,
+                                           sessions: day.ribbonSessions, resting: todayResting?.value,
+                                           liveBPM: liveBPM) { navigation.push(.heart) }
+                    } else {
                     Button { navigation.push(.day) } label: {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(alignment: .firstTextBaseline) {
@@ -575,12 +584,14 @@ struct NoopAct2Screens: View {
                         .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
+                    }
 
                     if let day { NoopTodayEnergyCard(record: day) { navigation.push(.energy) } } else { energyCard }
 
                     // Today's session moved to Fitness on 23 Oct 2026; training has one home there.
                     if !isHistorical { NoopActivityOffer() }
 
+                    if day == nil {
                     Act2TodayHeartRow(
                         anchor: todayPulseAnchor,
                         wakeCharge: dayContext.wakeCharge,
@@ -590,8 +601,11 @@ struct NoopAct2Screens: View {
                         measured: day != nil,
                         liveBPM: liveBPM
                     ) { navigation.push(.heart) }
+                    }
 
-                    // Rest left the tab bar for Fitness (22 Oct 2026); last night is one tap from here.
+                    // Rest left the tab bar for Fitness (22 Oct 2026). With a night on record the sleep
+                    // card above is its door; this row stays for a phone with no night yet.
+                    if day?.rest.latest == nil || (day?.rest.needMin ?? 0) <= 0 {
                     act2DestinationRow(
                         title: "Rest",
                         detail: "Last night, tonight and sleep debt",
@@ -600,6 +614,7 @@ struct NoopAct2Screens: View {
                         value: nil,
                         valueColor: NoopHTMLColor.nightLight
                     ) { navigation.push(.rest) }
+                    }
 
                     act2DestinationRow(
                         title: "Vitals",

@@ -22,6 +22,11 @@ struct NoopDayRecord {
     var dayStart: Date?
     /// The same five-minute buckets with their start times, for the scrubbable day and the Heart chart.
     var dayHRPoints: [(ts: Int, bpm: Double, maxBpm: Double)] = []
+    /// Today's ribbon: bedtime to now as one line, with the sleep and the sessions inside it.
+    var ribbonStart: Date?
+    var ribbonSleep: (start: Date, end: Date)?
+    var ribbonPoints: [(time: Date, bpm: Double)] = []
+    var ribbonSessions: [(start: Date, end: Date, sport: String)] = []
     /// Where the latest scored stress hour sits on the 0–3 proxy. Nil when nothing has been scored.
     var stressLevel: Double?
     /// Today's hourly stress steps (0–3), earliest first. Nil for an hour with too little signal.
@@ -71,6 +76,44 @@ final class NoopDayStore: ObservableObject {
         let clean = buckets.filter { $0.bpm.isFinite && $0.bpm > 0 }
         next.dayHR = clean.map(\.bpm)
         next.dayHRPoints = clean.map { ($0.ts, $0.bpm, $0.maxBpm) }
+
+        // The ribbon starts at last night's bedtime when that night ended in the last 20 hours, so
+        // the night's low line runs straight into the day; otherwise it starts at midnight.
+        let ribbonStart: Date
+        if let night = next.rest.latest, now.timeIntervalSince(night.endDate) < 20 * 3600 {
+            let sleepStart = night.bed?.inBed
+                ?? night.endDate.addingTimeInterval(-(night.asleepMin + night.stages.awake) * 60)
+            next.ribbonSleep = (sleepStart, night.bed?.outOfBed ?? night.endDate)
+            ribbonStart = sleepStart
+        } else {
+            ribbonStart = midnight
+        }
+        next.ribbonStart = ribbonStart
+        let ribbonBuckets = await repo.hrBuckets(from: Int(ribbonStart.timeIntervalSince1970),
+                                                 to: Int(now.timeIntervalSince1970), bucketSeconds: 300)
+        next.ribbonPoints = ribbonBuckets.filter { $0.bpm.isFinite && $0.bpm > 0 }
+            .map { (Date(timeIntervalSince1970: TimeInterval($0.ts)), $0.bpm) }
+        #if DEBUG
+        // `--noop-ribbon-demo`: a synthetic night-into-day line for checking the Today ribbon.
+        if CommandLine.arguments.contains("--noop-ribbon-demo"), next.ribbonPoints.count < 2 {
+            let wake = next.ribbonSleep?.end ?? ribbonStart.addingTimeInterval(7 * 3600)
+            next.ribbonPoints = stride(from: ribbonStart, to: now, by: 300).map { t in
+                let asleep = t < wake
+                let x = t.timeIntervalSince(ribbonStart) / 3600
+                let workout = abs(t.timeIntervalSince(wake.addingTimeInterval(3 * 3600))) < 1500
+                let base = asleep ? 54 + 3 * sin(x * 1.3) : 68 + 6 * sin(x * 0.9) + 4 * sin(x * 3.1)
+                return (t, workout ? base + 70 : base)
+            }
+            next.ribbonSessions = [(wake.addingTimeInterval(3 * 3600 - 1500), wake.addingTimeInterval(3 * 3600 + 1500), "Running")]
+        }
+        #endif
+        if let store = await repo.storeHandle(),
+           let rows = try? await store.workouts(deviceId: repo.deviceId, from: Int(ribbonStart.timeIntervalSince1970),
+                                                to: Int(now.timeIntervalSince1970), limit: 20) {
+            next.ribbonSessions = rows.map {
+                (Date(timeIntervalSince1970: TimeInterval($0.startTs)), Date(timeIntervalSince1970: TimeInterval($0.endTs)), $0.sport)
+            }.sorted { $0.start < $1.start }
+        }
 
         if let stress = await StressDayCurve.today(repo: repo, now: now, calendar: calendar) {
             next.stressLevel = stress.result.timeline.last(where: { $0.level != nil })?.level
