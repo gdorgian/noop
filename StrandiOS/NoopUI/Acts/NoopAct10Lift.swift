@@ -525,17 +525,18 @@ private struct NoopLiftLiveScreen: View {
             NoopFitnessExercisePicker(yours: vocabulary) { choice in
                 _ = live.addExercise(choice.name, primaryMuscle: choice.primary, secondaryMuscles: choice.secondaries)
             }
+            .noopSheet()
         }
         .sheet(item: $lastTimeFor) { target in
             NoopLiftLastTimeSheet(exercise: target.name, sets: lastTime[target.name] ?? [:], units: units)
-                .presentationDetents([.medium])
+                .noopSheet([.medium])
         }
         .sheet(isPresented: $ratingEffort) {
             NoopLiftEffortSheet(rating: $sessionRpe) {
                 ratingEffort = false
                 Task { await finish(includeShownValues: true) }
             }
-            .presentationDetents([.large])
+            .noopSheet()
             .interactiveDismissDisabled(saving)
         }
         .alert("End the workout?", isPresented: $showFinish) {
@@ -1756,6 +1757,7 @@ private struct NoopLiftDetailScreen: View {
                 rating = false
                 Task { await saveRpe() }
             }
+            .noopSheet()
         }
     }
 
@@ -3056,7 +3058,7 @@ struct NoopLiftEffortSheet: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Text("How hard was that?").font(NoopHTMLFont.outfit(24)).foregroundStyle(NoopHTMLColor.ink)
+            Text("How hard was that?").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                 .padding(.top, 34)
             Text("Your own read of the whole session. It sits beside the heart-rate figures, which cannot see a heavy set.")
                 .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)

@@ -104,6 +104,7 @@ struct NoopActivityOffer: View {
                 save(row, selection: selection)
             }
             .environmentObject(repo)
+            .noopSheet()
         }
         .alert("Activity wasn’t saved", isPresented: $saveFailed) {
             Button("OK", role: .cancel) { }

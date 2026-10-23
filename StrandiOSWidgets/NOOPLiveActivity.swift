@@ -28,7 +28,7 @@ struct NOOPLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: NOOPActivityAttributes.self) { context in
             lockScreen(context)
-                .activityBackgroundTint(Color(.sRGB, red: 20 / 255, green: 24 / 255, blue: 23 / 255, opacity: 1))
+                .activityBackgroundTint(Color(.sRGB, red: 10 / 255, green: 13 / 255, blue: 13 / 255, opacity: 0.86))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -56,7 +56,7 @@ struct NOOPLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 9) {
                         figure(context, size: 40)
-                        zoneStrip(context)
+                        track(context)
                         status(context)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -97,31 +97,100 @@ struct NOOPLiveActivity: Widget {
             .shadow(color: freshBPM(context) == nil ? .clear : heartRed.opacity(0.55), radius: 4)
     }
 
+    /// The lock-screen banner, seen many times a day: an aura orb that takes the colour of the zone you
+    /// are in, the figure large and light beside it, and one track from resting to Zone 5 with the
+    /// current band lit. Nothing on it moves except when a reading arrives.
     private func lockScreen(_ context: ActivityViewContext<NOOPActivityAttributes>) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(spacing: 7) {
-                heart(context, size: 12)
-                Text("Noop Aura · Live heart rate")
-                    .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 10))
-                    .tracking(1.3)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Color(.sRGB, red: 147 / 255, green: 156 / 255, blue: 151 / 255, opacity: 1))
-            }
-            HStack(alignment: .lastTextBaseline, spacing: 14) {
-                figure(context, size: 46)
-                Spacer(minLength: 0)
-                Text(zoneLabel(context))
-                    .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 12))
-                    .foregroundStyle(zoneInk(context))
-                    .lineLimit(1)
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                zoneStrip(context)
-                status(context)
+        let tone = auraTone(context)
+        return HStack(alignment: .center, spacing: 16) {
+            orb(context, tone: tone)
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if freshBPM(context) != nil {
+                        figure(context, size: 44)
+                    } else {
+                        Text(context.state.lastBPM.map { "\($0)" } ?? "\u{2013}")
+                            .font(.custom(NoopSpecType.Face.outfitLight, fixedSize: 44))
+                            .foregroundStyle(quiet)
+                    }
+                    Spacer(minLength: 4)
+                    Text(zoneLabel(context))
+                        .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 11))
+                        .tracking(0.9)
+                        .textCase(.uppercase)
+                        .foregroundStyle(zoneInk(context))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                track(context)
+                HStack(spacing: 0) {
+                    status(context)
+                    Spacer(minLength: 6)
+                    Text("Noop Aura")
+                        .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 10.5))
+                        .tracking(0.6)
+                        .foregroundStyle(quiet)
+                }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 15)
+        .padding(.leading, 16)
+        .padding(.trailing, 18)
+        .padding(.vertical, 16)
+        .background(alignment: .leading) {
+            RadialGradient(colors: [tone.opacity(freshBPM(context) == nil ? 0.10 : 0.34), tone.opacity(0)],
+                           center: .init(x: 0.12, y: 0.5), startRadius: 4, endRadius: 190)
+        }
+    }
+
+    /// The zone colour the banner wears: resting mint, the five zone colours, amber over the ceiling,
+    /// grey once readings stop.
+    private func auraTone(_ context: ActivityViewContext<NOOPActivityAttributes>) -> Color {
+        guard freshBPM(context) != nil else { return quiet }
+        if overCeiling(context) { return amber }
+        guard let z = context.state.zoneNumber, (1...5).contains(z) else { return restingTone }
+        return zoneColors[z - 1]
+    }
+
+    private var restingTone: Color { Color(.sRGB, red: 120 / 255, green: 214 / 255, blue: 196 / 255, opacity: 1) }
+
+    /// A soft sphere of the zone colour with the heart at its centre.
+    private func orb(_ context: ActivityViewContext<NOOPActivityAttributes>, tone: Color) -> some View {
+        let live = freshBPM(context) != nil
+        return ZStack {
+            Circle()
+                .fill(RadialGradient(colors: [tone.opacity(live ? 0.55 : 0.18), tone.opacity(live ? 0.16 : 0.05), .clear],
+                                     center: .center, startRadius: 2, endRadius: 34))
+            Circle()
+                .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.32), tone.opacity(0.18)],
+                                             startPoint: .top, endPoint: .bottom), lineWidth: 0.75)
+                .padding(9)
+            Image(systemName: live ? "heart.fill" : "heart")
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(live ? heartRed : quiet)
+                .shadow(color: live ? heartRed.opacity(0.7) : .clear, radius: 6)
+        }
+        .frame(width: 64, height: 64)
+    }
+
+    /// Resting and the five zones as one quiet track; the band you are in is lit and carries a dot.
+    private func track(_ context: ActivityViewContext<NOOPActivityAttributes>) -> some View {
+        let live = freshBPM(context) != nil
+        let current = live ? min(max(context.state.zoneNumber ?? 0, 0), 5) : -1
+        let tones = [restingTone] + zoneColors
+        return HStack(spacing: 3) {
+            ForEach(0..<6, id: \.self) { band in
+                Capsule()
+                    .fill(band == current ? tones[band] : band < current ? tones[band].opacity(0.4) : Color.white.opacity(0.1))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 5)
+                    .overlay {
+                        if band == current {
+                            Circle().fill(.white).frame(width: 9, height: 9)
+                                .shadow(color: tones[band].opacity(0.9), radius: 5)
+                        }
+                    }
+            }
+        }
     }
 
     @ViewBuilder
@@ -163,9 +232,10 @@ struct NOOPLiveActivity: Widget {
                     .foregroundStyle(secondary)
                     .lineLimit(2)
             } else {
-                (Text("Updated ") + Text(sampledAt, style: .relative))
+                (Text("Live \u{00B7} ") + Text(sampledAt, style: .relative) + Text(" ago"))
                     .font(.custom(NoopSpecType.Face.sansRegular, fixedSize: 12))
                     .foregroundStyle(secondary)
+                    .monospacedDigit()
             }
         } else if let lastBPM = context.state.lastBPM,
                   let lastAt = context.state.lastSampledAt {

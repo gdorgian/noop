@@ -62,7 +62,7 @@ struct NoopFitnessAddSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 HStack {
-                    Text("Add").font(NoopHTMLFont.outfit(26)).foregroundStyle(NoopHTMLColor.ink)
+                    Text("Add").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(NoopHTMLColor.inkSoft)
@@ -174,6 +174,7 @@ struct NoopFitnessAddSheet: View {
                 dismiss()
             }
             .environmentObject(repo)
+            .noopSheet()
         }
         .confirmationDialog("Start a session", isPresented: $showAll, titleVisibility: .visible) {
             ForEach(WorkoutCatalog.all.filter { s in !Self.quick.contains { $0.name == s.name } && s.name != "Strength" }) { s in
@@ -357,7 +358,7 @@ struct NoopFitnessPlanSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
-                    Text("Plan a routine").font(NoopHTMLFont.outfit(26)).foregroundStyle(NoopHTMLColor.ink)
+                    Text("Plan a routine").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(NoopHTMLColor.inkSoft)

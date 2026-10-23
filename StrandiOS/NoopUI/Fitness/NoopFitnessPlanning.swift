@@ -282,6 +282,7 @@ struct NoopFitnessRoutineScreen: View {
                                                   exercises: exerciseCount, sets: setCount)],
                                  fixedRoutineID: navigation.fitnessRoutineID)
                 .environmentObject(settings)
+                .noopSheet()
         }
     }
 
@@ -369,7 +370,7 @@ struct NoopFitnessCalendarScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 Color.clear.frame(height: 0)
                     .sheet(isPresented: $planningDay) {
-                        NoopFitnessPlanSheet(routines: fitness.snapshot?.routines ?? [], day: selected).environmentObject(settings)
+                        NoopFitnessPlanSheet(routines: fitness.snapshot?.routines ?? [], day: selected).environmentObject(settings).noopSheet()
                     }
                 HStack {
                     step(.left) { month = cal.date(byAdding: .month, value: -1, to: month) ?? month }

@@ -127,8 +127,7 @@ struct NoopVerifiedEnergyScreen: View {
                 showingProfileConfirmation = false
                 Task { await WidgetSnapshot.publish(from: model) }
             }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+            .noopSheet()
         }
     }
 
@@ -343,6 +342,7 @@ struct NoopAct2Screens: View {
             WhatsNewView(presentation: .bell) {
                 showReleaseNotes = false
             }
+            .noopSheet()
         }
     }
 
@@ -550,9 +550,7 @@ struct NoopAct2Screens: View {
                                                 sleep: day.ribbonSleep, sessions: day.ribbonSessions,
                                                 personal: day.stressPersonal,
                                                 onBreathe: { navigation.push(.breathe) })
-                                    .presentationDetents([.large])
-                                    .presentationDragIndicator(.visible)
-                                    .presentationBackground(NoopHTMLColor.canvas)
+                                    .noopSheet()
                             }
                     } else {
                     Button { navigation.push(.day) } label: {

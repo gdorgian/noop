@@ -38,7 +38,7 @@ struct NoopFitnessHome: View {
                 }
                 if let s = fitness.snapshot {
                     content(s)
-                        .sheet(isPresented: $planning) { NoopFitnessPlanSheet(routines: s.routines).environmentObject(layout) }
+                        .sheet(isPresented: $planning) { NoopFitnessPlanSheet(routines: s.routines).environmentObject(layout).noopSheet() }
                 } else {
                     Text(fitness.isLoading ? "Reading your training…" : "")
                         .font(NoopHTMLFont.sans(13))
@@ -714,6 +714,7 @@ struct NoopFitnessSessionButton: View {
                 }
             }
             .environmentObject(repo)
+            .noopSheet()
         }
     }
 }

@@ -145,6 +145,7 @@ struct NoopAct5Screens: View {
             WhatsNewView(presentation: .bell) {
                 showReleaseNotes = false
             }
+            .noopSheet()
         }
         .alert("Clear the stored strap flag?", isPresented: Binding(
             get: { labFlagToClear != nil },
@@ -995,7 +996,7 @@ private extension NoopAct5Screens {
                 confirmingProfile = false
                 Task { await WidgetSnapshot.publish(from: model) }
             }
-            .presentationDetents([.large])
+            .noopSheet()
         }
         .onChangeCompat(of: photoItem) { item in
             guard let item else { return }

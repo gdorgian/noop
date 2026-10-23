@@ -82,9 +82,7 @@ struct NoopFitnessSheet: View {
         .environment(\.noopScrollMemory, scrollMemory)
         .environment(\.noopScrollKey, "fitness-sheet")
         .task { await fitness.load(repo: repo, profile: profile) }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(NoopHTMLColor.canvas)
+        .noopSheet()
         .preferredColorScheme(.dark)
     }
 }

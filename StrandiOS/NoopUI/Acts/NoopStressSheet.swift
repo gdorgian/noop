@@ -142,7 +142,7 @@ struct NoopStressSheet: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Stress").font(NoopHTMLFont.outfit(26)).foregroundStyle(NoopHTMLColor.ink)
+                Text("Stress").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                 Text(Date().formatted(.dateTime.weekday(.wide).day().month(.wide)))
                     .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
             }

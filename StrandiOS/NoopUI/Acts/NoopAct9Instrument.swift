@@ -418,7 +418,7 @@ private struct NoopInstrumentDateNavigation: View {
     private var calendarSheet: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Choose dates").font(NoopHTMLFont.outfit(23))
+                Text("Choose dates").font(NoopHTMLFont.sheetTitle)
                 Spacer()
                 Button("Done") { choosingDate = false }.frame(minWidth: 44, minHeight: 44)
             }
@@ -433,8 +433,7 @@ private struct NoopInstrumentDateNavigation: View {
         .foregroundStyle(NoopHTMLColor.ink)
         .tint(NoopHTMLColor.night)
         .background(NoopHTMLColor.canvas)
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+        .noopSheet()
         .preferredColorScheme(.dark)
     }
 }
@@ -1975,14 +1974,12 @@ struct NoopInstrumentSignalPickerSheet: View {
 
                 VStack(spacing: 0) {
                     VStack(spacing: 11) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.16))
-                            .frame(width: 38, height: 4)
+                        NoopSheetGrabber()
 
                         HStack(alignment: .bottom, spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(slot == .first ? "First signal" : "Second signal")
-                                    .font(NoopHTMLFont.outfit(21))
+                                    .font(NoopHTMLFont.sheetTitle)
                                     .tracking(-0.525)
                                     .foregroundStyle(NoopHTMLColor.ink)
                                 Text("Any signal Noop keeps, including the things you log")

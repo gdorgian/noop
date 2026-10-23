@@ -107,6 +107,9 @@ enum NoopHTMLFont {
 
     /// CSS `font-weight: 200` for the variable Outfit face.
     /// SwiftUI's `.thin` is weight 200; `.ultraLight` would incorrectly select 100.
+    /// Every sheet's title, native or overlay.
+    static var sheetTitle: Font { outfit(24, weight: .semibold) }
+
     static func outfit200(_ size: CGFloat) -> Font {
         scaled("Outfit", size).weight(.thin)
     }
@@ -1161,13 +1164,11 @@ struct NoopBottomSheet<Content: View>: View {
                     .onTapGesture(perform: dismiss)
 
                 VStack(spacing: 16) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.18))
-                        .frame(width: 38, height: 4)
+                    NoopSheetGrabber()
                         .padding(.top, 10)
                     HStack {
                         Text(title)
-                            .font(NoopHTMLFont.outfit(22, weight: .regular))
+                            .font(NoopHTMLFont.sheetTitle)
                             .foregroundStyle(NoopHTMLColor.ink)
                         Spacer()
                         if showsDone {
@@ -1241,7 +1242,37 @@ private struct NoopDragToDismiss: ViewModifier {
     }
 }
 
+// MARK: - Sheets: one engine
+
+/// The grabber every Noop sheet carries, native or overlay: small and quiet, as on iOS.
+struct NoopSheetGrabber: View {
+    var body: some View {
+        Capsule().fill(Color.white.opacity(0.24)).frame(width: 32, height: 4)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Every native sheet in the app: Noop's grabber in place of the system one, the canvas behind it,
+/// the same corner radius, and the system's own swipe-down to close (never disabled unless saving).
+private struct NoopSheetStyle: ViewModifier {
+    let detents: Set<PresentationDetent>
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .top) { NoopSheetGrabber().padding(.top, 6).allowsHitTesting(false) }
+            .presentationDetents(detents)
+            .presentationDragIndicator(.hidden)
+            .presentationCornerRadius(32)
+            .presentationBackground(NoopHTMLColor.canvas)
+            .presentationContentInteraction(.scrolls)
+    }
+}
+
 extension View {
+    func noopSheet(_ detents: Set<PresentationDetent> = [.large]) -> some View {
+        modifier(NoopSheetStyle(detents: detents))
+    }
+
     func noopDragToDismiss(_ dismiss: @escaping () -> Void) -> some View {
         modifier(NoopDragToDismiss(dismiss: dismiss))
     }

@@ -95,7 +95,7 @@ struct NoopFitnessExercisePicker: View {
 
         VStack(spacing: 0) {
             HStack {
-                Text("Add exercise").font(NoopHTMLFont.outfit(21)).foregroundStyle(NoopHTMLColor.ink)
+                Text("Add exercise").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                 Spacer()
                 Button("Done") { dismiss() }
                     .font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
@@ -137,8 +137,7 @@ struct NoopFitnessExercisePicker: View {
             }
         }
         .background(NoopHTMLColor.canvas.ignoresSafeArea())
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+        .noopSheet()
     }
 
     private func row(_ c: NoopFitnessExerciseChoice) -> some View {
@@ -249,7 +248,7 @@ struct NoopFitnessRoutineEditor: View {
                     .disabled(!canSave || saving)
                 }
 
-                Text(isNew ? "New routine" : "Edit routine").font(NoopHTMLFont.outfit(27)).foregroundStyle(NoopHTMLColor.ink)
+                Text(isNew ? "New routine" : "Edit routine").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
 
                 TextField("Name, like Full body A", text: $name)
                     .font(NoopHTMLFont.sans(17, weight: .medium))
@@ -314,6 +313,7 @@ struct NoopFitnessRoutineEditor: View {
             NoopFitnessExercisePicker(yours: vocabulary) { choice in
                 lines.append(Line(exercise: choice.name, primary: choice.primary, secondaries: choice.secondaries))
             }
+            .noopSheet()
         }
         .confirmationDialog("Delete this routine?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete routine", role: .destructive) { Task { await archive() } }

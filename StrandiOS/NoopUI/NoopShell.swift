@@ -116,15 +116,11 @@ struct NoopAppShell: View {
         }
         .sheet(isPresented: $navigation.addSheetPresented) {
             NoopFitnessAddSheet(navigation: navigation)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(NoopHTMLColor.canvas)
+                .noopSheet()
         }
         .sheet(isPresented: Binding(get: { navigation.metricSheetPresented }, set: { if !$0 { navigation.dismissMetricSheet() } })) {
             NoopAct9Screens(navigation: navigation, data: .prototype, metricSheet: true)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(NoopHTMLColor.canvas)
+                .noopSheet()
         }
         .onChange(of: navigation.route) { oldRoute, newRoute in
             if oldRoute == .review, newRoute != .review {
@@ -789,17 +785,13 @@ struct NoopVerifiedAppShell: View {
         }
         .sheet(isPresented: $navigation.addSheetPresented) {
             NoopFitnessAddSheet(navigation: navigation)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(NoopHTMLColor.canvas)
+                .noopSheet()
         }
         .sheet(isPresented: Binding(get: { navigation.metricSheetPresented }, set: { if !$0 { navigation.dismissMetricSheet() } })) {
             NoopAct9Screens(navigation: navigation, data: instrumentStore.data(for: repo.deviceId),
                             loadState: instrumentStore.state(for: repo.deviceId),
                             retry: { Task { await instrumentStore.load(from: repo, force: true) } }, metricSheet: true)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(NoopHTMLColor.canvas)
+                .noopSheet()
         }
         .environment(\.noopLiveBarInset,
                      (liftSession.isActive || navigation.sessionRunning || model.activeWorkout != nil)
@@ -1830,14 +1822,12 @@ private struct NoopAddRecordSheet: View {
                     .onTapGesture(perform: navigation.dismissOverlay)
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.16))
-                        .frame(width: 38, height: 4)
+                    NoopSheetGrabber()
                         .frame(maxWidth: .infinity)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Add to your record")
-                            .font(NoopHTMLFont.outfit(21, weight: .regular))
+                            .font(NoopHTMLFont.sheetTitle)
                             .tracking(-0.525)
                             .foregroundStyle(NoopHTMLColor.ink)
                         Text("The four things Noop cannot work out by watching you.")
@@ -1971,14 +1961,12 @@ private struct NoopNightJournalSheet: View {
                     .onTapGesture(perform: navigation.dismissOverlay)
 
                 VStack(alignment: .leading, spacing: 18) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.20))
-                        .frame(width: 38, height: 4)
+                    NoopSheetGrabber()
                         .frame(maxWidth: .infinity)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Log the day")
-                            .font(NoopHTMLFont.outfit(23, weight: .regular))
+                            .font(NoopHTMLFont.sheetTitle)
                             .tracking(-0.46)
                             .foregroundStyle(NoopHTMLColor.ink)
                         Text("Ten seconds. Skip anything.")
@@ -2147,14 +2135,12 @@ private struct NoopDayLogSheet: View {
                     .onTapGesture(perform: navigation.dismissOverlay)
 
                 VStack(alignment: .leading, spacing: 16) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.2))
-                        .frame(width: 38, height: 4)
+                    NoopSheetGrabber()
                         .frame(maxWidth: .infinity)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Log it")
-                            .font(NoopHTMLFont.outfit(23, weight: .regular))
+                            .font(NoopHTMLFont.sheetTitle)
                             .tracking(-0.46)
                             .foregroundStyle(NoopHTMLColor.ink)
                         Text("One tap each. Tap twice for two.")
@@ -2350,15 +2336,13 @@ private struct NoopLoggedItemsSheet: View {
 
                 VStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 11) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.16))
-                            .frame(width: 38, height: 4)
+                        NoopSheetGrabber()
                             .frame(maxWidth: .infinity)
 
                         HStack(alignment: .bottom, spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Everything you logged")
-                                    .font(NoopHTMLFont.outfit(21, weight: .regular))
+                                    .font(NoopHTMLFont.sheetTitle)
                                     .tracking(-0.52)
                                 Text("\(filteredCount) in the last three days · \(filter.summarySuffix)")
                                     .font(.custom("Instrument Sans", fixedSize: 11.5))
