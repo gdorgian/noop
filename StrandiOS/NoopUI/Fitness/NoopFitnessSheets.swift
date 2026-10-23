@@ -72,7 +72,7 @@ struct NoopFitnessAddSheet: View {
                 }
                 if let refusal {
                     Text("\(refusal.name) is still running. Finish it before starting another session.")
-                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.warm)
+                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.volt)
                 }
 
                 section("Log") {
@@ -90,7 +90,7 @@ struct NoopFitnessAddSheet: View {
                         detail: "Height, weight and the optional waist") {
                         navigation.afterAddSheet { navigation.reset(to: .record) }
                     }
-                    row(symbol: "drop.fill", tint: NoopHTMLColor.warm, title: "Bloodwork",
+                    row(symbol: "drop.fill", tint: NoopHTMLColor.volt, title: "Bloodwork",
                         detail: "Photograph a lab report or type the results") {
                         navigation.afterAddSheet { navigation.enterLabPicker() }
                     }
@@ -98,7 +98,7 @@ struct NoopFitnessAddSheet: View {
 
                 section("Strength") {
                     if allRoutines.isEmpty {
-                        row(symbol: "plus", tint: NoopHTMLColor.warm, title: "Build your first routine",
+                        row(symbol: "plus", tint: NoopHTMLColor.volt, title: "Build your first routine",
                             detail: "Exercises, sets and rest, then start it in one tap") {
                             navigation.afterAddSheet {
                                 navigation.fitnessRoutineID = nil
@@ -108,7 +108,7 @@ struct NoopFitnessAddSheet: View {
                         }
                     }
                     ForEach(allRoutines) { r in
-                        row(symbol: "dumbbell.fill", tint: NoopHTMLColor.warm, title: r.name,
+                        row(symbol: "dumbbell.fill", tint: NoopHTMLColor.volt, title: r.name,
                             detail: "\(r.exercises) \(r.exercises == 1 ? "exercise" : "exercises") · \(r.sets) sets",
                             trailing: "Start") {
                             Task {
@@ -214,8 +214,8 @@ struct NoopFitnessAddSheet: View {
                 }
                 Spacer(minLength: 6)
                 if let trailing {
-                    Text(trailing).font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
-                        .padding(.horizontal, 14).frame(minHeight: 32).background(NoopHTMLColor.warm, in: Capsule())
+                    Text(trailing).font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.voltInk)
+                        .padding(.horizontal, 14).frame(minHeight: 32).background(NoopHTMLColor.volt, in: Capsule())
                 } else {
                     NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                 }
@@ -294,9 +294,9 @@ struct NoopFitnessRepeatEditor: View {
                         } label: {
                             Text(String(Calendar.current.veryShortWeekdaySymbols[d % 7]))
                                 .font(NoopHTMLFont.sans(14, weight: .semibold))
-                                .foregroundStyle(on ? NoopHTMLColor.warmInk : NoopHTMLColor.inkSoft)
+                                .foregroundStyle(on ? NoopHTMLColor.voltInk : NoopHTMLColor.inkSoft)
                                 .frame(maxWidth: .infinity).frame(minHeight: 42)
-                                .background(on ? NoopHTMLColor.warm : Color.white.opacity(0.06), in: Circle())
+                                .background(on ? NoopHTMLColor.volt : Color.white.opacity(0.06), in: Circle())
                         }
                         .buttonStyle(NoopHTMLPressStyle())
                         .accessibilityLabel(Calendar.current.weekdaySymbols[d % 7])
@@ -325,10 +325,10 @@ struct NoopFitnessRepeatEditor: View {
             }
             DatePicker("Time", selection: $plan.time, displayedComponents: .hourAndMinute)
                 .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
-            Text(plan.summary).font(NoopHTMLFont.sans(12.5, weight: .medium)).foregroundStyle(NoopHTMLColor.warm)
+            Text(plan.summary).font(NoopHTMLFont.sans(12.5, weight: .medium)).foregroundStyle(NoopHTMLColor.volt)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .tint(NoopHTMLColor.warm)
+        .tint(NoopHTMLColor.volt)
         .colorScheme(.dark)
     }
 
@@ -377,7 +377,7 @@ struct NoopFitnessPlanSheet: View {
                             Button { withAnimation(NoopMotion.swap) { routineID = r.id } } label: {
                                 HStack(spacing: 12) {
                                     Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                                        .font(.system(size: 19)).foregroundStyle(on ? NoopHTMLColor.warm : NoopHTMLColor.muted)
+                                        .font(.system(size: 19)).foregroundStyle(on ? NoopHTMLColor.volt : NoopHTMLColor.muted)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(r.name).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                                         Text("\(r.exercises) exercise\(r.exercises == 1 ? "" : "s") · \(r.sets) set\(r.sets == 1 ? "" : "s")").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
@@ -387,7 +387,7 @@ struct NoopFitnessPlanSheet: View {
                                 .padding(13)
                                 .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(on ? NoopHTMLColor.warm.opacity(0.6) : NoopHTMLColor.border, lineWidth: on ? 1 : 0.5))
+                                    .strokeBorder(on ? NoopHTMLColor.volt.opacity(0.6) : NoopHTMLColor.border, lineWidth: on ? 1 : 0.5))
                             }
                             .buttonStyle(NoopHTMLPressStyle())
                         }
@@ -400,9 +400,9 @@ struct NoopFitnessPlanSheet: View {
                         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
                 Button(action: save) {
-                    Text("Add to calendar").font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
+                    Text("Add to calendar").font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.voltInk)
                         .frame(maxWidth: .infinity).frame(minHeight: 54)
-                        .background(NoopHTMLColor.warm.opacity(canSave ? 1 : 0.4), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .background(NoopHTMLColor.volt.opacity(canSave ? 1 : 0.4), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .buttonStyle(NoopHTMLPressStyle())
                 .disabled(!canSave)

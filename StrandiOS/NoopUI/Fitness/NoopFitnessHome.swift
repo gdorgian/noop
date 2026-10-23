@@ -449,12 +449,12 @@ struct NoopFitnessHome: View {
                         navigation.push(.fitnessRoutine)
                     } label: {
                         HStack(spacing: 13) {
-                            NoopCanonicalGlyph(name: .weight, size: 17, color: NoopHTMLColor.warm)
+                            NoopCanonicalGlyph(name: .weight, size: 17, color: NoopHTMLColor.volt)
                                 .frame(width: 42, height: 42)
                                 .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                    .strokeBorder(NoopHTMLColor.warm.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+                                    .strokeBorder(NoopHTMLColor.volt.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("PLANNED").font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.1).foregroundStyle(NoopHTMLColor.warm)
+                                Text("PLANNED").font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.1).foregroundStyle(NoopHTMLColor.volt)
                                 Text(plan.routineName).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                             }
                             Spacer()
@@ -589,8 +589,8 @@ struct NoopFitnessWeekStrip: View {
             Circle()
                 .fill(day.sessions.first.map { NoopFitnessSessionRow.tint($0).opacity(0.2) } ?? Color.white.opacity(0.04))
             if day.sessions.isEmpty && planned {
-                Circle().strokeBorder(NoopHTMLColor.warm.opacity(0.7), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
-                NoopCanonicalGlyph(name: .weight, size: 12, color: NoopHTMLColor.warm.opacity(0.8))
+                Circle().strokeBorder(NoopHTMLColor.volt.opacity(0.7), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                NoopCanonicalGlyph(name: .weight, size: 12, color: NoopHTMLColor.volt.opacity(0.8))
             } else if day.sessions.isEmpty {
                 Circle().strokeBorder(Color.white.opacity(future ? 0.12 : 0.0),
                                       style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
@@ -738,9 +738,9 @@ struct NoopFitnessSessionRow: View {
                     Text(when).font(NoopHTMLFont.sans(11.5, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
                     if session.detected {
                         Text("detected")
-                            .font(NoopHTMLFont.sans(10, weight: .semibold)).foregroundStyle(NoopHTMLColor.warm)
+                            .font(NoopHTMLFont.sans(10, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
                             .padding(.horizontal, 6).frame(height: 17)
-                            .background(NoopHTMLColor.warm.opacity(0.12), in: Capsule())
+                            .background(NoopHTMLColor.volt.opacity(0.12), in: Capsule())
                     }
                 }
                 Text(session.title)
@@ -749,7 +749,7 @@ struct NoopFitnessSessionRow: View {
                     .lineLimit(1)
                 HStack(spacing: 10) {
                     chip("clock", NoopFitnessHome.duration(session.durationS))
-                    if let e = session.row?.strain, e > 0 { chip("bolt.fill", String(format: "%.1f", e), tint: NoopHTMLColor.warm) }
+                    if let e = session.row?.strain, e > 0 { chip("bolt.fill", String(format: "%.1f", e), tint: NoopHTMLColor.volt) }
                     if let k = session.kcal, k > 0 { chip("flame.fill", "\(Int(k.rounded()))", tint: NoopHTMLColor.amber) }
                     if let hr = session.row?.avgHr, hr > 0 { chip("heart.fill", "\(hr)", tint: NoopHTMLColor.red) }
                 }
@@ -788,7 +788,7 @@ struct NoopFitnessSessionRow: View {
     /// One colour per kind of session, the same on the strip, the rows and the calendar.
     static func tint(_ session: NoopFitnessSession) -> Color {
         switch glyph(session) {
-        case .weight: NoopHTMLColor.warm
+        case .weight: NoopHTMLColor.volt
         case .wave: NoopHTMLColor.blueLight
         case .bike: NoopHTMLColor.blue
         case .walk: NoopHTMLColor.green
@@ -804,11 +804,11 @@ struct NoopFitnessRoutineCard: View {
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 4) {
-                NoopCanonicalGlyph(name: .weight, size: 18, color: NoopHTMLColor.warm)
+                NoopCanonicalGlyph(name: .weight, size: 18, color: NoopHTMLColor.volt)
                     .padding(.bottom, 22)
                 Text("Strength")
                     .font(NoopHTMLFont.sans(11.5, weight: .semibold))
-                    .foregroundStyle(NoopHTMLColor.warm)
+                    .foregroundStyle(NoopHTMLColor.volt)
                 Text(routine.name)
                     .font(NoopHTMLFont.sans(15, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.ink)

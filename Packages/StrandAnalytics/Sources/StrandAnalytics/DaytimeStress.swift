@@ -96,6 +96,9 @@ public enum DaytimeStress {
     /// `marginToSigma` for how it's translated onto the shared 0–3 squash curve.
     public static let baselineRelativeHighMarginBPM: Double = 15.0
 
+    /// Where a sleeping hour at the night's own calm sits on the 0–3 scale (see step 3b of `analyze`).
+    public static let sleepCalmLevel: Double = 0.5
+
     /// Gate for whether the personal daytime-RMSSD baseline feeds the live 0–3 score. `false`:
     /// `.baselineRelative` scores HR-only, exactly the channel the r≈0.6 margin above was validated
     /// on. The RMSSD half of the pipeline — `dayDaytimeAggregate`, `foldDaytimeBaselines`, the
@@ -544,6 +547,21 @@ public enum DaytimeStress {
             }
         }
 
+        // 3b) Sleep is its own baseline. A sleeping hour is scored against the night's calm end (the
+        //     lower quartile of sleeping HR, the upper quartile of sleeping RMSSD) and the spread across
+        //     sleeping hours, never against the waking reference: sleeping HR sits far below it, and
+        //     waking RMSSD, read through movement, often sits far ABOVE sleeping RMSSD, which scored
+        //     every hour of a quiet night as high. Only used when the caller passes `asleep`.
+        //     Sleep is the calmest state of the day, so a sleeping hour at the night's own calm lands on
+        //     `sleepCalmLevel` (low) rather than the waking 1.5, and climbs by the same steps from there.
+        let sleepAggs = aggs.filter { isAsleep($0.bucket) && !isAmbulatory($0.bucket) }
+        let sleepHR = sleepAggs.compactMap { $0.meanHR }
+        let sleepRMSSD = sleepAggs.compactMap { $0.rmssd }
+        let sleepRefHR = calmReference(sleepHR, calmIsLow: true)
+        let sleepRefRMSSD = calmReference(sleepRMSSD, calmIsLow: false)
+        let sleepSdHR = max(std(sleepHR, mean: mean(sleepHR)), Baselines.daytimeHRCfg.floorSpread)
+        let sleepSdRMSSD = max(std(sleepRMSSD, mean: mean(sleepRMSSD)), Baselines.metricCfg["daytime_rmssd"]!.floorSpread)
+
         // 4) Score each waking-hour bucket on the shared 0–3 curve.
         //
         // Written against a supplied bucket grid so the SAME expression scores the on-the-hour pass
@@ -572,9 +590,14 @@ public enum DaytimeStress {
             let masked = a.meanHR != nil && (ambulatory(a.bucket) || shadow)
             // Score only when at least one signal is present AND HR cleared the count gate AND the
             // hour was not motion-masked (HR is the always-available anchor; RMSSD enriches it).
+            let asleepHour = isAsleep(a.bucket)
             let level: Double? = (a.meanHR != nil && !masked)
-                ? squash(rawScore(hr: a.meanHR, meanHR: refHR, sdHR: sdHR,
-                                  rmssd: a.rmssd, meanRMSSD: refRMSSD, sdRMSSD: sdRMSSD))
+                ? squash(asleepHour
+                    ? rawScore(hr: a.meanHR, meanHR: sleepRefHR, sdHR: sleepSdHR,
+                               rmssd: a.rmssd, meanRMSSD: sleepRefRMSSD, sdRMSSD: sleepSdRMSSD)
+                        - log(3 / sleepCalmLevel - 1)
+                    : rawScore(hr: a.meanHR, meanHR: refHR, sdHR: sdHR,
+                               rmssd: a.rmssd, meanRMSSD: refRMSSD, sdRMSSD: sdRMSSD))
                 : nil
             points.append(HourPoint(hour: hourOfDay, startTs: wallStart,
                                     level: level, meanHR: a.meanHR, rmssd: a.rmssd,

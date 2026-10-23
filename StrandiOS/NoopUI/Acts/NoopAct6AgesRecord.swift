@@ -184,6 +184,7 @@ final class NoopAgesStore: ObservableObject {
         next.pace = AgingPace.estimate(pacePoints)
         next.loaded = true
         record = next
+        NoopAgeTone.shared.update(bodyAge: next.bodyAge, chronoAge: next.chronoAge)
     }
 }
 #endif

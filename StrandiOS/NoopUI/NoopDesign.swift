@@ -33,10 +33,29 @@ enum NoopHTMLColor {
     static let blush = Color(hex: 0xE08A9B)
     static let blushInk = Color(hex: 0x2A0E14)
     static let green = Color(hex: 0x2ECC80)
+    /// Fitness's own character: an electric volt, the colour of effort rather than of a warning.
+    static let volt = Color(hex: 0xD2F04A)
+    static let voltInk = Color(hex: 0x161C05)
     static let red = Color(hex: 0xE66F62)
     static let gold = Color(hex: 0xD5AE62)
     static let border = Color.white.opacity(0.06)
     static let borderStrong = Color.white.opacity(0.09)
+}
+
+/// Trends' character follows body age: green while body age sits at or under the calendar age, amber
+/// once it is above. One value, read by the Trends cards, the ambient glow and the tab pill alike.
+@MainActor
+final class NoopAgeTone: ObservableObject {
+    static let shared = NoopAgeTone()
+    @Published private(set) var older = false
+
+    func update(bodyAge: Double?, chronoAge: Int) {
+        let next = bodyAge.map { chronoAge > 0 && $0 > Double(chronoAge) } ?? false
+        if next != older { older = next }
+    }
+
+    var accent: Color { older ? NoopHTMLColor.warm : NoopHTMLColor.green }
+    var accentLight: Color { older ? Color(hex: 0xFFE0A5) : Color(hex: 0x8FEFC0) }
 }
 
 /// A native linear gradient whose angle follows CSS conventions exactly.

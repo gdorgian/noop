@@ -15,6 +15,10 @@ enum NoopStressPalette {
         level >= DaytimeStress.highBandFloor ? high : level >= 1 ? medium : low
     }
 
+    /// The level as a one-decimal figure, cut rather than rounded so 1.97 shows 1.9, not a
+    /// 2.0 that would sit in a different band from its own name.
+    static func shown(_ level: Double) -> Double { (level * 10).rounded(.down) / 10 }
+
     static func name(_ level: Double) -> String {
         level >= DaytimeStress.highBandFloor ? "High" : level >= 1 ? "Medium" : "Low"
     }
@@ -102,7 +106,7 @@ struct NoopStressSheet: View {
     private var weekday: String { Date().formatted(.dateTime.weekday(.wide)) }
     private var today: NoopStressBands { NoopStressBands(hours: scoredHours.map { ($0.level, $0.masked) }) }
     private var current: (time: Date, level: Double)? {
-        timeline.last(where: { $0.level != nil }).map { ($0.time, ($0.level! * 10).rounded() / 10) }
+        timeline.last(where: { $0.level != nil }).map { ($0.time, NoopStressPalette.shown($0.level!)) }
     }
     private var chartStart: Date {
         let first = timeline.first(where: { $0.level != nil })?.time.addingTimeInterval(-1800)

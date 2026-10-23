@@ -311,6 +311,8 @@ struct NoopAct2Screens: View {
     @SceneStorage("noop.act3.rest-day") private var restDay = false
     @State private var todayPulseAnchor = Date()
     @State private var heartPulseAnchor = Date()
+    @State private var heartScrub: Int?
+    @State private var heartChartWidth: CGFloat = 1
     @State private var showReleaseNotes = false
     var body: some View {
         Group {
@@ -1580,13 +1582,31 @@ struct NoopAct2Screens: View {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
                                 NoopSectionLabel(day == nil ? "Today · \(dayContext.span)" : todaySpan.map { "Today · \($0)" } ?? "Today")
                                 Spacer()
-                                Text(heartRangeText ?? "")
+                                Text(heartScrubText ?? heartRangeText ?? "")
                                     .font(NoopHTMLFont.sans(11))
-                                    .foregroundStyle(NoopHTMLColor.faint)
+                                    .foregroundStyle(heartScrubText == nil ? NoopHTMLColor.faint : NoopHTMLColor.ink)
                                     .monospacedDigit()
                             }
-                            Act2FixedHeartChart(values: todayHeartValues ?? [], kind: .heart, resting: todayRestingLine)
+                            Act2FixedHeartChart(values: todayHeartValues ?? [], kind: .heart, resting: todayRestingLine,
+                                                selected: heartScrub)
                                 .frame(height: 84)
+                                .contentShape(Rectangle())
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onChanged { g in
+                                            let count = todayHeartValues?.count ?? 0
+                                            guard count > 1, g.startLocation.x >= 0 else { return }
+                                            let width = max(1, heartChartWidth)
+                                            let i = Int((min(max(g.location.x, 0), width) / width * CGFloat(count - 1)).rounded())
+                                            if heartScrub != i { heartScrub = i }
+                                        }
+                                        .onEnded { _ in heartScrub = nil }
+                                )
+                                .background(GeometryReader { proxy in
+                                    Color.clear.onAppear { heartChartWidth = proxy.size.width }
+                                        .onChange(of: proxy.size.width) { _, w in heartChartWidth = w }
+                                })
+                                .sensoryFeedback(.selection, trigger: heartScrub)
                             if let caption = todayRestingCaption {
                             Text(caption)
                                 .font(NoopHTMLFont.sans(11))
@@ -1677,17 +1697,24 @@ struct NoopAct2Screens: View {
 
     /// Today's five-minute means sorted into the wearer's own five zones (owner decision, 24 Sep): the
     /// app's zones by number, never the design's example bands. Nil until the zones are the wearer's
-    /// own or there is heart rate to sort; time under zone 1 is not a zone and is not listed.
+    /// own or there is heart rate to sort. Time under zone 1 leads the list as Resting, so a quiet day
+    /// still shows where its hours went instead of five empty rows.
     private var liveHeartZones: [Act2HeartZone]? {
         guard let day, NoopZoneSource.current(profile).trusted, !day.dayHRPoints.isEmpty else { return nil }
         let set = profile.hrZoneSet
         let colors = Self.heartZones.map(\.color)
         var minutes = Array(repeating: 0, count: 5)
+        var resting = 0
         for point in day.dayHRPoints {
             let zone = set.zoneNumber(forBPM: point.bpm)
-            if (1...5).contains(zone) { minutes[zone - 1] += 5 }
+            if (1...5).contains(zone) { minutes[zone - 1] += 5 } else if zone < 1 { resting += 5 }
         }
-        return set.zones.prefix(5).enumerated().map { index, z in
+        let restingRow = set.zones.first.map { z in
+            Act2HeartZone(name: "Resting", range: "under \(Int(z.lower.rounded()))",
+                          time: resting == 0 ? "\u{2014}" : NoopRestRecord.duration(Double(resting)),
+                          weight: resting, color: Color.white.opacity(0.16))
+        }
+        return (restingRow.map { [$0] } ?? []) + set.zones.prefix(5).enumerated().map { index, z in
             let lo = Int(z.lower.rounded()), hi = Int(z.upper.rounded())
             let m = minutes[index]
             return Act2HeartZone(name: NoopZoneSource.name(index + 1),
@@ -1708,6 +1735,16 @@ struct NoopAct2Screens: View {
         guard let last = day.dayHRPoints.last else { return "bpm" }
         let time = Date(timeIntervalSince1970: TimeInterval(last.ts + 150))
         return "bpm at \(AppClock.hourMinuteFormatter().string(from: time))"
+    }
+
+    /// "74 bpm at 13:20" for the point under the finger while the Today chart is dragged.
+    private var heartScrubText: String? {
+        guard let i = heartScrub else { return nil }
+        if let series = todayHeartSeries, series.indices.contains(i) {
+            return "\(Int(series[i].bpm.rounded())) bpm at \(AppClock.hourMinuteFormatter().string(from: series[i].time))"
+        }
+        guard let values = todayHeartValues, values.indices.contains(i) else { return nil }
+        return "\(Int(values[i].rounded())) bpm"
     }
 
     /// "52 low · 68 avg · 96 high" from today's five-minute means (the high is the busiest sample).
@@ -3133,6 +3170,8 @@ private struct Act2FixedHeartChart: View {
     let kind: Act2ChartKind
     /// Where the resting dashes sit: the design's fixed line, the wearer's resting pulse, or none.
     var resting: Act2RestingLine = .design
+    /// The point under the finger while the chart is dragged; nil draws no cursor.
+    var selected: Int? = nil
 
     var body: some View {
         Canvas { context, size in
@@ -3168,6 +3207,15 @@ private struct Act2FixedHeartChart: View {
 
             var line = Path(); line.move(to: points[0]); points.dropFirst().forEach { line.addLine(to: $0) }
             context.stroke(line, with: .color(NoopHTMLColor.blue), style: StrokeStyle(lineWidth: kind.lineWidth, lineCap: .round, lineJoin: .round))
+
+            if let selected, !kind.isMini {
+                let p = points[min(max(selected, 0), points.count - 1)]
+                var cursor = Path(); cursor.move(to: CGPoint(x: p.x, y: 0)); cursor.addLine(to: CGPoint(x: p.x, y: size.height))
+                context.stroke(cursor, with: .color(Color.white.opacity(0.26)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+                let dot = Path(ellipseIn: CGRect(x: p.x - 4.5, y: p.y - 4.5, width: 9, height: 9))
+                context.fill(dot, with: .color(NoopHTMLColor.blue))
+                context.stroke(dot, with: .color(NoopHTMLColor.card), style: StrokeStyle(lineWidth: 2.5))
+            }
 
             if case let .scrub(selected) = kind {
                 let index = min(max(selected, 0), points.count - 1)

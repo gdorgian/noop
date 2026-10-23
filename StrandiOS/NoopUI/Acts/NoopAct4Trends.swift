@@ -7,6 +7,7 @@ import SwiftUI
 
 struct NoopAct4Screens: View {
     @ObservedObject var navigation: NoopNavigation
+    @ObservedObject private var ageTone = NoopAgeTone.shared
     /// The production shell's measured weekly lines. Nil only in the seeded Debug shell.
     var trends: NoopTrendsRecord? = nil
     var battery: Int? = nil
@@ -85,9 +86,14 @@ private enum NoopTrendWindow: String, CaseIterable {
     }
 }
 
+@MainActor
 private enum NoopA4 {
-    static let green = Color(hex: 0x2ECC80)
-    static let greenLight = Color(hex: 0x8FEFC0)
+    /// The page accent, which follows `NoopAgeTone`: green under the calendar age, amber over it.
+    static var green: Color { NoopAgeTone.shared.accent }
+    static var greenLight: Color { NoopAgeTone.shared.accentLight }
+    /// Green that means "better" whatever the page tone, for up/down chips and verdicts.
+    static let good = Color(hex: 0x2ECC80)
+    static let goodLight = Color(hex: 0x8FEFC0)
     static let lavender = Color(hex: 0x8B99D6)
     static let warm = Color(hex: 0xF2B45C)
 
@@ -114,6 +120,7 @@ private enum NoopA4 {
 
 private struct NoopTrendsScreen: View {
     @ObservedObject var navigation: NoopNavigation
+    @ObservedObject private var ageTone = NoopAgeTone.shared
     @EnvironmentObject private var repo: Repository
     @StateObject private var labBook = NoopLabBook()
     @State private var showingRecordingHistory = false
@@ -519,7 +526,7 @@ private struct NoopBodyAgeHero: View {
                 if let pace, pace.isDefensible {
                     let label = pace.direction == .slower ? "slower than real time"
                         : pace.direction == .faster ? "faster than real time" : "in step with real time"
-                    let tint = pace.direction == .faster ? NoopA4.warm : NoopA4.greenLight
+                    let tint = pace.direction == .faster ? NoopA4.warm : NoopA4.goodLight
                     Text(label)
                         .font(NoopHTMLFont.sans(11, weight: .semibold))
                         .foregroundStyle(tint)
@@ -1124,8 +1131,8 @@ private struct NoopCapacityScreen: View {
                         if values.count >= 2 {
                         NoopA4Chip(
                             text: "\(change >= 0 ? "+" : "−")\(abs(change).formatted(.number.precision(.fractionLength(1)))) over the window",
-                            color: change >= 0 ? NoopA4.greenLight : Color(hex: 0xF3C888),
-                            background: change >= 0 ? NoopA4.green : NoopA4.warm
+                            color: change >= 0 ? NoopA4.goodLight : Color(hex: 0xF3C888),
+                            background: change >= 0 ? NoopA4.good : NoopA4.warm
                         )
                         }
                     }

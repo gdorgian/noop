@@ -242,7 +242,7 @@ struct NoopFitnessActivityPage: View {
         if ws.contains(where: { $0.effort != nil }) {
             out.append(.init(id: "effort", label: "Effort", combine: .mean,
                              events: ws.compactMap { w in w.effort.map { (w.start, $0) } },
-                             format: NoopFitnessFormat.one, tint: NoopHTMLColor.warm))
+                             format: NoopFitnessFormat.one, tint: NoopHTMLColor.volt))
         }
         return out
     }
@@ -318,10 +318,10 @@ struct NoopFitnessStrengthPage: View {
         if exercise != nil {
             out.append(.init(id: "heaviest", label: "Heaviest set", combine: .max,
                              events: sets.compactMap { s in s.weightKg.flatMap { $0 > 0 ? (s.date, $0) : nil } },
-                             format: NoopFitnessFormat.kg, tint: NoopHTMLColor.warm))
+                             format: NoopFitnessFormat.kg, tint: NoopHTMLColor.volt))
             out.append(.init(id: "reps", label: "Most reps", combine: .max,
                              events: sets.compactMap { s in s.reps.map { (s.date, Double($0)) } },
-                             format: { "\(Int($0)) reps" }, tint: NoopHTMLColor.warm))
+                             format: { "\(Int($0)) reps" }, tint: NoopHTMLColor.volt))
         } else {
             let sessions = history.liftSessions.map { (Date(timeIntervalSince1970: Double($0.startTs)), 1.0) }
             out.append(.init(id: "sessions", label: "Sessions", combine: .sum, events: sessions.map { ($0.0, $0.1) },
@@ -364,8 +364,8 @@ struct NoopFitnessStrengthPage: View {
 
     private func record(_ title: String, _ value: String, _ date: Date) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "trophy.fill").font(.system(size: 13)).foregroundStyle(NoopHTMLColor.warm)
-                .frame(width: 34, height: 34).background(NoopHTMLColor.warm.opacity(0.13), in: Circle())
+            Image(systemName: "trophy.fill").font(.system(size: 13)).foregroundStyle(NoopHTMLColor.volt)
+                .frame(width: 34, height: 34).background(NoopHTMLColor.volt.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(value).font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 Text(title).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)

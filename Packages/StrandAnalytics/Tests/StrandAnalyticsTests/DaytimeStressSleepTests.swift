@@ -39,6 +39,21 @@ final class DaytimeStressSleepTests: XCTestCase {
         XCTAssertTrue(night.allSatisfy { ($0.level ?? 3) < 1 }, "sleep reads low: \(night.map { $0.level ?? -1 })")
     }
 
+    func testNoisyWakingHRVDoesNotMakeSleepHigh() {
+        // Waking R-R read through movement often shows MORE variability than sleep. Against that
+        // reference every quiet sleeping hour scored as high; against the night's own, it reads low.
+        let rr: [RRInterval] = stride(from: day + 3 * 3600, to: day + 16 * 3600, by: 2).enumerated().map { i, ts in
+            let asleep = ts < day + 10 * 3600
+            let swing = asleep ? 20 : 70
+            return RRInterval(ts: ts, rrMs: (asleep ? 1050 : 800) + (i % 2 == 0 ? swing : -swing) / 2)
+        }
+        let aware = DaytimeStress.analyze(hr: samples(), rr: rr, tzOffsetSeconds: 0,
+                                          asleep: [(day + 3 * 3600)...(day + 10 * 3600)])
+        let night = aware.hours.filter { $0.startTs < day + 10 * 3600 }
+        XCTAssertEqual(night.count, 7)
+        XCTAssertTrue(night.allSatisfy { ($0.level ?? 3) < 1 }, "sleep reads low: \(night.map { $0.level ?? -1 })")
+    }
+
     func testNoSleepWindowIsUnchanged() {
         let hr = samples()
         XCTAssertEqual(DaytimeStress.analyze(hr: hr, rr: [], tzOffsetSeconds: 0),

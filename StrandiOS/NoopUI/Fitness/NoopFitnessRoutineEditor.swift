@@ -153,7 +153,7 @@ struct NoopFitnessExercisePicker: View {
                         .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 Spacer()
-                NoopCanonicalGlyph(name: .plus, size: 15, color: NoopHTMLColor.warm)
+                NoopCanonicalGlyph(name: .plus, size: 15, color: NoopHTMLColor.volt)
             }
             .padding(.horizontal, 14).padding(.vertical, 11)
             .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -170,9 +170,9 @@ struct NoopFitnessExercisePicker: View {
                 ForEach(LiftMuscle.ordered, id: \.self) { m in
                     Button { newPrimary = m } label: {
                         Text(m.displayName).font(NoopHTMLFont.sans(12, weight: .semibold))
-                            .foregroundStyle(newPrimary == m ? NoopHTMLColor.warmInk : NoopHTMLColor.inkSoft)
+                            .foregroundStyle(newPrimary == m ? NoopHTMLColor.voltInk : NoopHTMLColor.inkSoft)
                             .padding(.horizontal, 10).frame(minHeight: 28)
-                            .background(newPrimary == m ? NoopHTMLColor.warm : Color.white.opacity(0.06), in: Capsule())
+                            .background(newPrimary == m ? NoopHTMLColor.volt : Color.white.opacity(0.06), in: Capsule())
                     }
                     .buttonStyle(NoopHTMLPressStyle())
                 }
@@ -181,15 +181,15 @@ struct NoopFitnessExercisePicker: View {
                 onPick(.init(name: name, primary: newPrimary, secondaries: [], equipment: nil, isYours: false))
                 dismiss()
             } label: {
-                Text("Add \(name)").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
+                Text("Add \(name)").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.voltInk)
                     .frame(maxWidth: .infinity).frame(minHeight: 42)
-                    .background(NoopHTMLColor.warm, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(NoopHTMLColor.volt, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(NoopHTMLPressStyle())
         }
         .padding(14)
-        .background(NoopHTMLColor.warm.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(NoopHTMLColor.warm.opacity(0.3), lineWidth: 0.5))
+        .background(NoopHTMLColor.volt.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(NoopHTMLColor.volt.opacity(0.3), lineWidth: 0.5))
     }
 }
 
@@ -241,9 +241,9 @@ struct NoopFitnessRoutineEditor: View {
                     Spacer()
                     Button { Task { await save() } } label: {
                         Text(saving ? "Saving…" : "Save")
-                            .font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
+                            .font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.voltInk)
                             .padding(.horizontal, 18).frame(minHeight: 34)
-                            .background(NoopHTMLColor.warm.opacity(canSave ? 1 : 0.4), in: Capsule())
+                            .background(NoopHTMLColor.volt.opacity(canSave ? 1 : 0.4), in: Capsule())
                     }
                     .buttonStyle(NoopHTMLPressStyle())
                     .disabled(!canSave || saving)
@@ -270,12 +270,12 @@ struct NoopFitnessRoutineEditor: View {
 
                 Button { picking = true } label: {
                     HStack(spacing: 8) {
-                        NoopCanonicalGlyph(name: .plus, size: 15, color: NoopHTMLColor.warm)
-                        Text("Add exercise").font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.warm)
+                        NoopCanonicalGlyph(name: .plus, size: 15, color: NoopHTMLColor.volt)
+                        Text("Add exercise").font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
                     }
                     .frame(maxWidth: .infinity).frame(height: 50)
                     .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(NoopHTMLColor.warm.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                        .strokeBorder(NoopHTMLColor.volt.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
                 }
                 .buttonStyle(NoopHTMLPressStyle())
 
@@ -287,7 +287,7 @@ struct NoopFitnessRoutineEditor: View {
                                 .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
                         }
                     }
-                    .tint(NoopHTMLColor.warm)
+                    .tint(NoopHTMLColor.volt)
                     if planIt {
                         NoopFitnessRepeatEditor(plan: $repeatPlan)
                     }

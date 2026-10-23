@@ -457,14 +457,13 @@ private struct NoopLiftLiveBar: View {
 }
 
 /// Each act's ambient glow — one rule, read by the seeded shell and the production shell alike.
+@MainActor
 enum NoopAmbient {
     static func color(for route: NoopRoute, warmEffort: Bool) -> Color {
         switch route.act {
         case .night: NoopHTMLColor.night
-        case .picture: NoopHTMLColor.green
-        // Act 6 keeps the same green ambient on every child screen. The Health branch changes
-        // only the selected navigation pill to warm; the canonical HTML never recolours the aura.
-        case .ages: NoopHTMLColor.green
+        // Trends and Your ages carry the age tone: green while body age is under the calendar, amber over.
+        case .picture, .ages: NoopAgeTone.shared.accent
         case .plumbing:
             switch route {
             case .strap, .devices, .pair: NoopHTMLColor.blue
@@ -478,8 +477,8 @@ enum NoopAmbient {
         // PROVISIONAL, and the same value the default would have given. Stated explicitly so the
         // act's ambient is a named decision design can change rather than an inherited accident.
         case .lift: NoopHTMLColor.blue
-        // Fitness is the training tab: the warm accent its cards, routines and live screen carry.
-        case .fitness: NoopHTMLColor.warm
+        // Fitness is the training tab: its own volt, the accent its cards, routines and planner carry.
+        case .fitness: NoopHTMLColor.volt
         default: NoopHTMLColor.blue
         }
     }
@@ -581,6 +580,7 @@ struct NoopVerifiedAppShell: View {
     @StateObject private var historyStore = NoopHistoryStore()
     @StateObject private var effortStore = NoopEffortStore()
     @StateObject private var agesStore = NoopAgesStore()
+    @ObservedObject private var ageTone = NoopAgeTone.shared
     /// Today's day-log counts as last written to the journal, and the day they belong to.
     /// How far the current screen follows an edge swipe before it commits or springs back.
     /// Gesture state, so a cancelled drag (a call, a system gesture) can never strand it off-zero.
@@ -1684,6 +1684,7 @@ struct NoopCanonicalGlyph: View {
 }
 
 struct NoopBottomNavigation: View {
+    @ObservedObject private var ageTone = NoopAgeTone.shared
     @ObservedObject var navigation: NoopNavigation
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Namespace private var pill
@@ -1725,9 +1726,10 @@ struct NoopBottomNavigation: View {
         guard selected else { return NoopHTMLColor.copy }
         switch navigation.route.act {
         case .night, .svea, .instrument: return NoopHTMLColor.night
-        case .picture, .ages: return NoopHTMLColor.green
+        case .picture, .ages: return ageTone.accent
         case .plumbing: return NoopHTMLColor.blush
-        case .goals, .fitness: return NoopHTMLColor.warm
+        case .goals: return NoopHTMLColor.warm
+        case .fitness: return NoopHTMLColor.volt
         default: return NoopHTMLColor.blue
         }
     }
