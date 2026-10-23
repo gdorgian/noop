@@ -39,6 +39,9 @@ struct NoopAgesRecord {
     /// the driver's ten-week line), keyed like `Contribution.key`. Nil for a week without that input.
     var weeklyInputs: [String: [Double?]] = [:]
     var weeklyInputDates: [Date] = []
+    /// Pace of aging fitted over up to a year of weekly estimates; nil below eight of them.
+    var pace: AgingPace.Result?
+    var paceWeeks = 0
     var loaded = false
 
     /// A factor's input in the unit its driver screen prints.
@@ -113,7 +116,7 @@ final class NoopAgesStore: ObservableObject {
         // Fetch enough history for the 26-week driver trend, then select an as-of value for
         // each week. The existing 120-day lookback still bounds how long a prior estimate can
         // be carried forward; no week can borrow a later sample.
-        let vo2Series = await repo.exploreSeries(key: "vo2max_est", source: "my-whoop", days: 310)
+        let vo2Series = await repo.exploreSeries(key: "vo2max_est", source: "my-whoop", days: 490)
         let fitnessAgeSeries = await repo.exploreSeries(key: "fitness_age", source: "my-whoop", days: 120)
         let sessions = await repo.allSleepSessions()
         let calendar = Calendar.current
@@ -168,6 +171,17 @@ final class NoopAgesStore: ObservableObject {
         for key in next.drivers.map(\.key) {
             next.weeklyInputs[key] = weeks.map { $0.flatMap { NoopAgesRecord.value(of: key, in: $0) } }
         }
+        // Pace of aging: a year of weekly estimates. The model's whole-year age is swapped for
+        // exact age, so a birthday inside the year doesn't read as a one-year jump.
+        let year = 365.2425 * 86_400
+        let pacePoints: [(date: Date, age: Double)] = (0..<52).reversed().compactMap { weeksBack in
+            guard let end = calendar.date(byAdding: .day, value: -7 * weeksBack, to: now),
+                  let r = result(endingOn: end) else { return nil }
+            let exact = end.timeIntervalSince(dateOfBirth) / year
+            return (end, r.bodyAge - Double(ProfileStore.years(from: dateOfBirth, to: end)) + exact)
+        }
+        next.paceWeeks = pacePoints.count
+        next.pace = AgingPace.estimate(pacePoints)
         next.loaded = true
         record = next
     }
