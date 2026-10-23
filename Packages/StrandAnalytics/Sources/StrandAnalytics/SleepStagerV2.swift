@@ -180,7 +180,12 @@ public enum SleepStagerV2 {
     /// gravity-jerk over the in-bed session), NOT an absolute g. Self-calibrates to the strap's
     /// gravity-decode scale and the wearer's fit.
     static let jerkFloorMoveMult = 38.0  // a per-second jerk counts as "moving" above floor × this
-    static let jerkFloorGateMult = 55.0  // wake-boost when an epoch's peak jerk exceeds floor × this
+    /// Wake-boost when an epoch's peak jerk exceeds floor × this. Was 55: on a WHOOP 5.0 (quiet floor
+    /// ~0.0015 g) that is ~0.08 g, so every turn-over in sleep voted awake and one night read 56 min awake
+    /// against Fitbit's 8 and the strap's own uninterrupted sleep state (23 Oct 2026). At 500 a turn-over
+    /// still counts as movement through `moveFrac`; only the extra boost needs a real jolt. PSG (31 nights):
+    /// kappa 0.349 → 0.344, wake precision 67.6 % → 76.1 %, wake sensitivity 26.3 % → 22.2 %.
+    static let jerkFloorGateMult = 500.0
     static let motionGateBoost = 2.0
 
     /// Motion-corroborated wake (elevated-but-flat-HR nights). An epoch is MOTION-QUIESCENT when it shows no
@@ -197,8 +202,12 @@ public enum SleepStagerV2 {
         f.moveFrac <= 0.0 && f.jerkMax <= f.jerkScale * jerkFloorGateMult
     }
 
-    /// Weight of the RSA respiration-regularity term (regular → deep, irregular → REM).
-    static let respWeight = 0.6
+    /// Weight of the RSA respiration-regularity term (regular → deep, irregular → REM). OFF (was 0.6).
+    /// The term reads R-R, which the PSG benchmark has none of, so it was never validated; on a WHOOP 5.0
+    /// night it turned light sleep into REM and deep (light 112 / deep 133 / REM 156 min against Fitbit's
+    /// 260 / 88 / 97). At 0 the same night reads 209 / 90 / 124. PSG is unchanged by construction. Kept as a
+    /// knob, not deleted, so a validated weight can return once R-R nights with a reference exist.
+    static let respWeight = 0.0
 
     /// Transition matrix (rows = from, cols = to). Self-transitions dominate; deep↔rem rare; wake mostly
     /// to/from light. A priori, not fit.

@@ -89,8 +89,8 @@ struct RecipeConfig: Equatable {
     static let shipped = RecipeConfig(
         priorLight: log(0.50), priorDeep: log(0.15), priorRem: log(0.22), priorAwake: log(0.10),
         deepGateThresh: 0.25, deepGateSlope: 5.0,
-        jerkFloorMoveMult: 38.0, jerkFloorGateMult: 55.0, motionGateBoost: 2.0,
-        respWeight: 0.6,
+        jerkFloorMoveMult: 38.0, jerkFloorGateMult: 500.0, motionGateBoost: 2.0,
+        respWeight: 0.0,
         awakeDeadzone: 0.0,
         deepZhv: -1.1, deepZhr: 0.0, deepZmv: -0.5,
         remZhv: 0.6, remZmv: -0.6, remZhr: 0.4,

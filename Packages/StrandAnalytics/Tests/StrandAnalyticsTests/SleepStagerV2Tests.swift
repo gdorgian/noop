@@ -56,8 +56,9 @@ final class SleepStagerV2Tests: XCTestCase {
 
         let sorted = SleepStagerV2.stageSession(
             start: start, end: start + duration, grav: grav, hr: hr, rr: rr, resp: [])
-        XCTAssertEqual(sorted, [StageSegment(start: start, end: start + duration, stage: "light")],
-                       "the sorted-input output is the frozen control")
+        XCTAssertEqual(sorted, [StageSegment(start: start, end: start + 4330, stage: "light"),
+                                StageSegment(start: start + 4330, end: start + duration, stage: "rem")],
+                       "the sorted-input output is the frozen control (23 Oct 2026 recipe)")
 
         let shuffled = SleepStagerV2.stageSession(
             start: start, end: start + duration,
@@ -92,10 +93,13 @@ final class SleepStagerV2Tests: XCTestCase {
         }
         let base = 1_752_513_600
         let cancelledSorted = stagedShape(start: base, signalLast: false, shuffled: false)
-        let cancelledShuffled = stagedShape(start: base + 10_000_000, signalLast: false, shuffled: true)
-        let retainedSorted = stagedShape(start: base + 20_000_000, signalLast: true, shuffled: false)
+        // Translations are whole 30 s epochs, so every call tiles its window on the same epoch grid and the
+        // shapes are comparable boundary-for-boundary (10_000_000 is not a multiple of 30).
+        let cancelledShuffled = stagedShape(start: base + 10_000_020, signalLast: false, shuffled: true)
+        let retainedSorted = stagedShape(start: base + 20_000_010, signalLast: true, shuffled: false)
         let retainedShuffled = stagedShape(start: base + 30_000_000, signalLast: true, shuffled: true)
-        let cancelledOracle = ["0:5400:light"]
+        // Frozen under the 23 Oct 2026 recipe (R-R RSA term off, wake jerk-gate 500 × floor).
+        let cancelledOracle = ["0:4320:light", "4320:5400:rem"]
         let retainedOracle = ["0:5400:wake"]
         XCTAssertEqual(cancelledSorted, cancelledOracle)
         XCTAssertEqual(cancelledShuffled, cancelledOracle)
@@ -327,9 +331,11 @@ final class SleepStagerV2Tests: XCTestCase {
                                                   grav: grav, hr: hr, rr: rr, resp: [])
         XCTAssertEqual(v2.stages.map { $0.stage }, v2Direct.map { $0.stage },
                        "flag ON must produce the V2 hypnogram")
-        let v2Stages = Set(v2.stages.map { $0.stage })
-        XCTAssertTrue(v2Stages.contains("deep"), "V2 night should express deep")
-        XCTAssertTrue(v2Stages.contains("rem"), "V2 night should express REM")
+        // Proof the flag flipped the engine: the V2 hypnogram is not V1's. (It used to assert deep and REM,
+        // but on this synthetic still night deep came only from the R-R RSA term, which is off since 23 Oct.)
+        XCTAssertNotEqual(v2.stages.map { "\($0.start)-\($0.end)-\($0.stage)" },
+                          v1.stages.map { "\($0.start)-\($0.end)-\($0.stage)" },
+                          "flag ON must produce a different engine's hypnogram")
     }
 
     // MARK: - #277: lock the V2 recipe shape + parity (golden) and the tuned deep-boundary values (directly)
@@ -373,8 +379,10 @@ final class SleepStagerV2Tests: XCTestCase {
         }
         let segs = SleepStagerV2.stageSession(start: start, end: start + dur, grav: grav, hr: hr, rr: rr, resp: [])
         let golden: [(Int, Int, String)] = [
-            (0, 5070, "deep"), (5070, 5310, "light"), (5310, 5550, "rem"),
-            (5550, 10740, "light"), (10740, 16290, "rem"), (16290, 21600, "wake")]
+            // Regenerated 23 Oct 2026 (R-R RSA term off, wake jerk-gate 500 × floor): same shape, boundaries
+            // moved by one to three epochs. The Android twin still pins the previous recipe.
+            (0, 5070, "deep"), (5070, 5280, "light"), (5280, 5550, "rem"),
+            (5550, 10800, "light"), (10800, 16200, "rem"), (16200, 21600, "wake")]
         XCTAssertEqual(segs.count, golden.count, "segment count")
         for k in 0..<min(segs.count, golden.count) {
             XCTAssertEqual(segs[k].start, start + golden[k].0, "seg \(k) start")

@@ -15,6 +15,9 @@ struct Args {
     var csv: String?
     var subjects: Int?
     var seed: UInt64 = PortValidation.defaultSeed
+    var night: String?
+    var nightStart: Int?
+    var nightEnd: Int?
 }
 var a = Args()
 var it = CommandLine.arguments.dropFirst().makeIterator()
@@ -25,6 +28,9 @@ while let k = it.next() {
     case "--csv": a.csv = it.next()
     case "--subjects": a.subjects = Int(it.next() ?? "")
     case "--seed": a.seed = UInt64(it.next() ?? "") ?? a.seed
+    case "--night": a.night = it.next()
+    case "--night-start": a.nightStart = Int(it.next() ?? "")
+    case "--night-end": a.nightEnd = Int(it.next() ?? "")
     case "-h", "--help":
         print("""
         usage: sleeppsg --dataset <sleep-accel root> [--section all|port|baseline|strata|rem|variants|priors]
@@ -508,6 +514,93 @@ if want("priors") {
         print("    \(v.name.padding(toLength: 26, withPad: " ", startingAt: 0))\(f(mean(ps.map { $0.kappa }), 7, 3))   \(kBetter)/\(n)     "
               + "\(f(meanAbs("wake"), 5, 2)) \(f(meanAbs("deep"), 5, 2)) \(f(meanAbs("rem"), 5, 2)) \(f(meanAbs("light"), 5, 2))      "
               + "\(better("wake"))/\(n) \(better("deep"))/\(n) \(better("rem"))/\(n) \(better("light"))/\(n)")
+    }
+}
+
+if want("inbed") {
+    print("""
+
+    ================================================================================
+    8. IN-BED WAKE (InBedWake) ON TOP OF THE SHIPPED STAGER
+    ================================================================================
+    `InBedWake.refine` relabels awake time at the night's edges (before the first sleep, after the final
+    waking) from a raised pulse, wrist movement and, on a strap, its own wake state (absent here). The
+    question is whether it moves wake and total sleep toward PSG without costing agreement elsewhere.
+    Total sleep time error is per subject, in minutes, against the PSG-scored epochs.
+    """)
+    let refined = subjects.map { s in
+        score(s, using: { s in
+            InBedWake.refine(stageShipped(s), start: s.start, end: s.end, hr: s.hr, grav: s.grav)
+        })
+    }
+    func tstMin(_ labels: [String]) -> Double { Double(labels.filter { $0 != "wake" }.count) * 0.5 }
+    func row(_ name: String, _ rows: [Scored]) {
+        let su = summarise(rows)
+        let pooled = pooledPct(rows) { $0.pred }
+        let bin = confusion(ref: rows.flatMap { toSleepWake($0.truth) }, pred: rows.flatMap { toSleepWake($0.pred) },
+                            classes: ["wake", "sleep"])
+        let w = bin.sensSpec("wake")
+        let tstErr = rows.map { tstMin($0.pred) - tstMin($0.truth) }
+        print("    \(name.padding(toLength: 22, withPad: " ", startingAt: 0))\(f(su.kappa, 6, 3))  "
+              + "wake \(f(pooled["wake"] ?? .nan, 5, 2))% (truth \(f(pooledTruth["wake"] ?? .nan, 5, 2))%)  "
+              + "wake sens \(f(w.sens * 100, 5, 1))% spec \(f(w.spec * 100, 5, 1))%  "
+              + "TST bias \(f(mean(tstErr), 6, 1)) MAE \(f(mae(tstErr), 5, 1)) min")
+    }
+    row("shipped", shipped)
+    row("shipped + InBedWake", refined)
+    let changed = zip(shipped, refined).filter { $0.0.pred != $0.1.pred }.count
+    print("    nights changed: \(changed)/\(subjects.count)")
+    for (a, b) in zip(shipped, refined) where a.pred != b.pred {
+        let dA = tstMin(a.pred) - tstMin(a.truth), dB = tstMin(b.pred) - tstMin(b.truth)
+        print("      subject \(a.subject.id): TST error \(f(dA, 6, 1)) -> \(f(dB, 6, 1)) min")
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────
+// NIGHT — one wearer's exported night (Lab → Export raw sensor data) beside the PSG cohort, per variant.
+// The night has no truth; it shows how a variant moves a real WHOOP night while PSG shows what it costs.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────
+
+if a.section == "night", let path = a.night, let ns = a.nightStart, let ne = a.nightEnd {
+    var hr: [HRSample] = [], rr: [RRInterval] = [], grav: [GravitySample] = []
+    let text = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
+    for line in text.split(separator: "\n").dropFirst() {
+        let c = line.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+        guard c.count > 7, let t = Int(c[0]), t >= ns - 600, t <= ne + 600 else { continue }
+        switch c[2] {
+        case "hr": if let b = Int(c[3]) { hr.append(.init(ts: t, bpm: b)) }
+        case "rr": if let r = Int(c[4]) { rr.append(.init(ts: t, rrMs: r)) }
+        case "gravity":
+            if let x = Double(c[5]), let y = Double(c[6]), let z = Double(c[7]) { grav.append(.init(ts: t, x: x, y: y, z: z)) }
+        default: break
+        }
+    }
+    func minutes(_ segs: [StageSegment]) -> [String: Int] {
+        var m: [String: Int] = [:]
+        for x in segs { m[x.stage == "awake" ? "wake" : x.stage, default: 0] += x.end - x.start }
+        return m.mapValues { $0 / 60 }
+    }
+    var cands: [(String, RecipeConfig)] = [("shipped", .shipped)]
+    func add(_ n: String, _ f: (inout RecipeConfig) -> Void) { var c = RecipeConfig.shipped; f(&c); cands.append((n, c)) }
+    add("gateBoost 1.0") { $0.motionGateBoost = 1.0 }
+    add("gateBoost 0") { $0.motionGateBoost = 0 }
+    add("awakeZmv 0.5") { $0.awakeZmv = 0.5 }
+    add("gateMult 200") { $0.jerkFloorGateMult = 200 }
+    add("gateMult 500") { $0.jerkFloorGateMult = 500 }
+    add("moveMult 150") { $0.jerkFloorMoveMult = 150 }
+    add("moveMult 150 + gateMult 500") { $0.jerkFloorMoveMult = 150; $0.jerkFloorGateMult = 500 }
+    add("boost 1 + zmv 0.5") { $0.motionGateBoost = 1.0; $0.awakeZmv = 0.5 }
+    add("respWeight 0") { $0.respWeight = 0 }
+    add("respWeight 0 + boost 1") { $0.respWeight = 0; $0.motionGateBoost = 1.0 }
+    add("respWeight 0 + gateMult 500") { $0.respWeight = 0; $0.jerkFloorGateMult = 500 }
+    print("\n    variant                         PSG kappa  wakeSens  wakePrec  wake% (truth)   night: wake light deep rem (min)")
+    for (n, c) in cands {
+        let rows = subjects.map { score($0, using: stageVariant(c)) }
+        let sm = summarise(rows)
+        let p = pooledPct(rows) { $0.pred }, t = pooledPct(rows) { $0.truth }
+        let w = sm.conf.prf("wake")
+        let m = minutes(V2Recipe.stageSession(start: ns, end: ne, grav: grav, hr: hr, rr: rr, resp: [], cfg: c))
+        print("    \(n.padding(toLength: 32, withPad: " ", startingAt: 0))\(f(sm.kappa, 8, 3))  \(f(w.recall * 100, 8, 1))  \(f(w.precision * 100, 8, 1))  \(f(p["wake"]!, 6, 2)) (\(f(t["wake"]!, 5, 2)))      \(m["wake"] ?? 0)  \(m["light"] ?? 0)  \(m["deep"] ?? 0)  \(m["rem"] ?? 0)")
     }
 }
 
