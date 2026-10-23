@@ -110,9 +110,9 @@ final class NoopDayStore: ObservableObject {
         if let store = await repo.storeHandle(),
            let rows = try? await store.workouts(deviceId: repo.deviceId, from: Int(ribbonStart.timeIntervalSince1970),
                                                 to: Int(now.timeIntervalSince1970), limit: 20) {
-            next.ribbonSessions = rows.map {
+            next.ribbonSessions = (next.ribbonSessions + rows.map {
                 (Date(timeIntervalSince1970: TimeInterval($0.startTs)), Date(timeIntervalSince1970: TimeInterval($0.endTs)), $0.sport)
-            }.sorted { $0.start < $1.start }
+            }).sorted { $0.start < $1.start }
         }
 
         if let stress = await StressDayCurve.today(repo: repo, now: now, calendar: calendar) {
@@ -339,9 +339,19 @@ struct NoopEnergyReading: Equatable {
                                 ("The forecast\u{2019}s width", "\u{00B1}\(Int((band * 100).rounded()))%", "the widest band Noop will publish; below this it stops being a reading")])
         case .appleSplit, .strapWornTime, .mixed:
             guard let total = s.totalBurnedSoFar, total > 0 else { return nil }
-            let basal = s.basalBurnedSoFar ?? 0, active = s.activeBurnedSoFar ?? 0
-            let hasSplit = s.basalBurnedSoFar != nil && s.activeBurnedSoFar != nil && basal + active > 0
             let measuredH = (s.coverage.overall ?? 1) * elapsedH
+            var basal = s.basalBurnedSoFar ?? 0, active = s.activeBurnedSoFar ?? 0
+            var hasSplit = s.basalBurnedSoFar != nil && s.activeBurnedSoFar != nil && basal + active > 0
+            // The strap writes one whole-day total. Without a split, a midnight-to-now total reads as
+            // "what I did", when most of it is the body at rest (sleep included). Split it with the
+            // profile's modelled resting rate over the measured hours, and say that it is modelled.
+            var modelledSplit = false
+            if !hasSplit, let bmr = s.estimatedBMR24h, bmr > 0, measuredH > 0 {
+                basal = min(total, bmr * measuredH / 24)
+                active = max(0, total - basal)
+                hasSplit = true
+                modelledSplit = true
+            }
             let missed = Int((elapsedH - measuredH).rounded())
             let seen = hoursWord(measuredH), all = hoursWord(elapsedH)
             let partial = missed >= 2
@@ -377,11 +387,17 @@ struct NoopEnergyReading: Equatable {
                          hero: grouped(tens(total)),
                          heroNote: partial
                             ? "spent in the \(seen) hours it saw \u{2014} the gap is not in this figure"
-                            : "spent in the hours it measured, basal and active together",
-                         // The strap writes one whole-day total with no basal/active split; an unknown
-                         // split is left out rather than drawn as two zeros.
-                         segments: hasSplit ? split(basal, active, soft: false) : [],
-                         legend: hasSplit ? [("basal \(grouped(tens(basal)))", .basal), ("active \(grouped(tens(active)))", .active)] : [],
+                            : modelledSplit
+                                ? (active < 25
+                                   ? "since midnight, sleep included. Almost all of it is your body at rest, about \(grouped(tens(basal / max(measuredH, 1)))) an hour"
+                                   : "since midnight, sleep included. About \(grouped(tens(active))) of it is movement; the rest is your body at rest")
+                                : "since midnight, sleep included: resting and active together",
+                         segments: hasSplit ? split(basal, active, soft: modelledSplit) : [],
+                         legend: hasSplit
+                            ? (modelledSplit
+                               ? [("resting \u{2248}\(grouped(tens(basal)))", .basalSoft), ("moving \u{2248}\(grouped(tens(active)))", .activeSoft)]
+                               : [("resting \(grouped(tens(basal)))", .basal), ("moving \(grouped(tens(active)))", .active)])
+                            : [],
                          projection: projection ?? "",
                          projectionIsLive: projection != nil,
                          coverage: coverage,

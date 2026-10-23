@@ -10,19 +10,18 @@ import SwiftUI
 struct NoopTodayNightCard: View {
     let night: NoopRestRecord.Night
     let needMin: Double
-    let debtMin: Double?
     var nightWorker = false
     let action: () -> Void
 
-    private static let stageColors: [Color] = [Color.white.opacity(0.32), NoopHTMLColor.nightLight,
-                                               Color(hex: 0x4FB8E8), Color(hex: 0x5D6BC4)]
+    static let stageColors: [Color] = [Color.white.opacity(0.32), NoopHTMLColor.nightLight,
+                                       Color(hex: 0x4FB8E8), Color(hex: 0x5D6BC4)]
 
     private var recent: Bool { Date().timeIntervalSince(night.endDate) < 36 * 3600 }
     private var diff: Double { (night.asleepMin - needMin).rounded() }
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 11) {
                 HStack(spacing: 8) {
                     Image(systemName: "moon.fill").font(.system(size: 12, weight: .semibold)).foregroundStyle(NoopHTMLColor.night)
                     NoopSectionLabel(recent ? (nightWorker ? "Last sleep" : "Last night") : night.longDate,
@@ -33,111 +32,41 @@ struct NoopTodayNightCard: View {
                         .foregroundStyle(NoopHTMLColor.faint)
                     NoopFixedChevron(direction: .right, color: NoopHTMLColor.nightLight.opacity(0.7))
                 }
-
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(NoopRestRecord.duration(night.asleepMin))
-                        .font(NoopHTMLFont.outfit(38, weight: .light))
-                        .tracking(-1.1)
+                        .font(NoopHTMLFont.outfit(30, weight: .light))
+                        .tracking(-0.8)
                         .foregroundStyle(NoopHTMLColor.ink)
-                    Text("asleep").font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
-                    Spacer(minLength: 0)
+                    Text("asleep").font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                    Spacer(minLength: 6)
+                    if needMin > 0 {
+                        Text(diff >= 0 ? "\(NoopRestRecord.duration(diff)) over your need"
+                                       : "\(NoopRestRecord.duration(-diff)) short of your need")
+                            .font(NoopHTMLFont.sans(12))
+                            .foregroundStyle(diff >= 0 ? Color(hex: 0x8FE3B4) : NoopHTMLColor.copy)
+                    }
                 }
-
-                if needMin > 0 { needBar }
-
+                // The night at a glance: one strip, each slice in its stage's colour.
                 if let slices = night.slices, slices.count > 3 {
-                    VStack(spacing: 6) {
-                        NoopStageTimeline(slices: slices, colors: Self.stageColors)
-                            .frame(height: 74)
-                        if let axis = night.axis, axis.count >= 2 {
-                            HStack {
-                                ForEach(Array(axis.enumerated()), id: \.offset) { i, label in
-                                    Text(label)
-                                    if i < axis.count - 1 { Spacer() }
-                                }
-                            }
-                            .font(NoopHTMLFont.sans(10)).monospacedDigit()
-                            .foregroundStyle(NoopHTMLColor.faint)
+                    HStack(spacing: 0) {
+                        ForEach(Array(slices.enumerated()), id: \.offset) { _, stage in
+                            Rectangle().fill(Self.stageColors[min(max(stage, 0), 3)])
                         }
                     }
-                }
-
-                stageTotals
-
-                if let debtMin, debtMin >= 15 {
-                    HStack(spacing: 8) {
-                        Circle().fill(NoopHTMLColor.warm).frame(width: 6, height: 6)
-                        Text("Sleep debt \(NoopRestRecord.duration(debtMin)) across the week")
-                            .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.inkSoft)
-                        Spacer()
-                        Text("Tonight").font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(NoopHTMLColor.nightLight)
-                    }
-                    .padding(.top, 2)
+                    .frame(height: 8)
+                    .clipShape(Capsule())
                 }
             }
-            .padding(.horizontal, 17)
-            .padding(.top, 16)
-            .padding(.bottom, 16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 15)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                ZStack {
-                    NoopHTMLColor.card
-                    RadialGradient(colors: [NoopHTMLColor.night.opacity(0.22), .clear],
-                                   center: .topLeading, startRadius: 0, endRadius: 320)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            }
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(NoopHTMLColor.night.opacity(0.26), lineWidth: 0.5))
+            .background(NoopHTMLColor.night.opacity(0.09), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(NoopHTMLColor.night.opacity(0.22), lineWidth: 0.5))
         }
         .buttonStyle(NoopHTMLPressStyle())
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens Rest")
-    }
-
-    /// Asleep against need: the filled part is the night, the faint part what it fell short by.
-    private var needBar: some View {
-        let ratio = min(1, night.asleepMin / max(needMin, 1))
-        return VStack(alignment: .leading, spacing: 7) {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.07))
-                    Capsule()
-                        .fill(LinearGradient(colors: [Color(hex: 0x5D6BC4), NoopHTMLColor.nightLight],
-                                             startPoint: .leading, endPoint: .trailing))
-                        .frame(width: max(8, proxy.size.width * ratio))
-                }
-            }
-            .frame(height: 8)
-            Text(diff >= 0
-                 ? "\(NoopRestRecord.duration(diff)) over your \(NoopRestRecord.duration(needMin)) need"
-                 : "\(NoopRestRecord.duration(-diff)) short of your \(NoopRestRecord.duration(needMin)) need")
-                .font(NoopHTMLFont.sans(12))
-                .foregroundStyle(diff >= 0 ? Color(hex: 0x8FE3B4) : NoopHTMLColor.copy)
-        }
-    }
-
-    private var stageTotals: some View {
-        let m = night.stages
-        let items: [(String, Double, Color)] = [("Deep", m.deep, Self.stageColors[3]), ("REM", m.rem, Self.stageColors[2]),
-                                                ("Light", m.light, Self.stageColors[1]), ("Awake", m.awake, Self.stageColors[0])]
-        return HStack(spacing: 0) {
-            ForEach(Array(items.enumerated()), id: \.offset) { i, item in
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 5) {
-                        RoundedRectangle(cornerRadius: 2).fill(item.2).frame(width: 7, height: 7)
-                        Text(item.0).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
-                    }
-                    Text(item.1 > 0 ? NoopRestRecord.duration(item.1) : "\u{2014}")
-                        .font(NoopHTMLFont.sans(13.5, weight: .semibold)).monospacedDigit()
-                        .foregroundStyle(NoopHTMLColor.ink)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if i < items.count - 1 {
-                    Rectangle().fill(NoopHTMLColor.border).frame(width: 0.5, height: 28).padding(.trailing, 10)
-                }
-            }
-        }
     }
 }
 
@@ -146,6 +75,8 @@ struct NoopTodayNightCard: View {
 struct NoopStageTimeline: View {
     let slices: [Int]
     let colors: [Color]
+    /// When set, every other stage is drawn faint.
+    var selected: Int? = nil
 
     var body: some View {
         Canvas { context, size in
@@ -177,8 +108,9 @@ struct NoopStageTimeline: View {
             for run in runs {
                 let rect = CGRect(x: CGFloat(run.from) * w, y: laneY(run.stage) - barH / 2,
                                   width: max(2, CGFloat(run.to - run.from + 1) * w), height: barH)
-                let color = colors[min(max(run.stage, 0), 3)]
-                if run.stage == 3 {
+                let base = colors[min(max(run.stage, 0), 3)]
+                let color = selected == nil || selected == run.stage ? base : Color.white.opacity(0.07)
+                if run.stage == 3 && (selected == nil || selected == 3) {
                     var glow = context
                     glow.addFilter(.shadow(color: color.opacity(0.8), radius: 5))
                     glow.fill(Path(roundedRect: rect, cornerRadius: barH / 2), with: .color(color))
@@ -245,7 +177,7 @@ struct NoopTodayDayRibbon: View {
             .buttonStyle(NoopHTMLPressStyle())
 
             if points.count >= 2 {
-                chart.frame(height: 150)
+                chart.frame(height: 176)
                 stats
             } else {
                 Text("No heart rate recorded since \(AppClock.hourMinuteFormatter().string(from: start)). It fills in after the next sync.")
@@ -278,26 +210,14 @@ struct NoopTodayDayRibbon: View {
 
     private var chart: some View {
         Chart {
+            // Sleep and sessions as bands: a soft fill, a bright top edge, and the icon centred
+            // above it, so either reads at a glance across the whole line.
             if let sleep {
-                RectangleMark(xStart: .value("From", sleep.start), xEnd: .value("To", min(sleep.end, now)))
-                    .foregroundStyle(LinearGradient(colors: [NoopHTMLColor.night.opacity(0), NoopHTMLColor.night.opacity(0.07)],
-                                                    startPoint: .top, endPoint: .bottom))
-                    .annotation(position: .overlay, alignment: .topLeading, spacing: 0) {
-                        Label("Asleep", systemImage: "moon.fill")
-                            .font(NoopHTMLFont.sans(9.5, weight: .semibold))
-                            .foregroundStyle(NoopHTMLColor.nightLight)
-                            .labelStyle(.titleAndIcon)
-                            .padding(6)
-                    }
+                band(from: sleep.start, to: min(sleep.end, now), tint: NoopHTMLColor.night, symbol: "moon.fill")
             }
             ForEach(Array(sessions.enumerated()), id: \.offset) { _, s in
-                RectangleMark(xStart: .value("From", s.start), xEnd: .value("To", max(s.end, s.start.addingTimeInterval(600))))
-                    .foregroundStyle(NoopHTMLColor.warm.opacity(0.16))
-                    .annotation(position: .top, spacing: 2) {
-                        Image(systemName: NoopFitnessCardioLive.symbol(for: s.sport))
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(NoopHTMLColor.warm)
-                    }
+                band(from: s.start, to: max(s.end, s.start.addingTimeInterval(600)), tint: NoopHTMLColor.warm,
+                     symbol: NoopFitnessCardioLive.symbol(for: s.sport))
             }
             if let resting {
                 RuleMark(y: .value("Resting", resting))
@@ -311,20 +231,21 @@ struct NoopTodayDayRibbon: View {
             ForEach(Array(points.enumerated()), id: \.offset) { _, p in
                 AreaMark(x: .value("Time", p.time), yStart: .value("Floor", yDomain.lowerBound), yEnd: .value("bpm", p.bpm))
                     .interpolationMethod(.monotone)
-                    .foregroundStyle(LinearGradient(colors: [NoopHTMLColor.blue.opacity(0.28), NoopHTMLColor.blue.opacity(0)],
+                    .foregroundStyle(LinearGradient(colors: [Color(hex: 0x6FCFB4).opacity(0.16), Color(hex: 0x6FCFB4).opacity(0)],
                                                     startPoint: .top, endPoint: .bottom))
                 LineMark(x: .value("Time", p.time), y: .value("bpm", p.bpm))
                     .interpolationMethod(.monotone)
                     .lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(LinearGradient(colors: [NoopHTMLColor.warm, NoopHTMLColor.blueLight, NoopHTMLColor.nightLight],
+                    .foregroundStyle(LinearGradient(colors: [Color(hex: 0xF29A5C), Color(hex: 0xC8B27A), Color(hex: 0x6FCFB4), Color(hex: 0x5FB8A8)],
                                                     startPoint: .top, endPoint: .bottom))
             }
             if let last = points.last, selected == nil {
                 PointMark(x: .value("Time", last.time), y: .value("bpm", last.bpm))
                     .symbolSize(38)
-                    .foregroundStyle(NoopHTMLColor.blueLight)
+                    .foregroundStyle(Color(hex: 0x6FCFB4))
             }
-            if let peak, selected == nil {
+            // Inside a session the band already marks it; the label would sit on the band's edge.
+            if let peak, selected == nil, !sessions.contains(where: { peak.time >= $0.start && peak.time <= $0.end }) {
                 PointMark(x: .value("Time", peak.time), y: .value("bpm", peak.bpm))
                     .symbolSize(22)
                     .foregroundStyle(NoopHTMLColor.warm)
@@ -351,6 +272,7 @@ struct NoopTodayDayRibbon: View {
                     .symbolSize(40).foregroundStyle(NoopHTMLColor.ink)
             }
         }
+        .padding(.top, 22)
         .chartXScale(domain: start...max(now, start.addingTimeInterval(3600)))
         .chartYScale(domain: yDomain)
         .chartYAxis {
@@ -378,6 +300,22 @@ struct NoopTodayDayRibbon: View {
         }
         .sensoryFeedback(.selection, trigger: selectedPoint?.time)
         .accessibilityLabel("Heart rate from \(AppClock.hourMinuteFormatter().string(from: start)) to now")
+    }
+
+    @ChartContentBuilder
+    private func band(from: Date, to: Date, tint: Color, symbol: String) -> some ChartContent {
+        RectangleMark(xStart: .value("From", from), xEnd: .value("To", to),
+                      yStart: .value("Floor", yDomain.lowerBound), yEnd: .value("Top", yDomain.upperBound))
+            .foregroundStyle(LinearGradient(colors: [tint.opacity(0.22), tint.opacity(0.04)], startPoint: .top, endPoint: .bottom))
+        RectangleMark(xStart: .value("From", from), xEnd: .value("To", to),
+                      yStart: .value("Edge", yDomain.upperBound - (yDomain.upperBound - yDomain.lowerBound) * 0.012),
+                      yEnd: .value("Top", yDomain.upperBound))
+            .foregroundStyle(tint.opacity(0.9))
+            .annotation(position: .top, alignment: .center, spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(tint == NoopHTMLColor.night ? NoopHTMLColor.nightLight : tint)
+            }
     }
 
     private var stats: some View {

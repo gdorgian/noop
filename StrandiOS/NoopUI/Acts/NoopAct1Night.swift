@@ -276,14 +276,14 @@ struct NoopAct1Screens: View {
                 ZStack(alignment: .bottom) {
                     Canvas { context, size in
                         var need = Path()
-                        let y = size.height - (22 + 44 * min(8.4, restNeedHours) / 8.4)
+                        let y = size.height - (23.5 + 96 * min(8.4, restNeedHours) / 8.4)
                         need.move(to: CGPoint(x: 0, y: y))
                         need.addLine(to: CGPoint(x: size.width, y: y))
                         context.stroke(need, with: .color(NoopHTMLColor.night.opacity(0.55)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
                     }
                     .allowsHitTesting(false)
 
-                    HStack(alignment: .bottom, spacing: 6) {
+                    HStack(alignment: .bottom, spacing: 10) {
                         ForEach(Array(restBars.enumerated()), id: \.offset) { index, night in
                             let selected = index == (restSelectedIndex ?? -1) && night.value > 0
                             Button {
@@ -296,6 +296,7 @@ struct NoopAct1Screens: View {
                                     Text(selected ? String(format: "%.1fh", night.value) : "")
                                         .font(NoopHTMLFont.sans(11, weight: .semibold))
                                         .foregroundStyle(NoopHTMLColor.ink)
+                                        .monospacedDigit()
                                         .frame(height: 18)
                                         .padding(.horizontal, selected ? 7 : 0)
                                         .background(selected ? Color(hex: 0x6E7DB8).opacity(0.9) : .clear, in: Capsule())
@@ -305,7 +306,15 @@ struct NoopAct1Screens: View {
                                                 ? LinearGradient(colors: [Color(hex: 0xA9B6E8), Color(hex: 0x6E7DB8)], startPoint: .top, endPoint: .bottom)
                                                 : LinearGradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom)
                                         )
-                                        .frame(height: 44 * min(8.4, night.value) / 8.4)
+                                        .frame(height: max(night.value > 0 ? 4 : 0, 96 * min(8.4, night.value) / 8.4))
+                                        .overlay(alignment: .top) {
+                                            if !selected, night.value >= 1.5 {
+                                                Text(String(format: "%.1f", night.value))
+                                                    .font(NoopHTMLFont.sans(10)).monospacedDigit()
+                                                    .foregroundStyle(NoopHTMLColor.copy)
+                                                    .padding(.top, 7)
+                                            }
+                                        }
                                         .shadow(color: selected ? Color(hex: 0x6E7DB8).opacity(0.35) : .clear, radius: 9, y: 5)
                                     Text(night.day)
                                         .font(NoopHTMLFont.sans(11.5, weight: selected ? .semibold : .medium))
@@ -318,9 +327,9 @@ struct NoopAct1Screens: View {
                         }
                     }
                 }
-                .frame(width: proxy.size.width, height: 84, alignment: .bottom)
+                .frame(width: proxy.size.width, height: 148, alignment: .bottom)
             }
-            .frame(height: 84)
+            .frame(height: 148)
             // Bar labels sit on the chart's own geometry, so they keep the design size.
             .dynamicTypeSize(.large)
         }
@@ -448,59 +457,36 @@ struct NoopAct1Screens: View {
                     .noopAct1LineBox(fontSize: 14, ratio: 1.5)
                 }
 
+                // The whole night is always drawn (23 Oct 2026): four lanes, awake to deep, with
+                // the stage rows under it; tapping a row picks that stage out of the night.
                 if rest == nil || restNight != nil {
-                Button {
-                    withAnimation(.easeOut(duration: 0.22)) { showHypnogram.toggle() }
-                } label: {
-                    VStack(spacing: 9) {
-                        Act1StageStrip(selectedStage: selectedStage, minutes: restStageMinutes)
-                        .frame(height: 10)
-                        .clipShape(Capsule())
-
-                        HStack(spacing: 8) {
-                            Text(restStageCaption)
-                                .font(NoopHTMLFont.sans(11.5))
-                                .foregroundStyle(NoopHTMLColor.muted)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.86)
-                                .allowsTightening(true)
-                            Spacer()
-                            if restHasTimeline {
-                            Text(showHypnogram ? "Hide the night" : "See the whole night")
-                                .font(NoopHTMLFont.sans(11.5, weight: .semibold))
-                                .foregroundStyle(NoopHTMLColor.night)
-                                .fixedSize(horizontal: true, vertical: false)
+                    if restHasTimeline || rest == nil {
+                        VStack(spacing: 7) {
+                            NoopStageTimeline(slices: restNight?.slices ?? Act1Hypnogram.prototypeStages,
+                                              colors: NoopTodayNightCard.stageColors, selected: selectedStage)
+                                .frame(height: 96)
+                            HStack {
+                                Text(restAxis[0]); Spacer()
+                                Text(restAxis[1]); Spacer()
+                                Text(restAxis[2]); Spacer()
+                                Text(restAxis[3])
                             }
+                            .font(NoopHTMLFont.sans(10.5)).monospacedDigit()
+                            .foregroundStyle(NoopHTMLColor.faint)
                         }
+                    } else {
+                        Act1StageStrip(selectedStage: selectedStage, minutes: restStageMinutes)
+                            .frame(height: 10)
+                            .clipShape(Capsule())
                     }
-                }
-                .buttonStyle(NoopPlainHitStyle())
-                .disabled(!restHasTimeline)
-                }
-
-                if showHypnogram && restHasTimeline {
-                    VStack(spacing: 12) {
-                        Act1Hypnogram(selectedStage: selectedStage, stages: restNight?.slices)
-                            .frame(height: 84)
-                        HStack {
-                            Text(restAxis[0]); Spacer()
-                            Text(restAxis[1]); Spacer()
-                            Text(restAxis[2]); Spacer()
-                            Text(restAxis[3])
-                        }
+                    stageRows
+                    Text(selectedStage == nil
+                         ? restStageCaption
+                         : "Showing \(["awake", "light", "REM", "deep"][selectedStage!]) only. Tap again to show all.")
                         .font(NoopHTMLFont.sans(10.5))
                         .foregroundStyle(NoopHTMLColor.faint)
-                        stageRows
-                        Text(selectedStage == nil
-                             ? "Tap a stage to pick it out of the night"
-                             : "Showing \(["awake", "light", "REM", "deep"][selectedStage!]) only — tap again to show all")
-                            .font(NoopHTMLFont.sans(10.5))
-                            .foregroundStyle(NoopHTMLColor.faint)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, 4)
-                    }
-                    .padding(.top, 4)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 4)
                 }
         }
         .padding(.horizontal, 17)
@@ -1935,7 +1921,7 @@ private struct Act1RingCanvas: View {
     var stages: [Int]? = nil
     var singleTone = false
 
-    private static let prototypeStages = [1, 1, 2, 3, 3, 3, 2, 2, 3, 3, 2, 1, 0, 1, 2, 3, 3, 2, 2, 1, 1, 2, 2, 3, 2, 1, 0, 1, 1, 2, 2, 1, 1, 0]
+    static let prototypeStages = [1, 1, 2, 3, 3, 3, 2, 2, 3, 3, 2, 1, 0, 1, 2, 3, 3, 2, 2, 1, 1, 2, 2, 3, 2, 1, 0, 1, 1, 2, 2, 1, 1, 0]
 
     var body: some View {
         Canvas { context, size in
@@ -2069,7 +2055,7 @@ private struct Act1StageStrip: View {
 private struct Act1Hypnogram: View {
     let selectedStage: Int?
     var stages: [Int]? = nil
-    private static let prototypeStages = [1, 1, 2, 3, 3, 3, 2, 2, 3, 3, 2, 1, 0, 1, 2, 3, 3, 2, 2, 1, 1, 2, 2, 3, 2, 1, 0, 1, 1, 2, 2, 1, 1, 0]
+    static let prototypeStages = [1, 1, 2, 3, 3, 3, 2, 2, 3, 3, 2, 1, 0, 1, 2, 3, 3, 2, 2, 1, 1, 2, 2, 3, 2, 1, 0, 1, 1, 2, 2, 1, 1, 0]
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 2) {

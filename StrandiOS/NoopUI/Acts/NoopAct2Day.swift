@@ -479,7 +479,6 @@ struct NoopAct2Screens: View {
 
                     if let day, let night = day.rest.latest, day.rest.needMin > 0 {
                         NoopTodayNightCard(night: night, needMin: day.rest.needMin,
-                                           debtMin: day.rest.debt.last?.minutes,
                                            nightWorker: isNightWorker) { navigation.push(.rest) }
                     } else if day == nil || todayLastSleepLine != nil {
                     HStack(spacing: 12) {
@@ -2684,7 +2683,7 @@ private struct NoopTodayEnergyCard: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 11) {
                 HStack(alignment: .firstTextBaseline) {
-                    NoopSectionLabel("What today has cost")
+                    NoopSectionLabel("Energy since midnight")
                     Spacer()
                     if let chip = reading?.chip {
                         NoopEnergyChip(label: chip, calibrating: reading?.chipCalibrating ?? false)
