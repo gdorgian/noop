@@ -300,6 +300,7 @@ struct NoopAct2Screens: View {
     /// The wearer's own name from Your record, for the greeting.
     var displayName: String? = nil
     @EnvironmentObject private var updateStore: UpdateStore
+    @State private var showingStress = false
     @EnvironmentObject private var profile: ProfileStore
     @ObservedObject private var planStore = CoachPlanStore.shared
 
@@ -540,7 +541,16 @@ struct NoopAct2Screens: View {
                     if let day {
                         NoopTodayDayRibbon(points: day.ribbonPoints, sleep: day.ribbonSleep,
                                            sessions: day.ribbonSessions, resting: todayResting?.value,
-                                           liveBPM: liveBPM) { navigation.push(.heart) }
+                                           liveBPM: liveBPM, stress: day.stressTimeline,
+                                           onStress: { showingStress = true }) { navigation.push(.heart) }
+                            .sheet(isPresented: $showingStress) {
+                                NoopStressSheet(timeline: day.stressTimeline, scoredHours: day.stressScoredHours,
+                                                sleep: day.ribbonSleep, sessions: day.ribbonSessions,
+                                                personal: day.stressPersonal)
+                                    .presentationDetents([.large])
+                                    .presentationDragIndicator(.visible)
+                                    .presentationBackground(NoopHTMLColor.canvas)
+                            }
                     } else {
                     Button { navigation.push(.day) } label: {
                         VStack(alignment: .leading, spacing: 12) {
@@ -624,6 +634,9 @@ struct NoopAct2Screens: View {
                         valueColor: todayVitalsOut > 0 ? Color(hex: 0xF3C888) : NoopHTMLColor.blueLight
                     ) { navigation.push(.vitals) }
 
+                    // With a scored day the stress strip on Your day is the way in; the row stays for the
+                    // demo and for a day with nothing scored yet.
+                    if day == nil || (day?.stressTimeline.allSatisfy { $0.level == nil } ?? true) {
                     act2DestinationRow(
                         title: "Stress",
                         detail: "Four steps, not a traffic light",
@@ -632,6 +645,7 @@ struct NoopAct2Screens: View {
                         value: todayStressValue,
                         valueColor: todayStressStep >= 2 ? Color(hex: 0xF3C888) : NoopHTMLColor.blueLight
                     ) { navigation.push(.stress) }
+                    }
 
                     if navigation.dayLogSaved {
                         VStack(alignment: .leading, spacing: 9) {
@@ -660,7 +674,14 @@ struct NoopAct2Screens: View {
                 .padding(.top, 4)
             }
         }
-        .onAppear { todayPulseAnchor = Date() }
+        .onAppear {
+            todayPulseAnchor = Date()
+            #if DEBUG
+            if CommandLine.arguments.contains("--noop-open-stress") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { showingStress = true }
+            }
+            #endif
+        }
     }
 
     // MARK: - Today, measured (production shell)
@@ -863,9 +884,12 @@ struct NoopAct2Screens: View {
                 Button { navigation.push(.inbox) } label: {
                     ZStack(alignment: .topTrailing) {
                         NoopCanonicalGlyph(name: .bell, size: 15, color: NoopHTMLColor.inkSoft)
-                            .frame(width: 34, height: 34)
-                            .background(Color.white.opacity(0.06), in: Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+                            .frame(width: 32, height: 32)
+                            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 11))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 11)
+                                    .stroke(Color.white.opacity(0.09), lineWidth: 0.5)
+                            )
 
                         if inboxUnreadCount > 0 {
                             Text("\(min(inboxUnreadCount, 99))")
@@ -879,7 +903,7 @@ struct NoopAct2Screens: View {
                                 .offset(x: 4, y: -4)
                         }
                     }
-                    .frame(width: 34, height: 34)
+                    .frame(width: 32, height: 32)
                 }
                 .buttonStyle(NoopPlainHitStyle())
                 .accessibilityLabel(

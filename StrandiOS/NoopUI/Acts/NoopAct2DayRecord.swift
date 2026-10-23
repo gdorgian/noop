@@ -31,6 +31,12 @@ struct NoopDayRecord {
     var stressLevel: Double?
     /// Today's hourly stress steps (0–3), earliest first. Nil for an hour with too little signal.
     var stressHours: [(start: Date, step: Int?)] = []
+    /// Today's stress on the 0–3 scale for the Your day strip and the Stress sheet: the half-hourly
+    /// display timeline (each point an hour of data), the non-overlapping scored hours (for time in
+    /// band), and whether it was scored against the personal 30-day baseline.
+    var stressTimeline: [(time: Date, level: Double?, masked: Bool)] = []
+    var stressScoredHours: [(start: Date, level: Double?, masked: Bool)] = []
+    var stressPersonal = false
     /// Vitals with a band, and how many of them sit outside it. Nil when none could be banded.
     var vitalsBanded: Int = 0
     var vitalsOut: Int = 0
@@ -115,12 +121,35 @@ final class NoopDayStore: ObservableObject {
             }).sorted { $0.start < $1.start }
         }
 
-        if let stress = await StressDayCurve.today(repo: repo, now: now, calendar: calendar) {
+        // Scored against the personal 30-day daytime baseline (validated r≈0.6 against Oura, where a
+        // day judged against itself scored 0.43–0.53 and always finds a "high" hour). With too little
+        // history the resolver falls back to the day-relative lens on its own.
+        let stressMode = await DaytimeStressMode.selected(repo: repo, startOfToday: midnight,
+                                                          calendar: calendar, personalBaseline: true)
+        if case .baselineRelative = stressMode { next.stressPersonal = true }
+        if let stress = await StressDayCurve.today(repo: repo, now: now, calendar: calendar, personalBaseline: true) {
+            next.stressTimeline = stress.result.timeline.map {
+                (Date(timeIntervalSince1970: TimeInterval($0.startTs + DaytimeStress.bucketSeconds / 2)), $0.level, $0.maskedForActivity)
+            }
+            next.stressScoredHours = stress.result.hours.map {
+                (Date(timeIntervalSince1970: TimeInterval($0.startTs)), $0.level, $0.maskedForActivity)
+            }
             next.stressLevel = stress.result.timeline.last(where: { $0.level != nil })?.level
             next.stressHours = stress.result.hours.map {
                 (Date(timeIntervalSince1970: TimeInterval($0.startTs)), $0.level.map(NoopDayRecord.stressStep))
             }
         }
+        #if DEBUG
+        if CommandLine.arguments.contains("--noop-ribbon-demo"), next.stressTimeline.allSatisfy({ $0.level == nil }) {
+            let from = max(midnight.addingTimeInterval(6 * 3600), next.ribbonSleep?.end ?? midnight)
+            next.stressTimeline = stride(from: from, to: now, by: 1800).enumerated().map { i, t in
+                let workout = next.ribbonSessions.contains { t >= $0.start && t <= $0.end }
+                return (t, workout ? nil : min(3, max(0, 0.6 + 0.9 * sin(Double(i) * 0.7) + Double(i) * 0.05)), workout)
+            }
+            next.stressScoredHours = next.stressTimeline.enumerated().filter { $0.offset % 2 == 0 }.map { $0.element }
+            next.stressPersonal = true
+        }
+        #endif
 
         let readings = BodyVitalSigns.readings(sourceRows: repo.vitalMetricRows,
                                                temperatureUnit: .celsius, now: now)

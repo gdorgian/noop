@@ -1,5 +1,6 @@
 #if os(iOS)
 import Charts
+import StrandAnalytics
 import SwiftUI
 
 // MARK: - Last night
@@ -134,9 +135,27 @@ struct NoopTodayDayRibbon: View {
     let sessions: [(start: Date, end: Date, sport: String)]
     let resting: Double?
     let liveBPM: Int?
+    /// Today's stress on the 0–3 scale, drawn as a strip under the line on the same clock.
+    var stress: [(time: Date, level: Double?, masked: Bool)] = []
+    var onStress: (() -> Void)? = nil
     let action: () -> Void
 
     @State private var selected: Date?
+
+    private var hasStress: Bool { stress.contains { $0.level != nil } }
+    /// The plot runs below the heart-rate floor by one strip's height when there is stress to draw,
+    /// so the strip shares the line's time axis without ever sitting under the line.
+    private var plotDomain: ClosedRange<Double> {
+        guard hasStress else { return yDomain }
+        let span = yDomain.upperBound - yDomain.lowerBound
+        return (yDomain.lowerBound - span * 0.16)...yDomain.upperBound
+    }
+    private var yTicks: [Double] {
+        let span = yDomain.upperBound - yDomain.lowerBound
+        let step = span <= 30 ? 10.0 : span <= 60 ? 20.0 : span <= 120 ? 40.0 : 50.0
+        let first = (yDomain.lowerBound / step).rounded(.up) * step
+        return Array(stride(from: first, through: yDomain.upperBound, by: step))
+    }
 
     private var start: Date { sleep?.start ?? points.first?.time ?? Date() }
     private var now: Date { Date() }
@@ -180,8 +199,9 @@ struct NoopTodayDayRibbon: View {
             .buttonStyle(NoopHTMLPressStyle())
 
             if points.count >= 2 {
-                chart.frame(height: 176)
+                chart.frame(height: hasStress ? 190 : 176)
                 stats
+                if hasStress, let onStress { stressRow(onStress) }
             } else {
                 Text("No heart rate recorded since \(AppClock.hourMinuteFormatter().string(from: start)). It fills in after the next sync.")
                     .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
@@ -221,6 +241,18 @@ struct NoopTodayDayRibbon: View {
             ForEach(Array(sessions.enumerated()), id: \.offset) { _, s in
                 band(from: s.start, to: max(s.end, s.start.addingTimeInterval(600)), tint: NoopHTMLColor.warm,
                      symbol: NoopFitnessCardioLive.symbol(for: s.sport))
+            }
+            if hasStress {
+                let span = yDomain.upperBound - yDomain.lowerBound
+                ForEach(Array(stress.enumerated()), id: \.offset) { _, p in
+                    if p.level != nil || p.masked {
+                        RectangleMark(xStart: .value("From", p.time.addingTimeInterval(-900)),
+                                      xEnd: .value("To", p.time.addingTimeInterval(900)),
+                                      yStart: .value("Strip", plotDomain.lowerBound + span * 0.015),
+                                      yEnd: .value("Strip", plotDomain.lowerBound + span * 0.075))
+                            .foregroundStyle(p.level.map(NoopStressPalette.color) ?? Color.white.opacity(0.12))
+                    }
+                }
             }
             if let resting {
                 RuleMark(y: .value("Resting", resting))
@@ -277,9 +309,9 @@ struct NoopTodayDayRibbon: View {
         }
         .padding(.top, 22)
         .chartXScale(domain: start...max(now, start.addingTimeInterval(3600)))
-        .chartYScale(domain: yDomain)
+        .chartYScale(domain: plotDomain)
         .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { _ in
+            AxisMarks(position: .trailing, values: yTicks) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.white.opacity(0.05))
                 AxisValueLabel().font(NoopHTMLFont.sans(9)).foregroundStyle(NoopHTMLColor.faint)
             }
@@ -303,6 +335,34 @@ struct NoopTodayDayRibbon: View {
         }
         .sensoryFeedback(.selection, trigger: selectedPoint?.time)
         .accessibilityLabel("Heart rate from \(AppClock.hourMinuteFormatter().string(from: start)) to now")
+    }
+
+    private func stressRow(_ open: @escaping () -> Void) -> some View {
+        let current = stress.last(where: { $0.level != nil })?.level
+        let highHalfHours = stress.filter { ($0.level ?? 0) >= DaytimeStress.highBandFloor }.count
+        return Button(action: open) {
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(LinearGradient(colors: [NoopStressPalette.low, NoopStressPalette.medium, NoopStressPalette.high],
+                                         startPoint: .leading, endPoint: .trailing))
+                    .frame(width: 18, height: 6)
+                Text("Stress").font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                if let current {
+                    Text("\(NoopStressPalette.name(current)) now").font(NoopHTMLFont.sans(12.5))
+                        .foregroundStyle(NoopStressPalette.color(current))
+                }
+                if highHalfHours > 0 {
+                    Text("· high for about \(NoopRestRecord.duration(Double(highHalfHours * 30)))")
+                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                }
+                Spacer(minLength: 4)
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
+            }
+            .frame(minHeight: 36)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .padding(.top, 2)
     }
 
     @ChartContentBuilder
