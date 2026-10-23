@@ -58,7 +58,7 @@ public enum RoutineEditing {
                 RoutineSetPlan(phase: set.phase, intensifier: set.intensifier,
                                targetWeightKg: set.targetWeightKg, repsMin: set.repsMin,
                                repsMax: set.repsMax, targetDurationS: set.targetDurationS,
-                               targetDistanceM: set.targetDistanceM,
+                               targetDistanceM: set.targetDistanceM, restSeconds: set.restSeconds,
                                intensifierConfiguration: set.intensifierConfiguration)
             }
             let copiedGroup = entry.supersetId.map { old in

@@ -1,5 +1,6 @@
 import Foundation
 import WhoopStore
+import StrandTraining
 
 // The session state machine: the heart of the Lift Log.
 //
@@ -48,6 +49,7 @@ struct LiftPlanItem: Equatable {
     /// Added while the session ran (`LiftSessionEngine.addExercise`), so the program has no line for it
     /// yet; finishing offers to add one.
     var addedInSession: Bool
+    var routinePlan: RoutineExercise?
 
     /// Rest used when a program line does not specify one. Two minutes sits in the middle of the
     /// range the hypertrophy literature uses for compound work, and is only a starting value: what
@@ -65,7 +67,8 @@ struct LiftPlanItem: Equatable {
          targetWeightKg: Double? = nil,
          note: String? = nil,
          programItemId: String? = nil,
-         addedInSession: Bool = false) {
+         addedInSession: Bool = false,
+         routinePlan: RoutineExercise? = nil) {
         self.exercise = exercise
         self.primaryMuscle = primaryMuscle
         self.secondaryMuscles = secondaryMuscles
@@ -78,6 +81,7 @@ struct LiftPlanItem: Equatable {
         self.note = note
         self.programItemId = programItemId
         self.addedInSession = addedInSession
+        self.routinePlan = routinePlan
     }
 }
 
@@ -223,7 +227,20 @@ struct LiftSessionEngine: Equatable {
     /// your sets on the machine you are standing at. The skipped exercise is not forgotten — it is
     /// still pending, and it is what you get once the current one is done.
     func slotAfter(_ slot: LiftSlot) -> LiftSlot? {
-        slots(forExercise: slot.exerciseIndex).first { !isCompleted($0) } ?? nextPendingSlot
+        nextSlot(after: slot, excludingCurrent: false)
+    }
+
+    private func nextSlot(after slot: LiftSlot, excludingCurrent: Bool) -> LiftSlot? {
+        let group = planItem(for: slot)?.routinePlan?.supersetId
+        let candidates: [LiftSlot]
+        if let group {
+            candidates = plan.indices.filter { plan[$0].routinePlan?.supersetId == group }
+                .flatMap { slots(forExercise: $0) }
+                .sorted { ($0.setIndex, $0.exerciseIndex) < ($1.setIndex, $1.exerciseIndex) }
+        } else {
+            candidates = slots(forExercise: slot.exerciseIndex)
+        }
+        return (candidates + allSlots).first { !isCompleted($0) && (!excludingCurrent || $0 != slot) }
     }
 
     /// The set the session is heading to after the current one — what the minimised bar and the Lock
@@ -236,8 +253,7 @@ struct LiftSessionEngine: Equatable {
         case .warmup:
             return nextPendingSlot
         case .working(let slot), .resting(let slot, _):
-            return slots(forExercise: slot.exerciseIndex).first { !isCompleted($0) && $0 != slot }
-                ?? allSlots.first { !isCompleted($0) && $0 != slot }
+            return nextSlot(after: slot, excludingCurrent: true)
         case .finished:
             return nil
         }
@@ -251,7 +267,16 @@ struct LiftSessionEngine: Equatable {
     var completedWorkingSets: Int { sets.filter { !$0.isWarmup }.count }
 
     func planItem(for slot: LiftSlot) -> LiftPlanItem? {
-        plan.indices.contains(slot.exerciseIndex) ? plan[slot.exerciseIndex] : nil
+        guard plan.indices.contains(slot.exerciseIndex) else { return nil }
+        var item = plan[slot.exerciseIndex]
+        if let sets = item.routinePlan?.sets, sets.indices.contains(slot.setIndex - 1) {
+            let set = sets[slot.setIndex - 1]
+            item.targetWeightKg = set.targetWeightKg
+            item.targetRepsLow = set.repsMin
+            item.targetRepsHigh = set.repsMax
+            item.restSec = set.restSeconds ?? item.routinePlan?.restSeconds ?? item.restSec
+        }
+        return item
     }
 
     /// Seconds left in the current rest, floored at zero. Nil when not resting.
@@ -295,6 +320,10 @@ struct LiftSessionEngine: Equatable {
         let previous = previousSetInSession(for: slot).map { values(of: $0.slot, lastSession: lastSession) }
         let last = lastSession[slot.setIndex]
         let item = planItem(for: slot)
+        if let item, item.routinePlan != nil {
+            return LiftSetCarry(weightKg: item.targetWeightKg ?? previous?.weightKg ?? last?.weightKg,
+                                reps: item.targetRepsLow ?? previous?.reps ?? last?.reps)
+        }
         return LiftSetCarry(
             weightKg: previous?.weightKg ?? last?.weightKg ?? item?.targetWeightKg,
             reps: previous?.reps ?? last?.reps ?? item?.targetRepsLow)

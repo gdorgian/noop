@@ -4,6 +4,38 @@ import GRDB
 
 final class LiftLogStoreTests: XCTestCase {
 
+    func testFitnessPayloadMigrationAndRoundTrip() async throws {
+        let store = try await WhoopStore.inMemory()
+        let exerciseColumns = try await store.columnNamesForTest(table: "liftExercise")
+        let itemColumns = try await store.columnNamesForTest(table: "liftProgramItem")
+        XCTAssertTrue(exerciseColumns.contains("definitionJSON"))
+        XCTAssertTrue(itemColumns.contains("planJSON"))
+        let scope = UUID().uuidString
+        let exercise = LiftExerciseRow(id: "exercise", deviceId: scope, name: "Carry", primaryMuscle: .forearms,
+                                       createdAt: 1, lastUsedTs: nil, definitionJSON: "{\"mode\":\"duration\"}")
+        try await store.upsertLiftExercises([exercise])
+        var legacyUpdate = exercise
+        legacyUpdate.definitionJSON = nil
+        try await store.upsertLiftExercises([legacyUpdate])
+        let exercises = try await store.liftExercises(deviceId: scope)
+        XCTAssertEqual(exercises.first?.definitionJSON, exercise.definitionJSON)
+        let program = LiftProgramRow(id: "routine", deviceId: scope, name: "A", note: "User note",
+                                     createdAt: 1, updatedAt: 1, archived: false)
+        let item = LiftProgramItemRow(id: "line", deviceId: scope, programId: program.id, ord: 0, exercise: "Carry",
+                                     targetSets: 2, targetRepsLow: nil, targetRepsHigh: nil, targetRpe: nil,
+                                     targetWeightKg: 20, restSec: 90, note: "Technique cue", planJSON: "{\"sets\":[30,45]}")
+        try await store.saveLiftProgram(program, items: [item])
+        var read = try await store.liftProgramItems(programId: program.id)
+        XCTAssertEqual(read, [item])
+        try await store.replaceLiftProgramItems(programId: program.id, items: [item])
+        read = try await store.liftProgramItems(programId: program.id)
+        XCTAssertEqual(read, [item])
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(item)) as? [String: Any])
+        json.removeValue(forKey: "planJSON")
+        let legacy = try JSONDecoder().decode(LiftProgramItemRow.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(legacy.planJSON)
+    }
+
     // MARK: - v46 migration (additive: five new tables + indexes, nothing dropped)
 
     func testV46CreatesLiftLogTables() async throws {

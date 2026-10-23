@@ -221,12 +221,13 @@ public struct RoutineSetPlan: Identifiable, Codable, Equatable, Sendable {
     public var repsMax: Int?
     public var targetDurationS: Int?
     public var targetDistanceM: Double?
+    public var restSeconds: Int?
     public var intensifierConfiguration: SetIntensifierConfiguration?
 
     public init(id: UUID = UUID(), phase: TrainingSetPhase = .work,
                 intensifier: TrainingSetIntensifier = .none, targetWeightKg: Double? = nil,
                 repsMin: Int? = nil, repsMax: Int? = nil, targetDurationS: Int? = nil,
-                targetDistanceM: Double? = nil,
+                targetDistanceM: Double? = nil, restSeconds: Int? = nil,
                 intensifierConfiguration: SetIntensifierConfiguration? = nil) {
         self.id = id
         self.phase = phase
@@ -236,6 +237,7 @@ public struct RoutineSetPlan: Identifiable, Codable, Equatable, Sendable {
         self.repsMax = repsMax
         self.targetDurationS = targetDurationS
         self.targetDistanceM = targetDistanceM
+        self.restSeconds = restSeconds.map { max(0, $0) }
         self.intensifierConfiguration = intensifierConfiguration
     }
 }

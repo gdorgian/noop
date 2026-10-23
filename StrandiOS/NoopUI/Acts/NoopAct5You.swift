@@ -3313,6 +3313,8 @@ private extension NoopAct5Screens {
                 }
 
                 settingsGroup("Workouts and Today") {
+                    NoopExerciseAnimationToggle().padding(14)
+                    Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Keep the screen on in a workout", detail: "Holds the screen awake while a manual recording runs.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Journal reminder", detail: "The seven-day strip on Today. Off removes it entirely.", tint: Self.blush)
@@ -3487,7 +3489,7 @@ private extension NoopAct5Screens {
         "Strap": "your strap connection battery sensors sync manage straps pair switch forget rename band automations double tap move reminder stress check-ins illness live heart rate dynamic island lock screen",
         "Alerts": "battery alerts charging off-wrist reminder wrist wear notification offer a workout spotted detect auto quiet hours buzz anchor wake",
         "Battery": "power saving sync 45 minutes low battery pause hrv stream",
-        "Workouts and Today": "keep the screen on workout journal reminder today strip hydration water recalibrate baselines recovery hrv resting pulse respiration skin temperature restart",
+        "Workouts and Today": "exercise animations media keep the screen on workout journal reminder today strip hydration water recalibrate baselines recovery hrv resting pulse respiration skin temperature restart",
         "Health and data": "apple health healthkit data permissions privacy import history nutrition backup restore noopbak export",
         "Units and display": "units metric imperial temperature celsius fahrenheit effort 0–21 0–100 reduce motion widgets app icon",
         "Svea": "svea provider key model anthropic what she may read consent memory manner plain quiet direct",

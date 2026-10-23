@@ -1,6 +1,7 @@
 import XCTest
 @testable import Strand
 import WhoopStore
+import StrandTraining
 
 /// The crash-safe snapshot of an in-flight session, and the one question that decides whether an
 /// update can be installed OVER the previous build or needs a wipe: **does data written by the
@@ -11,6 +12,15 @@ import WhoopStore
 /// old build wrote. A schema change is the other half of that question and is answered by the
 /// migration, not here.
 final class LiftSessionPersistenceTests: XCTestCase {
+
+    func testRoutinePlanSurvivesSessionRestoreAndLegacySnapshotHasNone() throws {
+        var snapshot = try XCTUnwrap(LiftSessionPersistence.decode(snapshotJSONWithoutProgramItemId()))
+        XCTAssertNil(snapshot.plan[0].routinePlan)
+        let plan = RoutineExercise(exerciseId: "press", sets: [.init(targetWeightKg: 20, repsMin: 8, restSeconds: 75)], supersetId: UUID())
+        snapshot.plan[0].routinePlan = plan
+        let restored = try XCTUnwrap(LiftSessionPersistence.decode(LiftSessionPersistence.encode(snapshot)))
+        XCTAssertEqual(LiftSessionPersistence.engine(from: restored).plan[0].routinePlan, plan)
+    }
 
     private let t0 = 1_700_000_000
 

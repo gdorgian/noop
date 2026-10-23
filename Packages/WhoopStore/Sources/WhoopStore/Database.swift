@@ -1183,6 +1183,10 @@ extension WhoopStore {
         migrator.registerMigration("v47-rr-whoop5-fill") { db in
             try db.execute(sql: WhoopStore.whoop5RrFillMigrationSQL)
         }
+        migrator.registerMigration("v48-fitness-routine-plans") { db in
+            try db.alter(table: "liftExercise") { $0.add(column: "definitionJSON", .text) }
+            try db.alter(table: "liftProgramItem") { $0.add(column: "planJSON", .text) }
+        }
         return migrator
     }
 }

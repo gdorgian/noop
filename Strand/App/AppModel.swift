@@ -272,6 +272,9 @@ final class AppModel: ObservableObject {
     @Published var bpm: Int?
     private var hrWindow: [(t: Date, v: Double)] = []
     private var hrCancellables = Set<AnyCancellable>()
+    /// When live heart rate last triggered a detected-activity scan, and how often it may.
+    private var lastActivityScan = Date.distantPast
+    private static let activityScanIntervalS: TimeInterval = 4 * 60
     /// Drives the READ spine off the registry's active device (#814 HIGH-1). A Devices-screen
     /// switch/remove/re-add calls `registry.setActive` DIRECTLY (not through `registerDevice`), so without
     /// this subscription the reads stayed pinned to whatever id was active at wiring time for the whole
@@ -401,6 +404,14 @@ final class AppModel: ObservableObject {
             // its cue can claim the wrist before zone training asks for it.
             let ceilingCue = self.evaluateHRCeiling(hr, at: Date())
             self.evaluateHRZoneTraining(hr, at: Date(), ceilingCue: ceilingCue)
+            // Live heart rate is the moment an unstarted session shows up: scan for one every few
+            // minutes rather than waiting for the next analysis pass.
+            if Date().timeIntervalSince(self.lastActivityScan) >= Self.activityScanIntervalS {
+                self.lastActivityScan = Date()
+                Task { @MainActor in
+                    if await self.repo.autoLogDetectedActivities() > 0 { await self.repo.refresh() }
+                }
+            }
         }.store(in: &hrCancellables)
         // Illness/strain early-warning recomputes when the daily history changes.
         repo.$days.sink { [weak self] days in

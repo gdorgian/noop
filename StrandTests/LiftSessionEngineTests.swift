@@ -1,10 +1,37 @@
 import XCTest
 @testable import Strand
 import WhoopStore
+import StrandTraining
 
 /// The Lift Log session state machine. Pure, so a whole gym session can be driven through a known
 /// timeline with no strap, no database and no simulator — which is the point of keeping it pure.
 final class LiftSessionEngineTests: XCTestCase {
+
+    func testRoutineSetsKeepTheirOwnTargetsAndRest() {
+        let routine = RoutineExercise(exerciseId: "press", sets: [
+            .init(targetWeightKg: 20, repsMin: 12, restSeconds: 30),
+            .init(targetWeightKg: 25, repsMin: 8, restSeconds: 90)
+        ])
+        let engine = LiftSessionEngine(plan: [.init(exercise: "Press", targetSets: 2, routinePlan: routine)], startTs: 0)
+        let second = LiftSlot(exerciseIndex: 0, setIndex: 2)
+        XCTAssertEqual(engine.carry(for: second, lastSession: [2: .init(weightKg: 50, reps: 5)]), .init(weightKg: 25, reps: 8))
+        XCTAssertEqual(engine.planItem(for: second)?.restSec, 90)
+    }
+
+    func testSupersetUpcomingAndAdvanceUseTheSameOrder() {
+        let group = UUID()
+        let plans = ["Press", "Row"].map { name in
+            LiftPlanItem(exercise: name, targetSets: 2, restSec: 0,
+                         routinePlan: .init(exerciseId: name, sets: [.init(), .init()], restSeconds: 0, supersetId: group))
+        }
+        var engine = LiftSessionEngine(plan: plans, startTs: 0)
+        engine.advance(now: 0)
+        XCTAssertEqual(engine.upcomingSlot, .init(exerciseIndex: 1, setIndex: 1))
+        engine.advance(now: 10)
+        if case .resting = engine.stage { engine.advance(now: 10) }
+        XCTAssertEqual(engine.currentSlot, .init(exerciseIndex: 1, setIndex: 1))
+        XCTAssertEqual(engine.upcomingSlot, .init(exerciseIndex: 0, setIndex: 2))
+    }
 
     private let t0 = 1_700_000_000
 

@@ -552,6 +552,8 @@ struct NoopAct2Screens: View {
                                                 onBreathe: { navigation.push(.breathe) })
                                     .noopSheet()
                             }
+                        // A session the strap caught but nobody logged sits right under the line it shows on.
+                        if !isHistorical { NoopActivityOffer() }
                     } else {
                     Button { navigation.push(.day) } label: {
                         VStack(alignment: .leading, spacing: 12) {
@@ -598,8 +600,6 @@ struct NoopAct2Screens: View {
 
                     if let day { NoopTodayEnergyCard(record: day) { navigation.push(.energy) } } else { energyCard }
 
-                    // Today's session moved to Fitness on 23 Oct 2026; training has one home there.
-                    if !isHistorical { NoopActivityOffer() }
 
                     if day == nil {
                     Act2TodayHeartRow(

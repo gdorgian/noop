@@ -113,9 +113,10 @@ final class NoopDayStore: ObservableObject {
             next.ribbonSessions = [(wake.addingTimeInterval(3 * 3600 - 1500), wake.addingTimeInterval(3 * 3600 + 1500), "Running")]
         }
         #endif
-        if let store = await repo.storeHandle(),
-           let rows = try? await store.workouts(deviceId: repo.deviceId, from: Int(ribbonStart.timeIntervalSince1970),
-                                                to: Int(now.timeIntervalSince1970), limit: 20) {
+        // Every visible session, detected ones included, so an auto-logged activity shows on the line too.
+        let fromTs = Int(ribbonStart.timeIntervalSince1970), toTs = Int(now.timeIntervalSince1970)
+        let rows = (await repo.workoutRows(days: 2)).filter { $0.endTs > fromTs && $0.startTs < toTs }
+        if !rows.isEmpty {
             next.ribbonSessions = (next.ribbonSessions + rows.map {
                 (Date(timeIntervalSince1970: TimeInterval($0.startTs)), Date(timeIntervalSince1970: TimeInterval($0.endTs)), $0.sport)
             }).sorted { $0.start < $1.start }

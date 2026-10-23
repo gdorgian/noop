@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import WhoopStore
+import StrandTraining
 
 // MARK: - Layout and schedule
 
@@ -46,13 +47,9 @@ final class NoopFitnessSettings: ObservableObject {
         }
     }
 
-    struct Plan: Codable, Identifiable, Equatable {
-        var id = UUID()
-        let routineID: String
-        let routineName: String
-        let date: Date
-    }
+    typealias Plan = RoutineScheduleEntry
 
+    @Published var routineToast: String?
     @Published var sections: [Section] { didSet { save() } }
     @Published var hidden: Set<Card> { didSet { save() } }
     @Published var plans: [Plan] { didSet { save() } }
@@ -87,15 +84,15 @@ final class NoopFitnessSettings: ObservableObject {
     }
 
     /// Several dates at once, saved in one write.
-    func schedule(routineID: String, name: String, dates: [Date]) {
-        plans += dates.map { Plan(routineID: routineID, routineName: name, date: $0) }
+    func schedule(routineID: String, name: String, dates: [Date], includesTime: Bool = true) {
+        plans += dates.map { Plan(routineID: routineID, routineName: name, date: $0, includesTime: includesTime) }
     }
 
     func remove(_ plan: Plan) { plans.removeAll { $0.id == plan.id } }
 
     /// Every future plan of a routine, for "stop repeating".
     func removeUpcoming(routineID: String) {
-        plans.removeAll { $0.routineID == routineID && $0.date > Date() }
+        plans.removeAll { $0.routineID == routineID && $0.isUpcoming(asOf: Date()) }
     }
 
     private func save() {
@@ -186,6 +183,9 @@ struct NoopFitnessRoutineScreen: View {
     @EnvironmentObject private var settings: NoopFitnessSettings
     @EnvironmentObject private var live: LiftSessionController
     @EnvironmentObject private var app: AppModel
+    @EnvironmentObject private var profile: ProfileStore
+    @State private var deleting = false
+    @State private var error: String?
     @State private var program: LiftProgramRow?
     @State private var items: [LiftProgramItemRow] = []
     @State private var scheduling = false
@@ -199,12 +199,11 @@ struct NoopFitnessRoutineScreen: View {
                 HStack {
                     NoopBackHeader(label: "Fitness") { navigation.back(or: .fitness) }
                     Spacer()
-                    Button { navigation.push(.fitnessRoutineEdit) } label: {
-                        Text("Edit").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                            .padding(.horizontal, 14).frame(minHeight: 32)
-                            .background(Color.white.opacity(0.06), in: Capsule())
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
+                    Menu {
+                        Button("Edit") { navigation.push(.fitnessRoutineEdit) }
+                        Button("Duplicate") { Task { await duplicate() } }
+                        Button("Delete", role: .destructive) { deleting = true }
+                    } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
                 }
                 .padding(.bottom, 18)
 
@@ -224,19 +223,20 @@ struct NoopFitnessRoutineScreen: View {
                     ForEach(items, id: \.id) { item in exerciseCard(item) }
                 }
 
+                if let error { Text(error).foregroundStyle(NoopHTMLColor.red) }
                 if let refusal {
                     Text("\(refusal.name) is still running. Finish it before starting another session.")
                         .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.volt)
                         .padding(.top, 12)
                 }
 
-                let upcoming = settings.plans.filter { $0.routineID == navigation.fitnessRoutineID && $0.date > Date() }
+                let upcoming = settings.plans.filter { $0.routineID == navigation.fitnessRoutineID && $0.isUpcoming(asOf: Date()) }
                     .sorted { $0.date < $1.date }
                 if !upcoming.isEmpty {
                     NoopFitnessPanel(label: "Scheduled") {
                         ForEach(upcoming) { p in
                             HStack {
-                                Text(p.date.formatted(.dateTime.weekday(.wide).day().month().hour().minute()))
+                                Text(p.includesTime == false ? p.date.formatted(.dateTime.weekday(.wide).day().month()) : p.date.formatted(.dateTime.weekday(.wide).day().month().hour().minute()))
                                     .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
                                 Spacer()
                                 Button("Remove") { settings.remove(p) }
@@ -254,7 +254,7 @@ struct NoopFitnessRoutineScreen: View {
 
                 HStack(spacing: 10) {
                     Button { scheduling = true } label: {
-                        Text("Plan")
+                        Text("Schedule")
                             .font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                             .frame(maxWidth: .infinity).frame(minHeight: 52)
                             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -276,6 +276,10 @@ struct NoopFitnessRoutineScreen: View {
                 .padding(.top, 16)
             }
         }
+        .alert("Delete this routine?", isPresented: $deleting) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) { Task { await delete() } }
+        } message: { Text("Your logged sessions will be kept.") }
         .task(id: "\(navigation.fitnessRoutineID ?? "")-\(repo.refreshSeq)") { await load() }
         .sheet(isPresented: $scheduling) {
             NoopFitnessPlanSheet(routines: [.init(id: program?.id ?? "", name: program?.name ?? "Routine",
@@ -290,41 +294,71 @@ struct NoopFitnessRoutineScreen: View {
     private var setCount: Int { items.reduce(0) { $0 + ($1.targetSets ?? 1) } }
 
     private func exerciseCard(_ item: LiftProgramItemRow) -> some View {
-        let n = max(1, item.targetSets ?? 1)
-        let reps: String = {
-            switch (item.targetRepsLow, item.targetRepsHigh) {
-            case let (lo?, hi?) where hi != lo: return "\(lo)–\(hi)"
-            case let (lo?, _): return "\(lo)"
-            case let (nil, hi?): return "\(hi)"
-            default: return "—"
-            }
-        }()
-        let kg = item.targetWeightKg.map { $0.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int($0))" : String(format: "%.1f", $0) } ?? "—"
+        let plan = item.planJSON.flatMap { $0.data(using: .utf8) }.flatMap { try? JSONDecoder().decode(RoutineExercise.self, from: $0) }
+        let sets = plan?.sets ?? (0..<max(1, item.targetSets ?? 1)).map { _ in
+            RoutineSetPlan(targetWeightKg: item.targetWeightKg, repsMin: item.targetRepsLow, repsMax: item.targetRepsHigh)
+        }
         return NoopFitnessPanel {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.exercise).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                    Text("\(n) \(n == 1 ? "set" : "sets")\(item.restSec.map { " · \(LiftFormat.duration($0)) rest" } ?? "")")
-                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
-                }
-                Spacer()
-            }
-            HStack {
-                Text("SET").lineLimit(1).frame(width: 34, alignment: .leading)
-                Text("KG").frame(maxWidth: .infinity)
-                Text("REPS").frame(maxWidth: .infinity)
-            }
-            .font(NoopHTMLFont.sans(10, weight: .semibold)).foregroundStyle(NoopHTMLColor.muted)
-            ForEach(1...n, id: \.self) { i in
+            Text(item.exercise).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+            Text("\(sets.count) sets · \(LiftFormat.duration(plan?.restSeconds ?? item.restSec ?? 120)) rest")
+                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+            ForEach(Array(sets.enumerated()), id: \.element.id) { index, set in
                 HStack(spacing: 8) {
-                    Text("\(i)").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                        .frame(width: 26, height: 30).background(Color.white.opacity(0.06), in: Circle())
-                        .frame(width: 34, alignment: .leading)
-                    cell(kg)
-                    cell(reps == "—" ? reps : "\(reps) reps")
+                    Text("\(index + 1)").frame(width: 30)
+                    cell(set.targetWeightKg.map { "\(LiftFormat.trim($0)) kg" } ?? "—")
+                    cell(set.targetDurationS.map { "\($0)s" } ?? set.repsMin.map { low in
+                        if let high = set.repsMax, high != low { return "\(low)–\(high) reps" }
+                        return "\(low) reps"
+                    } ?? "—")
+                    cell("\(set.restSeconds ?? plan?.restSeconds ?? item.restSec ?? 120)s")
                 }
             }
         }
+    }
+
+    private func duplicate() async {
+        guard let program, let store = await repo.storeHandle() else { return }
+        do {
+            let now = Int(Date().timeIntervalSince1970)
+            var copy = program
+            copy.id = "routine-\(UUID().uuidString)"
+            copy.name += " copy"
+            copy.createdAt = now; copy.updatedAt = now; copy.archived = false
+            var groups: [UUID: UUID] = [:]
+            let copied = try items.map { item in
+                var result = item
+                result.id = UUID().uuidString; result.programId = copy.id
+                if let data = item.planJSON?.data(using: .utf8), let plan = try? JSONDecoder().decode(RoutineExercise.self, from: data) {
+                    var fresh = RoutineEditing.duplicate(.init(title: "", exercises: [plan]), title: "", now: now).exercises[0]
+                    if let group = plan.supersetId {
+                        let next = groups[group] ?? UUID(); groups[group] = next; fresh.supersetId = next
+                    }
+                    result.id = fresh.id.uuidString
+                    result.planJSON = String(decoding: try JSONEncoder().encode(fresh), as: UTF8.self)
+                }
+                return result
+            }
+            try await store.saveLiftProgram(copy, items: copied)
+            NoopFitnessModel.markChanged()
+            await repo.refresh(); await fitness.load(repo: repo, profile: profile)
+            navigation.fitnessRoutineID = copy.id
+            await load()
+        } catch { self.error = "The routine could not be duplicated. Try again." }
+    }
+
+    private func delete() async {
+        guard var program, let store = await repo.storeHandle() else { return }
+        do {
+            program.archived = true
+            program.updatedAt = Int(Date().timeIntervalSince1970)
+            try await store.saveLiftProgram(program, items: items)
+            settings.removeUpcoming(routineID: program.id)
+            settings.routineToast = "Routine deleted"
+            NoopFitnessModel.markChanged()
+            await repo.refresh(); await fitness.load(repo: repo, profile: profile)
+            navigation.fitnessRoutineID = nil
+            navigation.reset(to: .fitness)
+        } catch { self.error = "The routine could not be deleted. Try again." }
     }
 
     private func cell(_ t: String) -> some View {
@@ -445,7 +479,7 @@ struct NoopFitnessCalendarScreen: View {
                                 .overlay(Circle().strokeBorder(NoopHTMLColor.volt.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(p.routineName).font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                                Text("Planned · \(p.date.formatted(date: .omitted, time: .shortened))")
+                                Text(p.includesTime == false ? "Planned" : "Planned · \(p.date.formatted(date: .omitted, time: .shortened))")
                                     .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
                             }
                             Spacer()

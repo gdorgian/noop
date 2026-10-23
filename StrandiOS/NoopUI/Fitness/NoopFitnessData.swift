@@ -20,6 +20,7 @@ struct NoopFitnessSnapshot {
         let name: String
         let exercises: Int
         let sets: Int
+        var createdAt: Int = 0
     }
 
     /// The days of the current week, Monday first, each with its sessions.
@@ -307,7 +308,7 @@ final class NoopFitnessModel: ObservableObject {
             for p in programs where Self.debugHistoryDays != 0 {
                 let items = (try? await store.liftProgramItems(programId: p.id)) ?? []
                 routines.append(.init(id: p.id, name: p.name, exercises: Set(items.map(\.exercise)).count,
-                                      sets: items.reduce(0) { $0 + ($1.targetSets ?? 1) }))
+                                      sets: items.reduce(0) { $0 + ($1.targetSets ?? 1) }, createdAt: p.createdAt))
             }
             liftSessions = (try? await store.liftSessions(deviceId: repo.deviceId, fromTs: fromTs, toTs: nowTs)) ?? []
             for s in liftSessions {

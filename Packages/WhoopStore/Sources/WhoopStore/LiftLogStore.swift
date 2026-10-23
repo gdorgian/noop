@@ -36,6 +36,7 @@ public struct LiftExerciseRow: Equatable, Codable, Sendable {
     public var createdAt: Int
     /// Unix seconds; most-recently-used floats to the top of the picker. Nil until first used.
     public var lastUsedTs: Int?
+    public var definitionJSON: String?
 
     public init(
         id: String,
@@ -44,7 +45,8 @@ public struct LiftExerciseRow: Equatable, Codable, Sendable {
         primaryMuscle: LiftMuscle?,
         secondaryMuscles: [LiftMuscle] = [],
         createdAt: Int,
-        lastUsedTs: Int?
+        lastUsedTs: Int?,
+        definitionJSON: String? = nil
     ) {
         self.id = id
         self.deviceId = deviceId
@@ -54,6 +56,7 @@ public struct LiftExerciseRow: Equatable, Codable, Sendable {
             LiftMuscle.encodeList(secondaryMuscles, excluding: primaryMuscle))
         self.createdAt = createdAt
         self.lastUsedTs = lastUsedTs
+        self.definitionJSON = definitionJSON
     }
 
     static func decode(_ row: Row) -> LiftExerciseRow {
@@ -64,7 +67,8 @@ public struct LiftExerciseRow: Equatable, Codable, Sendable {
             primaryMuscle: LiftMuscle(rawValue: row["primaryMuscle"] ?? ""),
             secondaryMuscles: LiftMuscle.decodeList(row["secondaryMuscles"]),
             createdAt: row["createdAt"],
-            lastUsedTs: row["lastUsedTs"]
+            lastUsedTs: row["lastUsedTs"],
+            definitionJSON: row["definitionJSON"]
         )
     }
 }
@@ -136,6 +140,7 @@ public struct LiftProgramItemRow: Equatable, Codable, Sendable {
     public var restSec: Int?
     /// The user's own technique cue, stored and shown back verbatim.
     public var note: String?
+    public var planJSON: String?
 
     public init(
         id: String,
@@ -149,7 +154,8 @@ public struct LiftProgramItemRow: Equatable, Codable, Sendable {
         targetRpe: Double?,
         targetWeightKg: Double?,
         restSec: Int?,
-        note: String?
+        note: String?,
+        planJSON: String? = nil
     ) {
         self.id = id
         self.deviceId = deviceId
@@ -163,6 +169,7 @@ public struct LiftProgramItemRow: Equatable, Codable, Sendable {
         self.targetWeightKg = targetWeightKg
         self.restSec = restSec
         self.note = note
+        self.planJSON = planJSON
     }
 
     static func decode(_ row: Row) -> LiftProgramItemRow {
@@ -178,7 +185,8 @@ public struct LiftProgramItemRow: Equatable, Codable, Sendable {
             targetRpe: row["targetRpe"],
             targetWeightKg: row["targetWeightKg"],
             restSec: row["restSec"],
-            note: row["note"]
+            note: row["note"],
+            planJSON: row["planJSON"]
         )
     }
 }
@@ -399,9 +407,10 @@ extension WhoopStore {
                 }
                 try db.execute(sql: """
                     INSERT INTO liftExercise
-                        (id, deviceId, name, primaryMuscle, secondaryMuscles, createdAt, lastUsedTs)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                        (id, deviceId, name, primaryMuscle, secondaryMuscles, createdAt, lastUsedTs, definitionJSON)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(deviceId, name) DO UPDATE SET
+                        definitionJSON = COALESCE(excluded.definitionJSON, definitionJSON),
                         primaryMuscle = COALESCE(excluded.primaryMuscle, primaryMuscle),
                         secondaryMuscles = COALESCE(excluded.secondaryMuscles, secondaryMuscles),
                         lastUsedTs = MAX(COALESCE(excluded.lastUsedTs, 0), COALESCE(lastUsedTs, 0))
@@ -409,7 +418,7 @@ extension WhoopStore {
                         r.id, r.deviceId, r.name,
                         r.primaryMuscle?.rawValue,
                         LiftMuscle.encodeList(r.secondaryMuscles, excluding: r.primaryMuscle),
-                        r.createdAt, r.lastUsedTs,
+                        r.createdAt, r.lastUsedTs, r.definitionJSON,
                     ])
                 n += db.changesCount
             }
@@ -487,12 +496,12 @@ extension WhoopStore {
                 try db.execute(sql: """
                     INSERT INTO liftProgramItem
                         (id, deviceId, programId, ord, exercise, targetSets,
-                         targetRepsLow, targetRepsHigh, targetRpe, targetWeightKg, restSec, note)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         targetRepsLow, targetRepsHigh, targetRpe, targetWeightKg, restSec, note, planJSON)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, arguments: [item.id, item.deviceId, item.programId, item.ord,
                                       item.exercise, item.targetSets, item.targetRepsLow,
                                       item.targetRepsHigh, item.targetRpe, item.targetWeightKg,
-                                      item.restSec, item.note])
+                                      item.restSec, item.note, item.planJSON])
             }
         }
     }
@@ -541,12 +550,12 @@ extension WhoopStore {
                 try db.execute(sql: """
                     INSERT INTO liftProgramItem
                         (id, deviceId, programId, ord, exercise, targetSets,
-                         targetRepsLow, targetRepsHigh, targetRpe, targetWeightKg, restSec, note)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         targetRepsLow, targetRepsHigh, targetRpe, targetWeightKg, restSec, note, planJSON)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, arguments: [
                         r.id, r.deviceId, r.programId, r.ord, r.exercise, r.targetSets,
                         r.targetRepsLow, r.targetRepsHigh, r.targetRpe, r.targetWeightKg,
-                        r.restSec, r.note,
+                        r.restSec, r.note, r.planJSON,
                     ])
                 n += db.changesCount
             }

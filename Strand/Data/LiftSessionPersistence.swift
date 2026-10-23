@@ -1,5 +1,6 @@
 import Foundation
 import WhoopStore
+import StrandTraining
 
 // Crash-safety for an in-flight gym session.
 //
@@ -73,6 +74,7 @@ enum LiftSessionPersistence {
             /// True for a line added during the session. Absent from a snapshot written before lines
             /// could be added, which decodes to nil: a line from the program.
             var addedInSession: Bool?
+            var routinePlan: RoutineExercise? = nil
         }
 
         /// The stage as a flat, forward-compatible record rather than an encoded enum: a persisted
@@ -165,7 +167,7 @@ enum LiftSessionPersistence {
                                   note: $0.note,
                                   programItemId: $0.programItemId,
                                   // Written only when true, so a session nobody added to encodes as before.
-                                  addedInSession: $0.addedInSession ? true : nil)
+                                  addedInSession: $0.addedInSession ? true : nil, routinePlan: $0.routinePlan)
             },
             stage: box(engine.stage),
             sets: engine.sets.map {
@@ -222,7 +224,7 @@ enum LiftSessionPersistence {
                          targetWeightKg: $0.targetWeightKg,
                          note: $0.note,
                          programItemId: $0.programItemId,
-                         addedInSession: $0.addedInSession ?? false)
+                         addedInSession: $0.addedInSession ?? false, routinePlan: $0.routinePlan)
         }
         let sets = s.sets.map {
             LiftRecordedSet(exerciseIndex: $0.exerciseIndex, setIndex: $0.setIndex,

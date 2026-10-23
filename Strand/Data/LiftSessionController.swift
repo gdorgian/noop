@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import WhoopStore
 import StrandAnalytics
+import StrandTraining
 
 // The live session, owned ABOVE any screen.
 //
@@ -714,6 +715,24 @@ final class LiftSessionController: ObservableObject {
         return items.map { row in
             guard let top = heaviest[row.id] else { return row }
             var edited = row
+            if let data = row.planJSON?.data(using: .utf8),
+               var routine = try? JSONDecoder().decode(RoutineExercise.self, from: data) {
+                for set in sets where set.startTs != nil && !set.isWarmup && LiftMetrics.isPerformed(reps: set.reps) {
+                    guard plan.indices.contains(set.slot.exerciseIndex),
+                          plan[set.slot.exerciseIndex].programItemId == row.id,
+                          routine.sets.indices.contains(set.slot.setIndex - 1) else { continue }
+                    let index = set.slot.setIndex - 1
+                    routine.sets[index].targetWeightKg = set.weightKg ?? routine.sets[index].targetWeightKg
+                    if let reps = set.reps { routine.sets[index].repsMin = reps; routine.sets[index].repsMax = reps }
+                }
+                if let json = try? JSONEncoder().encode(routine) {
+                    edited.planJSON = String(decoding: json, as: UTF8.self)
+                    edited.targetWeightKg = routine.sets.first?.targetWeightKg
+                    edited.targetRepsLow = routine.sets.first?.repsMin
+                    edited.targetRepsHigh = routine.sets.first?.repsMax
+                }
+                return edited
+            }
             if let weight = top.weightKg { edited.targetWeightKg = weight }
             if let reps = top.reps {
                 edited.targetRepsLow = reps
@@ -763,6 +782,18 @@ final class LiftSessionController: ObservableObject {
             guard let sets = counts[row.id] else { return row }
             var edited = row
             edited.targetSets = sets
+            if let data = row.planJSON?.data(using: .utf8),
+               var routine = try? JSONDecoder().decode(RoutineExercise.self, from: data) {
+                routine.sets = Array(routine.sets.prefix(max(1, sets)))
+                while routine.sets.count < max(1, sets) {
+                    let last = routine.sets.last ?? RoutineSetPlan()
+                    routine.sets.append(.init(phase: last.phase, intensifier: last.intensifier,
+                        targetWeightKg: last.targetWeightKg, repsMin: last.repsMin, repsMax: last.repsMax,
+                        targetDurationS: last.targetDurationS, targetDistanceM: last.targetDistanceM,
+                        restSeconds: last.restSeconds, intensifierConfiguration: last.intensifierConfiguration))
+                }
+                if let json = try? JSONEncoder().encode(routine) { edited.planJSON = String(decoding: json, as: UTF8.self) }
+            }
             return edited
         }
     }

@@ -161,6 +161,7 @@ struct NoopAppShell: View {
         case .lift: NoopAct10Screens(navigation: navigation, flow: liftFlow)
         case .fitness: NoopFitnessScreens(navigation: navigation, fitness: fitnessStore, layout: fitnessSettings)
                 .environmentObject(fitnessSettings)
+                .environmentObject(liftFlow)
         }
     }
 
@@ -687,6 +688,7 @@ struct NoopVerifiedAppShell: View {
                 } else if navigation.route.act == .fitness {
                     NoopFitnessScreens(navigation: navigation, fitness: fitnessStore, layout: fitnessSettings)
                         .environmentObject(fitnessSettings)
+                        .environmentObject(liftFlow)
                 } else if Self.canonicalSveaRoutes.contains(navigation.route) {
                     NoopAct7Screens(navigation: navigation)
                 } else if Self.canonicalYouRoutes.contains(navigation.route) {

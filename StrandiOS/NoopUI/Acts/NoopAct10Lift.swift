@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import StrandFitness
 import UniformTypeIdentifiers
 import Security
 import WhoopStore
@@ -1698,9 +1699,12 @@ private struct NoopLiftProgramScreen: View {
 
 // MARK: - lift-detail
 
-private struct NoopLiftDetailScreen: View {
+struct NoopLiftDetailScreen: View {
     @ObservedObject var navigation: NoopNavigation
     @ObservedObject var flow: NoopLiftFlowModel
+    /// Opened over Fitness as a sheet (23 Oct 2026), like every other session, instead of as a page.
+    var asSheet = false
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var repo: Repository
     @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
 
@@ -1723,35 +1727,26 @@ private struct NoopLiftDetailScreen: View {
     @State private var rating = false
     @State private var newRpe = 6.0
 
+    @State private var matched: WorkoutRow?
+
     var body: some View {
-        NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 16) {
-                NoopLiftBackHeader(label: navigation.liftDetailReturnRoute == .history ? "Everything you logged" : navigation.liftDetailReturnRoute.screenTitle) {
-                    navigation.back(or: navigation.liftDetailReturnRoute)
+        Group {
+            if asSheet {
+                ScrollView {
+                    content.padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 28)
                 }
-                if let record {
-                    hero(record)
-                    if !records.isEmpty { recordsStrip }
-                    statsGrid(record)
-                    effortCard(record)
-                    if !muscleShares.isEmpty { musclesCard }
-                    exerciseTables
-                    musclesDoor
-                    VStack(alignment: .leading, spacing: 6) {
-                        NoopSectionLabel("Where these exercises come from")
-                        Text("Exercise data: ExerciseDB v1 via hasaneyldrm/exercises-dataset, MIT licence. Exercise media is not included and is not covered by that licence.")
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
-                            .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
+            } else {
+                NoopScreen(topInset: 56) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        NoopLiftBackHeader(label: navigation.liftDetailReturnRoute == .history ? "Everything you logged" : navigation.liftDetailReturnRoute.screenTitle) {
+                            navigation.back(or: navigation.liftDetailReturnRoute)
+                        }
+                        content
                     }
-                    .padding(.horizontal, 2)
-                } else {
-                    NoopLiftTitle(title: "No session selected",
-                                  subtitle: "Open a lifting session from your history to see what was recorded.")
-                    NoopLiftActionButton(title: "Open programs") { navigation.replace(with: .liftLibrary) }
                 }
             }
         }
-        .task { await load() }
+        .task { await load(); await loadMatched() }
         .sheet(isPresented: $rating) {
             NoopLiftEffortSheet(rating: $newRpe) {
                 rating = false
@@ -1761,31 +1756,63 @@ private struct NoopLiftDetailScreen: View {
         }
     }
 
-    // MARK: Hero
+    /// Leaves the sheet first when there is one, so the next screen opens on the page underneath.
+    private func open(_ route: NoopRoute) {
+        guard asSheet else { navigation.push(route); return }
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { navigation.push(route) }
+    }
 
-    private func hero(_ record: LiftSessionRow) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ZStack {
-                Circle().fill(RadialGradient(colors: [NoopHTMLColor.warm.opacity(0.45), NoopHTMLColor.warm.opacity(0)],
-                                             center: .center, startRadius: 4, endRadius: 46))
-                    .frame(width: 92, height: 92)
-                NoopCanonicalGlyph(name: .weight, size: 26, color: NoopHTMLColor.warmInk)
-                    .frame(width: 58, height: 58)
-                    .background(NoopHTMLColor.warm, in: Circle())
-                    .shadow(color: NoopHTMLColor.warm.opacity(0.4), radius: 14, y: 6)
+    private var content: some View {
+            VStack(alignment: .leading, spacing: 14) {
+                if let record {
+                    NoopSessionHero(symbol: "figure.strengthtraining.traditional", kind: "Strength training",
+                                    title: record.programName ?? "A lift", when: detailSubtitle(record),
+                                    source: "Noop Aura · recorded live")
+                    if !records.isEmpty { recordsStrip }
+                    NoopSessionHeading(title: "Workout details")
+                    if let strain = matched?.strain, strain > 0 {
+                        let e = NoopSessionEffort.describe(strain)
+                        NoopSessionRingRow(value: e.value, fraction: e.fraction, title: "Effort", line: e.line)
+                    }
+                    statsGrid(record)
+                    NoopSessionHeading(title: "Perceived effort")
+                    effortCard(record)
+                    if !muscleShares.isEmpty {
+                        NoopSessionHeading(title: "Muscles")
+                        musclesCard
+                    }
+                    NoopSessionHeading(title: "Exercises", subtitle: exercisesLine)
+                    exerciseTables
+                    if let end = record.endTs {
+                        NoopSessionHeart(start: record.startTs, end: end, source: matched?.source ?? "")
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        NoopSectionLabel("Where these exercises come from")
+                        Text("Exercise data: ExerciseDB v1 via hasaneyldrm/exercises-dataset, MIT licence. Exercise animations, when turned on, © Gym visual.")
+                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                            .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 2).padding(.top, 10)
+                } else {
+                    NoopLiftTitle(title: "No session selected",
+                                  subtitle: "Open a lifting session from your history to see what was recorded.")
+                    NoopLiftActionButton(title: "Open programs") { navigation.replace(with: .liftLibrary) }
+                }
             }
-            .frame(width: 92, height: 92, alignment: .leading)
-            .padding(.leading, -17)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("STRENGTH").font(NoopHTMLFont.sans(11, weight: .semibold)).tracking(1.3)
-                    .foregroundStyle(NoopHTMLColor.warm)
-                Text(record.programName ?? "A lift")
-                    .font(NoopHTMLFont.outfit(31, weight: .light)).tracking(-0.7)
-                    .foregroundStyle(NoopHTMLColor.ink)
-                Text(detailSubtitle(record)).font(NoopHTMLFont.sans(13))
-                    .foregroundStyle(NoopHTMLColor.copy).monospacedDigit()
-            }
-        }
+    }
+
+    private var exercisesLine: String {
+        let n = Set(working.map(\.exercise)).count
+        return "\(n) \(n == 1 ? "exercise" : "exercises"), \(working.count) \(working.count == 1 ? "set" : "sets")"
+    }
+
+    /// The workout row this lift saved, for the strap's effort, heart rate and energy over the session.
+    private func loadMatched() async {
+        guard let record else { matched = nil; return }
+        matched = (await repo.workoutRows(days: 400))
+            .filter { abs($0.startTs - record.startTs) <= 180 }
+            .min { abs($0.startTs - record.startTs) < abs($1.startTs - record.startTs) }
     }
 
     // MARK: Records
@@ -1819,30 +1846,21 @@ private struct NoopLiftDetailScreen: View {
     // MARK: Stats
 
     private func statsGrid(_ record: LiftSessionRow) -> some View {
-        let minutes = record.endTs.map { max(1, ($0 - record.startTs) / 60) }
+        let total = record.endTs.map { $0 - record.startTs }
+        let active = working.compactMap { s in s.startTs.flatMap { a in s.endTs.map { $0 - a } } }.filter { $0 > 0 }.reduce(0, +)
         let reps = working.compactMap(\.reps).reduce(0, +)
-        let exercises = Set(working.map(\.exercise)).count
-        return LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-            stat("Duration", minutes.map { $0 >= 60 ? "\($0 / 60)h \($0 % 60)m" : "\($0) min" } ?? "—")
-            stat("Exercises", "\(exercises)")
-            stat("Working sets", "\(working.count)", foot: sets.count > working.count ? "+\(sets.count - working.count) warm-up" : nil)
-            stat("Total reps", reps > 0 ? "\(reps)" : "—")
-            stat("Volume", volume > 0 ? "\(groupedWeight(volume)) \(LiftFormat.weightUnit(units))" : "—")
-            stat("Heaviest set", heaviest.flatMap { h in liftWeight(h.weightKg, system: units).map { w in h.reps.map { "\(w) × \($0)" } ?? w } } ?? "—")
+        var items: [NoopSessionFigures.Item] = []
+        if active > 0 { items.append(.init(label: "Active duration", value: liftClock(active))) }
+        items.append(.init(label: "Total duration", value: total.map { liftClock($0) } ?? "—"))
+        items.append(.init(label: "Total reps", value: reps > 0 ? "\(reps)" : "—"))
+        items.append(.init(label: "Total weight", value: volume > 0 ? groupedWeight(volume) : "—",
+                           unit: volume > 0 ? LiftFormat.weightUnit(units) : nil))
+        if let hr = matched?.avgHr { items.append(.init(label: "Avg HR", value: "\(hr)", unit: "bpm")) }
+        if let kcal = matched?.energyKcal, kcal > 0 { items.append(.init(label: "Energy", value: "\(Int(kcal.rounded()))", unit: "kcal")) }
+        if let h = heaviest, let w = liftWeight(h.weightKg, system: units) {
+            items.append(.init(label: "Heaviest set", value: h.reps.map { "\(w) × \($0)" } ?? w))
         }
-        .padding(16)
-        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-    }
-
-    private func stat(_ label: String, _ value: String, foot: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
-            Text(value).font(NoopHTMLFont.outfit(23)).foregroundStyle(NoopHTMLColor.ink)
-                .lineLimit(1).minimumScaleFactor(0.7).monospacedDigit()
-            if let foot { Text(foot).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.muted) }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        return NoopSessionFigures(items: items)
     }
 
     // MARK: Effort
@@ -1852,29 +1870,12 @@ private struct NoopLiftDetailScreen: View {
             newRpe = record.sessionRpe ?? 6
             rating = true
         } label: {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle().stroke(Color.white.opacity(0.07), lineWidth: 5)
-                    Circle().trim(from: 0, to: (record.sessionRpe ?? 0) / 10)
-                        .stroke(effortColor(record.sessionRpe ?? 0), style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    Text(record.sessionRpe.map { "\(Int($0.rounded()))" } ?? "–")
-                        .font(NoopHTMLFont.outfit(20)).foregroundStyle(NoopHTMLColor.ink)
-                }
-                .frame(width: 50, height: 50)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(record.sessionRpe.map { NoopLiftEffortSheet.word(Int($0.rounded())) } ?? "How hard was it?")
-                        .font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(record.sessionRpe == nil ? "Not rated yet. Tap to rate the session from 1 to 10."
-                                                  : "Your effort, out of 10. Tap to change it.")
-                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
-                }
-                Spacer()
-                NoopChevron()
-            }
-            .padding(16)
-            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+            let rpe = record.sessionRpe
+            NoopSessionRingRow(value: rpe.map { "\(Int($0.rounded()))" } ?? "–", fraction: (rpe ?? 0) / 10,
+                               title: rpe.map { NoopLiftEffortSheet.word(Int($0.rounded())) } ?? "How hard was it?",
+                               line: rpe == nil ? "Not rated yet. Tap to rate it from 1 to 10." : "Your rating, out of 10. Tap to change it.",
+                               colors: [NoopHTMLColor.blueLight, Color(hex: 0xF2B45C), effortColor(rpe ?? 0)],
+                               chevron: true)
         }
         .buttonStyle(NoopHTMLPressStyle())
     }
@@ -1903,46 +1904,66 @@ private struct NoopLiftDetailScreen: View {
         return credit.map { ($0.key, $0.value / total) }.sorted { $0.share > $1.share }
     }
 
+    private static let muscleColors: [Color] = [Color(hex: 0x4FB8E8), Color(hex: 0x6FCFB4), NoopHTMLColor.volt,
+                                                Color(hex: 0xB69CFF), Color(hex: 0xF2B45C), Color(hex: 0xEF7A9A)]
+
     private var musclesCard: some View {
-        let shares = muscleShares
+        let shares = Array(muscleShares.prefix(6))
         let top = shares[0]
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle().stroke(Color.white.opacity(0.07), lineWidth: 7)
-                    Circle().trim(from: 0, to: top.share)
-                        .stroke(NoopHTMLColor.blush, style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    Text("\(Int((top.share * 100).rounded()))%").font(NoopHTMLFont.sans(12.5, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.ink)
-                }
-                .frame(width: 58, height: 58)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("MOSTLY").font(NoopHTMLFont.sans(10.5, weight: .semibold)).tracking(1.2).foregroundStyle(NoopHTMLColor.muted)
-                    Text(top.muscle.displayName).font(NoopHTMLFont.outfit(22)).foregroundStyle(NoopHTMLColor.ink)
-                    Text("of the work, counting helpers at half").font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
-                }
-            }
-            ForEach(shares.prefix(6), id: \.muscle) { s in
-                HStack(spacing: 10) {
-                    Text(s.muscle.displayName).font(NoopHTMLFont.sans(13, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
-                        .frame(width: 104, alignment: .leading).lineLimit(1)
-                    GeometryReader { g in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Color.white.opacity(0.06))
-                            Capsule().fill(NoopHTMLColor.blush.opacity(0.4 + 0.6 * s.share / top.share))
-                                .frame(width: max(5, g.size.width * s.share / top.share))
+        return NoopSessionCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        NoopSessionCardTitle(symbol: "chart.pie.fill", title: "Muscle breakdown")
+                        Text(top.muscle.displayName).font(NoopHTMLFont.outfit(28, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                        Text("\(Int((top.share * 100).rounded()))% of the work").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                    }
+                    Spacer()
+                    ZStack {
+                        ForEach(Array(shares.enumerated()), id: \.offset) { i, s in
+                            let before = shares.prefix(i).map(\.share).reduce(0, +)
+                            Circle().trim(from: before + 0.012, to: max(before + 0.013, before + s.share - 0.012))
+                                .stroke(Self.muscleColors[i % 6], style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
                         }
                     }
-                    .frame(height: 7)
-                    Text("\(Int((s.share * 100).rounded()))%").font(NoopHTMLFont.sans(12, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.copy).frame(width: 38, alignment: .trailing)
+                    .frame(width: 78, height: 78)
                 }
+                ForEach(Array(shares.enumerated()), id: \.offset) { i, s in
+                    HStack(spacing: 12) {
+                        Group {
+                            if let group = FitnessMuscleGroup.forMuscleId(s.muscle.rawValue) {
+                                NoopFitnessMuscleThumb(group: group, tint: Self.muscleColors[i % 6]).padding(.vertical, 3)
+                            } else {
+                                Circle().fill(Self.muscleColors[i % 6]).frame(width: 10, height: 10)
+                            }
+                        }
+                        .frame(width: 38, height: 38)
+                        .background(Color.white.opacity(0.05), in: Circle())
+                        Text(s.muscle.displayName).font(NoopHTMLFont.sans(15, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                            .frame(width: 108, alignment: .leading).lineLimit(1)
+                        GeometryReader { g in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.06))
+                                Capsule().fill(Self.muscleColors[i % 6]).frame(width: max(8, g.size.width * s.share / top.share))
+                            }
+                        }
+                        .frame(height: 9)
+                        Text("\(Int((s.share * 100).rounded()))%").font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.copy)
+                            .monospacedDigit().frame(width: 42, alignment: .trailing)
+                    }
+                    if i < shares.count - 1 { Divider().overlay(NoopHTMLColor.border) }
+                }
+                Button { open(.liftMuscles) } label: {
+                    HStack(spacing: 6) {
+                        Text("How sets are credited").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(NoopHTMLColor.copy).frame(maxWidth: .infinity, minHeight: 36)
+                }
+                .buttonStyle(NoopPlainHitStyle())
             }
         }
-        .padding(16)
-        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
     }
 
     // MARK: Exercises
@@ -1951,68 +1972,74 @@ private struct NoopLiftDetailScreen: View {
         let order = NSOrderedSet(array: sets.map(\.exercise)).array.compactMap { $0 as? String }
         let prSets = Set(records.compactMap(\.setID))
         return VStack(alignment: .leading, spacing: 12) {
-            NoopSectionLabel(order.count == 1 ? "1 exercise" : "\(order.count) exercises")
             ForEach(order, id: \.self) { exercise in
                 let rows = sets.filter { $0.exercise == exercise }
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 11) {
-                        NoopCanonicalGlyph(name: .weight, size: 15, color: NoopHTMLColor.warm)
-                            .frame(width: 34, height: 34)
-                            .background(NoopHTMLColor.warm.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(exercise).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                            Text(exerciseMeta(exercise, rows: rows.filter { !$0.isWarmup }))
-                                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
-                        }
-                    }
-                    HStack {
-                        Text("SET").lineLimit(1).frame(width: 34, alignment: .leading)
-                        Text(LiftFormat.weightUnit(units).uppercased()).frame(maxWidth: .infinity)
-                        Text("REPS").frame(maxWidth: .infinity)
-                        Text("REST").frame(width: 52, alignment: .trailing)
-                    }
-                    .font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(0.8).foregroundStyle(NoopHTMLColor.muted)
-                    ForEach(rows, id: \.id) { row in
-                        HStack {
-                            Text(row.isWarmup ? "W" : "\(row.setIndex)")
-                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
-                                .foregroundStyle(row.isWarmup ? NoopHTMLColor.muted : NoopHTMLColor.inkSoft)
-                                .frame(width: 26, height: 26).background(Color.white.opacity(0.05), in: Circle())
-                                .frame(width: 34, alignment: .leading)
-                            Text(row.weightKg.map { LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units)) } ?? "—")
-                                .frame(maxWidth: .infinity)
-                            HStack(spacing: 5) {
-                                Text(row.reps.map(String.init) ?? "—")
-                                if prSets.contains(row.id) {
-                                    Image(systemName: "trophy.fill").font(.system(size: 10)).foregroundStyle(NoopHTMLColor.warm)
-                                }
+                let choice = NoopFitnessExerciseChoice.lookup(exercise)
+                NoopSessionCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 13) {
+                            if let choice {
+                                NoopExerciseMedia(choice: choice, thumbnail: true, tile: 60)
+                            } else {
+                                NoopCanonicalGlyph(name: .weight, size: 20, color: NoopHTMLColor.volt)
+                                    .frame(width: 60, height: 60)
+                                    .background(NoopHTMLColor.volt.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                             }
-                            .frame(maxWidth: .infinity)
-                            Text(row.restSec.map { liftClock($0) } ?? "—").foregroundStyle(NoopHTMLColor.copy)
-                                .frame(width: 52, alignment: .trailing)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(exercise).font(NoopHTMLFont.sans(17, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                                let n = rows.filter { !$0.isWarmup }.count
+                                Text([choice?.equipment?.split(separator: ",").first.map { String($0).capitalized },
+                                      "\(n) \(n == 1 ? "set" : "sets")"].compactMap { $0 }.joined(separator: " · "))
+                                    .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                            }
                         }
-                        .font(NoopHTMLFont.sans(14.5, weight: .medium)).monospacedDigit()
-                        .foregroundStyle(row.isWarmup ? NoopHTMLColor.copy : NoopHTMLColor.ink)
-                        .frame(height: 36)
-                        .background(prSets.contains(row.id) ? NoopHTMLColor.warm.opacity(0.07) : Color.white.opacity(0.025),
-                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        HStack(spacing: 8) {
+                            Text("SET").frame(width: 36)
+                            Text(LiftFormat.weightUnit(units).uppercased()).frame(maxWidth: .infinity)
+                            Text("REPS").frame(maxWidth: .infinity)
+                            Text("REST").frame(maxWidth: .infinity)
+                        }
+                        .font(NoopHTMLFont.sans(11, weight: .semibold)).tracking(0.8).foregroundStyle(NoopHTMLColor.muted)
+                        .padding(.top, 4)
+                        ForEach(rows, id: \.id) { row in
+                            HStack(spacing: 8) {
+                                Text(row.isWarmup ? "W" : "\(row.setIndex)")
+                                    .font(NoopHTMLFont.sans(14, weight: .semibold))
+                                    .foregroundStyle(row.isWarmup ? Color(hex: 0xF2B45C) : NoopHTMLColor.ink)
+                                    .frame(width: 36, height: 36).background(Color.white.opacity(0.06), in: Circle())
+                                pill(row.weightKg.map { LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units)) } ?? "—")
+                                pill(row.reps.map { "\($0) reps" } ?? "—", trophy: prSets.contains(row.id))
+                                pill(row.restSec.map { liftClock($0) } ?? "—", dim: true)
+                            }
+                            .opacity(row.isWarmup ? 0.75 : 1)
+                        }
                     }
                 }
-                .padding(14)
-                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
             }
-            Button { navigation.push(.liftEdit) } label: {
-                HStack(spacing: 9) {
-                    Text("Correct something in this session")
-                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.blueLight)
-                    Spacer(); NoopChevron()
+            Button { open(.liftEdit) } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "pencil").font(.system(size: 13, weight: .semibold))
+                    Text("Correct something in this session").font(NoopHTMLFont.sans(14, weight: .semibold))
                 }
-                .padding(.horizontal, 16).frame(minHeight: 50)
-                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .foregroundStyle(NoopHTMLColor.ink)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(Color.white.opacity(0.07), in: Capsule())
             }
             .buttonStyle(NoopHTMLPressStyle())
+            .padding(.top, 4)
         }
+    }
+
+    private func pill(_ text: String, trophy: Bool = false, dim: Bool = false) -> some View {
+        HStack(spacing: 5) {
+            Text(text)
+            if trophy { Image(systemName: "trophy.fill").font(.system(size: 10)).foregroundStyle(NoopHTMLColor.volt) }
+        }
+        .font(NoopHTMLFont.sans(14.5, weight: .medium)).monospacedDigit()
+        .foregroundStyle(dim ? NoopHTMLColor.inkSoft : NoopHTMLColor.ink)
+        .frame(maxWidth: .infinity, minHeight: 40)
+        .background(trophy ? NoopHTMLColor.volt.opacity(0.10) : Color.white.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     /// Bests from every earlier session of each exercise in this one, so a record says what it beat.

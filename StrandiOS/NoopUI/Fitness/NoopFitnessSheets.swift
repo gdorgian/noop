@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import WhoopStore
+import StrandTraining
 
 // MARK: - Starting a routine
 
@@ -24,7 +25,8 @@ enum NoopFitnessRoutineStarter {
                 secondaryMuscles: known?.secondaryMuscles ?? [], targetSets: row.targetSets,
                 restSec: row.restSec, targetRepsLow: row.targetRepsLow,
                 targetRepsHigh: row.targetRepsHigh, targetRpe: row.targetRpe,
-                targetWeightKg: row.targetWeightKg, note: row.note, programItemId: row.id)
+                targetWeightKg: row.targetWeightKg, note: row.note, programItemId: row.id,
+                routinePlan: row.planJSON.flatMap { $0.data(using: .utf8) }.flatMap { try? JSONDecoder().decode(RoutineExercise.self, from: $0) })
         }
         if let running = NoopRunningSession.current(app: app, lift: live, navigation: navigation) { return running }
         guard live.start(plan: plan, programId: program.id, programName: program.name) else { return nil }
@@ -233,6 +235,7 @@ struct NoopFitnessAddSheet: View {
 
 /// When a routine happens: once on a date, or on chosen weekdays for a number of weeks.
 struct NoopFitnessRepeatPlan: Equatable {
+    var includesTime = true
     var weekly = true
     var weekdays: Set<Int> = []          // 1 = Monday … 7 = Sunday
     var weeks = 8
@@ -247,7 +250,8 @@ struct NoopFitnessRepeatPlan: Equatable {
         let cal = Calendar.current
         let hm = cal.dateComponents([.hour, .minute], from: time)
         func at(_ day: Date) -> Date {
-            cal.date(bySettingHour: hm.hour ?? 18, minute: hm.minute ?? 0, second: 0, of: day) ?? day
+            guard includesTime else { return cal.startOfDay(for: day) }
+            return cal.date(bySettingHour: hm.hour ?? 18, minute: hm.minute ?? 0, second: 0, of: day) ?? day
         }
         guard weekly else { return [at(once)] }
         var out: [Date] = []
@@ -255,7 +259,7 @@ struct NoopFitnessRepeatPlan: Equatable {
         var d = start
         while d < end {
             let wd = (cal.component(.weekday, from: d) + 5) % 7 + 1
-            if weekdays.contains(wd), at(d) > Date() { out.append(at(d)) }
+            if weekdays.contains(wd), at(d) >= cal.startOfDay(for: Date()), (!includesTime || at(d) > Date()) { out.append(at(d)) }
             d = cal.date(byAdding: .day, value: 1, to: d) ?? end
         }
         return out
@@ -263,13 +267,15 @@ struct NoopFitnessRepeatPlan: Equatable {
 
     var summary: String {
         guard weekly else {
-            return "Once, \(dates.first?.formatted(.dateTime.weekday(.wide).day().month(.wide).hour().minute()) ?? "")"
+            let date = dates.first ?? once
+            return "Once, " + (includesTime ? date.formatted(.dateTime.weekday(.wide).day().month(.wide).hour().minute()) : date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
         }
         guard !weekdays.isEmpty else { return "Pick the days you train" }
         let names = Calendar.current.shortWeekdaySymbols
         let days = weekdays.sorted().map { names[$0 % 7] }.joined(separator: ", ")
         let n = dates.count
-        return "\(days) at \(time.formatted(date: .omitted, time: .shortened)) · \(n) \(n == 1 ? "session" : "sessions") over \(weeks) weeks"
+        let timing = includesTime ? " at \(time.formatted(date: .omitted, time: .shortened))" : ""
+        return "\(days)\(timing) · \(n) \(n == 1 ? "session" : "sessions") over \(weeks) weeks"
     }
 }
 
@@ -324,8 +330,12 @@ struct NoopFitnessRepeatEditor: View {
                 DatePicker("Day", selection: $plan.once, in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date)
                     .datePickerStyle(.graphical)
             }
-            DatePicker("Time", selection: $plan.time, displayedComponents: .hourAndMinute)
+            Toggle("Set a time", isOn: $plan.includesTime)
                 .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+            if plan.includesTime {
+                DatePicker("Time", selection: $plan.time, displayedComponents: .hourAndMinute)
+                    .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+            }
             Text(plan.summary).font(NoopHTMLFont.sans(12.5, weight: .medium)).foregroundStyle(NoopHTMLColor.volt)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -428,7 +438,7 @@ struct NoopFitnessPlanSheet: View {
     private func save() {
         guard let id = routineID else { return }
         let name = routines.first { $0.id == id }?.name ?? "Routine"
-        settings.schedule(routineID: id, name: name, dates: plan.dates)
+        settings.schedule(routineID: id, name: name, dates: plan.dates, includesTime: plan.includesTime)
         dismiss()
     }
 }

@@ -219,6 +219,23 @@ struct NoopFitnessCardioLive: View {
         if s.contains("hiit") || s.contains("interval") { return "figure.highintensity.intervaltraining" }
         if s.contains("yoga") { return "figure.yoga" }
         if s.contains("ellip") { return "figure.elliptical" }
+        if s.contains("core") { return "figure.core.training" }
+        if s.contains("strength") || s.contains("weight") || s.contains("lift") || s.contains("gym") {
+            return "figure.strengthtraining.traditional"
+        }
+        if s.contains("functional") || s.contains("crossfit") { return "figure.strengthtraining.functional" }
+        if s.contains("pilates") { return "figure.pilates" }
+        if s.contains("danc") { return "figure.dance" }
+        if s.contains("box") || s.contains("kickbox") { return "figure.boxing" }
+        if s.contains("martial") { return "figure.martial.arts" }
+        if s.contains("climb") { return "figure.climbing" }
+        if s.contains("tennis") || s.contains("padel") { return "figure.tennis" }
+        if s.contains("basketball") { return "figure.basketball" }
+        if s.contains("soccer") || s.contains("football") { return "figure.soccer" }
+        if s.contains("stretch") || s.contains("mobility") { return "figure.flexibility" }
+        if s.contains("stair") { return "figure.stair.stepper" }
+        if s.contains("ski") { return "figure.skiing.downhill" }
+        if s.contains("surf") { return "figure.surfing" }
         return "figure.mixed.cardio"
     }
 }

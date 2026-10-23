@@ -16,6 +16,7 @@ struct NoopFitnessHome: View {
     @State private var weekOffset = 0
     @State private var editing = false
     @State private var planning = false
+    @State private var allRoutines = false
 
     var body: some View {
         NoopScreen(topInset: 58) {
@@ -46,6 +47,21 @@ struct NoopFitnessHome: View {
                         .padding(.top, 40)
                 }
             }
+        }
+        .sheet(isPresented: $allRoutines) {
+            NoopFitnessRoutineGrid(navigation: navigation, routines: fitness.snapshot?.routines ?? []).noopSheet()
+        }
+        .overlay(alignment: .top) {
+            if let toast = layout.routineToast {
+                Text(toast).font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.ink)
+                    .padding(12).background(NoopHTMLColor.cardRaised, in: Capsule()).padding(.top, 50)
+            }
+        }
+        .sensoryFeedback(.success, trigger: layout.routineToast)
+        .task(id: layout.routineToast) {
+            guard layout.routineToast != nil else { return }
+            try? await Task.sleep(for: .seconds(3))
+            if !Task.isCancelled { layout.routineToast = nil }
         }
     }
 
@@ -265,6 +281,7 @@ struct NoopFitnessHome: View {
                 NoopFitnessIconButton(glyph: .plus) { navigation.plus() }
                     .accessibilityLabel("Start or log")
             }
+            if Calendar.current.isDateInToday(selectedDay) { NoopActivityOffer().padding(.bottom, 10) }
             activity(s)
             Button { navigation.push(.across) } label: {
                 HStack(spacing: 6) {
@@ -282,10 +299,12 @@ struct NoopFitnessHome: View {
             .padding(.bottom, 20)
         case .routines:
             sectionTitle("Routines") {
+                Button("See all") { allRoutines = true }
+                    .font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
                 Menu {
                     Button { newRoutine() } label: { Label("New routine", systemImage: "plus") }
                     Button { planning = true } label: { Label("Plan a routine", systemImage: "calendar.badge.plus") }
-                    Button { navigation.push(.liftLibrary) } label: { Label("All routines", systemImage: "list.bullet") }
+                    Button { allRoutines = true } label: { Label("All routines", systemImage: "list.bullet") }
                     Button { navigation.push(.liftImport) } label: { Label("Import from another app", systemImage: "square.and.arrow.down") }
                 } label: {
                     NoopFitnessIconGlyph(glyph: .plus)
@@ -321,7 +340,7 @@ struct NoopFitnessHome: View {
                                 Button { planning = true } label: { Label("Plan on the calendar", systemImage: "calendar") }
                             }
                         }
-                        Button { navigation.push(.liftLibrary) } label: {
+                        Button { allRoutines = true } label: {
                             VStack(spacing: 8) {
                                 NoopFixedChevron(direction: .right, color: NoopHTMLColor.inkSoft)
                                     .frame(width: 38, height: 38).background(Color.white.opacity(0.06), in: Circle())
@@ -669,6 +688,9 @@ struct NoopFitnessSessionButton: View {
     @EnvironmentObject private var repo: Repository
     @EnvironmentObject private var model: AppModel
     @State private var editing: WorkoutRow?
+    @State private var confirming: WorkoutRow?
+    @State private var showingLift = false
+    @EnvironmentObject private var liftFlow: NoopLiftFlowModel
     @State private var confirmDelete = false
 
     var body: some View {
@@ -676,9 +698,9 @@ struct NoopFitnessSessionButton: View {
             if let lift = session.liftSessionID {
                 navigation.selectedLiftSessionID = lift
                 navigation.liftDetailReturnRoute = returnRoute
-                navigation.push(.liftDetail)
+                showingLift = true
             } else if session.editable {
-                editing = session.row
+                confirming = session.row
             }
         } label: {
             NoopFitnessSessionRow(session: session, showsDate: showsDate)
@@ -687,7 +709,7 @@ struct NoopFitnessSessionButton: View {
         .disabled(session.liftSessionID == nil && !session.editable)
         .contextMenu {
             if session.editable {
-                Button("Edit details") { editing = session.row }
+                Button("Edit details") { confirming = session.row }
                 Button("Delete", role: .destructive) { confirmDelete = true }
             }
         }
@@ -715,6 +737,17 @@ struct NoopFitnessSessionButton: View {
             }
             .environmentObject(repo)
             .noopSheet()
+        }
+        .sheet(isPresented: $showingLift) {
+            NoopLiftDetailScreen(navigation: navigation, flow: liftFlow, asSheet: true)
+                .environmentObject(repo)
+                .noopSheet()
+        }
+        .sheet(item: Binding(get: { confirming.map(NoopEditTarget.init) }, set: { confirming = $0?.row })) { target in
+            NoopActivityConfirmSheet(row: target.row)
+                .environmentObject(repo)
+                .environmentObject(model)
+                .noopSheet()
         }
     }
 }
