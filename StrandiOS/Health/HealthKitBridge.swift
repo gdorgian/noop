@@ -143,6 +143,9 @@ final class HealthKitBridge: ObservableObject {
            let saved = try? JSONDecoder().decode(HealthHeartRateExperiment.self, from: data) {
             heartRateExperiment = saved
         }
+        #if DEBUG
+        if CommandLine.arguments.contains("--noop-health-probe") { probeShareSet() }
+        #endif
     }
 
     // MARK: - Types
@@ -157,6 +160,22 @@ final class HealthKitBridge: ObservableObject {
         // empty and the imported workout shows distance but no map — same as today, so the addition
         // is strictly additive.
         s.insert(HKSeriesType.workoutRoute())
+        // Everything else Health offers (owner decision, 24 Oct 2026): every quantity and category
+        // type, the characteristics, and the sample kinds that are not plain quantities.
+        for raw in Self.allQuantityIdentifiers {
+            if let t = HKObjectType.quantityType(forIdentifier: .init(rawValue: raw)) { s.insert(t) }
+        }
+        for raw in Self.allCategoryIdentifiers {
+            if let t = HKObjectType.categoryType(forIdentifier: .init(rawValue: raw)) { s.insert(t) }
+        }
+        for id: HKCharacteristicTypeIdentifier in [.biologicalSex, .bloodType, .dateOfBirth, .fitzpatrickSkinType,
+                                                  .wheelchairUse, .activityMoveMode] {
+            if let t = HKObjectType.characteristicType(forIdentifier: id) { s.insert(t) }
+        }
+        s.insert(HKObjectType.audiogramSampleType())
+        s.insert(HKObjectType.electrocardiogramType())
+        s.insert(HKSeriesType.heartbeat())
+        if #available(iOS 18.0, *) { s.insert(HKObjectType.stateOfMindType()) }
         return s
     }
 
@@ -175,6 +194,17 @@ final class HealthKitBridge: ObservableObject {
         if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) { s.insert(sleep) }
         s.insert(HKObjectType.workoutType())
         s.insert(HKSeriesType.workoutRoute())
+        // Every type Health lets an app write (owner decision, 24 Oct 2026), less the ones Apple keeps to
+        // its own devices: asking to share one of those is an uncatchable launch crash, see `writeDenied`.
+        for raw in Self.allQuantityIdentifiers where !Self.shareDisallowed.contains(raw) {
+            if let t = HKObjectType.quantityType(forIdentifier: .init(rawValue: raw)) { s.insert(t) }
+        }
+        for raw in Self.allCategoryIdentifiers where !Self.shareDisallowed.contains(raw) {
+            if let t = HKObjectType.categoryType(forIdentifier: .init(rawValue: raw)) { s.insert(t) }
+        }
+        s.insert(HKObjectType.audiogramSampleType())
+        s.insert(HKSeriesType.heartbeat())
+        if #available(iOS 18.0, *) { s.insert(HKObjectType.stateOfMindType()) }
         return s
     }
 
