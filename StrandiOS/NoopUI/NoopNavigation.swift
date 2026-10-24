@@ -709,7 +709,9 @@ final class NoopNavigation: ObservableObject {
             path = [requestedRoute]
         }
         if let flag = arguments.firstIndex(of: "--noop-metric"), arguments.indices.contains(flag + 1) {
-            metricSheet = NoopMetricSheetRequest(metricID: arguments[flag + 1])
+            let id = arguments[flag + 1]
+            metricSheet = NoopMetricSheetRequest(metricID: id,
+                                                 group: NoopMetric.sleep.contains { $0.id == id } && id != "resp" ? "sleep" : "vitals")
         }
         if path.last == .instrumentMetric {
             path = [.instrumentIndex]

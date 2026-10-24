@@ -354,6 +354,7 @@ struct NoopAct1Screens: View {
                 Text("\(Int((bed.efficiency * 100).rounded()))% of it asleep")
                     .font(NoopHTMLFont.sans(NoopType.eyebrow))
                     .foregroundStyle(NoopHTMLColor.faint)
+                NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
 
             HStack(alignment: .top, spacing: 0) {
@@ -396,7 +397,12 @@ struct NoopAct1Screens: View {
         .padding(.bottom, 15)
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
         .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+        .contentShape(Rectangle())
+        // The night's figures over time open the shared metric sheet on sleep.
+        .onTapGesture { navigation.metricSheet = NoopMetricSheetRequest(metricID: "asleep", group: "sleep") }
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens your sleep over time")
     }
 
     private func inBedFigure(_ label: String, _ value: String, color: Color) -> some View {

@@ -38,10 +38,19 @@ struct NoopMetric: Identifiable {
     let about: String
     /// The daily value from a stored day.
     let value: (DailyMetric) -> Double?
+    /// Durations in hours read as "7h 08m", the way the rest of the app writes them.
+    var isDuration = false
 
     func format(_ v: Double) -> String {
-        decimals == 0 ? "\(Int(v.rounded()))" : String(format: "%.\(decimals)f", v)
+        if isDuration {
+            let m = Int((v * 60).rounded())
+            return m >= 60 ? "\(m / 60)h \(String(format: "%02d", m % 60))m" : "\(m)m"
+        }
+        return decimals == 0 ? "\(Int(v.rounded()))" : String(format: "%.\(decimals)f", v)
     }
+
+    /// The unit beside a value; a duration carries its own.
+    var shownUnit: String { isDuration ? "" : unit }
 }
 
 /// A dated reading.
@@ -133,6 +142,37 @@ extension NoopMetric {
 
     /// The measures that open together, as chips on one sheet.
     static let vitals: [NoopMetric] = [.recovery, .hrv, .restingHR, .respiration, .spo2, .skinTemp]
+
+    static let asleep = NoopMetric(
+        id: "asleep", title: "Time asleep", short: "Asleep", unit: "h", decimals: 1,
+        about: "Every minute staged as sleep in your main night, without the time awake in bed. Most adults need seven to nine hours; your own need is on Rest.",
+        value: { $0.totalSleepMin.map { $0 / 60 } }, isDuration: true)
+
+    static let efficiency = NoopMetric(
+        id: "efficiency", title: "Sleep efficiency", short: "Efficiency", unit: "%",
+        zones: [.init(label: "Restless", range: 0..<80, color: NoopHTMLColor.warm),
+                .init(label: "Normal", range: 80..<90, color: NoopHTMLColor.night),
+                .init(label: "Efficient", range: 90..<101, color: NoopHTMLColor.green)],
+        scale: 50...100,
+        about: "The share of your time in bed spent asleep. Above 85 % is considered good; it falls with long wakes in the night and long lie-ins awake.",
+        value: { $0.efficiency.map { $0 <= 1 ? $0 * 100 : $0 } })
+
+    static let deep = NoopMetric(
+        id: "deep", title: "Deep sleep", short: "Deep", unit: "h", decimals: 1,
+        about: "The slowest, most restorative stage, mostly in the first half of the night. It shrinks with alcohol, late meals and a warm room.",
+        value: { $0.deepMin.map { $0 / 60 } }, isDuration: true)
+
+    static let rem = NoopMetric(
+        id: "rem", title: "REM sleep", short: "REM", unit: "h", decimals: 1,
+        about: "The dreaming stage, mostly in the second half of the night, so a short night cuts it first.",
+        value: { $0.remMin.map { $0 / 60 } }, isDuration: true)
+
+    static let disturbances = NoopMetric(
+        id: "wakes", title: "Disturbances", short: "Wakes", unit: "", higherIsBetter: false,
+        about: "How many times sleep was broken by a wake long enough to stage. A few a night is normal.",
+        value: { $0.disturbances.map(Double.init) })
+
+    static let sleep: [NoopMetric] = [.asleep, .efficiency, .deep, .rem, .disturbances, .respiration]
 }
 
 // MARK: - Sheet
@@ -140,10 +180,11 @@ extension NoopMetric {
 /// Opens the shared sheet on one metric of a group: `navigation.metricSheet = .init(metricID: "hrv")`.
 struct NoopMetricSheetRequest: Identifiable, Equatable {
     var metricID: String
+    /// Which chips open beside it: "vitals" or "sleep".
     var group: String = "vitals"
     var id: String { group + "." + metricID }
 
-    var metrics: [NoopMetric] { NoopMetric.vitals }
+    var metrics: [NoopMetric] { group == "sleep" ? NoopMetric.sleep : NoopMetric.vitals }
 }
 
 /// The period the chart shows.
@@ -232,51 +273,20 @@ struct NoopMetricSheet: View {
     // MARK: Parts
 
     private var topBar: some View {
-        ZStack {
-            Text(metric.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                .lineLimit(1).padding(.horizontal, 60)
-            HStack {
-                NoopIconButton(systemImage: "xmark", size: .small, label: "Close") { dismiss() }
-                Spacer()
-            }
-        }
-        .padding(.horizontal, NoopSpace.l)
-        .padding(.top, NoopSpace.l)
-        .padding(.bottom, NoopSpace.s)
+        NoopMetricTopBar(title: metric.title) { dismiss() }
     }
 
     private var hero: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(focus.map { metric.format($0.value) } ?? "—")
-                        .font(NoopHTMLFont.outfit(NoopType.title1 + 8, weight: .medium)).monospacedDigit()
-                        .foregroundStyle(NoopHTMLColor.ink)
-                        .contentTransition(.numericText())
-                    if focus != nil {
-                        Text(metric.unit).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
-                    }
-                }
-                Text(focus.map { $0.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year()) } ?? "No readings in this period")
-                    .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
-            }
-            Spacer(minLength: NoopSpace.s)
-            if let focus, let status = statusText(focus.value) {
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(status.text).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(status.color)
-                    if let normal {
-                        HStack(spacing: 6) {
-                            RoundedRectangle(cornerRadius: 2).fill(accent.fill.opacity(0.25)).frame(width: 14, height: 10)
-                            Text("\(metric.format(normal.low))–\(metric.format(normal.high))\(metric.unit == "%" ? "%" : "")")
-                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).monospacedDigit()
-                                .foregroundStyle(NoopHTMLColor.inkSoft)
-                        }
-                        .accessibilityLabel("Your normal range")
-                    }
-                }
-            }
-        }
-        .animation(.easeOut(duration: 0.15), value: focus)
+        let status = focus.flatMap { statusText($0.value) }
+        return NoopMetricHero(
+            value: focus.map { metric.format($0.value) } ?? "—",
+            unit: focus == nil || metric.shownUnit.isEmpty ? nil : metric.shownUnit,
+            caption: focus.map { $0.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year()) }
+                ?? "No readings in this period",
+            status: status,
+            range: status == nil ? nil : normal.map {
+                "\(metric.format($0.low))–\(metric.format($0.high))\(metric.unit == "%" ? "%" : "")"
+            })
     }
 
     private func statusText(_ v: Double) -> (text: String, color: Color)? {
@@ -319,11 +329,12 @@ struct NoopMetricSheet: View {
     private var zonesCard: some View {
         NoopMetricCard(title: "\(metric.short) zones") {
             GeometryReader { geo in
-                let span = (metric.scale?.upperBound ?? 100) - (metric.scale?.lowerBound ?? 0)
+                let lo = metric.scale?.lowerBound ?? 0, hi = metric.scale?.upperBound ?? 100
+                let gaps = CGFloat(max(0, metric.zones.count - 1)) * 4
                 HStack(spacing: 4) {
                     ForEach(Array(metric.zones.enumerated()), id: \.offset) { _, z in
-                        Capsule().fill(z.color)
-                            .frame(width: max(8, (geo.size.width - 8) * (min(z.range.upperBound, 100) - z.range.lowerBound) / span))
+                        let part = (min(z.range.upperBound, hi) - max(z.range.lowerBound, lo)) / (hi - lo)
+                        Capsule().fill(z.color).frame(width: max(8, (geo.size.width - gaps) * max(0, part)))
                     }
                 }
             }
@@ -359,51 +370,7 @@ struct NoopMetricSheet: View {
     }
 
     private var trendsCard: some View {
-        let trends = NoopMetricTrend.all(all.filter { $0.date <= window.upperBound })
-        let lastDay = all.last { $0.date <= window.upperBound }?.date
-        return NoopMetricCard(title: "Trend",
-                              subtitle: lastDay.map { "Your 7-day average up to \($0.formatted(.dateTime.day().month(.abbreviated))), against the same span before" }
-                                ?? "Your 7-day average, against the same span before") {
-            VStack(spacing: 0) {
-                ForEach(Array(trends.enumerated()), id: \.element.id) { i, t in
-                    HStack(spacing: NoopSpace.s) {
-                        Text("\(t.days)-day").font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
-                            .frame(width: 64, alignment: .leading)
-                        changeLabel(t.change)
-                        Spacer(minLength: NoopSpace.xs)
-                        NoopSparkline(values: t.line,
-                                      color: t.change.map { abs($0) < 0.01 ? NoopHTMLColor.muted : tone(up: $0 >= 0) } ?? NoopHTMLColor.muted)
-                            .frame(width: 96, height: 28)
-                    }
-                    .frame(minHeight: 48)
-                    .overlay(alignment: .top) {
-                        if i > 0 { Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5) }
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func changeLabel(_ change: Double?) -> some View {
-        if let change, abs(change) < 0.01 {
-            HStack(spacing: 6) {
-                Image(systemName: "equal").font(.system(size: 11, weight: .bold)).foregroundStyle(NoopHTMLColor.canvas)
-                    .frame(width: 20, height: 20).background(NoopHTMLColor.muted, in: Circle())
-                Text("No change").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-            }
-        } else if let change {
-            let up = change >= 0
-            HStack(spacing: 6) {
-                Image(systemName: up ? "arrow.up" : "arrow.down")
-                    .font(.system(size: 11, weight: .bold)).foregroundStyle(NoopHTMLColor.canvas)
-                    .frame(width: 20, height: 20).background(tone(up: up), in: Circle())
-                Text("\(up ? "+" : "−")\(Int((abs(change) * 100).rounded()))%")
-                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
-            }
-        } else {
-            Text("Not enough data").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
-        }
+        NoopMetricTrendCard(points: all.filter { $0.date <= window.upperBound }, higherIsBetter: metric.higherIsBetter)
     }
 
     private var aboutCard: some View {
@@ -411,7 +378,7 @@ struct NoopMetricSheet: View {
             Text(metric.about).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.inkSoft)
                 .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             if let normal {
-                Text("Your normal, the middle of your last 30 days, is \(metric.format(normal.low))–\(metric.format(normal.high)) \(metric.unit).")
+                Text("Your normal, the middle of your last 30 days, is \(metric.format(normal.low))–\(metric.format(normal.high)) \(metric.shownUnit).")
                     .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -445,6 +412,140 @@ struct NoopMetricSheet: View {
 }
 
 // MARK: - Pieces
+
+/// The sheet's top: a close button and the title centred over the sheet. Every metric sheet, Fitness's too.
+struct NoopMetricTopBar: View {
+    let title: String
+    let close: () -> Void
+
+    var body: some View {
+        ZStack {
+            Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                .lineLimit(1).padding(.horizontal, 60)
+            HStack {
+                NoopIconButton(systemImage: "xmark", size: .small, label: "Close", action: close)
+                Spacer()
+            }
+        }
+        .padding(.horizontal, NoopSpace.l)
+        .padding(.top, NoopSpace.l)
+        .padding(.bottom, NoopSpace.s)
+    }
+}
+
+/// The figure at the top of a metric: value and unit, its date or period, and on the right where it sits
+/// (a status in its colour) with the range it is judged against.
+struct NoopMetricHero: View {
+    let value: String
+    var unit: String? = nil
+    let caption: String
+    var comparison: String? = nil
+    var status: (text: String, color: Color)? = nil
+    /// The range beside the status, drawn with a swatch of the chart's band.
+    var range: String? = nil
+    /// A plain line under the status when there is no range.
+    var trailing: String? = nil
+
+    @Environment(\.noopAccent) private var accent
+
+    var body: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(value)
+                        .font(NoopHTMLFont.outfit(NoopType.title1 + 8, weight: .medium)).monospacedDigit()
+                        .foregroundStyle(NoopHTMLColor.ink)
+                        .contentTransition(.numericText())
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                    if let unit {
+                        Text(unit).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
+                    }
+                }
+                Text(caption).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+                if let comparison {
+                    Text(comparison).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
+                }
+            }
+            Spacer(minLength: NoopSpace.s)
+            VStack(alignment: .trailing, spacing: 4) {
+                if let status {
+                    Text(status.text).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(status.color)
+                }
+                if let range {
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 2).fill(accent.fill.opacity(0.25)).frame(width: 14, height: 10)
+                        Text(range).font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).monospacedDigit()
+                            .foregroundStyle(NoopHTMLColor.inkSoft)
+                    }
+                    .accessibilityLabel("Range \(range)")
+                } else if let trailing {
+                    Text(trailing).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: value)
+    }
+}
+
+/// The trend table, for any dated series: the 7-day average now against the same span before.
+struct NoopMetricTrendCard: View {
+    let points: [NoopMetricPoint]
+    var higherIsBetter: Bool? = true
+
+    var body: some View {
+        let trends = NoopMetricTrend.all(points)
+        let lastDay = points.last?.date
+        NoopMetricCard(title: "Trend",
+                       subtitle: lastDay.map { "Your 7-day average up to \($0.formatted(.dateTime.day().month(.abbreviated))), against the same span before" }
+                         ?? "Your 7-day average, against the same span before") {
+            VStack(spacing: 0) {
+                ForEach(Array(trends.enumerated()), id: \.element.id) { i, t in
+                    HStack(spacing: NoopSpace.s) {
+                        Text("\(t.days)-day").font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                            .frame(width: 64, alignment: .leading)
+                        changeLabel(t.change)
+                        Spacer(minLength: NoopSpace.xs)
+                        NoopSparkline(values: t.line,
+                                      color: t.change.map { abs($0) < 0.01 ? NoopHTMLColor.muted : tone(up: $0 >= 0) } ?? NoopHTMLColor.muted)
+                            .frame(width: 96, height: 28)
+                    }
+                    .frame(minHeight: 48)
+                    .overlay(alignment: .top) {
+                        if i > 0 { Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func tone(up: Bool) -> Color {
+        guard let better = higherIsBetter else { return NoopHTMLColor.blueLight }
+        return up == better ? NoopHTMLColor.green : NoopHTMLColor.warm
+    }
+
+    @ViewBuilder
+    private func changeLabel(_ change: Double?) -> some View {
+        if let change, abs(change) < 0.01 {
+            HStack(spacing: 6) {
+                Image(systemName: "equal").font(.system(size: 11, weight: .bold)).foregroundStyle(NoopHTMLColor.canvas)
+                    .frame(width: 20, height: 20).background(NoopHTMLColor.muted, in: Circle())
+                Text("No change").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+            }
+        } else if let change {
+            let up = change >= 0
+            HStack(spacing: 6) {
+                Image(systemName: up ? "arrow.up" : "arrow.down")
+                    .font(.system(size: 11, weight: .bold)).foregroundStyle(NoopHTMLColor.canvas)
+                    .frame(width: 20, height: 20).background(tone(up: up), in: Circle())
+                Text("\(up ? "+" : "−")\(Int((abs(change) * 100).rounded()))%")
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+            }
+        } else {
+            Text("Not enough data").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
+        }
+    }
+}
 
 /// A titled card below the chart; every section of the sheet is one.
 struct NoopMetricCard<Content: View>: View {

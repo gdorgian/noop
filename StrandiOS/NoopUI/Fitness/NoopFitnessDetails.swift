@@ -101,22 +101,7 @@ struct NoopFitnessPage<Content: View>: View {
     /// Close button and centred title pinned above the scroll, as in the metric sheet.
     private var sheetBody: some View {
         VStack(spacing: 0) {
-            HStack {
-                Button { navigation.back() } label: {
-                    Image(systemName: "xmark").font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(NoopHTMLColor.ink)
-                        .frame(width: 44, height: 44)
-                        .background(Color.white.opacity(0.07), in: Circle())
-                }
-                .buttonStyle(NoopPlainHitStyle())
-                .accessibilityLabel("Close")
-                Spacer()
-                Text(title).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold))
-                    .foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
-                Spacer()
-                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
-            }
-            .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 8)
+            NoopMetricTopBar(title: title) { navigation.back() }
             NoopScreen(bottomInset: 32, topInset: 6) {
                 VStack(alignment: .leading, spacing: 0) {
                     if let subtitle {

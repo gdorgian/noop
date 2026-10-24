@@ -120,12 +120,29 @@ private struct NoopFitnessMeasurePage<Top: View, Bottom: View>: View {
                 .padding(16)
                 .fitnessCard()
                 NoopFitnessRangeBar(range: $range, offset: $offset, maxOffset: maxOffset)
+                NoopMetricTrendCard(points: Self.daily(measure, upTo: window.end), higherIsBetter: !measure.lowerIsBetter)
                 bottom(window)
             }
         }
         .onChange(of: range) { selection = nil }
         .onChange(of: offset) { selection = nil }
         .onChange(of: selected) { selection = nil }
+    }
+
+    /// One point per day for the trend table: the day's total for a sum, else its combined reading.
+    static func daily(_ m: NoopFitnessMeasure, upTo end: Date) -> [NoopMetricPoint] {
+        let cal = Calendar.current
+        let byDay = Dictionary(grouping: m.events.filter { $0.date <= end }) { cal.startOfDay(for: $0.date) }
+        return byDay.map { day, es in
+            let vs = es.map(\.value)
+            let v: Double = switch m.combine {
+            case .sum: vs.reduce(0, +)
+            case .mean: vs.reduce(0, +) / Double(vs.count)
+            case .max: vs.max() ?? 0
+            case .latest: es.max { $0.date < $1.date }?.value ?? 0
+            }
+            return NoopMetricPoint(date: day, value: v)
+        }.sorted { $0.date < $1.date }
     }
 
     @ViewBuilder

@@ -174,30 +174,10 @@ struct NoopFitnessInstrumentHeader: View {
     var status: (text: String, color: Color)? = nil
     var trailing: String? = nil
 
+    /// The metric sheet's hero (NoopMetricHero), so every metric page reads the same.
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text(value).font(NoopHTMLFont.outfit(NoopType.title1)).foregroundStyle(NoopHTMLColor.ink)
-                        .contentTransition(.numericText())
-                    if let unit { Text(unit).font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.copy) }
-                }
-                Text(caption).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                if let comparison {
-                    Text(comparison).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
-                }
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 3) {
-                if let status {
-                    Text(status.text).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(status.color)
-                }
-                if let trailing {
-                    Text(trailing).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                }
-            }
-        }
-        .animation(NoopMotion.swap, value: value)
+        NoopMetricHero(value: value, unit: unit, caption: caption, comparison: comparison,
+                       status: status, trailing: trailing)
     }
 }
 
@@ -216,43 +196,17 @@ struct NoopFitnessMeasureChips: View {
     let items: [Item]
     @Binding var selected: String
 
+    /// Text chips, as the metric sheet draws them; the figures themselves live in the hero.
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+        ScrollView(.horizontal) {
+            HStack(spacing: NoopSpace.xs) {
                 ForEach(items) { item in
-                    Button { withAnimation(NoopMotion.swap) { selected = item.id } } label: { chip(item) }
-                        .buttonStyle(NoopHTMLPressStyle())
-                }
-            }
-            .padding(.horizontal, 1)
-        }
-    }
-
-    private func chip(_ item: Item) -> some View {
-        let on = item.id == selected
-        return VStack(alignment: .leading, spacing: 3) {
-            Text(item.label).font(NoopHTMLFont.sans(NoopType.caption, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
-            Text(item.value).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                .lineLimit(1)
-            if let status = item.status {
-                Text(status.text).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(status.color)
-            } else if let prev = item.previous {
-                HStack(spacing: 4) {
-                    if let t = item.trend {
-                        Image(systemName: t.up ? "arrow.up" : "arrow.down")
-                            .font(.system(size: 8.5, weight: .bold))
-                            .foregroundStyle(t.good ? NoopHTMLColor.green : NoopHTMLColor.warm)
-                    }
-                    Text(prev).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted).lineLimit(1)
+                    NoopChip(title: item.label, isOn: item.id == selected) { selected = item.id }
                 }
             }
         }
-        .padding(.horizontal, 13).padding(.vertical, 10)
-        .frame(minWidth: 112, alignment: .leading)
-        .background(on ? Color.white.opacity(0.07) : Color.white.opacity(0.03),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .strokeBorder(on ? NoopHTMLColor.inkSoft.opacity(0.55) : NoopHTMLColor.border, lineWidth: on ? 1 : 0.5))
+        .scrollIndicators(.hidden)
+        .scrollClipDisabled()
     }
 }
 
@@ -262,43 +216,22 @@ struct NoopFitnessRangeBar: View {
     @Binding var offset: Int
     var ranges: [NoopFitnessRange] = NoopFitnessRange.allCases
     var maxOffset = 4
-    @Environment(\.noopAccent) private var accent
 
+    /// The metric sheet's period bar (NoopMetricRangeBar): arrows outside, tabs in a track.
     var body: some View {
-        HStack(spacing: 2) {
-            step(.left, enabled: offset < maxOffset) { offset += 1 }
-            ForEach(ranges) { r in
-                Button {
-                    withAnimation(NoopMotion.swap) { range = r; offset = 0 }
-                } label: {
-                    // Same tab as NoopTabs; this bar adds the earlier/later arrows either side.
-                    Text(r.rawValue)
-                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: range == r ? .semibold : .regular))
-                        .foregroundStyle(range == r ? accent.fill : NoopHTMLColor.copy)
-                        .frame(maxWidth: .infinity).frame(height: NoopControlSize.small.height)
-                        .background(range == r ? accent.fill.opacity(0.20) : .clear,
-                                    in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .strokeBorder(range == r ? accent.fill.opacity(0.42) : .clear, lineWidth: 0.5))
-                        .noopHitTarget()
-                }
-                .buttonStyle(NoopHTMLPressStyle())
+        HStack(spacing: NoopSpace.xs) {
+            NoopIconButton(systemImage: "chevron.left", size: .small, label: "Earlier") {
+                withAnimation(NoopMotion.swap) { offset += 1 }
             }
-            step(.right, enabled: offset > 0) { offset -= 1 }
+            .disabled(offset >= maxOffset).opacity(offset >= maxOffset ? 0.35 : 1)
+            NoopTabs(options: ranges.map { ($0.rawValue, $0) }, selection: Binding(
+                get: { range }, set: { r in range = r; offset = 0 }))
+            NoopIconButton(systemImage: "chevron.right", size: .small, label: "Later") {
+                withAnimation(NoopMotion.swap) { offset -= 1 }
+            }
+            .disabled(offset == 0).opacity(offset == 0 ? 0.35 : 1)
         }
-        .padding(4)
-        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .sensoryFeedback(.selection, trigger: offset)
-    }
-
-    private func step(_ d: NoopFixedChevron.Direction, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button { withAnimation(NoopMotion.swap) { action() } } label: {
-            NoopFixedChevron(direction: d, color: enabled ? NoopHTMLColor.inkSoft : NoopHTMLColor.chevronDim)
-                .frame(width: 44, height: 40)
-        }
-        .buttonStyle(NoopHTMLPressStyle())
-        .disabled(!enabled)
-        .accessibilityLabel(d == .left ? "Earlier" : "Later")
     }
 }
 
