@@ -218,7 +218,7 @@ struct NoopMetricSheet: View {
             .scrollIndicators(.hidden)
         }
         .background(NoopHTMLColor.canvas.ignoresSafeArea())
-        .task { await load() }
+        .task(id: repo.refreshSeq) { await load() }
         .onChange(of: selectedID) { _, _ in picked = nil; openOnLatest() }
         .onChange(of: range) { _, _ in picked = nil; offset = 0 }
         .onChange(of: offset) { _, _ in picked = nil }
@@ -419,9 +419,9 @@ struct NoopMetricSheet: View {
     }
 
     private func load() async {
-        let cal = Calendar.current
-        let from = cal.date(byAdding: .day, value: -400, to: Date()) ?? Date()
-        days = await repo.dailyMetrics(fromDay: Self.dayFormatter.string(from: from), toDay: Self.dayFormatter.string(from: Date()))
+        // `repo.days` is the app's merged daily list — the strap's computed days and imported history —
+        // the same rows Today and Trends read. (`dailyMetrics(fromDay:)` reads imported rows only.)
+        days = repo.days
         if !metrics.contains(where: { $0.id == selectedID }), let first = metrics.first { selectedID = first.id }
         openOnLatest()
     }

@@ -1787,19 +1787,29 @@ struct NoopAct2Screens: View {
     }
 
     private func metricRow(_ title: String, note: String, value: String, warm: Bool = false) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(NoopHTMLFont.sans(NoopType.footnote))
-                if !note.isEmpty {
-                    Text(note).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
+        // The vitals that have a history open the shared metric sheet (NoopMetricSheet).
+        let metricID: String? = ["Resting heart rate": "rhr", "Variability": "hrv"][title]
+        return Button {
+            if let metricID { navigation.metricSheet = NoopMetricSheetRequest(metricID: metricID) }
+        } label: {
+            HStack(spacing: NoopSpace.s) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
+                    if !note.isEmpty {
+                        Text(note).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
+                    }
                 }
+                Spacer()
+                Text(value)
+                    .font(NoopHTMLFont.outfit(NoopType.title3))
+                    .foregroundStyle(warm ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue)
+                if metricID != nil { NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim) }
             }
-            Spacer()
-            Text(value)
-                .font(NoopHTMLFont.outfit(NoopType.title3))
-                .foregroundStyle(warm ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue)
+            .frame(minHeight: 58)
+            .contentShape(Rectangle())
         }
-        .frame(minHeight: 58)
+        .buttonStyle(NoopHTMLPressStyle())
+        .disabled(metricID == nil)
     }
 
     // MARK: - The day so far

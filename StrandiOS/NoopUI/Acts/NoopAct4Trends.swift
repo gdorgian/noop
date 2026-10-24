@@ -430,6 +430,11 @@ private struct NoopTrendsScreen: View {
     }
 
     private func openMetric(_ row: NoopTrendSignal) {
+        // Measures the shared metric sheet carries open there, the same template as everywhere else.
+        if let id = ["rhr": "rhr", "hrv": "hrv"][row.key] {
+            navigation.metricSheet = NoopMetricSheetRequest(metricID: id)
+            return
+        }
         let calendar = Calendar.current
         let end = live?.throughDay ?? calendar.startOfDay(for: Date())
         var mondayCalendar = calendar
