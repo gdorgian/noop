@@ -163,14 +163,9 @@ struct NoopExerciseMedia: View {
 struct NoopExerciseAnimationToggle: View {
     @AppStorage(ExerciseMediaStore.enabledKey) private var enabled = false
     var body: some View {
-        Toggle(isOn: $enabled) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Exercise animations").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                Text("Download exercise media from GitHub when viewed. Cached media works offline.")
-                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-            }
-        }
-        .tint(NoopHTMLColor.volt)
+        NoopToggleRow(title: "Exercise animations",
+                      subtitle: "Download exercise media from GitHub when viewed. Cached media works offline.",
+                      isOn: $enabled)
         .onChange(of: enabled) { _, on in
             if !on { Task { await ExerciseMediaStore.shared.cancelDownloads() } }
         }

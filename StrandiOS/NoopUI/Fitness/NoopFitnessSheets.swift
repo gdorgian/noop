@@ -326,8 +326,7 @@ struct NoopFitnessRepeatEditor: View {
                 DatePicker("Day", selection: $plan.once, in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date)
                     .datePickerStyle(.graphical)
             }
-            Toggle("Set a time", isOn: $plan.includesTime)
-                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+            NoopToggleRow(title: "Set a time", isOn: $plan.includesTime)
             if plan.includesTime {
                 DatePicker("Time", selection: $plan.time, displayedComponents: .hourAndMinute)
                     .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)

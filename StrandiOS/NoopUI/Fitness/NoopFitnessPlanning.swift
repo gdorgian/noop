@@ -122,36 +122,19 @@ struct NoopFitnessEditScreen: View {
                             move(.down, enabled: i < layout.sections.count - 1) { swap(i, i + 1) }
                         }
                         ForEach(section.cards, id: \.self) { card in
-                            Toggle(isOn: Binding(
+                            NoopToggleRow(title: card.title, isOn: Binding(
                                 get: { layout.isShown(card) },
-                                set: { on in if on { layout.hidden.remove(card) } else { layout.hidden.insert(card) } })
-                            ) {
-                                Text(card.title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.inkSoft)
-                            }
-                            .tint(NoopHTMLColor.blue)
+                                set: { on in if on { layout.hidden.remove(card) } else { layout.hidden.insert(card) } }))
                         }
                     }
                 }
                 NoopFitnessPanel(label: "Activity detection") {
-                    Toggle(isOn: $autoLog) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Log detected activities").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                            Text("When your strap records a workout you did not start, it is added as a detected activity you can rename, correct or delete.")
-                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .tint(NoopHTMLColor.volt)
-                    Toggle(isOn: $activityNotices) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Notify me").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                            Text("While a session is under way, and once it has been logged, so you can confirm what it was.")
-                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .tint(NoopHTMLColor.volt)
-                    .disabled(!autoLog)
+                    NoopToggleRow(title: "Log detected activities",
+                                  subtitle: "When your strap records a workout you did not start, it is added as a detected activity you can rename, correct or delete.",
+                                  isOn: $autoLog)
+                    NoopToggleRow(title: "Notify me",
+                                  subtitle: "While a session is under way, and once it has been logged, so you can confirm what it was.",
+                                  isOn: $activityNotices, enabled: autoLog)
                 }
                 Button {
                     layout.sections = NoopFitnessSettings.Section.allCases

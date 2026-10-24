@@ -330,7 +330,7 @@ struct NoopFitnessRoutineEditor: View {
                     $0.routineID == navigation.fitnessRoutineID && $0.isUpcoming(asOf: Date())
                 }) {
                     NoopFitnessPanel {
-                        Toggle("Put it on the calendar", isOn: $planIt)
+                        NoopToggleRow(title: "Put it on the calendar", isOn: $planIt)
                         if planIt { NoopFitnessRepeatEditor(plan: $repeatPlan) }
                     }
                 }

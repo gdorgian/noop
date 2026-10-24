@@ -262,6 +262,7 @@ struct NoopFitnessRangeBar: View {
     @Binding var offset: Int
     var ranges: [NoopFitnessRange] = NoopFitnessRange.allCases
     var maxOffset = 4
+    @Environment(\.noopAccent) private var accent
 
     var body: some View {
         HStack(spacing: 2) {
@@ -272,18 +273,21 @@ struct NoopFitnessRangeBar: View {
                 } label: {
                     // Same tab as NoopTabs; this bar adds the earlier/later arrows either side.
                     Text(r.rawValue)
-                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                        .foregroundStyle(range == r ? NoopHTMLColor.ink : NoopHTMLColor.copy)
-                        .frame(maxWidth: .infinity).frame(height: NoopControlSize.medium.height - 4)
-                        .background(range == r ? Color.white.opacity(0.1) : .clear, in: Capsule())
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: range == r ? .semibold : .regular))
+                        .foregroundStyle(range == r ? accent.fill : NoopHTMLColor.copy)
+                        .frame(maxWidth: .infinity).frame(height: NoopControlSize.small.height)
+                        .background(range == r ? accent.fill.opacity(0.20) : .clear,
+                                    in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .strokeBorder(range == r ? accent.fill.opacity(0.42) : .clear, lineWidth: 0.5))
                         .noopHitTarget()
                 }
                 .buttonStyle(NoopHTMLPressStyle())
             }
             step(.right, enabled: offset > 0) { offset -= 1 }
         }
-        .padding(3)
-        .background(Color.white.opacity(0.04), in: Capsule())
+        .padding(4)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .sensoryFeedback(.selection, trigger: offset)
     }
 

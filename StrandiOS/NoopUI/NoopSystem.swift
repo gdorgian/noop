@@ -68,7 +68,7 @@ enum NoopControlSize {
     /// The main action of a screen or sheet.
     case large
 
-    var height: CGFloat { switch self { case .small: 34; case .medium: 44; case .large: 52 } }
+    var height: CGFloat { switch self { case .small: 34; case .medium: 44; case .large: 48 } }
     var text: CGFloat { switch self { case .small: NoopType.footnote; case .medium, .large: NoopType.subhead } }
     var icon: CGFloat { switch self { case .small: 15; case .medium: 16; case .large: 17 } }
     var padding: CGFloat { switch self { case .small: 12; case .medium: 16; case .large: 20 } }
@@ -149,14 +149,19 @@ struct NoopActionButton: View {
             .padding(.horizontal, variant == .plain ? 0 : size.padding)
             .frame(maxWidth: fullWidth ? .infinity : nil)
             .frame(height: size.height)
-            .background(background, in: RoundedRectangle(cornerRadius: size == .large ? NoopRadius.button : size.height / 2,
-                                                         style: .continuous))
+            .background(background, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(variant == .secondary || variant == .destructive ? Color.white.opacity(0.08) : .clear,
+                              lineWidth: 0.5))
             .noopHitTarget()
         }
         .buttonStyle(NoopHTMLPressStyle())
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.45)
     }
+
+    /// Handoff §7: 17 on the primary 48, 15 on the 44 secondary, a capsule on chips.
+    private var radius: CGFloat { switch size { case .large: 17; case .medium: 15; case .small: size.height / 2 } }
 
     private var foreground: Color {
         switch variant {
@@ -170,9 +175,8 @@ struct NoopActionButton: View {
     private var background: Color {
         switch variant {
         case .primary: accent.fill
-        case .secondary: Color.white.opacity(0.07)
+        case .secondary, .destructive: Color.white.opacity(0.07)
         case .plain: .clear
-        case .destructive: NoopHTMLColor.red.opacity(0.12)
         }
     }
 }
@@ -210,7 +214,8 @@ struct NoopIconDiscShape<Content: View>: View {
     }
 }
 
-/// A selectable pill: filters and choices. Selected fills white, so the accent stays for actions.
+/// A selectable pill (handoff primitive §6): unselected on the control fill; selected takes the section
+/// hue as a tint — 12 % fill, 30 % border, the hue as text — never a solid block.
 struct NoopChip: View {
     let title: String
     var systemImage: String? = nil
@@ -220,6 +225,8 @@ struct NoopChip: View {
     var size: NoopControlSize = .small
     let action: () -> Void
 
+    @Environment(\.noopAccent) private var accent
+
     var body: some View {
         Button { withAnimation(NoopMotion.swap) { action() } } label: {
             HStack(spacing: NoopSpace.xxs + 2) {
@@ -227,10 +234,11 @@ struct NoopChip: View {
                 if let systemImage { Image(systemName: systemImage).font(.system(size: size.icon, weight: .semibold)) }
                 Text(title).font(NoopHTMLFont.sans(size.text, weight: .semibold)).lineLimit(1)
             }
-            .foregroundStyle(isOn ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
+            .foregroundStyle(isOn ? accent.fill : NoopHTMLColor.inkSoft)
             .padding(.horizontal, size.padding + 2)
             .frame(height: size.height)
-            .background(isOn ? NoopHTMLColor.ink : Color.white.opacity(0.07), in: Capsule())
+            .background(isOn ? accent.fill.opacity(0.12) : Color.white.opacity(0.07), in: Capsule())
+            .overlay(Capsule().strokeBorder(isOn ? accent.fill.opacity(0.30) : Color.white.opacity(0.06), lineWidth: 0.5))
             .noopHitTarget()
         }
         .buttonStyle(NoopHTMLPressStyle())
@@ -238,30 +246,73 @@ struct NoopChip: View {
     }
 }
 
-/// Equal-width tabs in a track: periods (7D / 30D), modes (Cardio / Muscular).
+/// Equal-width tabs in a track (handoff primitive §5, the segmented control): a 5 % track, the selected
+/// option tinted in the section hue — 20 % fill, 42 % border, the hue as text.
 struct NoopTabs<Value: Hashable>: View {
     let options: [(label: String, value: Value)]
     @Binding var selection: Value
+
+    @Environment(\.noopAccent) private var accent
 
     var body: some View {
         HStack(spacing: NoopSpace.xxs) {
             ForEach(options, id: \.value) { option in
                 let on = option.value == selection
-                Button { withAnimation(NoopMotion.swap) { selection = option.value } } label: {
+                Button { withAnimation(.easeInOut(duration: 0.18)) { selection = option.value } } label: {
                     Text(option.label)
-                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                        .foregroundStyle(on ? NoopHTMLColor.ink : NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: on ? .semibold : .regular))
+                        .lineLimit(1)
+                        .foregroundStyle(on ? accent.fill : NoopHTMLColor.copy)
                         .frame(maxWidth: .infinity).frame(height: NoopControlSize.small.height)
-                        .background(on ? Color.white.opacity(0.1) : .clear, in: Capsule())
+                        .background(on ? accent.fill.opacity(0.20) : .clear,
+                                    in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .strokeBorder(on ? accent.fill.opacity(0.42) : .clear, lineWidth: 0.5))
                         .noopHitTarget()
                 }
                 .buttonStyle(NoopHTMLPressStyle())
                 .accessibilityAddTraits(on ? .isSelected : [])
             }
         }
-        .padding(2)
-        .background(Color.white.opacity(0.05), in: Capsule())
+        .padding(4)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .sensoryFeedback(.selection, trigger: selection)
+    }
+}
+
+/// A row that switches something (handoff primitives §2 + §4): title, an optional sub-line saying what
+/// it changes, and the custom toggle in the section hue. The whole row is the tap target.
+struct NoopToggleRow: View {
+    let title: String
+    var subtitle: String? = nil
+    @Binding var isOn: Bool
+    var enabled = true
+
+    @Environment(\.noopAccent) private var accent
+
+    var body: some View {
+        Button { if enabled { withAnimation(.easeInOut(duration: 0.22)) { isOn.toggle() } } } label: {
+            HStack(alignment: .center, spacing: NoopSpace.s) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                    if let subtitle {
+                        Text(subtitle).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                NoopHTMLToggle(isOn: isOn, color: accent.fill) { if enabled { isOn.toggle() } }
+                    .allowsHitTesting(false)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(NoopPlainHitStyle())
+        .opacity(enabled ? 1 : 0.45)
+        .sensoryFeedback(.selection, trigger: isOn)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
