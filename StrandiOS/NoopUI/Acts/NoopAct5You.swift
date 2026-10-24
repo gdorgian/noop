@@ -117,6 +117,8 @@ struct NoopAct5Screens: View {
     @State private var selectedShift: String?
     @State private var paired = false
     @State private var labFlagToClear: String?
+    @StateObject var youLayout = NoopPageLayout(page: "you", catalog: NoopAct5Screens.youSections)
+    @State var youEditing = NoopPageEditing()
 
     var body: some View {
         Group {
@@ -520,97 +522,117 @@ private extension NoopAct5Screens {
                 }
                 .padding(.bottom, -30)
                 .zIndex(1)
-                VStack(spacing: 2) {
-                    if let you {
-                        NoopBodyClock(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour,
-                                      showsNow: true,
-                                      initials: NoopYouRecord.initials(profile.displayName),
-                                      photo: profile.avatarImage)
-                        if let name = profile.displayName {
-                            Text(name)
-                                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
-                                .tracking(-0.8)
-                        }
-                        // The prototype's line goes on to claim how tightly the need has held; no
-                        // template exists for that, so only the window and the need are stated.
-                        if let onset = you.usualOnsetHour, let wake = you.usualWakeHour {
-                            Text("Asleep \(NoopYouRecord.clock(onset)) \u{2192} \(NoopYouRecord.clock(wake)) \u{00B7} a \(NoopRestRecord.duration(you.needMin)) need")
-                                .font(NoopHTMLFont.sans(NoopType.caption))
-                                .foregroundStyle(Color(hex: 0x8B958F))
-                                .multilineTextAlignment(.center)
-                                .lineSpacing(3)
-                                .frame(maxWidth: 300)
-                        }
-                    } else {
-                    NoopBodyClock()
-                    Text("Gabriel")
-                        .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
-                        .tracking(-0.8)
-                    Text("Asleep 23:20 → 06:32 · a 7h 12m need, held to within nine minutes for 221 nights")
-                        .font(NoopHTMLFont.sans(NoopType.caption))
-                        .foregroundStyle(Color(hex: 0x8B958F))
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(3)
-                        .frame(maxWidth: 300)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 9) {
-                    youSectionLabel("Your body")
-                    Button { navigation.push(.record) } label: {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                NoopSectionLabel("Your record", color: Color(hex: 0xC08E98))
-                                if you == nil {
-                                HStack(spacing: 10) {
-                                    recordFact("29", "years")
-                                    recordFact(heightDisplay, "")
-                                    recordFact(weightDisplay, "")
-                                    recordFact(sex.lowercased(), "")
-                                }
-                                } else if profileConfirmed {
-                                HStack(spacing: 10) {
-                                    recordFact("\(profile.age)", "years")
-                                    recordFact(liveHeightDisplay, "")
-                                    recordFact(liveWeightDisplay, "")
-                                    recordFact(liveSexDisplay, "")
-                                }
-                                }
-                            }
-                            Spacer()
-                            NoopChevron(color: Color(hex: 0xC08E98))
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 15)
-                        .background(Self.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Self.blush.opacity(0.22), lineWidth: 0.5))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-
-                    dividedCard {
-                        copyRow("Your zones", detail: "five bands for your effort", symbol: "chart.bar", tint: Self.blush, value: "5") { navigation.push(.zones) }
-                    }
-
-                    youSectionLabel("Your journey")
-                        .padding(.top, 8)
-                    dividedCard {
-                        VStack(spacing: 0) {
-                            copyRow("Your journey", detail: you == nil ? "half marathon, 26 October · 46% recorded" : nil, symbol: "sparkles", tint: Self.blush) { navigation.push(.goal) }
-                            Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Everything you logged", detail: "sessions, sleeps, coffees", symbol: "waveform.path.ecg", tint: Self.blush, value: you == nil ? "142" : nil) { navigation.push(.history) }
-                            Divider().overlay(NoopHTMLColor.border)
-                            copyRow("Bloodwork", detail: "your lab results, each with its own date", symbol: "drop", tint: NoopHTMLColor.warm) { navigation.push(.labs) }
-                        }
-                    }
-
-                    Text("Noop is told six things about your body and works the rest out.")
-                        .font(NoopHTMLFont.sans(NoopType.caption))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .lineSpacing(4)
-                        .padding(.horizontal, 2)
-                }
-                .padding(.top, 18)
+                NoopEditableSections(layout: youLayout, editing: $youEditing, spacing: 0) { id in youSection(id) }
             }
+        }
+        .noopEditBar($youEditing, layout: youLayout)
+    }
+
+    /// You's sections in their default order; each carries the space above it.
+    static let youSections: [NoopPageSection] = [
+        NoopPageSection(id: "portrait", title: "Your clock", detail: "Your name and your usual sleep window"),
+        NoopPageSection(id: "body", title: "Your body", detail: "Your record and your zones"),
+        NoopPageSection(id: "journey", title: "Your journey", detail: "Your goal, everything you logged and bloodwork")
+    ]
+
+    @ViewBuilder
+    func youSection(_ id: String) -> some View {
+        switch id {
+        case "portrait":
+            VStack(spacing: 2) {
+                if let you {
+                    NoopBodyClock(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour,
+                                  showsNow: true,
+                                  initials: NoopYouRecord.initials(profile.displayName),
+                                  photo: profile.avatarImage)
+                    if let name = profile.displayName {
+                        Text(name)
+                            .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
+                            .tracking(-0.8)
+                    }
+                    // The prototype's line goes on to claim how tightly the need has held; no
+                    // template exists for that, so only the window and the need are stated.
+                    if let onset = you.usualOnsetHour, let wake = you.usualWakeHour {
+                        Text("Asleep \(NoopYouRecord.clock(onset)) \u{2192} \(NoopYouRecord.clock(wake)) \u{00B7} a \(NoopRestRecord.duration(you.needMin)) need")
+                            .font(NoopHTMLFont.sans(NoopType.caption))
+                            .foregroundStyle(Color(hex: 0x8B958F))
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(3)
+                            .frame(maxWidth: 300)
+                    }
+                } else {
+                NoopBodyClock()
+                Text("Gabriel")
+                    .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
+                    .tracking(-0.8)
+                Text("Asleep 23:20 → 06:32 · a 7h 12m need, held to within nine minutes for 221 nights")
+                    .font(NoopHTMLFont.sans(NoopType.caption))
+                    .foregroundStyle(Color(hex: 0x8B958F))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .frame(maxWidth: 300)
+                }
+            }
+        case "body":
+            VStack(alignment: .leading, spacing: 9) {
+                youSectionLabel("Your body")
+                Button { navigation.push(.record) } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            NoopSectionLabel("Your record", color: Color(hex: 0xC08E98))
+                            if you == nil {
+                            HStack(spacing: 10) {
+                                recordFact("29", "years")
+                                recordFact(heightDisplay, "")
+                                recordFact(weightDisplay, "")
+                                recordFact(sex.lowercased(), "")
+                            }
+                            } else if profileConfirmed {
+                            HStack(spacing: 10) {
+                                recordFact("\(profile.age)", "years")
+                                recordFact(liveHeightDisplay, "")
+                                recordFact(liveWeightDisplay, "")
+                                recordFact(liveSexDisplay, "")
+                            }
+                            }
+                        }
+                        Spacer()
+                        NoopChevron(color: Color(hex: 0xC08E98))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 15)
+                    .background(Self.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Self.blush.opacity(0.22), lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+
+                dividedCard {
+                    copyRow("Your zones", detail: "five bands for your effort", symbol: "chart.bar", tint: Self.blush, value: "5") { navigation.push(.zones) }
+                }
+            }
+            .padding(.top, 18)
+        case "journey":
+            VStack(alignment: .leading, spacing: 9) {
+                youSectionLabel("Your journey")
+                dividedCard {
+                    VStack(spacing: 0) {
+                        copyRow("Your journey", detail: you == nil ? "half marathon, 26 October · 46% recorded" : nil, symbol: "sparkles", tint: Self.blush) { navigation.push(.goal) }
+                        Divider().overlay(NoopHTMLColor.border)
+                        copyRow("Everything you logged", detail: "sessions, sleeps, coffees", symbol: "waveform.path.ecg", tint: Self.blush, value: you == nil ? "142" : nil) { navigation.push(.history) }
+                        Divider().overlay(NoopHTMLColor.border)
+                        copyRow("Bloodwork", detail: "your lab results, each with its own date", symbol: "drop", tint: NoopHTMLColor.warm) { navigation.push(.labs) }
+                    }
+                }
+
+                Text("Noop is told six things about your body and works the rest out.")
+                    .font(NoopHTMLFont.sans(NoopType.caption))
+                    .foregroundStyle(NoopHTMLColor.faint)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 2)
+            }
+            .padding(.top, 17)
+        default:
+            EmptyView()
         }
     }
 
