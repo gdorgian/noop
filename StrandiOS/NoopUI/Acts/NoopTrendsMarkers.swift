@@ -200,6 +200,14 @@ struct NoopMarkerRow: View {
     }
 
     @ViewBuilder private var status: some View {
+        if let v = reading?.latest, let zone = metric.zones.first(where: { $0.range.contains(v) }) {
+            Text(zone.label).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(zone.color)
+        } else {
+            direction
+        }
+    }
+
+    @ViewBuilder private var direction: some View {
         let (word, symbol): (String, String) = {
             switch reading?.direction {
             case .increasing: ("Increasing", "arrow.up.circle.fill")

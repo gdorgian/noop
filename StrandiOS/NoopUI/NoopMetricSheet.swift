@@ -42,6 +42,8 @@ struct NoopMetric: Identifiable {
     var isDuration = false
     /// When set, readings come from this catalogue series instead of the daily rows.
     var series: Series? = nil
+    /// Who the zones are standardized for, when they come from a population reference.
+    var zoneCaption: String? = nil
 
     struct Series {
         let key: String
@@ -93,21 +95,29 @@ struct NoopMetricTrend: Identifiable {
     let days: Int
     let change: Double?
     let line: [Double]
+    /// The same move in the measure's own units.
+    var delta: Double? = nil
     var id: Int { days }
 
     static func all(_ points: [NoopMetricPoint], spans: [Int] = [3, 7, 14, 30, 90]) -> [NoopMetricTrend] {
         let cal = Calendar.current
         let byDay = Dictionary(points.map { (cal.startOfDay(for: $0.date), $0.value) }, uniquingKeysWith: { a, _ in a })
         guard let last = byDay.keys.max() else { return spans.map { .init(days: $0, change: nil, line: []) } }
+        // A daily measure averages the readings in the week; a sparse one (weigh-ins, body fat) has
+        // fewer than three, so the week takes its latest reading in the four months before instead.
+        let sortedDays = byDay.keys.sorted()
         func rolling(_ end: Date) -> Double? {
             let vs = (0..<7).compactMap { byDay[cal.date(byAdding: .day, value: -$0, to: end) ?? end] }
-            return vs.count >= 3 ? vs.reduce(0, +) / Double(vs.count) : nil
+            if vs.count >= 3 { return vs.reduce(0, +) / Double(vs.count) }
+            guard let floor = cal.date(byAdding: .day, value: -120, to: end),
+                  let day = sortedDays.last(where: { $0 <= end && $0 > floor }) else { return nil }
+            return byDay[day]
         }
         return spans.map { span in
             let line = (0...span).reversed().compactMap { rolling(cal.date(byAdding: .day, value: -$0, to: last) ?? last) }
             guard let now = rolling(last), let then = rolling(cal.date(byAdding: .day, value: -span, to: last) ?? last),
                   then != 0, line.count >= 2 else { return .init(days: span, change: nil, line: line) }
-            return .init(days: span, change: (now - then) / abs(then), line: line)
+            return .init(days: span, change: (now - then) / abs(then), line: line, delta: now - then)
         }
     }
 }
@@ -206,11 +216,13 @@ extension NoopMetric {
     /// Any catalogue measure as a sheet metric: Trends' pinned markers and their See all list.
     init(marker d: MetricDescriptor) {
         let minutes = d.unit == "min"
+        let norms = NoopMarkerNorms.ranges(for: d.key, profile: .current)
         self.init(id: d.id, title: d.title, short: d.title, unit: minutes ? "h" : d.unit, decimals: minutes ? 1 : d.decimals,
-                  higherIsBetter: d.higherIsBetter,
+                  higherIsBetter: d.higherIsBetter, zones: norms?.zones ?? [], scale: norms?.scale,
                   about: d.description ?? "\(d.title), from \(d.sourceLabel).",
                   value: { _ in nil }, isDuration: minutes,
-                  series: .init(key: d.key, source: d.source, transform: minutes ? { $0 / 60 } : { $0 }))
+                  series: .init(key: d.key, source: d.source, transform: minutes ? { $0 / 60 } : { $0 }),
+                  zoneCaption: norms?.caption)
     }
 }
 
@@ -356,51 +368,79 @@ struct NoopMetricSheet: View {
             .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
     }
 
+    /// Bevel's range card: the zones as a segmented bar with your reading marked on it, the name of the
+    /// zone it falls in, and who the zones are standardized for.
     private var zonesCard: some View {
-        NoopMetricCard(title: "\(metric.short) zones") {
+        let reading = focus?.value
+        let current = reading.flatMap { v in metric.zones.first { $0.range.contains(v) } }
+        let lo = metric.scale?.lowerBound ?? metric.zones.first?.range.upperBound ?? 0
+        let hi = metric.scale?.upperBound ?? metric.zones.last?.range.lowerBound ?? 100
+        func at(_ v: Double) -> CGFloat { CGFloat((min(max(v, lo), hi) - lo) / max(hi - lo, 0.0001)) }
+        return VStack(alignment: .leading, spacing: NoopSpace.s) {
             GeometryReader { geo in
-                let lo = metric.scale?.lowerBound ?? 0, hi = metric.scale?.upperBound ?? 100
-                let gaps = CGFloat(max(0, metric.zones.count - 1)) * 4
-                HStack(spacing: 4) {
+                let w = geo.size.width
+                ZStack(alignment: .topLeading) {
                     ForEach(Array(metric.zones.enumerated()), id: \.offset) { _, z in
-                        let part = (min(z.range.upperBound, hi) - max(z.range.lowerBound, lo)) / (hi - lo)
-                        Capsule().fill(z.color).frame(width: max(8, (geo.size.width - gaps) * max(0, part)))
+                        let a = at(max(z.range.lowerBound, lo)), b = at(min(z.range.upperBound, hi))
+                        let on = current?.label == z.label
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(z.color.opacity(on ? 0.9 : 0.22))
+                            .frame(width: max(4, (b - a) * w - 4), height: 18)
+                            .offset(x: a * w + 2, y: 8)
+                    }
+                    if let reading {
+                        Image(systemName: "triangle.fill")
+                            .font(.system(size: 10))
+                            .rotationEffect(.degrees(180))
+                            .foregroundStyle(NoopHTMLColor.ink)
+                            .offset(x: at(reading) * w - 5, y: 0)
                     }
                 }
             }
-            .frame(height: 10)
-            VStack(alignment: .leading, spacing: NoopSpace.s) {
-                ForEach(Array(metric.zones.enumerated()), id: \.offset) { i, z in
-                    HStack(spacing: NoopSpace.s) {
-                        Circle().fill(z.color).frame(width: 9, height: 9)
-                        Text(z.label).font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
-                        Text(zoneRange(z, index: i)).font(NoopHTMLFont.sans(NoopType.footnote)).monospacedDigit()
+            .frame(height: 28)
+            GeometryReader { geo in
+                ZStack(alignment: .topLeading) {
+                    ForEach(Array(metric.zones.dropFirst().enumerated()), id: \.offset) { i, z in
+                        let x = at(z.range.lowerBound) * geo.size.width
+                        Text(zoneEdge(z.range.lowerBound, first: i == 0, last: i == metric.zones.count - 2))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
+                            .monospacedDigit()
                             .foregroundStyle(NoopHTMLColor.copy)
-                        Spacer()
-                        Text(share(of: z)).font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).monospacedDigit()
-                            .foregroundStyle(NoopHTMLColor.inkSoft)
+                            .fixedSize()
+                            .offset(x: min(max(0, x - 4), geo.size.width - 44))
                     }
                 }
             }
-            .padding(.top, NoopSpace.xs)
-            Text("Share of days in this period.").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
+            .frame(height: 18)
+            VStack(alignment: .leading, spacing: 3) {
+                (Text("Your range is ").foregroundColor(NoopHTMLColor.ink)
+                 + Text(current?.label ?? "not known yet").foregroundColor(current?.color ?? NoopHTMLColor.muted))
+                    .font(NoopHTMLFont.sans(NoopType.body, weight: .semibold))
+                if let caption = metric.zoneCaption {
+                    Text(caption).font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).foregroundStyle(NoopHTMLColor.inkSoft)
+                }
+                if let d = focus?.date {
+                    Text("Reading of \(d.formatted(.dateTime.day().month(.abbreviated).year()))")
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
+                }
+            }
+            .padding(.top, NoopSpace.xxs)
         }
+        .padding(NoopSpace.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
     }
 
-    private func zoneRange(_ z: NoopMetric.Zone, index: Int) -> String {
-        if index == 0 { return "below \(metric.format(z.range.upperBound))\(metric.unit)" }
-        if index == metric.zones.count - 1 { return "\(metric.format(z.range.lowerBound))\(metric.unit) and up" }
-        return "\(metric.format(z.range.lowerBound))–\(metric.format(z.range.upperBound))\(metric.unit)"
-    }
-
-    private func share(of z: NoopMetric.Zone) -> String {
-        guard !shown.isEmpty else { return "—" }
-        let n = shown.filter { z.range.contains($0.value) }.count
-        return "\(Int((Double(n) / Double(shown.count) * 100).rounded()))%"
+    private func zoneEdge(_ v: Double, first: Bool, last: Bool) -> String {
+        let unit = metric.unit == "%" ? "%" : ""
+        return metric.format(v) + unit
     }
 
     private var trendsCard: some View {
-        NoopMetricTrendCard(points: all.filter { $0.date <= window.upperBound }, higherIsBetter: metric.higherIsBetter)
+        NoopMetricTrendCard(points: all.filter { $0.date <= window.upperBound }, higherIsBetter: metric.higherIsBetter,
+                            format: { metric.format($0) + (metric.shownUnit.isEmpty ? "" : (metric.shownUnit == "%" ? "%" : " \(metric.shownUnit)")) },
+                            title: metric.title)
     }
 
     private var aboutCard: some View {
@@ -526,19 +566,29 @@ struct NoopMetricHero: View {
 struct NoopMetricTrendCard: View {
     let points: [NoopMetricPoint]
     var higherIsBetter: Bool? = true
+    /// Given a formatter, changes read in the measure's own units and the card opens with the latest
+    /// trend and a 30-day projection, as Bevel's Trends Analysis does. Without one, changes are percents.
+    var format: ((Double) -> String)? = nil
+    var title: String? = nil
 
     var body: some View {
         let trends = NoopMetricTrend.all(points)
         let lastDay = points.last?.date
-        NoopMetricCard(title: "Trend",
-                       subtitle: lastDay.map { "Your 7-day average up to \($0.formatted(.dateTime.day().month(.abbreviated))), against the same span before" }
-                         ?? "Your 7-day average, against the same span before") {
+        NoopMetricCard(title: format == nil ? "Trend" : "Trends analysis",
+                       subtitle: format == nil
+                         ? (lastDay.map { "Your 7-day average up to \($0.formatted(.dateTime.day().month(.abbreviated))), against the same span before" }
+                            ?? "Your 7-day average, against the same span before")
+                         : lastDay.map { "Last reading on \($0.formatted(.dateTime.day().month(.abbreviated).year()))" }) {
+            if let format {
+                headline(format)
+                    .padding(.bottom, NoopSpace.xs)
+            }
             VStack(spacing: 0) {
                 ForEach(Array(trends.enumerated()), id: \.element.id) { i, t in
                     HStack(spacing: NoopSpace.s) {
                         Text("\(t.days)-day").font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
                             .frame(width: 64, alignment: .leading)
-                        changeLabel(t.change)
+                        changeLabel(t)
                         Spacer(minLength: NoopSpace.xs)
                         NoopSparkline(values: t.line,
                                       color: t.change.map { abs($0) < 0.01 ? NoopHTMLColor.muted : tone(up: $0 >= 0) } ?? NoopHTMLColor.muted)
@@ -550,7 +600,57 @@ struct NoopMetricTrendCard: View {
                     }
                 }
             }
+            if format != nil {
+                Text("Based on 7-day rolling averages.")
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
+            }
         }
+    }
+
+    /// The latest 7-day average beside where a straight line through the last 30 days would put it
+    /// 30 days on. No projection from fewer than ten readings, and never past a bound of the readings
+    /// seen so far by more than their own span.
+    private func headline(_ format: (Double) -> String) -> some View {
+        let recentWeek = points.suffix(7).map(\.value)
+        let last = recentWeek.isEmpty ? nil : recentWeek.reduce(0, +) / Double(recentWeek.count)
+        let projected = Self.projection(points)
+        return HStack(alignment: .top, spacing: 0) {
+            stat("Last \(title.map { $0.lowercased() } ?? "") trend", last.map(format) ?? "\u{2014}")
+            Rectangle().fill(NoopHTMLColor.border).frame(width: 0.5, height: 48)
+                .padding(.horizontal, NoopSpace.m)
+            stat("30-day projection", projected.map(format) ?? "\u{2014}")
+        }
+    }
+
+    static func projection(_ points: [NoopMetricPoint]) -> Double? {
+        guard let end = points.last?.date,
+              let start = Calendar.current.date(byAdding: .day, value: -30, to: end) else { return nil }
+        // Thirty days of a daily measure; a sparse one falls back to its readings of the last ninety.
+        var recent = points.filter { $0.date > start }
+        if recent.count < 10, let wide = Calendar.current.date(byAdding: .day, value: -90, to: end) {
+            recent = points.filter { $0.date > wide }
+            guard recent.count >= 4 else { return nil }
+        }
+        let xs = recent.map { $0.date.timeIntervalSince(end) / 86_400 }, ys = recent.map(\.value)
+        let mx = xs.reduce(0, +) / Double(xs.count), my = ys.reduce(0, +) / Double(ys.count)
+        let sxx = xs.map { ($0 - mx) * ($0 - mx) }.reduce(0, +)
+        guard sxx > 0 else { return my }
+        let slope = zip(xs, ys).map { ($0 - mx) * ($1 - my) }.reduce(0, +) / sxx
+        let value = my + slope * (30 - mx)
+        let all = points.map(\.value)
+        guard let lo = all.min(), let hi = all.max() else { return value }
+        return min(max(value, lo - (hi - lo)), hi + (hi - lo))
+    }
+
+    private func stat(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.replacingOccurrences(of: "  ", with: " "))
+                .font(NoopHTMLFont.sans(NoopType.caption, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
+                .lineLimit(1).minimumScaleFactor(0.8)
+            Text(value).font(NoopHTMLFont.outfit(NoopType.title2, weight: .medium)).monospacedDigit()
+                .foregroundStyle(NoopHTMLColor.ink).lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func tone(up: Bool) -> Color {
@@ -559,25 +659,30 @@ struct NoopMetricTrendCard: View {
     }
 
     @ViewBuilder
-    private func changeLabel(_ change: Double?) -> some View {
-        if let change, abs(change) < 0.01 {
+    private func changeLabel(_ t: NoopMetricTrend) -> some View {
+        if let change = t.change, abs(change) < 0.01 {
             HStack(spacing: 6) {
                 Image(systemName: "equal").font(.system(size: 11, weight: .bold)).foregroundStyle(NoopHTMLColor.canvas)
                     .frame(width: 20, height: 20).background(NoopHTMLColor.muted, in: Circle())
                 Text("No change").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
             }
-        } else if let change {
+        } else if let change = t.change {
             let up = change >= 0
             HStack(spacing: 6) {
                 Image(systemName: up ? "arrow.up" : "arrow.down")
                     .font(.system(size: 11, weight: .bold)).foregroundStyle(NoopHTMLColor.canvas)
                     .frame(width: 20, height: 20).background(tone(up: up), in: Circle())
-                Text("\(up ? "+" : "−")\(Int((abs(change) * 100).rounded()))%")
+                Text(amount(t, up: up))
                     .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
             }
         } else {
             Text("Not enough data").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
         }
+    }
+
+    private func amount(_ t: NoopMetricTrend, up: Bool) -> String {
+        if let format, let d = t.delta { return (up ? "+" : "\u{2212}") + format(abs(d)) }
+        return "\(up ? "+" : "\u{2212}")\(Int((abs(t.change ?? 0) * 100).rounded()))%"
     }
 }
 
