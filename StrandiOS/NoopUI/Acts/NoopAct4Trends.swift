@@ -124,6 +124,7 @@ private struct NoopTrendsScreen: View {
     @EnvironmentObject private var repo: Repository
     @StateObject private var labBook = NoopLabBook()
     @State private var showingRecordingHistory = false
+    @State private var showingAges = false
     @Binding var window: NoopTrendWindow
     var live: NoopTrendsRecord? = nil
     var battery: Int? = nil
@@ -132,25 +133,18 @@ private struct NoopTrendsScreen: View {
     var body: some View {
         NoopScreen(topInset: 58) {
             VStack(alignment: .leading, spacing: 0) {
-                NoopA4Header(title: "Trends", eyebrow: window.span) {
-                    NoopBatteryChip(percent: live == nil ? 52 : battery) { navigation.push(.strap) }
-                }
+                NoopA4Header(title: "Trends", eyebrow: window.span) { EmptyView() }
 
-                Button { navigation.reset(to: .ages) } label: {
-                    NoopBodyAgeHero(
-                        live: ages?.bodyAge.map { (age: $0, chrono: ages?.chronoAge ?? 0) },
-                        calibrating: live != nil,
-                        profileNeeded: live != nil && ages?.loaded == true && (ages?.chronoAge ?? 0) == 0,
-                        waitingReason: ages?.buildReason ?? "Checking recorded signals",
-                        pace: ages?.pace,
-                        paceWeeks: ages?.paceWeeks ?? 0
-                    )
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-                .padding(.top, 10)
+                NoopTrendsHero(
+                    bodyAge: ages?.bodyAge,
+                    chronoAge: ages?.chronoAge ?? 0,
+                    pace: ages?.pace,
+                    paceWeeks: ages?.paceWeeks ?? 0,
+                    waitingReason: ages?.buildReason ?? "Checking recorded signals"
+                ) { showingAges = true }
 
                 windowControl
-                    .padding(.top, 16)
+                    .padding(.top, 24)
 
                 if live?.readFailed == true {
                     Text("Some history could not be refreshed. Available readings are shown; try refreshing again.")
@@ -224,6 +218,7 @@ private struct NoopTrendsScreen: View {
             guard live != nil else { return }
             await labBook.load(store: await repo.storeHandle(), deviceId: repo.deviceId)
         }
+        .sheet(isPresented: $showingAges) { NoopYourAgesSheet() }
     }
 
     private func sectionLabel(_ title: String, color: Color = NoopHTMLColor.muted) -> some View {

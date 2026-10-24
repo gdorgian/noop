@@ -48,14 +48,19 @@ enum NoopHTMLColor {
 final class NoopAgeTone: ObservableObject {
     static let shared = NoopAgeTone()
     @Published private(set) var older = false
+    /// The body-age orb's colour position, so the page accent always matches the orb.
+    @Published private(set) var colorScore = 0.0
 
     func update(bodyAge: Double?, chronoAge: Int) {
         let next = bodyAge.map { chronoAge > 0 && $0 > Double(chronoAge) } ?? false
         if next != older { older = next }
+        let difference = bodyAge.flatMap { chronoAge > 0 ? $0 - Double(chronoAge) : nil }
+        let score = NoopAuraOrbModel.colorScore(yearsDifference: difference)
+        if score != colorScore { colorScore = score }
     }
 
-    var accent: Color { older ? NoopHTMLColor.warm : NoopHTMLColor.green }
-    var accentLight: Color { older ? Color(hex: 0xFFE0A5) : Color(hex: 0x8FEFC0) }
+    var accent: Color { NoopAuraOrbModel.palette(colorScore).top }
+    var accentLight: Color { NoopAuraOrbModel.palette(colorScore).bottom }
 }
 
 /// A native linear gradient whose angle follows CSS conventions exactly.
