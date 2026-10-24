@@ -29,21 +29,21 @@ struct NoopTodayNightCard: View {
                                      color: NoopHTMLColor.nightLight)
                     Spacer()
                     Text(night.asleepWindow)
-                        .font(NoopHTMLFont.sans(11.5)).monospacedDigit()
+                        .font(NoopHTMLFont.sans(NoopType.caption)).monospacedDigit()
                         .foregroundStyle(NoopHTMLColor.faint)
                     NoopFixedChevron(direction: .right, color: NoopHTMLColor.nightLight.opacity(0.7))
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(NoopRestRecord.duration(night.asleepMin))
-                        .font(NoopHTMLFont.outfit(30, weight: .light))
+                        .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
                         .tracking(-0.8)
                         .foregroundStyle(NoopHTMLColor.ink)
-                    Text("asleep").font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                    Text("asleep").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer(minLength: 6)
                     if needMin > 0 {
                         Text(diff >= 0 ? "\(NoopRestRecord.duration(diff)) over your need"
                                        : "\(NoopRestRecord.duration(-diff)) short of your need")
-                            .font(NoopHTMLFont.sans(12))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(diff >= 0 ? Color(hex: 0x8FE3B4) : NoopHTMLColor.copy)
                     }
                 }
@@ -174,7 +174,7 @@ struct NoopTodayDayRibbon: View {
                     VStack(alignment: .leading, spacing: 3) {
                         NoopSectionLabel("Your day")
                         Text("\(AppClock.hourMinuteFormatter().string(from: start)) \u{2192} now")
-                            .font(NoopHTMLFont.sans(11.5)).monospacedDigit()
+                            .font(NoopHTMLFont.sans(NoopType.caption)).monospacedDigit()
                             .foregroundStyle(NoopHTMLColor.faint)
                     }
                     Spacer()
@@ -191,7 +191,7 @@ struct NoopTodayDayRibbon: View {
                 if hasStress, let onStress { stressRow(onStress) }
             } else {
                 Text("No heart rate recorded since \(AppClock.hourMinuteFormatter().string(from: start)). It fills in after the next sync.")
-                    .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -208,10 +208,10 @@ struct NoopTodayDayRibbon: View {
         return HStack(spacing: 5) {
             NoopTodayBeatDot(live: liveBPM != nil)
             Text(shown.map(String.init) ?? "\u{2014}")
-                .font(NoopHTMLFont.outfit(17)).monospacedDigit()
+                .font(NoopHTMLFont.outfit(NoopType.body)).monospacedDigit()
                 .foregroundStyle(NoopHTMLColor.ink)
             Text(liveBPM != nil ? "now" : "last")
-                .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
         }
         .padding(.horizontal, 10)
         .frame(minHeight: 30)
@@ -235,7 +235,7 @@ struct NoopTodayDayRibbon: View {
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 4]))
                     .annotation(position: .bottom, alignment: .trailing, spacing: 1) {
                         Text("resting \(Int(resting.rounded()))")
-                            .font(NoopHTMLFont.sans(9)).foregroundStyle(NoopHTMLColor.faint)
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                     }
             }
             ForEach(Array(points.enumerated()), id: \.offset) { _, p in
@@ -260,7 +260,7 @@ struct NoopTodayDayRibbon: View {
                     .symbolSize(22)
                     .foregroundStyle(NoopHTMLColor.warm)
                     .annotation(position: .trailing, spacing: 3) {
-                        Text("\(Int(peak.bpm.rounded()))").font(NoopHTMLFont.sans(10, weight: .semibold))
+                        Text("\(Int(peak.bpm.rounded()))").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                             .foregroundStyle(NoopHTMLColor.warm)
                     }
             }
@@ -270,8 +270,8 @@ struct NoopTodayDayRibbon: View {
                     .lineStyle(StrokeStyle(lineWidth: 1))
                     .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                         VStack(spacing: 1) {
-                            Text("\(Int(p.bpm.rounded())) bpm").font(NoopHTMLFont.sans(12, weight: .semibold))
-                            Text(AppClock.hourMinuteFormatter().string(from: p.time)).font(NoopHTMLFont.sans(10))
+                            Text("\(Int(p.bpm.rounded())) bpm").font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
+                            Text(AppClock.hourMinuteFormatter().string(from: p.time)).font(NoopHTMLFont.sans(NoopType.eyebrow))
                                 .foregroundStyle(NoopHTMLColor.copy)
                         }
                         .foregroundStyle(NoopHTMLColor.ink)
@@ -288,12 +288,12 @@ struct NoopTodayDayRibbon: View {
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.white.opacity(0.05))
-                AxisValueLabel().font(NoopHTMLFont.sans(9)).foregroundStyle(NoopHTMLColor.faint)
+                AxisValueLabel().font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
             }
         }
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                AxisValueLabel(format: .dateTime.hour()).font(NoopHTMLFont.sans(9.5)).foregroundStyle(NoopHTMLColor.faint)
+                AxisValueLabel(format: .dateTime.hour()).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
             }
         }
         .chartOverlay { proxy in
@@ -321,14 +321,14 @@ struct NoopTodayDayRibbon: View {
                     .fill(LinearGradient(colors: [NoopStressPalette.low, NoopStressPalette.medium, NoopStressPalette.high],
                                          startPoint: .leading, endPoint: .trailing))
                     .frame(width: 18, height: 6)
-                Text("Stress").font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                Text("Stress").font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 if let current {
-                    Text("\(NoopStressPalette.name(current)) now").font(NoopHTMLFont.sans(12.5))
+                    Text("\(NoopStressPalette.name(current)) now").font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopStressPalette.color(current))
                 }
                 if highHalfHours > 0 {
                     Text("· high for about \(NoopRestRecord.duration(Double(highHalfHours * 30)))")
-                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 Spacer(minLength: 4)
                 NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
@@ -366,10 +366,10 @@ struct NoopTodayDayRibbon: View {
         return HStack(spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.offset) { i, item in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.0).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(item.0).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text(item.1).font(NoopHTMLFont.outfit(19)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
-                        Text(item.2 ?? "bpm").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                        Text(item.1).font(NoopHTMLFont.outfit(NoopType.title3)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+                        Text(item.2 ?? "bpm").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

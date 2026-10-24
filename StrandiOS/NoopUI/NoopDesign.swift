@@ -576,39 +576,42 @@ struct NoopPill: View {
     }
 }
 
+/// The app's text-button style, on NoopSystem's medium control: 40 pt, 15 pt label, the section accent
+/// for primary. `NoopActionButton` is the same look as a ready-made view.
 struct NoopHTMLButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary, quiet, destructive }
     let kind: Kind
     var fullWidth = false
 
+    @Environment(\.noopAccent) private var accent
+
     func makeBody(configuration: Configuration) -> some View {
+        let size = NoopControlSize.medium
         let foreground: Color = {
             switch kind {
-            case .primary: NoopHTMLColor.blueInk
+            case .primary: accent.ink
             case .destructive: NoopHTMLColor.red
-            default: NoopHTMLColor.inkSoft
+            case .quiet: accent.fill
+            case .secondary: NoopHTMLColor.ink
             }
         }()
         let background: Color = {
             switch kind {
-            case .primary: NoopHTMLColor.blue
-            case .destructive: NoopHTMLColor.red.opacity(0.11)
-            case .secondary: Color.white.opacity(0.065)
+            case .primary: accent.fill
+            case .destructive: NoopHTMLColor.red.opacity(0.12)
+            case .secondary: Color.white.opacity(0.07)
             case .quiet: .clear
             }
         }()
 
         configuration.label
-            .font(NoopHTMLFont.sans(13, weight: .semibold))
+            .font(NoopHTMLFont.sans(size.text, weight: .semibold))
             .foregroundStyle(foreground)
-            .padding(.horizontal, 15)
+            .padding(.horizontal, kind == .quiet ? 0 : size.padding)
             .frame(maxWidth: fullWidth ? .infinity : nil)
-            .frame(height: 44)
-            .background(background, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .stroke(kind == .primary || kind == .quiet ? .clear : foreground.opacity(0.2), lineWidth: 0.5)
-            )
+            .frame(height: size.height)
+            .background(background, in: Capsule())
+            .noopHitTarget()
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .opacity(configuration.isPressed ? 0.82 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
@@ -647,29 +650,15 @@ struct NoopHTMLToggle: View {
     }
 }
 
+/// String-keyed tabs, drawn as NoopSystem's `NoopTabs`.
 struct NoopSegmentedControl: View {
     let items: [String]
     let selection: String
     var action: (String) -> Void
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(items, id: \.self) { item in
-                Button { action(item) } label: {
-                    Text(item)
-                        .font(NoopHTMLFont.sans(11.5, weight: item == selection ? .semibold : .regular))
-                        .foregroundStyle(item == selection ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 32)
-                        .background(item == selection ? NoopHTMLColor.blue.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(item == selection ? NoopHTMLColor.blue.opacity(0.42) : .clear, lineWidth: 0.5))
-                }
-                .buttonStyle(NoopPlainHitStyle())
-            }
-        }
-        .padding(4)
-        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+        NoopTabs(options: items.map { ($0, $0) },
+                 selection: Binding(get: { selection }, set: { action($0) }))
     }
 }
 

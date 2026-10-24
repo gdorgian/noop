@@ -268,7 +268,7 @@ private struct NoopLiftBackHeader: View {
             .buttonStyle(NoopPlainHitStyle())
 
             Text(label)
-                .font(NoopHTMLFont.sans(13.5))
+                .font(NoopHTMLFont.sans(NoopType.footnote))
                 .foregroundStyle(NoopHTMLColor.copy)
             Spacer()
         }
@@ -285,11 +285,11 @@ private struct NoopLiftTitle: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(NoopHTMLFont.outfit(25, weight: .regular))
+                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .regular))
                 .tracking(-0.625)
                 .foregroundStyle(NoopHTMLColor.ink)
             Text(subtitle)
-                .font(NoopHTMLFont.sans(13))
+                .font(NoopHTMLFont.sans(NoopType.footnote))
                 .foregroundStyle(NoopHTMLColor.copy)
                 .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
@@ -305,16 +305,16 @@ private struct NoopLiftSheetHeader: View {
         HStack {
             Button(action: back) {
                 Text(label)
-                    .font(NoopHTMLFont.sans(13.5))
+                    .font(NoopHTMLFont.sans(NoopType.footnote))
                     .foregroundStyle(NoopHTMLColor.blueLight)
-                    .frame(minHeight: 34)
+                    .frame(minHeight: 36)
                     .padding(.horizontal, 4)
             }
             .buttonStyle(NoopPlainHitStyle())
             Spacer()
             if let trailing {
                 Text(trailing)
-                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.blueLight)
             }
         }
@@ -330,7 +330,7 @@ private struct NoopLiftActionButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                 .foregroundStyle(warm ? Color(hex: 0xF3C888) : accent ? NoopHTMLColor.blueInk : NoopHTMLColor.inkSoft)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 48)
@@ -359,9 +359,9 @@ private struct NoopLiftDoor: View {
             HStack(spacing: 13) {
                 NoopCanonicalGlyph(name: icon, size: 20, color: NoopHTMLColor.blue)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                     Text(subtitle)
-                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -504,7 +504,7 @@ private struct NoopLiftLiveScreen: View {
                     Button { addingExercise = true } label: {
                         HStack(spacing: 8) {
                             NoopCanonicalGlyph(name: .plus, size: 14, color: NoopHTMLColor.inkSoft)
-                            Text("Add exercise").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                            Text("Add exercise").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                         }
                         .frame(maxWidth: .infinity).frame(height: 50)
                         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -512,7 +512,7 @@ private struct NoopLiftLiveScreen: View {
                     }
                     .buttonStyle(NoopHTMLPressStyle())
                     Text("Warm-ups are left out of every figure. Sets you never reach are not saved.")
-                        .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
                         .frame(maxWidth: .infinity).multilineTextAlignment(.center)
                 }
             }
@@ -566,23 +566,23 @@ private struct NoopLiftLiveScreen: View {
                 // between taps (upstream 12.0).
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text(liftClock(liveElapsed(presentation, at: context.date), long: true))
-                        .font(NoopHTMLFont.outfit(34, weight: .light))
+                        .font(NoopHTMLFont.outfit(NoopType.title1, weight: .light))
                         .monospacedDigit()
                         .foregroundStyle(live.isPaused ? NoopHTMLColor.copy : NoopHTMLColor.ink)
                 }
                 HStack(spacing: 6) {
                     NoopCanonicalGlyph(name: .weight, size: 13, color: NoopHTMLColor.warm)
                     Text(live.isPaused ? "Paused" : (live.programName ?? "Lift"))
-                        .font(NoopHTMLFont.sans(13, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         .foregroundStyle(live.isPaused ? NoopHTMLColor.copy : NoopHTMLColor.warm)
                         .lineLimit(1)
                 }
             }
             Spacer()
             Button { showFinish = true } label: {
-                Text("Finish").font(NoopHTMLFont.sans(14, weight: .semibold))
+                Text("Finish").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.warmInk)
-                    .padding(.horizontal, 18).frame(minHeight: 38)
+                    .padding(.horizontal, 18).frame(minHeight: 40)
                     .background(NoopHTMLColor.warm, in: Capsule())
             }
             .buttonStyle(NoopHTMLPressStyle())
@@ -598,7 +598,7 @@ private struct NoopLiftLiveScreen: View {
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.inkSoft)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 40, height: 40)
                     .background(Color.white.opacity(0.06), in: Circle())
                     .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
             }
@@ -619,15 +619,15 @@ private struct NoopLiftLiveScreen: View {
                     .background((isCurrent ? NoopHTMLColor.warm : Color.white).opacity(isCurrent ? 0.14 : 0.05),
                                 in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(line.exercise).font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(line.exercise).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                         .lineLimit(1)
                     Text(exerciseMeta(line, done: done, of: slots.count))
-                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy).lineLimit(1)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 HStack(spacing: 4) {
                     Image(systemName: "timer").font(.system(size: 10.5, weight: .semibold))
-                    Text(liftClock(line.restSec)).font(NoopHTMLFont.sans(11.5, weight: .semibold)).monospacedDigit()
+                    Text(liftClock(line.restSec)).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).monospacedDigit()
                 }
                 .foregroundStyle(NoopHTMLColor.copy)
                 .padding(.horizontal, 9).frame(height: 26)
@@ -646,7 +646,7 @@ private struct NoopLiftLiveScreen: View {
                     Button { lastTimeFor = .init(name: line.exercise) } label: { Label("Last time", systemImage: "clock.arrow.circlepath") }
                 } label: {
                     Image(systemName: "ellipsis").font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.copy).frame(width: 30, height: 30)
+                        .foregroundStyle(NoopHTMLColor.copy).frame(width: 32, height: 32).noopHitTarget()
                 }
             }
             HStack(spacing: 8) {
@@ -655,7 +655,7 @@ private struct NoopLiftLiveScreen: View {
                 Text("REPS").frame(maxWidth: .infinity)
                 Color.clear.frame(width: 38, height: 1)
             }
-            .font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(0.8).foregroundStyle(NoopHTMLColor.muted)
+            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(0.8).foregroundStyle(NoopHTMLColor.muted)
             .padding(.top, 4)
             ForEach(slots, id: \.self) { row in
                 setRow(row, engine: engine, active: row == current && !isResting)
@@ -664,9 +664,9 @@ private struct NoopLiftLiveScreen: View {
             Button { _ = live.addSet(toExercise: index) } label: {
                 HStack(spacing: 5) {
                     NoopCanonicalGlyph(name: .plus, size: 11, color: NoopHTMLColor.inkSoft)
-                    Text("Add set").font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                    Text("Add set").font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                 }
-                .frame(maxWidth: .infinity).frame(height: 34)
+                .frame(maxWidth: .infinity).frame(height: 36)
                 .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
             }
             .buttonStyle(NoopHTMLPressStyle())
@@ -700,7 +700,7 @@ private struct NoopLiftLiveScreen: View {
                     Circle().fill(done ? NoopHTMLColor.green.opacity(0.16) : Color.clear)
                     Circle().strokeBorder(active ? NoopHTMLColor.warm : done ? .clear : Color.white.opacity(0.12), lineWidth: 1.2)
                     Text(live.isWarmup(row) ? "W" : "\(row.setIndex)")
-                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(done ? NoopHTMLColor.green : active ? NoopHTMLColor.warm : NoopHTMLColor.inkSoft)
                 }
                 .frame(width: 30, height: 30)
@@ -760,7 +760,7 @@ private struct NoopLiftLiveScreen: View {
                     HStack(spacing: 5) {
                         Image(systemName: "timer").font(.system(size: 10, weight: .bold))
                         Text(remaining > 0 ? liftClock(remaining) : "Rest done")
-                            .font(NoopHTMLFont.sans(12, weight: .semibold)).monospacedDigit()
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).monospacedDigit()
                     }
                     .foregroundStyle(NoopHTMLColor.blueInk)
                     .padding(.horizontal, 10).frame(height: 24)
@@ -771,13 +771,13 @@ private struct NoopLiftLiveScreen: View {
             }
         } else if let rest = engine.recordedSet(for: row)?.restSec, !isLast {
             Text("rested \(liftClock(rest))")
-                .font(NoopHTMLFont.sans(10.5)).monospacedDigit().foregroundStyle(NoopHTMLColor.muted)
+                .font(NoopHTMLFont.sans(NoopType.eyebrow)).monospacedDigit().foregroundStyle(NoopHTMLColor.muted)
                 .frame(maxWidth: .infinity)
         }
     }
 
     private func cell(_ t: String, done: Bool, typed: Bool) -> some View {
-        Text(t).font(NoopHTMLFont.sans(15, weight: done ? .semibold : .regular))
+        Text(t).font(NoopHTMLFont.sans(NoopType.subhead, weight: done ? .semibold : .regular))
             .foregroundStyle(done ? NoopHTMLColor.ink : typed ? NoopHTMLColor.inkSoft : NoopHTMLColor.muted)
             .monospacedDigit()
             .frame(maxWidth: .infinity).frame(minHeight: 40)
@@ -790,7 +790,7 @@ private struct NoopLiftLiveScreen: View {
         TextField(placeholder, text: text)
             .keyboardType(focus == .weight ? .decimalPad : .numberPad)
             .multilineTextAlignment(.center)
-            .font(NoopHTMLFont.sans(16, weight: .semibold))
+            .font(NoopHTMLFont.sans(NoopType.body, weight: .semibold))
             .foregroundStyle(NoopHTMLColor.ink)
             .monospacedDigit()
             .focused($focused, equals: focus)
@@ -810,7 +810,7 @@ private struct NoopLiftLiveScreen: View {
             Button { nudge(isWeight: f == .weight, amount: 1, slot: slot) } label: { Image(systemName: "plus") }
             Spacer()
             if f == .weight, let plates = plateLine {
-                Text(plates).font(NoopHTMLFont.sans(11.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                Text(plates).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
                     .lineLimit(1).minimumScaleFactor(0.7)
                 Spacer()
             }
@@ -853,7 +853,7 @@ private struct NoopLiftLiveScreen: View {
                 let inSet = max(0, nowSec - engine.stageStartedAt)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(warmup ? "Warm-up" : item.exercise)
-                        .font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
+                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
                     Group {
                         if presentation.isResting {
                             Text((remaining ?? 0) > 0 ? "Rest \(liftClock(remaining ?? 0))" : "Ready for the next set")
@@ -864,13 +864,13 @@ private struct NoopLiftLiveScreen: View {
                             Text("Set \(slot.setIndex) · \(liftClock(inSet))").foregroundStyle(NoopHTMLColor.copy)
                         }
                     }
-                    .font(NoopHTMLFont.sans(12, weight: .medium)).monospacedDigit()
+                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .medium)).monospacedDigit()
                 }
             }
             Spacer(minLength: 6)
             if let bpm = heart.heartRate, bpm > 0 {
                 HStack(spacing: 4) {
-                    Text("\(bpm)").font(NoopHTMLFont.sans(15, weight: .semibold)).monospacedDigit()
+                    Text("\(bpm)").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).monospacedDigit()
                         .foregroundStyle(NoopHTMLColor.ink)
                     Image(systemName: "heart.fill").font(.system(size: 11)).foregroundStyle(NoopHTMLColor.red)
                 }
@@ -926,7 +926,7 @@ private struct NoopLiftLiveScreen: View {
                               subtitle: "Start from one of your programs. The session will remain live if you leave this screen.")
                 NoopHTMLCard {
                     Text("Nothing is timed, inferred or saved until you start a session.")
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                 }
                 NoopLiftActionButton(title: "Choose a program") { navigation.replace(with: .liftLibrary) }
             }
@@ -1168,7 +1168,7 @@ private struct NoopLiftLibraryScreen: View {
                 } else if programs.isEmpty {
                     NoopHTMLCard {
                         Text("Nothing here yet. A program is a list of lines you keep — write one, or bring your programs across from Hevy.")
-                            .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                            .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                             .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                     }
                 } else {
@@ -1196,13 +1196,13 @@ private struct NoopLiftLibraryScreen: View {
                 }
 
                 Text("A program is something you keep rather than somewhere you go. Start one here, or from Routines on Fitness, where you can also plan it on the calendar.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     .lineSpacing(4)
 
                 VStack(alignment: .leading, spacing: 6) {
                     NoopSectionLabel("Where the exercises come from")
                     Text("Exercise data: ExerciseDB v1 via hasaneyldrm/exercises-dataset, MIT licence. Exercise media is not included and is not covered by that licence.")
-                        .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 2)
@@ -1225,7 +1225,7 @@ private struct NoopLiftLibraryScreen: View {
             } label: {
                 HStack {
                     Text(showArchived ? "Archived · \(archived.count)" : "Show \(archived.count) archived programs")
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.blueLight)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.blueLight)
                     Spacer()
                     NoopChevron().rotationEffect(.degrees(showArchived ? -90 : 0))
                 }
@@ -1237,20 +1237,20 @@ private struct NoopLiftLibraryScreen: View {
                     HStack(spacing: 11) {
                         NoopCanonicalGlyph(name: .weight, size: 17, color: NoopHTMLColor.copy)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(program.name).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink)
+                            Text(program.name).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                             Text("kept with its session history")
-                                .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                                .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
                         }
                         Spacer()
                         Text("read-only")
-                            .font(NoopHTMLFont.sans(10.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
                     }
                     .padding(.vertical, 11).opacity(0.38)
                     .overlay(alignment: .top) { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) }
                     .contentShape(Rectangle()).onTapGesture { open(program) }
                 }
                 Text("An archived program keeps every session you did on it. Restore it to change a line.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     .lineSpacing(3)
             }
         }
@@ -1266,13 +1266,13 @@ private struct NoopLiftLibraryScreen: View {
                     NoopCanonicalGlyph(name: .weight, size: 21,
                                        color: featured ? NoopHTMLColor.blue : NoopHTMLColor.copy.opacity(0.82))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(program.name).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                        Text(programMeta(program)).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                        Text(program.name).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                        Text(programMeta(program)).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     if featured {
                         Text("next up")
-                            .font(NoopHTMLFont.sans(10, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(NoopHTMLColor.blue.opacity(0.13), in: RoundedRectangle(cornerRadius: 6))
                     }
@@ -1285,7 +1285,7 @@ private struct NoopLiftLibraryScreen: View {
                 }
                 Button { open(program) } label: {
                     Text("Open")
-                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.inkSoft)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.inkSoft)
                         .padding(.horizontal, 16).frame(minHeight: 44)
                         .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
                         .overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
@@ -1294,7 +1294,7 @@ private struct NoopLiftLibraryScreen: View {
             }
             if featured {
                 Text("Targets are optional. Any line may remain only an exercise name.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 15)
@@ -1405,12 +1405,12 @@ private struct NoopLiftProgramScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     Button("Programs") { navigation.back(or: .liftLibrary) }
-                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.blueLight)
-                        .buttonStyle(NoopPlainHitStyle()).frame(minHeight: 34)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.blueLight)
+                        .buttonStyle(NoopPlainHitStyle()).frame(minHeight: 36)
                     Spacer()
                     if !readOnly {
                         Button(saving ? "Saving…" : "Done") { Task { await save() } }
-                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                             .foregroundStyle(canSave ? NoopHTMLColor.blueLight : NoopHTMLColor.muted)
                             .buttonStyle(NoopPlainHitStyle()).disabled(!canSave || saving)
                     }
@@ -1418,16 +1418,16 @@ private struct NoopLiftProgramScreen: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     if readOnly {
-                        Text(name).font(NoopHTMLFont.outfit(25, weight: .regular)).tracking(-0.625)
+                        Text(name).font(NoopHTMLFont.outfit(NoopType.title2, weight: .regular)).tracking(-0.625)
                     } else {
                         TextField("Name it", text: $name)
-                            .font(NoopHTMLFont.outfit(25, weight: .regular)).tracking(-0.625)
+                            .font(NoopHTMLFont.outfit(NoopType.title2, weight: .regular)).tracking(-0.625)
                             .foregroundStyle(NoopHTMLColor.ink)
                     }
                     Text(readOnly
                          ? "These lines are exactly as they were when the program was archived."
                          : "A name and one exercise is a program. Add targets later, or never.")
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -1435,7 +1435,7 @@ private struct NoopLiftProgramScreen: View {
                     HStack(alignment: .top, spacing: 10) {
                         NoopCanonicalGlyph(name: .key, size: 17, color: NoopHTMLColor.copy)
                         Text("Archived and read-only. Restore it from Programs and every line becomes editable again.")
-                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                             .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(13)
@@ -1470,7 +1470,7 @@ private struct NoopLiftProgramScreen: View {
         VStack(spacing: 0) {
             if items.isEmpty {
                 Text("Add the first exercise. Nothing else is required.")
-                    .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 18)
             }
             ForEach(items.indices, id: \.self) { index in
@@ -1486,9 +1486,9 @@ private struct NoopLiftProgramScreen: View {
                         }
                         VStack(alignment: .leading, spacing: 3) {
                             Text(items[index].exercise.isEmpty ? "Exercise name" : items[index].exercise)
-                                .font(NoopHTMLFont.sans(13.5)).foregroundStyle(items[index].exercise.isEmpty ? NoopHTMLColor.muted : NoopHTMLColor.ink)
+                                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(items[index].exercise.isEmpty ? NoopHTMLColor.muted : NoopHTMLColor.ink)
                             Text(liftTargetSummary(items[index], system: units))
-                                .font(NoopHTMLFont.sans(11.5))
+                                .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(liftTargetSummary(items[index], system: units) == "just the exercise" ? NoopHTMLColor.muted : NoopHTMLColor.blueLight)
                                 .monospacedDigit()
                         }
@@ -1515,9 +1515,9 @@ private struct NoopLiftProgramScreen: View {
             VStack(alignment: .leading, spacing: 11) {
                 HStack {
                     Text(items[selectedLine].exercise.isEmpty ? "EXERCISE" : items[selectedLine].exercise.uppercased())
-                        .font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.2).foregroundStyle(NoopHTMLColor.muted)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.2).foregroundStyle(NoopHTMLColor.muted)
                     Spacer()
-                    Text("weight × reps").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                    Text("weight × reps").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                 }
                 targetRow("Exercise", text: binding(\.exercise), keyboard: .default)
                 targetRow("Sets", text: optionalIntBinding(\.targetSets))
@@ -1532,7 +1532,7 @@ private struct NoopLiftProgramScreen: View {
                     selectedLine = max(0, min(selectedLine, items.count - 1))
                 } label: {
                     Text("Remove this line")
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                         .frame(maxWidth: .infinity, alignment: .leading).frame(minHeight: 44)
                 }
                 .buttonStyle(NoopPlainHitStyle())
@@ -1546,12 +1546,12 @@ private struct NoopLiftProgramScreen: View {
     private func targetRow(_ label: String, text: Binding<String>,
                            keyboard: UIKeyboardType = .decimalPad, disabled: Bool = false) -> some View {
         HStack(spacing: 8) {
-            Text(label).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+            Text(label).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
             Spacer(minLength: 8)
             TextField("not set", text: text)
                 .keyboardType(keyboard)
                 .multilineTextAlignment(.trailing)
-                .font(NoopHTMLFont.sans(13, weight: text.wrappedValue == "not set" || text.wrappedValue.isEmpty ? .regular : .semibold))
+                .font(NoopHTMLFont.sans(NoopType.footnote, weight: text.wrappedValue == "not set" || text.wrappedValue.isEmpty ? .regular : .semibold))
                 .foregroundStyle(disabled || text.wrappedValue == "not set" ? NoopHTMLColor.muted : NoopHTMLColor.ink)
                 .disabled(disabled)
                 .focused($focusedTarget, equals: label)
@@ -1578,17 +1578,17 @@ private struct NoopLiftProgramScreen: View {
             ForEach(Array(values.enumerated()), id: \.offset) { index, value in
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(value.0).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
-                        Text(value.2).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                        Text(value.0).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
+                        Text(value.2).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     }
                     Spacer()
-                    Text(value.1).font(NoopHTMLFont.outfit(18, weight: .regular)).foregroundStyle(NoopHTMLColor.blueLight)
+                    Text(value.1).font(NoopHTMLFont.outfit(NoopType.title3, weight: .regular)).foregroundStyle(NoopHTMLColor.blueLight)
                 }
                 .padding(.vertical, 8)
                 .overlay(alignment: .top) { if index > 0 { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) } }
             }
             Text("The catalogue carries the mode. A line only asks for the values that mode can honestly hold.")
-                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                 .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
@@ -1790,7 +1790,7 @@ struct NoopLiftDetailScreen: View {
                     VStack(alignment: .leading, spacing: 6) {
                         NoopSectionLabel("Where these exercises come from")
                         Text("Exercise data: ExerciseDB v1 via hasaneyldrm/exercises-dataset, MIT licence. Exercise animations, when turned on, © Gym visual.")
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
                             .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.horizontal, 2).padding(.top, 10)
@@ -1827,10 +1827,10 @@ struct NoopLiftDetailScreen: View {
                             Image(systemName: r.symbol).font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(r.tint)
                                 .frame(width: 30, height: 30).background(r.tint.opacity(0.15), in: Circle())
-                            Text(r.exercise).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy).lineLimit(1)
-                            Text(r.title).font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            Text(r.exercise).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineLimit(1)
+                            Text(r.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                                 .lineLimit(1)
-                            Text(r.detail).font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(r.tint).lineLimit(1)
+                            Text(r.detail).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(r.tint).lineLimit(1)
                         }
                         .padding(14).frame(width: 168, alignment: .leading)
                         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -1915,8 +1915,8 @@ struct NoopLiftDetailScreen: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         NoopSessionCardTitle(symbol: "chart.pie.fill", title: "Muscle breakdown")
-                        Text(top.muscle.displayName).font(NoopHTMLFont.outfit(28, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                        Text("\(Int((top.share * 100).rounded()))% of the work").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                        Text(top.muscle.displayName).font(NoopHTMLFont.outfit(NoopType.title2, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                        Text("\(Int((top.share * 100).rounded()))% of the work").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     }
                     Spacer()
                     ZStack {
@@ -1940,7 +1940,7 @@ struct NoopLiftDetailScreen: View {
                         }
                         .frame(width: 38, height: 38)
                         .background(Color.white.opacity(0.05), in: Circle())
-                        Text(s.muscle.displayName).font(NoopHTMLFont.sans(15, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                        Text(s.muscle.displayName).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
                             .frame(width: 108, alignment: .leading).lineLimit(1)
                         GeometryReader { g in
                             ZStack(alignment: .leading) {
@@ -1949,17 +1949,17 @@ struct NoopLiftDetailScreen: View {
                             }
                         }
                         .frame(height: 9)
-                        Text("\(Int((s.share * 100).rounded()))%").font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.copy)
+                        Text("\(Int((s.share * 100).rounded()))%").font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.copy)
                             .monospacedDigit().frame(width: 42, alignment: .trailing)
                     }
                     if i < shares.count - 1 { Divider().overlay(NoopHTMLColor.border) }
                 }
                 Button { open(.liftMuscles) } label: {
                     HStack(spacing: 6) {
-                        Text("How sets are credited").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                        Text("How sets are credited").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
                     }
-                    .foregroundStyle(NoopHTMLColor.copy).frame(maxWidth: .infinity, minHeight: 36)
+                    .foregroundStyle(NoopHTMLColor.copy).frame(maxWidth: .infinity, minHeight: 40)
                 }
                 .buttonStyle(NoopPlainHitStyle())
             }
@@ -1986,11 +1986,11 @@ struct NoopLiftDetailScreen: View {
                                     .background(NoopHTMLColor.volt.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                             }
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(exercise).font(NoopHTMLFont.sans(17, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                                Text(exercise).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                                 let n = rows.filter { !$0.isWarmup }.count
                                 Text([choice?.equipment?.split(separator: ",").first.map { String($0).capitalized },
                                       "\(n) \(n == 1 ? "set" : "sets")"].compactMap { $0 }.joined(separator: " · "))
-                                    .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                                    .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                             }
                         }
                         HStack(spacing: 8) {
@@ -1999,12 +1999,12 @@ struct NoopLiftDetailScreen: View {
                             Text("REPS").frame(maxWidth: .infinity)
                             Text("REST").frame(maxWidth: .infinity)
                         }
-                        .font(NoopHTMLFont.sans(11, weight: .semibold)).tracking(0.8).foregroundStyle(NoopHTMLColor.muted)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(0.8).foregroundStyle(NoopHTMLColor.muted)
                         .padding(.top, 4)
                         ForEach(rows, id: \.id) { row in
                             HStack(spacing: 8) {
                                 Text(row.isWarmup ? "W" : "\(row.setIndex)")
-                                    .font(NoopHTMLFont.sans(14, weight: .semibold))
+                                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                                     .foregroundStyle(row.isWarmup ? Color(hex: 0xF2B45C) : NoopHTMLColor.ink)
                                     .frame(width: 36, height: 36).background(Color.white.opacity(0.06), in: Circle())
                                 pill(row.weightKg.map { LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units)) } ?? "—")
@@ -2019,7 +2019,7 @@ struct NoopLiftDetailScreen: View {
             Button { open(.liftEdit) } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "pencil").font(.system(size: 13, weight: .semibold))
-                    Text("Correct something in this session").font(NoopHTMLFont.sans(14, weight: .semibold))
+                    Text("Correct something in this session").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                 }
                 .foregroundStyle(NoopHTMLColor.ink)
                 .frame(maxWidth: .infinity, minHeight: 50)
@@ -2035,7 +2035,7 @@ struct NoopLiftDetailScreen: View {
             Text(text)
             if trophy { Image(systemName: "trophy.fill").font(.system(size: 10)).foregroundStyle(NoopHTMLColor.volt) }
         }
-        .font(NoopHTMLFont.sans(14.5, weight: .medium)).monospacedDigit()
+        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).monospacedDigit()
         .foregroundStyle(dim ? NoopHTMLColor.inkSoft : NoopHTMLColor.ink)
         .frame(maxWidth: .infinity, minHeight: 40)
         .background(trophy ? NoopHTMLColor.volt.opacity(0.10) : Color.white.opacity(0.05),
@@ -2060,11 +2060,11 @@ struct NoopLiftDetailScreen: View {
             HStack(spacing: 13) {
                 NoopCanonicalGlyph(name: .person, size: 21, color: NoopHTMLColor.blush)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Which muscles this credited").font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text("Which muscles this credited").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                     Text(isPrototypeRecord
                          ? "7 regions · 22.5 credited sets · mapping stated"
                          : "credited sets · mapping stated")
-                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                 }
                 Spacer(); NoopChevron()
             }
@@ -2172,13 +2172,13 @@ private struct NoopLiftEditScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     Button("Cancel") { navigation.back(or: .liftDetail) }
-                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.blueLight)
-                        .buttonStyle(NoopPlainHitStyle()).frame(minHeight: 34)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.blueLight)
+                        .buttonStyle(NoopPlainHitStyle()).frame(minHeight: 36)
                     Spacer()
                     NoopSectionLabel("Correcting")
                     Spacer()
                     Button(saving ? "Saving…" : "Save") { Task { await save() } }
-                        .font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
                         .buttonStyle(NoopPlainHitStyle()).disabled(saving)
                 }
                 NoopLiftTitle(title: editTitle,
@@ -2188,9 +2188,9 @@ private struct NoopLiftEditScreen: View {
                     HStack(spacing: 11) {
                         NoopCanonicalGlyph(name: .check, size: 19, color: Color(hex: 0x6FBF7F))
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Saved").font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(Color(hex: 0xA8E0B0))
+                            Text("Saved").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(Color(hex: 0xA8E0B0))
                             Text("\(working.count) working sets, \(groupedWeight(volume)). The session’s figures are recomputed from what is here now.")
-                                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                         }
                     }
                     .padding(14).frame(maxWidth: .infinity, alignment: .leading)
@@ -2203,7 +2203,7 @@ private struct NoopLiftEditScreen: View {
                         NoopSectionLabel(selectedExercise)
                         Spacer()
                         Text(totalText)
-                            .font(NoopHTMLFont.sans(11.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
                             .monospacedDigit()
                     }
                     VStack(spacing: 0) {
@@ -2215,7 +2215,7 @@ private struct NoopLiftEditScreen: View {
                         HStack(spacing: 9) {
                             NoopCanonicalGlyph(name: .plus, size: 16, color: NoopHTMLColor.blueLight)
                             Text("Add a set you forgot")
-                                .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.blueLight)
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.blueLight)
                             Spacer()
                         }
                         .frame(minHeight: 44)
@@ -2228,7 +2228,7 @@ private struct NoopLiftEditScreen: View {
                 .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
 
                 Text("A corrected session is the session. Noop keeps one record and this screen edits it — there is no second, truer copy kept somewhere you cannot see.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 2)
             }
@@ -2247,21 +2247,21 @@ private struct NoopLiftEditScreen: View {
         let isDeleted = deleted.contains(rows[index].id)
         return HStack(spacing: 10) {
             Text("\(rows[index].setIndex)")
-                .font(NoopHTMLFont.sans(11.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                 .frame(width: 20, alignment: .leading)
             HStack(spacing: 7) {
                 TextField("—", text: weightBinding(index))
                     .keyboardType(.decimalPad).multilineTextAlignment(.center)
-                    .font(NoopHTMLFont.sans(14, weight: .medium)).foregroundStyle(isDeleted ? NoopHTMLColor.copy : NoopHTMLColor.ink)
+                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(isDeleted ? NoopHTMLColor.copy : NoopHTMLColor.ink)
                     .frame(width: 76, height: 36)
                     .background(isDeleted ? Color.clear : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 11))
                     .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(isDeleted ? Color.clear : Color.white.opacity(0.12), lineWidth: 0.5))
                     .strikethrough(isDeleted)
                     .disabled(isDeleted)
-                Text("×").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                Text("×").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 TextField("—", text: repsBinding(index))
                     .keyboardType(.numberPad).multilineTextAlignment(.center)
-                    .font(NoopHTMLFont.sans(14, weight: .medium)).foregroundStyle(isDeleted ? NoopHTMLColor.copy : NoopHTMLColor.ink)
+                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(isDeleted ? NoopHTMLColor.copy : NoopHTMLColor.ink)
                     .frame(width: 48, height: 36)
                     .background(isDeleted ? Color.clear : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 11))
                     .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(isDeleted ? Color.clear : Color.white.opacity(0.12), lineWidth: 0.5))
@@ -2269,7 +2269,7 @@ private struct NoopLiftEditScreen: View {
                     .disabled(isDeleted)
                 if isDeleted {
                     Text("deleted")
-                        .font(NoopHTMLFont.sans(10, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
                         .padding(.horizontal, 7).padding(.vertical, 3)
                         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
                 }
@@ -2279,7 +2279,7 @@ private struct NoopLiftEditScreen: View {
                 if isDeleted { deleted.remove(rows[index].id) } else { deleted.insert(rows[index].id) }
             } label: {
                 if isDeleted {
-                    Text("Undo").font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
+                    Text("Undo").font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
                 } else {
                     NoopCanonicalGlyph(name: .trash, size: 17, color: NoopHTMLColor.copy.opacity(0.82))
                 }
@@ -2428,15 +2428,15 @@ private struct NoopLiftImportScreen: View {
                 VStack(alignment: .leading, spacing: 9) {
                     NoopSectionLabel("Two things it does to your numbers")
                     Text("Hevy counts warm-ups in a set count. Noop does not: warm-up sets fold away and are left out of every figure a session states.")
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(4)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(4)
                     Text("Exercise names are matched to Noop’s own catalogue where they match, and kept exactly as the file wrote them where they do not. Nothing is renamed for you.")
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(4)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(4)
                 }
                 .padding(16).background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
                 .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
 
                 Text("The file stays where it is. Noop reads it, writes its own rows only after review, and never modifies or deletes what you handed it.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 2)
             }
@@ -2465,13 +2465,13 @@ private struct NoopLiftImportScreen: View {
                 HStack(spacing: 13) {
                     NoopCanonicalGlyph(name: icon, size: 21, color: NoopHTMLColor.blue)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(title).font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                        Text(meta).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                        Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                        Text(meta).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     NoopChevron()
                 }
-                Text(note).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                Text(note).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 16).padding(.vertical, 15)
@@ -2490,13 +2490,13 @@ private struct NoopLiftImportScreen: View {
                     Button("Remove") {
                         NoopHevyKeyStore.clear(); keySuffix = nil; keyDraft = ""; keyMessage = "Removed from this phone."
                     }
-                    .font(NoopHTMLFont.sans(11.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
                     .buttonStyle(NoopPlainHitStyle())
                 }
             }
             SecureField("Paste the read-only key", text: $keyDraft)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
-                .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink)
+                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                 .padding(.horizontal, 13).frame(height: 46)
                 .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
@@ -2509,7 +2509,7 @@ private struct NoopLiftImportScreen: View {
                 }
             }
             if let keyMessage {
-                Text(keyMessage).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
+                Text(keyMessage).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             }
         }
         .padding(16).background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 20))
@@ -2519,13 +2519,13 @@ private struct NoopLiftImportScreen: View {
     private var readingCard: some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack { NoopSectionLabel("Reading the file", color: NoopHTMLColor.blueLight); Spacer()
-                Text("on this phone").font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy) }
+                Text("on this phone").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy) }
             GeometryReader { proxy in
                 RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.07))
                     .overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 3).fill(NoopHTMLColor.blue).frame(width: proxy.size.width * 0.72) }
             }.frame(height: 6)
             Text("Reading does not write anything. Nothing is added until you have seen what it found.")
-                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
         }
         .padding(16).background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(NoopHTMLColor.blue.opacity(0.24), lineWidth: 0.5))
@@ -2533,7 +2533,7 @@ private struct NoopLiftImportScreen: View {
 
     private func failureCard(_ error: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("The file stopped here").font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+            Text("The file stopped here").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
             failurePart("What happened", error)
             failurePart("Why it stopped", "Guessing which value is a weight or rep count would write numbers nobody measured.")
             failurePart("What you can do", "In Hevy, export your data and choose that CSV. A screenshot or workout summary cannot be read, and nothing was added.")
@@ -2551,7 +2551,7 @@ private struct NoopLiftImportScreen: View {
             Circle().fill(NoopHTMLColor.blueLight).frame(width: 7, height: 7).padding(.top, 5)
             VStack(alignment: .leading, spacing: 2) {
                 NoopSectionLabel(title)
-                Text(text).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                Text(text).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                     .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -2604,11 +2604,11 @@ private struct NoopLiftReviewScreen: View {
                             }
                         }
                         Button("Not now") { navigation.back(or: .liftLibrary) }
-                            .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                            .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                             .buttonStyle(NoopPlainHitStyle()).frame(maxWidth: .infinity).frame(height: 46)
                     }
                     Text("Adding uses the dates in the file. Running the same import twice does not double a session already in your record.")
-                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                         .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                 } else {
                     nothingRead
@@ -2638,12 +2638,12 @@ private struct NoopLiftReviewScreen: View {
     private func summaryRow(_ title: String, sub: String, value: String, first: Bool = false) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink)
-                Text(sub).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
+                Text(sub).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
-            Text(value).font(NoopHTMLFont.outfit(20, weight: .regular)).foregroundStyle(NoopHTMLColor.blueLight)
+            Text(value).font(NoopHTMLFont.outfit(NoopType.title3, weight: .regular)).foregroundStyle(NoopHTMLColor.blueLight)
         }
         .frame(minHeight: 52).padding(.vertical, 6)
         .overlay(alignment: .top) { if !first { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) } }
@@ -2653,19 +2653,19 @@ private struct NoopLiftReviewScreen: View {
         let recent = Array(result.sessions.suffix(5).reversed())
         return VStack(alignment: .leading, spacing: 10) {
             HStack { NoopSectionLabel("The newest of them"); Spacer()
-                Text("from the file").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82)) }
+                Text("from the file").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82)) }
             ForEach(Array(recent.enumerated()), id: \.offset) { index, item in
                 HStack(spacing: 11) {
-                    Text(item.start.noopLiftDay).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82)).frame(width: 52, alignment: .leading)
+                    Text(item.start.noopLiftDay).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82)).frame(width: 52, alignment: .leading)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.title?.isEmpty == false ? item.title! : "Untitled")
-                            .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink)
+                            .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                         Text("\(item.exerciseCount) exercise\(item.exerciseCount == 1 ? "" : "s") · \(item.setCount) working set\(item.setCount == 1 ? "" : "s")" + (item.durationS.map { " · \(Int($0 / 60)) min" } ?? ""))
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     }
                     Spacer()
                     Text("from the file")
-                        .font(NoopHTMLFont.sans(10, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
                         .padding(.horizontal, 7).padding(.vertical, 3)
                         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
                 }
@@ -2673,7 +2673,7 @@ private struct NoopLiftReviewScreen: View {
                 .overlay(alignment: .top) { if index > 0 { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) } }
             }
             Text("There is nothing to tick here. The importer produces whole sessions with no reference back to each source row, so Noop cannot honestly claim a reconstructed line is the exact line it read.")
-                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                 .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
         }
         .padding(16).background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
@@ -2683,12 +2683,12 @@ private struct NoopLiftReviewScreen: View {
     private func skipped(_ result: LiftingImportResult) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             Text("Some rows could not become sessions")
-                .font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
             HStack { Text("No readable date or no countable set")
-                    .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
-                Spacer(); Text("\(result.skipped)").font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink) }
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
+                Spacer(); Text("\(result.skipped)").font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink) }
             Text("A skipped row stays in the file; it is never half-added to your record.")
-                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
         }
         .padding(16).background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
         .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
@@ -2700,9 +2700,9 @@ private struct NoopLiftReviewScreen: View {
             HStack(alignment: .top, spacing: 11) {
                 NoopCanonicalGlyph(name: .check, size: 19, color: Color(hex: 0x6FBF7F))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Sessions added").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(Color(hex: 0xA8E0B0))
+                    Text("Sessions added").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(Color(hex: 0xA8E0B0))
                     Text("They are in your record, dated when they happened. Everything that reads your history can use them now.")
-                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(3)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft).lineSpacing(3)
                 }
             }
             .padding(16).background(Color(hex: 0x6FBF7F).opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
@@ -2717,7 +2717,7 @@ private struct NoopLiftReviewScreen: View {
                           subtitle: "Nothing was written, nothing changed, and the file is exactly as it was handed over.")
             NoopHTMLCard {
                 Text("Choose a Hevy CSV export or a Liftosaur JSON export. A screenshot or summary cannot supply the individual sessions this import needs.")
-                    .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                     .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
             }
             NoopLiftActionButton(title: "Choose another file", accent: false) { navigation.back(or: .liftImport) }
@@ -2835,7 +2835,7 @@ private struct NoopLiftMusclesScreen: View {
                 }
                 if isAbsent { absentCard }
                 Text("Seven regions and thirty-three muscles, which is what the catalogue actually knows. Credited sets are a count of work, not a target: there is no weekly figure to hit here and nothing on this screen goes red.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     .lineSpacing(4).fixedSize(horizontal: false, vertical: true).padding(.horizontal, 2)
             }
         }
@@ -2856,7 +2856,7 @@ private struct NoopLiftMusclesScreen: View {
              + Text(" to the muscle the exercise is built around and ").foregroundStyle(NoopHTMLColor.inkSoft)
              + Text("0.5").fontWeight(.semibold).foregroundStyle(NoopHTMLColor.ink)
              + Text(" to the ones it also uses. Stabilisers count nothing — they are written down, not credited. Warm-ups count nothing either.").foregroundStyle(NoopHTMLColor.inkSoft))
-                .font(NoopHTMLFont.sans(12.5)).lineSpacing(4).fixedSize(horizontal: false, vertical: true)
+                .font(NoopHTMLFont.sans(NoopType.caption)).lineSpacing(4).fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 16).padding(.vertical, 15)
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -2867,13 +2867,13 @@ private struct NoopLiftMusclesScreen: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text("\(weekSessionCount) \(weekSessionCount == 1 ? "session" : "sessions") recorded")
-                    .font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 Spacer()
-                Text("still learning").font(NoopHTMLFont.sans(11, weight: .semibold))
+                Text("still learning").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.blueLight).padding(.horizontal, 8).padding(.vertical, 4)
                     .background(NoopHTMLColor.blue.opacity(0.13), in: RoundedRectangle(cornerRadius: 7))
             }
-            Text(calibratingReason).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+            Text(calibratingReason).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                 .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
@@ -2891,15 +2891,15 @@ private struct NoopLiftMusclesScreen: View {
     private func regionCard(_ group: NoopLiftMuscleRegion) -> some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(regionName(group.region)).font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                Text(regionName(group.region)).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 Spacer()
                 Text(group.total > 0 ? "\(creditString(group.total)) credited" : "nothing this week")
-                    .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                     .foregroundStyle(group.total > 0 ? NoopHTMLColor.blueLight : NoopHTMLColor.muted)
             }
             VStack(spacing: 9) { ForEach(group.muscles) { muscleRow($0) } }
             if let read = group.recoveryRead, !read.isEmpty {
-                Text(read).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.nightLight)
+                Text(read).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.nightLight)
                     .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -2912,7 +2912,7 @@ private struct NoopLiftMusclesScreen: View {
         let value = credits[muscle.id, default: 0]
         let indented = Self.indentedMuscles.contains(muscle.id)
         return HStack(spacing: 10) {
-            Text(muscle.name).font(NoopHTMLFont.sans(12.5))
+            Text(muscle.name).font(NoopHTMLFont.sans(NoopType.caption))
                 .foregroundStyle(value > 0 ? NoopHTMLColor.ink : NoopHTMLColor.muted)
                 .padding(.leading, indented ? 12 : 0).frame(width: indented ? 112 : 100, alignment: .leading)
             GeometryReader { proxy in
@@ -2924,7 +2924,7 @@ private struct NoopLiftMusclesScreen: View {
             }
             .frame(height: 5)
             Text(value > 0 ? creditString(value) : "—")
-                .font(NoopHTMLFont.sans(12)).foregroundStyle(value > 0 ? NoopHTMLColor.inkSoft : NoopHTMLColor.copy)
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(value > 0 ? NoopHTMLColor.inkSoft : NoopHTMLColor.copy)
                 .monospacedDigit().frame(width: 26, alignment: .trailing)
         }
     }
@@ -2936,7 +2936,7 @@ private struct NoopLiftMusclesScreen: View {
             Text(isDemo
                  ? "Nineteen of this week’s twenty-four exercises carry a muscle mapping someone checked by hand. Five fall back to the catalogue’s own, which is usually right and occasionally generous about what a movement uses. They are named so a number you doubt can be traced."
                  : "Each credited exercise is resolved through Noop’s reviewed local anatomy catalogue. An exercise without an unambiguous mapping is withheld rather than guessed.")
-                .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                 .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 6) {
                 provenanceChip(isDemo ? "19 checked" : "\(mapped) checked", highlighted: true)
@@ -2950,7 +2950,7 @@ private struct NoopLiftMusclesScreen: View {
     }
 
     private func provenanceChip(_ text: String, highlighted: Bool = false) -> some View {
-        Text(text).font(NoopHTMLFont.sans(10, weight: .semibold))
+        Text(text).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
             .foregroundStyle(highlighted ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
             .padding(.horizontal, 7).padding(.vertical, 3)
             .background(highlighted ? NoopHTMLColor.blue.opacity(0.13) : Color.white.opacity(0.06),
@@ -2959,7 +2959,7 @@ private struct NoopLiftMusclesScreen: View {
 
     private var absentCard: some View {
         Text("No lifting on record. This screen fills itself the first time you finish a session — there is nothing to set up and nothing to connect.")
-            .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+            .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
             .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
             .padding(16).frame(maxWidth: .infinity, alignment: .leading)
             .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -3024,29 +3024,29 @@ private struct NoopLiftLastTimeSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("LAST TIME").font(NoopHTMLFont.sans(10.5, weight: .semibold)).tracking(1.2)
+                    Text("LAST TIME").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.2)
                         .foregroundStyle(NoopHTMLColor.muted)
-                    Text(exercise).font(NoopHTMLFont.outfit(22)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(exercise).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink)
                 }
                 Spacer()
                 Button("Done") { dismiss() }
-                    .font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.warm)
+                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.warm)
             }
             if sets.isEmpty {
                 Text("No earlier session of this exercise. The numbers you log today become next time's guide.")
-                    .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 ForEach(sets.keys.sorted(), id: \.self) { i in
                     let s = sets[i]!
                     HStack {
-                        Text("\(i)").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                        Text("\(i)").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                             .frame(width: 30, height: 30).background(Color.white.opacity(0.06), in: Circle())
                         Text(s.weightKg.map { "\(LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units))) \(LiftFormat.weightUnit(units))" } ?? "—")
                             .frame(maxWidth: .infinity)
                         Text(s.reps.map { "\($0) reps" } ?? "—").frame(maxWidth: .infinity)
                     }
-                    .font(NoopHTMLFont.sans(15, weight: .medium)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
                 }
             }
             Spacer(minLength: 0)
@@ -3088,18 +3088,18 @@ struct NoopLiftEffortSheet: View {
             Text("How hard was that?").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                 .padding(.top, 34)
             Text("Your own read of the whole session. It sits beside the heart-rate figures, which cannot see a heavy set.")
-                .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                 .multilineTextAlignment(.center).padding(.horizontal, 26)
             dial.frame(width: 280, height: 280).padding(.top, 10)
             VStack(spacing: 4) {
-                Text(Self.words[value - 1].0).font(NoopHTMLFont.outfit(22)).foregroundStyle(color(rating))
-                Text(Self.words[value - 1].1).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                Text(Self.words[value - 1].0).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(color(rating))
+                Text(Self.words[value - 1].1).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     .multilineTextAlignment(.center)
             }
             .animation(NoopMotion.swap, value: value)
             Spacer()
             Button(action: save) {
-                Text("Save workout").font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
+                Text("Save workout").font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
                     .frame(maxWidth: .infinity).frame(minHeight: 56)
                     .background(NoopHTMLColor.warm, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
@@ -3144,7 +3144,7 @@ struct NoopLiftEffortSheet: View {
                 HStack {
                     Text("1"); Spacer(); Text("10")
                 }
-                .font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(NoopHTMLColor.muted)
+                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.muted)
                 .frame(width: r * 1.3).position(x: c.x, y: c.y + r * 0.92)
             }
             .contentShape(Circle())

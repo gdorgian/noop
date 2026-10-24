@@ -457,7 +457,7 @@ struct NoopDataScreen: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Bring your history in")
-                        .font(NoopHTMLFont.outfit(23))
+                        .font(NoopHTMLFont.outfit(NoopType.title3))
                         .tracking(-0.46)
                         .foregroundStyle(NoopHTMLColor.ink)
                         .padding(.horizontal, 2)
@@ -473,7 +473,7 @@ struct NoopDataScreen: View {
                                 Spacer(minLength: 0)
                             }
                             Text(storedSpan)
-                                .font(NoopHTMLFont.sans(11.5))
+                                .font(NoopHTMLFont.sans(NoopType.caption))
                                 .monospacedDigit()
                                 .foregroundStyle(NoopHTMLColor.faint)
                         }
@@ -504,7 +504,7 @@ struct NoopDataScreen: View {
                     .padding(.top, 18)
 
                     Text("Your scores stay yours. Noop recomputes Rest, Charge and Effort from the raw heart rate, variability and sleep it finds. A brand’s own score is kept for reference and never shown as one of yours — so your numbers here will not match your old app’s.")
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Self.dim)
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -527,13 +527,13 @@ struct NoopDataScreen: View {
             .frame(width: 47, height: 47)
 
             Text("Hand it one file")
-                .font(NoopHTMLFont.outfit(19))
+                .font(NoopHTMLFont.outfit(NoopType.title3))
                 .tracking(-0.38)
                 .foregroundStyle(NoopHTMLColor.ink)
                 .padding(.top, 12)
 
             Text("A zip, a folder, or a single file. Noop reads it and works out what it is — you don’t pick a brand.")
-                .font(NoopHTMLFont.sans(12.5))
+                .font(NoopHTMLFont.sans(NoopType.caption))
                 .foregroundStyle(NoopHTMLColor.copy)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
@@ -550,7 +550,7 @@ struct NoopDataScreen: View {
                 }
             } label: {
                 Text("Choose a file or folder")
-                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                     .foregroundStyle(Self.blushInk)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 46)
@@ -560,7 +560,7 @@ struct NoopDataScreen: View {
             .padding(.top, 14)
 
             Text("Sharing to Noop from Files or Mail works too")
-                .font(NoopHTMLFont.sans(11))
+                .font(NoopHTMLFont.sans(NoopType.eyebrow))
                 .foregroundStyle(NoopHTMLColor.faint)
                 .padding(.top, 12)
         }
@@ -600,7 +600,7 @@ struct NoopDataScreen: View {
                 .monospacedDigit()
                 .foregroundStyle(NoopHTMLColor.ink)
             Text(unit)
-                .font(NoopHTMLFont.sans(12.5))
+                .font(NoopHTMLFont.sans(NoopType.caption))
                 .foregroundStyle(NoopHTMLColor.copy)
         }
     }
@@ -614,12 +614,12 @@ struct NoopDataScreen: View {
                     VStack(alignment: .leading, spacing: 0) {
                         NoopSectionLabel("Last snapshot", color: Self.dim)
                         Text(snapshotAge)
-                            .font(NoopHTMLFont.outfit(21, weight: .light))
+                            .font(NoopHTMLFont.outfit(NoopType.title3, weight: .light))
                             .tracking(-0.42)
                             .foregroundStyle(NoopHTMLColor.ink)
                             .padding(.top, 4)
                         Text(snapshotPlace)
-                            .font(NoopHTMLFont.sans(11.5))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.faint)
                             .padding(.top, 5)
                     }
@@ -634,7 +634,7 @@ struct NoopDataScreen: View {
                 HStack(spacing: 8) {
                     NoopCanonicalGlyph(name: .clock, size: 13, color: NoopHTMLColor.faint)
                     Text(snapshotNext)
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Self.dim)
                 }
                 .padding(.top, 10)
@@ -689,7 +689,7 @@ struct NoopDataScreen: View {
                 NoopBackHeader(label: "Your data") { navigation.back(or: .data) }
                     .padding(.bottom, -8)
                 Text("Backup and sync")
-                    .font(NoopHTMLFont.outfit(23))
+                    .font(NoopHTMLFont.outfit(NoopType.title3))
                     .tracking(-0.46)
                     .foregroundStyle(NoopHTMLColor.ink)
                     .padding(.horizontal, 2)
@@ -727,7 +727,7 @@ struct NoopDataScreen: View {
         HStack(spacing: 6) {
             Circle().fill(Self.blush.opacity(0.75)).frame(width: 5, height: 5)
             Text(scheduleWord)
-                .font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                 .tracking(0.63)
                 .foregroundStyle(Self.blushLight)
         }
@@ -744,7 +744,7 @@ struct NoopDataScreen: View {
             + Text("noop (APPROXIMATE)").font(.system(size: 11, design: .monospaced)).foregroundColor(Self.dim)
             + Text(" and skipped on the way back in, and Apple Health rows are left out entirely so they cannot be mis-attributed to a strap.")
         )
-        .font(NoopHTMLFont.sans(11.5))
+        .font(NoopHTMLFont.sans(NoopType.caption))
         .foregroundStyle(NoopHTMLColor.faint)
         .lineSpacing(3.5)
         .fixedSize(horizontal: false, vertical: true)
@@ -764,11 +764,11 @@ struct NoopDataScreen: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Data and permissions")
-                        .font(NoopHTMLFont.outfit(25))
+                        .font(NoopHTMLFont.outfit(NoopType.title2))
                         .tracking(-0.625)
                         .foregroundStyle(NoopHTMLColor.ink)
                     Text("What is collected, where it sits, and how to take it with you.")
-                        .font(NoopHTMLFont.sans(13.5))
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(4)
                 }
@@ -844,7 +844,7 @@ struct NoopDataScreen: View {
                         HStack(spacing: 9) {
                             NoopCanonicalGlyph(name: .trash, size: 19, color: Color(hex: 0xF3A472))
                             Text("Delete my account and data")
-                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         }
                         .foregroundStyle(Color(hex: 0xF3A472))
                         .frame(maxWidth: .infinity)
@@ -856,7 +856,7 @@ struct NoopDataScreen: View {
                 }
 
                 Text("Nothing here is sold, and there is no advertising identifier in the app. Deleting takes effect immediately and the export is a plain file you can read yourself.")
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(NoopHTMLColor.faint)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
@@ -878,8 +878,8 @@ struct NoopDataScreen: View {
         HStack(alignment: .top, spacing: 11) {
             Circle().fill(NoopHTMLColor.blue).frame(width: 7, height: 7).padding(.top, 6)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink)
-                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
+                Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
             }
         }
     }
@@ -888,8 +888,8 @@ struct NoopDataScreen: View {
         HStack(alignment: .top, spacing: 12) {
             NoopCanonicalGlyph(name: glyph, size: 19, color: Self.blush).frame(width: 20)
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.ink)
-                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
+                Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
             }
         }
     }
@@ -897,8 +897,8 @@ struct NoopDataScreen: View {
     private func dataConnection(_ title: String, _ detail: String) -> some View {
         HStack(spacing: 13) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
-                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
+                Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
             }
             Spacer(minLength: 8)
             NoopA5TintToggle(isOn: connectedServices.contains(title), tint: Self.blush) {
@@ -914,8 +914,8 @@ struct NoopDataScreen: View {
             HStack(spacing: 12) {
                 NoopCanonicalGlyph(name: glyph, size: 19, color: Self.blush).frame(width: 20)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                 }
                 Spacer(minLength: 8)
                 NoopChevron()
@@ -949,11 +949,11 @@ struct NoopDataScreen: View {
                                 .monospacedDigit()
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text("%")
-                                .font(NoopHTMLFont.sans(15))
+                                .font(NoopHTMLFont.sans(NoopType.subhead))
                                 .foregroundStyle(NoopHTMLColor.copy)
                             Spacer(minLength: 8)
                             Text("export.xml · 2.4 GB")
-                                .font(NoopHTMLFont.sans(11.5))
+                                .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(NoopHTMLColor.faint)
                         }
                     }
@@ -962,7 +962,7 @@ struct NoopDataScreen: View {
                     readingBar
 
                     Text("Streaming it a piece at a time and aggregating as it goes, so a file this size never has to fit in memory.")
-                        .font(NoopHTMLFont.sans(12.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -980,7 +980,7 @@ struct NoopDataScreen: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Button { navigation.replace(with: .importHistory) } label: {
                         Text("Stop")
-                            .font(NoopHTMLFont.sans(13.5, weight: .medium))
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium))
                             .foregroundStyle(NoopHTMLColor.inkSoft)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 47)
@@ -989,7 +989,7 @@ struct NoopDataScreen: View {
                     .buttonStyle(NoopHTMLPressStyle())
 
                     Text("Stopping keeps what has been written already. Nothing here leaves the phone — there is no server to send it to.")
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1050,7 +1050,7 @@ struct NoopDataScreen: View {
                     Text(current == nil
                          ? "No read is running. Choose a file from the drop target to start one."
                          : "Reading it locally and writing only records the importer can identify. Nothing leaves this phone.")
-                        .font(NoopHTMLFont.sans(12.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1066,7 +1066,7 @@ struct NoopDataScreen: View {
                     if current == nil {
                         Button { navigation.replace(with: .importHistory) } label: {
                             Text("Choose a file")
-                                .font(NoopHTMLFont.sans(13.5, weight: .medium))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium))
                                 .foregroundStyle(NoopHTMLColor.inkSoft)
                                 .frame(maxWidth: .infinity)
                                 .frame(minHeight: 47)
@@ -1075,7 +1075,7 @@ struct NoopDataScreen: View {
                         .buttonStyle(NoopHTMLPressStyle())
                     }
                     Text("A read cannot be stopped once it has started. Nothing here leaves the phone \u{2014} there is no server to send it to.")
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1128,11 +1128,11 @@ struct NoopDataScreen: View {
                                 .monospacedDigit()
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text("days")
-                                .font(NoopHTMLFont.sans(14))
+                                .font(NoopHTMLFont.sans(NoopType.subhead))
                                 .foregroundStyle(NoopHTMLColor.copy)
                         }
                         Text("12 Feb 2019 — 28 Aug 2026")
-                            .font(NoopHTMLFont.sans(12))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(Self.dim)
                     }
                     Spacer(minLength: 8)
@@ -1171,7 +1171,7 @@ struct NoopDataScreen: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Button { navigation.reset(to: .data) } label: {
                         Text("Done")
-                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                             .foregroundStyle(Self.blushInk)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 46)
@@ -1181,7 +1181,7 @@ struct NoopDataScreen: View {
 
                     Button { navigation.replace(with: .importHistory) } label: {
                         Text("Import something else")
-                            .font(NoopHTMLFont.sans(13.5, weight: .medium))
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium))
                             .foregroundStyle(NoopHTMLColor.inkSoft)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 47)
@@ -1194,7 +1194,7 @@ struct NoopDataScreen: View {
                         + Text("building").font(NoopHTMLFont.serif(14, italic: true))
                         + Text(" chip while the baselines catch up.")
                     )
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(Self.dim)
                     .lineSpacing(3.5)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1227,11 +1227,11 @@ struct NoopDataScreen: View {
                         }
                         .frame(width: 30, height: 30)
                         Text("Oura/heartrate.csv")
-                            .font(NoopHTMLFont.sans(12.5))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.warm)
                     }
                     Text("That is Oura’s raw heart-rate log — one row per reading, with no daily summary Noop can attach to a date. There is nothing wrong with the file; it is the wrong one of the set.")
-                        .font(NoopHTMLFont.sans(13))
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                         .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1259,7 +1259,7 @@ struct NoopDataScreen: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Button { navigation.replace(with: .importHistory) } label: {
                         Text("Choose another file")
-                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                             .foregroundStyle(Self.blushInk)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 46)
@@ -1268,7 +1268,7 @@ struct NoopDataScreen: View {
                     .buttonStyle(NoopHTMLPressStyle())
 
                     Text("Your 1,284 stored days are untouched. A rejected file changes nothing — it is read, judged and dropped.")
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Self.dim)
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1310,11 +1310,11 @@ struct NoopDataScreen: View {
                                 .monospacedDigit()
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text(dayCount == nil ? "records" : "days")
-                                .font(NoopHTMLFont.sans(14))
+                                .font(NoopHTMLFont.sans(NoopType.subhead))
                                 .foregroundStyle(NoopHTMLColor.copy)
                         }
                         Text(span ?? "The file carried no dates")
-                            .font(NoopHTMLFont.sans(12))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .monospacedDigit()
                             .foregroundStyle(Self.dim)
                     }
@@ -1347,7 +1347,7 @@ struct NoopDataScreen: View {
                 navigation.reset(to: .data)
             } label: {
                 Text("Done")
-                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                     .foregroundStyle(Self.blushInk)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 46)
@@ -1360,7 +1360,7 @@ struct NoopDataScreen: View {
                 navigation.replace(with: .importHistory)
             } label: {
                 Text("Import something else")
-                    .font(NoopHTMLFont.sans(13.5, weight: .medium))
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium))
                     .foregroundStyle(NoopHTMLColor.inkSoft)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 47)
@@ -1369,7 +1369,7 @@ struct NoopDataScreen: View {
             .buttonStyle(NoopHTMLPressStyle())
 
             Text("Only measures supported by what the file actually carried can be calculated. Missing inputs stay blank.")
-            .font(NoopHTMLFont.sans(11.5))
+            .font(NoopHTMLFont.sans(NoopType.caption))
             .foregroundStyle(Self.dim)
             .lineSpacing(3.5)
             .fixedSize(horizontal: false, vertical: true)
@@ -1395,7 +1395,7 @@ struct NoopDataScreen: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Text(refused.reason)
-                        .font(NoopHTMLFont.sans(13))
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                         .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1425,7 +1425,7 @@ struct NoopDataScreen: View {
                         navigation.replace(with: .importHistory)
                     } label: {
                         Text("Choose another file")
-                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                             .foregroundStyle(Self.blushInk)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 46)
@@ -1434,7 +1434,7 @@ struct NoopDataScreen: View {
                     .buttonStyle(NoopHTMLPressStyle())
 
                     Text(untouchedLine)
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Self.dim)
                         .lineSpacing(3.5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1455,7 +1455,7 @@ struct NoopDataScreen: View {
                 NoopScreenHeader(title, eyebrow: eyebrow)
                     .padding(.bottom, -18)
                 Text("There is no finished read on this launch to show. Results are not kept once you leave them.")
-                    .font(NoopHTMLFont.sans(13))
+                    .font(NoopHTMLFont.sans(NoopType.footnote))
                     .foregroundStyle(NoopHTMLColor.copy)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1482,7 +1482,7 @@ struct NoopDataScreen: View {
                 noteView
             } else if let note {
                 Text(note)
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(noteColor)
                     .lineSpacing(3.5)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1544,7 +1544,7 @@ struct NoopDataScreen: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(row.title)
-                    .font(NoopHTMLFont.sans(13))
+                    .font(NoopHTMLFont.sans(NoopType.footnote))
                     .foregroundStyle(row.titleColor)
                 if !row.note.isEmpty {
                     Text(row.note)
@@ -1563,7 +1563,7 @@ struct NoopDataScreen: View {
                 NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             case let .value(text, color):
                 Text(text)
-                    .font(NoopHTMLFont.sans(12.5, weight: .medium))
+                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .medium))
                     .monospacedDigit()
                     .foregroundStyle(color)
             case let .glyph(name, color, size):
@@ -1608,10 +1608,10 @@ struct NoopImportCatalogSheet: View {
                         ForEach(Array(group.1.enumerated()), id: \.offset) { index, item in
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(item.0)
-                                    .font(NoopHTMLFont.sans(13))
+                                    .font(NoopHTMLFont.sans(NoopType.footnote))
                                     .foregroundStyle(NoopHTMLColor.inkSoft)
                                 Text(item.1)
-                                    .font(NoopHTMLFont.sans(11.5))
+                                    .font(NoopHTMLFont.sans(NoopType.caption))
                                     .foregroundStyle(Color(hex: 0x8B958F))
                                     .lineSpacing(2)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -1624,7 +1624,7 @@ struct NoopImportCatalogSheet: View {
                     }
                 }
                 Text("Oura, Fitbit and Garmin share one importer and are told apart by JSON key shape. That is why the screen shows a summary and this list sits behind a chevron: it is documentation, not a control.")
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(NoopHTMLColor.faint)
                     .lineSpacing(3.5)
                     .fixedSize(horizontal: false, vertical: true)

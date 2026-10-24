@@ -119,7 +119,7 @@ struct NoopHistoryPlot: View {
                 }
                 if spacious, let average = presentation.average {
                     let label = context.resolve(Text(averageLabel ?? "Avg. \(valueLabel(average))")
-                        .font(NoopHTMLFont.sans(10.5, weight: .semibold)).foregroundColor(NoopHTMLColor.ink))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundColor(NoopHTMLColor.ink))
                     let measured = label.measure(in: CGSize(width: plot.width - 20, height: 24))
                     let badgeWidth = min(plot.width - 16, measured.width + 16)
                     // Put the badge on the opposite side to the selected/latest observation.
@@ -134,7 +134,7 @@ struct NoopHistoryPlot: View {
             }
             .overlay {
                 if !compact && presentation.series.points.isEmpty {
-                    Text("No recorded values in this period").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.muted)
+                    Text("No recorded values in this period").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
                 }
             }
             .contentShape(Rectangle())

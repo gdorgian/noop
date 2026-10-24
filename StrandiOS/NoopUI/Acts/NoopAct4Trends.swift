@@ -154,7 +154,7 @@ private struct NoopTrendsScreen: View {
 
                 if live?.readFailed == true {
                     Text("Some history could not be refreshed. Available readings are shown; try refreshing again.")
-                        .font(NoopHTMLFont.sans(12))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopA4.warm)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 12)
@@ -209,7 +209,7 @@ private struct NoopTrendsScreen: View {
                     DisclosureGroup(isExpanded: $showingRecordingHistory) {
                         NoopAttendanceCard(live: live?.attendance).padding(.top, 10)
                     } label: {
-                        Text("Recording history").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                        Text("Recording history").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                             .frame(minHeight: 44)
                     }
                     .tint(NoopA4.greenLight)
@@ -243,21 +243,21 @@ private struct NoopTrendsScreen: View {
 
         return VStack(alignment: .leading, spacing: 9) {
             Text(kicker.uppercased())
-                .font(NoopHTMLFont.sans(10, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                 .tracking(1.4)
                 .foregroundStyle(tone == 0 ? Color(hex: 0xC9D0EE) : tint)
             Text(headline)
-                .font(NoopHTMLFont.outfit(32, weight: .light))
+                .font(NoopHTMLFont.outfit(NoopType.title1, weight: .light))
                 .tracking(-1.024)
                 .foregroundStyle(NoopHTMLColor.ink)
                 .frame(minHeight: 34.56, alignment: .top)
             Text(body)
-                .font(NoopHTMLFont.sans(13.5))
+                .font(NoopHTMLFont.sans(NoopType.footnote))
                 .foregroundStyle(Color(hex: 0xB4C9BE))
                 .noopA4LineBox(fontSize: 13.5, ratio: 1.6)
             if live != nil {
                 Text("Each signal's first half of the window against its second. A change is called only when it clears that signal's own week-to-week swing.")
-                    .font(NoopHTMLFont.sans(11))
+                    .font(NoopHTMLFont.sans(NoopType.eyebrow))
                     .foregroundStyle(NoopHTMLColor.faint)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
@@ -352,10 +352,10 @@ private struct NoopTrendsScreen: View {
                     NoopCanonicalGlyph(name: .drop, size: 20, color: NoopHTMLColor.warm)
                         .frame(width: 22)
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Biomarkers").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
-                        Text(bloodworkSummary).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                        Text("Biomarkers").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
+                        Text(bloodworkSummary).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                         Text("Lab results keep their own dates, independent of the chart period.")
-                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+                            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
                     }
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -371,10 +371,10 @@ private struct NoopTrendsScreen: View {
             ForEach(NoopTrendWindow.allCases, id: \.rawValue) { item in
                 Button { withAnimation(.easeOut(duration: 0.18)) { window = item } } label: {
                     Text(item.rawValue)
-                        .font(NoopHTMLFont.sans(12.5, weight: item == window ? .semibold : .regular))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: item == window ? .semibold : .regular))
                         .foregroundStyle(item == window ? Color(hex: 0x9FE2FB) : NoopHTMLColor.copy)
                         .frame(maxWidth: .infinity)
-                        .frame(minHeight: 34)
+                        .frame(minHeight: 36)
                         .background(item == window ? NoopA4.green.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(item == window ? NoopA4.green.opacity(0.4) : .clear, lineWidth: 0.5))
                 }
@@ -453,9 +453,9 @@ private struct NoopTrendsScreen: View {
                 NoopCanonicalGlyph(name: glyph(for: symbol), size: 20, color: tint)
                     .frame(width: 22)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                     if let detail {
-                        Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                        Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                     }
                 }
                 Spacer()
@@ -488,11 +488,11 @@ private struct NoopA4Header<Trailing: View>: View {
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(eyebrow)
-                    .font(NoopHTMLFont.sans(13.5))
+                    .font(NoopHTMLFont.sans(NoopType.footnote))
                     .foregroundStyle(NoopHTMLColor.copy)
                     .frame(height: 16.5, alignment: .top)
                 Text(title)
-                    .font(NoopHTMLFont.outfit(23))
+                    .font(NoopHTMLFont.outfit(NoopType.title3))
                     .tracking(-0.46)
                     .foregroundStyle(NoopHTMLColor.ink)
                     .frame(minHeight: 26.45, alignment: .top)
@@ -528,7 +528,7 @@ private struct NoopBodyAgeHero: View {
                         : pace.direction == .faster ? "faster than real time" : "in step with real time"
                     let tint = pace.direction == .faster ? NoopA4.warm : NoopA4.goodLight
                     Text(label)
-                        .font(NoopHTMLFont.sans(11, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                         .foregroundStyle(tint)
                         .padding(.horizontal, 9)
                         .frame(minHeight: 25)
@@ -542,14 +542,14 @@ private struct NoopBodyAgeHero: View {
                       ? "At this pace you are putting on about \(months) months of body age a year."
                       : "At this pace your body age is falling by about \(months) months a year.")
                      + " Fitted to \(pace.points) weekly estimates, give or take \(pace.halfWidth.formatted(.number.precision(.fractionLength(1))))×. Read it as a direction, not a promise.")
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                     .noopA4LineBox(fontSize: 11.5, ratio: 1.55)
             } else {
                 Text(paceWeeks < AgingPace.minPoints
                      ? "Appears after eight weekly estimates. \(paceWeeks) so far."
                      : "Not pinned down yet. \(paceWeeks) weekly estimates still leave too wide a range to show a number. It narrows as the weeks add up.")
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -566,11 +566,11 @@ private struct NoopBodyAgeHero: View {
                 Spacer()
                 if live == nil && !calibrating {
                 Text("next update Saturday")
-                    .font(NoopHTMLFont.sans(10.5))
+                    .font(NoopHTMLFont.sans(NoopType.eyebrow))
                     .foregroundStyle(NoopHTMLColor.faint)
                 } else if measured {
                     Text("from the last 7 days")
-                        .font(NoopHTMLFont.sans(10.5))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow))
                         .foregroundStyle(NoopHTMLColor.faint)
                 }
             }
@@ -589,7 +589,7 @@ private struct NoopBodyAgeHero: View {
                     NoopSectionLabel("Pace of aging", color: Color(hex: 0x8B958F))
                     Spacer()
                     Text("slower vs last month")
-                        .font(NoopHTMLFont.sans(11, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                         .foregroundStyle(NoopA4.greenLight)
                         .padding(.horizontal, 9)
                         .frame(minHeight: 25)
@@ -599,7 +599,7 @@ private struct NoopBodyAgeHero: View {
                 NoopPaceScale()
 
                 Text("At this pace you are putting on about 10 months of body age a year instead of twelve. Read it as a direction, not a promise.")
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                     .noopA4LineBox(fontSize: 11.5, ratio: 1.55)
             }
@@ -610,7 +610,7 @@ private struct NoopBodyAgeHero: View {
                 Text(awaitingAge
                      ? (profileNeeded ? "Confirm your profile to begin" : "Your ages — gathering measured inputs")
                      : (live == nil ? "Your ages — five drivers, the ±5 band, and how it is figured" : "Your ages"))
-                    .font(NoopHTMLFont.sans(12.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(NoopHTMLColor.inkSoft)
                 Spacer(minLength: 0)
                 NoopA4CSSChevron(direction: .right, color: olderThanChronological ? NoopA4.warm : NoopA4.greenLight)
@@ -718,12 +718,12 @@ private struct NoopA4AnimatedAgeAura: View {
                         .frame(minHeight: 68)
                         .shadow(color: .black.opacity(0.6), radius: 13, y: 2)
                     Text("BODY AGE")
-                        .font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                         .tracking(2.1)
                         .foregroundStyle(Color(hex: 0x93A0A6))
                         .padding(.top, 7)
                     Text(calibrating ? waitingReason : auraDelta)
-                        .font(NoopHTMLFont.sans(13.5))
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(calibrating ? NoopHTMLColor.inkSoft : accentLight)
                         .padding(.top, 9)
                 }
@@ -928,7 +928,7 @@ private struct NoopPaceScale: View {
                         .offset(x: proxy.size.width * position - 1, y: 12)
 
                     Text("\(pace.formatted(.number.precision(.fractionLength(1))))×")
-                        .font(NoopHTMLFont.outfit(21))
+                        .font(NoopHTMLFont.outfit(NoopType.title3))
                         .tracking(-0.525)
                         .monospacedDigit()
                         .fixedSize()
@@ -946,7 +946,7 @@ private struct NoopPaceScale: View {
                 Spacer()
                 Text("3.0×")
             }
-            .font(NoopHTMLFont.sans(10.5))
+            .font(NoopHTMLFont.sans(NoopType.eyebrow))
             .foregroundStyle(NoopHTMLColor.faint)
         }
     }
@@ -973,17 +973,17 @@ private struct NoopTrendSignalCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(row.name).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.inkSoft)
+                Text(row.name).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.inkSoft)
                 Spacer()
                 if showsDetail { NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.chevronDim) }
             }
             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text(row.value).font(NoopHTMLFont.outfit(26, weight: .light)).tracking(-0.78).monospacedDigit()
-                Text(row.unit).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted)
+                Text(row.value).font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).tracking(-0.78).monospacedDigit()
+                Text(row.unit).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
                 Spacer()
                 if !row.delta.isEmpty {
                     Text(row.delta)
-                        .font(NoopHTMLFont.sans(11, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                         .padding(.horizontal, 9)
                         .frame(minHeight: 25)
@@ -995,7 +995,7 @@ private struct NoopTrendSignalCard: View {
                 .accessibilityHidden(true)
             if !row.read.isEmpty {
                 Text(row.read)
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(NoopHTMLColor.copy)
                     .noopA4LineBox(fontSize: 11.5, ratio: 1.5)
             }
@@ -1031,7 +1031,7 @@ private struct NoopAttendanceCard: View {
                     NoopSectionLabel("Recorded days")
                     Spacer()
                     Text("12 weeks \u{00B7} \(recordedDays) of 84 days")
-                        .font(NoopHTMLFont.sans(11))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow))
                         .foregroundStyle(NoopHTMLColor.faint)
                 }
                 HStack(spacing: 4) {
@@ -1056,7 +1056,7 @@ private struct NoopAttendanceCard: View {
                     key("No record", color: Color.white.opacity(0.06))
                 }
                 Text("A fixed twelve-week view of the available record. Gaps mean no data was recorded.")
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(NoopHTMLColor.copy)
                     .noopA4LineBox(fontSize: 11.5, ratio: 1.55)
             }
@@ -1066,7 +1066,7 @@ private struct NoopAttendanceCard: View {
     private func key(_ title: String, color: Color) -> some View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 9, height: 9)
-            Text(title).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+            Text(title).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85))
         }
     }
 }
@@ -1110,16 +1110,16 @@ private struct NoopCapacityScreen: View {
                 NoopA4BackHeader(label: "Trends", action: navigation.back)
                 VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Capacity").font(NoopHTMLFont.outfit(25)).tracking(-0.6)
+                    Text("Capacity").font(NoopHTMLFont.outfit(NoopType.title2)).tracking(-0.6)
                     HStack(alignment: .firstTextBaseline, spacing: 9) {
                         Text(values.last.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? (live == nil ? "44.4" : "\u{2014}"))
                             .font(NoopHTMLFont.outfit200(54)).tracking(-2.43)
                             .frame(minHeight: 54)
-                        Text("ml/kg/min, estimated").font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        Text("ml/kg/min, estimated").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     }
                     if let read {
                     Text(read)
-                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         .noopA4LineBox(fontSize: 13.5, ratio: 1.6)
                     }
                 }
@@ -1159,9 +1159,9 @@ private struct NoopCapacityScreen: View {
                     }
 
                     VStack(alignment: .leading, spacing: 9) {
-                        Text("What would move it next").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                        Text("What would move it next").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         Text("One session a week with real intensity, on a day your readiness allows it. Everything else you are already doing. Noop will offer it when the morning agrees — it will not put it in a plan you then have to obey.")
-                            .font(NoopHTMLFont.sans(12.5)).foregroundStyle(Color(hex: 0xB4C9BE))
+                            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0xB4C9BE))
                             .noopA4LineBox(fontSize: 12.5, ratio: 1.6)
                     }
                     .padding(16)
@@ -1169,7 +1169,7 @@ private struct NoopCapacityScreen: View {
                     .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopA4.green.opacity(0.2), lineWidth: 0.5))
 
                     Text("Estimated from resting pulse, recovery after effort and the pace you hold at a given heart rate. It is a direction with an error bar, not a laboratory figure.")
-                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
                         .noopA4LineBox(fontSize: 11.5, ratio: 1.6).padding(.horizontal, 2)
                 }
                 }
@@ -1181,7 +1181,7 @@ private struct NoopCapacityScreen: View {
     private func capacityFactor(_ title: String, value: String, progress: Double, note: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack { Text(title); Spacer(); Text(value).foregroundStyle(NoopHTMLColor.copy) }
-                .font(NoopHTMLFont.sans(13))
+                .font(NoopHTMLFont.sans(NoopType.footnote))
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.07))
@@ -1191,7 +1191,7 @@ private struct NoopCapacityScreen: View {
                 }
             }
             .frame(height: 6)
-            Text(note).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+            Text(note).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                 .noopA4LineBox(fontSize: 11.5, ratio: 1.5)
         }
     }
@@ -1232,11 +1232,11 @@ private struct NoopRhythmScreen: View {
                 NoopA4BackHeader(label: navigation.previousScreenTitle ?? "Trends", action: navigation.back)
                 VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Rhythm").font(NoopHTMLFont.outfit(25)).tracking(-0.6)
+                    Text("Rhythm").font(NoopHTMLFont.outfit(NoopType.title2)).tracking(-0.6)
                     Text(sleep.isEmpty ? "" : live == nil
                          ? "Average nightly sleep is \(formattedSleep), against a need of \(needText). The average is the less interesting half of this screen."
                          : "Average of the recorded weekly sleep durations: \(formattedSleep). The dashed line below is the app's sleep planning target, not a measured personal requirement.")
-                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         .noopA4LineBox(fontSize: 13.5, ratio: 1.6)
                 }
 
@@ -1247,13 +1247,13 @@ private struct NoopRhythmScreen: View {
                                          : (isNightWorker ? "Main sleep against target" : "Sleep against target"))
                         Spacer()
                         Text("\(live == nil ? "need" : "target") \(needText)")
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                     }
                     NoopA4SleepChart(chart: sleepChart, need: needHours)
                         .frame(height: 112)
                     axis
                     Text(live == nil ? "Grey dashes show the recorded mean; lavender dashes show your labelled sleep need. You have been over it more weeks than under it since April, which is the whole reason the other three lines moved." : "Dashes mark the app's sleep planning target.")
-                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                         .noopA4LineBox(fontSize: 11.5, ratio: 1.55)
                 }
                 .padding(.horizontal, 16)
@@ -1281,7 +1281,7 @@ private struct NoopRhythmScreen: View {
                                 ? "Each bar is how far that week’s main sleep moved from your anchor. On a rotating roster this is the only regularity available, and it is the one that counts."
                                 : "Each bar is how many minutes that week’s bedtime wandered from your own hour. Under half an hour is where your body stops noticing.")
                              : "Each bar is that week's average distance between sleep onset and the usual onset in this record.")
-                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                             .noopA4LineBox(fontSize: 11.5, ratio: 1.55)
                     }
                 }
@@ -1304,7 +1304,7 @@ private struct NoopRhythmScreen: View {
                 Text(live == nil
                      ? "Regularity beats duration in the long run. It is the one thing on this screen you can decide tonight."
                      : "These readings describe sleep timing and duration; they do not establish what caused changes in other readings.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
                     .noopA4LineBox(fontSize: 11.5, ratio: 1.6).padding(.horizontal, 2)
                 }
                 .padding(.top, 8)
@@ -1314,7 +1314,7 @@ private struct NoopRhythmScreen: View {
 
     private var axis: some View {
         HStack { ForEach(Array(axisLabels.enumerated()), id: \.offset) { i, label in Text(label); if i < axisLabels.count - 1 { Spacer() } } }
-            .font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
     }
 
     /// Consecutive weeks under thirty minutes of drift; the example's "11 weeks" in the demo.
@@ -1348,12 +1348,12 @@ private struct NoopRhythmScreen: View {
     private func rhythmRow(_ title: String, detail: String, value: String, warm: Bool = false) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(NoopHTMLFont.sans(13))
-                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote))
+                Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
             }
             Spacer()
             Text(value)
-                .font(NoopHTMLFont.outfit(19))
+                .font(NoopHTMLFont.outfit(NoopType.title3))
                 .foregroundStyle(warm ? Color(hex: 0xF3C888) : NoopHTMLColor.ink)
                 .monospacedDigit()
         }
@@ -1384,9 +1384,9 @@ private struct NoopYearScreen: View {
                 NoopA4BackHeader(label: "Trends", action: navigation.back)
                 VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("The year so far").font(NoopHTMLFont.outfit(25)).tracking(-0.6)
+                    Text("The year so far").font(NoopHTMLFont.outfit(NoopType.title2)).tracking(-0.6)
                     Text("Eight months in four chapters, written the way you would tell it to someone — not as a chart you have to interpret.")
-                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         .noopA4LineBox(fontSize: 13.5, ratio: 1.6)
                 }
 
@@ -1394,13 +1394,13 @@ private struct NoopYearScreen: View {
                     ForEach(Array(chapters.enumerated()), id: \.offset) { _, chapter in
                         VStack(alignment: .leading, spacing: 8) {
                                 HStack {
-                                    Text(chapter.0.uppercased()).font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.3).foregroundStyle(chapter.4)
+                                    Text(chapter.0.uppercased()).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.3).foregroundStyle(chapter.4)
                                     Spacer()
-                                    Text(chapter.1).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                                    Text(chapter.1).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                                 }
-                                Text(chapter.2).font(NoopHTMLFont.outfit(19)).tracking(-0.38)
+                                Text(chapter.2).font(NoopHTMLFont.outfit(NoopType.title3)).tracking(-0.38)
                                     .frame(minHeight: 22.8, alignment: .top)
-                                Text(chapter.3).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                                Text(chapter.3).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                                     .noopA4LineBox(fontSize: 12.5, ratio: 1.6)
                         }
                         .padding(.horizontal, 16)
@@ -1419,11 +1419,11 @@ private struct NoopYearScreen: View {
                                 HStack(alignment: .top, spacing: 11) {
                                     NoopCanonicalGlyph(name: firstGlyph(item.3), size: 17, color: NoopA4.green).frame(width: 18)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(item.0).font(NoopHTMLFont.sans(13))
-                                        Text(item.1).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                                        Text(item.0).font(NoopHTMLFont.sans(NoopType.footnote))
+                                        Text(item.1).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                                     }
                                     Spacer()
-                                    Text(item.2).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+                                    Text(item.2).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
                                 }
                             }
                         }
@@ -1433,7 +1433,7 @@ private struct NoopYearScreen: View {
                 VStack(alignment: .leading, spacing: 9) {
                     NoopSectionLabel("Svea", color: Color(hex: 0xC9D0EE))
                     Text("Nothing here happened because of a hard week. It happened because you went to bed at roughly the same hour for four months and walked most days. The interesting part is that your body is now good enough at recovering that it can take the harder sessions you have been avoiding.")
-                        .font(NoopHTMLFont.sans(14)).foregroundStyle(Color(hex: 0xDCE3E0))
+                        .font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(Color(hex: 0xDCE3E0))
                         .noopA4LineBox(fontSize: 14, ratio: 1.68)
                 }
                 .padding(16)
@@ -1441,7 +1441,7 @@ private struct NoopYearScreen: View {
                 .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopA4.lavender.opacity(0.2), lineWidth: 0.5))
 
                 Text("No year-in-review confetti, no personal bests you did not try for. A chapter only appears once there is enough of it to be true.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
                     .noopA4LineBox(fontSize: 11.5, ratio: 1.6).padding(.horizontal, 2)
                 }
                 .padding(.top, 8)
@@ -1477,7 +1477,7 @@ private struct NoopA4BackHeader: View {
             }
             .buttonStyle(NoopPlainHitStyle())
             Text(label)
-                .font(NoopHTMLFont.sans(13.5))
+                .font(NoopHTMLFont.sans(NoopType.footnote))
                 .foregroundStyle(NoopHTMLColor.copy)
             Spacer(minLength: 0)
         }
@@ -1517,7 +1517,7 @@ private struct NoopA4Chip: View {
 
     var body: some View {
         Text(text)
-            .font(NoopHTMLFont.sans(11, weight: .semibold))
+            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
             .foregroundStyle(color)
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
@@ -1535,7 +1535,7 @@ private struct NoopA4Axis: View {
                 if index < labels.count - 1 { Spacer() }
             }
         }
-        .font(NoopHTMLFont.sans(10.5))
+        .font(NoopHTMLFont.sans(NoopType.eyebrow))
         .foregroundStyle(NoopHTMLColor.faint)
     }
 }

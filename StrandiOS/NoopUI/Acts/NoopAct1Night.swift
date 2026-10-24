@@ -59,10 +59,10 @@ struct NoopAct1Screens: View {
                 HStack(alignment: .top, spacing: 14) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(restHeaderLabel)
-                            .font(NoopHTMLFont.sans(13.5))
+                            .font(NoopHTMLFont.sans(NoopType.footnote))
                             .foregroundStyle(NoopHTMLColor.copy)
                         Text("Rest")
-                            .font(NoopHTMLFont.outfit(23, weight: .regular))
+                            .font(NoopHTMLFont.outfit(NoopType.title3, weight: .regular))
                             .tracking(-0.46)
                             .frame(minHeight: 26.45, alignment: .top)
                     }
@@ -83,7 +83,7 @@ struct NoopAct1Screens: View {
                                 NoopSectionLabel("Against your need", color: Color(hex: 0x8B958F))
                                 Spacer()
                                 Text(restNight.map { "asleep \($0.asleepWindow)" } ?? selectedNight.window)
-                                    .font(NoopHTMLFont.sans(10.5))
+                                    .font(NoopHTMLFont.sans(NoopType.eyebrow))
                                     .foregroundStyle(NoopHTMLColor.faint)
                                     .monospacedDigit()
                             }
@@ -111,7 +111,7 @@ struct NoopAct1Screens: View {
 
                             HStack(spacing: 10) {
                                 Text(restRingRead)
-                                    .font(NoopHTMLFont.sans(12.5))
+                                    .font(NoopHTMLFont.sans(NoopType.caption))
                                     .foregroundStyle(NoopHTMLColor.inkSoft)
                                     .multilineTextAlignment(.leading)
                                 Spacer(minLength: 4)
@@ -197,23 +197,23 @@ struct NoopAct1Screens: View {
                             // the current sleep record has no in-bed start, so this is only a door.
                             if !activeBedtimes.isEmpty {
                             Text("Lights out by \(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].time)")
-                                .font(NoopHTMLFont.outfit(27, weight: .light))
+                                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
                                 .tracking(-0.675)
                                 .frame(minHeight: 29.7, alignment: .top)
                             Text(rest == nil && selectedBedtime == 2
                                  ? "Clears twenty minutes of debt before your \(alarmTime) alarm."
                                  : "\(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].length) before your \(alarmTime) alarm.")
-                                .font(NoopHTMLFont.sans(13))
+                                .font(NoopHTMLFont.sans(NoopType.footnote))
                                 .foregroundStyle(Color(hex: 0xB7C3C9))
                                 .noopAct1LineBox(fontSize: 13, ratio: 1.5)
                             } else if rest != nil && behavior.smartAlarmEnabled {
                                 // No bedtime to show, but an armed alarm is a decision already made.
                                 Text("Wake by \(alarmSetText)")
-                                    .font(NoopHTMLFont.outfit(27, weight: .light))
+                                    .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
                                     .tracking(-0.675)
                                     .frame(minHeight: 29.7, alignment: .top)
                                 Text("Armed on the strap.")
-                                    .font(NoopHTMLFont.sans(13))
+                                    .font(NoopHTMLFont.sans(NoopType.footnote))
                                     .foregroundStyle(Color(hex: 0xB7C3C9))
                                     .noopAct1LineBox(fontSize: 13, ratio: 1.5)
                             }
@@ -221,7 +221,7 @@ struct NoopAct1Screens: View {
                                 Text("Decide it")
                                 NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.blueInk)
                             }
-                            .font(NoopHTMLFont.sans(13, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                             .foregroundStyle(NoopHTMLColor.blueInk)
                             .padding(.horizontal, 14)
                             .frame(height: 38)
@@ -265,7 +265,7 @@ struct NoopAct1Screens: View {
                     if rest == nil || rest?.phase == .ready {
                         Text(rest == nil ? "dashes \u{2014} your own need, 7h 05m"
                              : "dashes \u{2014} your need, \(rest.map { NoopRestRecord.duration($0.needMin) } ?? "")")
-                            .font(NoopHTMLFont.sans(10.5))
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow))
                             .foregroundStyle(NoopHTMLColor.faint)
                     }
                 }
@@ -294,7 +294,7 @@ struct NoopAct1Screens: View {
                             } label: {
                                 VStack(spacing: 6) {
                                     Text(selected ? String(format: "%.1fh", night.value) : "")
-                                        .font(NoopHTMLFont.sans(11, weight: .semibold))
+                                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                                         .foregroundStyle(NoopHTMLColor.ink)
                                         .monospacedDigit()
                                         .frame(height: 18)
@@ -310,14 +310,14 @@ struct NoopAct1Screens: View {
                                         .overlay(alignment: .top) {
                                             if !selected, night.value >= 1.5 {
                                                 Text(String(format: "%.1f", night.value))
-                                                    .font(NoopHTMLFont.sans(10)).monospacedDigit()
+                                                    .font(NoopHTMLFont.sans(NoopType.eyebrow)).monospacedDigit()
                                                     .foregroundStyle(NoopHTMLColor.copy)
                                                     .padding(.top, 7)
                                             }
                                         }
                                         .shadow(color: selected ? Color(hex: 0x6E7DB8).opacity(0.35) : .clear, radius: 9, y: 5)
                                     Text(night.day)
-                                        .font(NoopHTMLFont.sans(11.5, weight: selected ? .semibold : .medium))
+                                        .font(NoopHTMLFont.sans(NoopType.caption, weight: selected ? .semibold : .medium))
                                         .foregroundStyle(selected ? NoopHTMLColor.ink : NoopHTMLColor.faint)
                                 }
                                 .frame(maxWidth: .infinity)
@@ -352,7 +352,7 @@ struct NoopAct1Screens: View {
                 NoopSectionLabel("In bed and asleep")
                 Spacer()
                 Text("\(Int((bed.efficiency * 100).rounded()))% of it asleep")
-                    .font(NoopHTMLFont.sans(10.5))
+                    .font(NoopHTMLFont.sans(NoopType.eyebrow))
                     .foregroundStyle(NoopHTMLColor.faint)
             }
 
@@ -387,7 +387,7 @@ struct NoopAct1Screens: View {
             }
 
             Text(inBedRead(bed))
-                .font(NoopHTMLFont.sans(12.5))
+                .font(NoopHTMLFont.sans(NoopType.caption))
                 .foregroundStyle(NoopHTMLColor.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -402,13 +402,13 @@ struct NoopAct1Screens: View {
     private func inBedFigure(_ label: String, _ value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(value)
-                .font(NoopHTMLFont.outfit(21, weight: .regular))
+                .font(NoopHTMLFont.outfit(NoopType.title3, weight: .regular))
                 .foregroundStyle(color)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text(label)
-                .font(NoopHTMLFont.sans(11))
+                .font(NoopHTMLFont.sans(NoopType.eyebrow))
                 .foregroundStyle(NoopHTMLColor.faint)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -417,11 +417,11 @@ struct NoopAct1Screens: View {
     private func inBedMoment(_ label: String, _ time: String, alignment: HorizontalAlignment) -> some View {
         VStack(alignment: alignment, spacing: 1) {
             Text(time)
-                .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                 .foregroundStyle(NoopHTMLColor.ink)
                 .monospacedDigit()
             Text(label)
-                .font(NoopHTMLFont.sans(10))
+                .font(NoopHTMLFont.sans(NoopType.eyebrow))
                 .foregroundStyle(NoopHTMLColor.faint)
         }
     }
@@ -444,7 +444,7 @@ struct NoopAct1Screens: View {
                     NoopSectionLabel("The shape of it")
                     Spacer()
                     Text(restNight?.window ?? (rest == nil ? selectedNight.window : ""))
-                        .font(NoopHTMLFont.sans(11))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .monospacedDigit()
                 }
@@ -452,7 +452,7 @@ struct NoopAct1Screens: View {
                 // approved template for a real night yet, so production omits it (listed for design).
                 if rest == nil {
                 Text(selectedNight.verdict)
-                    .font(NoopHTMLFont.sans(14))
+                    .font(NoopHTMLFont.sans(NoopType.subhead))
                     .foregroundStyle(NoopHTMLColor.ink)
                     .noopAct1LineBox(fontSize: 14, ratio: 1.5)
                 }
@@ -471,7 +471,7 @@ struct NoopAct1Screens: View {
                                 Text(restAxis[2]); Spacer()
                                 Text(restAxis[3])
                             }
-                            .font(NoopHTMLFont.sans(10.5)).monospacedDigit()
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).monospacedDigit()
                             .foregroundStyle(NoopHTMLColor.faint)
                         }
                     } else {
@@ -483,7 +483,7 @@ struct NoopAct1Screens: View {
                     Text(selectedStage == nil
                          ? restStageCaption
                          : "Showing \(["awake", "light", "REM", "deep"][selectedStage!]) only. Tap again to show all.")
-                        .font(NoopHTMLFont.sans(10.5))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, 4)
@@ -538,7 +538,7 @@ struct NoopAct1Screens: View {
                         .frame(height: 6)
                         Text(row.1).frame(width: 54, alignment: .trailing).foregroundStyle(NoopHTMLColor.ink)
                     }
-                    .font(NoopHTMLFont.sans(12, weight: selected ? .semibold : .regular))
+                    .font(NoopHTMLFont.sans(NoopType.caption, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? NoopHTMLColor.ink : NoopHTMLColor.copy)
                     .padding(.horizontal, 6)
                     .frame(height: 31)
@@ -558,11 +558,11 @@ struct NoopAct1Screens: View {
                 .frame(width: 16, height: 16)
                 .background(NoopHTMLColor.blue, in: Circle())
             Text(savedJournalSummary)
-                .font(NoopHTMLFont.sans(12.5))
+                .font(NoopHTMLFont.sans(NoopType.caption))
                 .foregroundStyle(NoopHTMLColor.inkSoft)
             Spacer()
             Button("Edit") { navigation.show(.nightJournal) }
-                .font(NoopHTMLFont.sans(12, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                 .foregroundStyle(NoopHTMLColor.blue)
         }
         .padding(.horizontal, 16)
@@ -600,7 +600,7 @@ struct NoopAct1Screens: View {
                 if !activeBedtimes.isEmpty {
                     VStack(spacing: 9) {
                         Text("LIGHTS OUT BY")
-                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             .tracking(1.25)
                             .foregroundStyle(NoopHTMLColor.muted)
                         Text(activeBedtimes[selectedBedtime].time)
@@ -610,7 +610,7 @@ struct NoopAct1Screens: View {
                             .frame(minHeight: 77.08, alignment: .top)
                             .offset(y: -13)
                         Text("\(activeBedtimes[selectedBedtime].length) before your \(alarmTime) alarm")
-                            .font(NoopHTMLFont.sans(14))
+                            .font(NoopHTMLFont.sans(NoopType.subhead))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .monospacedDigit()
                     }
@@ -629,10 +629,10 @@ struct NoopAct1Screens: View {
                                 } label: {
                                     VStack(spacing: 4) {
                                         Text(stop.time)
-                                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                             .foregroundStyle(selected ? NoopHTMLColor.ink : NoopHTMLColor.copy)
                                         Text(stop.length)
-                                            .font(NoopHTMLFont.sans(10))
+                                            .font(NoopHTMLFont.sans(NoopType.eyebrow))
                                             .foregroundStyle(selected ? NoopHTMLColor.blue : NoopHTMLColor.faint)
                                     }
                                     .padding(.horizontal, 4)
@@ -689,10 +689,10 @@ struct NoopAct1Screens: View {
                                 NoopCanonicalGlyph(name: .alarm, size: 21, color: NoopHTMLColor.night)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text("Wake me by \(alarmSetText)")
-                                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                         .foregroundStyle(alarmArmed ? Color(hex: 0xEDF1EF) : Color(hex: 0xEDF1EF).opacity(0.38))
                                     Text(alarmArmed ? alarmFromText : "Not armed")
-                                        .font(NoopHTMLFont.sans(11.5))
+                                        .font(NoopHTMLFont.sans(NoopType.caption))
                                         .foregroundStyle(Color(hex: 0x6C7570))
                                         .lineSpacing(NoopSpecType.lineSpacing(size: 11.5, cssLineHeight: 1.45, face: NoopSpecType.Face.sansRegular))
                                         .fixedSize(horizontal: false, vertical: true)
@@ -741,11 +741,11 @@ struct NoopAct1Screens: View {
                             HStack(spacing: 12) {
                                 Act1CheckDisc(size: 18)
                                 Text("Set — lights out \(activeBedtimes[selectedBedtime].time)\(windDownBuzz ? ", buzz at \(windDownTime)" : ", no wind-down buzz")")
-                                    .font(NoopHTMLFont.sans(13.5))
+                                    .font(NoopHTMLFont.sans(NoopType.footnote))
                                     .foregroundStyle(NoopHTMLColor.inkSoft)
                                 Spacer()
                                 Button("Change") { bedtimeCommitted = false }
-                                    .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                                     .foregroundStyle(NoopHTMLColor.blue)
                             }
                             .padding(.horizontal, 18)
@@ -755,7 +755,7 @@ struct NoopAct1Screens: View {
                             .padding(.top, 4)
                         } else {
                             Button("Set tonight") { bedtimeCommitted = true }
-                                .font(NoopHTMLFont.sans(15, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.blueInk)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 54)
@@ -765,7 +765,7 @@ struct NoopAct1Screens: View {
                         }
 
                         Text("\(rhythmLine) Nothing here is a target — miss it and the next read simply says you missed it.")
-                            .font(NoopHTMLFont.sans(11.5))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.faint)
                             .noopAct1LineBox(fontSize: 11.5, ratio: 1.6)
                             .multilineTextAlignment(.center)
@@ -780,17 +780,17 @@ struct NoopAct1Screens: View {
     private func tonightReason(_ title: String, note: String, value: String, blue: Bool = false) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                 if !note.isEmpty {
                 Text(note)
-                    .font(NoopHTMLFont.sans(12))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(NoopHTMLColor.copy)
                     .noopAct1LineBox(fontSize: 12, ratio: 1.5)
                 }
             }
             Spacer(minLength: 6)
             Text(value)
-                .font(NoopHTMLFont.outfit(17))
+                .font(NoopHTMLFont.outfit(NoopType.body))
                 .foregroundStyle(blue ? NoopHTMLColor.blue : NoopHTMLColor.faint)
         }
         .frame(minHeight: 68)
@@ -801,11 +801,11 @@ struct NoopAct1Screens: View {
             NoopCanonicalGlyph(name: glyph, size: 21, color: NoopHTMLColor.night)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.88)
                     .allowsTightening(true)
-                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.muted)
+                Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
             }
             Spacer(minLength: 4)
             Act1Toggle(isOn: isOn, action: action)
@@ -827,7 +827,7 @@ struct NoopAct1Screens: View {
                             .frame(width: 22, height: 22)
                             .shadow(color: NoopHTMLColor.blue.opacity(0.5), radius: 6)
                         Text("SVEA")
-                            .font(NoopHTMLFont.sans(11, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                             .tracking(1.43)
                             .foregroundStyle(NoopHTMLColor.muted)
                     }
@@ -838,7 +838,7 @@ struct NoopAct1Screens: View {
                         .tracking(-0.29)
                         .noopAct1LineBox(fontSize: 29, ratio: 1.22)
                     Text(whyParagraphOneDisplay)
-                        .font(NoopHTMLFont.sans(14.5))
+                        .font(NoopHTMLFont.sans(NoopType.subhead))
                         .foregroundStyle(Color(hex: 0xB7C3C9))
                         .tracking(-0.25)
                         .noopAct1LineBox(fontSize: 14.5, ratio: 1.68)
@@ -854,7 +854,7 @@ struct NoopAct1Screens: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("WHAT THE NIGHT WAS MADE OF")
-                        .font(NoopHTMLFont.sans(10, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                         .tracking(1.3)
                         .foregroundStyle(NoopHTMLColor.muted)
                         .padding(.leading, 2)
@@ -874,7 +874,7 @@ struct NoopAct1Screens: View {
                             Text("Take this into tonight")
                             NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.blue)
                         }
-                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blue)
                         .padding(.horizontal, 17)
                         .padding(.vertical, 12)
@@ -883,7 +883,7 @@ struct NoopAct1Screens: View {
                     }
                     .buttonStyle(NoopHTMLPressStyle())
                 }
-                .font(NoopHTMLFont.sans(11.5))
+                .font(NoopHTMLFont.sans(NoopType.caption))
                 .foregroundStyle(NoopHTMLColor.faint)
                 .padding(.top, 18)
                 .padding(.horizontal, 2)
@@ -907,12 +907,12 @@ struct NoopAct1Screens: View {
                                 .frame(width: 17, height: 17)
                         )
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(cause.title).font(NoopHTMLFont.sans(13.5, weight: .semibold))
-                        Text(cause.meta).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                        Text(cause.title).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                        Text(cause.meta).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                     }
                     Spacer(minLength: 4)
                     Text(cause.effect)
-                        .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(cause.good ? NoopHTMLColor.blueLight : Color(hex: 0xF3C888))
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
@@ -924,7 +924,7 @@ struct NoopAct1Screens: View {
                 if open {
                     VStack(alignment: .leading, spacing: 11) {
                         Text(cause.detail)
-                            .font(NoopHTMLFont.sans(13))
+                            .font(NoopHTMLFont.sans(NoopType.footnote))
                             .foregroundStyle(Color(hex: 0xB7C3C9))
                             .noopAct1LineBox(fontSize: 13, ratio: 1.62)
                         if cause.hasTemperatureChart {
@@ -937,7 +937,7 @@ struct NoopAct1Screens: View {
                                     Text(selectedNight.warmestLabel); Spacer()
                                     Text(selectedNight.axis[3])
                                 }
-                                .font(NoopHTMLFont.sans(10.5))
+                                .font(NoopHTMLFont.sans(NoopType.eyebrow))
                                 .foregroundStyle(NoopHTMLColor.faint)
                             }
                         }
@@ -973,10 +973,10 @@ struct NoopAct1Screens: View {
                                 debtPoint = nil
                             } label: {
                                 Text(item)
-                                    .font(NoopHTMLFont.sans(12.5, weight: selected ? .semibold : .medium))
+                                    .font(NoopHTMLFont.sans(NoopType.caption, weight: selected ? .semibold : .medium))
                                     .foregroundStyle(selected ? Color(hex: 0x0D1120) : NoopHTMLColor.copy)
                                     .frame(maxWidth: .infinity)
-                                    .frame(minHeight: 38)
+                                    .frame(minHeight: 40)
                                     .background(selected ? NoopHTMLColor.night : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 13))
                                     .overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? .clear : Color.white.opacity(0.07), lineWidth: 0.5))
                             }
@@ -993,12 +993,12 @@ struct NoopAct1Screens: View {
                                 .frame(width: 163, height: 52, alignment: .topLeading)
                                 .offset(x: 2, y: -3)
                             Text("behind")
-                                .font(NoopHTMLFont.sans(13))
+                                .font(NoopHTMLFont.sans(NoopType.footnote))
                                 .foregroundStyle(NoopHTMLColor.copy)
                         }
                         Text(rest == nil ? "against your own need of 7h 05m a night"
                              : "against your need of \(rest.map { NoopRestRecord.duration($0.needMin) } ?? "") a night")
-                            .font(NoopHTMLFont.sans(13.5))
+                            .font(NoopHTMLFont.sans(NoopType.footnote))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .noopAct1LineBox(fontSize: 13.5, ratio: 1.55)
                     }
@@ -1019,7 +1019,7 @@ struct NoopAct1Screens: View {
                             Text(debtLabel(model.axis[2])); Spacer()
                             Text(debtLabel(model.axis[3]))
                         }
-                        .font(NoopHTMLFont.sans(10.5))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow))
                         .foregroundStyle(NoopHTMLColor.faint)
                     }
                     .padding(.horizontal, 16)
@@ -1032,11 +1032,11 @@ struct NoopAct1Screens: View {
                         ForEach(Array(model.stats.enumerated()), id: \.offset) { _, stat in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(stat.0.uppercased())
-                                    .font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                                    .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                                     .tracking(1.05)
                                     .foregroundStyle(NoopHTMLColor.muted)
                                 Text(stat.1)
-                                    .font(NoopHTMLFont.outfit(19))
+                                    .font(NoopHTMLFont.outfit(NoopType.title3))
                                     .monospacedDigit()
                             }
                             .padding(.horizontal, 15)
@@ -1057,12 +1057,12 @@ struct NoopAct1Screens: View {
                         ForEach(Array(Self.correlates.enumerated()), id: \.offset) { index, correlate in
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(correlate.0).font(NoopHTMLFont.sans(13.5))
-                                    Text(correlate.1).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                                    Text(correlate.0).font(NoopHTMLFont.sans(NoopType.footnote))
+                                    Text(correlate.1).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                                 }
                                 Spacer()
                                 Text(correlate.2)
-                                    .font(NoopHTMLFont.outfit(17))
+                                    .font(NoopHTMLFont.outfit(NoopType.body))
                                     .foregroundStyle(correlate.3 ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue)
                             }
                             .frame(minHeight: 58)
@@ -1075,7 +1075,7 @@ struct NoopAct1Screens: View {
                     .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
 
                     Text(model.read)
-                        .font(NoopHTMLFont.sans(14))
+                        .font(NoopHTMLFont.sans(NoopType.subhead))
                         .foregroundStyle(Color(hex: 0xB7C3C9))
                         .noopAct1LineBox(fontSize: 14, ratio: 1.65)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1093,13 +1093,13 @@ struct NoopAct1Screens: View {
         let phrase = "0.4°C warmer"
         guard let range = selectedNight.whyParagraphTwo.range(of: phrase) else {
             return Text(selectedNight.whyParagraphTwo)
-                .font(NoopHTMLFont.sans(14.5))
+                .font(NoopHTMLFont.sans(NoopType.subhead))
         }
         let prefix = String(selectedNight.whyParagraphTwo[..<range.lowerBound])
         let suffix = String(selectedNight.whyParagraphTwo[range.upperBound...])
-        return Text(prefix).font(NoopHTMLFont.sans(14.5))
+        return Text(prefix).font(NoopHTMLFont.sans(NoopType.subhead))
             + Text(phrase).font(NoopHTMLFont.serif(16, italic: true))
-            + Text(suffix).font(NoopHTMLFont.sans(14.5))
+            + Text(suffix).font(NoopHTMLFont.sans(NoopType.subhead))
     }
 
     /// Chromium's `text-wrap: pretty` keeps this final phrase together. SwiftUI uses a
@@ -1251,7 +1251,7 @@ struct NoopAct1Screens: View {
                     .padding(.vertical, 18)
             } else {
                 Text("No night recorded. The strap needs to be worn while you sleep.")
-                    .font(NoopHTMLFont.sans(13.5))
+                    .font(NoopHTMLFont.sans(NoopType.footnote))
                     .foregroundStyle(NoopHTMLColor.faint)
                     .noopAct1LineBox(fontSize: 13.5, ratio: 1.5)
             }
@@ -1362,7 +1362,7 @@ struct NoopAct1Screens: View {
                         Text(rest != nil
                             ? "Exact means exact — the strap wakes you at \(alarmSetText) whatever stage you are in. An earlier window needs light-sleep timing the strap does not give yet."
                             : "Fifteen minutes is enough to find light sleep on most nights. Exact means exact — it wakes you at \(alarmSetText) whatever stage you are in.")
-                            .font(NoopHTMLFont.sans(11.5))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                             .lineSpacing(NoopSpecType.lineSpacing(size: 11.5, cssLineHeight: 1.55, face: NoopSpecType.Face.sansRegular))
                             .fixedSize(horizontal: false, vertical: true)
@@ -1385,7 +1385,7 @@ struct NoopAct1Screens: View {
     private var alarmHero: some View {
         VStack(spacing: 8) {
             Text("Wake me by")
-                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                 .tracking(1.25)           // .1em x 12.5
                 .textCase(.uppercase)
                 .foregroundStyle(Color(hex: 0x6C7570))
@@ -1393,7 +1393,7 @@ struct NoopAct1Screens: View {
             // The block is centred; the sentence itself sets left, as in the HTML, so a wrap
             // reads as a paragraph rather than a centred couplet.
             Text(alarmFromText)
-                .font(NoopHTMLFont.sans(14))
+                .font(NoopHTMLFont.sans(NoopType.subhead))
                 .monospacedDigit()
                 .foregroundStyle(NoopHTMLColor.muted)
                 .multilineTextAlignment(.leading)
@@ -1438,7 +1438,7 @@ struct NoopAct1Screens: View {
         let mask = Array(alarmDayMask.padding(toLength: 7, withPad: "0", startingAt: 0))
         return VStack(alignment: .leading, spacing: 11) {
             Text("Which days")
-                .font(NoopHTMLFont.sans(10, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                 .tracking(1.2)
                 .textCase(.uppercase)
                 .foregroundStyle(Color(hex: 0x6C7570))
@@ -1461,7 +1461,7 @@ struct NoopAct1Screens: View {
                         alarmDayMask = String(next)
                     } label: {
                         Text(label)
-                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             .foregroundStyle(on ? Color(hex: 0xC9CEE8) : NoopHTMLColor.muted)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 42)
@@ -1483,7 +1483,7 @@ struct NoopAct1Screens: View {
     private var alarmWindowPicker: some View {
         VStack(alignment: .leading, spacing: 11) {
             Text("How early it may wake you")
-                .font(NoopHTMLFont.sans(10, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                 .tracking(1.2)
                 .textCase(.uppercase)
                 .foregroundStyle(Color(hex: 0x6C7570))
@@ -1495,10 +1495,10 @@ struct NoopAct1Screens: View {
                     Button { if rest == nil { alarmWindowIndex = index } } label: {
                         VStack(spacing: 2) {
                             Text(window == 0 ? "Exact" : "\(window) min")
-                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                                 .foregroundStyle(on ? Color(hex: 0xC9CEE8) : NoopHTMLColor.muted)
                             Text(window == 0 ? alarmSetText : "from \(alarmClock(alarmSetMinutes - window))")
-                                .font(NoopHTMLFont.sans(10))
+                                .font(NoopHTMLFont.sans(NoopType.eyebrow))
                                 .monospacedDigit()
                                 .foregroundStyle(NoopHTMLColor.faint)
                         }
@@ -1527,10 +1527,10 @@ struct NoopAct1Screens: View {
     private var alarmStrapCard: some View {
         VStack(alignment: .leading, spacing: 9) {
             Text("It runs on the strap, not the phone")
-                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                 .foregroundStyle(Color(hex: 0xEDF1EF))
             Text(alarmStrapCopy)
-                .font(NoopHTMLFont.sans(12.5))
+                .font(NoopHTMLFont.sans(NoopType.caption))
                 .foregroundStyle(Color(hex: 0xC9CEE8))
                 .lineSpacing(NoopSpecType.lineSpacing(size: 12.5, cssLineHeight: 1.6, face: NoopSpecType.Face.sansRegular))
                 .fixedSize(horizontal: false, vertical: true)
@@ -1542,10 +1542,10 @@ struct NoopAct1Screens: View {
                 )) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Let the 5.0 try")
-                            .font(NoopHTMLFont.sans(13, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                             .foregroundStyle(Color(hex: 0xEDF1EF))
                         Text("Experimental. Keep a phone alarm for anything you cannot miss.")
-                            .font(NoopHTMLFont.sans(11.5))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.copy)
                     }
                 }
@@ -1596,13 +1596,13 @@ struct NoopAct1Screens: View {
         ]
         return VStack(alignment: .leading, spacing: 10) {
             Text("When it will not fire")
-                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                 .foregroundStyle(Color(hex: 0xEDF1EF))
             ForEach(Array(failures.enumerated()), id: \.offset) { index, line in
                 HStack(alignment: .firstTextBaseline, spacing: 11) {
                     Circle().fill(Color(hex: 0xC8934B)).frame(width: 5, height: 5)
                     Text(line)
-                        .font(NoopHTMLFont.sans(12.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(NoopSpecType.lineSpacing(size: 12.5, cssLineHeight: 1.55, face: NoopSpecType.Face.sansRegular))
                         .fixedSize(horizontal: false, vertical: true)
@@ -1638,7 +1638,7 @@ struct NoopAct1Screens: View {
             navigation.back(or: .tonight)
         } label: {
             Text(alarmArmed ? "Armed · back to tonight" : "Arm it for tonight")
-                .font(NoopHTMLFont.sans(15, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                 .foregroundStyle(alarmArmed ? Color(hex: 0xC9CEE8) : Color(hex: 0x12142B))
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 54)
@@ -1724,7 +1724,7 @@ private struct Act1BackHeader: View {
             }
             .buttonStyle(NoopPlainHitStyle())
             Text(label)
-                .font(NoopHTMLFont.sans(13.5))
+                .font(NoopHTMLFont.sans(NoopType.footnote))
                 .foregroundStyle(NoopHTMLColor.copy)
             Spacer(minLength: 0)
         }
@@ -1746,11 +1746,11 @@ private struct Act1LinkRow: View {
                 NoopCanonicalGlyph(name: glyph, size: 21, color: NoopHTMLColor.night)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.ink)
                     if let detail {
                         Text(detail)
-                            .font(NoopHTMLFont.sans(12))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .noopAct1LineBox(fontSize: 12, ratio: 1.5)
                             .multilineTextAlignment(.leading)
@@ -1798,7 +1798,7 @@ private struct Act1Toggle: View {
                     .overlay(Capsule().stroke(Color.white.opacity(isOn ? 0.14 : 0.16), lineWidth: 0.5))
                 Circle()
                     .fill(NoopHTMLColor.ink)
-                    .frame(width: 24, height: 24)
+                    .frame(width: 32, height: 32).noopHitTarget()
                     .padding(2)
                     .shadow(color: .black.opacity(0.45), radius: 1.5, y: 1)
             }
@@ -1881,12 +1881,12 @@ private struct Act1SleepRing: View {
                         .offset(y: -8)
                         .shadow(color: .black.opacity(0.6), radius: 12, y: 2)
                     Text("ASLEEP")
-                        .font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                         .tracking(2.1)
                         .foregroundStyle(Color(hex: 0x93A0A6))
                         .padding(.top, 8)
                     Text(delta)
-                        .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(deltaCloses ? NoopHTMLColor.blueLight : NoopHTMLColor.inkSoft)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -1898,7 +1898,7 @@ private struct Act1SleepRing: View {
 
                 if let needCaption {
                     Text(needCaption)
-                        .font(NoopHTMLFont.sans(10.5))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow))
                         .foregroundStyle(NoopHTMLColor.faint)
                         // Measured against the final HTML at 402 × 874: the caption's centre sits 19 pt
                         // below the ring box, just above the read-out card.
@@ -2160,10 +2160,10 @@ private struct Act1DebtChart: View {
 
                 VStack(spacing: 1) {
                     Text(day)
-                        .font(NoopHTMLFont.sans(10.5))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow))
                         .foregroundStyle(NoopHTMLColor.copy)
                     Text(value)
-                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.ink)
                         .monospacedDigit()
                 }

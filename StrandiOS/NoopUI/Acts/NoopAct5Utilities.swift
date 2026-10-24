@@ -44,10 +44,10 @@ struct NoopUtilityPage<Content: View>: View {
                     .padding(.bottom, -10)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(title)
-                        .font(NoopHTMLFont.outfit(25)).tracking(-0.6)
+                        .font(NoopHTMLFont.outfit(NoopType.title2)).tracking(-0.6)
                         .foregroundStyle(NoopHTMLColor.ink)
                     Text(lead)
-                        .font(NoopHTMLFont.sans(13.5)).tracking(-0.15)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).tracking(-0.15)
                         .foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -71,7 +71,7 @@ private struct NoopUtilityCard<Content: View>: View {
                         if let label { NoopSectionLabel(label) }
                         Spacer()
                         if let trailing {
-                            Text(trailing).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                            Text(trailing).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                         }
                     }
                 }
@@ -91,15 +91,15 @@ private struct NoopUtilityRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                 if let detail {
-                    Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                         .lineSpacing(2).fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: 8)
             if let value {
-                Text(value).font(NoopHTMLFont.outfit(16)).monospacedDigit().foregroundStyle(valueTint)
+                Text(value).font(NoopHTMLFont.outfit(NoopType.body)).monospacedDigit().foregroundStyle(valueTint)
             }
         }
         .padding(.vertical, 4)
@@ -110,7 +110,7 @@ struct NoopUtilityNote: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
             .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 2)
     }
@@ -124,7 +124,7 @@ struct NoopUtilityButton: View {
     var body: some View {
         Button(action: action) {
             Text(busy ? "Working…" : title)
-                .font(NoopHTMLFont.sans(14, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                 .foregroundStyle(NoopHTMLColor.inkSoft)
                 .frame(maxWidth: .infinity).frame(minHeight: 50)
                 .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
@@ -162,13 +162,13 @@ private struct NoopHowItWorksPage: View {
             ForEach(sections, id: \.0) { section in
                 NoopUtilityCard(label: section.0, trailing: section.2) {
                     Text(section.1)
-                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                 }
             }
             NoopUtilityCard(label: "Where a number comes from") {
                 Text("A badge says whether a figure was scored on this phone, or imported from WHOOP or Apple Health. When Noop cannot compute something honestly it shows a dash and says what is missing, rather than a number it had to make up.")
-                    .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -200,11 +200,11 @@ private struct NoopStrapLimitsPage: View {
                     Text("4.0").frame(width: 62)
                     Text("5.0 / MG").frame(width: 70)
                 }
-                .font(NoopHTMLFont.sans(10.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.faint)
+                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.faint)
                 ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                     if index > 0 { noopDivider() }
                     HStack {
-                        Text(row.0).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                        Text(row.0).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         mark(row.1).frame(width: 62)
                         mark(row.2).frame(width: 70)
@@ -222,14 +222,14 @@ private struct NoopStrapLimitsPage: View {
 
     private func mark(_ reach: Reach) -> some View {
         Text(reach == .full ? "yes" : reach == .partial ? "partly" : "no")
-            .font(NoopHTMLFont.sans(11, weight: .semibold))
+            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
             .foregroundStyle(reach == .full ? NoopHTMLColor.green : reach == .partial ? NoopHTMLColor.warm : NoopHTMLColor.faint)
     }
 
     private func legend(_ reach: Reach, _ text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             mark(reach).frame(width: 44, alignment: .leading)
-            Text(text).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+            Text(text).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -291,11 +291,11 @@ private struct NoopShortcutExportPage: View {
             if enabled {
                 NoopUtilityCard(label: "When the files went empty") {
                     Text("Rewinds the export so the files offer the past seven days again — for when your Shortcut never read them, or you changed it.")
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                     NoopUtilityButton(title: "Re-export the last 7 days", busy: rebuilding) { rebuild() }
                     if let message {
-                        Text(message).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.green)
+                        Text(message).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.green)
                     }
                 }
             }
@@ -353,7 +353,7 @@ private struct NoopStoragePage: View {
                 }
             }
             if let cleaned {
-                Text(cleaned).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.green).padding(.horizontal, 2)
+                Text(cleaned).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.green).padding(.horizontal, 2)
             }
             NoopUtilityNote(text: "Clearing never touches your record. Deleting the record itself lives under Data and permissions, behind its own confirmation.")
         }
@@ -396,7 +396,7 @@ private struct NoopDigestPage: View {
             NoopUtilityCard(label: "This week", trailing: "\(digest.daysWithData) of 7 days measured") {
                 if metrics.isEmpty {
                     Text("Nothing measured this week yet.")
-                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                 } else {
                     ForEach(Array(metrics.enumerated()), id: \.offset) { index, m in
                         if index > 0 { noopDivider() }
@@ -409,7 +409,7 @@ private struct NoopDigestPage: View {
             if !focal.isEmpty {
                 NoopUtilityCard(label: "Worth noticing") {
                     ForEach(focal, id: \.self) { line in
-                        Text(line).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        Text(line).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                             .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -458,7 +458,7 @@ private struct NoopFusedPage: View {
             } else {
                 NoopUtilityCard {
                     Text(record == nil ? "Reading today’s sources…" : "No source has reported anything for today yet.")
-                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                 }
             }
             NoopUtilityNote(text: "When two sources disagree Noop keeps the one it trusts more for that reading — the strap over a phone estimate — and says so here. Nothing is averaged into a number neither source measured.")
@@ -529,9 +529,9 @@ struct NoopTrendsReportPage: View {
                 ForEach([ReportRange.days30, .days90, .days180, .days365], id: \.self) { option in
                     Button { range = option } label: {
                         Text(option.label)
-                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             .foregroundStyle(option == range ? NoopHTMLColor.blushInk : NoopHTMLColor.inkSoft)
-                            .frame(maxWidth: .infinity).frame(minHeight: 36)
+                            .frame(maxWidth: .infinity).frame(minHeight: 40)
                             .background(option == range ? NoopHTMLColor.blush : Color.white.opacity(0.05),
                                         in: RoundedRectangle(cornerRadius: 12))
                     }
@@ -566,11 +566,11 @@ struct NoopReportBody: View {
         VStack(alignment: .leading, spacing: 13) {
             if forPrint {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Noop Aura · Trends report").font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                    Text("Noop Aura · Trends report").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                         .tracking(1.2).textCase(.uppercase).foregroundStyle(NoopHTMLColor.faint)
-                    Text(rangeName).font(NoopHTMLFont.outfit(25)).tracking(-0.6)
+                    Text(rangeName).font(NoopHTMLFont.outfit(NoopType.title2)).tracking(-0.6)
                     Text("\(report.start) → \(report.end) · \(report.totalDays) days")
-                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 }
             }
             NoopHTMLCard(radius: 22, padding: 16) {
@@ -578,24 +578,24 @@ struct NoopReportBody: View {
                     HStack {
                         NoopSectionLabel(forPrint ? "Readings" : rangeName)
                         Spacer()
-                        Text("first half → second half").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                        Text("first half → second half").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                     }
                     if shown.isEmpty {
                         Text("Nothing was measured in this window.")
-                            .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                            .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     }
                     ForEach(Array(shown.enumerated()), id: \.offset) { index, stat in
                         if index > 0 { Divider().overlay(NoopHTMLColor.border) }
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(Self.label(stat.metric)).font(NoopHTMLFont.sans(13.5))
+                                Text(Self.label(stat.metric)).font(NoopHTMLFont.sans(NoopType.footnote))
                                 Text("\(Self.value(stat.min.value, stat.metric)) – \(Self.value(stat.max.value, stat.metric)) · \(stat.n) days")
-                                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                             }
                             Spacer(minLength: 8)
                             VStack(alignment: .trailing, spacing: 3) {
-                                Text(Self.value(stat.mean, stat.metric)).font(NoopHTMLFont.outfit(17)).monospacedDigit()
-                                Text(Self.trend(stat)).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+                                Text(Self.value(stat.mean, stat.metric)).font(NoopHTMLFont.outfit(NoopType.body)).monospacedDigit()
+                                Text(Self.trend(stat)).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85))
                             }
                         }
                         .padding(.vertical, 3)
@@ -609,7 +609,7 @@ struct NoopReportBody: View {
                     VStack(alignment: .leading, spacing: 8) {
                         NoopSectionLabel("Worth noticing")
                         ForEach(headlines, id: \.self) { line in
-                            Text(line).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                            Text(line).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                                 .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -677,8 +677,8 @@ struct NoopHydrationPage: View {
                         navigation: navigation) {
             NoopUtilityCard(label: "Today", trailing: "goal \(Self.litres(Double(goal)))") {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(Self.litres(total)).font(NoopHTMLFont.outfit(34, weight: .light)).monospacedDigit()
-                    Text("of \(Self.litres(Double(goal)))").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(Self.litres(total)).font(NoopHTMLFont.outfit(NoopType.title1, weight: .light)).monospacedDigit()
+                    Text("of \(Self.litres(Double(goal)))").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
@@ -692,7 +692,7 @@ struct NoopHydrationPage: View {
                     ForEach([250, 330, 500], id: \.self) { ml in
                         Button { Task { await log(ml) } } label: {
                             Text("+\(ml) ml")
-                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.blueInk)
                                 .frame(maxWidth: .infinity).frame(minHeight: 40)
                                 .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 13))
@@ -707,13 +707,13 @@ struct NoopHydrationPage: View {
                         if index > 0 { noopDivider() }
                         HStack {
                             Text(entry.loggedAt.formatted(date: .omitted, time: .shortened))
-                                .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                             Spacer()
-                            Text("\(entry.amountMl) ml").font(NoopHTMLFont.outfit(16)).monospacedDigit()
+                            Text("\(entry.amountMl) ml").font(NoopHTMLFont.outfit(NoopType.body)).monospacedDigit()
                             Button { Task { await remove(entry) } } label: {
                                 Image(systemName: "xmark").font(.system(size: 10, weight: .semibold))
                                     .foregroundStyle(NoopHTMLColor.faint)
-                                    .frame(width: 30, height: 30)
+                                    .frame(width: 32, height: 32).noopHitTarget()
                             }
                             .buttonStyle(NoopHTMLPressStyle())
                             .accessibilityLabel("Remove \(entry.amountMl) millilitres")
@@ -730,7 +730,7 @@ struct NoopHydrationPage: View {
                                 RoundedRectangle(cornerRadius: 3)
                                     .fill(point.value >= Double(goal) ? NoopHTMLColor.blue : Color.white.opacity(0.18))
                                     .frame(height: max(2, CGFloat(point.value / top) * 70))
-                                Text(String(point.day.suffix(2))).font(NoopHTMLFont.sans(10)).foregroundStyle(NoopHTMLColor.faint)
+                                Text(String(point.day.suffix(2))).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                             }
                             .frame(maxWidth: .infinity)
                         }

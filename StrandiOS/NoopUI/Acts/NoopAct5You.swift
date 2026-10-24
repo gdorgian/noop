@@ -320,12 +320,12 @@ private extension NoopAct5Screens {
     func pageTitle(_ title: String, copy: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(NoopHTMLFont.outfit(25))
+                .font(NoopHTMLFont.outfit(NoopType.title2))
                 .tracking(-0.6)
                 .foregroundStyle(NoopHTMLColor.ink)
             if !copy.isEmpty {
                 Text(copy)
-                    .font(NoopHTMLFont.sans(13.5))
+                    .font(NoopHTMLFont.sans(NoopType.footnote))
                     .tracking(-0.15)
                     .foregroundStyle(NoopHTMLColor.copy)
                     .lineSpacing(4)
@@ -360,14 +360,14 @@ private extension NoopAct5Screens {
                         .frame(width: 21)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                     if let detail {
-                        Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                        Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
                     }
                 }
                 Spacer(minLength: 8)
                 if let value {
-                    Text(value).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(value).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 if action != nil { NoopChevron() }
             }
@@ -391,17 +391,17 @@ private extension NoopAct5Screens {
                     .frame(width: 21)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(NoopHTMLFont.sans(13.5))
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(NoopHTMLColor.ink)
                     Text(detail)
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Color(hex: 0x7F8A85))
                         .lineSpacing(2)
                 }
                 Spacer(minLength: 8)
                 if let value {
                     Text(value)
-                        .font(NoopHTMLFont.sans(12))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.copy)
                 }
                 NoopChevron()
@@ -416,8 +416,8 @@ private extension NoopAct5Screens {
         VStack(alignment: .leading, spacing: gate == nil ? 0 : 8) {
             HStack(spacing: 13) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
                 }
                 Spacer(minLength: 8)
                 if isLater(title) {
@@ -435,7 +435,7 @@ private extension NoopAct5Screens {
             .padding(.vertical, 13)
             if let gate {
                 Text(gate)
-                    .font(NoopHTMLFont.sans(11))
+                    .font(NoopHTMLFont.sans(NoopType.eyebrow))
                     .foregroundStyle(Color(hex: 0x8B92AE))
                     .lineSpacing(3)
                     .padding(.bottom, 13)
@@ -452,9 +452,9 @@ private extension NoopAct5Screens {
     ) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(title).font(NoopHTMLFont.sans(13.5))
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote))
                 Spacer()
-                Text(detail).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85)).multilineTextAlignment(.trailing)
+                Text(detail).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85)).multilineTextAlignment(.trailing)
             }
             HStack(spacing: 4) {
                 ForEach(choices, id: \.self) { choice in
@@ -481,10 +481,10 @@ private extension NoopAct5Screens {
                         }
                     } label: {
                         Text(choice)
-                            .font(NoopHTMLFont.sans(11.5, weight: selected ? .semibold : .regular))
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: selected ? .semibold : .regular))
                             .foregroundStyle(selected ? Self.blushLight : NoopHTMLColor.copy)
                             .frame(maxWidth: .infinity)
-                            .frame(minHeight: 32)
+                            .frame(minHeight: 36)
                             .background(selected ? tint.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11))
                             .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? tint.opacity(0.42) : .clear, lineWidth: 0.5))
                     }
@@ -514,7 +514,7 @@ private extension NoopAct5Screens {
                         Image(systemName: "gearshape")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(NoopHTMLColor.inkSoft)
-                            .frame(width: 38, height: 38)
+                            .frame(width: 40, height: 40)
                             .background(Color.white.opacity(0.06), in: Circle())
                             .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                     }
@@ -531,14 +531,14 @@ private extension NoopAct5Screens {
                                       photo: profile.avatarImage)
                         if let name = profile.displayName {
                             Text(name)
-                                .font(NoopHTMLFont.outfit(27, weight: .light))
+                                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
                                 .tracking(-0.8)
                         }
                         // The prototype's line goes on to claim how tightly the need has held; no
                         // template exists for that, so only the window and the need are stated.
                         if let onset = you.usualOnsetHour, let wake = you.usualWakeHour {
                             Text("Asleep \(NoopYouRecord.clock(onset)) \u{2192} \(NoopYouRecord.clock(wake)) \u{00B7} a \(NoopRestRecord.duration(you.needMin)) need")
-                                .font(NoopHTMLFont.sans(12.5))
+                                .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(Color(hex: 0x8B958F))
                                 .multilineTextAlignment(.center)
                                 .lineSpacing(3)
@@ -547,10 +547,10 @@ private extension NoopAct5Screens {
                     } else {
                     NoopBodyClock()
                     Text("Gabriel")
-                        .font(NoopHTMLFont.outfit(27, weight: .light))
+                        .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
                         .tracking(-0.8)
                     Text("Asleep 23:20 → 06:32 · a 7h 12m need, held to within nine minutes for 221 nights")
-                        .font(NoopHTMLFont.sans(12.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Color(hex: 0x8B958F))
                         .multilineTextAlignment(.center)
                         .lineSpacing(3)
@@ -607,7 +607,7 @@ private extension NoopAct5Screens {
                     }
 
                     Text("Noop is told six things about your body and works the rest out.")
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(4)
                         .padding(.horizontal, 2)
@@ -672,8 +672,8 @@ private extension NoopAct5Screens {
 
     func recordFact(_ value: String, _ label: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(value).font(NoopHTMLFont.outfit(17)).foregroundStyle(Self.blushLight).monospacedDigit()
-            if !label.isEmpty { Text(label).font(NoopHTMLFont.sans(10.5)).foregroundStyle(Color(hex: 0x8B958F)) }
+            Text(value).font(NoopHTMLFont.outfit(NoopType.body)).foregroundStyle(Self.blushLight).monospacedDigit()
+            if !label.isEmpty { Text(label).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x8B958F)) }
         }
         .lineLimit(1)
     }
@@ -713,8 +713,8 @@ private extension NoopAct5Screens {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(title).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
-                            Text(value).font(NoopHTMLFont.outfit(27, weight: .light)).tracking(-0.8).monospacedDigit()
+                            Text(title).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                            Text(value).font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).tracking(-0.8).monospacedDigit()
                         }
                         Spacer()
                         if let tag {
@@ -722,7 +722,7 @@ private extension NoopAct5Screens {
                         }
                     }
                     if let copy {
-                        Text(copy).font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                        Text(copy).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
                     }
                 }
             }
@@ -899,7 +899,7 @@ private struct NoopBodyClock: View {
 
     private func clockLabel(_ value: String, x: CGFloat, y: CGFloat) -> some View {
         Text(value)
-            .font(NoopHTMLFont.sans(9, weight: .semibold))
+            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
             .tracking(0.7)
             .foregroundStyle(Color(hex: 0x5A635F))
             .offset(x: x, y: y)
@@ -927,7 +927,7 @@ private extension NoopAct5Screens {
                                 if hasPhoto {
                                     Image(systemName: "person.crop.circle.fill").resizable().scaledToFit().foregroundStyle(Self.blushLight)
                                 } else {
-                                    Text("G").font(NoopHTMLFont.outfit(31, weight: .light)).foregroundStyle(Self.blushLight)
+                                    Text("G").font(NoopHTMLFont.outfit(NoopType.title1, weight: .light)).foregroundStyle(Self.blushLight)
                                 }
                             }
                             .frame(width: 68, height: 68)
@@ -948,7 +948,7 @@ private extension NoopAct5Screens {
 
                             VStack(spacing: 7) {
                                 Button(hasPhoto ? "Change photo" : "Choose photo") { hasPhoto = true }
-                                    .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                                     .foregroundStyle(Self.blushLight)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 40)
@@ -957,12 +957,12 @@ private extension NoopAct5Screens {
                                     .buttonStyle(NoopHTMLPressStyle())
                                 if hasPhoto {
                                     Button("Remove photo") { hasPhoto = false }
-                                        .font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x7F8A85)).frame(height: 32)
+                                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).frame(height: 32)
                                 }
                             }
                         }
                         Text("Optional. It stays on this phone and is never uploaded — Noop has no account to upload it to.")
-                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                     }
                     .padding(.vertical, 3.5)
                 }
@@ -973,9 +973,9 @@ private extension NoopAct5Screens {
                         Divider().overlay(NoopHTMLColor.border)
                         HStack(spacing: 13) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Sex").font(NoopHTMLFont.sans(13.5))
+                                Text("Sex").font(NoopHTMLFont.sans(NoopType.footnote))
                                 Text("used in the calorie and VO₂max models")
-                                    .font(NoopHTMLFont.sans(11))
+                                    .font(NoopHTMLFont.sans(NoopType.eyebrow))
                                     .foregroundStyle(Color(hex: 0x7F8A85))
                                     // Wraps as in the design rather than shrinking into "VO₂ma…".
                                     .fixedSize(horizontal: false, vertical: true)
@@ -1002,9 +1002,9 @@ private extension NoopAct5Screens {
                 }
 
                 VStack(alignment: .leading, spacing: 9) {
-                    Text("Why the waist is optional").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                    Text("Why the waist is optional").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                     Text("It adds an estimated VO₂max. It does not sharpen your body age — that model cancels the body term out — so Noop will not nag you for it.")
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(Color(hex: 0xC9BEC0)).lineSpacing(4)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0xC9BEC0)).lineSpacing(4)
                 }
                 .padding(16)
                 .background(Self.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
@@ -1044,7 +1044,7 @@ private extension NoopAct5Screens {
                         if let photo = profile.avatarImage {
                             photo.resizable().scaledToFill()
                         } else if let initials = NoopYouRecord.initials(profile.displayName) {
-                            Text(initials).font(NoopHTMLFont.outfit(31, weight: .light)).foregroundStyle(Self.blushLight)
+                            Text(initials).font(NoopHTMLFont.outfit(NoopType.title1, weight: .light)).foregroundStyle(Self.blushLight)
                         } else {
                             BrandMark(size: 30)
                         }
@@ -1057,7 +1057,7 @@ private extension NoopAct5Screens {
                     VStack(spacing: 7) {
                         PhotosPicker(selection: $photoItem, matching: .images) {
                             Text(profile.hasAvatar ? "Change photo" : "Choose photo")
-                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                                 .foregroundStyle(Self.blushLight)
                                 .frame(maxWidth: .infinity)
                                 .frame(minHeight: 40)
@@ -1067,15 +1067,15 @@ private extension NoopAct5Screens {
                         .buttonStyle(NoopHTMLPressStyle())
                         if profile.hasAvatar {
                             Button("Remove photo") { profile.clearAvatar() }
-                                .font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x7F8A85)).frame(height: 32)
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).frame(height: 32)
                         }
                     }
                 }
                 Divider().overlay(NoopHTMLColor.border)
                 HStack(spacing: 12) {
-                    Text("Name").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                    Text("Name").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                     TextField("What Today greets you by", text: $profile.name)
-                        .font(NoopHTMLFont.sans(13.5))
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                         .multilineTextAlignment(.trailing)
                         .textInputAutocapitalization(.words)
@@ -1084,7 +1084,7 @@ private extension NoopAct5Screens {
                 }
                 .frame(minHeight: 36)
                 Text("Optional, like the photo. Both stay on this phone and are never uploaded — Noop has no account to upload them to.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
             }
             .padding(.vertical, 3.5)
         }
@@ -1095,9 +1095,9 @@ private extension NoopAct5Screens {
                 Divider().overlay(NoopHTMLColor.border)
                 HStack(spacing: 13) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Sex").font(NoopHTMLFont.sans(13.5))
+                        Text("Sex").font(NoopHTMLFont.sans(NoopType.footnote))
                         Text("used in the calorie and VO₂max models")
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 4)
@@ -1140,9 +1140,9 @@ private extension NoopAct5Screens {
         }
 
         VStack(alignment: .leading, spacing: 9) {
-            Text("Why the waist is optional").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+            Text("Why the waist is optional").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
             Text("It adds an estimated VO₂max. It does not sharpen your body age — that model cancels the body term out — so Noop will not nag you for it.")
-                .font(NoopHTMLFont.sans(12.5)).foregroundStyle(Color(hex: 0xC9BEC0)).lineSpacing(4)
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0xC9BEC0)).lineSpacing(4)
         }
         .padding(16)
         .background(Self.blush.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
@@ -1170,10 +1170,10 @@ private extension NoopAct5Screens {
         }
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Date of birth").font(NoopHTMLFont.sans(13.5))
+                Text("Date of birth").font(NoopHTMLFont.sans(NoopType.footnote))
                 Spacer()
                 Text(profileConfirmed ? "\(day) \(monthLabel) \(String(year)) \u{00B7} \(profile.age) years" : "\u{2014}")
-                    .font(NoopHTMLFont.sans(12)).foregroundStyle(Self.blushLight)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Self.blushLight)
             }
             HStack(spacing: 7) {
                 compactStepper(value: profileConfirmed ? "\(day)" : "\u{2014}", label: "day",
@@ -1184,7 +1184,7 @@ private extension NoopAct5Screens {
                                minus: { set(day, month, max(1930, year - 1)) }, plus: { set(day, month, min(2012, year + 1)) })
             }
             Text("Your age is derived from this, so it advances on its own. Nothing else in the app asks for it.")
-                .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(2)
+                .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(2)
         }
         .padding(.vertical, 11.5)
     }
@@ -1195,10 +1195,10 @@ private extension NoopAct5Screens {
                 let selected = profileConfirmed && profile.sex == value
                 Button { editProfile { profile.sex = value } } label: {
                     Text(label)
-                        .font(NoopHTMLFont.sans(11.5, weight: selected ? .semibold : .regular))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: selected ? .semibold : .regular))
                         .lineLimit(1).minimumScaleFactor(0.85).fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(selected ? Self.blushLight : NoopHTMLColor.copy)
-                        .padding(.horizontal, 9).frame(height: 32)
+                        .padding(.horizontal, 9).frame(height: 36)
                         .background(selected ? Self.blush.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
                 }
@@ -1213,10 +1213,10 @@ private extension NoopAct5Screens {
     var dateOfBirthRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Date of birth").font(NoopHTMLFont.sans(13.5))
+                Text("Date of birth").font(NoopHTMLFont.sans(NoopType.footnote))
                 Spacer()
                 Text("\(birthDay) \(monthName) \(String(birthYear)) · 29 years")
-                    .font(NoopHTMLFont.sans(12)).foregroundStyle(Self.blushLight)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Self.blushLight)
             }
             HStack(spacing: 7) {
                 compactStepper(value: "\(birthDay)", label: "day", minus: { birthDay = birthDay == 1 ? 31 : birthDay - 1 }, plus: { birthDay = birthDay == 31 ? 1 : birthDay + 1 })
@@ -1224,7 +1224,7 @@ private extension NoopAct5Screens {
                 compactStepper(value: "\(birthYear)", label: "year", minus: { birthYear = max(1930, birthYear - 1) }, plus: { birthYear = min(2012, birthYear + 1) })
             }
             Text("Your age is derived from this, so it advances on its own. Nothing else in the app asks for it.")
-                .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(2)
+                .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(2)
         }
         .padding(.vertical, 11.5)
     }
@@ -1235,7 +1235,7 @@ private extension NoopAct5Screens {
                 let selected = sex == choice
                 Button { sex = choice } label: {
                     Text(choice)
-                        .font(NoopHTMLFont.sans(11.5, weight: selected ? .semibold : .regular))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: selected ? .semibold : .regular))
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                         .fixedSize(horizontal: true, vertical: false)
@@ -1255,17 +1255,17 @@ private extension NoopAct5Screens {
 
     func compactStepper(value: String, label: String, minus: @escaping () -> Void, plus: @escaping () -> Void) -> some View {
         HStack(spacing: 5) {
-            Button(action: minus) { Image(systemName: "minus").font(.system(size: 9, weight: .semibold)).frame(width: 26, height: 26) }
+            Button(action: minus) { Image(systemName: "minus").font(.system(size: 9, weight: .semibold)).frame(width: 32, height: 32).noopHitTarget() }
                 .buttonStyle(NoopA5CompactStepStyle())
             VStack(spacing: 1) {
                 // The HTML's nowrap value may run a few points into the gap; truncating turned the
                 // year into "19…" on every phone width.
-                Text(value).font(NoopHTMLFont.outfit(15)).monospacedDigit().lineLimit(1).fixedSize()
-                Text(label.uppercased()).font(NoopHTMLFont.sans(8.5, weight: .semibold)).tracking(0.7).foregroundStyle(Color(hex: 0x7F8A85))
+                Text(value).font(NoopHTMLFont.outfit(NoopType.body)).monospacedDigit().lineLimit(1).fixedSize()
+                Text(label.uppercased()).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(0.7).foregroundStyle(Color(hex: 0x7F8A85))
                     .lineLimit(1).fixedSize()
             }
             .frame(maxWidth: .infinity)
-            Button(action: plus) { Image(systemName: "plus").font(.system(size: 9, weight: .semibold)).frame(width: 26, height: 26) }
+            Button(action: plus) { Image(systemName: "plus").font(.system(size: 9, weight: .semibold)).frame(width: 32, height: 32).noopHitTarget() }
                 .buttonStyle(NoopA5CompactStepStyle())
         }
         .foregroundStyle(NoopHTMLColor.inkSoft)
@@ -1279,11 +1279,11 @@ private extension NoopAct5Screens {
     func stepperRow(_ title: String, detail: String, value: String, minus: @escaping () -> Void, plus: @escaping () -> Void) -> some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(NoopHTMLFont.sans(13.5))
-                Text(detail).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote))
+                Text(detail).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
             }
             Spacer(minLength: 4)
-            Text(value).font(NoopHTMLFont.outfit(17)).monospacedDigit().multilineTextAlignment(.trailing)
+            Text(value).font(NoopHTMLFont.outfit(NoopType.body)).monospacedDigit().multilineTextAlignment(.trailing)
             HStack(spacing: 4) {
                 Button(action: minus) { Image(systemName: "minus") }
                 Button(action: plus) { Image(systemName: "plus") }
@@ -1301,7 +1301,7 @@ private struct NoopA5StepButtonStyle: ButtonStyle {
         configuration.label
             .contentShape(Rectangle())
             .foregroundStyle(NoopHTMLColor.inkSoft)
-            .frame(width: 30, height: 30)
+            .frame(width: 32, height: 32).noopHitTarget()
             .background(Color.white.opacity(configuration.isPressed ? 0.12 : 0.07), in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.11), lineWidth: 0.5))
     }
@@ -1341,23 +1341,23 @@ private extension NoopAct5Screens {
                                 HStack(spacing: 11) {
                                     RoundedRectangle(cornerRadius: 4).fill(zone.color).frame(width: 10, height: 26)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(zone.name).font(NoopHTMLFont.sans(14, weight: .semibold))
-                                        Text(zone.percent).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                                        Text(zone.name).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                                        Text(zone.percent).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                                     }
                                     Spacer()
-                                    Text(zone.range).font(NoopHTMLFont.outfit(16)).foregroundStyle(NoopHTMLColor.inkSoft).monospacedDigit()
+                                    Text(zone.range).font(NoopHTMLFont.outfit(NoopType.body)).foregroundStyle(NoopHTMLColor.inkSoft).monospacedDigit()
                                 }
                                 if openZone == index {
                                     if !zone.use.isEmpty {
-                                    Text(zone.use).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
+                                    Text(zone.use).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
                                     }
                                     HStack(spacing: 10) {
-                                        Text("Lower edge").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted)
+                                        Text("Lower edge").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
                                         NoopProgressBar(progress: zone.progress, color: zone.color, height: 4)
-                                        Text(zone.lower).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                                        Text(zone.lower).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                                     }
                                     Text("Nudging an edge only changes what the app calls it. Your history is not renumbered.")
-                                        .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                                 }
                             }
                             .padding(16)
@@ -1370,9 +1370,9 @@ private extension NoopAct5Screens {
 
                 if !measured {
                 VStack(alignment: .leading, spacing: 9) {
-                    Text("These update themselves").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                    Text("These update themselves").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                     Text("When your resting pulse or your measured maximum moves, the edges move with them and you get one line about it in Trends. There is no annual retest to remember.")
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(Color(hex: 0xB7C3C9)).lineSpacing(4)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0xB7C3C9)).lineSpacing(4)
                 }
                 .padding(16)
                 .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
@@ -1386,12 +1386,12 @@ private extension NoopAct5Screens {
         NoopHTMLCard(radius: 20, padding: 16) {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(value).font(NoopHTMLFont.outfit(27, weight: .light)).tracking(-0.8)
-                    Text("bpm").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.muted)
+                    Text(value).font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).tracking(-0.8)
+                    Text("bpm").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
                 }
-                Text(title).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.inkSoft)
+                Text(title).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                 if !copy.isEmpty {
-                    Text(copy).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                    Text(copy).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
                 }
             }
         }
@@ -1455,10 +1455,10 @@ private extension NoopAct5Screens {
                     ForEach(["All", "Sessions", "Sleep", "Logs"], id: \.self) { filter in
                         Button { historyFilter = filter } label: {
                             Text(filter)
-                                .font(NoopHTMLFont.sans(12, weight: .medium))
+                                .font(NoopHTMLFont.sans(NoopType.caption, weight: .medium))
                                 .foregroundStyle(historyFilter == filter ? Self.blushLight : NoopHTMLColor.copy)
                                 .padding(.horizontal, 13)
-                                .frame(minHeight: 37)
+                                .frame(minHeight: 40)
                                 .background(historyFilter == filter ? Self.blush.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(historyFilter == filter ? Self.blush.opacity(0.4) : Color.white.opacity(0.07), lineWidth: 0.5))
                         }
@@ -1484,10 +1484,10 @@ private extension NoopAct5Screens {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Every session, in aggregate")
-                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text("A window rather than a list — how much you rode, walked and lifted in it.")
-                                .font(NoopHTMLFont.sans(11.5))
+                                .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -1509,9 +1509,9 @@ private extension NoopAct5Screens {
                     ForEach(filteredHistory) { day in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
-                                Text(day.day).font(NoopHTMLFont.sans(12, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                                Text(day.day).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                                 Spacer()
-                                Text(day.summary).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                                Text(day.summary).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                             }
                             .padding(.horizontal, 2)
                             dividedCard {
@@ -1528,7 +1528,7 @@ private extension NoopAct5Screens {
                 }
 
                 Text("Grouped by day, newest first. Sleeps sit in the same list as sessions because they are the same kind of fact about your week.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
         }
     }
@@ -1567,15 +1567,15 @@ private extension NoopAct5Screens {
                     .frame(width: 20)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name)
-                        .font(NoopHTMLFont.sans(13.5, weight: item.kind == .log ? .regular : .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: item.kind == .log ? .regular : .semibold))
                         .foregroundStyle(item.kind == .log ? NoopHTMLColor.inkSoft : NoopHTMLColor.ink)
                     Text(item.detail)
-                        .font(NoopHTMLFont.sans(11))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow))
                         .foregroundStyle(Color(hex: 0x7F8A85))
                 }
                 Spacer()
                 Text(item.value)
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                 if item.opensSomething {
                     NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
@@ -1639,11 +1639,11 @@ private extension NoopAct5Screens {
     func historyMetricTile(_ value: String, label: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value)
-                .font(NoopHTMLFont.outfit(21, weight: .light))
+                .font(NoopHTMLFont.outfit(NoopType.title3, weight: .light))
                 .tracking(-0.6)
                 .monospacedDigit()
             Text(label)
-                .font(NoopHTMLFont.sans(10.5))
+                .font(NoopHTMLFont.sans(NoopType.eyebrow))
                 .foregroundStyle(Color(hex: 0x7F8A85))
         }
         .padding(.horizontal, 14)
@@ -1770,7 +1770,7 @@ private extension NoopAct5Screens {
                                         .frame(width: 8, height: 8)
                                         .shadow(color: connected ? Self.green.opacity(0.7) : .clear, radius: 5)
                                     Text(connected ? "Connected and reading" : "Disconnected")
-                                        .font(NoopHTMLFont.sans(14, weight: .semibold))
+                                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                                 }
                                 strapFact("Secure link", connected && live.encryptedBond ? "Encrypted" : "\u{2014}")
                                 strapFact("On wrist", connected ? (live.worn ? "Yes" : "No") : "\u{2014}")
@@ -1787,11 +1787,11 @@ private extension NoopAct5Screens {
                         HStack(spacing: 11) {
                             NoopCanonicalGlyph(name: .heart, size: 20, color: Self.green).frame(width: 21)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Apple Health").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                Text("Apple Health").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 Text(health.auth != .authorized ? "not connected"
                                      : report.map { "wrote \(wroteKinds) kinds \u{00B7} \(relative.localizedString(for: $0.completedAt, relativeTo: Date()))" }
                                         ?? "connected")
-                                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                             }
                             Spacer()
                             NoopHTMLToggle(isOn: health.auth == .authorized, color: Self.green) {
@@ -1801,7 +1801,7 @@ private extension NoopAct5Screens {
                         NoopFlowLayout(spacing: 6) {
                             ForEach(["Sleep", "Workouts", "Heart rate", "HRV", "Respiration", "Body temp"], id: \.self) { kind in
                                 Text(kind)
-                                    .font(NoopHTMLFont.sans(10.5, weight: .medium))
+                                    .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .medium))
                                     .foregroundStyle(NoopHTMLColor.inkSoft)
                                     .padding(.horizontal, 10)
                                     .frame(minHeight: 27)
@@ -1815,7 +1815,7 @@ private extension NoopAct5Screens {
                             Task { _ = await health.sync() }
                         } label: {
                             Text(!authorized ? "Turn on Apple Health to sync" : "Sync Apple Health now")
-                                .font(NoopHTMLFont.sans(13, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(authorized ? Color(hex: 0x8FE3B4) : NoopHTMLColor.faint)
                                 .frame(maxWidth: .infinity).frame(minHeight: 46)
                                 .background(authorized ? Self.green.opacity(0.13) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 15))
@@ -1824,11 +1824,11 @@ private extension NoopAct5Screens {
                         .buttonStyle(NoopHTMLPressStyle())
                         .disabled(!authorized)
                         Text("Noop writes to Health and never reads your Health history back in — the only exception is your phone's step count, which fills days the strap could not estimate.")
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                         Button { navigation.push(.apple) } label: {
                             HStack(spacing: 12) {
                                 Text("What crossed, and what did not")
-                                    .font(NoopHTMLFont.sans(13))
+                                    .font(NoopHTMLFont.sans(NoopType.footnote))
                                     .foregroundStyle(NoopHTMLColor.ink)
                                 Spacer(minLength: 8)
                                 NoopChevron()
@@ -1857,7 +1857,7 @@ private extension NoopAct5Screens {
                 NoopHTMLCard(radius: 22, padding: 16) {
                     VStack(alignment: .leading, spacing: 11) {
                         HStack {
-                            Text("Buzz strength").font(NoopHTMLFont.sans(13.5))
+                            Text("Buzz strength").font(NoopHTMLFont.sans(NoopType.footnote))
                             Spacer()
                             NoopLaterChip()
                         }
@@ -1868,7 +1868,7 @@ private extension NoopAct5Screens {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { pinged = false }
                         } label: {
                             Text(pinged ? "Buzzing now — follow the sound" : "Buzz the strap to find it")
-                                .font(NoopHTMLFont.sans(13, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(pinged ? NoopHTMLColor.blueLight : NoopHTMLColor.inkSoft)
                                 .frame(maxWidth: .infinity).frame(minHeight: 46)
                                 .background(pinged ? NoopHTMLColor.blue.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
@@ -1886,10 +1886,10 @@ private extension NoopAct5Screens {
                             .frame(width: 20)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Buzz for phone notifications")
-                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text("designed · not built yet")
-                                .font(NoopHTMLFont.sans(11.5))
+                                .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
                         }
                         Spacer(minLength: 8)
@@ -1923,9 +1923,9 @@ private extension NoopAct5Screens {
                         Divider().overlay(NoopHTMLColor.border)
                         HStack(spacing: 13) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Save one copy a day").font(NoopHTMLFont.sans(13))
+                                Text("Save one copy a day").font(NoopHTMLFont.sans(NoopType.footnote))
                                 Text("A timestamped file at 22:00, on this phone. Off by default.")
-                                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
                             }
                             Spacer()
                             NoopHTMLToggle(isOn: dailyLogOn) {
@@ -1935,7 +1935,7 @@ private extension NoopAct5Screens {
                             }
                         }
                         Text("Send this log when a sync or a reading looks wrong. It is the one thing that makes a bug report answerable.")
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                     }
                 }
 
@@ -1952,7 +1952,7 @@ private extension NoopAct5Screens {
                         Image(systemName: connected ? "xmark.circle" : "arrow.triangle.2.circlepath")
                         Text(connected ? "Disconnect this strap" : "Reconnect")
                     }
-                    .font(NoopHTMLFont.sans(13, weight: .semibold))
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                     .foregroundStyle(connected ? Color(hex: 0xF3A472) : NoopHTMLColor.blueLight)
                     .frame(maxWidth: .infinity).frame(height: 50)
                     .background((connected ? NoopHTMLColor.amber : NoopHTMLColor.blue).opacity(0.09), in: RoundedRectangle(cornerRadius: 16))
@@ -1961,7 +1961,7 @@ private extension NoopAct5Screens {
                 .buttonStyle(NoopHTMLPressStyle())
 
                 Text("Every switch here says what it costs you in battery, because that is the only reason anyone turns one off.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
         }
     }
@@ -1985,7 +1985,7 @@ private extension NoopAct5Screens {
                                         .frame(width: 8, height: 8)
                                         .shadow(color: connected ? Self.green.opacity(0.7) : .clear, radius: 5)
                                     Text(connected ? "Connected and reading" : "Disconnected")
-                                        .font(NoopHTMLFont.sans(14, weight: .semibold))
+                                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                                 }
                                 strapFact("Secure link", connected ? "Encrypted" : "—")
                                 strapFact("On wrist", connected ? "Yes, worn since 06:38" : "No")
@@ -1999,7 +1999,7 @@ private extension NoopAct5Screens {
                                 Image(systemName: syncStage == 2 ? "checkmark" : "arrow.triangle.2.circlepath")
                                 Text(syncStage == 0 ? "Sync now" : syncStage == 1 ? "Syncing — 3 nights buffered" : "Up to date, just now")
                             }
-                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                             .foregroundStyle(syncStage == 0 ? NoopHTMLColor.blueInk : syncStage == 2 ? Color(hex: 0x8FE3B4) : NoopHTMLColor.blueLight)
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
@@ -2015,9 +2015,9 @@ private extension NoopAct5Screens {
                         HStack(spacing: 11) {
                             NoopCanonicalGlyph(name: .heart, size: 20, color: Self.green).frame(width: 21)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Apple Health").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                Text("Apple Health").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 Text(isEnabled("Apple Health") ? (healthSyncStage > 0 ? "wrote 6 kinds · just now" : "wrote 6 kinds · 2 hours ago") : "not connected")
-                                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                             }
                             Spacer()
                             NoopHTMLToggle(isOn: isEnabled("Apple Health"), color: Self.green) { flip("Apple Health") }
@@ -2025,7 +2025,7 @@ private extension NoopAct5Screens {
                         NoopFlowLayout(spacing: 6) {
                             ForEach(["Sleep", "Workouts", "Heart rate", "HRV", "Respiration", "Body temp"], id: \.self) { kind in
                                 Text(kind)
-                                    .font(NoopHTMLFont.sans(10.5, weight: .medium))
+                                    .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .medium))
                                     .foregroundStyle(NoopHTMLColor.inkSoft)
                                     .padding(.horizontal, 10)
                                     .frame(minHeight: 27)
@@ -2038,7 +2038,7 @@ private extension NoopAct5Screens {
                             healthSyncStage = min(2, healthSyncStage + 1)
                         } label: {
                             Text(!isEnabled("Apple Health") ? "Turn on Apple Health to sync" : healthSyncStage == 0 ? "Sync Apple Health now" : "Written — 6 kinds, 221 nights")
-                                .font(NoopHTMLFont.sans(13, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(isEnabled("Apple Health") ? Color(hex: 0x8FE3B4) : NoopHTMLColor.faint)
                                 .frame(maxWidth: .infinity).frame(minHeight: 46)
                                 .background(isEnabled("Apple Health") ? Self.green.opacity(healthSyncStage == 0 ? 0.13 : 0.2) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 15))
@@ -2047,17 +2047,17 @@ private extension NoopAct5Screens {
                         .buttonStyle(NoopHTMLPressStyle())
                         .disabled(!isEnabled("Apple Health"))
                         Text("Noop writes to Health and never reads your Health history back in — the only exception is your phone's step count, which fills days the strap could not estimate.")
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                         Button { navigation.push(.apple) } label: {
                             HStack(spacing: 12) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("What crossed, and what did not")
-                                        .font(NoopHTMLFont.sans(13))
+                                        .font(NoopHTMLFont.sans(NoopType.footnote))
                                         .foregroundStyle(NoopHTMLColor.ink)
                                     Text(healthAccessFixed
                                          ? "Six kinds out, steps in. Everything is crossing."
                                          : "One kind is being refused — variability has never reached Health")
-                                        .font(NoopHTMLFont.sans(11.5))
+                                        .font(NoopHTMLFont.sans(NoopType.caption))
                                         .foregroundStyle(healthAccessFixed ? Color(hex: 0x7F8A85) : Color(hex: 0xC8934B))
                                         .lineSpacing(3)
                                         .fixedSize(horizontal: false, vertical: true)
@@ -2089,17 +2089,17 @@ private extension NoopAct5Screens {
                 NoopHTMLCard(radius: 22, padding: 16) {
                     VStack(alignment: .leading, spacing: 11) {
                         HStack {
-                            Text("Buzz strength").font(NoopHTMLFont.sans(13.5))
+                            Text("Buzz strength").font(NoopHTMLFont.sans(NoopType.footnote))
                             Spacer()
                             Text(buzz == "Light" ? "easy to miss on a cold wrist" : buzz == "Normal" ? "enough to notice, not to startle" : "you will not miss it")
-                                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                         }
                         NoopSegmentedControl(items: ["Light", "Normal", "Firm"], selection: buzz) { buzz = $0 }
                         Button {
                             pinged = true
                         } label: {
                             Text(pinged ? "Buzzing now — follow the sound" : "Buzz the strap to find it")
-                                .font(NoopHTMLFont.sans(13, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(pinged ? NoopHTMLColor.blueLight : NoopHTMLColor.inkSoft)
                                 .frame(maxWidth: .infinity).frame(minHeight: 46)
                                 .background(pinged ? NoopHTMLColor.blue.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
@@ -2115,10 +2115,10 @@ private extension NoopAct5Screens {
                             .frame(width: 20)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Buzz for phone notifications")
-                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text("designed · not built yet")
-                                .font(NoopHTMLFont.sans(11.5))
+                                .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
                         }
                         Spacer(minLength: 8)
@@ -2141,15 +2141,15 @@ private extension NoopAct5Screens {
                         Divider().overlay(NoopHTMLColor.border)
                         HStack(spacing: 13) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Save one copy a day").font(NoopHTMLFont.sans(13))
+                                Text("Save one copy a day").font(NoopHTMLFont.sans(NoopType.footnote))
                                 Text("A timestamped file at 22:00, on this phone. Off by default.")
-                                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
                             }
                             Spacer()
                             NoopHTMLToggle(isOn: isEnabled("Save one copy a day")) { flip("Save one copy a day") }
                         }
                         Text("Send this log when a sync or a reading looks wrong. It is the one thing that makes a bug report answerable.")
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                     }
                 }
 
@@ -2165,7 +2165,7 @@ private extension NoopAct5Screens {
                         Image(systemName: connected ? "xmark.circle" : "arrow.triangle.2.circlepath")
                         Text(connected ? "Disconnect this strap" : "Reconnect")
                     }
-                    .font(NoopHTMLFont.sans(13, weight: .semibold))
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                     .foregroundStyle(connected ? Color(hex: 0xF3A472) : NoopHTMLColor.blueLight)
                     .frame(maxWidth: .infinity).frame(height: 50)
                     .background((connected ? NoopHTMLColor.amber : NoopHTMLColor.blue).opacity(0.09), in: RoundedRectangle(cornerRadius: 16))
@@ -2174,23 +2174,23 @@ private extension NoopAct5Screens {
                 .buttonStyle(NoopHTMLPressStyle())
 
                 Text("Every switch here says what it costs you in battery, because that is the only reason anyone turns one off.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
         }
     }
 
     func strapFact(_ title: String, _ value: String) -> some View {
         HStack {
-            Text(title).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+            Text(title).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
             Spacer()
-            Text(value).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.inkSoft).multilineTextAlignment(.trailing)
+            Text(value).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft).multilineTextAlignment(.trailing)
         }
     }
 
     func logButton(_ label: String, symbol: String, done: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(done ? (label == "Copy" ? "Copied" : "Saved") : label, systemImage: done ? "checkmark" : symbol)
-                .font(NoopHTMLFont.sans(13, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                 .foregroundStyle(done ? Color(hex: 0x8FE3B4) : NoopHTMLColor.inkSoft)
                 .frame(maxWidth: .infinity).frame(height: 46)
                 .background(done ? Self.green.opacity(0.12) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
@@ -2218,17 +2218,17 @@ private extension NoopAct5Screens {
                             .frame(width: 22)
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Mirroring is not built yet")
-                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text("iOS only hands notifications to a paired accessory over ANCS, and the strap does not consume it today. Everything below is the decided design, held here so you can see what it will ask for — no permission is requested and nothing is saved.")
-                                .font(NoopHTMLFont.sans(11.5))
+                                .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
                                 .lineSpacing(3)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Text("Later")
-                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .tracking(0.5)
                         .foregroundStyle(NoopHTMLColor.muted)
                         .frame(maxWidth: .infinity)
@@ -2244,10 +2244,10 @@ private extension NoopAct5Screens {
                     HStack(spacing: 13) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Mirror phone notifications")
-                                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text("Not available. Noop still buzzes for its own things — bedtime, sessions, battery.")
-                                .font(NoopHTMLFont.sans(11.5))
+                                .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
                                 .lineSpacing(3)
                         }
@@ -2271,7 +2271,7 @@ private extension NoopAct5Screens {
                             }
                         }
                         Text("Nothing in this list reaches your wrist while mirroring is unbuilt. The defaults are the intent: chat and calls through, feeds and newsletters not.")
-                            .font(NoopHTMLFont.sans(11))
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow))
                             .foregroundStyle(NoopHTMLColor.faint)
                             .lineSpacing(3)
                             .padding(.horizontal, 4)
@@ -2280,17 +2280,17 @@ private extension NoopAct5Screens {
                     NoopHTMLCard(radius: 22, padding: 16) {
                         VStack(alignment: .leading, spacing: 11) {
                             HStack(alignment: .firstTextBaseline) {
-                                Text("How it buzzes").font(NoopHTMLFont.sans(13.5))
+                                Text("How it buzzes").font(NoopHTMLFont.sans(NoopType.footnote))
                                 Spacer()
                                 Text(notificationBuzz == "One buzz" ? "easy to miss, easy to live with" : notificationBuzz == "Long" ? "hard to miss, harder to ignore" : "the one people keep")
-                                    .font(NoopHTMLFont.sans(11.5))
+                                    .font(NoopHTMLFont.sans(NoopType.caption))
                                     .foregroundStyle(Color(hex: 0x7F8A85))
                             }
                             NoopSegmentedControl(items: ["One buzz", "Two short", "Long"], selection: notificationBuzz) {
                                 notificationBuzz = $0
                             }
                             Text("Feel it on the strap")
-                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.inkSoft)
                                 .frame(maxWidth: .infinity)
                                 .frame(minHeight: 44)
@@ -2309,7 +2309,7 @@ private extension NoopAct5Screens {
                     }
 
                     Text("When this is built, Noop will never read what a notification says — only which app sent it, so it knows whether to buzz. Nothing on this page is stored or synced today.")
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(4)
                         .padding(.horizontal, 2)
@@ -2322,7 +2322,7 @@ private extension NoopAct5Screens {
 
     var laterChip: some View {
         Text("LATER")
-            .font(NoopHTMLFont.sans(10, weight: .semibold))
+            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
             .tracking(0.6)
             .foregroundStyle(NoopHTMLColor.muted)
             .padding(.horizontal, 10)
@@ -2357,10 +2357,10 @@ private extension NoopAct5Screens {
         HStack(spacing: 13) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(NoopHTMLFont.sans(13.5))
+                    .font(NoopHTMLFont.sans(NoopType.footnote))
                     .foregroundStyle(NoopHTMLColor.ink)
                 Text(detail)
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                     .lineSpacing(3)
             }
@@ -2391,10 +2391,10 @@ private extension NoopAct5Screens {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text("An imported score never becomes your score")
-                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blueLight)
                     Text("Another app\u{2019}s readiness or sleep score is kept under its own name and is never shown as Charge, Effort or Rest. Noop recomputes its own from the raw pulse, variability and sleep it can see.")
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Color(hex: 0xB7C3C9))
                         .lineSpacing(3)
                 }
@@ -2409,7 +2409,7 @@ private extension NoopAct5Screens {
                             NoopSectionLabel("Every kind, and what happened to it")
                             Spacer()
                             Text(refused.isEmpty ? "all crossing" : "\(refused.count) needs you")
-                                .font(NoopHTMLFont.sans(11))
+                                .font(NoopHTMLFont.sans(NoopType.eyebrow))
                                 .foregroundStyle(NoopHTMLColor.faint)
                         }
                         .padding(.horizontal, 2)
@@ -2424,7 +2424,7 @@ private extension NoopAct5Screens {
                             }
                         }
                         Text("iOS never tells an app that a read was refused \u{2014} a denied kind and a kind with no data look identical from in here. That is why this page counts what was written rather than claiming everything worked.")
-                            .font(NoopHTMLFont.sans(11.5))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.faint)
                             .lineSpacing(4)
                             .padding(.horizontal, 2)
@@ -2435,9 +2435,9 @@ private extension NoopAct5Screens {
                     HStack(spacing: 13) {
                         NoopCanonicalGlyph(name: .upload, size: 19, color: NoopHTMLColor.blue)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Bring history in").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("Bring history in").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                             Text("the one-time import \u{2014} a Health export, or any of the other eleven formats")
-                                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
                         }
                         Spacer(minLength: 8)
                         NoopChevron()
@@ -2484,10 +2484,10 @@ private extension NoopAct5Screens {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text("An imported score never becomes your score")
-                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blueLight)
                     Text("Another app’s readiness or sleep score is kept under its own name and is never shown as Charge, Effort or Rest. Noop recomputes its own from the raw pulse, variability and sleep it can see.")
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Color(hex: 0xB7C3C9))
                         .lineSpacing(3)
                 }
@@ -2501,7 +2501,7 @@ private extension NoopAct5Screens {
                         NoopSectionLabel("Every kind, and what happened to it")
                         Spacer()
                         Text(healthAccessFixed ? "all crossing" : "1 needs you")
-                            .font(NoopHTMLFont.sans(11))
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow))
                             .foregroundStyle(NoopHTMLColor.faint)
                     }
                     .padding(.horizontal, 2)
@@ -2516,7 +2516,7 @@ private extension NoopAct5Screens {
                     }
 
                     Text("iOS never tells an app that a read was refused — a denied kind and a kind with no data look identical from in here. That is why this page counts what was written rather than claiming everything worked.")
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(4)
                         .padding(.horizontal, 2)
@@ -2541,7 +2541,7 @@ private extension NoopAct5Screens {
                                 appleLegend("your phone, through Health", color: Color(hex: 0x5B7C8D))
                             }
                             Text("Three of the last fourteen days came from the phone — days the strap was off your wrist or charging. Nothing else on this page fills a gap that way.")
-                                .font(NoopHTMLFont.sans(11.5))
+                                .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(Color(hex: 0x8B958F))
                                 .lineSpacing(3)
                         }
@@ -2555,18 +2555,18 @@ private extension NoopAct5Screens {
                         ForEach(Array(appleUnused.enumerated()), id: \.offset) { index, item in
                             HStack(spacing: 12) {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.0).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.inkSoft)
-                                    Text(item.2).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                                    Text(item.0).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.inkSoft)
+                                    Text(item.2).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
                                 }
                                 Spacer(minLength: 8)
-                                Text(item.1).font(NoopHTMLFont.sans(12.5)).foregroundStyle(Color(hex: 0x8B958F)).monospacedDigit()
+                                Text(item.1).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x8B958F)).monospacedDigit()
                             }
                             .padding(.vertical, 13)
                             if index < appleUnused.count - 1 { Divider().overlay(NoopHTMLColor.border) }
                         }
                     }
                     Text("To bring any of this in as history rather than as a live feed, hand the Health export to Bring history in — it reads the same file and tells you what it wrote.")
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(4)
                         .padding(.horizontal, 2)
@@ -2576,9 +2576,9 @@ private extension NoopAct5Screens {
                     HStack(spacing: 13) {
                         NoopCanonicalGlyph(name: .upload, size: 19, color: NoopHTMLColor.blue)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Bring history in").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("Bring history in").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                             Text("the one-time import — a Health export, or any of the other eleven formats")
-                                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
                         }
                         Spacer(minLength: 8)
                         NoopChevron()
@@ -2630,11 +2630,11 @@ private extension NoopAct5Screens {
         VStack(alignment: .leading, spacing: 5) {
             NoopSectionLabel(eyebrow)
             Text(value)
-                .font(NoopHTMLFont.outfit(26, weight: .light))
+                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
                 .tracking(-0.78)
                 .foregroundStyle(NoopHTMLColor.ink)
             Text(copy)
-                .font(NoopHTMLFont.sans(11.5))
+                .font(NoopHTMLFont.sans(NoopType.caption))
                 .foregroundStyle(Color(hex: 0x7F8A85))
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -2655,16 +2655,16 @@ private extension NoopAct5Screens {
                 .padding(.top, 6)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(item.title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(item.title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                     Spacer(minLength: 8)
                     Text(item.value)
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(item.state < 0 ? NoopHTMLColor.warm : Color(hex: 0x8B958F))
                         .monospacedDigit()
                 }
                 if !item.copy.isEmpty {
                 Text(item.copy)
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(item.state < 0 ? Color(hex: 0xC8934B) : Color(hex: 0x7F8A85))
                     .lineSpacing(3)
                 }
@@ -2677,10 +2677,10 @@ private extension NoopAct5Screens {
                         }
                     } label: {
                         Text("Open Health → Noop")
-                            .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             .foregroundStyle(NoopHTMLColor.warm)
                             .padding(.horizontal, 12)
-                            .frame(minHeight: 29)
+                            .frame(minHeight: 36)
                             .background(NoopHTMLColor.warm.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(NoopHTMLColor.warm.opacity(0.34), lineWidth: 0.5))
                     }
@@ -2695,7 +2695,7 @@ private extension NoopAct5Screens {
     func appleLegend(_ title: String, color: Color) -> some View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 8, height: 8)
-            Text(title).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+            Text(title).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85))
         }
     }
 }
@@ -2744,7 +2744,7 @@ private extension NoopAct5Screens {
                                         Spacer()
                                         automationStepButton(plus: false) { setCeilingBPM(shownCeilingBPM - 2) }
                                         Text("\(shownCeilingBPM) bpm")
-                                            .font(NoopHTMLFont.outfit(30, weight: .light))
+                                            .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
                                             .tracking(-0.9)
                                             .monospacedDigit()
                                             .frame(minWidth: 104)
@@ -2755,13 +2755,13 @@ private extension NoopAct5Screens {
                                 if let armsAt = resolvedCeilingBPMShown {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("ARMS AT \(armsAt) BPM")
-                                        .font(NoopHTMLFont.sans(10, weight: .semibold))
+                                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                                         .tracking(1)
                                         .foregroundStyle(Self.blushLight)
                                     Text(shownCeilingMode == "Profile zone"
                                          ? "\(shownCeilingZone) starts at \(armsAt) bpm on your record. It arms with that number, and it moves if your maximum does."
                                          : "It arms with exactly this number, whatever your zones do later.")
-                                        .font(NoopHTMLFont.sans(11.5))
+                                        .font(NoopHTMLFont.sans(NoopType.caption))
                                         .foregroundStyle(Color(hex: 0xC9BEC0))
                                         .lineSpacing(3)
                                 }
@@ -2779,7 +2779,7 @@ private extension NoopAct5Screens {
                 }
 
                 Text("Everything here runs through Noop rather than on the strap: the strap reports, the app decides, and the app buzzes it back. Each one needs Noop running; background delivery is best effort because iOS may suspend it. Nothing on this page claims strap-firmware support.")
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(NoopHTMLColor.faint)
                     .lineSpacing(4)
                     .padding(.horizontal, 2)
@@ -2838,7 +2838,7 @@ private extension NoopAct5Screens {
                 Spacer(minLength: 8)
                 if !note.isEmpty {
                     Text(note)
-                        .font(NoopHTMLFont.sans(11))
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .multilineTextAlignment(.trailing)
                 }
@@ -2851,12 +2851,12 @@ private extension NoopAct5Screens {
     func automationSegment(_ title: String, detail: String, choices: [String]) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(title).font(NoopHTMLFont.sans(13.5))
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote))
                 Spacer()
                 if measured {
                     NoopLaterChip()
                 } else {
-                    Text(detail).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85))
                 }
             }
             if !measured {
@@ -2871,10 +2871,10 @@ private extension NoopAct5Screens {
             ForEach(choices, id: \.self) { choice in
                 Button { action(choice) } label: {
                     Text(choice)
-                        .font(NoopHTMLFont.sans(11.5, weight: choice == selection ? .semibold : .regular))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: choice == selection ? .semibold : .regular))
                         .foregroundStyle(choice == selection ? Self.blushLight : NoopHTMLColor.copy)
                         .frame(maxWidth: .infinity)
-                        .frame(minHeight: 32)
+                        .frame(minHeight: 36)
                         .background(choice == selection ? Self.blush.opacity(0.20) : .clear, in: RoundedRectangle(cornerRadius: 11))
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(choice == selection ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
                 }
@@ -2891,7 +2891,7 @@ private extension NoopAct5Screens {
                 Capsule().fill(NoopHTMLColor.inkSoft).frame(width: 11, height: 1.6)
                 if plus { Capsule().fill(NoopHTMLColor.inkSoft).frame(width: 1.6, height: 11) }
             }
-            .frame(width: 34, height: 34)
+            .frame(width: 32, height: 32).noopHitTarget()
             .background(Color.white.opacity(0.06), in: Circle())
             .overlay(Circle().stroke(Color.white.opacity(0.10), lineWidth: 0.5))
         }
@@ -2915,17 +2915,17 @@ private struct NoopStrapBatteryRing: View {
                 if let percent {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("\(percent)").font(NoopHTMLFont.outfit(38, weight: .ultraLight)).tracking(-1.5).foregroundStyle(NoopHTMLColor.blue)
-                        Text("%").font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x8B958F))
+                        Text("%").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x8B958F))
                     }
                 } else {
                     // A linked strap answers the battery read late while it sends its history; say that
                     // rather than draw "—%" beside a days-left figure, which reads as a broken gauge.
                     Text(connected ? "Checking" : "\u{2014}")
-                        .font(connected ? NoopHTMLFont.sans(13, weight: .medium) : NoopHTMLFont.outfit(38, weight: .ultraLight))
+                        .font(connected ? NoopHTMLFont.sans(NoopType.footnote, weight: .medium) : NoopHTMLFont.outfit(38, weight: .ultraLight))
                         .foregroundStyle(Color(hex: 0x8B958F))
                 }
                 if percent != nil, let daysLeft {
-                    Text(daysLeft).font(NoopHTMLFont.sans(10)).foregroundStyle(Color(hex: 0x7F8A85))
+                    Text(daysLeft).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85))
                 }
             }
         }
@@ -2969,7 +2969,7 @@ private extension NoopAct5Screens {
 
                 if let deviceNotice {
                     Text(deviceNotice)
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Color(hex: 0x8FE3B4))
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2979,7 +2979,7 @@ private extension NoopAct5Screens {
 
                 Button { navigation.push(.pair) } label: {
                     Label("Pair a new strap", systemImage: "plus")
-                        .font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blueInk)
                         .frame(maxWidth: .infinity).frame(height: 54)
                         .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 18))
@@ -2989,7 +2989,7 @@ private extension NoopAct5Screens {
 
                 Button { model.ble.scanForWhoops() } label: {
                     Label("Re-scan for straps", systemImage: "arrow.triangle.2.circlepath")
-                        .font(NoopHTMLFont.sans(13, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                         .frame(maxWidth: .infinity).frame(height: 50)
                         .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
@@ -2998,7 +2998,7 @@ private extension NoopAct5Screens {
                 .buttonStyle(NoopHTMLPressStyle())
 
                 Text("Forgetting a strap removes the pairing, not the nights. Its history stays in your record and stays in your export.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
         }
     }
@@ -3010,9 +3010,9 @@ private extension NoopAct5Screens {
                 HStack(spacing: 12) {
                     NoopCanonicalGlyph(name: .watch, size: 22, color: active ? NoopHTMLColor.blue : Color(hex: 0x7F8A85))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(device.displayName).font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                        Text(device.displayName).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                         if !meta.isEmpty {
-                            Text(meta).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                            Text(meta).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                         }
                     }
                     Spacer()
@@ -3030,7 +3030,7 @@ private extension NoopAct5Screens {
                         }
                     } label: {
                         Text(active ? "Disconnect" : "Switch to this")
-                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             .foregroundStyle(active ? NoopHTMLColor.inkSoft : NoopHTMLColor.blueLight)
                             .frame(maxWidth: .infinity).frame(minHeight: 44)
                             .background(active ? Color.white.opacity(0.05) : NoopHTMLColor.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
@@ -3046,7 +3046,7 @@ private extension NoopAct5Screens {
                         deviceNotice = "Pairing forgotten. Its history remains in your record and export."
                     } label: {
                         Text("Forget")
-                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             .foregroundStyle(Color(hex: 0xF3A472))
                             .padding(.horizontal, 18).frame(minHeight: 44)
                             .background(NoopHTMLColor.amber.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
@@ -3070,14 +3070,14 @@ private extension NoopAct5Screens {
                             renameDraft = ""
                             deviceNotice = "Renamed to \(value). The strap is rebooting to apply it."
                         }
-                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blueLight)
                         .padding(.horizontal, 15).frame(height: 40)
                         .background(NoopHTMLColor.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 13))
                         .overlay(RoundedRectangle(cornerRadius: 13).stroke(NoopHTMLColor.blue.opacity(0.34), lineWidth: 0.5))
                     }
                     Text("A 4.0 can be renamed over Bluetooth — useful for a second-hand band still carrying its old owner's name. The strap reboots to apply it.")
-                        .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                 }
             }
         }
@@ -3110,7 +3110,7 @@ private extension NoopAct5Screens {
 
                 if let deviceNotice {
                     Text(deviceNotice)
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Color(hex: 0x8FE3B4))
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -3120,7 +3120,7 @@ private extension NoopAct5Screens {
 
                 Button { paired = false; navigation.push(.pair) } label: {
                     Label("Pair a new strap", systemImage: "plus")
-                        .font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blueInk)
                         .frame(maxWidth: .infinity).frame(height: 54)
                         .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 18))
@@ -3132,7 +3132,7 @@ private extension NoopAct5Screens {
                     deviceNotice = "Search complete · \(sparePresent ? "two straps found" : "one strap found")"
                 } label: {
                     Label("Re-scan for straps", systemImage: "arrow.triangle.2.circlepath")
-                        .font(NoopHTMLFont.sans(13, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                         .frame(maxWidth: .infinity).frame(height: 50)
                         .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
@@ -3141,7 +3141,7 @@ private extension NoopAct5Screens {
                 .buttonStyle(NoopHTMLPressStyle())
 
                 Text("Forgetting a strap removes the pairing, not the nights. Its history stays in your record and stays in your export.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
         }
     }
@@ -3157,8 +3157,8 @@ private extension NoopAct5Screens {
                         color: active ? NoopHTMLColor.blue : Color(hex: 0x7F8A85)
                     )
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(name).font(NoopHTMLFont.sans(14.5, weight: .semibold))
-                        Text(meta).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                        Text(name).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                        Text(meta).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                     }
                     Spacer()
                     NoopPill(text: active ? "Connected" : "Paired", color: active ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
@@ -3176,7 +3176,7 @@ private extension NoopAct5Screens {
                         }
                     } label: {
                         Text(active ? "Disconnect" : "Switch to this")
-                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             .foregroundStyle(active ? NoopHTMLColor.inkSoft : NoopHTMLColor.blueLight)
                             .frame(maxWidth: .infinity).frame(minHeight: 44)
                             .background(active ? Color.white.opacity(0.05) : NoopHTMLColor.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
@@ -3196,7 +3196,7 @@ private extension NoopAct5Screens {
                         }
                     } label: {
                         Text("Forget")
-                            .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             .foregroundStyle(Color(hex: 0xF3A472))
                             .padding(.horizontal, 18).frame(minHeight: 44)
                             .background(NoopHTMLColor.amber.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
@@ -3220,14 +3220,14 @@ private extension NoopAct5Screens {
                             renameDraft = ""
                             deviceNotice = "Renamed to \(value). The strap is rebooting to apply it."
                         }
-                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blueLight)
                         .padding(.horizontal, 15).frame(height: 40)
                         .background(NoopHTMLColor.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 13))
                         .overlay(RoundedRectangle(cornerRadius: 13).stroke(NoopHTMLColor.blue.opacity(0.34), lineWidth: 0.5))
                     }
                     Text("A 4.0 can be renamed over Bluetooth — useful for a second-hand band still carrying its old owner's name. The strap reboots to apply it.")
-                        .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
                 }
             }
         }
@@ -3241,8 +3241,8 @@ private extension NoopAct5Screens {
         HStack(alignment: .top, spacing: 11) {
             Circle().fill(NoopHTMLColor.blue).frame(width: 7, height: 7).padding(.top, 6)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(NoopHTMLFont.sans(13))
-                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote))
+                Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
             }
         }
     }
@@ -3251,8 +3251,8 @@ private extension NoopAct5Screens {
         HStack(alignment: .top, spacing: 12) {
             NoopCanonicalGlyph(name: glyph, size: 19, color: NoopHTMLColor.blue).frame(width: 20)
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(NoopHTMLFont.sans(13))
-                Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote))
+                Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
             }
         }
     }
@@ -3291,7 +3291,7 @@ private extension NoopAct5Screens {
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(NoopHTMLColor.faint)
                     TextField("Search every setting", text: $settingsSearch)
-                        .font(NoopHTMLFont.sans(13))
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                         .textInputAutocapitalization(.never)
                 }
@@ -3459,9 +3459,9 @@ private extension NoopAct5Screens {
                     .padding(.top, 4)
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Coming later").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
+                        Text("Coming later").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                         Text("Designed, not built yet. Shown so you know they're planned.")
-                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                             .multilineTextAlignment(.leading)
                     }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -3475,7 +3475,7 @@ private extension NoopAct5Screens {
                 }
 
                 Text("Noop Aura \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · everything on this phone")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
         }
     }
@@ -3543,7 +3543,7 @@ private extension NoopAct5Screens {
                 }
             } else if !settingsSearchKeywords.keys.contains(where: settingsGroupMatches) {
                 Text("No matching setting or destination. Try profile, backup, units or alerts.")
-                    .font(NoopHTMLFont.sans(12.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(NoopHTMLColor.copy)
                     .padding(.vertical, 12)
             }
@@ -3571,7 +3571,7 @@ private extension NoopAct5Screens {
             NoopSectionLabel(title).padding(.horizontal, 2).padding(.top, 8)
             if let note {
                 Text(note)
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
@@ -3597,17 +3597,17 @@ private extension NoopAct5Screens {
                 .frame(width: 21)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(NoopHTMLFont.sans(13.5))
+                    .font(NoopHTMLFont.sans(NoopType.footnote))
                     .foregroundStyle(Color(hex: 0x8B958F))
                 Text(detail)
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             Text("Later")
-                .font(NoopHTMLFont.sans(9.5, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                 .tracking(0.95)
                 .textCase(.uppercase)
                 .foregroundStyle(Color(hex: 0x7F8A85))
@@ -3626,10 +3626,10 @@ private extension NoopAct5Screens {
                     .frame(width: 21)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("App icon")
-                        .font(NoopHTMLFont.sans(13.5))
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(NoopHTMLColor.ink)
                     Text(selectedAppIcon.detail)
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Color(hex: 0x7F8A85))
                         .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -3651,7 +3651,7 @@ private extension NoopAct5Screens {
                                 .clipShape(RoundedRectangle(cornerRadius: 10.3, style: .continuous))
                                 .shadow(color: .black.opacity(0.34), radius: 6.5, y: 2.3)
                             Text(choice.rawValue)
-                                .font(NoopHTMLFont.sans(11, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                                 .foregroundStyle(selected ? Color(hex: 0x9FE2FB) : Color(hex: 0x8B958F))
                                 .lineLimit(1)
                         }
@@ -3679,7 +3679,7 @@ private extension NoopAct5Screens {
             }
 
             Text("iOS shows its own alert when the icon changes, and the new one can take a moment to appear on the Home Screen. Nothing else about the app changes.")
-                .font(NoopHTMLFont.sans(11))
+                .font(NoopHTMLFont.sans(NoopType.eyebrow))
                 .foregroundStyle(Color(hex: 0x7F8A85))
                 .lineSpacing(3.5)
                 .fixedSize(horizontal: false, vertical: true)
@@ -3714,8 +3714,8 @@ private extension NoopAct5Screens {
             HStack(spacing: 13) {
                 Image(systemName: symbol).font(.system(size: 17, weight: .medium)).foregroundStyle(tint).frame(width: 21)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(titleColor ?? (tint == NoopHTMLColor.blue ? NoopHTMLColor.blueLight : tint))
-                    Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(titleColor ?? (tint == NoopHTMLColor.blue ? NoopHTMLColor.blueLight : tint))
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
                 }
                 Spacer()
             }
@@ -3760,14 +3760,14 @@ private extension NoopAct5Screens {
                             Spacer()
                             HStack(alignment: .firstTextBaseline, spacing: 5) {
                                 Text("56").font(NoopHTMLFont.outfit200(44)).tracking(-1.3)
-                                Text("of 92").font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
+                                Text("of 92").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85))
                             }
                             // Flip-checked against the 402×874 HTML: Swift's one flexible spacer
                             // seats this group six points too high while the header and footer land.
                             .offset(y: 6)
                             VStack(alignment: .leading, spacing: 8) {
                                 widgetChargeTrack
-                                Text("Plenty left").font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.inkSoft)
+                                Text("Plenty left").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.inkSoft)
                             }
                             .offset(y: 1)
                         }
@@ -3777,7 +3777,7 @@ private extension NoopAct5Screens {
                         .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
                         .shadow(color: .black.opacity(0.45), radius: 15, y: 12)
                         Text("How much of the day have I got left? The bar carries the day’s spend, the pale stretch behind it is what you woke with.")
-                            .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color.white.opacity(0.62)).lineSpacing(4)
+                            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color.white.opacity(0.62)).lineSpacing(4)
                     }
                 }
 
@@ -3789,9 +3789,9 @@ private extension NoopAct5Screens {
                                 .offset(y: 1)
                             Spacer()
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("7h 12m").font(NoopHTMLFont.outfit(32, weight: .ultraLight))
+                                Text("7h 12m").font(NoopHTMLFont.outfit(NoopType.title1, weight: .ultraLight))
                                 Text("7m over your need")
-                                    .font(NoopHTMLFont.sans(11))
+                                    .font(NoopHTMLFont.sans(NoopType.eyebrow))
                                     .foregroundStyle(Color(hex: 0x8B958F))
                                     .offset(y: -5)
                             }
@@ -3799,7 +3799,7 @@ private extension NoopAct5Screens {
                             Spacer()
                             // `text-wrap: pretty` deliberately makes this two lines in the HTML.
                             Text("Deep came early. Nothing\nto fix.")
-                                .font(NoopHTMLFont.sans(11))
+                                .font(NoopHTMLFont.sans(NoopType.eyebrow))
                                 .foregroundStyle(NoopHTMLColor.inkSoft)
                                 .lineSpacing(2)
                                 .offset(y: -4)
@@ -3823,7 +3823,7 @@ private extension NoopAct5Screens {
                                             .fill(Self.lavender.opacity(stage.2))
                                             .frame(height: stage.1)
                                         Text(stage.0)
-                                            .font(NoopHTMLFont.sans(8.5))
+                                            .font(NoopHTMLFont.sans(NoopType.eyebrow))
                                             .tracking(0.35)
                                             .foregroundStyle(NoopHTMLColor.muted)
                                             .lineLimit(1)
@@ -3839,7 +3839,7 @@ private extension NoopAct5Screens {
                             .padding(.leading, 12)
                             Spacer()
                             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                                Text("56").font(NoopHTMLFont.outfit(24, weight: .light)).foregroundStyle(NoopHTMLColor.blueLight)
+                                Text("56").font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).foregroundStyle(NoopHTMLColor.blueLight)
                                 NoopSectionLabel("charge", color: Color(hex: 0x7F8A85))
                             }
                             .padding(.leading, 12)
@@ -3854,7 +3854,7 @@ private extension NoopAct5Screens {
                     .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
                     .shadow(color: .black.opacity(0.45), radius: 15, y: 12)
                     Text("What did the night actually give me? Duration against your own need, the four stages, and the charge it left you on.")
-                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color.white.opacity(0.62)).lineSpacing(4)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color.white.opacity(0.62)).lineSpacing(4)
                 }
 
                 widgetSurface(colors: [Color(hex: 0x232323), Color(hex: 0x141414), NoopHTMLColor.canvas]) {
@@ -3863,15 +3863,15 @@ private extension NoopAct5Screens {
                         ZStack {
                             Circle().stroke(Color.white.opacity(0.16), lineWidth: 6)
                             Circle().trim(from: 0, to: 0.56).stroke(NoopHTMLColor.blueLight, style: StrokeStyle(lineWidth: 6, lineCap: .round)).rotationEffect(.degrees(-90))
-                            VStack(spacing: 0) { Text("56").font(NoopHTMLFont.outfit(22, weight: .light)); NoopSectionLabel("chg", color: Color.white.opacity(0.6)) }
+                            VStack(spacing: 0) { Text("56").font(NoopHTMLFont.outfit(NoopType.title3, weight: .light)); NoopSectionLabel("chg", color: Color.white.opacity(0.6)) }
                         }.frame(width: 74, height: 74)
                         VStack(alignment: .leading, spacing: 9) {
                             Text("9:41").font(NoopHTMLFont.outfit200(34))
-                            HStack(spacing: 7) { Circle().fill(NoopHTMLColor.blueLight).frame(width: 6, height: 6).shadow(color: NoopHTMLColor.blueLight.opacity(0.7), radius: 4); Text("Charge 56 · slept 7h 12m").font(NoopHTMLFont.sans(12)) }
+                            HStack(spacing: 7) { Circle().fill(NoopHTMLColor.blueLight).frame(width: 6, height: 6).shadow(color: NoopHTMLColor.blueLight.opacity(0.7), radius: 4); Text("Charge 56 · slept 7h 12m").font(NoopHTMLFont.sans(NoopType.caption)) }
                         }
                     }.padding(.vertical, 6)
                     Text("A glance without unlocking. The ring is the same gauge as the orb, and the inline line replaces the one thing people check the app for.")
-                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color.white.opacity(0.62)).lineSpacing(4)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color.white.opacity(0.62)).lineSpacing(4)
                 }
 
                 }
@@ -3884,10 +3884,10 @@ private extension NoopAct5Screens {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(family.title)
-                                    .font(NoopHTMLFont.sans(13))
+                                    .font(NoopHTMLFont.sans(NoopType.footnote))
                                     .foregroundStyle(NoopHTMLColor.ink)
                                 Text(family.detail)
-                                    .font(NoopHTMLFont.sans(11.5))
+                                    .font(NoopHTMLFont.sans(NoopType.caption))
                                     .foregroundStyle(Color(hex: 0x7F8A85))
                                     .lineSpacing(2.7)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -3895,7 +3895,7 @@ private extension NoopAct5Screens {
                             Spacer(minLength: 8)
                             if family.isNew {
                                 Text("new")
-                                    .font(NoopHTMLFont.sans(9, weight: .semibold))
+                                    .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                                     .tracking(0.9)
                                     .textCase(.uppercase)
                                     .foregroundStyle(NoopHTMLColor.blueLight)
@@ -3920,7 +3920,7 @@ private extension NoopAct5Screens {
                 )
 
                 Text("Long-press your Home Screen, tap the +, and search Noop. Every one of them reads the last sync — none of them wakes the strap on its own, and none of them shows a figure the app itself would withhold.")
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                     .lineSpacing(4)
                     .padding(.horizontal, 2)
@@ -4107,9 +4107,9 @@ private extension NoopAct5Screens {
                     .padding(.bottom, 8)
 
                 VStack(alignment: .leading, spacing: 9) {
-                    Text("Read this once").font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(Color(hex: 0xF6DCB4))
+                    Text("Read this once").font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(Color(hex: 0xF6DCB4))
                     Text("Three of these write a persistent flag to the strap itself. They are marked. Turning such a switch off stops Noop sending it — it does not undo what the strap already stored, so Noop offers to clear it instead of pretending.")
-                        .font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0xC9BFA9)).lineSpacing(4)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0xC9BFA9)).lineSpacing(4)
                 }
                 .padding(.vertical, 1)
                 .padding(.bottom, 2)
@@ -4140,7 +4140,7 @@ private extension NoopAct5Screens {
                 }
 
                 Text("If a probe here changes a reading you care about, it belongs in Settings and not in the Lab. Say so and it will move.")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2).padding(.top, 4)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2).padding(.top, 4)
             }
         }
     }
@@ -4149,7 +4149,7 @@ private extension NoopAct5Screens {
         VStack(alignment: .leading, spacing: 8) {
             NoopSectionLabel(title).padding(.horizontal, 2).padding(.top, 9)
             Text(blurb)
-                .font(NoopHTMLFont.sans(11.5))
+                .font(NoopHTMLFont.sans(NoopType.caption))
                 .foregroundStyle(NoopHTMLColor.faint)
                 .lineSpacing(4)
                 .padding(.horizontal, 2)
@@ -4163,17 +4163,17 @@ private extension NoopAct5Screens {
             HStack(alignment: .top, spacing: 13) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 7) {
-                        Text(title).font(NoopHTMLFont.sans(13.5))
+                        Text(title).font(NoopHTMLFont.sans(NoopType.footnote))
                         if let badge {
                             Text(badge.uppercased())
-                                .font(NoopHTMLFont.sans(9.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                                 .tracking(0.6)
                                 .foregroundStyle(badge == "writes to strap" ? Color(hex: 0xF6DCB4) : Color(hex: 0xC9D0EE))
                                 .padding(.horizontal, 7).frame(minHeight: 21)
                                 .background((badge == "writes to strap" ? Self.warm : Self.lavender).opacity(0.14), in: RoundedRectangle(cornerRadius: 6))
                         }
                     }
-                    Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 NoopA5TintToggle(isOn: labControlIsOn(title), tint: Self.lavender) {
@@ -4181,13 +4181,13 @@ private extension NoopAct5Screens {
                 }
             }
             if let gate {
-                Text(labGateCopy(title, fallback: gate)).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x8B92AE)).lineSpacing(3)
+                Text(labGateCopy(title, fallback: gate)).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x8B92AE)).lineSpacing(3)
             }
             if title == "R22 deep data", let report = live.r22DisableReport {
-                Text(report).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                Text(report).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
             }
             if title == "ECG raw data", let report = live.ecgRawDataGate {
-                Text(report.summary).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
+                Text(report.summary).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
             }
         }
         .padding(.vertical, 14)
@@ -4242,8 +4242,8 @@ private extension NoopAct5Screens {
             HStack(spacing: 13) {
                 Image(systemName: symbol).font(.system(size: 17, weight: .medium)).foregroundStyle(NoopHTMLColor.blue).frame(width: 21)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.blueLight)
-                    Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.blueLight)
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
                 }
                 Spacer()
             }
@@ -4300,7 +4300,7 @@ private extension NoopAct5Screens {
                             Capsule().fill(Color.white.opacity(0.14)).frame(width: 7, height: 7)
                         }
                         Spacer()
-                        Text("Step 2 of 4").font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                        Text("Step 2 of 4").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                     }
 
                     Spacer(minLength: 24)
@@ -4308,9 +4308,9 @@ private extension NoopAct5Screens {
                     VStack(alignment: .leading, spacing: 25) {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("When do you usually sleep?")
-                                .font(NoopHTMLFont.outfit(29, weight: .light)).tracking(-0.9).lineSpacing(1)
+                                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).tracking(-0.9).lineSpacing(1)
                             Text("This is the only question that changes the whole app. Everything else Noop works out by watching for a week.")
-                                .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
+                                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
                         }
 
                         VStack(spacing: 9) {
@@ -4320,9 +4320,9 @@ private extension NoopAct5Screens {
                         }
 
                         VStack(alignment: .leading, spacing: 9) {
-                            Text("What Noop will not ask you").font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                            Text("What Noop will not ask you").font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             Text(NoopPositionCopy.inlineSentence)
-                                .font(NoopHTMLFont.sans(12)).foregroundStyle(Color(hex: 0x939C97)).lineSpacing(4.5)
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x939C97)).lineSpacing(4.5)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(.horizontal, 16)
@@ -4339,7 +4339,7 @@ private extension NoopAct5Screens {
                             navigation.push(.pair)
                         } label: {
                             Text(selectedShift == nil ? "Pick one to continue" : "Continue")
-                                .font(NoopHTMLFont.sans(15, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                                 .foregroundStyle(selectedShift == nil ? NoopHTMLColor.muted : Self.blushDark)
                                 .frame(maxWidth: .infinity).frame(minHeight: 56)
                                 .background(selectedShift == nil ? Color.white.opacity(0.07) : Self.blush, in: RoundedRectangle(cornerRadius: 18))
@@ -4352,7 +4352,7 @@ private extension NoopAct5Screens {
                             selectedShift = nil
                             navigation.push(.pair)
                         }
-                        .font(NoopHTMLFont.sans(13))
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(Color(hex: 0x7F8A85))
                         .frame(height: 42)
                     }
@@ -4379,8 +4379,8 @@ private extension NoopAct5Screens {
                     .overlay(Circle().stroke(selected ? Self.blush : Color.white.opacity(0.22), lineWidth: 1.5))
                     .overlay(Circle().stroke(NoopHTMLColor.canvas, lineWidth: selected ? 4 : 0))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(NoopHTMLFont.sans(14.5, weight: .semibold))
-                    Text(detail).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
+                    Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
                 }
                 Spacer()
             }
@@ -4406,7 +4406,7 @@ private extension NoopAct5Screens {
                         Button(action: navigation.back) {
                             NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft)
                                 .offset(x: -1)
-                                .frame(width: 34, height: 34)
+                                .frame(width: 32, height: 32).noopHitTarget()
                                 .background(Color.white.opacity(0.06), in: Circle())
                                 .overlay(Circle().stroke(Color.white.opacity(0.09), lineWidth: 0.5))
                         }
@@ -4424,19 +4424,19 @@ private extension NoopAct5Screens {
 
                         VStack(spacing: 9) {
                             Text(paired ? "That is everything." : "Hold the button until it blinks.")
-                                .font(NoopHTMLFont.outfit(27, weight: .light)).tracking(-0.8).multilineTextAlignment(.center)
+                                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).tracking(-0.8).multilineTextAlignment(.center)
                             Text(paired
                                  ? "Three nights were buffered on the strap and they are importing now. Noop will watch for a week before it tells you anything — the first read arrives next Sunday."
                                  : "Noop found one strap nearby. Nothing is connected until you tap Connect, and pairing does not send anything anywhere.")
-                                .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy).multilineTextAlignment(.center).lineSpacing(4).frame(maxWidth: 290)
+                                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy).multilineTextAlignment(.center).lineSpacing(4).frame(maxWidth: 290)
                         }
 
                         HStack(spacing: 13) {
                             NoopCanonicalGlyph(name: .watch, size: 20, color: NoopHTMLColor.blue)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("WHOOP 5.0 / MG").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                Text("WHOOP 5.0 / MG").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 Text(paired ? "connected · 52% · importing 3 nights" : "signal strong · 52% battery")
-                                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                             }
                             Spacer()
                             NoopPill(text: paired ? "Connected" : "Found", color: paired ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
@@ -4455,7 +4455,7 @@ private extension NoopAct5Screens {
                             if paired { navigation.back() } else { paired = true; activeDevice = "mg"; connected = true }
                         } label: {
                             Text(paired ? "Back to your straps" : "Connect")
-                                .font(NoopHTMLFont.sans(15, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.blueInk)
                                 .frame(maxWidth: .infinity).frame(minHeight: 58)
                                 .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 19))
@@ -4465,7 +4465,7 @@ private extension NoopAct5Screens {
                         Text(paired
                              ? "You can wear it loosely. Noop would rather have an imperfect night than none."
                              : "If nothing appears, the strap is asleep — put it on the charger for a moment.")
-                            .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).multilineTextAlignment(.center).lineSpacing(3)
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).multilineTextAlignment(.center).lineSpacing(3)
                     }
                 }
                 .frame(width: max(0, canvasWidth - 44))
@@ -4546,12 +4546,12 @@ private extension NoopAct5Screens {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("What Noop will not ask you")
-                            .font(NoopHTMLFont.outfit(25))
+                            .font(NoopHTMLFont.outfit(NoopType.title2))
                             .tracking(-0.625)
                             .foregroundStyle(NoopHTMLColor.ink)
                             .fixedSize(horizontal: false, vertical: true)
                         Text(NoopPositionCopy.lead)
-                            .font(NoopHTMLFont.sans(13.5))
+                            .font(NoopHTMLFont.sans(NoopType.footnote))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .lineSpacing(4)
                             .fixedSize(horizontal: false, vertical: true)
@@ -4561,10 +4561,10 @@ private extension NoopAct5Screens {
                         ForEach(Array(NoopPositionCopy.denials.enumerated()), id: \.offset) { index, denial in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(denial.title)
-                                    .font(NoopHTMLFont.sans(14, weight: .semibold))
+                                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                                     .foregroundStyle(NoopHTMLColor.ink)
                                 Text(denial.reason)
-                                    .font(NoopHTMLFont.sans(12.5))
+                                    .font(NoopHTMLFont.sans(NoopType.caption))
                                     .foregroundStyle(NoopHTMLColor.copy)
                                     .lineSpacing(4.2)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -4585,10 +4585,10 @@ private extension NoopAct5Screens {
                     // The counterweight, so the screen is not five refusals and nothing else.
                     VStack(alignment: .leading, spacing: 8) {
                         Text(NoopPositionCopy.asksTitle)
-                            .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                             .foregroundStyle(NoopHTMLColor.ink)
                         Text(NoopPositionCopy.asks)
-                            .font(NoopHTMLFont.sans(12.5))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .lineSpacing(4.2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -4599,7 +4599,7 @@ private extension NoopAct5Screens {
                     .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Self.blush.opacity(0.20), lineWidth: 0.5))
 
                     Text(NoopPositionCopy.foot)
-                        .font(NoopHTMLFont.sans(11.5))
+                        .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
@@ -4644,11 +4644,11 @@ struct NoopLivePairScreen: View {
                         ZStack {
                             Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                             NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
-                        }.frame(width: 34, height: 34)
+                        }.frame(width: 32, height: 32).noopHitTarget()
                     }.buttonStyle(NoopHTMLPressStyle())
                     Spacer()
                     Text(registered ? "PAIRED" : "LOOKING")
-                        .font(NoopHTMLFont.sans(10.5, weight: .semibold)).tracking(1.5)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.5)
                         .foregroundStyle(Color(hex: 0x7F8A85))
                     Spacer()
                     Color.clear.frame(width: 34, height: 34)
@@ -4663,9 +4663,9 @@ struct NoopLivePairScreen: View {
                             model.presentWhoopScan(model: option)
                         } label: {
                             Text(option.displayName)
-                                .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                                 .foregroundStyle(option == family ? NoopHTMLColor.blueInk : NoopHTMLColor.inkSoft)
-                                .frame(maxWidth: .infinity).frame(minHeight: 38)
+                                .frame(maxWidth: .infinity).frame(minHeight: 40)
                                 .background(option == family ? NoopHTMLColor.blue : Color.white.opacity(0.05),
                                             in: RoundedRectangle(cornerRadius: 13))
                         }
@@ -4678,13 +4678,13 @@ struct NoopLivePairScreen: View {
 
                 VStack(spacing: 9) {
                     Text(registered ? "That is everything." : "Hold the button until it blinks.")
-                        .font(NoopHTMLFont.outfit(27, weight: .light)).tracking(-0.8).multilineTextAlignment(.center)
+                        .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).tracking(-0.8).multilineTextAlignment(.center)
                     Text(registered
                          ? "Noop is connecting and will import what the strap has buffered. It watches for a week before it tells you anything."
                          : found.isEmpty
                             ? "Looking for a \(family.displayName) nearby. Nothing is connected until you tap Connect, and pairing does not send anything anywhere."
                             : "Noop found \(found.count == 1 ? "one strap" : "\(found.count) straps") nearby. Nothing is connected until you tap Connect, and pairing does not send anything anywhere.")
-                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         .multilineTextAlignment(.center).lineSpacing(4).frame(maxWidth: 300)
                 }
 
@@ -4696,9 +4696,9 @@ struct NoopLivePairScreen: View {
                                 NoopCanonicalGlyph(name: .watch, size: 20, color: NoopHTMLColor.blue)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(strap.name.isEmpty ? family.displayName : strap.name)
-                                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                     Text(Self.signal(strap.rssi))
-                                        .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0x7F8A85))
+                                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
                                 }
                                 Spacer()
                                 NoopPill(text: registered && selected ? "Connected" : selected ? "Chosen" : "Found",
@@ -4717,7 +4717,7 @@ struct NoopLivePairScreen: View {
                 VStack(spacing: 8) {
                     Button { registered ? leave() : connect() } label: {
                         Text(registered ? "Back to your straps" : "Connect")
-                            .font(NoopHTMLFont.sans(15, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                             .foregroundStyle(canConnect || registered ? NoopHTMLColor.blueInk : NoopHTMLColor.muted)
                             .frame(maxWidth: .infinity).frame(minHeight: 58)
                             .background(canConnect || registered ? NoopHTMLColor.blue : Color.white.opacity(0.07),
@@ -4728,7 +4728,7 @@ struct NoopLivePairScreen: View {
                     Text(registered
                          ? "You can wear it loosely. Noop would rather have an imperfect night than none."
                          : "If nothing appears, the strap is asleep — put it on the charger for a moment.")
-                        .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                         .multilineTextAlignment(.center).lineSpacing(3)
                 }
             }
@@ -4804,7 +4804,7 @@ struct NoopStrapSyncButton: View {
                     icon
                     Text(title).contentTransition(.opacity)
                 }
-                .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                 .foregroundStyle(ink)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
@@ -4816,7 +4816,7 @@ struct NoopStrapSyncButton: View {
 
             TimelineView(.periodic(from: .now, by: 30)) { _ in
                 Text(caption)
-                    .font(NoopHTMLFont.sans(11.5))
+                    .font(NoopHTMLFont.sans(NoopType.caption))
                     .foregroundStyle(captionColor)
                     .frame(maxWidth: .infinity)
             }

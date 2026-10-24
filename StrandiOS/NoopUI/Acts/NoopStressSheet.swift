@@ -126,7 +126,7 @@ struct NoopStressSheet: View {
                 overnightCard
                 if let onBreathe { breatheCard(onBreathe) }
                 Text(methodNote)
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
                     .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 4)
             }
@@ -144,12 +144,12 @@ struct NoopStressSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Stress").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                 Text(Date().formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                    .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             }
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                    .frame(width: 32, height: 32).background(Color.white.opacity(0.07), in: Circle())
+                    .frame(width: 32, height: 32).noopHitTarget().background(Color.white.opacity(0.07), in: Circle())
             }
             .accessibilityLabel("Close")
         }
@@ -200,7 +200,7 @@ struct NoopStressSheet: View {
             text = t
         }
         return Text(text)
-            .font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.inkSoft)
+            .font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.inkSoft)
             .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -219,7 +219,7 @@ struct NoopStressSheet: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     label("Today")
                     Text("vs typical \(weekday)".uppercased())
-                        .font(NoopHTMLFont.sans(10.5, weight: .semibold)).tracking(1.2)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.2)
                         .foregroundStyle(NoopHTMLColor.faint)
                 }
                 bandBar(today, dim: false)
@@ -234,7 +234,7 @@ struct NoopStressSheet: View {
                      : report.loaded
                         ? "No earlier \(weekday) has enough scored hours yet. The comparison appears once one does."
                         : "Reading your last \(NoopStressReport.weeksBack) \(weekday)s…")
-                    .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.faint)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -263,13 +263,13 @@ struct NoopStressSheet: View {
     private func column(_ name: String, _ minutes: Int, _ typical: Int?, _ color: Color, higherIsBetter: Bool?) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(NoopStressSheet.clock(minutes))
-                .font(NoopHTMLFont.outfit(21)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+                .font(NoopHTMLFont.outfit(NoopType.title3)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
             if let typical, typical > 0 {
                 let delta = Double(minutes - typical) / Double(typical)
                 let good = higherIsBetter.map { $0 == (delta >= 0) }
                 HStack(spacing: 3) {
                     Image(systemName: delta >= 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill").font(.system(size: 7))
-                    Text("\(Int(abs(delta * 100).rounded()))%").font(NoopHTMLFont.sans(10.5, weight: .semibold)).monospacedDigit()
+                    Text("\(Int(abs(delta * 100).rounded()))%").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).monospacedDigit()
                 }
                 .foregroundStyle(good == nil ? NoopHTMLColor.inkSoft : good! ? Color(hex: 0x8FE3B4) : NoopStressPalette.high)
                 .padding(.horizontal, 6).frame(minHeight: 20)
@@ -277,7 +277,7 @@ struct NoopStressSheet: View {
             }
             HStack(spacing: 5) {
                 RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 8, height: 8)
-                Text(name.uppercased()).font(NoopHTMLFont.sans(10.5, weight: .semibold)).tracking(0.8)
+                Text(name.uppercased()).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(0.8)
                     .foregroundStyle(NoopHTMLColor.copy)
             }
         }
@@ -296,13 +296,13 @@ struct NoopStressSheet: View {
                         label("Coming into today")
                         Spacer()
                         Text("\(m.score.formatted(.number.precision(.fractionLength(1)))) \u{00B7} \(NoopStressPalette.name(m.score))")
-                            .font(NoopHTMLFont.sans(12, weight: .semibold))
+                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             .foregroundStyle(NoopStressPalette.color(m.score))
                             .padding(.horizontal, 9).frame(minHeight: 24)
                             .background(NoopStressPalette.color(m.score).opacity(0.13), in: Capsule())
                     }
                     Text(m.explanation)
-                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.inkSoft)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.inkSoft)
                         .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 0) {
                         overnightStat("Resting pulse", m.rhrToday.map { "\($0)" }, "bpm",
@@ -323,7 +323,7 @@ struct NoopStressSheet: View {
                             .chartYScale(domain: 0...3)
                             .chartXAxis(.hidden).chartYAxis(.hidden)
                             .frame(height: 46)
-                            Text("Last \(m.sparkValues.count) nights").font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                            Text("Last \(m.sparkValues.count) nights").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                         }
                     }
                 }
@@ -333,12 +333,12 @@ struct NoopStressSheet: View {
 
     private func overnightStat(_ name: String, _ value: String?, _ unit: String?, _ note: String?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(name).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
+            Text(name).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(value ?? "\u{2014}").font(NoopHTMLFont.outfit(19)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
-                if let unit, value != nil { Text(unit).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint) }
+                Text(value ?? "\u{2014}").font(NoopHTMLFont.outfit(NoopType.title3)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+                if let unit, value != nil { Text(unit).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint) }
             }
-            if let note { Text(note).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint).lineLimit(1).minimumScaleFactor(0.8) }
+            if let note { Text(note).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineLimit(1).minimumScaleFactor(0.8) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -354,9 +354,9 @@ struct NoopStressSheet: View {
                                          center: .center, startRadius: 2, endRadius: 22))
                     .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Bring it down").font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text("Bring it down").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                     Text("Breathe with the orb: four in, four held, four out, four held.")
-                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
@@ -419,8 +419,8 @@ struct NoopStressSheet: View {
                     .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                         VStack(spacing: 1) {
                             Text("\(p.level.formatted(.number.precision(.fractionLength(1)))) · \(NoopStressPalette.name(p.level))")
-                                .font(NoopHTMLFont.sans(12, weight: .semibold))
-                            Text(AppClock.hourMinuteFormatter().string(from: p.time)).font(NoopHTMLFont.sans(10))
+                                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
+                            Text(AppClock.hourMinuteFormatter().string(from: p.time)).font(NoopHTMLFont.sans(NoopType.eyebrow))
                                 .foregroundStyle(NoopHTMLColor.copy)
                         }
                         .foregroundStyle(NoopHTMLColor.ink)
@@ -438,12 +438,12 @@ struct NoopStressSheet: View {
             AxisMarks(position: .leading, values: [0, 1, 2, 3]) { v in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.white.opacity(0.06))
                 AxisValueLabel { Text("\(v.as(Int.self) ?? 0).0") }
-                    .font(NoopHTMLFont.sans(9.5)).foregroundStyle(NoopHTMLColor.faint)
+                    .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
             }
         }
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                AxisValueLabel(format: .dateTime.hour()).font(NoopHTMLFont.sans(9.5)).foregroundStyle(NoopHTMLColor.faint)
+                AxisValueLabel(format: .dateTime.hour()).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
             }
         }
         .chartOverlay { proxy in
@@ -544,11 +544,11 @@ struct NoopStressGauge: View {
                     .foregroundStyle(NoopHTMLColor.ink)
                 if let level {
                     Text(NoopStressPalette.name(level).uppercased())
-                        .font(NoopHTMLFont.sans(13, weight: .bold)).tracking(2)
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .bold)).tracking(2)
                         .foregroundStyle(NoopStressPalette.color(level))
                 }
                 Text(updated.map { "Updated \(AppClock.hourMinuteFormatter().string(from: $0))" } ?? "No scored hour yet today")
-                    .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint)
+                    .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                     .padding(.top, 2)
             }
             .offset(y: 6)
@@ -557,7 +557,7 @@ struct NoopStressGauge: View {
                 Spacer()
                 Text("3")
             }
-            .font(NoopHTMLFont.sans(11, weight: .semibold)).foregroundStyle(NoopHTMLColor.faint)
+            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.faint)
             .frame(width: size * 0.62)
             .offset(y: size * 0.42)
         }
@@ -566,7 +566,7 @@ struct NoopStressGauge: View {
         .overlay(alignment: .bottom) {
             if let comparison {
                 Text(comparison)
-                    .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                     .padding(.horizontal, 12).frame(minHeight: 28)
                     .background(Color.white.opacity(0.06), in: Capsule())
                     .offset(y: 30)

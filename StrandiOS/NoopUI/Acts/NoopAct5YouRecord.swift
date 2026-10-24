@@ -81,7 +81,7 @@ import SwiftUI
 struct NoopLaterChip: View {
     var body: some View {
         Text("Later")
-            .font(NoopHTMLFont.sans(9.5, weight: .semibold))
+            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
             .tracking(0.95)
             .textCase(.uppercase)
             .foregroundStyle(Color(hex: 0x7F8A85))
