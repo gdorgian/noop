@@ -459,20 +459,20 @@ struct NoopAct2Screens: View {
 
     /// Today's sections in their default order. The header and the look-back banner stay above them.
     static let todaySections: [NoopPageSection] = [
-        NoopPageSection(id: "rings-gyro", title: "Rings · Gyro", detail: "Three orbits turning around a glowing core"),
-        NoopPageSection(id: "rings-donuts", title: "Rings · Donuts", detail: "Three thick rings in a card, with strain's target"),
-        NoopPageSection(id: "rings-dials", title: "Rings · Dials", detail: "Three plain dials, recovery coloured by its band"),
-        NoopPageSection(id: "rings", title: "Rings · Living", detail: "Recovery, strain and sleep as living rings"),
-        NoopPageSection(id: "rings-segmented", title: "Rings · Segmented", detail: "Sleep in its stages, strain heating up, recovery on a gauge"),
+        NoopPageSection(id: "rings-gyro", title: "Rings · Gyro", detail: "Three orbits turning around a glowing core", onByDefault: false),
+        NoopPageSection(id: "rings-donuts", title: "Rings · Donuts", detail: "Three thick rings in a card, with strain's target", onByDefault: false),
+        NoopPageSection(id: "rings-dials", title: "Rings · Dials", detail: "Three plain dials, recovery coloured by its band", onByDefault: false),
+        NoopPageSection(id: "rings", title: "Rings · Living", detail: "Recovery, strain and sleep as living rings", onByDefault: false),
+        NoopPageSection(id: "rings-segmented", title: "Rings · Segmented", detail: "Sleep in its stages, strain heating up, recovery on a gauge", onByDefault: false),
         NoopPageSection(id: "breathe", title: "Breathing orb", detail: "Your pulse as a breathing sphere; tap it to breathe"),
         NoopPageSection(id: "sleep", title: "Last night", detail: "Sleep against your need"),
-        NoopPageSection(id: "sleep-tide", title: "Last night · Tide", detail: "The night drawn as water, its depth the depth of sleep"),
+        NoopPageSection(id: "sleep-tide", title: "Last night · Tide", detail: "The night drawn as water, its depth the depth of sleep", onByDefault: false),
         NoopPageSection(id: "coach", title: "Svea", detail: "Your morning read and the conversation"),
         NoopPageSection(id: "day", title: "Your day", detail: "Heart rate from bedtime to now, with stress"),
         NoopPageSection(id: "energy", title: "Energy", detail: "What today has cost"),
-        NoopPageSection(id: "energy-reservoir", title: "Energy · Reservoir", detail: "The day's burn filling toward midnight"),
+        NoopPageSection(id: "energy-reservoir", title: "Energy · Reservoir", detail: "The day's burn filling toward midnight", onByDefault: false),
         NoopPageSection(id: "vitals", title: "Vitals", detail: "Five signals, each against your own zone"),
-        NoopPageSection(id: "vitals-constellation", title: "Vitals · Constellation", detail: "Five signals as stars around your own zone"),
+        NoopPageSection(id: "vitals-constellation", title: "Vitals · Constellation", detail: "Five signals as stars around your own zone", onByDefault: false),
         NoopPageSection(id: "stress", title: "Stress", detail: "Shown until today has a scored stress line"),
         NoopPageSection(id: "logged", title: "Logged today", detail: "What you logged for today")
     ]
@@ -496,7 +496,7 @@ struct NoopAct2Screens: View {
         case "stress": return !(day == nil || (day?.stressTimeline.allSatisfy { $0.level == nil } ?? true))
         case "logged": return !navigation.dayLogSaved
         case "sleep-tide": return day?.rest.latest == nil
-        case "energy-reservoir": return day?.energy?.totalBurnedSoFar == nil
+        case "energy-reservoir": return day?.energy == nil
         default: return false
         }
     }

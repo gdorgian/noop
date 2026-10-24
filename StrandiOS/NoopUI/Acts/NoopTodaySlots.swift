@@ -248,8 +248,8 @@ struct NoopSleepTide: View {
                     .gesture(DragGesture(minimumDistance: 0)
                         .onChanged { g in
                             let f = min(1, max(0, g.location.x / max(1, geo.size.width)))
-                            if let old = scrub, stage(at: old) != stage(at: f) { UISelectionFeedbackGenerator().selectionChanged() }
-                            if scrub == nil { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+                            if let old = scrub, stage(at: old) != stage(at: f) { NoopHaptics.play(.tick) }
+                            if scrub == nil { NoopHaptics.play(.lift) }
                             scrub = f
                         }
                         .onEnded { _ in withAnimation(.easeOut(duration: 0.25)) { scrub = nil } })
@@ -381,10 +381,13 @@ struct NoopEnergyReservoir: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var burned: Double { summary.totalBurnedSoFar ?? 0 }
+    /// Nothing measured yet today: the glass stands empty, with the modelled day at rest marked.
+    private var measured: Bool { summary.totalBurnedSoFar != nil }
     private var active: Double { summary.activeBurnedSoFar ?? 0 }
     private var basal: Double { summary.basalBurnedSoFar ?? burned }
     private var capacity: Double {
         max(burned * 1.05, summary.projectedRangeKcal?.upperBound ?? summary.projectedTotalBurn ?? summary.estimatedBMR24h ?? burned * 1.5, 1)
+            * (measured ? 1 : 1.2)
     }
 
     var body: some View {
@@ -392,6 +395,16 @@ struct NoopEnergyReservoir: View {
             NoopSlotCard(tint: Self.basalColor) {
                 HStack(alignment: .center, spacing: 20) {
                     glass.frame(width: 96, height: 148)
+                    if !measured {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Nothing measured yet today")
+                                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            Text(summary.estimatedBMR24h.map { "A day at rest would come to about \($0.formatted(.number.precision(.fractionLength(0)))) kcal. The glass fills as the strap records." }
+                                 ?? "The glass fills as the strap records.")
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    } else {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .lastTextBaseline, spacing: 6) {
                             NoopCountUp(value: burned, format: { $0.formatted(.number.precision(.fractionLength(0))) },
@@ -405,6 +418,7 @@ struct NoopEnergyReservoir: View {
                         Spacer().frame(height: 6)
                         legend("Resting", basal, Self.basalColor)
                         legend("Moving", active, Self.activeColor)
+                    }
                     }
                     Spacer(minLength: 0)
                 }
@@ -431,7 +445,7 @@ struct NoopEnergyReservoir: View {
                         .float(Float(-tan(tilt) * 96 / 148)), .float(Float(slosh + 0.25 * max(0, 1 - level))),
                         .float(Float(share)), .color(Self.basalColor), .color(Self.activeColor)))
                     .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                if let p = summary.projectedTotalBurn {
+                if let p = summary.projectedTotalBurn ?? (measured ? nil : summary.estimatedBMR24h) {
                     GeometryReader { g in
                         Rectangle().fill(Color.white.opacity(0.35)).frame(height: 1)
                             .padding(.horizontal, 10)

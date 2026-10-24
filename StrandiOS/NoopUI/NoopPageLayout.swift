@@ -7,6 +7,9 @@ import SwiftUI
 // later build is not one the wearer removed, so it is slotted in at its default place the first
 // time the page sees it. Editing happens on the live page: each section gets a remove disc and can
 // be dragged, and the page's own spacing is kept, with no titles added between sections.
+//
+// A page opens in its original look: only sections marked `onByDefault` are on it until the wearer
+// adds others. Alternative designs sit in the Add sheet.
 
 struct NoopPageSection: Identifiable, Hashable {
     let id: String
@@ -14,6 +17,11 @@ struct NoopPageSection: Identifiable, Hashable {
     /// One line for the Add sheet and for the placeholder an empty section shows while editing.
     let detail: String
     var removable = true
+    /// On the page before the wearer changes anything. Alternative designs are off, waiting in Add.
+    var onByDefault = true
+    /// Stays interactive while the page is being edited, for a section with its own controls in edit
+    /// mode (hiding cards inside it, say). Others are drawn but not touchable while editing.
+    var liveWhileEditing = false
 }
 
 @MainActor
@@ -24,18 +32,29 @@ final class NoopPageLayout: ObservableObject {
 
     private var orderKey: String { "noop.layout.\(page)" }
     private var knownKey: String { "noop.layout.\(page).known" }
+    private var versionKey: String { "noop.layout.\(page).version" }
+
+    /// Raised when the meaning of a saved layout changes. Version 2: alternative sections became
+    /// off by default, so layouts saved before then (which held every section) start over.
+    static let version = 2
 
     init(page: String, catalog: [NoopPageSection]) {
         self.page = page
         self.catalog = catalog
         let defaults = UserDefaults.standard
-        let ids = catalog.map(\.id)
+        let ids = catalog.filter(\.onByDefault).map(\.id)
+        if defaults.integer(forKey: "noop.layout.\(page).version") < Self.version {
+            defaults.removeObject(forKey: "noop.layout.\(page)")
+            defaults.removeObject(forKey: "noop.layout.\(page).known")
+            defaults.set(Self.version, forKey: "noop.layout.\(page).version")
+        }
         guard let saved = defaults.string(forKey: "noop.layout.\(page)") else {
             order = ids
             return
         }
+        let allIDs = catalog.map(\.id)
         let known = Set((defaults.string(forKey: "noop.layout.\(page).known") ?? saved).split(separator: ",").map(String.init))
-        var result = saved.split(separator: ",").map(String.init).filter(ids.contains)
+        var result = saved.split(separator: ",").map(String.init).filter(allIDs.contains)
         // New sections go in after the nearest section above them in the default order.
         for (index, id) in ids.enumerated() where !known.contains(id) && !result.contains(id) {
             let before = ids[..<index].last { result.contains($0) }
@@ -55,9 +74,10 @@ final class NoopPageLayout: ObservableObject {
         order = newOrder
         UserDefaults.standard.set(newOrder.joined(separator: ","), forKey: orderKey)
         UserDefaults.standard.set(catalog.map(\.id).joined(separator: ","), forKey: knownKey)
+        UserDefaults.standard.set(Self.version, forKey: versionKey)
     }
 
-    var defaultOrder: [String] { catalog.map(\.id) }
+    var defaultOrder: [String] { catalog.filter(\.onByDefault).map(\.id) }
 }
 
 /// The edit session a page holds: the order being edited, kept apart until Save.
@@ -122,6 +142,8 @@ struct NoopEditableSections<Section: View>: View {
             }
             foot.padding(.top, 14)
         }
+        // Room for Cancel and Save, so the first section's remove disc never sits under them.
+        .padding(.top, editing.active ? 52 : 0)
         .coordinateSpace(name: "noop.sections")
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { screenFrame = $0 }
         .onChange(of: editing.saves) {
@@ -151,7 +173,7 @@ struct NoopEditableSections<Section: View>: View {
             if isEmpty(id) {
                 NoopSectionPlaceholder(title: info?.title ?? id, detail: info?.detail ?? "")
             } else {
-                section(id).allowsHitTesting(false)
+                section(id).allowsHitTesting(info?.liveWhileEditing ?? false)
             }
         }
         .frame(maxWidth: .infinity)
@@ -167,7 +189,7 @@ struct NoopEditableSections<Section: View>: View {
         .overlay(alignment: .topLeading) {
             if (info?.removable ?? true) && dragging == nil {
                 Button {
-                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.6)
+                    NoopHaptics.play(.remove)
                     withAnimation(.easeInOut(duration: 0.22)) { editing.draft.removeAll { $0 == id } }
                 } label: {
                     Image(systemName: "minus")
@@ -217,7 +239,7 @@ struct NoopEditableSections<Section: View>: View {
     private func carry(_ id: String, _ phase: NoopReorderPress.Phase) {
         switch phase {
         case .began:
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            NoopHaptics.play(.lift)
             withAnimation(.easeOut(duration: 0.15)) {
                 dragging = id
                 dragStartMid = frames[id]?.midY ?? 0
@@ -234,7 +256,7 @@ struct NoopEditableSections<Section: View>: View {
                     order.insert(id, at: min(target, order.count))
                     editing.draft = order
                 }
-                UISelectionFeedbackGenerator().selectionChanged()
+                NoopHaptics.play(.pass)
             }
         case .ended:
             withAnimation(.spring(duration: 0.3)) {
@@ -242,7 +264,7 @@ struct NoopEditableSections<Section: View>: View {
                 dragTranslation = 0
             }
             // It lands like a drop: the page moves out from its edges, and the phone feels it.
-            NoopDropHaptic.play(strength: 0.7)
+            NoopHaptics.play(.land)
             if let landed = frames[id] {
                 send(NoopSurfaceWave(origin: landed, delay: 0.12, source: id))
             }
@@ -269,13 +291,14 @@ struct NoopEditableSections<Section: View>: View {
                     .buttonStyle(NoopHTMLPressStyle())
                 }
                 NoopActionButton(title: "Reset to default", variant: .plain, size: .small) {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    NoopHaptics.play(.add)
                     withAnimation(.easeInOut(duration: 0.25)) { editing.draft = layout.defaultOrder }
                 }
             }
         } else {
             NoopActionButton(title: "Edit page", variant: .secondary, size: .medium) {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                NoopHaptics.prepare()
+                NoopHaptics.play(.enterEdit)
                 editing.draft = layout.order
                 withAnimation(.easeInOut(duration: 0.22)) { editing.active = true }
             }
@@ -429,7 +452,7 @@ private struct NoopReorderRecognizer: UIGestureRecognizerRepresentable {
             let moving = abs(next - current) > 0.5
             if moving != scrolling {
                 // A soft bump when the page starts to carry along, and again when it reaches an end.
-                UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: moving ? 0.6 : 0.9)
+                NoopHaptics.play(moving ? .edge : .tick)
                 scrolling = moving
             }
             guard moving else { return }
@@ -485,7 +508,7 @@ private struct NoopAddSectionSheet<Section: View>: View {
                 VStack(alignment: .leading, spacing: 22) {
                     ForEach(layout.catalog.filter { !editing.draft.contains($0.id) }) { info in
                         Button {
-                            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                            NoopHaptics.play(.add)
                             withAnimation(.easeInOut(duration: 0.22)) { editing.draft.append(info.id) }
                             dismiss()
                         } label: {
@@ -532,7 +555,7 @@ struct NoopEditBar: ViewModifier {
             if editing.active {
                 HStack {
                     NoopActionButton(title: "Cancel", variant: .secondary, size: .small, fullWidth: false) {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        NoopHaptics.play(.cancel)
                         withAnimation(.easeInOut(duration: 0.22)) { editing.active = false }
                     }
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: NoopControlSize.small.height / 2))
@@ -541,7 +564,7 @@ struct NoopEditBar: ViewModifier {
                         layout.save(editing.draft)
                         withAnimation(.easeInOut(duration: 0.22)) { editing.active = false }
                         editing.saves += 1
-                        NoopDropHaptic.play()
+                        NoopHaptics.play(.save)
                     }
                 }
                 .padding(.horizontal, 20)

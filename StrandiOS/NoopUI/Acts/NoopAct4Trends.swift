@@ -155,7 +155,7 @@ private struct NoopTrendsScreen: View {
     static let trendsSections: [NoopPageSection] = [
         NoopPageSection(id: "hero", title: "Body age", detail: "The orb, your body age and pace of aging"),
         NoopPageSection(id: "markers", title: "Markers", detail: "The measures you pinned"),
-        NoopPageSection(id: "markers-tiles", title: "Markers · Tiles", detail: "Your pinned measures as a grid of tiles"),
+        NoopPageSection(id: "markers-tiles", title: "Markers · Tiles", detail: "Your pinned measures as a grid of tiles", onByDefault: false),
         NoopPageSection(id: "changes", title: "What changed", detail: "The window's verdict, six weeks to a year"),
         NoopPageSection(id: "bloodwork", title: "Bloodwork", detail: "Your lab results"),
         NoopPageSection(id: "explore", title: "Explore", detail: "Compare signals and relationships"),

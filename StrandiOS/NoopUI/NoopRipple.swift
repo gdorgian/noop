@@ -38,48 +38,118 @@ struct NoopSurfaceWave: Equatable {
     }
 }
 
-/// The drop, felt: one firm, slightly soft hit, a low swell under it, then softer taps as each ring
-/// passes, fading with the picture.
-enum NoopDropHaptic {
-    @MainActor private static var engine: CHHapticEngine?
+/// Noop's haptic language: one engine, one pattern per action, designed as a set. Each pattern has
+/// a shape the hand can tell apart: a lift rises then catches, a pass is a crisp detent, a landing is
+/// a soft thud whose aftershocks follow the wave through the page, a save is a drop into water with
+/// ripples spreading and thinning, a removal is a small pop, an addition settles in.
+@MainActor
+enum NoopHaptics {
+    enum Kind { case enterEdit, lift, pass, land, save, remove, add, cancel, edge, tick }
 
-    /// `strength` scales every part of it: 1 for a save, less for a section set down.
-    @MainActor
-    static func play(strength: Float = 1) {
-        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else {
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+    private static var engine: CHHapticEngine?
+    private static var players: [Kind: CHHapticPatternPlayer] = [:]
+
+    /// Starts the engine ahead of a burst of feedback (entering edit mode), so the first one is on time.
+    static func prepare() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+        if engine == nil {
+            guard let made = try? CHHapticEngine() else { return }
+            made.isAutoShutdownEnabled = true
+            made.playsHapticsOnly = true
+            made.resetHandler = { [weak made] in
+                try? made?.start()
+                Task { @MainActor in players = [:] }
+            }
+            made.stoppedHandler = { _ in Task { @MainActor in players = [:] } }
+            engine = made
+        }
+        try? engine?.start()
+    }
+
+    static func play(_ kind: Kind) {
+        guard !UIAccessibility.isReduceMotionEnabled || kind == .tick || kind == .pass else {
+            // Reduce Motion keeps feedback, plainer.
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.7)
+            return
+        }
+        prepare()
+        guard let engine else {
+            UIImpactFeedbackGenerator(style: kind == .pass || kind == .tick ? .light : .medium).impactOccurred()
             return
         }
         do {
-            if engine == nil {
-                let made = try CHHapticEngine()
-                made.isAutoShutdownEnabled = true
-                made.resetHandler = { [weak made] in try? made?.start() }
-                engine = made
-            }
-            try engine?.start()
-            try engine?.makePlayer(with: pattern(strength)).start(atTime: CHHapticTimeImmediate)
+            let player = try players[kind] ?? engine.makePlayer(with: pattern(kind))
+            players[kind] = player
+            try player.start(atTime: CHHapticTimeImmediate)
         } catch {
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            players[kind] = nil
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         }
     }
 
-    private static func pattern(_ strength: Float) throws -> CHHapticPattern {
-        func tap(_ time: TimeInterval, _ intensity: Float, _ sharpness: Float) -> CHHapticEvent {
-            CHHapticEvent(eventType: .hapticTransient, parameters: [
-                CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity * strength),
-                CHHapticEventParameter(parameterID: .hapticSharpness, value: sharpness)
-            ], relativeTime: time)
-        }
-        let swell = CHHapticEvent(eventType: .hapticContinuous, parameters: [
-            CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.45 * strength),
-            CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.08)
-        ], relativeTime: 0.02, duration: 0.5)
-        let fade = CHHapticParameterCurve(parameterID: .hapticIntensityControl, controlPoints: [
-            .init(relativeTime: 0, value: 1), .init(relativeTime: 0.5, value: 0)
-        ], relativeTime: 0.02)
-        let rings = [(0.16, 0.42), (0.31, 0.30), (0.48, 0.21), (0.67, 0.14), (0.88, 0.09)]
-        let events = [tap(0, 0.95, 0.45), swell] + rings.map { tap($0.0, Float($0.1), 0.25) }
-        return try CHHapticPattern(events: events, parameterCurves: [fade])
+    private static func tap(_ t: TimeInterval, _ i: Float, _ s: Float) -> CHHapticEvent {
+        CHHapticEvent(eventType: .hapticTransient, parameters: [
+            .init(parameterID: .hapticIntensity, value: i), .init(parameterID: .hapticSharpness, value: s)
+        ], relativeTime: t)
     }
+
+    private static func hum(_ t: TimeInterval, _ d: TimeInterval, _ i: Float, _ s: Float) -> CHHapticEvent {
+        CHHapticEvent(eventType: .hapticContinuous, parameters: [
+            .init(parameterID: .hapticIntensity, value: i), .init(parameterID: .hapticSharpness, value: s)
+        ], relativeTime: t, duration: d)
+    }
+
+    private static func curve(_ id: CHHapticDynamicParameter.ID, at t: TimeInterval, _ points: [(TimeInterval, Float)]) -> CHHapticParameterCurve {
+        CHHapticParameterCurve(parameterID: id, controlPoints: points.map { .init(relativeTime: $0.0, value: $0.1) }, relativeTime: t)
+    }
+
+    private static func pattern(_ kind: Kind) throws -> CHHapticPattern {
+        switch kind {
+        case .enterEdit:
+            // Two light knocks: the page unlatching.
+            return try CHHapticPattern(events: [tap(0, 0.42, 0.55), tap(0.075, 0.6, 0.7)], parameters: [])
+        case .lift:
+            // A short swell that rises, then catches as the section leaves the surface.
+            return try CHHapticPattern(events: [hum(0, 0.11, 0.6, 0.25), tap(0.11, 0.75, 0.65)],
+                                       parameterCurves: [curve(.hapticIntensityControl, at: 0, [(0, 0.25), (0.11, 1)])])
+        case .pass:
+            // A crisp detent each time the carried section takes a new place.
+            return try CHHapticPattern(events: [tap(0, 0.5, 0.9)], parameters: [])
+        case .tick:
+            return try CHHapticPattern(events: [tap(0, 0.38, 0.8)], parameters: [])
+        case .edge:
+            // The page starting to carry along: a soft, low push.
+            return try CHHapticPattern(events: [hum(0, 0.14, 0.45, 0.1)],
+                                       parameterCurves: [curve(.hapticIntensityControl, at: 0, [(0, 1), (0.14, 0)])])
+        case .land:
+            // A soft thud, then two aftershocks as the wave reaches the sections around it.
+            return try CHHapticPattern(events: [
+                tap(0, 0.95, 0.22), hum(0.005, 0.12, 0.55, 0.05),
+                tap(0.12, 0.34, 0.35), tap(0.22, 0.18, 0.35)
+            ], parameterCurves: [curve(.hapticIntensityControl, at: 0.005, [(0, 1), (0.12, 0)])])
+        case .save:
+            // A drop into water: the plop, a low swell beneath it, then ripples that spread further
+            // apart and thinner as they go.
+            let ripples: [(TimeInterval, Float, Float)] = [(0.13, 0.55, 0.45), (0.27, 0.4, 0.4), (0.44, 0.28, 0.35),
+                                                          (0.64, 0.18, 0.3), (0.88, 0.1, 0.25)]
+            return try CHHapticPattern(events: [tap(0, 1, 0.55), hum(0.01, 0.4, 0.65, 0.04)]
+                                       + ripples.map { tap($0.0, $0.1, $0.2) },
+                                       parameterCurves: [curve(.hapticIntensityControl, at: 0.01, [(0, 1), (0.1, 0.55), (0.4, 0)])])
+        case .remove:
+            // A small pop: sharp, then a lighter echo.
+            return try CHHapticPattern(events: [tap(0, 0.72, 0.95), tap(0.045, 0.28, 0.6)], parameters: [])
+        case .add:
+            // Settling in: a brief rise that lands.
+            return try CHHapticPattern(events: [hum(0, 0.09, 0.45, 0.3), tap(0.09, 0.65, 0.45)],
+                                       parameterCurves: [curve(.hapticIntensityControl, at: 0, [(0, 0.2), (0.09, 1)])])
+        case .cancel:
+            return try CHHapticPattern(events: [tap(0, 0.45, 0.2)], parameters: [])
+        }
+    }
+}
+
+/// Kept for callers that send a drop: a save at full strength, a landing below it.
+enum NoopDropHaptic {
+    @MainActor
+    static func play(strength: Float = 1) { NoopHaptics.play(strength >= 1 ? .save : .land) }
 }

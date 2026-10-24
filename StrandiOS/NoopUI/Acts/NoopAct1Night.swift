@@ -86,11 +86,11 @@ struct NoopAct1Screens: View {
     /// Rest's sections in their default order.
     static let restSections: [NoopPageSection] = [
         NoopPageSection(id: "night", title: "Your sleep", detail: "Last night against your need"),
-        NoopPageSection(id: "night-glass", title: "Sleep · Glass", detail: "The night as layered liquid, filled toward your need"),
-        NoopPageSection(id: "night-aurora", title: "Sleep · Aurora", detail: "The night as curtains of light, as tall as the sleep was deep"),
-        NoopPageSection(id: "night-dial", title: "Sleep · Dial", detail: "The night on a clock face, cut into its stages"),
-        NoopPageSection(id: "night-performance", title: "Sleep · Performance", detail: "One gauge of sleep against need, with stage rows"),
-        NoopPageSection(id: "night-ledger", title: "Sleep · Ledger", detail: "The night as plain figures over a stage strip"),
+        NoopPageSection(id: "night-glass", title: "Sleep · Glass", detail: "The night as layered liquid, filled toward your need", onByDefault: false),
+        NoopPageSection(id: "night-aurora", title: "Sleep · Aurora", detail: "The night as curtains of light, as tall as the sleep was deep", onByDefault: false),
+        NoopPageSection(id: "night-dial", title: "Sleep · Dial", detail: "The night on a clock face, cut into its stages", onByDefault: false),
+        NoopPageSection(id: "night-performance", title: "Sleep · Performance", detail: "One gauge of sleep against need, with stage rows", onByDefault: false),
+        NoopPageSection(id: "night-ledger", title: "Sleep · Ledger", detail: "The night as plain figures over a stage strip", onByDefault: false),
         NoopPageSection(id: "seven", title: "Your last seven", detail: "Seven nights against your need"),
         NoopPageSection(id: "shape", title: "The shape of it", detail: "The night's stages, timeline or lanes"),
         NoopPageSection(id: "overtime", title: "Over time", detail: "Sleep debt, consistency and history"),
