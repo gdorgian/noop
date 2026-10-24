@@ -140,6 +140,12 @@ Swift, you MUST build the app yourself: `xcodebuild … build` locally, or run `
   silently miss straps. Reads must thread the registry's **active** strap id, not a raw BLE address.
 - **Design system is law:** UI uses only design tokens — `StrandPalette` / `StrandFont` / shared
   components. No hardcoded colors, fonts, or spacing.
+  - **Noop Aura iOS (`StrandiOS/NoopUI`):** sizes come from `NoopSystem.swift` — `NoopType` (8 text
+    sizes, nothing under 11 pt), `NoopSpace`, `NoopRadius`, `NoopControlSize` (small / medium / large,
+    44 pt hit area) — and controls are its components: `NoopActionButton`, `NoopIconButton` /
+    `NoopIconDiscShape`, `NoopChip`, `NoopTabs`, `NoopSectionHeader`. Selected chips are white; the
+    section accent (`\.noopAccent`, set by the shell from each act's ambient colour) is for primary
+    actions and links. Don't build a one-off button, chip or tab bar; extend the component instead.
 - **Migrations:** add a versioned migration + a test; never mutate an existing migration. Watch for
   data-loss traps (window-wide deletes, backfill rewrites) — prefer additive/transactional changes.
 - **Deriving a physiological signal from raw sensor data — validate against the artifact, not one

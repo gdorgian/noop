@@ -20,8 +20,7 @@ struct NoopFitnessExerciseDetail: View {
                 Text(choice.equipment ?? "Equipment not specified").foregroundStyle(NoopHTMLColor.copy)
                 NoopExerciseMedia(choice: choice)
                 if !animations {
-                    Button("Show animations") { animations = true }.buttonStyle(.borderedProminent)
-                        .foregroundStyle(NoopHTMLColor.voltInk)
+                    NoopActionButton(title: "Show animations", variant: .secondary, size: .medium) { animations = true }
                     Text("Downloads exercise media from GitHub and keeps an offline cache on this phone.")
                         .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 }
@@ -103,8 +102,7 @@ struct NoopFitnessChecklist: View {
                 }
                 .listRowBackground(NoopHTMLColor.card)
             }.scrollContentBackground(.hidden)
-            Button("Filter by \(title)") { selection = draft; dismiss() }
-                .buttonStyle(.borderedProminent).foregroundStyle(NoopHTMLColor.voltInk)
+            NoopActionButton(title: "Filter by \(title)") { selection = draft; dismiss() }
         }.padding(20).foregroundStyle(NoopHTMLColor.ink).font(NoopHTMLFont.sans(NoopType.subhead))
             .tint(NoopHTMLColor.volt).background(NoopHTMLColor.canvas).noopSheet()
             .onAppear { draft = selection }
@@ -152,9 +150,10 @@ struct NoopFitnessCustomExercise: View {
                     }
                 }
                 if let error { Text(error).foregroundStyle(NoopHTMLColor.red) }
-                Button(saving ? "Saving…" : "Save") { Task { await save() } }
-                    .buttonStyle(.borderedProminent).foregroundStyle(NoopHTMLColor.voltInk)
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving)
+                NoopActionButton(title: saving ? "Saving…" : "Save",
+                                 enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !saving) {
+                    Task { await save() }
+                }
             }.padding(20)
         }.font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.ink)
             .tint(NoopHTMLColor.volt).background(NoopHTMLColor.canvas)

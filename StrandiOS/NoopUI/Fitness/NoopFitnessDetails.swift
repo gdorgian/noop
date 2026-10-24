@@ -161,22 +161,7 @@ struct NoopFitnessPeriodPicker: View {
     var options: [Int] = [7, 30, 60]
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(options, id: \.self) { d in
-                Button { withAnimation(NoopMotion.swap) { days = d } } label: {
-                    Text("\(d) days")
-                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                        .foregroundStyle(days == d ? NoopHTMLColor.ink : NoopHTMLColor.copy)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 40)
-                        .background(days == d ? Color.white.opacity(0.09) : .clear,
-                                    in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-            }
-        }
-        .padding(3)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        NoopTabs(options: options.map { ("\($0) days", $0) }, selection: $days)
     }
 }
 
@@ -418,17 +403,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
     }
 
     private func chip(_ t: String, selected: Bool, dot: Color? = nil, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                if let dot { Circle().fill(dot).frame(width: 7, height: 7) }
-                Text(t).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-            }
-            .foregroundStyle(selected ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
-            .padding(.horizontal, 11)
-            .frame(height: 30)
-            .background(selected ? NoopHTMLColor.ink : Color.white.opacity(0.06), in: Capsule())
-        }
-        .buttonStyle(NoopHTMLPressStyle())
+        NoopChip(title: t, dot: dot, isOn: selected, action: action)
     }
 
     private func arrow(_ d: NoopFixedChevron.Direction, enabled: Bool, action: @escaping () -> Void) -> some View {

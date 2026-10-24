@@ -107,16 +107,7 @@ struct NoopActivityConfirmSheet: View {
         let top = item.caseInsensitiveCompare(suggestions.first?.sport ?? "") == .orderedSame
         let current = !unnamed && item.caseInsensitiveCompare(row.sport) == .orderedSame
         let lit = detected ? top : current
-        return Button { pick(item) } label: {
-            HStack(spacing: 6) {
-                Image(systemName: NoopFitnessCardioLive.symbol(for: item)).font(.system(size: 12, weight: .semibold))
-                Text(item).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-            }
-            .padding(.horizontal, 14).frame(minHeight: 40)
-            .foregroundStyle(lit ? NoopHTMLColor.voltInk : NoopHTMLColor.ink)
-            .background(lit ? NoopHTMLColor.volt : Color.white.opacity(0.07), in: Capsule())
-        }
-        .buttonStyle(NoopHTMLPressStyle())
+        return NoopChip(title: item, systemImage: NoopFitnessCardioLive.symbol(for: item), isOn: lit) { pick(item) }
     }
 
     private var changeRow: some View {
@@ -255,13 +246,7 @@ struct NoopSessionEditSheet: View {
                     NoopFlowLayout(spacing: 8) {
                         ForEach(choices, id: \.self) { item in
                             let on = item.caseInsensitiveCompare(sport) == .orderedSame
-                            Button { sport = item } label: {
-                                Text(item).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                                    .padding(.horizontal, 14).frame(minHeight: 36)
-                                    .foregroundStyle(on ? NoopHTMLColor.voltInk : NoopHTMLColor.ink)
-                                    .background(on ? NoopHTMLColor.volt : Color.white.opacity(0.07), in: Capsule())
-                            }
-                            .buttonStyle(NoopHTMLPressStyle())
+                            NoopChip(title: item, isOn: on) { sport = item }
                         }
                     }
                 }

@@ -300,8 +300,7 @@ struct NoopFitnessHome: View {
         case .routines:
             sectionTitle("Routines") {
                 if !s.routines.isEmpty {
-                    Button("See all") { allRoutines = true }
-                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                    NoopActionButton(title: "See all", variant: .plain, size: .small, fullWidth: false) { allRoutines = true }
                 }
                 Menu {
                     Button { newRoutine() } label: { Label("New routine", systemImage: "plus") }
@@ -509,18 +508,12 @@ struct NoopFitnessHome: View {
     }
 
     private func sectionTitle(_ text: String) -> some View {
-        sectionTitle(text) { EmptyView() }
+        NoopSectionHeader(text).padding(.bottom, NoopSpace.xxs)
     }
 
-    /// The app's section label: small, uppercase, muted — as Today, Trends and You label theirs.
+    /// The app's section header (NoopSystem): label, then trailing controls at the small control size.
     private func sectionTitle<T: View>(_ text: String, @ViewBuilder trailing: () -> T) -> some View {
-        HStack {
-            NoopSectionLabel(text)
-            Spacer()
-            trailing()
-        }
-        .frame(minHeight: 32)
-        .padding(.bottom, 6)
+        NoopSectionHeader(title: text, trailing: trailing).padding(.bottom, NoopSpace.xxs)
     }
 
     /// The seven days of the week `weekOffset` weeks from this one, Monday first, from the full history.
@@ -659,11 +652,10 @@ struct NoopFitnessIconGlyph: View {
     var compact = false
 
     var body: some View {
-        NoopCanonicalGlyph(name: glyph, size: compact ? 13 : 17, color: NoopHTMLColor.inkSoft)
-            .frame(width: compact ? 30 : 40, height: compact ? 30 : 40)
-            .background(Color.white.opacity(0.06), in: Circle())
-            .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-            .noopHitTarget()
+        let size: NoopControlSize = compact ? .small : .medium
+        NoopIconDiscShape(size: size) {
+            NoopCanonicalGlyph(name: glyph, size: size.icon, color: NoopHTMLColor.inkSoft)
+        }
     }
 }
 

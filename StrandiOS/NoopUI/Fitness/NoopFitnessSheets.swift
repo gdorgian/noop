@@ -286,12 +286,7 @@ struct NoopFitnessRepeatEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 4) {
-                seg("Every week", on: plan.weekly) { plan.weekly = true }
-                seg("Once", on: !plan.weekly) { plan.weekly = false }
-            }
-            .padding(3)
-            .background(Color.white.opacity(0.05), in: Capsule())
+            NoopTabs(options: [("Every week", true), ("Once", false)], selection: $plan.weekly)
 
             if plan.weekly {
                 HStack(spacing: 6) {
@@ -302,9 +297,9 @@ struct NoopFitnessRepeatEditor: View {
                         } label: {
                             Text(String(Calendar.current.veryShortWeekdaySymbols[d % 7]))
                                 .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                                .foregroundStyle(on ? NoopHTMLColor.voltInk : NoopHTMLColor.inkSoft)
+                                .foregroundStyle(on ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
                                 .frame(maxWidth: .infinity).frame(minHeight: 42)
-                                .background(on ? NoopHTMLColor.volt : Color.white.opacity(0.06), in: Circle())
+                                .background(on ? NoopHTMLColor.ink : Color.white.opacity(0.06), in: Circle())
                         }
                         .buttonStyle(NoopHTMLPressStyle())
                         .accessibilityLabel(Calendar.current.weekdaySymbols[d % 7])
@@ -344,15 +339,6 @@ struct NoopFitnessRepeatEditor: View {
         .colorScheme(.dark)
     }
 
-    private func seg(_ t: String, on: Bool, action: @escaping () -> Void) -> some View {
-        Button { withAnimation(NoopMotion.swap) { action() } } label: {
-            Text(t).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                .foregroundStyle(on ? NoopHTMLColor.ink : NoopHTMLColor.copy)
-                .frame(maxWidth: .infinity).frame(minHeight: 34)
-                .background(on ? Color.white.opacity(0.1) : .clear, in: Capsule())
-        }
-        .buttonStyle(NoopHTMLPressStyle())
-    }
 }
 
 /// "Plan a routine": which one, and when.

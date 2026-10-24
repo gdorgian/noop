@@ -98,6 +98,7 @@ struct NoopAppShell: View {
             .simultaneousGesture(backGesture)
             .environment(\.noopBackLabel, navigation.previousScreenTitle)
         .environment(\.noopScrollKey, navigation.scrollKey)
+        .environment(\.noopAccent, sectionAccent)
         .environment(\.noopScrollMemory, navigation.scrollMemory)
             // Content ends above the bar: its 46 pt plus the 6 pt gap.
             .environment(\.noopLiveBarInset,
@@ -166,6 +167,9 @@ struct NoopAppShell: View {
     }
 
     private var ambientColor: Color { NoopAmbient.color(for: navigation.route, warmEffort: usesWarmEffortAmbient) }
+
+    /// The section's accent for NoopSystem components: its ambient colour.
+    private var sectionAccent: NoopAccent { NoopAccent.of(ambientColor) }
 
     private var ambientOpacity: Double { NoopAmbient.opacity(for: navigation.route, warmEffort: usesWarmEffortAmbient) }
 
@@ -824,6 +828,7 @@ struct NoopVerifiedAppShell: View {
         .modifier(NoopRealtimeHRHold())
         .environment(\.noopBackLabel, navigation.previousScreenTitle)
         .environment(\.noopScrollKey, navigation.scrollKey)
+        .environment(\.noopAccent, sectionAccent)
         .environment(\.noopScrollMemory, navigation.scrollMemory)
         .task(id: instrumentLoadKey) {
             await loadOnce("instrument", instrumentLoadKey) { await instrumentStore.load(from: repo) }
@@ -1004,6 +1009,9 @@ struct NoopVerifiedAppShell: View {
     private var instrumentLoadKey: String? {
         (navigation.metricSheetPresented || Self.canonicalInstrumentRoutes.contains(navigation.route)) ? "\(repo.deviceId)-\(repo.loaded)-\(repo.refreshSeq)" : nil
     }
+
+    /// The section's accent for NoopSystem components: the same colour as its ambient glow below.
+    private var sectionAccent: NoopAccent { NoopAccent.of(NoopAmbient.color(for: navigation.route, warmEffort: false)) }
 
     @ViewBuilder
     private var verifiedAmbientGlow: some View {

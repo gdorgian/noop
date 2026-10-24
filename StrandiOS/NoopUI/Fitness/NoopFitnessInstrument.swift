@@ -270,11 +270,13 @@ struct NoopFitnessRangeBar: View {
                 Button {
                     withAnimation(NoopMotion.swap) { range = r; offset = 0 }
                 } label: {
+                    // Same tab as NoopTabs; this bar adds the earlier/later arrows either side.
                     Text(r.rawValue)
-                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         .foregroundStyle(range == r ? NoopHTMLColor.ink : NoopHTMLColor.copy)
-                        .frame(maxWidth: .infinity).frame(minHeight: 40)
-                        .background(range == r ? Color.white.opacity(0.09) : .clear, in: Capsule())
+                        .frame(maxWidth: .infinity).frame(height: NoopControlSize.medium.height - 4)
+                        .background(range == r ? Color.white.opacity(0.1) : .clear, in: Capsule())
+                        .noopHitTarget()
                 }
                 .buttonStyle(NoopHTMLPressStyle())
             }
@@ -311,13 +313,7 @@ struct NoopFitnessFilterChips: View {
     }
 
     private func chip(_ t: String, on: Bool, action: @escaping () -> Void) -> some View {
-        Button { withAnimation(NoopMotion.swap) { action() } } label: {
-            Text(t).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                .foregroundStyle(on ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
-                .padding(.horizontal, 14).frame(minHeight: 36)
-                .background(on ? NoopHTMLColor.ink : Color.white.opacity(0.06), in: Capsule())
-        }
-        .buttonStyle(NoopHTMLPressStyle())
+        NoopChip(title: t, isOn: on, action: action)
     }
 }
 

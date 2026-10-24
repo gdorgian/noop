@@ -447,14 +447,7 @@ struct NoopFitnessLoadPage: View {
     private var kindSwitch: some View {
         HStack(spacing: 4) {
             ForEach([NoopFitnessHistory.LoadKind.cardio, .muscular], id: \.self) { k in
-                Button { withAnimation(NoopMotion.swap) { kind = k } } label: {
-                    Text(k == .cardio ? "Cardio" : "Muscular")
-                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                        .foregroundStyle(kind == k ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
-                        .padding(.horizontal, 16).frame(minHeight: 36)
-                        .background(kind == k ? NoopHTMLColor.ink : Color.white.opacity(0.06), in: Capsule())
-                }
-                .buttonStyle(NoopHTMLPressStyle())
+                NoopChip(title: k == .cardio ? "Cardio" : "Muscular", isOn: kind == k) { kind = k }
             }
         }
     }

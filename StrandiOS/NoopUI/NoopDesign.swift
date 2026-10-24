@@ -462,7 +462,7 @@ struct NoopSectionLabel: View {
 
     var body: some View {
         Text(text.uppercased())
-            .font(NoopHTMLFont.sans(10, weight: .semibold))
+            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
             .tracking(1.2)
             .foregroundStyle(color)
             // A label is one line: at large text it shrinks before it gives way to the row's detail.

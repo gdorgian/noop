@@ -5,29 +5,6 @@ import StrandTraining
 // The routine editor's small sheets (rest timer, rep range, last time) and the routine page's schedule
 // summary. Each sheet is sized to its content, never a full-height page with a few controls in the middle.
 
-/// The two button weights every Fitness action uses: volt for the one thing the screen is for, glass for
-/// the rest. Same height and corner as the routine page's Schedule / Start pair.
-struct NoopFitnessActionButton: View {
-    enum Weight { case primary, secondary }
-    let title: String
-    var weight: Weight = .primary
-    var enabled = true
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                .foregroundStyle(weight == .primary ? NoopHTMLColor.voltInk : NoopHTMLColor.ink)
-                .frame(maxWidth: .infinity).frame(height: 52)
-                .background(weight == .primary ? NoopHTMLColor.volt : Color.white.opacity(0.07),
-                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(NoopHTMLPressStyle())
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.45)
-    }
-}
-
 /// Sheet chrome shared by the small sheets: a title, an optional subtitle, content, then actions.
 private struct NoopFitnessCompactSheet<Content: View, Actions: View>: View {
     let title: String
@@ -103,9 +80,9 @@ private struct NoopFitnessPresetRow<Value: Hashable>: View {
                 let on = option.value == selected
                 Button { pick(option.value) } label: {
                     Text(option.label).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).monospacedDigit()
-                        .foregroundStyle(on ? NoopHTMLColor.voltInk : NoopHTMLColor.inkSoft)
-                        .frame(maxWidth: .infinity).frame(height: 38)
-                        .background(on ? NoopHTMLColor.volt : Color.white.opacity(0.06),
+                        .foregroundStyle(on ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
+                        .frame(maxWidth: .infinity).frame(height: NoopControlSize.medium.height)
+                        .background(on ? NoopHTMLColor.ink : Color.white.opacity(0.06),
                                     in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(NoopHTMLPressStyle())
@@ -143,7 +120,7 @@ struct NoopFitnessRestSheet: View {
             NoopFitnessPresetRow(options: Self.more.map { (NoopRestFormat.clock($0), $0) },
                                  selected: seconds, pick: set)
         } actions: {
-            NoopFitnessActionButton(title: "Done", action: done)
+            NoopActionButton(title: "Done", action: done)
         }
         .sensoryFeedback(.selection, trigger: seconds)
     }
@@ -181,7 +158,7 @@ struct NoopFitnessRepRangeSheet: View {
                 .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 .fixedSize(horizontal: false, vertical: true)
         } actions: {
-            NoopFitnessActionButton(title: "Apply to all sets", action: apply)
+            NoopActionButton(title: "Apply to all sets", action: apply)
         }
         .sensoryFeedback(.selection, trigger: low * 1000 + high)
     }
@@ -228,7 +205,7 @@ struct NoopFitnessLastTimeSheet: View {
             .padding(14)
             .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         } actions: {
-            NoopFitnessActionButton(title: "Use these sets", action: use)
+            NoopActionButton(title: "Use these sets", action: use)
         }
     }
 }
@@ -294,7 +271,7 @@ struct NoopFitnessProgressionSheet: View {
             }
             .scrollIndicators(.hidden)
         } actions: {
-            NoopFitnessActionButton(title: "Done", action: done)
+            NoopActionButton(title: "Done", action: done)
         }
         .animation(NoopMotion.swap, value: configuration.policy)
         .sensoryFeedback(.selection, trigger: configuration.policy)

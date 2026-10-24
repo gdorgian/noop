@@ -314,7 +314,7 @@ struct NoopFitnessRoutineEditor: View {
                     VStack(spacing: 16) {
                         Text("No exercises yet").font(NoopHTMLFont.sheetTitle)
                         Text("Choose movements to build your routine.").foregroundStyle(NoopHTMLColor.copy)
-                        Button("Add exercises") { openPicker() }.buttonStyle(.borderedProminent).foregroundStyle(NoopHTMLColor.voltInk)
+                        NoopActionButton(title: "Add exercises", systemImage: "plus", size: .medium, fullWidth: false) { openPicker() }
                     }.frame(maxWidth: .infinity).padding(.vertical, 36)
                 }
                 ForEach($lines) { $line in
@@ -344,8 +344,8 @@ struct NoopFitnessRoutineEditor: View {
             // push these two up into the set being edited.
             if focusedField == nil {
                 HStack(spacing: 10) {
-                    NoopFitnessActionButton(title: "Add exercise", weight: .secondary) { openPicker() }
-                    NoopFitnessActionButton(title: saving ? "Saving…" : "Save", enabled: canSave && !saving) {
+                    NoopActionButton(title: "Add exercise", variant: .secondary) { openPicker() }
+                    NoopActionButton(title: saving ? "Saving…" : "Save", enabled: canSave && !saving) {
                         Task { await save() }
                     }
                 }
