@@ -1062,10 +1062,11 @@ final class IntelligenceEngine: ObservableObject {
         // "unrestricted nights" estimate. Both degrade honestly on thin history (consistency → nil →
         // neutral term; need → population default), so cold-start is unchanged.
         let sleepConsistency = VitalityEngine.sleepConsistency(nightlyHours: Array(nightlyHours.suffix(28)))
-        // A need the wearer set by hand replaces the estimate, so Rest and the debt surfaces agree.
-        let sleepNeedHours = SleepNeedPrefs.resolve(
-            estimatedMinutes: AnalyticsEngine.Rest.personalizedNeedHours(nightlyHours: nightlyHours,
-                                                                         age: profile.age) * 60) / 60
+        // A need the wearer set by hand replaces the estimate, so Rest and the debt surfaces agree. The
+        // estimate is used untouched otherwise: it feeds `dayCacheConfigSig` by bit pattern, and a minutes
+        // round-trip could flip a bit and force a needless full re-score.
+        let sleepNeedHours = SleepNeedPrefs.userMinutes().map { $0 / 60 }
+            ?? AnalyticsEngine.Rest.personalizedNeedHours(nightlyHours: nightlyHours, age: profile.age)
 
         // ── FIX 1 (main-actor jank): run the ENTIRE per-day enumeration OFF the main actor ───────────
         // Every `await store.…` read inside this loop has its continuation RESUME on the main actor
