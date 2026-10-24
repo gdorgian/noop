@@ -745,7 +745,7 @@ struct NoopAct2Screens: View {
     /// Up to 24 evenly spaced means of today's five-minute heart rate. Nil draws no line.
     private var todayHeartValues: [Double]? {
         guard day != nil else { return Self.heartValues }
-        return todayHeartSeries?.map { min(104, max(50, $0.bpm)) }
+        return todayHeartSeries?.map(\.bpm)
     }
 
     /// The same 24 means with the time each one is centred on, for the scrubbed day's "bpm at".
@@ -1899,7 +1899,7 @@ struct NoopAct2Screens: View {
 
     private var dayScreen: some View {
         let series = heartWindow == nil ? todayHeartSeries : (zoomedHeart.count > 1 ? zoomedHeart : todayHeartSeries)
-        let values = day == nil ? (todayHeartValues ?? []) : (series?.map { min(104, max(50, $0.bpm)) } ?? [])
+        let values = day == nil ? (todayHeartValues ?? []) : (series?.map(\.bpm) ?? [])
         let point = min(max(selectedHeartPoint, 0), max(0, values.count - 1))
         let nearest = nearestMark(to: point)
         return NoopScreen(topInset: 58) {
@@ -3254,6 +3254,11 @@ private struct Act2FixedHeartChart: View {
     var body: some View {
         Canvas { context, size in
             guard values.count > 1 else { return }
+            // The design's 50–104 bpm frame, widened only when the day leaves it, so a workout's peak or a
+            // low night reading is drawn where it is instead of flattened against the edge.
+            let floorBPM = min(50, (values.min() ?? 50) - 4)
+            let ceilingBPM = max(104, (values.max() ?? 104) + 4)
+            let range = ceilingBPM - floorBPM
             let referenceHeight: CGFloat = {
                 switch kind { case .mini: 54; case .heart: 84; case .scrub: 150 }
             }()
@@ -3261,9 +3266,9 @@ private struct Act2FixedHeartChart: View {
                 let x = CGFloat(index) / CGFloat(values.count - 1) * size.width
                 let yRef: CGFloat
                 switch kind {
-                case .mini: yRef = 54 - CGFloat((value - 50) / 54) * 44
-                case .heart: yRef = 84 - CGFloat((value - 50) / 54) * 70
-                case .scrub: yRef = 140 - CGFloat((value - 50) / 54) * 118
+                case .mini: yRef = 54 - CGFloat((value - floorBPM) / range) * 44
+                case .heart: yRef = 84 - CGFloat((value - floorBPM) / range) * 70
+                case .scrub: yRef = 140 - CGFloat((value - floorBPM) / range) * 118
                 }
                 return CGPoint(x: x, y: yRef / referenceHeight * size.height)
             }
@@ -3275,7 +3280,7 @@ private struct Act2FixedHeartChart: View {
 
             let restingY: CGFloat? = switch resting {
             case .design: (kind.isHeart ? 62.0 / 84.0 : 112.0 / 150.0) * size.height
-            case .at(let bpm): point(0, min(104, max(50, bpm))).y
+            case .at(let bpm): point(0, min(ceilingBPM, max(floorBPM, bpm))).y
             case .none: nil
             }
             if !kind.isMini, let baseline = restingY {
