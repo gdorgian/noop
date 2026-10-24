@@ -125,6 +125,8 @@ private struct NoopTrendsScreen: View {
     @StateObject private var labBook = NoopLabBook()
     @State private var showingRecordingHistory = false
     @State private var showingAges = false
+    @StateObject private var trendsLayout = NoopPageLayout(page: "trends", catalog: NoopTrendsScreen.trendsSections)
+    @State private var trendsEditing = NoopPageEditing()
     @Binding var window: NoopTrendWindow
     var live: NoopTrendsRecord? = nil
     var battery: Int? = nil
@@ -135,20 +137,48 @@ private struct NoopTrendsScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 NoopA4Header(title: "Trends", eyebrow: window.span) { EmptyView() }
 
-                NoopTrendsHero(
-                    bodyAge: ages?.bodyAge,
-                    chronoAge: ages?.chronoAge ?? 0,
-                    pace: ages?.pace,
-                    paceWeeks: ages?.paceWeeks ?? 0,
-                    waitingReason: ages?.buildReason ?? "Checking recorded signals"
-                ) { showingAges = true }
+                NoopEditableSections(layout: trendsLayout, editing: $trendsEditing, spacing: 0) { id in
+                    trendsSection(id)
+                }
+            }
+        }
+        .noopEditBar($trendsEditing, layout: trendsLayout)
+        .task(id: repo.deviceId) {
+            guard live != nil else { return }
+            await labBook.load(store: await repo.storeHandle(), deviceId: repo.deviceId)
+        }
+        .sheet(isPresented: $showingAges) { NoopYourAgesSheet() }
+    }
 
-                NoopTrendsMarkersSection(navigation: navigation)
-                    .padding(.top, 32)
+    /// Trends' sections in their default order; each carries the space above it, so the page reads
+    /// as it did before it was editable.
+    static let trendsSections: [NoopPageSection] = [
+        NoopPageSection(id: "hero", title: "Body age", detail: "The orb, your body age and pace of aging"),
+        NoopPageSection(id: "markers", title: "Markers", detail: "The measures you pinned"),
+        NoopPageSection(id: "changes", title: "What changed", detail: "The window's verdict, six weeks to a year"),
+        NoopPageSection(id: "bloodwork", title: "Bloodwork", detail: "Your lab results"),
+        NoopPageSection(id: "explore", title: "Explore", detail: "Compare signals and relationships"),
+        NoopPageSection(id: "summaries", title: "Your summaries", detail: "Weekly digest and the trends report"),
+        NoopPageSection(id: "history", title: "Recording history", detail: "Which days the strap recorded")
+    ]
 
+    @ViewBuilder
+    private func trendsSection(_ id: String) -> some View {
+        switch id {
+        case "hero":
+            NoopTrendsHero(
+                bodyAge: ages?.bodyAge,
+                chronoAge: ages?.chronoAge ?? 0,
+                pace: ages?.pace,
+                paceWeeks: ages?.paceWeeks ?? 0,
+                waitingReason: ages?.buildReason ?? "Checking recorded signals"
+            ) { showingAges = true }
+        case "markers":
+            NoopTrendsMarkersSection(navigation: navigation)
+                .padding(.top, 32)
+        case "changes":
+            VStack(alignment: .leading, spacing: 0) {
                 windowControl
-                    .padding(.top, 24)
-
                 if live?.readFailed == true {
                     Text("Some history could not be refreshed. Available readings are shown; try refreshing again.")
                         .font(NoopHTMLFont.sans(NoopType.caption))
@@ -156,57 +186,62 @@ private struct NoopTrendsScreen: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 12)
                 }
-
-                VStack(alignment: .leading, spacing: 9) {
-                    verdictCard
-
-                    sectionLabel("Bloodwork", color: NoopHTMLColor.warm)
-                    bloodworkCard
-
-                    sectionLabel("Explore")
-                    NoopHTMLCard(radius: 22, padding: 0) {
-                        VStack(spacing: 0) {
-                            trendLink(NoopRoute.instrumentCompare.screenTitle, detail: "two patterns, their timing and paired days", symbol: "chart", route: .instrumentCompare)
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            trendLink(NoopRoute.instrumentEffects.screenTitle, detail: "associations in your own recorded history", symbol: "ask", route: .instrumentEffects)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
-                    }
-
-                    sectionLabel("Your summaries")
-                    NoopHTMLCard(radius: 22, padding: 0) {
-                        VStack(spacing: 0) {
-                            trendLink("Weekly digest", detail: "this week against last, in your own numbers", symbol: "digest", route: .digest)
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            trendLink("Trends report", detail: "a longer read across a window, exportable as a PDF", symbol: "report", route: .report)
-                            if live == nil {
-                                Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                                trendLink("The year so far", detail: "eight months in four chapters", symbol: "chart.bar.xaxis", route: .year)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
-                    }
-                    DisclosureGroup(isExpanded: $showingRecordingHistory) {
-                        NoopAttendanceCard(live: live?.attendance).padding(.top, 10)
-                    } label: {
-                        Text("Recording history").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
-                            .frame(minHeight: 44)
-                    }
-                    .tint(NoopA4.greenLight)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 5)
-                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-                }
-                .padding(.top, 14)
+                verdictCard.padding(.top, 14)
             }
+            .padding(.top, 24)
+        case "bloodwork":
+            VStack(alignment: .leading, spacing: 9) {
+                sectionLabel("Bloodwork", color: NoopHTMLColor.warm)
+                bloodworkCard
+            }
+            .padding(.top, 9)
+        case "explore":
+            VStack(alignment: .leading, spacing: 9) {
+                sectionLabel("Explore")
+                NoopHTMLCard(radius: 22, padding: 0) {
+                    VStack(spacing: 0) {
+                        trendLink(NoopRoute.instrumentCompare.screenTitle, detail: "two patterns, their timing and paired days", symbol: "chart", route: .instrumentCompare)
+                        Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                        trendLink(NoopRoute.instrumentEffects.screenTitle, detail: "associations in your own recorded history", symbol: "ask", route: .instrumentEffects)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                }
+            }
+            .padding(.top, 9)
+        case "summaries":
+            VStack(alignment: .leading, spacing: 9) {
+                sectionLabel("Your summaries")
+                NoopHTMLCard(radius: 22, padding: 0) {
+                    VStack(spacing: 0) {
+                        trendLink("Weekly digest", detail: "this week against last, in your own numbers", symbol: "digest", route: .digest)
+                        Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                        trendLink("Trends report", detail: "a longer read across a window, exportable as a PDF", symbol: "report", route: .report)
+                        if live == nil {
+                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                            trendLink("The year so far", detail: "eight months in four chapters", symbol: "chart.bar.xaxis", route: .year)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                }
+            }
+            .padding(.top, 9)
+        case "history":
+            DisclosureGroup(isExpanded: $showingRecordingHistory) {
+                NoopAttendanceCard(live: live?.attendance).padding(.top, 10)
+            } label: {
+                Text("Recording history").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
+                    .frame(minHeight: 44)
+            }
+            .tint(NoopA4.greenLight)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 5)
+            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+            .padding(.top, 9)
+        default:
+            EmptyView()
         }
-        .task(id: repo.deviceId) {
-            guard live != nil else { return }
-            await labBook.load(store: await repo.storeHandle(), deviceId: repo.deviceId)
-        }
-        .sheet(isPresented: $showingAges) { NoopYourAgesSheet() }
     }
 
     private func sectionLabel(_ title: String, color: Color = NoopHTMLColor.muted) -> some View {
