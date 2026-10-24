@@ -459,8 +459,11 @@ struct NoopAct2Screens: View {
 
     /// Today's sections in their default order. The header and the look-back banner stay above them.
     static let todaySections: [NoopPageSection] = [
-        NoopPageSection(id: "rings", title: "Rings", detail: "Recovery, strain and sleep as living rings"),
-        NoopPageSection(id: "rings-segmented", title: "Rings, segmented", detail: "Sleep in its stages, strain heating up, recovery on a gauge"),
+        NoopPageSection(id: "rings-gyro", title: "Rings · Gyro", detail: "Three orbits turning around a glowing core"),
+        NoopPageSection(id: "rings-donuts", title: "Rings · Donuts", detail: "Three thick rings in a card, with strain's target"),
+        NoopPageSection(id: "rings-dials", title: "Rings · Dials", detail: "Three plain dials, recovery coloured by its band"),
+        NoopPageSection(id: "rings", title: "Rings · Living", detail: "Recovery, strain and sleep as living rings"),
+        NoopPageSection(id: "rings-segmented", title: "Rings · Segmented", detail: "Sleep in its stages, strain heating up, recovery on a gauge"),
         NoopPageSection(id: "breathe", title: "Breathing orb", detail: "Your pulse as a breathing sphere; tap it to breathe"),
         NoopPageSection(id: "sleep", title: "Last night", detail: "Sleep against your need"),
         NoopPageSection(id: "coach", title: "Svea", detail: "Your morning read and the conversation"),
@@ -496,6 +499,12 @@ struct NoopAct2Screens: View {
     @ViewBuilder
     private func todaySection(_ id: String) -> some View {
         switch id {
+        case "rings-gyro":
+            NoopTodayRings(values: todayRings, style: .gyro) { navigation.push(.rest) }
+        case "rings-donuts":
+            NoopTodayRings(values: todayRings, style: .donuts) { navigation.push(.rest) }
+        case "rings-dials":
+            NoopTodayRings(values: todayRings, style: .dials) { navigation.push(.rest) }
         case "rings":
             NoopTodayRings(values: todayRings, style: .living) { navigation.push(.rest) }
         case "rings-segmented":

@@ -30,7 +30,7 @@ struct NoopRingValues: Equatable {
     static let sleepColor = Color(hex: 0x9AA5FF)
 }
 
-enum NoopRingStyle { case living, segmented }
+enum NoopRingStyle { case living, segmented, donuts, dials, gyro }
 
 struct NoopTodayRings: View {
     let values: NoopRingValues
@@ -41,6 +41,15 @@ struct NoopTodayRings: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        switch style {
+        case .donuts: NoopDonutRings(values: values, action: action)
+        case .dials: NoopDialRings(values: values, action: action)
+        case .gyro: NoopGyroRings(values: values, action: action)
+        case .living, .segmented: concentric
+        }
+    }
+
+    private var concentric: some View {
         Button(action: action) {
             VStack(spacing: 18) {
                 ZStack {
@@ -53,7 +62,7 @@ struct NoopTodayRings: View {
                                                         .truncatingRemainder(dividingBy: 3600))
                             }
                         }
-                    case .segmented:
+                    default:
                         Canvas { context, size in NoopSegmentedRings.draw(in: &context, size: size, values: values) }
                     }
                     centre
@@ -259,5 +268,316 @@ private extension View {
         } else {
             self
         }
+    }
+}
+
+// MARK: - Donuts
+//
+// Three rings side by side in one card, each a thick arc in a recessed track whose rounded tip glows,
+// the number in a slightly raised middle. Strain also shows today's target as a hatched band with a
+// bright tick at each end: lighter after a low recovery, harder after a high one.
+
+private struct NoopDonutRings: View {
+    let values: NoopRingValues
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 0) {
+                column("Strain", fill: values.strainFill, value: values.strain.map { _ in values.strainFill * 100 },
+                       colors: [Color(hex: 0xFFE3A3), Color(hex: 0xF5B451)], target: strainTarget)
+                divider
+                column("Recovery", fill: values.recoveryFill, value: values.recovery,
+                       colors: [Color(hex: 0xE6F27A), Color(hex: 0x9BD93A)], target: nil)
+                divider
+                column("Sleep", fill: values.sleepFill, value: values.sleep.map { min(1, $0) * 100 },
+                       colors: [Color(hex: 0xB7C8FF), Color(hex: 0x5B52E0)], target: nil)
+            }
+            .padding(.vertical, 18)
+            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+    }
+
+    /// Today's strain target, as fractions of the ring: easier after a low recovery.
+    private var strainTarget: ClosedRange<Double>? {
+        guard let r = values.recovery else { return nil }
+        let mid = 0.25 + 0.45 * min(1, max(0, r / 100))
+        return (mid - 0.09)...(mid + 0.09)
+    }
+
+    private var divider: some View {
+        Rectangle().fill(Color.white.opacity(0.07)).frame(width: 0.5).padding(.vertical, 4)
+    }
+
+    private func column(_ title: String, fill: Double, value: Double?, colors: [Color], target: ClosedRange<Double>?) -> some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Canvas { context, size in
+                    NoopDonut.draw(in: &context, size: size, fill: fill, colors: colors, target: target)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 1) {
+                    Text(value.map { "\(Int($0.rounded()))" } ?? "--")
+                        .font(NoopHTMLFont.sans(NoopType.title2, weight: .semibold))
+                        .monospacedDigit()
+                    Text("%").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                }
+                .foregroundStyle(value == nil ? NoopHTMLColor.faint : NoopHTMLColor.ink)
+            }
+            .frame(width: 98, height: 98)
+            Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private enum NoopDonut {
+    static func draw(in context: inout GraphicsContext, size: CGSize, fill: Double, colors: [Color], target: ClosedRange<Double>?) {
+        let c = CGPoint(x: size.width / 2, y: size.height / 2)
+        let outer = min(size.width, size.height) / 2
+        let width: CGFloat = 12, r = outer - 9
+        func arc(_ from: Double, _ to: Double, radius: CGFloat = r) -> Path {
+            var p = Path()
+            p.addArc(center: c, radius: radius, startAngle: .radians(-.pi / 2 + from * 2 * .pi),
+                     endAngle: .radians(-.pi / 2 + to * 2 * .pi), clockwise: false)
+            return p
+        }
+        // A rim, the recessed track, and a slightly raised middle.
+        context.fill(Path(ellipseIn: CGRect(x: c.x - outer, y: c.y - outer, width: 2 * outer, height: 2 * outer)),
+                     with: .color(.white.opacity(0.05)))
+        context.stroke(arc(0, 1), with: .color(.black.opacity(0.28)), lineWidth: width)
+        var shade = context
+        shade.addFilter(.blur(radius: 2))
+        shade.stroke(arc(0, 1, radius: r - width / 2 + 1), with: .color(.black.opacity(0.35)), lineWidth: 2)
+        let inner = r - width / 2 - 1
+        context.fill(Path(ellipseIn: CGRect(x: c.x - inner, y: c.y - inner, width: 2 * inner, height: 2 * inner)),
+                     with: .color(.white.opacity(0.06)))
+        // The target band: hatched, with a bright tick at each end.
+        if let target {
+            var band = context
+            band.clip(to: arc(target.lowerBound, target.upperBound).strokedPath(StrokeStyle(lineWidth: width)))
+            band.fill(arc(target.lowerBound, target.upperBound).strokedPath(StrokeStyle(lineWidth: width)),
+                      with: .color(colors[1].opacity(0.35)))
+            var lines = Path()
+            var x = c.x - outer
+            while x < c.x + outer {
+                lines.move(to: CGPoint(x: x, y: c.y + outer)); lines.addLine(to: CGPoint(x: x + 2 * outer, y: c.y - outer))
+                x += 4
+            }
+            band.stroke(lines, with: .color(.black.opacity(0.35)), lineWidth: 1.4)
+            for end in [target.lowerBound, target.upperBound] {
+                let a = -.pi / 2 + end * 2 * .pi
+                var tick = Path()
+                tick.move(to: CGPoint(x: c.x + CGFloat(cos(a)) * (r - width / 2 - 1), y: c.y + CGFloat(sin(a)) * (r - width / 2 - 1)))
+                tick.addLine(to: CGPoint(x: c.x + CGFloat(cos(a)) * (r + width / 2 + 1), y: c.y + CGFloat(sin(a)) * (r + width / 2 + 1)))
+                context.stroke(tick, with: .color(.white), lineWidth: 2)
+            }
+        }
+        guard fill > 0.004 else { return }
+        // The arc, shaded along its length, with a glowing tip.
+        let gradient = Gradient(colors: [colors[0], colors[1]])
+        let shading = GraphicsContext.Shading.conicGradient(gradient, center: c, angle: .radians(-.pi / 2))
+        context.stroke(arc(0, fill), with: shading, style: StrokeStyle(lineWidth: width, lineCap: .round))
+        let a = -.pi / 2 + fill * 2 * .pi
+        let tip = CGPoint(x: c.x + CGFloat(cos(a)) * r, y: c.y + CGFloat(sin(a)) * r)
+        var glow = context
+        glow.addFilter(.blur(radius: 5))
+        glow.fill(Path(ellipseIn: CGRect(x: tip.x - width / 2, y: tip.y - width / 2, width: width, height: width)),
+                  with: .color(colors[1].opacity(0.9)))
+        context.fill(Path(ellipseIn: CGRect(x: tip.x - width / 2, y: tip.y - width / 2, width: width, height: width)),
+                     with: .color(colors[1]))
+    }
+}
+
+// MARK: - Dials
+//
+// Three plain dials in a row: a thin track, a thin arc from the top, the number in heavy type in the
+// middle, and a tracked capital label with a chevron. Recovery takes the colour of its band.
+
+private struct NoopDialRings: View {
+    let values: NoopRingValues
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 0) {
+                dial("Sleep", fill: values.sleepFill, text: values.sleep.map { "\(Int((min(1, $0) * 100).rounded()))" },
+                     percent: true, color: Color(hex: 0x7FA6C4))
+                dial("Recovery", fill: values.recoveryFill, text: values.recovery.map { "\(Int($0.rounded()))" },
+                     percent: true, color: recoveryColor)
+                dial("Strain", fill: values.strainFill, text: values.strain.map { String(format: "%.1f", $0) },
+                     percent: false, color: Color(hex: 0x1E9BF0))
+            }
+            .padding(.vertical, 10)
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+    }
+
+    private var recoveryColor: Color {
+        guard let r = values.recovery else { return .white }
+        return r >= 67 ? Color(hex: 0x2BE36A) : r >= 34 ? Color(hex: 0xF7D23E) : Color(hex: 0xF2445B)
+    }
+
+    private func dial(_ title: String, fill: Double, text: String?, percent: Bool, color: Color) -> some View {
+        VStack(spacing: 14) {
+            ZStack {
+                Circle().stroke(Color.white.opacity(0.1), lineWidth: 7)
+                Circle().trim(from: 0, to: fill)
+                    .stroke(color, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text(text ?? "--").font(NoopHTMLFont.sans(NoopType.title2, weight: .heavy)).monospacedDigit()
+                    if percent { Text("%").font(NoopHTMLFont.sans(NoopType.subhead, weight: .heavy)) }
+                }
+                .foregroundStyle(text == nil ? NoopHTMLColor.faint : NoopHTMLColor.ink)
+            }
+            .frame(width: 92, height: 92)
+            HStack(spacing: 5) {
+                Text(title.uppercased())
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .bold))
+                    .tracking(1.6)
+                    .foregroundStyle(NoopHTMLColor.ink)
+                Image(systemName: "chevron.right").font(.system(size: 11, weight: .heavy)).foregroundStyle(NoopHTMLColor.muted)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Gyro
+//
+// Aura's own: the three rings as tilted orbits around a glowing core, slowly turning like a
+// gyroscope. Each orbit's lit length is its score, ending in a bright bead; the half of an orbit
+// that passes behind the core is dimmer and thinner, the half in front brighter and fuller, so the
+// three read as one object in space rather than three flat circles.
+
+private struct NoopGyroRings: View {
+    let values: NoopRingValues
+    let action: () -> Void
+
+    @State private var onScreen = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 14) {
+                ZStack {
+                    TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !onScreen || reduceMotion)) { timeline in
+                        Canvas { context, size in
+                            NoopGyro.draw(in: &context, size: size, values: values,
+                                          t: reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600))
+                        }
+                    }
+                    VStack(spacing: 0) {
+                        Text(values.recovery.map { "\(Int($0.rounded()))" } ?? "—")
+                            .font(NoopHTMLFont.outfit(NoopType.title1)).monospacedDigit()
+                            .foregroundStyle(NoopHTMLColor.ink)
+                        Text("RECOVERY").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.2)
+                            .foregroundStyle(NoopHTMLColor.muted)
+                    }
+                }
+                .frame(height: 260)
+                HStack(spacing: 0) {
+                    legend("Recovery", values.recovery.map { "\(Int($0.rounded()))%" }, NoopGyro.colors[0])
+                    legend("Strain", values.strain.map { String(format: "%.1f", $0) }, NoopGyro.colors[1])
+                    legend("Sleep", values.sleepMinutes.map { NoopRestRecord.duration($0) }, NoopGyro.colors[2])
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .modifier(NoopGyroVisibility(onScreen: $onScreen))
+    }
+
+    private func legend(_ title: String, _ value: String?, _ color: Color) -> some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 6) {
+                Capsule().fill(color).frame(width: 12, height: 3)
+                Text(title.uppercased()).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.1)
+                    .foregroundStyle(NoopHTMLColor.muted)
+            }
+            Text(value ?? "—").font(NoopHTMLFont.outfit(NoopType.title3)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct NoopGyroVisibility: ViewModifier {
+    @Binding var onScreen: Bool
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) { content.onScrollVisibilityChange(threshold: 0.02) { onScreen = $0 } } else { content }
+    }
+}
+
+private enum NoopGyro {
+    static let colors = [Color(hex: 0x3DE6A5), Color(hex: 0xFF9F5A), Color(hex: 0x8F9BFF)]
+
+    static func draw(in context: inout GraphicsContext, size: CGSize, values: NoopRingValues, t: Double) {
+        let c = CGPoint(x: size.width / 2, y: size.height / 2)
+        let base = min(size.width, size.height) / 2 - 8
+        // Radius, tilt from face-on, the turn of its axis, and how fast that axis drifts.
+        let orbits: [(r: Double, tilt: Double, phase: Double, drift: Double, fill: Double)] = [
+            (Double(base), 1.12, 0.0, 0.05, values.recoveryFill),
+            (Double(base) * 0.86, 1.18, 2.1, -0.07, values.strainFill),
+            (Double(base) * 0.72, 1.05, 4.2, 0.09, values.sleepFill)
+        ]
+        typealias Seg = (a: CGPoint, b: CGPoint, depth: Double, lit: Double, k: Int)
+        var segs: [Seg] = []
+        var beads: [(p: CGPoint, depth: Double, k: Int)] = []
+        let steps = 160
+        for (k, o) in orbits.enumerated() {
+            let spin = o.phase + t * o.drift
+            func point(_ th: Double) -> (CGPoint, Double) {
+                let x = o.r * cos(th), y = o.r * sin(th) * cos(o.tilt), z = o.r * sin(th) * sin(o.tilt)
+                let px = x * cos(spin) - y * sin(spin), py = x * sin(spin) + y * cos(spin)
+                return (CGPoint(x: c.x + CGFloat(px), y: c.y + CGFloat(py)), z / o.r)
+            }
+            let start = -Double.pi / 2
+            for i in 0..<steps {
+                let u0 = Double(i) / Double(steps), u1 = Double(i + 1) / Double(steps)
+                let (a, d0) = point(start + u0 * 2 * .pi), (b, d1) = point(start + u1 * 2 * .pi)
+                let lit = u1 <= o.fill ? 0.35 + 0.65 * (u1 / max(o.fill, 0.001)) : 0
+                segs.append((a, b, (d0 + d1) / 2, lit, k))
+            }
+            if o.fill > 0.004 {
+                let (p, d) = point(start + o.fill * 2 * .pi)
+                beads.append((p, d, k))
+            }
+        }
+        func drawSeg(_ s: Seg) {
+            var path = Path(); path.move(to: s.a); path.addLine(to: s.b)
+            let front = (s.depth + 1) / 2
+            if s.lit > 0 {
+                let w = 3 + 5 * front
+                context.stroke(path, with: .color(colors[s.k].opacity((0.35 + 0.65 * front) * s.lit)),
+                               style: StrokeStyle(lineWidth: w, lineCap: .round))
+            } else {
+                context.stroke(path, with: .color(.white.opacity(0.04 + 0.08 * front)), lineWidth: 1 + front)
+            }
+        }
+        func drawBead(_ b: (p: CGPoint, depth: Double, k: Int)) {
+            let front = (b.depth + 1) / 2, g = 9 + 7 * front
+            context.fill(Path(ellipseIn: CGRect(x: b.p.x - g, y: b.p.y - g, width: 2 * g, height: 2 * g)),
+                         with: .radialGradient(Gradient(colors: [colors[b.k].opacity(0.9), colors[b.k].opacity(0)]),
+                                               center: b.p, startRadius: 0, endRadius: g))
+            let s = 3 + 2.5 * front
+            context.fill(Path(ellipseIn: CGRect(x: b.p.x - s, y: b.p.y - s, width: 2 * s, height: 2 * s)), with: .color(.white))
+        }
+        context.blendMode = .plusLighter
+        // Behind the core, then the core, then in front of it.
+        for s in segs where s.depth < 0 { drawSeg(s) }
+        for b in beads where b.depth < 0 { drawBead(b) }
+        let core = base * 0.42
+        context.fill(Path(ellipseIn: CGRect(x: c.x - core, y: c.y - core, width: 2 * core, height: 2 * core)),
+                     with: .radialGradient(Gradient(colors: [colors[0].opacity(0.22), colors[2].opacity(0.08), .clear]),
+                                           center: c, startRadius: 0, endRadius: core))
+        context.blendMode = .normal
+        context.fill(Path(ellipseIn: CGRect(x: c.x - core * 0.62, y: c.y - core * 0.62, width: core * 1.24, height: core * 1.24)),
+                     with: .color(NoopHTMLColor.canvas.opacity(0.75)))
+        context.blendMode = .plusLighter
+        for s in segs where s.depth >= 0 { drawSeg(s) }
+        for b in beads where b.depth >= 0 { drawBead(b) }
     }
 }
