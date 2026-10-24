@@ -75,4 +75,34 @@ final class SourceIdentityTests: XCTestCase {
         XCTAssertEqual(SourceIdentity.resolve(address: "AA:BB:CC:DD:EE:03",
                                               rows: [legacy], currentId: "oura-abc"), "my-whoop")
     }
+
+    // MARK: allWhoopsForgotten
+
+    private func with(_ device: PairedDevice, _ status: DeviceStatus) -> PairedDevice {
+        var copy = device; copy.status = status; return copy
+    }
+
+    /// The reported bug: the strap was forgotten (archived) and nothing replaced it. Launch must not
+    /// re-adopt it under the "my-whoop" fallback.
+    func testEveryWhoopArchivedAndNothingActiveIsForgotten() {
+        let legacy = with(row("my-whoop", "WHOOP", nil), .archived)
+        let health = row("apple-health", "Apple", nil)
+        XCTAssertTrue(SourceIdentity.allWhoopsForgotten([legacy, with(strap, .archived), health]))
+    }
+
+    /// Another WHOOP still paired → the user hasn't released the strap; keep today's behaviour.
+    func testOnePairedWhoopIsNotForgotten() {
+        XCTAssertFalse(SourceIdentity.allWhoopsForgotten([with(row("my-whoop", "WHOOP", nil), .archived), strap]))
+    }
+
+    /// Something active (a re-paired strap, or a ring) → the normal gate decides, not this.
+    func testAnActiveDeviceIsNeverForgotten() {
+        XCTAssertFalse(SourceIdentity.allWhoopsForgotten([with(strap, .archived), with(ring, .active)]))
+    }
+
+    /// No WHOOP rows at all (a ring-only or empty registry) is not "forgotten".
+    func testNoWhoopRowsIsNotForgotten() {
+        XCTAssertFalse(SourceIdentity.allWhoopsForgotten([]))
+        XCTAssertFalse(SourceIdentity.allWhoopsForgotten([ring]))
+    }
 }

@@ -45,4 +45,15 @@ public enum SourceIdentity {
     public static func isWhoop(_ device: PairedDevice) -> Bool {
         device.id == "my-whoop" || device.brand.caseInsensitiveCompare("WHOOP") == .orderedSame
     }
+
+    /// True when the user has forgotten every WHOOP: no device is active and every WHOOP row is archived.
+    /// Forget archives the active row without promoting another, so nothing is active afterwards — but the
+    /// connect gate fails open on a missing active row, and the registry falls back to "my-whoop", so the
+    /// strap was silently re-adopted on the next launch while hidden from Manage straps. The launch seed
+    /// closes the gate on exactly this state; pairing any strap makes a row active and reopens it.
+    public static func allWhoopsForgotten(_ rows: [PairedDevice]) -> Bool {
+        guard !rows.contains(where: { $0.status == .active }) else { return false }
+        let whoops = rows.filter(isWhoop)
+        return !whoops.isEmpty && whoops.allSatisfy { $0.status == .archived }
+    }
 }

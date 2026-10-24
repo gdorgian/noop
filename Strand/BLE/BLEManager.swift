@@ -1459,6 +1459,12 @@ public final class BLEManager: NSObject, ObservableObject {
             } else {
                 self.deviceId = activeId
             }
+        } else if let rows = try? registry.all(), SourceIdentity.allWhoopsForgotten(rows) {
+            // Every WHOOP was forgotten and nothing replaced it: stay off the strap until one is paired
+            // again, instead of re-adopting it under the "my-whoop" fallback (and stealing it from
+            // another app) while Manage straps lists nothing to forget.
+            setWhoopIsActiveDevice(false)
+            log("Every WHOOP was forgotten — not reconnecting until a strap is paired again")
         }
         // Restore the ECG latch for THIS device now that `deviceId` has settled for the launch. Done
         // here rather than at init because the id is not known that early, and the latch is per device.

@@ -1870,7 +1870,7 @@ private extension NoopAct5Screens {
                 }
 
                 NoopHTMLRow(title: "Manage straps",
-                            detail: pairedStrapCount == 1 ? "one band paired" : "\(pairedStrapCount) bands paired",
+                            detail: pairedStrapCount == 0 ? "no strap paired" : pairedStrapCount == 1 ? "one band paired" : "\(pairedStrapCount) bands paired",
                             symbol: "link", value: nil) {
                     navigation.push(.devices)
                 }
@@ -1896,7 +1896,9 @@ private extension NoopAct5Screens {
         }
     }
 
-    var pairedStrapCount: Int { model.deviceRegistry?.devices.count ?? 0 }
+    /// The straps Manage straps actually lists, so the count can never promise rows the list hides
+    /// (forgotten straps, Apple Health, imports).
+    var pairedStrapCount: Int { liveDevices.count }
 
     var prototypeStrapScreen: some View {
         NoopScreen(topInset: 56) {
@@ -2964,6 +2966,10 @@ private extension NoopAct5Screens {
                         // and the design promises the pairing goes while the history stays.
                         if isActive { model.ble.forgetDevice(device.peripheralId) }
                         model.deviceRegistry?.archive(device.id)
+                        // Forgetting the active strap leaves nothing active. Close the connect gate too, or
+                        // the next system reconnect re-adopts it under "my-whoop" while this list shows
+                        // nothing. Pairing a strap makes a row active and reopens the gate.
+                        if isActive, SourceIdentity.isWhoop(device) { model.ble.setWhoopIsActiveDevice(false) }
                         deviceNotice = "Pairing forgotten. Its history remains in your record and export."
                     } label: {
                         Text("Forget")
