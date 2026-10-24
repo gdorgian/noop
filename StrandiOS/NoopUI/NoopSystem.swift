@@ -52,19 +52,22 @@ enum NoopRadius {
     static let card: CGFloat = 20
 }
 
-/// The three control sizes. Height, label size, icon size and padding move together, so a button can
-/// never end up big with a tiny label again. Every size keeps a 44 pt hit area.
+/// The three control sizes, taken from the 11.7 design handoff (`docs/design/11.7/app`), measured across
+/// every drawn screen: 34 pt is its round icon button (57 uses) and its chip (68 uses), 44 its secondary
+/// button, 52 its main action. Height, label, icon and padding move together, so a control can never be
+/// big with a tiny label. Every size is tappable over at least 44 × 44 pt (`noopHitTarget`).
 enum NoopControlSize {
-    /// Chips, inline actions, buttons beside a section label.
+    /// Header icon buttons (bell, gear, calendar), header chips, filter chips, period tabs, buttons beside
+    /// a section label. Everything at the top of a screen is this size.
     case small
-    /// Toolbar buttons, segmented tabs, secondary actions in a card.
+    /// Secondary buttons in a card or sheet.
     case medium
     /// The main action of a screen or sheet.
     case large
 
-    var height: CGFloat { switch self { case .small: 32; case .medium: 40; case .large: 52 } }
+    var height: CGFloat { switch self { case .small: 34; case .medium: 44; case .large: 52 } }
     var text: CGFloat { switch self { case .small: NoopType.footnote; case .medium, .large: NoopType.subhead } }
-    var icon: CGFloat { switch self { case .small: 13; case .medium: 15; case .large: 17 } }
+    var icon: CGFloat { switch self { case .small: 15; case .medium: 16; case .large: 17 } }
     var padding: CGFloat { switch self { case .small: 12; case .medium: 16; case .large: 20 } }
 }
 
@@ -102,9 +105,17 @@ extension EnvironmentValues {
 }
 
 extension View {
-    /// Keeps a small-looking control at the 44 × 44 pt hit area iOS asks for, without changing how it looks.
+    /// Gives a small-looking control the 44 × 44 pt hit area iOS asks for, WITHOUT changing its size: the
+    /// extra area is an invisible tappable layer behind the view, so layout and any background added after
+    /// this call keep the view's own size. (It used to set a 44 pt frame, which grew every circle drawn
+    /// after it — the bell on Today, the gear on You.)
     func noopHitTarget() -> some View {
-        frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+        background {
+            Color.clear
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .contentShape(Rectangle())
     }
 }
 
@@ -215,7 +226,7 @@ struct NoopChip: View {
             }
             .foregroundStyle(isOn ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
             .padding(.horizontal, size.padding + 2)
-            .frame(height: size.height + 4)
+            .frame(height: size.height)
             .background(isOn ? NoopHTMLColor.ink : Color.white.opacity(0.07), in: Capsule())
             .noopHitTarget()
         }
@@ -237,7 +248,7 @@ struct NoopTabs<Value: Hashable>: View {
                     Text(option.label)
                         .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         .foregroundStyle(on ? NoopHTMLColor.ink : NoopHTMLColor.copy)
-                        .frame(maxWidth: .infinity).frame(height: NoopControlSize.medium.height - 4)
+                        .frame(maxWidth: .infinity).frame(height: NoopControlSize.small.height)
                         .background(on ? Color.white.opacity(0.1) : .clear, in: Capsule())
                         .noopHitTarget()
                 }

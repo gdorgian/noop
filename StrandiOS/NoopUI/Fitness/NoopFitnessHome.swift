@@ -652,7 +652,8 @@ struct NoopFitnessIconGlyph: View {
     var compact = false
 
     var body: some View {
-        let size: NoopControlSize = compact ? .small : .medium
+        // Header and section-header icon buttons are one size everywhere (NoopControlSize.small).
+        let size: NoopControlSize = .small
         NoopIconDiscShape(size: size) {
             NoopCanonicalGlyph(name: glyph, size: size.icon, color: NoopHTMLColor.inkSoft)
         }

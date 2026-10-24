@@ -511,12 +511,9 @@ private extension NoopAct5Screens {
                     Spacer()
                     NoopBatteryChip(percent: you == nil ? 52 : battery) { navigation.push(.strap) }
                     Button { navigation.push(.settings) } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(NoopHTMLColor.inkSoft)
-                            .frame(width: 40, height: 40)
-                            .background(Color.white.opacity(0.06), in: Circle())
-                            .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+                        NoopIconDiscShape(size: .small) {
+                            Image(systemName: "gearshape").font(.system(size: NoopControlSize.small.icon, weight: .medium))
+                        }
                     }
                     .buttonStyle(NoopHTMLPressStyle())
                     .accessibilityLabel("Settings")

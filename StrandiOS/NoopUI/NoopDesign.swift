@@ -304,7 +304,7 @@ struct NoopScreenHeader<Trailing: View>: View {
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(eyebrow)
-                    .font(NoopHTMLFont.sans(13.5))
+                    .font(NoopHTMLFont.sans(NoopType.footnote))
                     .foregroundStyle(NoopHTMLColor.copy)
                 Text(title)
                     .font(NoopHTMLFont.outfit(23, weight: .regular))
@@ -350,7 +350,7 @@ struct NoopBackHeader: View {
             .buttonStyle(NoopPlainHitStyle())
 
             Text(realBackLabel ?? label)
-                .font(NoopHTMLFont.sans(13.5))
+                .font(NoopHTMLFont.sans(NoopType.footnote))
                 .foregroundStyle(NoopHTMLColor.copy)
             Spacer()
         }
@@ -406,13 +406,13 @@ struct NoopBatteryChip: View {
                     .frame(width: 1.6, height: 4.4)
                 }
                 Text(percent.map { "\($0)%" } ?? "\u{2014}")
-                    .font(NoopHTMLFont.sans(12, weight: .semibold))
+                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                     .tracking(-0.12)
                     .monospacedDigit()
                     .foregroundStyle(isLow ? tint : NoopHTMLColor.inkSoft)
             }
             .padding(.horizontal, 11)
-            .frame(height: 30)
+            .frame(height: NoopControlSize.small.height)
             .background(
                 isLow ? NoopHTMLColor.warm.opacity(0.12) : Color.white.opacity(0.06),
                 in: Capsule()
@@ -531,12 +531,12 @@ struct NoopHTMLRow: View {
                 if let symbol { NoopIconDisc(symbol: symbol, color: tint, size: 36) }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.ink)
                         .multilineTextAlignment(.leading)
                     if let detail {
                         Text(detail)
-                            .font(NoopHTMLFont.sans(12))
+                            .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .multilineTextAlignment(.leading)
                             .lineSpacing(2)
@@ -545,7 +545,7 @@ struct NoopHTMLRow: View {
                 Spacer(minLength: 8)
                 if let value {
                     Text(value)
-                        .font(NoopHTMLFont.sans(12.5, weight: .medium))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .medium))
                         .foregroundStyle(NoopHTMLColor.copy)
                 }
                 NoopChevron()
@@ -567,7 +567,7 @@ struct NoopPill: View {
 
     var body: some View {
         Text(text)
-            .font(NoopHTMLFont.sans(11, weight: .semibold))
+            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
             .foregroundStyle(filled ? NoopHTMLColor.blueInk : color)
             .padding(.horizontal, 11)
             .frame(minHeight: 28)
@@ -1162,7 +1162,7 @@ struct NoopBottomSheet<Content: View>: View {
                         Spacer()
                         if showsDone {
                             Button("Done", action: dismiss)
-                                .font(NoopHTMLFont.sans(13, weight: .semibold))
+                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.blue)
                         }
                     }

@@ -885,7 +885,7 @@ struct NoopAct2Screens: View {
                             .foregroundStyle(dayRailOpen || isHistorical ? NoopHTMLColor.blueLight : NoopHTMLColor.inkSoft)
                     }
                     .padding(.horizontal, 11)
-                    .frame(height: 30)
+                    .frame(height: NoopControlSize.small.height)
                     .background(dayRailOpen || isHistorical ? NoopHTMLColor.blue.opacity(0.14) : Color.white.opacity(0.06), in: Capsule())
                     .overlay(Capsule().stroke(dayRailOpen || isHistorical ? NoopHTMLColor.blue.opacity(0.34) : Color.white.opacity(0.1), lineWidth: 0.5))
                 }
@@ -894,13 +894,9 @@ struct NoopAct2Screens: View {
 
                 Button { navigation.push(.inbox) } label: {
                     ZStack(alignment: .topTrailing) {
-                        NoopCanonicalGlyph(name: .bell, size: 15, color: NoopHTMLColor.inkSoft)
-                            .frame(width: 32, height: 32).noopHitTarget()
-                            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 11))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 11)
-                                    .stroke(Color.white.opacity(0.09), lineWidth: 0.5)
-                            )
+                        NoopIconDiscShape(size: .small) {
+                            NoopCanonicalGlyph(name: .bell, size: NoopControlSize.small.icon, color: NoopHTMLColor.inkSoft)
+                        }
 
                         if inboxUnreadCount > 0 {
                             Text("\(min(inboxUnreadCount, 99))")
