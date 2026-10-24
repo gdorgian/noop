@@ -611,17 +611,16 @@ struct NoopAct2Screens: View {
                     if let day { NoopTodayEnergyCard(record: day) { navigation.push(.energy) } } else { energyCard }
 
 
-                    if day == nil {
+                    // Handoff 41 §2.1: Heart · Vitals · Stress, three rows, always — Heart carries the live pulse.
                     Act2TodayHeartRow(
                         anchor: todayPulseAnchor,
                         wakeCharge: dayContext.wakeCharge,
                         charge: dayContext.charge,
                         recordedBPM: dayContext.recordedPulse,
-                        isHistorical: false,
+                        isHistorical: isHistorical,
                         measured: day != nil,
                         liveBPM: liveBPM
                     ) { navigation.push(.heart) }
-                    }
 
                     // Rest left the tab bar for Fitness (22 Oct 2026). With a night on record the sleep
                     // card above is its door; this row stays for a phone with no night yet.
@@ -645,9 +644,6 @@ struct NoopAct2Screens: View {
                         valueColor: todayVitalsOut > 0 ? Color(hex: 0xF3C888) : NoopHTMLColor.blueLight
                     ) { navigation.push(.vitals) }
 
-                    // With a scored day the stress strip on Your day is the way in; the row stays for the
-                    // demo and for a day with nothing scored yet.
-                    if day == nil || (day?.stressTimeline.allSatisfy { $0.level == nil } ?? true) {
                     act2DestinationRow(
                         title: "Stress",
                         detail: "Four steps, not a traffic light",
@@ -656,7 +652,6 @@ struct NoopAct2Screens: View {
                         value: todayStressValue,
                         valueColor: todayStressStep >= 2 ? Color(hex: 0xF3C888) : NoopHTMLColor.blueLight
                     ) { navigation.push(.stress) }
-                    }
 
                     if navigation.dayLogSaved {
                         VStack(alignment: .leading, spacing: 9) {
@@ -3030,6 +3025,11 @@ private struct Act2TodayHeartRow: View {
                             .foregroundStyle(NoopHTMLColor.copy)
                         } else if liveBPM != nil {
                         Text("Live now")
+                            .font(NoopHTMLFont.sans(NoopType.caption))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                        } else {
+                        // Handoff 41 §2.6: with no live connection the figure is absent and the line says why.
+                        Text("Strap not connected")
                             .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.copy)
                         }
