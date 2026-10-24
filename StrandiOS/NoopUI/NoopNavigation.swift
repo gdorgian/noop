@@ -409,6 +409,8 @@ final class NoopNavigation: ObservableObject {
     /// it is gone, the page underneath never left). Nil when none is.
     @Published var fitnessSheet: NoopRoute?
     @Published var addSheetPresented = false
+    /// The metric the shared metric sheet (`NoopMetricSheet`) is open on; nil when closed.
+    @Published var metricSheet: NoopMetricSheetRequest?
     static let fitnessSheetRoutes: Set<NoopRoute> = [.fitnessDetail, .fitnessMuscles]
     /// A metric inspection keeps the presenting page mounted, including its scroll position.
     func dismissMetricSheet() {
@@ -705,6 +707,9 @@ final class NoopNavigation: ObservableObject {
            arguments.indices.contains(flag + 1),
            let requestedRoute = NoopRoute(rawValue: arguments[flag + 1]) {
             path = [requestedRoute]
+        }
+        if let flag = arguments.firstIndex(of: "--noop-metric"), arguments.indices.contains(flag + 1) {
+            metricSheet = NoopMetricSheetRequest(metricID: arguments[flag + 1])
         }
         if path.last == .instrumentMetric {
             path = [.instrumentIndex]

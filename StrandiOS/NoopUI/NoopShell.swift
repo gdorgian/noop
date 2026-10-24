@@ -115,6 +115,11 @@ struct NoopAppShell: View {
         .sheet(isPresented: Binding(get: { navigation.fitnessSheet != nil }, set: { if !$0 { navigation.fitnessSheet = nil } })) {
             NoopFitnessSheet(navigation: navigation, fitness: fitnessStore)
         }
+        .sheet(item: $navigation.metricSheet) { request in
+            NoopMetricSheet(metrics: request.metrics, selectedID: request.metricID)
+                .environment(\.noopAccent, sectionAccent)
+                .noopSheet()
+        }
         .sheet(isPresented: $navigation.addSheetPresented) {
             NoopFitnessAddSheet(navigation: navigation)
                 .noopSheet()
@@ -805,6 +810,12 @@ struct NoopVerifiedAppShell: View {
                     .filter { abs($0.startTs - start) <= 20 * 60 }
                     .min { abs($0.startTs - start) < abs($1.startTs - start) }
             }
+        }
+        .sheet(item: $navigation.metricSheet) { request in
+            NoopMetricSheet(metrics: request.metrics, selectedID: request.metricID)
+                .environmentObject(repo)
+                .environment(\.noopAccent, sectionAccent)
+                .noopSheet()
         }
         .sheet(isPresented: $navigation.addSheetPresented) {
             NoopFitnessAddSheet(navigation: navigation)
