@@ -30,7 +30,10 @@ struct NoopAuraOrb: View {
     /// the next. A nil point is the centre. An ember keeps the birthplace it had, so one born under the
     /// finger flies on from there after the finger has moved or lifted.
     @State private var emitterTrail: [(t: Double, p: CGPoint?)] = []
+    /// Off screen (scrolled away or another tab) nothing animates, so the orb costs nothing there.
+    @State private var onScreen = true
 
+    private var still: Bool { paused || reduceMotion || !onScreen }
     private var segmentCount: Int { NoopAuraOrbModel.segmentCount(shapeScore) }
 
     var body: some View {
@@ -41,10 +44,17 @@ struct NoopAuraOrb: View {
             let palette = NoopAuraOrbModel.palette(colorScore)
             let wash = LinearGradient(colors: [palette.top, palette.bottom], startPoint: .top, endPoint: .bottom)
             ZStack {
-                // Halo.
-                shape
-                    .stroke(wash, lineWidth: 15 * scale)
-                    .blur(radius: 50 * scale)
+                // Halo. Blurred at a quarter of the size and scaled up: the same soft glow for a
+                // sixteenth of the pixels, which matters because the outline moves every frame.
+                let q: CGFloat = 0.25, pad = 50 * scale * q * 2.5
+                NoopAmoebaShape(offsets: offsets, inset: NoopAuraOrbModel.inset(shapeScore) * scale * q, unit: scale * q)
+                    .stroke(wash, lineWidth: 15 * scale * q)
+                    .frame(width: side * q, height: side * q)
+                    .blur(radius: 50 * scale * q)
+                    .padding(pad)
+                    .drawingGroup()
+                    .scaleEffect(1 / q)
+                    .frame(width: side, height: side)
                     .opacity(0.59)
                 // Body, then the dark well over it.
                 shape.fill(wash)
@@ -56,7 +66,7 @@ struct NoopAuraOrb: View {
                 // A fine lit edge.
                 shape.stroke(wash, lineWidth: 1.2 * scale).opacity(0.85)
                 // Embers.
-                TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: paused || reduceMotion)) { timeline in
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: still)) { timeline in
                     let t = (paused || reduceMotion) ? 4.0 : NoopAuraOrbModel.clock(timeline.date)
                     let spin = heldSpin ?? (NoopAuraOrbModel.naturalSpin(t) + spinOffset)
                     let trail = emitterTrail
@@ -76,7 +86,7 @@ struct NoopAuraOrb: View {
             // Embers drifting out across the page, behind the orb; a background may overflow the frame.
             .background {
                 if drift > 0 {
-                    TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: paused || reduceMotion)) { timeline in
+                    TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: still)) { timeline in
                         let t = (paused || reduceMotion) ? 4.0 : NoopAuraOrbModel.clock(timeline.date)
                         let spin = heldSpin ?? (NoopAuraOrbModel.naturalSpin(t) + spinOffset)
                         Canvas { context, size in
@@ -103,7 +113,10 @@ struct NoopAuraOrb: View {
                 }
             }
         }
-        .task(id: segmentCount) { await morph() }
+        .task(id: [segmentCount, onScreen ? 1 : 0]) { await morph() }
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
+        .modifier(NoopAuraVisibility(onScreen: $onScreen))
         .accessibilityHidden(true)
     }
 
@@ -111,7 +124,7 @@ struct NoopAuraOrb: View {
     private func morph() async {
         let count = segmentCount
         offsets = NoopAuraOrbModel.randomOffsets(count: count, score: shapeScore)
-        guard !paused, !reduceMotion else { return }
+        guard !still else { return }
         while !Task.isCancelled {
             withAnimation(.easeInOut(duration: 6)) {
                 offsets = NoopAuraOrbModel.randomOffsets(count: count, score: shapeScore)
@@ -323,6 +336,19 @@ enum NoopAuraMath {
     }
     static func smooth(_ x: Double) -> Double { let c = max(0, min(1, x)); return c * c * (3 - 2 * c) }
     static func step(_ a: Double, _ b: Double, _ x: Double) -> Double { smooth((x - a) / (b - a)) }
+}
+
+/// Tracks whether the orb is scrolled into view.
+private struct NoopAuraVisibility: ViewModifier {
+    @Binding var onScreen: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollVisibilityChange(threshold: 0.02) { onScreen = $0 }
+        } else {
+            content
+        }
+    }
 }
 
 // MARK: - Touch

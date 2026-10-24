@@ -46,6 +46,10 @@ struct NoopRestRecord: Equatable {
         let slices: [Int]?
         /// Four clock labels across the night for the hypnogram, only when a real timeline exists.
         let axis: [String]?
+        /// Every stage run at its true length, as fractions of `span`; only when a real timeline exists.
+        var runs: [StageRun]? = nil
+        /// The recorded timeline's first and last moment, which `runs` and `axis` are measured across.
+        var span: ClosedRange<Date>? = nil
         /// The in-bed span and, inside it, when sleep began and when the final waking came. The edges are
         /// only known from a real timeline; without one they are nil and only the totals are shown.
         var bed: Bed? = nil
@@ -56,6 +60,13 @@ struct NoopRestRecord: Equatable {
             let f = AppClock.hourMinuteFormatter()
             return "\(f.string(from: bed.fellAsleep)) \u{2013} \(f.string(from: bed.finalWake))"
         }
+    }
+
+    struct StageRun: Equatable {
+        /// 0 awake · 1 light · 2 REM · 3 deep.
+        let stage: Int
+        let from: Double
+        let to: Double
     }
 
     /// In bed against asleep, the split the night is judged on. In-bed is the detected window (wrist
@@ -174,6 +185,8 @@ struct NoopRestRecord: Equatable {
                 stages: stages,
                 slices: real.map { slices(of: $0) },
                 axis: real.map { _ in axis(onset: night.onsetDate, wake: end, calendar: calendar) },
+                runs: real.map { runs(of: $0) },
+                span: real.flatMap { span(of: $0, onset: night.onsetDate) },
                 bed: real.flatMap { Bed(segments: $0, start: night.onsetDate, end: end) }
             )
             if latest == nil { latest = built }
@@ -216,6 +229,23 @@ struct NoopRestRecord: Equatable {
             }
             return seconds.max { $0.value < $1.value }?.key ?? 0
         }
+    }
+
+    /// Each interval as a fraction of the timeline from its first start to its last end.
+    static func runs(of intervals: [SleepInterval]) -> [StageRun] {
+        guard let first = intervals.map(\.start).min(),
+              let last = intervals.map(\.end).max(), last > first else { return [] }
+        let total = last - first
+        return intervals.sorted { $0.start < $1.start }.map {
+            StageRun(stage: stageIndex($0.stage), from: ($0.start - first) / total, to: ($0.end - first) / total)
+        }
+    }
+
+    /// `intervals` carry seconds from `onset`.
+    static func span(of intervals: [SleepInterval], onset: Date) -> ClosedRange<Date>? {
+        guard let first = intervals.map(\.start).min(),
+              let last = intervals.map(\.end).max(), last > first else { return nil }
+        return onset.addingTimeInterval(first)...onset.addingTimeInterval(last)
     }
 
     static func stageIndex(_ stage: SleepStage) -> Int {
