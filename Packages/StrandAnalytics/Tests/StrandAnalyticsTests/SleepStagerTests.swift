@@ -1312,10 +1312,8 @@ final class SleepStagerTests: XCTestCase {
     }
 
     func testBandStateWakeVetoPreservesTilingAndOnlyRemovesWake() {
-        XCTAssertFalse(SleepStager.bandStateWakeVetoEnabled,
-                       "band sleep_state veto ships default-OFF until PSG supports it — the harness "
-                       + "currently measures the shipped recipe UNDER-calling wake (bias −4.92 pp), "
-                       + "so converting wake→light by default would move away from truth")
+        XCTAssertTrue(SleepStager.bandStateWakeVetoEnabled,
+                      "Aura ships the band sleep_state veto ON — see the flag's comment for the evidence")
         let stages = vetoHypnoFixture()
         let out = SleepStager.applyBandStateWakeVeto(stages, start: 0, end: 960,
                                                      bandSleepState: bandAllAsleep(start: 0, end: 960),
@@ -1329,15 +1327,11 @@ final class SleepStagerTests: XCTestCase {
         XCTAssertLessThan(wake(out), wake(stages), "the veto only ever turns wake into sleep")
     }
 
-    func testBandStateWakeVetoDefaultOffLeavesHypnogramUnchangedEndToEnd() {
-        // WIRING PROOF through detectSleep, for the SHIPPED default (OFF until PSG supports the veto —
-        // the harness currently measures the recipe UNDER-calling wake against truth, bias −4.92 pp, so
-        // default-on would move away from it). A still overnight night with a mid-sleep motion+HR burst
-        // that NOOP scores as INTERIOR wake, plus an all-"asleep" band threaded end to end: with the
-        // flag off the band must change NOTHING — byte-identical stages, identical efficiency. This is
-        // the wiring test's inverse: it proves the band stream reaches the veto AND that the flag gates
-        // it, so flipping the default is the only change needed to re-enable (the ON-path mechanism is
-        // covered by the pure `applyBandStateWakeVeto(enabled: true)` tests above).
+    func testBandStateWakeVetoRecoversInteriorWakeEndToEnd() {
+        // WIRING PROOF through detectSleep, for the SHIPPED default (ON in Aura). A still overnight night
+        // with a mid-sleep motion+HR burst that NOOP scores as INTERIOR wake, plus an all-"asleep" band
+        // threaded end to end: the strap's asleep call turns that wake back into sleep, so the hypnogram
+        // loses its wake segment and efficiency rises. Without a band nothing changes.
         let start = nightStart(2)                 // 02:00 overnight (skips the daytime nap guard)
         let dur = 6 * 3600
         var grav = stillGravity(start: start, durationS: dur)
@@ -1348,13 +1342,13 @@ final class SleepStagerTests: XCTestCase {
         }
         let noBand = SleepStager.detectSleep(hr: hr, gravity: grav)
         XCTAssertEqual(noBand.count, 1)
+        XCTAssertTrue(noBand[0].stages.contains { $0.stage == "wake" }, "the burst is scored wake without a band")
         let withBand = SleepStager.detectSleep(hr: hr, gravity: grav,
                                                bandSleepState: bandAllAsleep(start: start, end: start + dur))
         XCTAssertEqual(withBand.count, 1)
-        XCTAssertEqual(withBand[0].stages, noBand[0].stages,
-                       "default-off: an all-asleep band changes NOTHING — byte-identical hypnogram")
-        XCTAssertEqual(withBand[0].efficiency, noBand[0].efficiency, accuracy: 1e-9,
-                       "default-off: efficiency is untouched by the band stream")
+        XCTAssertFalse(withBand[0].stages.contains { $0.stage == "wake" },
+                       "an all-asleep band recovers the interior wake")
+        XCTAssertGreaterThan(withBand[0].efficiency, noBand[0].efficiency)
     }
 
     func testBandVetoShadowLineIsNamespacedAndUncounted() {
@@ -1367,11 +1361,10 @@ final class SleepStagerTests: XCTestCase {
                        "shadow line must not be counted as a captured sleep day")
     }
 
-    func testBandVetoShadowTraceReportsRecoveryOutputNeutral() {
-        // #1210 shadow: veto DORMANT (default-off) + a band present + a collecting traceSink -> a
-        // `bandVeto(shadow):` line quantifying what the veto WOULD recover, WITHOUT changing the persisted
-        // hypnogram (detectSleep's documented trace contract). Same burst fixture as the default-off wiring
-        // test. (The line reports MAGNITUDE only; whether the move is toward truth needs the PSG harness.)
+    func testBandVetoShadowTraceSilentWhileVetoIsOn() {
+        // #1210 shadow: the `bandVeto(shadow):` line only reports what a DORMANT veto would recover. With the
+        // veto on (Aura's default) the recovery is applied, so no shadow line is emitted and tracing still
+        // leaves the persisted hypnogram unchanged.
         let start = nightStart(2)
         let dur = 6 * 3600
         var grav = stillGravity(start: start, durationS: dur)
@@ -1386,9 +1379,9 @@ final class SleepStagerTests: XCTestCase {
         let traced = SleepStager.detectSleep(hr: hr, gravity: grav, bandSleepState: band,
                                              traceSink: { lines.append($0) })
         XCTAssertEqual(traced[0].stages, untraced[0].stages,
-                       "shadow trace must not change the persisted hypnogram")
-        XCTAssertTrue(lines.contains { $0.hasPrefix("bandVeto(shadow):") && $0.contains("recoveredMin=") },
-                      "a banded night with interior false-wake emits a shadow line")
+                       "tracing must not change the persisted hypnogram")
+        XCTAssertFalse(lines.contains { $0.hasPrefix("bandVeto(shadow):") },
+                       "no shadow line while the veto is applied")
     }
 
     func testBandVetoCutoffSparesNightsBeforeCutoff() {

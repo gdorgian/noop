@@ -1175,6 +1175,81 @@ public enum SleepStager {
         return Double(asleep) / Double(inBlock.count) >= morningReonsetBandAsleepFrac
     }
 
+    // MARK: - Band "up" closes the night
+
+    /// The persisted band sleep_state value that means "up" (out of bed) — see `bandStateAsleep`.
+    public static let bandStateUp: Int = 3
+    /// Seconds of continuous band "up" that count as getting up. Shorter runs are a stir.
+    public static let bandUpMinRunS: Int = 120
+    /// Band samples further apart than this break an "up" run (a BLE gap is not proof of staying up).
+    static let bandUpMaxGapS: Int = 10
+    /// Seconds of band "asleep" after an "up" run that mean the wearer went back to sleep.
+    static let bandUpReturnAsleepS: Int = 120
+    /// The strap also calls "up" while the wearer lies still in bed (a real 5.0 morning: 15 minutes of "up"
+    /// after a turn-over, pulse flat). Getting up lifts the pulse, so an "up" run only counts when the median
+    /// pulse over the `bandUpHRAfterS` after its start is at least `bandUpHRRiseBpm` above the median over
+    /// the `bandUpHRBeforeS` before it (skipping the last `bandUpHRGuardS`, the stir itself).
+    static let bandUpHRRiseBpm: Double = 5
+    static let bandUpHRAfterS: Int = 300
+    static let bandUpHRBeforeS: Int = 1_800
+    static let bandUpHRGuardS: Int = 120
+
+    /// True when the pulse rose at `ts` as getting up does, or when there is too little pulse to judge
+    /// (the strap's call then stands alone).
+    static func hrConfirmsUp(at ts: Int, hr: [HRSample]) -> Bool {
+        func median(_ from: Int, _ to: Int) -> Double? {
+            let v = hr.filter { $0.ts >= from && $0.ts < to && $0.bpm > 25 && $0.bpm < 230 }
+                .map { Double($0.bpm) }.sorted()
+            return v.count >= 30 ? v[v.count / 2] : nil
+        }
+        guard let before = median(ts - bandUpHRBeforeS, ts - bandUpHRGuardS),
+              let after = median(ts, ts + bandUpHRAfterS) else { return true }
+        return after - before >= bandUpHRRiseBpm
+    }
+
+    /// The time the strap itself says the wearer got out of bed, when it falls inside `[start, end]`: the
+    /// start of the LAST sustained, pulse-confirmed "up" run with no sustained "asleep" after it. A still
+    /// wrist at a desk keeps the gravity run open long after waking, so without this the night's end (and
+    /// "Up") follows the clock. nil when there is no such run; the caller then keeps the gravity end. Only
+    /// ever shortens.
+    static func bandUpCut(start: Int, end: Int, bandSleepState: [(ts: Int, state: Int)],
+                          hr: [HRSample] = []) -> Int? {
+        let inRun = bandSleepState.filter { $0.ts > start && $0.ts <= end }.sorted { $0.ts < $1.ts }
+        guard !inRun.isEmpty else { return nil }
+        let hrNear = hr.filter { $0.ts >= start - bandUpHRBeforeS && $0.ts <= end + bandUpHRAfterS }
+        var cut: Int? = nil
+        var rejected: Int? = nil   // an "up" run the pulse did not confirm; not re-checked every sample
+        var upStart: Int? = nil, upPrev = 0
+        var asleepAfterCut = 0, asleepPrev: Int? = nil
+        for s in inRun {
+            if s.state == bandStateUp {
+                if upStart != nil, s.ts - upPrev > bandUpMaxGapS { upStart = nil }
+                if upStart == nil { upStart = s.ts }
+                upPrev = s.ts
+                // A standing cut is kept: only sustained sleep after it (below) cancels it.
+                if cut == nil, let u = upStart, upPrev - u >= bandUpMinRunS, rejected != u {
+                    if hrConfirmsUp(at: u, hr: hrNear) {
+                        cut = u
+                        asleepAfterCut = 0
+                    } else {
+                        rejected = u
+                    }
+                }
+                asleepPrev = nil
+            } else {
+                upStart = nil
+                if cut != nil, s.state == bandStateAsleep {
+                    if let a = asleepPrev, s.ts - a <= bandUpMaxGapS { asleepAfterCut += s.ts - a }
+                    asleepPrev = s.ts
+                    if asleepAfterCut >= bandUpReturnAsleepS { cut = nil; asleepAfterCut = 0 }
+                } else {
+                    asleepPrev = nil
+                }
+            }
+        }
+        return cut
+    }
+
     // MARK: - Band sleep_state WAKE-veto (recover strap-disputed false wakes)
 
     // NOOP's cardiorespiratory stager is known to OVER-CALL wake: an EEG-free stager reads a still, low-HR
@@ -1196,7 +1271,13 @@ public enum SleepStager {
     /// only with PSG evidence in hand — `sleeppsg --section variants` prints the wake%/bias row this
     /// decision keys on. The mechanism stays fully tested behind the flag (tests pass `enabled: true`
     /// explicitly). An absent band stream (WHOOP 4.0 / unbanded window) is a no-op regardless.
-    public static let bandStateWakeVetoEnabled: Bool = false
+    ///
+    /// Aura turns it ON (owner decision, 2026-10-24). The PSG truth set carries no WHOOP band stream, so
+    /// it cannot exercise the veto itself. On the owner's first two WHOOP 5.0 nights after the
+    /// 2026-10-23 retune, every interior wake minute but a handful was scored asleep by the strap (25 of
+    /// 25, then 30 of 39 minutes), each a 1–5 minute turn-over, and Fitbit on the same wrist night
+    /// counted 7h 02m asleep against 6h 43m without the veto and about 7h 08m with it.
+    public static let bandStateWakeVetoEnabled: Bool = true
 
     /// #1210 item 2 (retroactive-rescore story): the new-nights-only cutoff. When the veto is flipped on
     /// (`bandStateWakeVetoEnabled = true`), a NON-ZERO cutoff (a unix second) restricts the correction to
@@ -1575,8 +1656,12 @@ public enum SleepStager {
         var minSleepDrops = 0
         var firstSleepStart = Int.max
         var lastSleepEnd = 0
-        for p in runs {
+        for var p in runs {
             if p.stage != "sleep" { continue }
+            // The strap's own "up" closes the night; a still wrist after getting up does not extend it.
+            if let up = bandUpCut(start: p.start, end: p.end, bandSleepState: bandSleepState, hr: hrS) {
+                p.end = up
+            }
             runIndex += 1
             sleepRunsSeen += 1
             firstSleepStart = min(firstSleepStart, p.start)
