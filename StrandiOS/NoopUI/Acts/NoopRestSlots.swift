@@ -288,92 +288,54 @@ struct NoopSleepAuroraSection: View {
     let needMin: Double
     let action: () -> Void
 
+    /// How high each stage reaches: awake barely lifts off the horizon, deep reaches the top.
+    private static let height: [Float] = [0.08, 0.42, 0.62, 0.95]
+
+    /// The night's depth at 64 points, softened so the crown flows rather than steps.
+    private var heights: [Float] {
+        let runs = noopNightRuns(night)
+        func stage(at f: Double) -> Int { runs.first { f >= $0.from && f < $0.to }?.stage ?? runs.last?.stage ?? 0 }
+        let n = 64
+        let raw = (0..<n).map { Self.height[stage(at: (Double($0) + 0.5) / Double(n))] }
+        return (0..<n).map { i in
+            var sum: Float = 0, wsum: Float = 0
+            for j in max(0, i - 2)...min(n - 1, i + 2) {
+                let wt = exp(-Float((j - i) * (j - i)) / 2.5)
+                sum += raw[j] * wt; wsum += wt
+            }
+            return sum / wsum
+        }
+    }
+
     var body: some View {
         Button(action: action) {
             ZStack(alignment: .topLeading) {
                 NoopSlotClock { t, reveal in
-                    Canvas { context, size in draw(&context, size, t: t, reveal: reveal) }
+                    GeometryReader { g in
+                        Rectangle()
+                            .colorEffect(ShaderLibrary.noopAurora(
+                                .float2(g.size), .float(Float(t)), .float(Float(reveal)), .floatArray(heights)))
+                    }
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    NoopSectionLabel("Last night", color: Color(hex: 0xB7F5D8))
-                    Text(NoopRestRecord.duration(night.asleepMin))
-                        .font(NoopHTMLFont.outfit(NoopType.title1 + 10, weight: .ultraLight)).monospacedDigit()
+                VStack(alignment: .leading, spacing: 2) {
+                    NoopCountUp(value: night.asleepMin, format: { NoopRestRecord.duration($0) },
+                                font: NoopHTMLFont.outfit(NoopType.title1 + 8, weight: .ultraLight))
                         .foregroundStyle(NoopHTMLColor.ink)
                     Text(noopNeedLine(night.asleepMin, needMin)).font(NoopHTMLFont.sans(NoopType.caption))
-                        .foregroundStyle(NoopHTMLColor.copy)
+                        .foregroundStyle(Color.white.opacity(0.6))
                 }
-                .padding(18)
+                .padding(20)
                 Text(night.asleepWindow).font(NoopHTMLFont.sans(NoopType.eyebrow)).monospacedDigit()
-                    .foregroundStyle(NoopHTMLColor.faint)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .padding(14)
+                    .foregroundStyle(Color.white.opacity(0.4))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(20)
             }
-            .frame(height: 280)
-            .background(Color(hex: 0x05070D), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
+            .frame(height: 300)
+            .background(Color(hex: 0x04060B), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.white.opacity(0.07), lineWidth: 0.5))
         }
         .buttonStyle(NoopHTMLPressStyle())
-    }
-
-    /// Curtain colours: deep sleep a violet-green aurora, REM a cyan, light a pale green, awake a
-    /// faint white.
-    private static let curtain: [(Color, Color)] = [
-        (Color.white.opacity(0.5), Color.white.opacity(0)),
-        (Color(hex: 0x7CF5B4), Color(hex: 0x2A8F7A)),
-        (Color(hex: 0x6FE6FF), Color(hex: 0x3A6FE0)),
-        (Color(hex: 0xB28CFF), Color(hex: 0x3BE3A0))
-    ]
-    private static let height: [Double] = [0.12, 0.45, 0.62, 0.92]
-
-    private func draw(_ context: inout GraphicsContext, _ size: CGSize, t: Double, reveal: Double) {
-        let w = Double(size.width), h = Double(size.height)
-        // Stars, twinkling.
-        for i in 0..<70 {
-            let x = NoopAuraMath.hash(i * 3 + 1) * w, y = NoopAuraMath.hash(i * 5 + 2) * h * 0.55
-            let tw = 0.3 + 0.7 * (0.5 + 0.5 * sin(t * (0.8 + NoopAuraMath.hash(i) * 2) + Double(i)))
-            let s = 0.6 + 1.2 * NoopAuraMath.hash(i * 7)
-            context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: s, height: s)), with: .color(.white.opacity(0.5 * tw * reveal)))
-        }
-        // The curtains: one vertical ray every few points across the night, rising from the
-        // horizon as high as that moment's sleep was deep, swaying and shimmering.
-        let runs = noopNightRuns(night)
-        func stage(at f: Double) -> Int { runs.first { f >= $0.from && f < $0.to }?.stage ?? 0 }
-        let horizon = h * 0.98
-        var glow = context
-        glow.blendMode = .plusLighter
-        glow.addFilter(.blur(radius: 3))
-        let rays = 120
-        for i in 0..<rays {
-            let f = Double(i) / Double(rays - 1)
-            guard f <= reveal else { break }
-            // A soft average of nearby depth so the curtain's top edge flows.
-            var depth = 0.0, wsum = 0.0
-            for k in -4...4 {
-                let ff = min(1, max(0, f + Double(k) / Double(rays)))
-                let wt = exp(-Double(k * k) / 8)
-                depth += Self.height[stage(at: ff)] * wt; wsum += wt
-            }
-            depth /= wsum
-            let st = stage(at: f)
-            let sway = 6 * sin(t * 0.7 + f * 9) + 3 * sin(t * 1.3 - f * 17)
-            let shimmer = 0.65 + 0.35 * sin(t * 2.1 + f * 40)
-            let x = 10 + f * (w - 20) + sway * (1 - f * 0.3)
-            let top = horizon - depth * h * 0.78 * (0.94 + 0.06 * sin(t + f * 6))
-            var ray = Path()
-            ray.move(to: CGPoint(x: x, y: horizon)); ray.addLine(to: CGPoint(x: x + sway * 0.4, y: top))
-            let (c0, c1) = Self.curtain[st]
-            glow.stroke(ray, with: .linearGradient(Gradient(stops: [
-                .init(color: c1.opacity(0), location: 0),
-                .init(color: c1.opacity(0.35 * shimmer), location: 0.25),
-                .init(color: c0.opacity(0.75 * shimmer), location: 0.8),
-                .init(color: c0.opacity(0), location: 1)
-            ]), startPoint: CGPoint(x: x, y: horizon), endPoint: CGPoint(x: x, y: top)), lineWidth: 4.2)
-        }
-        // The horizon line, faintly lit.
-        var line = Path()
-        line.move(to: CGPoint(x: 0, y: horizon)); line.addLine(to: CGPoint(x: w * reveal, y: horizon))
-        context.stroke(line, with: .linearGradient(Gradient(colors: [.clear, Color(hex: 0x7CF5B4).opacity(0.5), .clear]),
-                                                   startPoint: .zero, endPoint: CGPoint(x: w, y: 0)), lineWidth: 1)
+        .accessibilityElement(children: .combine)
     }
 }

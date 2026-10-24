@@ -43,6 +43,30 @@ struct NoopSlotVisibility: ViewModifier {
     }
 }
 
+/// A figure that counts up from zero the first time it appears, its digits rolling into place.
+struct NoopCountUp: View {
+    let value: Double
+    var format: (Double) -> String = { "\(Int($0.rounded()))" }
+    var font: Font
+
+    @State private var shown: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Text(format(shown))
+            .font(font)
+            .monospacedDigit()
+            .contentTransition(.numericText(value: shown))
+            .onAppear {
+                guard shown == 0 else { return }
+                if reduceMotion { shown = value; return }
+                withAnimation(.spring(response: 1.1, dampingFraction: 0.9)) { shown = value }
+            }
+            .onChange(of: value) { _, v in withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) { shown = v } }
+            .accessibilityLabel(format(value))
+    }
+}
+
 struct NoopSlotCard<Content: View>: View {
     var tint: Color
     @ViewBuilder var content: Content
@@ -149,25 +173,23 @@ struct NoopVitalsConstellation: View {
             let p = point(i % n, radius(ordered[i % n]) * (0.6 + 0.4 * reveal))
             if i == 0 { shape.move(to: p) } else { shape.addLine(to: p) }
         }
-        context.fill(shape, with: .radialGradient(Gradient(colors: [Self.calm.opacity(0.02), Self.calm.opacity(0.16 * reveal)]),
-                                                 center: c, startRadius: 0, endRadius: CGFloat(R)))
-        context.stroke(shape.trimmedPath(from: 0, to: reveal), with: .color(Self.calm.opacity(0.55)),
-                       style: StrokeStyle(lineWidth: 1.4, lineJoin: .round))
-        // The stars, each appearing in turn; one outside its zone pulses warm.
+        context.fill(shape, with: .color(Self.calm.opacity(0.07 * reveal)))
+        context.stroke(shape.trimmedPath(from: 0, to: reveal), with: .color(.white.opacity(0.5)),
+                       style: StrokeStyle(lineWidth: 1, lineJoin: .round))
+        // The stars, each landing in turn on a spring: a small solid point in a fine ring. One
+        // outside its zone is warm, and its ring breathes.
         for (i, v) in ordered.enumerated() {
-            let appear = max(0, min(1, reveal * Double(n + 2) - Double(i)))
-            guard appear > 0 else { continue }
+            let local = max(0, min(1, reveal * Double(n + 2) - Double(i)))
+            guard local > 0 else { continue }
+            // A damped spring from 0 to 1: a little overshoot, then settled.
+            let appear = 1 - exp(-6 * local) * cos(9 * local)
             let p = point(i, radius(v) * (0.6 + 0.4 * reveal))
-            let color = v.outside ? Self.watch : Self.calm
-            let pulse = v.outside ? 0.5 + 0.5 * sin(t * 3.2 + Double(i)) : 0.5 + 0.5 * sin(t * 1.1 + Double(i) * 1.7)
-            let g = CGFloat((v.outside ? 16 : 11) + 5 * pulse) * CGFloat(appear)
-            var glow = context
-            glow.blendMode = .plusLighter
-            glow.fill(Path(ellipseIn: CGRect(x: p.x - g, y: p.y - g, width: 2 * g, height: 2 * g)),
-                      with: .radialGradient(Gradient(colors: [color.opacity(0.75), color.opacity(0)]),
-                                            center: p, startRadius: 0, endRadius: g))
-            let s = CGFloat(3.6 * appear)
-            context.fill(Path(ellipseIn: CGRect(x: p.x - s, y: p.y - s, width: 2 * s, height: 2 * s)), with: .color(.white))
+            let color = v.outside ? Self.watch : Color.white
+            let ringR = CGFloat(7 + (v.outside ? 2.5 * (0.5 + 0.5 * sin(t * 2.4)) : 0)) * CGFloat(appear)
+            context.stroke(Path(ellipseIn: CGRect(x: p.x - ringR, y: p.y - ringR, width: 2 * ringR, height: 2 * ringR)),
+                           with: .color(color.opacity(0.45)), lineWidth: 1)
+            let s = CGFloat(3 * appear)
+            context.fill(Path(ellipseIn: CGRect(x: p.x - s, y: p.y - s, width: 2 * s, height: 2 * s)), with: .color(color))
             // Label just outside the rim.
             let lp = point(i, 1.0 + 0.02)
             let anchor: UnitPoint = abs(cos(angle(i))) < 0.3 ? (sin(angle(i)) < 0 ? .bottom : .top)
@@ -176,7 +198,7 @@ struct NoopVitalsConstellation: View {
                 .foregroundStyle(NoopHTMLColor.muted)
                 + Text(format(v)).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                 .foregroundStyle(v.outside ? Self.watch : NoopHTMLColor.ink)
-            context.opacity = appear
+            context.opacity = min(1, local * 1.5)
             context.draw(label, at: lp, anchor: anchor)
             context.opacity = 1
         }
@@ -184,48 +206,71 @@ struct NoopVitalsConstellation: View {
 }
 
 // MARK: - Last night · Tide
+//
+// The night as water over a sea bed whose depth is the depth of sleep. Nothing moves for its own
+// sake: the surface is still once drawn in. Put a finger on it to read the night — a line follows
+// it with the time and the stage, the bed under it brightens, and the phone ticks at each change
+// of stage.
 
 struct NoopSleepTide: View {
     let night: NoopRestRecord.Night
     let needMin: Double
     let action: () -> Void
 
+    @State private var scrub: Double?
+
     private static let deep = Color(hex: 0x4B4FC9)
     private static let surface = Color(hex: 0x8FB6FF)
-
     /// How far down each stage sits: awake at the surface, deep at the floor.
-    private static let depth: [Double] = [0.08, 0.5, 0.32, 0.92]
+    private static let depth: [Double] = [0.06, 0.48, 0.3, 0.94]
+    private static let names = ["Awake", "Light", "REM", "Deep"]
 
     var body: some View {
-        Button(action: action) {
-            NoopSlotCard(tint: Self.deep) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline) {
-                        NoopSectionLabel("Last night", color: Self.surface)
-                        Spacer()
-                        Text(night.asleepWindow).font(NoopHTMLFont.sans(NoopType.caption)).monospacedDigit()
-                            .foregroundStyle(NoopHTMLColor.faint)
-                    }
+        NoopSlotCard(tint: Self.deep) {
+            VStack(alignment: .leading, spacing: 12) {
+                Button(action: action) {
                     HStack(alignment: .lastTextBaseline, spacing: 8) {
-                        Text(NoopRestRecord.duration(night.asleepMin))
-                            .font(NoopHTMLFont.outfit(NoopType.title1, weight: .light)).monospacedDigit()
+                        NoopCountUp(value: night.asleepMin, format: { NoopRestRecord.duration($0) },
+                                    font: NoopHTMLFont.outfit(NoopType.title1, weight: .light))
                             .foregroundStyle(NoopHTMLColor.ink)
                         Text(deltaText).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+                        Spacer()
+                        NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                     }
-                    NoopSlotClock { t, reveal in
-                        Canvas { context, size in draw(&context, size, t: t, reveal: reveal) }
-                    }
-                    .frame(height: 120)
-                    HStack(spacing: 14) {
-                        legend("Deep", night.stages.deep, NoopTodayNightCard.stageColors[3])
-                        legend("REM", night.stages.rem, NoopTodayNightCard.stageColors[2])
-                        legend("Light", night.stages.light, NoopTodayNightCard.stageColors[1])
-                        legend("Awake", night.stages.awake, .white.opacity(0.5))
-                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(NoopHTMLPressStyle())
+                GeometryReader { geo in
+                    NoopSlotClock { _, reveal in
+                        Canvas { context, size in draw(&context, size, reveal: reveal) }
+                    }
+                    .contentShape(Rectangle())
+                    .gesture(DragGesture(minimumDistance: 0)
+                        .onChanged { g in
+                            let f = min(1, max(0, g.location.x / max(1, geo.size.width)))
+                            if let old = scrub, stage(at: old) != stage(at: f) { UISelectionFeedbackGenerator().selectionChanged() }
+                            if scrub == nil { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+                            scrub = f
+                        }
+                        .onEnded { _ in withAnimation(.easeOut(duration: 0.25)) { scrub = nil } })
+                }
+                .frame(height: 112)
+                HStack {
+                    if let f = scrub {
+                        Text(timeText(f)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+                        Text(Self.names[stage(at: f)]).foregroundStyle(stageColor(stage(at: f)))
+                    } else {
+                        Text(night.asleepWindow).monospacedDigit().foregroundStyle(NoopHTMLColor.faint)
+                    }
+                    Spacer()
+                    Text("Deep \(NoopRestRecord.duration(night.stages.deep)) · REM \(NoopRestRecord.duration(night.stages.rem))")
+                        .monospacedDigit().foregroundStyle(NoopHTMLColor.faint)
+                }
+                .font(NoopHTMLFont.sans(NoopType.caption))
             }
         }
-        .buttonStyle(NoopHTMLPressStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Last night, \(NoopRestRecord.duration(night.asleepMin)) asleep, \(deltaText)")
     }
 
     private var deltaText: String {
@@ -234,15 +279,14 @@ struct NoopSleepTide: View {
         return d >= 0 ? "\(NoopRestRecord.duration(d)) over your need" : "\(NoopRestRecord.duration(-d)) short"
     }
 
-    private func legend(_ name: String, _ minutes: Double, _ color: Color) -> some View {
-        HStack(spacing: 5) {
-            Circle().fill(color).frame(width: 6, height: 6)
-            Text("\(name) \(NoopRestRecord.duration(minutes))").font(NoopHTMLFont.sans(NoopType.eyebrow)).monospacedDigit()
-                .foregroundStyle(NoopHTMLColor.copy)
-        }
+    private func stageColor(_ st: Int) -> Color { st == 0 ? Color.white.opacity(0.7) : NoopTodayNightCard.stageColors[st] }
+
+    private func timeText(_ f: Double) -> String {
+        guard let span = night.span else { return "" }
+        let d = span.lowerBound.addingTimeInterval(span.upperBound.timeIntervalSince(span.lowerBound) * f)
+        return AppClock.hourMinuteFormatter().string(from: d)
     }
 
-    /// The night's runs, or the totals laid out in a typical order when no timeline was kept.
     private var runs: [NoopRestRecord.StageRun] {
         if let runs = night.runs, !runs.isEmpty { return runs }
         let s = night.stages
@@ -255,17 +299,14 @@ struct NoopSleepTide: View {
         return out
     }
 
-    private func draw(_ context: inout GraphicsContext, _ size: CGSize, t: Double, reveal: Double) {
+    private func stage(at f: Double) -> Int { runs.first { f >= $0.from && f < $0.to }?.stage ?? runs.last?.stage ?? 0 }
+
+    private func draw(_ context: inout GraphicsContext, _ size: CGSize, reveal: Double) {
         let w = Double(size.width), h = Double(size.height)
-        let top = 10.0, floor = h - 4
+        let top = 4.0, floor = h - 3
         func y(_ d: Double) -> Double { top + d * (floor - top) }
-        // The sea bed: the night's depth at every point, smoothed over about a twentieth of the night
-        // so brief changes soften into the shape rather than spiking.
-        let rs = runs
-        let n = 160
-        func stage(at f: Double) -> Int { rs.first { f >= $0.from && f < $0.to }?.stage ?? 0 }
+        let n = 180, k = 5
         let raw = (0...n).map { Self.depth[stage(at: Double($0) / Double(n))] }
-        let k = 6
         let smooth: [Double] = (0...n).map { i in
             var sum = 0.0, wsum = 0.0
             for j in max(0, i - k)...min(n, i + k) {
@@ -276,184 +317,147 @@ struct NoopSleepTide: View {
         }
         let pts = (0...n).map { CGPoint(x: Double($0) / Double(n) * w, y: y(smooth[$0])) }
         var water = Path()
-        water.move(to: CGPoint(x: 0, y: 0))
+        water.move(to: CGPoint(x: 0, y: top))
         for p in pts { water.addLine(to: p) }
-        water.addLine(to: CGPoint(x: w, y: 0)); water.closeSubpath()
+        water.addLine(to: CGPoint(x: w, y: top)); water.closeSubpath()
 
         var clipped = context
         clipped.clip(to: Path(CGRect(x: 0, y: 0, width: w * reveal, height: h)))
-        // Light falls off with depth.
         clipped.fill(water, with: .linearGradient(Gradient(stops: [
-            .init(color: Self.surface.opacity(0.32), location: 0),
-            .init(color: Self.deep.opacity(0.5), location: 0.55),
-            .init(color: Color(hex: 0x20236B).opacity(0.85), location: 1)
+            .init(color: Self.surface.opacity(0.22), location: 0),
+            .init(color: Self.deep.opacity(0.42), location: 0.6),
+            .init(color: Color(hex: 0x1C1F5E).opacity(0.9), location: 1)
         ]), startPoint: .zero, endPoint: CGPoint(x: 0, y: h)))
-        // Caustics: slow bright ripples drifting across the water.
-        var light = clipped
-        light.blendMode = .plusLighter
-        light.clip(to: water)
-        for kk in 0..<5 {
-            var ripple = Path()
-            let baseY = h * (0.15 + 0.17 * Double(kk))
-            for i in 0...60 {
-                let x = Double(i) / 60 * w
-                let yy = baseY + 4 * sin(x / 38 + t * (0.6 + 0.15 * Double(kk)) + Double(kk))
-                if i == 0 { ripple.move(to: CGPoint(x: x, y: yy)) } else { ripple.addLine(to: CGPoint(x: x, y: yy)) }
-            }
-            light.stroke(ripple, with: .color(.white.opacity(0.045 - 0.006 * Double(kk))), lineWidth: 6)
-        }
-        // The bed's edge, coloured by the stage underneath each stretch.
+        var surface = Path(); surface.move(to: CGPoint(x: 0, y: top)); surface.addLine(to: CGPoint(x: w, y: top))
+        clipped.stroke(surface, with: .color(Self.surface.opacity(0.55)), lineWidth: 1)
+
+        // The bed, coloured by stage; the stretch under a finger is brighter and thicker.
+        let focus = scrub.map { stage(at: $0) }
         var i = 0
         while i < n {
             let st = stage(at: Double(i) / Double(n))
-            var seg = Path()
-            seg.move(to: pts[i])
+            var seg = Path(); seg.move(to: pts[i])
             var j = i + 1
             while j <= n {
                 seg.addLine(to: pts[j])
                 if j == n || stage(at: Double(j) / Double(n)) != st { break }
                 j += 1
             }
-            let color = st == 0 ? Color.white.opacity(0.6) : NoopTodayNightCard.stageColors[st]
-            clipped.stroke(seg, with: .color(color), style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
+            let dim = focus != nil && focus != st
+            clipped.stroke(seg, with: .color(stageColor(st).opacity(dim ? 0.3 : 1)),
+                           style: StrokeStyle(lineWidth: dim ? 1.6 : 2.4, lineCap: .round, lineJoin: .round))
             i = j
         }
-        // The surface, moving.
-        var surface = Path()
-        for i in 0...80 {
-            let x = Double(i) / 80 * w
-            let yy = 3 + 2.2 * sin(x / 22 + t * 1.6) + 1.2 * sin(x / 9 - t * 2.3)
-            if i == 0 { surface.move(to: CGPoint(x: x, y: yy)) } else { surface.addLine(to: CGPoint(x: x, y: yy)) }
-        }
-        clipped.stroke(surface, with: .color(Self.surface.opacity(0.7)), lineWidth: 1.3)
-        // The deepest moment, marked with a small rising bubble.
-        if let deepest = rs.filter({ $0.stage == 3 }).max(by: { ($0.to - $0.from) < ($1.to - $1.from) }) {
-            let x = (deepest.from + deepest.to) / 2 * w
-            let rise = (t * 0.25).truncatingRemainder(dividingBy: 1)
-            let floorY = Double(pts[min(n, Int((deepest.from + deepest.to) / 2 * Double(n)))].y)
-            let by = floorY - rise * (floorY - top)
-            let r = 2.2 + 1.5 * rise
-            clipped.stroke(Path(ellipseIn: CGRect(x: x - r + 3 * sin(t * 2), y: by - r, width: 2 * r, height: 2 * r)),
-                           with: .color(.white.opacity(0.55 * (1 - rise))), lineWidth: 1)
+        // The reading line.
+        if let f = scrub {
+            let x = f * w
+            let idx = min(n, max(0, Int((f * Double(n)).rounded())))
+            var line = Path(); line.move(to: CGPoint(x: x, y: top)); line.addLine(to: pts[idx])
+            context.stroke(line, with: .color(.white.opacity(0.7)), lineWidth: 1)
+            let p = pts[idx]
+            context.fill(Path(ellipseIn: CGRect(x: p.x - 4, y: p.y - 4, width: 8, height: 8)), with: .color(.white))
         }
     }
 }
 
 // MARK: - Energy · Reservoir
+//
+// The day's burn as liquid in a glass, rendered on the GPU. The level springs up to what has been
+// burned; the surface stays level as the phone tilts and sloshes when it moves, then settles. The
+// resting share is the deeper layer, the moving share above it; a fine line marks midnight's
+// projection.
 
 struct NoopEnergyReservoir: View {
     let summary: DailyEnergySummary
     let action: () -> Void
 
-    private static let basal = Color(hex: 0x2D7FF0)
-    private static let active = Color(hex: 0x6FE3F5)
+    private static let basalColor = Color(hex: 0x2D7FF0)
+    private static let activeColor = Color(hex: 0x6FE3F5)
+
+    @State private var level: Double = 0
+    @State private var onScreen = true
+    @State private var lastTilt: Double = 0
+    @State private var slosh: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var burned: Double { summary.totalBurnedSoFar ?? 0 }
-    private var basal: Double { summary.basalBurnedSoFar ?? burned }
     private var active: Double { summary.activeBurnedSoFar ?? 0 }
+    private var basal: Double { summary.basalBurnedSoFar ?? burned }
     private var capacity: Double {
         max(burned * 1.05, summary.projectedRangeKcal?.upperBound ?? summary.projectedTotalBurn ?? summary.estimatedBMR24h ?? burned * 1.5, 1)
     }
 
     var body: some View {
         Button(action: action) {
-            NoopSlotCard(tint: Self.basal) {
-                HStack(alignment: .center, spacing: 18) {
-                    NoopSlotClock { t, reveal in
-                        Canvas { context, size in draw(&context, size, t: t, reveal: reveal) }
-                    }
-                    .frame(width: 104, height: 150)
-                    VStack(alignment: .leading, spacing: 8) {
-                        NoopSectionLabel("Energy", color: Self.active)
+            NoopSlotCard(tint: Self.basalColor) {
+                HStack(alignment: .center, spacing: 20) {
+                    glass.frame(width: 96, height: 148)
+                    VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .lastTextBaseline, spacing: 6) {
-                            Text(burned.formatted(.number.precision(.fractionLength(0))))
-                                .font(NoopHTMLFont.outfit(NoopType.title1, weight: .light)).monospacedDigit()
+                            NoopCountUp(value: burned, format: { $0.formatted(.number.precision(.fractionLength(0))) },
+                                        font: NoopHTMLFont.outfit(NoopType.title1, weight: .light))
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text("kcal").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                         }
-                        if let p = summary.projectedTotalBurn {
-                            Text("heading for about \(p.formatted(.number.precision(.fractionLength(0)))) by midnight")
-                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            legend("resting", basal, Self.basal)
-                            legend("moving", active, Self.active)
-                        }
-                        .padding(.top, 2)
+                        Text(summary.projectedTotalBurn.map { "of about \($0.formatted(.number.precision(.fractionLength(0)))) by midnight" }
+                             ?? "since midnight")
+                            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                        Spacer().frame(height: 6)
+                        legend("Resting", basal, Self.basalColor)
+                        legend("Moving", active, Self.activeColor)
                     }
                     Spacer(minLength: 0)
                 }
             }
         }
         .buttonStyle(NoopHTMLPressStyle())
+        .onAppear {
+            if reduceMotion { level = 1; return }
+            withAnimation(.spring(response: 1.4, dampingFraction: 0.72)) { level = 1 }
+        }
+    }
+
+    private var glass: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !onScreen || reduceMotion)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600)
+            let tilt = reduceMotion ? 0 : LiquidMotion.shared.tilt
+            let fill = min(1, burned / capacity) * level
+            let share = burned > 0 ? basal / burned : 1
+            ZStack {
+                RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Color.white.opacity(0.04))
+                Rectangle()
+                    .colorEffect(ShaderLibrary.noopLiquid(
+                        .float2(CGSize(width: 96, height: 148)), .float(Float(t)), .float(Float(fill)),
+                        .float(Float(-tan(tilt) * 96 / 148)), .float(Float(slosh + 0.25 * max(0, 1 - level))),
+                        .float(Float(share)), .color(Self.basalColor), .color(Self.activeColor)))
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                if let p = summary.projectedTotalBurn {
+                    GeometryReader { g in
+                        Rectangle().fill(Color.white.opacity(0.35)).frame(height: 1)
+                            .padding(.horizontal, 10)
+                            .offset(y: g.size.height * (1 - p / capacity))
+                    }
+                }
+                RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+            }
+            .onChange(of: timeline.date) {
+                // The slosh grows with how fast the phone turns and dies away over a second or so.
+                let turn = abs(tilt - lastTilt)
+                slosh = min(1.4, slosh * 0.94 + turn * 9)
+                lastTilt = tilt
+            }
+        }
+        .onAppear { LiquidMotion.shared.acquire() }
+        .onDisappear { LiquidMotion.shared.release() }
+        .modifier(NoopSlotVisibility(onScreen: $onScreen))
     }
 
     private func legend(_ name: String, _ kcal: Double, _ color: Color) -> some View {
-        HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 8, height: 8)
-            Text("\(name) \(kcal.formatted(.number.precision(.fractionLength(0))))")
-                .font(NoopHTMLFont.sans(NoopType.eyebrow)).monospacedDigit().foregroundStyle(NoopHTMLColor.copy)
+        HStack(spacing: 7) {
+            Capsule().fill(color).frame(width: 12, height: 4)
+            Text(name).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+            Text(kcal.formatted(.number.precision(.fractionLength(0)))).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
+                .monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
         }
-    }
-
-    private func draw(_ context: inout GraphicsContext, _ size: CGSize, t: Double, reveal: Double) {
-        let w = Double(size.width), h = Double(size.height)
-        let vessel = Path(roundedRect: CGRect(x: 1, y: 1, width: w - 2, height: h - 2), cornerRadius: 26, style: .continuous)
-        context.fill(vessel, with: .color(.white.opacity(0.04)))
-        // Where the day is heading: a faint line at the projection, the range as a soft band.
-        if let range = summary.projectedRangeKcal {
-            let y0 = h * (1 - range.upperBound / capacity), y1 = h * (1 - range.lowerBound / capacity)
-            context.fill(Path(CGRect(x: 0, y: y0, width: w, height: max(1, y1 - y0))), with: .color(.white.opacity(0.04)))
-        }
-        if let p = summary.projectedTotalBurn {
-            var line = Path(); let y = h * (1 - p / capacity)
-            line.move(to: CGPoint(x: 8, y: y)); line.addLine(to: CGPoint(x: w - 8, y: y))
-            context.stroke(line, with: .color(.white.opacity(0.3)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-        }
-        var inside = context
-        inside.clip(to: vessel)
-        let level = min(1, burned / capacity) * reveal
-        let activeShare = burned > 0 ? active / burned : 0
-        func surfacePath(_ fill: Double, phase: Double, amp: Double) -> Path {
-            var p = Path()
-            let base = h * (1 - fill)
-            p.move(to: CGPoint(x: 0, y: h))
-            for i in 0...40 {
-                let x = Double(i) / 40 * w
-                let y = base + amp * sin(x / 16 + t * 1.8 + phase) + amp * 0.5 * sin(x / 7 - t * 2.6 + phase)
-                p.addLine(to: CGPoint(x: x, y: y))
-            }
-            p.addLine(to: CGPoint(x: w, y: h)); p.closeSubpath()
-            return p
-        }
-        // The whole burn as the lighter, moving layer; the resting part beneath it in deeper blue.
-        inside.fill(surfacePath(level, phase: 0, amp: 2.6), with: .linearGradient(
-            Gradient(colors: [Self.active.opacity(0.85), Self.active.opacity(0.55)]),
-            startPoint: CGPoint(x: 0, y: h * (1 - level)), endPoint: CGPoint(x: 0, y: h)))
-        inside.fill(surfacePath(level * (1 - activeShare), phase: 1.3, amp: 1.6), with: .linearGradient(
-            Gradient(colors: [Self.basal.opacity(0.95), Color(hex: 0x123A86)]),
-            startPoint: CGPoint(x: 0, y: h * (1 - level)), endPoint: CGPoint(x: 0, y: h)))
-        // Bubbles rising through it.
-        var fizz = inside
-        fizz.blendMode = .plusLighter
-        for i in 0..<9 {
-            let hsh = NoopAuraMath.hash(i * 37 + 11)
-            let speed = 0.12 + 0.1 * NoopAuraMath.hash(i * 13 + 5)
-            let p = (t * speed + hsh).truncatingRemainder(dividingBy: 1)
-            let y = h - p * h * level
-            guard y > h * (1 - level) + 4 else { continue }
-            let x = w * (0.15 + 0.7 * NoopAuraMath.hash(i * 7 + 3)) + 3 * sin(t * 2 + Double(i))
-            let r = 1.2 + 1.8 * NoopAuraMath.hash(i * 3 + 1)
-            fizz.stroke(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: 2 * r, height: 2 * r)),
-                        with: .color(.white.opacity(0.35 * (1 - p))), lineWidth: 0.8)
-        }
-        // A glint down the side of the glass.
-        context.stroke(vessel, with: .color(.white.opacity(0.14)), lineWidth: 1)
-        var glint = Path()
-        glint.move(to: CGPoint(x: 10, y: 30)); glint.addLine(to: CGPoint(x: 10, y: h - 30))
-        context.stroke(glint, with: .linearGradient(Gradient(colors: [.white.opacity(0), .white.opacity(0.18), .white.opacity(0)]),
-                                                    startPoint: CGPoint(x: 0, y: 30), endPoint: CGPoint(x: 0, y: h - 30)),
-                       style: StrokeStyle(lineWidth: 2, lineCap: .round))
     }
 }
