@@ -65,11 +65,14 @@ struct NoopPageEditing {
     var active = false
     var draft: [String] = []
     var adding = false
+    /// Counts saves; each one drops a ripple on the page.
+    var saves = 0
 }
 
 /// Lays out a page's sections in the wearer's order. While editing, every section carries a remove
-/// disc and can be dragged onto another to take its place, and the foot of the page offers Add and
-/// Reset; otherwise the foot offers Edit.
+/// disc and can be held and carried to a new place, and the foot of the page offers Add and Reset;
+/// otherwise the foot offers Edit. Each step answers with its own tap: picked up, passed, dropped,
+/// removed, added, reset.
 struct NoopEditableSections<Section: View>: View {
     @ObservedObject var layout: NoopPageLayout
     @Binding var editing: NoopPageEditing
@@ -86,6 +89,8 @@ struct NoopEditableSections<Section: View>: View {
     @State private var dragStartMid: CGFloat = 0
     @State private var dragTranslation: CGFloat = 0
     @State private var frames: [String: CGRect] = [:]
+    /// Where the page sits on screen, so the drop lands in the middle of what is in view.
+    @State private var screenFrame: CGRect = .zero
 
     var body: some View {
         VStack(spacing: spacing) {
@@ -99,6 +104,11 @@ struct NoopEditableSections<Section: View>: View {
             foot.padding(.top, 14)
         }
         .coordinateSpace(name: "noop.sections")
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { screenFrame = $0 }
+        .modifier(NoopDropRipple(trigger: editing.saves, origin: CGPoint(
+            x: screenFrame.width / 2, y: UIScreen.main.bounds.midY - screenFrame.minY)))
+        // Leaving the page mid-edit (another tab) drops the unsaved edit rather than keeping it open.
+        .onDisappear { if editing.active { editing.active = false } }
         #if DEBUG
         .onAppear {
             if CommandLine.arguments.contains("--noop-edit-page"), !editing.active {
@@ -125,11 +135,18 @@ struct NoopEditableSections<Section: View>: View {
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
+        // Cards are see-through; a lifted one is backed with the page so nothing shows through it.
+        .background {
+            if dragging == id {
+                RoundedRectangle(cornerRadius: 22, style: .continuous).fill(NoopHTMLColor.canvas)
+            }
+        }
         .scaleEffect(dragging == id ? 1.03 : 1)
         .shadow(color: .black.opacity(dragging == id ? 0.5 : 0), radius: 18, y: 8)
         .overlay(alignment: .topLeading) {
             if (info?.removable ?? true) && dragging == nil {
                 Button {
+                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.6)
                     withAnimation(.easeInOut(duration: 0.22)) { editing.draft.removeAll { $0 == id } }
                 } label: {
                     Image(systemName: "minus")
@@ -148,7 +165,20 @@ struct NoopEditableSections<Section: View>: View {
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("noop.sections")) } action: { frames[id] = $0 }
         .offset(y: dragging == id ? dragStartMid + dragTranslation - (frames[id]?.midY ?? dragStartMid) : 0)
         .zIndex(dragging == id ? 1 : 0)
+        .transition(.scale(scale: 0.92).combined(with: .opacity))
         .modifier(NoopReorderPress { phase in carry(id, phase) })
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(info?.title ?? id)
+        .accessibilityAction(named: "Move up") { move(id, by: -1) }
+        .accessibilityAction(named: "Move down") { move(id, by: 1) }
+    }
+
+    /// One place up or down, for VoiceOver, which cannot hold and carry.
+    private func move(_ id: String, by step: Int) {
+        guard let from = editing.draft.firstIndex(of: id) else { return }
+        let to = from + step
+        guard editing.draft.indices.contains(to) else { return }
+        withAnimation(.easeInOut(duration: 0.2)) { editing.draft.swapAt(from, to) }
     }
 
     /// Hold to pick a section up, move to carry it; it takes the place of whichever section its
@@ -203,11 +233,13 @@ struct NoopEditableSections<Section: View>: View {
                     .buttonStyle(NoopHTMLPressStyle())
                 }
                 NoopActionButton(title: "Reset to default", variant: .plain, size: .small) {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     withAnimation(.easeInOut(duration: 0.25)) { editing.draft = layout.defaultOrder }
                 }
             }
         } else {
             NoopActionButton(title: "Edit page", variant: .secondary, size: .medium) {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 editing.draft = layout.order
                 withAnimation(.easeInOut(duration: 0.22)) { editing.active = true }
             }
@@ -230,6 +262,9 @@ private struct NoopReorderPress: ViewModifier {
     }
 }
 
+/// The press itself, in UIKit so it can drive the page's scroll view: held near the top or bottom of
+/// the screen, the page scrolls under the finger, faster the closer it is to the edge, and the carried
+/// section moves with it.
 @available(iOS 18.0, *)
 private struct NoopReorderRecognizer: UIGestureRecognizerRepresentable {
     let onChange: (NoopReorderPress.Phase) -> Void
@@ -241,22 +276,109 @@ private struct NoopReorderRecognizer: UIGestureRecognizerRepresentable {
         return press
     }
 
+    func updateUIGestureRecognizer(_ recognizer: UILongPressGestureRecognizer, context: Context) {
+        context.coordinator.onChange = onChange
+    }
+
     func handleUIGestureRecognizerAction(_ recognizer: UILongPressGestureRecognizer, context: Context) {
-        let y = recognizer.location(in: recognizer.view?.window).y
+        let coordinator = context.coordinator
+        coordinator.onChange = onChange
         switch recognizer.state {
-        case .began:
-            context.coordinator.startY = y
-            onChange(.began)
-        case .changed:
-            onChange(.moved(y - context.coordinator.startY))
-        default:
-            onChange(.ended)
+        case .began: coordinator.begin(recognizer)
+        case .changed: coordinator.move(recognizer)
+        default: coordinator.end()
         }
     }
 
-    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator(onChange: onChange) }
 
-    final class Coordinator { var startY: CGFloat = 0 }
+    @MainActor
+    final class Coordinator: NSObject {
+        var onChange: (NoopReorderPress.Phase) -> Void
+        private weak var scrollView: UIScrollView?
+        private var startY: CGFloat = 0
+        private var startOffset: CGFloat = 0
+        private var fingerY: CGFloat = 0
+        private var link: CADisplayLink?
+        private var scrolling = false
+
+        /// The band at each end of the screen where holding scrolls, and the fastest it goes.
+        private static let edge: CGFloat = 120
+        private static let topClear: CGFloat = 110
+        private static let bottomClear: CGFloat = 120
+        private static let maxSpeed: CGFloat = 900
+
+        init(onChange: @escaping (NoopReorderPress.Phase) -> Void) { self.onChange = onChange }
+
+        func begin(_ recognizer: UILongPressGestureRecognizer) {
+            scrollView = recognizer.view?.window.flatMap { Self.pageScroller(in: $0, at: recognizer.location(in: $0)) }
+            fingerY = recognizer.location(in: recognizer.view?.window).y
+            startY = fingerY
+            startOffset = scrollView?.contentOffset.y ?? 0
+            onChange(.began)
+            let link = CADisplayLink(target: self, selector: #selector(tick(_:)))
+            link.add(to: .main, forMode: .common)
+            self.link = link
+        }
+
+        func move(_ recognizer: UILongPressGestureRecognizer) {
+            fingerY = recognizer.location(in: recognizer.view?.window).y
+            report()
+        }
+
+        func end() {
+            link?.invalidate()
+            link = nil
+            scrolling = false
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.8)
+            onChange(.ended)
+        }
+
+        /// The deepest vertically scrolling view under the finger: the page, not a chart inside it.
+        private static func pageScroller(in root: UIView, at point: CGPoint) -> UIScrollView? {
+            var found: UIScrollView?
+            func visit(_ view: UIView) {
+                guard !view.isHidden, view.alpha > 0.01 else { return }
+                if let scroll = view as? UIScrollView, scroll.isScrollEnabled,
+                   scroll.contentSize.height > scroll.bounds.height + 1,
+                   scroll.bounds.contains(scroll.convert(point, from: root)) {
+                    found = scroll
+                }
+                view.subviews.forEach(visit)
+            }
+            visit(root)
+            return found
+        }
+
+        /// How far the section has travelled in the page: the finger's move plus the page's.
+        private func report() {
+            let scrolled = (scrollView?.contentOffset.y ?? startOffset) - startOffset
+            onChange(.moved(fingerY - startY + scrolled))
+        }
+
+        @objc private func tick(_ link: CADisplayLink) {
+            guard let scrollView, let window = scrollView.window else { return }
+            let height = window.bounds.height
+            let top = Self.topClear + Self.edge, bottom = height - Self.bottomClear - Self.edge
+            var speed: CGFloat = 0
+            if fingerY < top { speed = -Self.maxSpeed * min(1, (top - fingerY) / Self.edge) }
+            if fingerY > bottom { speed = Self.maxSpeed * min(1, (fingerY - bottom) / Self.edge) }
+            let maxOffset = max(-scrollView.adjustedContentInset.top,
+                                scrollView.contentSize.height - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
+            let minOffset = -scrollView.adjustedContentInset.top
+            let current = scrollView.contentOffset.y
+            let next = min(maxOffset, max(minOffset, current + speed * CGFloat(link.targetTimestamp - link.timestamp)))
+            let moving = abs(next - current) > 0.5
+            if moving != scrolling {
+                // A soft bump when the page starts to carry along, and again when it reaches an end.
+                UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: moving ? 0.6 : 0.9)
+                scrolling = moving
+            }
+            guard moving else { return }
+            scrollView.contentOffset.y = next
+            report()
+        }
+    }
 }
 
 /// A section with nothing to show yet, drawn while editing so it can still be placed.
@@ -305,6 +427,7 @@ private struct NoopAddSectionSheet<Section: View>: View {
                 VStack(alignment: .leading, spacing: 22) {
                     ForEach(layout.catalog.filter { !editing.draft.contains($0.id) }) { info in
                         Button {
+                            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
                             withAnimation(.easeInOut(duration: 0.22)) { editing.draft.append(info.id) }
                             dismiss()
                         } label: {
@@ -351,6 +474,7 @@ struct NoopEditBar: ViewModifier {
             if editing.active {
                 HStack {
                     NoopActionButton(title: "Cancel", variant: .secondary, size: .small, fullWidth: false) {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(.easeInOut(duration: 0.22)) { editing.active = false }
                     }
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: NoopControlSize.small.height / 2))
@@ -358,6 +482,8 @@ struct NoopEditBar: ViewModifier {
                     NoopActionButton(title: "Save", size: .small, fullWidth: false) {
                         layout.save(editing.draft)
                         withAnimation(.easeInOut(duration: 0.22)) { editing.active = false }
+                        editing.saves += 1
+                        NoopDropHaptic.play()
                     }
                 }
                 .padding(.horizontal, 20)
