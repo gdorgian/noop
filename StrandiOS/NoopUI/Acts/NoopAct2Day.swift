@@ -466,10 +466,13 @@ struct NoopAct2Screens: View {
         NoopPageSection(id: "rings-segmented", title: "Rings · Segmented", detail: "Sleep in its stages, strain heating up, recovery on a gauge"),
         NoopPageSection(id: "breathe", title: "Breathing orb", detail: "Your pulse as a breathing sphere; tap it to breathe"),
         NoopPageSection(id: "sleep", title: "Last night", detail: "Sleep against your need"),
+        NoopPageSection(id: "sleep-tide", title: "Last night · Tide", detail: "The night drawn as water, its depth the depth of sleep"),
         NoopPageSection(id: "coach", title: "Svea", detail: "Your morning read and the conversation"),
         NoopPageSection(id: "day", title: "Your day", detail: "Heart rate from bedtime to now, with stress"),
         NoopPageSection(id: "energy", title: "Energy", detail: "What today has cost"),
+        NoopPageSection(id: "energy-reservoir", title: "Energy · Reservoir", detail: "The day's burn filling toward midnight"),
         NoopPageSection(id: "vitals", title: "Vitals", detail: "Five signals, each against your own zone"),
+        NoopPageSection(id: "vitals-constellation", title: "Vitals · Constellation", detail: "Five signals as stars around your own zone"),
         NoopPageSection(id: "stress", title: "Stress", detail: "Shown until today has a scored stress line"),
         NoopPageSection(id: "logged", title: "Logged today", detail: "What you logged for today")
     ]
@@ -492,6 +495,8 @@ struct NoopAct2Screens: View {
         switch id {
         case "stress": return !(day == nil || (day?.stressTimeline.allSatisfy { $0.level == nil } ?? true))
         case "logged": return !navigation.dayLogSaved
+        case "sleep-tide": return day?.rest.latest == nil
+        case "energy-reservoir": return day?.energy?.totalBurnedSoFar == nil
         default: return false
         }
     }
@@ -499,6 +504,16 @@ struct NoopAct2Screens: View {
     @ViewBuilder
     private func todaySection(_ id: String) -> some View {
         switch id {
+        case "sleep-tide":
+            if let day, let night = day.rest.latest {
+                NoopSleepTide(night: night, needMin: day.rest.needMin) { navigation.push(.rest) }
+            }
+        case "energy-reservoir":
+            if let energy = day?.energy {
+                NoopEnergyReservoir(summary: energy) { navigation.push(.energy) }
+            }
+        case "vitals-constellation":
+            NoopVitalsConstellation(vitals: day?.vitals ?? []) { navigation.push(.vitals) }
         case "rings-gyro":
             NoopTodayRings(values: todayRings, style: .gyro) { navigation.push(.rest) }
         case "rings-donuts":
