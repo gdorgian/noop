@@ -1973,18 +1973,16 @@ struct NoopAct2Screens: View {
 
                     if !values.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                NoopSectionLabel(day == nil ? "Drag along the day"
-                                                 : heartWindow == nil ? "Drag along the day \u{00B7} pinch to zoom"
-                                                 : "Drag to move \u{00B7} hold to read")
-                                Spacer()
-                                if heartWindow != nil {
-                                    Button("Whole day") { resetHeartZoom(series: series, point: point) }
-                                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                                        .foregroundStyle(NoopHTMLColor.blueLight)
-                                        .buttonStyle(NoopPlainHitStyle())
-                                }
+                            if heartBounds != nil {
+                                // Zoom you can see, as Apple Health picks its span with tabs; pinch and drag
+                                // still work on the chart itself.
+                                NoopTabs(options: Self.heartSpans, selection: Binding(
+                                    get: { heartSpanSelection },
+                                    set: { setHeartSpan($0, series: series, point: point) }))
                             }
+                            NoopSectionLabel(day == nil ? "Drag along the day"
+                                             : heartWindow == nil ? "Drag to read \u{00B7} pinch to zoom"
+                                             : "Drag to move \u{00B7} hold to read")
                             Act2ScrubbableDayChart(values: values, selected: $selectedHeartPoint, resting: todayRestingLine,
                                                    pan: heartWindow == nil ? nil : { panHeart(by: $0, ended: $1, series: series, point: point) })
                                 .frame(height: 150)
@@ -2134,6 +2132,30 @@ struct NoopAct2Screens: View {
         let latestStart = bounds.upperBound.addingTimeInterval(-span)
         let lower = min(max(start, bounds.lowerBound), latestStart)
         return lower...lower.addingTimeInterval(span)
+    }
+
+    /// The spans the zoom tabs offer, in seconds; 0 is the whole day.
+    private static let heartSpans: [(label: String, value: TimeInterval)] = [
+        ("Day", 0), ("6h", 6 * 3600), ("3h", 3 * 3600), ("1h", 3600)
+    ]
+
+    /// The tab that matches the current window, or none when a pinch left it between two.
+    private var heartSpanSelection: TimeInterval {
+        guard let w = heartWindow else { return 0 }
+        let span = w.upperBound.timeIntervalSince(w.lowerBound)
+        return Self.heartSpans.first { $0.value > 0 && abs($0.value - span) < 60 }?.value ?? -1
+    }
+
+    /// Zoom to a fixed span around the selected moment (the tabs above the chart).
+    private func setHeartSpan(_ span: TimeInterval, series: [(time: Date, bpm: Double)]?, point: Int) {
+        guard span > 0 else { resetHeartZoom(series: series, point: point); return }
+        guard let bounds = heartBounds else { return }
+        let fullSpan = bounds.upperBound.timeIntervalSince(bounds.lowerBound)
+        guard span < fullSpan else { resetHeartZoom(series: series, point: point); return }
+        let focus = heartTime(series, point) ?? bounds.upperBound
+        heartGestureAnchor = nil
+        heartWindow = clampedHeartWindow(start: focus.addingTimeInterval(-span / 2), span: span, in: bounds)
+        heartFocus = focus
     }
 
     private func resetHeartZoom(series: [(time: Date, bpm: Double)]?, point: Int) {
