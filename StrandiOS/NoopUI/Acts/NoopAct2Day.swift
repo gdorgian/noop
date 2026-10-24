@@ -459,6 +459,8 @@ struct NoopAct2Screens: View {
 
     /// Today's sections in their default order. The header and the look-back banner stay above them.
     static let todaySections: [NoopPageSection] = [
+        NoopPageSection(id: "rings", title: "Rings", detail: "Recovery, strain and sleep as living rings"),
+        NoopPageSection(id: "rings-segmented", title: "Rings, segmented", detail: "Sleep in its stages, strain heating up, recovery on a gauge"),
         NoopPageSection(id: "breathe", title: "Breathing orb", detail: "Your pulse as a breathing sphere; tap it to breathe"),
         NoopPageSection(id: "sleep", title: "Last night", detail: "Sleep against your need"),
         NoopPageSection(id: "coach", title: "Svea", detail: "Your morning read and the conversation"),
@@ -468,6 +470,20 @@ struct NoopAct2Screens: View {
         NoopPageSection(id: "stress", title: "Stress", detail: "Shown until today has a scored stress line"),
         NoopPageSection(id: "logged", title: "Logged today", detail: "What you logged for today")
     ]
+
+    /// The seeded shell's rings.
+    static let demoRings = NoopRingValues(recovery: 68, strain: 11.4, sleep: 0.92, sleepMinutes: 432, sleepRuns: nil)
+
+    private var todayRings: NoopRingValues {
+        #if DEBUG
+        if CommandLine.arguments.contains("--noop-demo-rings") {
+            var demo = Self.demoRings
+            demo.sleepRuns = day?.rest.latest?.runs
+            return demo
+        }
+        #endif
+        return day?.rings ?? Self.demoRings
+    }
 
     private func todaySectionEmpty(_ id: String) -> Bool {
         switch id {
@@ -480,8 +496,19 @@ struct NoopAct2Screens: View {
     @ViewBuilder
     private func todaySection(_ id: String) -> some View {
         switch id {
+        case "rings":
+            NoopTodayRings(values: todayRings, style: .living) { navigation.push(.rest) }
+        case "rings-segmented":
+            NoopTodayRings(values: todayRings, style: .segmented) { navigation.push(.rest) }
         case "breathe":
             VStack(spacing: 10) {
+                if !isHistorical {
+                    Text("Take four breaths first")
+                        .font(NoopHTMLFont.outfit(NoopType.title2))
+                        .tracking(-0.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 // Production has no charge left to draw, so the gauge and its door to Charge are absent;
                 // the orb is Breathe's door either way.
                 Button { navigation.push(day == nil ? .charge : .breathe) } label: {
@@ -955,11 +982,14 @@ struct NoopAct2Screens: View {
             }
             .fixedSize(horizontal: true, vertical: false)
         }
-            Text(isHistorical ? dayContext.header : "Take four breaths first")
-                .font(NoopHTMLFont.outfit(NoopType.title2))
-                .tracking(-0.5)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // The breathing prompt belongs to the orb and moves with it; a past day keeps its header.
+            if isHistorical {
+                Text(dayContext.header)
+                    .font(NoopHTMLFont.outfit(NoopType.title2))
+                    .tracking(-0.5)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(.bottom, 4)
     }

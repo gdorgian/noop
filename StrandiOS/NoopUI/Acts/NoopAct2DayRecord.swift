@@ -49,6 +49,8 @@ struct NoopDayRecord {
     /// The latest weekly Fitness Age and the calendar age it is read against. Nil until the engine has
     /// scored one and the profile's age is confirmed — an example birthday cannot anchor "under your own".
     var fitnessAge: (value: Double, chrono: Int)?
+    /// Today's recovery, strain and sleep for the rings.
+    var rings = NoopRingValues()
     var loaded = false
 
     /// The design's four steps for a 0–3 stress level.
@@ -172,6 +174,14 @@ final class NoopDayStore: ObservableObject {
         next.energyConfirmed = UserDefaults.standard.bool(forKey: "noop.energy.profileConfirmed")
         let dayKey = Repository.localDayKey(now)
         let day = repo.days.last { $0.day == dayKey }
+        // Recovery belongs to the morning it was scored; strain to today; sleep to the latest night.
+        next.rings.recovery = day?.recovery ?? repo.days.last { $0.recovery != nil && $0.day >= Repository.localDayKey(midnight.addingTimeInterval(-86_400)) }?.recovery
+        next.rings.strain = day?.strain
+        if let night = next.rest.latest, next.rest.needMin > 0 {
+            next.rings.sleep = night.asleepMin / next.rest.needMin
+            next.rings.sleepMinutes = night.asleepMin
+            next.rings.sleepRuns = night.runs
+        }
         let end = calendar.date(byAdding: .day, value: 1, to: midnight) ?? midnight.addingTimeInterval(86_400)
         next.energy = EnergyEngine.summarize(
             .init(day: dayKey, strapTotalKcal: day?.activeKcalEst, steps: day?.steps),
