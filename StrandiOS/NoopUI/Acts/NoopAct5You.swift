@@ -49,6 +49,8 @@ struct NoopAct5Screens: View {
     @AppStorage(PuffinExperiment.deepDataKey) private var deepDataEnabled = false
     @AppStorage(PuffinExperiment.broadcastHrKey) private var broadcastHrEnabled = false
     @AppStorage(PuffinExperiment.ecgRawDataKey) private var ecgRawDataEnabled = false
+    @AppStorage(SleepNeedPrefs.key) private var sleepNeedUserMinutes = 0
+    @State private var choosingSleepNeed = false
 
     @SceneStorage("noop.act5.history-filter") private var historyFilter = "All"
     @State private var openZone: Int?
@@ -625,8 +627,22 @@ private extension NoopAct5Screens {
                         // Values are the wearer's; the explanatory copy is the example person's
                         // (221 nights, a hill in June) and has no template, so it is left out.
                         // A planning target, not a measured need (owner decision, 24 Sep): never tagged "learned".
+                        // Tapping it lets the wearer set their own, since the estimate never goes below 8 h.
+                        let userSet = SleepNeedPrefs.userMinutes() != nil
                         coreCard("Your sleep need", value: NoopRestRecord.duration(you.needMin),
-                                 tag: nil, copy: nil)
+                                 tag: userSet ? "set by you" : nil,
+                                 copy: userSet ? nil : "Tap to set your own if your schedule can't fit this.") {
+                            choosingSleepNeed = true
+                        }
+                        .confirmationDialog("Your sleep need", isPresented: $choosingSleepNeed, titleVisibility: .visible) {
+                            ForEach(SleepNeedPrefs.choices, id: \.self) { minutes in
+                                Button(NoopRestRecord.duration(Double(minutes))) { setSleepNeed(minutes) }
+                            }
+                            Button("Use the estimate") { setSleepNeed(0) }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("Sleep debt and Rest measure against this.")
+                        }
                         if let onset = you.usualOnsetHour {
                             coreCard("Your bedtime hour", value: NoopYouRecord.clock(onset), tag: "learned", copy: nil)
                         }
@@ -682,6 +698,13 @@ private extension NoopAct5Screens {
         guard let registry = model.deviceRegistry,
               let active = registry.devices.first(where: { $0.id == registry.activeDeviceId }) else { return nil }
         return active.displayName
+    }
+
+    /// Store the wearer's sleep need (0 = back to the estimate) and re-score recent nights against it.
+    /// The screens reload because the shell keys their loads on this setting.
+    func setSleepNeed(_ minutes: Int) {
+        sleepNeedUserMinutes = minutes
+        Task { await model.intelligence.analyzeRecent(); await model.repo.refresh() }
     }
 
     func coreCard(_ title: String, value: String, tag: String?, copy: String?, action: (() -> Void)? = nil) -> some View {
