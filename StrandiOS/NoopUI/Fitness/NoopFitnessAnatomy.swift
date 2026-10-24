@@ -36,7 +36,7 @@ struct NoopFitnessBodyMap: View {
             }
             .aspectRatio(100 / 212, contentMode: .fit)
             if !compact {
-                Text(label).font(NoopHTMLFont.sans(11, weight: .semibold)).foregroundStyle(NoopHTMLColor.muted)
+                Text(label).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.muted)
             }
         }
         .accessibilityHidden(true)

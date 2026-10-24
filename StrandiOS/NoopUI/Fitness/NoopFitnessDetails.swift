@@ -111,7 +111,7 @@ struct NoopFitnessPage<Content: View>: View {
                 .buttonStyle(NoopPlainHitStyle())
                 .accessibilityLabel("Close")
                 Spacer()
-                Text(title).font(NoopHTMLFont.sans(17, weight: .semibold))
+                Text(title).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
                 Spacer()
                 Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
@@ -121,7 +121,7 @@ struct NoopFitnessPage<Content: View>: View {
                 VStack(alignment: .leading, spacing: 0) {
                     if let subtitle {
                         Text(subtitle)
-                            .font(NoopHTMLFont.sans(13.5))
+                            .font(NoopHTMLFont.sans(NoopType.footnote))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
@@ -140,11 +140,11 @@ struct NoopFitnessPage<Content: View>: View {
                 NoopBackHeader(label: "Fitness") { navigation.back(or: .fitness) }
                     .padding(.bottom, 14)
                 Text(title)
-                    .font(NoopHTMLFont.outfit(27))
+                    .font(NoopHTMLFont.outfit(NoopType.title2))
                     .foregroundStyle(NoopHTMLColor.ink)
                 if let subtitle {
                     Text(subtitle)
-                        .font(NoopHTMLFont.sans(13.5))
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -165,10 +165,10 @@ struct NoopFitnessPeriodPicker: View {
             ForEach(options, id: \.self) { d in
                 Button { withAnimation(NoopMotion.swap) { days = d } } label: {
                     Text("\(d) days")
-                        .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(days == d ? NoopHTMLColor.ink : NoopHTMLColor.copy)
                         .frame(maxWidth: .infinity)
-                        .frame(minHeight: 34)
+                        .frame(minHeight: 40)
                         .background(days == d ? Color.white.opacity(0.09) : .clear,
                                     in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 }
@@ -206,13 +206,13 @@ struct NoopFitnessRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(NoopHTMLFont.sans(14, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
                 if let detail {
-                    Text(detail).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 }
             }
             Spacer(minLength: 10)
-            Text(value).font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(valueColor)
+            Text(value).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(valueColor)
         }
         .padding(.vertical, 4)
     }
@@ -235,10 +235,10 @@ struct NoopFitnessBarRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(title).font(NoopHTMLFont.sans(13.5, weight: .medium)).foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
-                if let detail { Text(detail).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted) }
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
+                if let detail { Text(detail).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted) }
                 Spacer()
-                Text(text).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                Text(text).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             }
             GeometryReader { g in
                 ZStack(alignment: .leading) {
@@ -340,7 +340,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
             HStack {
                 arrow(.left, enabled: dayOffset < 41) { dayOffset += 1 }
                 Text(dayOffset == 0 ? "Today" : fmtDate(day))
-                    .font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                     .frame(maxWidth: .infinity)
                 arrow(.right, enabled: dayOffset > 0) { dayOffset -= 1 }
             }
@@ -353,7 +353,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
                 Button { leastFirst.toggle() } label: {
                     Text(leastFirst ? (mode == .freshness ? "Least recovered first" : "Most first")
                                     : (mode == .freshness ? "Most recovered first" : "Least first"))
-                        .font(NoopHTMLFont.sans(11.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
                 }
                 .buttonStyle(NoopHTMLPressStyle())
             }
@@ -369,9 +369,9 @@ struct NoopFitnessMuscleGroupsScreen: View {
                     HStack(spacing: 12) {
                         Circle().fill(color(g, mode: mode, values: values, fresh: fresh, top: top)).frame(width: 12, height: 12)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(g.title).font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            Text(g.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                             Text(line(g, values: values, fresh: fresh))
-                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                         }
                         Spacer()
                         if mode == .freshness, let r = fresh[g] {
@@ -387,7 +387,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
                  ? "Freshness falls with each set and with the leg work in cardio, and recovers at each muscle's own pace — about a day and a half to halve for legs and lower back, less for arms, calves and abs."
                  : mode == .load ? "Muscular load per muscle: hard sets count in full, easy ones less, helpers half."
                  : "Weight moved, credited to each exercise's main muscle.")
-                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.muted)
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -421,7 +421,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 if let dot { Circle().fill(dot).frame(width: 7, height: 7) }
-                Text(t).font(NoopHTMLFont.sans(12, weight: .semibold))
+                Text(t).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
             }
             .foregroundStyle(selected ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
             .padding(.horizontal, 11)
@@ -434,7 +434,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
     private func arrow(_ d: NoopFixedChevron.Direction, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             NoopFixedChevron(direction: d, color: enabled ? NoopHTMLColor.inkSoft : NoopHTMLColor.chevronDim)
-                .frame(width: 36, height: 32)
+                .frame(width: 44, height: 40)
         }
         .buttonStyle(NoopHTMLPressStyle())
         .disabled(!enabled)

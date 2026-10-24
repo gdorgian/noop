@@ -50,7 +50,7 @@ struct NoopFitnessCardioLive: View {
             figureGrid
             controls.padding(.top, 18)
             if let footnote {
-                Text(footnote).font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.faint).padding(.top, 8)
+                Text(footnote).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).padding(.top, 8)
             }
         }
         .padding(.horizontal, 22)
@@ -74,20 +74,20 @@ struct NoopFitnessCardioLive: View {
     private var header: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(Self.clock(elapsed)).font(NoopHTMLFont.outfit(34, weight: .light)).monospacedDigit()
+                Text(Self.clock(elapsed)).font(NoopHTMLFont.outfit(NoopType.title1, weight: .light)).monospacedDigit()
                     .foregroundStyle(paused ? NoopHTMLColor.copy : NoopHTMLColor.ink)
                 HStack(spacing: 6) {
                     Image(systemName: symbol).font(.system(size: 12, weight: .semibold))
-                    Text(paused ? "Paused" : sport).font(NoopHTMLFont.sans(13, weight: .semibold)).lineLimit(1)
+                    Text(paused ? "Paused" : sport).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).lineLimit(1)
                 }
                 .foregroundStyle(paused ? NoopHTMLColor.copy : NoopHTMLColor.blueLight)
             }
             Spacer()
             if let target, zoneRanges.indices.contains(target - 1) {
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("TARGET").font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.1).foregroundStyle(NoopHTMLColor.muted)
+                    Text("TARGET").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.1).foregroundStyle(NoopHTMLColor.muted)
                     Text("\(zoneNames[safe: target - 1] ?? "Zone \(target)") · \(zoneRanges[target - 1].0)–\(zoneRanges[target - 1].1)")
-                        .font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(NoopFitnessZonesCard.colors[target - 1])
+                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopFitnessZonesCard.colors[target - 1])
                 }
             }
         }
@@ -116,7 +116,7 @@ struct NoopFitnessCardioLive: View {
                                    value: bpm == nil)
                 }
                 Text(bpm == nil ? "Waiting for heart rate" : zone > 0 ? zoneLabel : "bpm")
-                    .font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(bpm == nil ? NoopHTMLColor.copy : tint)
+                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(bpm == nil ? NoopHTMLColor.copy : tint)
             }
         }
         .frame(width: 250, height: 250)
@@ -141,7 +141,7 @@ struct NoopFitnessCardioLive: View {
             HStack(spacing: 4) {
                 ForEach(1...5, id: \.self) { z in
                     Text(zoneRanges[safe: z - 1].map { "\($0.0)" } ?? "")
-                        .font(NoopHTMLFont.sans(9.5, weight: .medium)).foregroundStyle(NoopHTMLColor.muted)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .medium)).foregroundStyle(NoopHTMLColor.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -164,9 +164,9 @@ struct NoopFitnessCardioLive: View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
             ForEach(figures) { f in
                 VStack(spacing: 3) {
-                    Text(f.value).font(NoopHTMLFont.outfit(21)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+                    Text(f.value).font(NoopHTMLFont.outfit(NoopType.title3)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
                         .lineLimit(1).minimumScaleFactor(0.7)
-                    Text(f.label).font(NoopHTMLFont.sans(10.5, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(f.label).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 .frame(maxWidth: .infinity).padding(.vertical, 12)
                 .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -180,7 +180,7 @@ struct NoopFitnessCardioLive: View {
             Button(action: pauseAction) {
                 HStack(spacing: 8) {
                     Image(systemName: paused ? "play.fill" : "pause.fill").font(.system(size: 15, weight: .semibold))
-                    Text(paused ? "Resume" : "Pause").font(NoopHTMLFont.sans(15, weight: .semibold))
+                    Text(paused ? "Resume" : "Pause").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                 }
                 .foregroundStyle(NoopHTMLColor.ink)
                 .frame(maxWidth: .infinity).frame(height: 56)
@@ -190,7 +190,7 @@ struct NoopFitnessCardioLive: View {
             Button { confirmEnd = true } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "stop.fill").font(.system(size: 14, weight: .semibold))
-                    Text("Finish").font(NoopHTMLFont.sans(15, weight: .semibold))
+                    Text("Finish").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                 }
                 .foregroundStyle(NoopHTMLColor.blueInk)
                 .frame(maxWidth: .infinity).frame(height: 56)

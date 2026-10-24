@@ -116,7 +116,7 @@ struct NoopFitnessEditScreen: View {
                 ForEach(Array(layout.sections.enumerated()), id: \.element) { i, section in
                     NoopFitnessPanel {
                         HStack {
-                            Text(section.title).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            Text(section.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                             Spacer()
                             move(.up, enabled: i > 0) { swap(i, i - 1) }
                             move(.down, enabled: i < layout.sections.count - 1) { swap(i, i + 1) }
@@ -126,7 +126,7 @@ struct NoopFitnessEditScreen: View {
                                 get: { layout.isShown(card) },
                                 set: { on in if on { layout.hidden.remove(card) } else { layout.hidden.insert(card) } })
                             ) {
-                                Text(card.title).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.inkSoft)
+                                Text(card.title).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.inkSoft)
                             }
                             .tint(NoopHTMLColor.blue)
                         }
@@ -135,18 +135,18 @@ struct NoopFitnessEditScreen: View {
                 NoopFitnessPanel(label: "Activity detection") {
                     Toggle(isOn: $autoLog) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Log detected activities").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("Log detected activities").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                             Text("When your strap records a workout you did not start, it is added as a detected activity you can rename, correct or delete.")
-                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .tint(NoopHTMLColor.volt)
                     Toggle(isOn: $activityNotices) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Notify me").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("Notify me").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                             Text("While a session is under way, and once it has been logged, so you can confirm what it was.")
-                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -158,7 +158,7 @@ struct NoopFitnessEditScreen: View {
                     layout.hidden = []
                 } label: {
                     Text("Reset to the standard layout")
-                        .font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
                         .frame(maxWidth: .infinity).frame(minHeight: 46)
                 }
                 .buttonStyle(NoopHTMLPressStyle())
@@ -176,7 +176,7 @@ struct NoopFitnessEditScreen: View {
         Button(action: action) {
             NoopFixedChevron(direction: .right, color: enabled ? NoopHTMLColor.inkSoft : NoopHTMLColor.chevronDim)
                 .rotationEffect(.degrees(way == .up ? -90 : 90))
-                .frame(width: 34, height: 30)
+                .frame(width: 44, height: 40)
                 .background(Color.white.opacity(enabled ? 0.06 : 0.02), in: RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(NoopHTMLPressStyle())
@@ -223,10 +223,10 @@ struct NoopFitnessRoutineScreen: View {
                     NoopCanonicalGlyph(name: .weight, size: 24, color: NoopHTMLColor.volt)
                         .frame(width: 52, height: 52)
                         .overlay(Circle().strokeBorder(NoopHTMLColor.volt.opacity(0.5), style: StrokeStyle(lineWidth: 1.2, dash: [3, 3])))
-                    Text("Strength").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
-                    Text(program?.name ?? "Routine").font(NoopHTMLFont.outfit(27)).foregroundStyle(NoopHTMLColor.ink)
+                    Text("Strength").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                    Text(program?.name ?? "Routine").font(NoopHTMLFont.outfit(NoopType.title2)).foregroundStyle(NoopHTMLColor.ink)
                     Text("\(exerciseCount) \(exerciseCount == 1 ? "exercise" : "exercises") · \(setCount) \(setCount == 1 ? "set" : "sets")")
-                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 20)
@@ -238,7 +238,7 @@ struct NoopFitnessRoutineScreen: View {
                 if let error { Text(error).foregroundStyle(NoopHTMLColor.red) }
                 if let refusal {
                     Text("\(refusal.name) is still running. Finish it before starting another session.")
-                        .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.volt)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.volt)
                         .padding(.top, 12)
                 }
 
@@ -259,7 +259,7 @@ struct NoopFitnessRoutineScreen: View {
                 HStack(spacing: 10) {
                     Button { scheduling = true } label: {
                         Text("Schedule")
-                            .font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                             .frame(maxWidth: .infinity).frame(minHeight: 52)
                             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
@@ -267,7 +267,7 @@ struct NoopFitnessRoutineScreen: View {
                     Button { Task { await start() } } label: {
                         HStack(spacing: 8) {
                             NoopCanonicalGlyph(name: .play, size: 15, color: NoopHTMLColor.voltInk)
-                            Text("Start").font(NoopHTMLFont.sans(15, weight: .semibold))
+                            Text("Start").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                         }
                         .foregroundStyle(NoopHTMLColor.voltInk)
                         .frame(maxWidth: .infinity).frame(height: 52)
@@ -306,9 +306,9 @@ struct NoopFitnessRoutineScreen: View {
             RoutineSetPlan(targetWeightKg: item.targetWeightKg, repsMin: item.targetRepsLow, repsMax: item.targetRepsHigh)
         }
         return NoopFitnessPanel {
-            Text(item.exercise).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+            Text(item.exercise).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
             Text("\(sets.count) sets · \(LiftFormat.duration(plan?.restSeconds ?? item.restSec ?? 120)) rest")
-                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             ForEach(Array(sets.enumerated()), id: \.element.id) { index, set in
                 HStack(spacing: 8) {
                     Text("\(index + 1)").frame(width: 30)
@@ -369,8 +369,8 @@ struct NoopFitnessRoutineScreen: View {
     }
 
     private func cell(_ t: String) -> some View {
-        Text(t).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
-            .frame(maxWidth: .infinity).frame(minHeight: 34)
+        Text(t).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
+            .frame(maxWidth: .infinity).frame(minHeight: 40)
             .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
@@ -416,7 +416,7 @@ struct NoopFitnessCalendarScreen: View {
                 HStack {
                     step(.left) { month = cal.date(byAdding: .month, value: -1, to: month) ?? month }
                     Text(month.formatted(.dateTime.month(.wide).year()))
-                        .font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                         .frame(maxWidth: .infinity)
                     step(.right) { month = cal.date(byAdding: .month, value: 1, to: month) ?? month }
                 }
@@ -438,7 +438,7 @@ struct NoopFitnessCalendarScreen: View {
                 }
                 LazyVGrid(columns: cols, spacing: 6) {
                     ForEach(Self.weekdayLetters, id: \.self) { l in
-                        Text(l).font(NoopHTMLFont.sans(10.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.muted)
+                        Text(l).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.muted)
                     }
                     ForEach(Array(days.enumerated()), id: \.offset) { _, day in
                         if let day {
@@ -470,7 +470,7 @@ struct NoopFitnessCalendarScreen: View {
                 let planned = settings.plans(on: selected).filter { p in !done.contains { $0.routineID == p.routineID } }
                 if done.isEmpty && planned.isEmpty {
                     Text(selected > Date() ? "Nothing planned." : "Rest day.")
-                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 ForEach(done) { s in
                     NoopFitnessSessionButton(session: s, navigation: navigation, returnRoute: .fitnessCalendar)
@@ -485,9 +485,9 @@ struct NoopFitnessCalendarScreen: View {
                                 .frame(width: 38, height: 38)
                                 .overlay(Circle().strokeBorder(NoopHTMLColor.volt.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(p.routineName).font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                                Text(p.routineName).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                                 Text(p.includesTime == false ? "Planned" : "Planned · \(p.date.formatted(date: .omitted, time: .shortened))")
-                                    .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                             }
                             Spacer()
                             NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
@@ -526,7 +526,7 @@ struct NoopFitnessCalendarScreen: View {
         return Button { withAnimation(NoopMotion.swap) { selected = cal.startOfDay(for: day) } } label: {
             VStack(spacing: 3) {
                 Text("\(cal.component(.day, from: day))")
-                    .font(NoopHTMLFont.sans(12, weight: today ? .bold : .medium))
+                    .font(NoopHTMLFont.sans(NoopType.caption, weight: today ? .bold : .medium))
                     .foregroundStyle(today ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
                 ZStack {
                     if let first = done.first {
@@ -542,12 +542,12 @@ struct NoopFitnessCalendarScreen: View {
                 .frame(width: 26, height: 26)
                 .overlay(alignment: .topTrailing) {
                     if done.count > 1 {
-                        Text("\(done.count)").font(NoopHTMLFont.sans(8.5, weight: .bold)).foregroundStyle(NoopHTMLColor.canvas)
+                        Text("\(done.count)").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .bold)).foregroundStyle(NoopHTMLColor.canvas)
                             .frame(width: 13, height: 13).background(NoopHTMLColor.ink, in: Circle()).offset(x: 4, y: -3)
                     }
                 }
                 if metric != .none {
-                    Text(value(done) ?? " ").font(NoopHTMLFont.sans(9, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                    Text(value(done) ?? " ").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                         .lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
@@ -592,19 +592,19 @@ struct NoopFitnessCalendarScreen: View {
 
     private func summaryCell(_ v: String, _ l: String) -> some View {
         VStack(spacing: 2) {
-            Text(v).font(NoopHTMLFont.outfit(19)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
-            Text(l).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.copy)
+            Text(v).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+            Text(l).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
         }
         .frame(maxWidth: .infinity)
     }
 
     private func filterChip(_ t: String) -> some View {
         HStack(spacing: 5) {
-            Text(t).font(NoopHTMLFont.sans(12, weight: .semibold))
+            Text(t).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
             Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
         }
         .foregroundStyle(NoopHTMLColor.inkSoft)
-        .padding(.horizontal, 12).frame(height: 30)
+        .padding(.horizontal, 14).frame(height: 36)
         .background(Color.white.opacity(0.06), in: Capsule())
     }
 
@@ -617,7 +617,7 @@ struct NoopFitnessCalendarScreen: View {
     private func step(_ d: NoopFixedChevron.Direction, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             NoopFixedChevron(direction: d, color: NoopHTMLColor.inkSoft)
-                .frame(width: 38, height: 34)
+                .frame(width: 44, height: 40)
                 .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 11))
         }
         .buttonStyle(NoopHTMLPressStyle())

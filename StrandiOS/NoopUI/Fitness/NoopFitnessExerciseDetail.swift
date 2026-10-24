@@ -23,7 +23,7 @@ struct NoopFitnessExerciseDetail: View {
                     Button("Show animations") { animations = true }.buttonStyle(.borderedProminent)
                         .foregroundStyle(NoopHTMLColor.voltInk)
                     Text("Downloads exercise media from GitHub and keeps an offline cache on this phone.")
-                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 Picker("Exercise details", selection: $guide) {
                     Text("About").tag(false)
@@ -47,7 +47,7 @@ struct NoopFitnessExerciseDetail: View {
                 }
             }.padding(20)
         }
-        .font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.ink)
+        .font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.ink)
         .tint(NoopHTMLColor.volt).background(NoopHTMLColor.canvas)
     }
 
@@ -105,7 +105,7 @@ struct NoopFitnessChecklist: View {
             }.scrollContentBackground(.hidden)
             Button("Filter by \(title)") { selection = draft; dismiss() }
                 .buttonStyle(.borderedProminent).foregroundStyle(NoopHTMLColor.voltInk)
-        }.padding(20).foregroundStyle(NoopHTMLColor.ink).font(NoopHTMLFont.sans(14))
+        }.padding(20).foregroundStyle(NoopHTMLColor.ink).font(NoopHTMLFont.sans(NoopType.subhead))
             .tint(NoopHTMLColor.volt).background(NoopHTMLColor.canvas).noopSheet()
             .onAppear { draft = selection }
     }
@@ -156,7 +156,7 @@ struct NoopFitnessCustomExercise: View {
                     .buttonStyle(.borderedProminent).foregroundStyle(NoopHTMLColor.voltInk)
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving)
             }.padding(20)
-        }.font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.ink)
+        }.font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.ink)
             .tint(NoopHTMLColor.volt).background(NoopHTMLColor.canvas)
     }
 

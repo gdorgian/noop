@@ -38,9 +38,9 @@ struct NoopFitnessRoutineGrid: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 12) {
                                 Image(systemName: "dumbbell").foregroundStyle(NoopHTMLColor.volt)
-                                Text(routine.name).font(NoopHTMLFont.sans(15, weight: .semibold)).lineLimit(2)
+                                Text(routine.name).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).lineLimit(2)
                                 Text("\(routine.exercises) exercises · \(routine.sets) sets")
-                                    .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                             }.frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
                                 .padding(14).background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18))
                         }.buttonStyle(NoopHTMLPressStyle())
@@ -49,7 +49,7 @@ struct NoopFitnessRoutineGrid: View {
                 if filtered.isEmpty { Text(routines.isEmpty ? "No routines yet" : "No matching routines").padding(24) }
             }
         }.padding(20).foregroundStyle(NoopHTMLColor.ink).tint(NoopHTMLColor.volt)
-            .font(NoopHTMLFont.sans(14)).background(NoopHTMLColor.canvas)
+            .font(NoopHTMLFont.sans(NoopType.subhead)).background(NoopHTMLColor.canvas)
     }
 }
 #endif

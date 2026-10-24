@@ -164,11 +164,11 @@ struct NoopFitnessExercisePicker: View {
                     ForEach(results) { row($0) }
                     if results.isEmpty { Text("No matching exercises").foregroundStyle(NoopHTMLColor.copy).padding() }
                     Text("Catalogue: ExerciseDB via hasaneyldrm/exercises-dataset, MIT licence.")
-                        .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.muted)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
                 }
             }
         }
-        .padding(20).font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.ink)
+        .padding(20).font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.ink)
         .tint(NoopHTMLColor.volt).background(NoopHTMLColor.canvas)
         .sensoryFeedback(.selection, trigger: selected.count)
         .sheet(item: $detail) { NoopFitnessExerciseDetail(choice: $0).noopSheet() }
@@ -195,15 +195,15 @@ struct NoopFitnessExercisePicker: View {
             NoopExerciseMedia(choice: choice, thumbnail: true)
             Button { select(choice) } label: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(choice.name).font(NoopHTMLFont.sans(14, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(choice.equipment ?? choice.muscleLine).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(choice.name).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(choice.equipment ?? choice.muscleLine).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }.buttonStyle(.plain)
-            Button { detail = choice } label: { Image(systemName: "info.circle").frame(width: 32, height: 44) }
+            Button { detail = choice } label: { Image(systemName: "info.circle").frame(width: 44, height: 44) }
                 .accessibilityLabel("About \(choice.name)")
             Button { select(choice) } label: {
                 Image(systemName: selected.contains(where: { $0.id == choice.id }) ? "checkmark.circle.fill" : "plus")
-                    .frame(width: 32, height: 44)
+                    .frame(width: 44, height: 44)
             }.accessibilityLabel(selected.contains(where: { $0.id == choice.id }) ? "Deselect \(choice.name)" : "Select \(choice.name)")
         }.padding(10).background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 14))
     }
@@ -308,7 +308,7 @@ struct NoopFitnessRoutineEditor: View {
                 Text(isNew ? "New routine" : "Edit routine").font(NoopHTMLFont.sheetTitle)
                 TextField(lines.isEmpty ? "Routine name" : suggestedName, text: $name)
                     .focused($focusedField, equals: "name").submitLabel(.done)
-                    .font(NoopHTMLFont.sans(17, weight: .medium)).padding(15)
+                    .font(NoopHTMLFont.sans(NoopType.body, weight: .medium)).padding(15)
                     .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16))
                 if lines.isEmpty {
                     VStack(spacing: 16) {
@@ -337,7 +337,7 @@ struct NoopFitnessRoutineEditor: View {
                 if let error { Text(error).foregroundStyle(NoopHTMLColor.red) }
             }
         }
-        .font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.ink).tint(NoopHTMLColor.volt)
+        .font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.ink).tint(NoopHTMLColor.volt)
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom) {
             // Hidden while typing: the bar above the number pad carries Done, and the pad would otherwise
@@ -431,12 +431,12 @@ struct NoopFitnessRoutineEditor: View {
             HStack {
                 NoopExerciseMedia(choice: value.choice, thumbnail: true)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(value.choice.name).font(NoopHTMLFont.sans(15, weight: .semibold))
+                    Text(value.choice.name).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                     Text("\(bodyweight ? "Bodyweight" : value.choice.equipment ?? value.choice.muscleLine) · \(setCount) \(setCount == 1 ? "set" : "sets")")
-                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 Spacer(minLength: 0)
-                Button { restID = value.id } label: { Image(systemName: "timer").frame(width: 32, height: 44) }.accessibilityLabel("Rest timer")
+                Button { restID = value.id } label: { Image(systemName: "timer").frame(width: 44, height: 44) }.accessibilityLabel("Rest timer")
                 Menu {
                     Section {
                         if !timed { Button { openRepRange(value) } label: { Label("Target rep range", systemImage: "arrow.left.and.right") } }
@@ -466,7 +466,7 @@ struct NoopFitnessRoutineEditor: View {
                     Button(role: .destructive) {
                         withAnimation(spring) { lines.removeAll { $0.id == value.id }; normalizeGroups(); feedback += 1 }
                     } label: { Label("Remove exercise", systemImage: "trash") }
-                } label: { Image(systemName: "ellipsis").frame(width: 32, height: 44) }
+                } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
                     .accessibilityLabel("Exercise actions")
             }
             HStack {
@@ -474,12 +474,12 @@ struct NoopFitnessRoutineEditor: View {
                 Text(bodyweight ? (value.pounds ? "+LB" : "+KG") : (value.pounds ? "LB" : "KG")).frame(maxWidth: .infinity)
                 Text(timed ? "TIME (s)" : "REPS").frame(maxWidth: .infinity)
                 Text("REST").frame(maxWidth: .infinity)
-            }.font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1).foregroundStyle(NoopHTMLColor.copy)
+            }.font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1).foregroundStyle(NoopHTMLColor.copy)
             ForEach(line.plan.sets) { set in
                 let number = (value.plan.sets.firstIndex { $0.id == set.wrappedValue.id } ?? 0) + 1
                 let id = set.wrappedValue.id.uuidString
                 HStack(spacing: 8) {
-                    Text("\(number)").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                    Text("\(number)").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
                         .frame(width: 30)
                     numberField("Weight", placeholder: bodyweight ? "BW" : "—", focus: id + ".w", value: Binding(get: {
                         set.wrappedValue.targetWeightKg.map { value.pounds ? $0 * 2.2046226218 : $0 }
@@ -487,7 +487,7 @@ struct NoopFitnessRoutineEditor: View {
                     if !timed, let low = set.wrappedValue.repsMin, let high = set.wrappedValue.repsMax, high > low {
                         // A range is set with the range sheet, so the cell opens it rather than a number pad.
                         Button { focusedField = nil; openRepRange(value) } label: {
-                            Text("\(low)–\(high)").font(NoopHTMLFont.sans(15, weight: .medium)).monospacedDigit()
+                            Text("\(low)–\(high)").font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).monospacedDigit()
                                 .foregroundStyle(NoopHTMLColor.ink)
                                 .frame(maxWidth: .infinity, minHeight: 40)
                                 .background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 10))
@@ -504,7 +504,7 @@ struct NoopFitnessRoutineEditor: View {
                     }
                     Button { focusedField = nil; restID = value.id } label: {
                         Text(NoopRestFormat.clock(set.wrappedValue.restSeconds ?? value.plan.restSeconds))
-                            .font(NoopHTMLFont.sans(15)).monospacedDigit().foregroundStyle(NoopHTMLColor.inkSoft)
+                            .font(NoopHTMLFont.sans(NoopType.subhead)).monospacedDigit().foregroundStyle(NoopHTMLColor.inkSoft)
                             .frame(maxWidth: .infinity, minHeight: 40)
                             .background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 10))
                     }
@@ -533,7 +533,7 @@ struct NoopFitnessRoutineEditor: View {
     private func numberField(_ label: String, placeholder: String, focus: String, value: Binding<Double?>) -> some View {
         TextField(placeholder, value: value, format: .number.precision(.fractionLength(0...2)))
             .keyboardType(.decimalPad).multilineTextAlignment(.center).accessibilityLabel(label)
-            .font(NoopHTMLFont.sans(15, weight: .medium)).monospacedDigit()
+            .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).monospacedDigit()
             .focused($focusedField, equals: focus)
             .frame(maxWidth: .infinity, minHeight: 40)
             .background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 10))
@@ -543,7 +543,7 @@ struct NoopFitnessRoutineEditor: View {
     private func integerField(_ label: String, focus: String, value: Binding<Int?>) -> some View {
         TextField("—", value: value, format: .number).keyboardType(.numberPad)
             .multilineTextAlignment(.center).accessibilityLabel(label)
-            .font(NoopHTMLFont.sans(15, weight: .medium)).monospacedDigit()
+            .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).monospacedDigit()
             .focused($focusedField, equals: focus)
             .frame(maxWidth: .infinity, minHeight: 40)
             .background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 10))

@@ -16,7 +16,7 @@ struct NoopFitnessActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title).font(NoopHTMLFont.sans(15, weight: .semibold))
+            Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                 .foregroundStyle(weight == .primary ? NoopHTMLColor.voltInk : NoopHTMLColor.ink)
                 .frame(maxWidth: .infinity).frame(height: 52)
                 .background(weight == .primary ? NoopHTMLColor.volt : Color.white.opacity(0.07),
@@ -40,7 +40,7 @@ private struct NoopFitnessCompactSheet<Content: View, Actions: View>: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                 if let subtitle {
-                    Text(subtitle).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(subtitle).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                 }
             }
             content
@@ -63,11 +63,11 @@ private struct NoopFitnessStepper: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Text(label.uppercased()).font(NoopHTMLFont.sans(10.5, weight: .semibold)).tracking(1.2)
+            Text(label.uppercased()).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.2)
                 .foregroundStyle(NoopHTMLColor.copy)
             HStack(spacing: 0) {
                 step("minus", enabled: canDecrement, action: decrement).accessibilityLabel("Less")
-                Text(value).font(NoopHTMLFont.outfit(34)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+                Text(value).font(NoopHTMLFont.outfit(NoopType.title1)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
                     .contentTransition(.numericText()).frame(maxWidth: .infinity)
                     .lineLimit(1).minimumScaleFactor(0.6)
                 step("plus", enabled: canIncrement, action: increment).accessibilityLabel("More")
@@ -102,7 +102,7 @@ private struct NoopFitnessPresetRow<Value: Hashable>: View {
             ForEach(options, id: \.value) { option in
                 let on = option.value == selected
                 Button { pick(option.value) } label: {
-                    Text(option.label).font(NoopHTMLFont.sans(13, weight: .semibold)).monospacedDigit()
+                    Text(option.label).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).monospacedDigit()
                         .foregroundStyle(on ? NoopHTMLColor.voltInk : NoopHTMLColor.inkSoft)
                         .frame(maxWidth: .infinity).frame(height: 38)
                         .background(on ? NoopHTMLColor.volt : Color.white.opacity(0.06),
@@ -178,7 +178,7 @@ struct NoopFitnessRepRangeSheet: View {
                 change { low = range.lowerBound; high = range.upperBound }
             }
             Text("Hit the top of the range on every set, then add weight next time.")
-                .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 .fixedSize(horizontal: false, vertical: true)
         } actions: {
             NoopFitnessActionButton(title: "Apply to all sets", action: apply)
@@ -209,7 +209,7 @@ struct NoopFitnessLastTimeSheet: View {
                     Text("REPS").frame(maxWidth: .infinity)
                     Text("REST").frame(maxWidth: .infinity)
                 }
-                .font(NoopHTMLFont.sans(10.5, weight: .semibold)).tracking(1).foregroundStyle(NoopHTMLColor.copy)
+                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1).foregroundStyle(NoopHTMLColor.copy)
                 .padding(.bottom, 8)
                 ForEach(Array(sets.enumerated()), id: \.element.id) { index, set in
                     HStack {
@@ -220,7 +220,7 @@ struct NoopFitnessLastTimeSheet: View {
                         Text(set.restSeconds.map(NoopRestFormat.clock) ?? "—").foregroundStyle(NoopHTMLColor.copy)
                             .frame(maxWidth: .infinity)
                     }
-                    .font(NoopHTMLFont.sans(15, weight: .medium)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
                     .frame(height: 40)
                     if index < sets.count - 1 { Divider().overlay(NoopHTMLColor.border) }
                 }
@@ -307,8 +307,8 @@ struct NoopFitnessProgressionSheet: View {
                 Image(systemName: on ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18)).foregroundStyle(on ? NoopHTMLColor.volt : NoopHTMLColor.muted)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(name).font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(line).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(name).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(line).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -362,8 +362,8 @@ struct NoopFitnessScheduleSummary: View {
                     .frame(width: 36, height: 36)
                     .background(NoopHTMLColor.volt.opacity(0.12), in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(headline).font(NoopHTMLFont.sans(15, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(detail).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(headline).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 Spacer(minLength: 0)
                 Menu {
@@ -388,12 +388,12 @@ struct NoopFitnessScheduleSummary: View {
             if let skipped {
                 HStack {
                     Text("Skipped \(skipped.date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)))")
-                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
                     Button("Undo") {
                         withAnimation(NoopMotion.swap) { restore(skipped); self.skipped = nil }
                     }
-                    .font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
                 }
                 .padding(.horizontal, 12).frame(height: 40)
                 .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -408,7 +408,7 @@ struct NoopFitnessScheduleSummary: View {
                         Text(expanded ? "Show less" : "All \(upcoming.count) sessions")
                         Image(systemName: "chevron.down").rotationEffect(.degrees(expanded ? 180 : 0))
                     }
-                    .font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                     .frame(maxWidth: .infinity).frame(height: 40)
                 }
                 .buttonStyle(NoopHTMLPressStyle())
@@ -438,22 +438,22 @@ struct NoopFitnessScheduleSummary: View {
         HStack(spacing: 14) {
             VStack(spacing: 0) {
                 Text(plan.date.formatted(.dateTime.month(.abbreviated)).uppercased())
-                    .font(NoopHTMLFont.sans(9.5, weight: .bold)).tracking(0.8)
+                    .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .bold)).tracking(0.8)
                     .foregroundStyle(next ? NoopHTMLColor.volt : NoopHTMLColor.copy)
                 Text(plan.date.formatted(.dateTime.day()))
-                    .font(NoopHTMLFont.sans(17, weight: .semibold)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+                    .font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
             }
             .frame(width: 42, height: 44)
             .background(Color.white.opacity(next ? 0.08 : 0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(plan.date.formatted(.dateTime.weekday(.wide)))
-                    .font(NoopHTMLFont.sans(14.5, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
                 Text(relative(plan))
-                    .font(NoopHTMLFont.sans(12)).foregroundStyle(next ? NoopHTMLColor.volt : NoopHTMLColor.copy)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(next ? NoopHTMLColor.volt : NoopHTMLColor.copy)
             }
             Spacer(minLength: 0)
             Button { skip(plan) } label: {
-                Text("Skip").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                Text("Skip").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                     .padding(.horizontal, 14).frame(height: 32)
                     .background(Color.white.opacity(0.07), in: Capsule())
             }

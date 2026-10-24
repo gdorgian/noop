@@ -291,11 +291,11 @@ struct NoopFitnessStrengthPage: View {
         } label: {
             HStack(spacing: 6) {
                 Text(exercise == nil ? "Every exercise" : "One exercise")
-                    .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                 Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
             }
             .foregroundStyle(NoopHTMLColor.inkSoft)
-            .padding(.horizontal, 12).frame(height: 30)
+            .padding(.horizontal, 14).frame(height: 36)
             .background(Color.white.opacity(0.06), in: Capsule())
         }
     }
@@ -365,14 +365,14 @@ struct NoopFitnessStrengthPage: View {
     private func record(_ title: String, _ value: String, _ date: Date) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "trophy.fill").font(.system(size: 13)).foregroundStyle(NoopHTMLColor.volt)
-                .frame(width: 34, height: 34).background(NoopHTMLColor.volt.opacity(0.13), in: Circle())
+                .frame(width: 40, height: 40).background(NoopHTMLColor.volt.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text(value).font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                Text(title).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
+                Text(value).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                Text(title).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             }
             Spacer()
             Text(date.formatted(.dateTime.month(.abbreviated).day().year()))
-                .font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.muted)
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
         }
         .padding(.vertical, 2)
     }
@@ -421,9 +421,9 @@ struct NoopFitnessLoadPage: View {
                         statusStrip(points)
                     } else {
                         VStack(spacing: 5) {
-                            Text("No load in this period").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                            Text("No load in this period").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                             Text(kind == .cardio ? "Workouts with heart rate build it up." : "Logged sets and cardio build it up.")
-                                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.muted)
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
                         }
                         .frame(maxWidth: .infinity).frame(height: 210)
                     }
@@ -449,9 +449,9 @@ struct NoopFitnessLoadPage: View {
             ForEach([NoopFitnessHistory.LoadKind.cardio, .muscular], id: \.self) { k in
                 Button { withAnimation(NoopMotion.swap) { kind = k } } label: {
                     Text(k == .cardio ? "Cardio" : "Muscular")
-                        .font(NoopHTMLFont.sans(13, weight: .semibold))
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         .foregroundStyle(kind == k ? NoopHTMLColor.canvas : NoopHTMLColor.inkSoft)
-                        .padding(.horizontal, 16).frame(minHeight: 32)
+                        .padding(.horizontal, 16).frame(minHeight: 36)
                         .background(kind == k ? NoopHTMLColor.ink : Color.white.opacity(0.06), in: Capsule())
                 }
                 .buttonStyle(NoopHTMLPressStyle())
@@ -512,7 +512,7 @@ struct NoopFitnessLoadPage: View {
             AxisMarks(values: Array(stride(from: 0, to: window.buckets.count, by: max(1, window.buckets.count / 4)))) { v in
                 AxisValueLabel {
                     if let i = v.as(Int.self) {
-                        Text(window.tick(i)).font(NoopHTMLFont.sans(10)).foregroundStyle(NoopHTMLColor.muted)
+                        Text(window.tick(i)).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
                     }
                 }
             }
@@ -522,7 +522,7 @@ struct NoopFitnessLoadPage: View {
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.white.opacity(0.06))
                 AxisValueLabel {
                     if let d = v.as(Double.self) {
-                        Text(abs(d - d.rounded()) < 0.01 ? String(format: "%.0f", d) : fmt(d)).font(NoopHTMLFont.sans(9.5)).foregroundStyle(NoopHTMLColor.muted)
+                        Text(abs(d - d.rounded()) < 0.01 ? String(format: "%.0f", d) : fmt(d)).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
                     }
                 }
             }
@@ -626,7 +626,7 @@ struct NoopFitnessReadingPage: View {
                     NoopFitnessPanel(label: "Sessions") {
                         if list.isEmpty {
                             Text("No session in this period has heart rate after it ended. Keep the strap on for a minute after you stop.")
-                                .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         ForEach(list) { r in
@@ -698,7 +698,7 @@ struct NoopFitnessFocusPage: View {
                         AxisMarks(values: Array(stride(from: 0, to: window.buckets.count, by: max(1, window.buckets.count / 4)))) { v in
                             AxisValueLabel {
                                 if let i = v.as(Int.self) {
-                                    Text(window.tick(i)).font(NoopHTMLFont.sans(10)).foregroundStyle(NoopHTMLColor.muted)
+                                    Text(window.tick(i)).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
                                 }
                             }
                         }
@@ -708,7 +708,7 @@ struct NoopFitnessFocusPage: View {
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.white.opacity(0.06))
                             AxisValueLabel {
                                 if let d = v.as(Double.self) {
-                                    Text("\(Int(d))m").font(NoopHTMLFont.sans(9.5)).foregroundStyle(NoopHTMLColor.muted)
+                                    Text("\(Int(d))m").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
                                 }
                             }
                         }
@@ -717,7 +717,7 @@ struct NoopFitnessFocusPage: View {
                     .frame(height: 200)
                     .overlay {
                         if bars.isEmpty {
-                            Text("No heart-rate time in this period").font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                            Text("No heart-rate time in this period").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                 .foregroundStyle(NoopHTMLColor.inkSoft)
                         }
                     }
@@ -791,7 +791,7 @@ struct NoopFitnessZonesPage: View {
                             Button { withAnimation(NoopMotion.swap) { zone = zone == i ? nil : i } } label: {
                                 VStack(spacing: 6) {
                                     Text(total > 0 ? "\(Int((minutes[i] / total * 100).rounded()))%" : "")
-                                        .font(NoopHTMLFont.sans(10.5, weight: .semibold))
+                                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                                         .foregroundStyle(shown == i ? NoopHTMLColor.ink : NoopHTMLColor.muted)
                                     GeometryReader { g in
                                         VStack {
@@ -804,7 +804,7 @@ struct NoopFitnessZonesPage: View {
                                     }
                                     HStack(spacing: 4) {
                                         Circle().fill(colors[i]).frame(width: 6, height: 6)
-                                        Text("Z\(i + 1)").font(NoopHTMLFont.sans(11, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                                        Text("Z\(i + 1)").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
                                     }
                                 }
                             }

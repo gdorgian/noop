@@ -165,9 +165,9 @@ struct NoopExerciseAnimationToggle: View {
     var body: some View {
         Toggle(isOn: $enabled) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Exercise animations").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                Text("Exercise animations").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 Text("Download exercise media from GitHub when viewed. Cached media works offline.")
-                    .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             }
         }
         .tint(NoopHTMLColor.volt)

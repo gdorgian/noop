@@ -40,13 +40,13 @@ struct NoopSessionHero: View {
             .padding(.leading, -14)
             .padding(.top, 6)
             HStack(spacing: 8) {
-                Text(kind).font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(tint)
+                Text(kind).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(tint)
                 if let badge {
-                    Text(badge).font(NoopHTMLFont.sans(10.5, weight: .semibold)).foregroundStyle(tint)
+                    Text(badge).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(tint)
                         .padding(.horizontal, 7).frame(height: 18).background(tint.opacity(0.13), in: Capsule())
                 }
             }
-            Text(title).font(NoopHTMLFont.outfit(32, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+            Text(title).font(NoopHTMLFont.outfit(NoopType.title1, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 .lineLimit(2).minimumScaleFactor(0.75)
             VStack(alignment: .leading, spacing: 6) {
                 Label(when, systemImage: "calendar").labelStyle(NoopSessionMetaLabel())
@@ -61,7 +61,7 @@ private struct NoopSessionMetaLabel: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 8) {
             configuration.icon.font(.system(size: 13)).foregroundStyle(NoopHTMLColor.faint).frame(width: 18)
-            configuration.title.font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.copy).monospacedDigit()
+            configuration.title.font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.copy).monospacedDigit()
         }
     }
 }
@@ -75,9 +75,9 @@ struct NoopSessionHeading<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(NoopHTMLFont.outfit(22, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                Text(title).font(NoopHTMLFont.outfit(NoopType.title3, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 if let subtitle {
-                    Text(subtitle).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(subtitle).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                 }
             }
             Spacer()
@@ -112,7 +112,7 @@ struct NoopSessionCardTitle: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: symbol).font(.system(size: 14, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
-            Text(title).font(NoopHTMLFont.sans(14, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
+            Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
         }
     }
 }
@@ -132,12 +132,12 @@ struct NoopSessionFigures: View {
                       alignment: .leading, spacing: 20) {
                 ForEach(items, id: \.self) { item in
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(item.label).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                        Text(item.label).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(item.value).font(NoopHTMLFont.outfit(28, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                            Text(item.value).font(NoopHTMLFont.outfit(NoopType.title2, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
                                 .monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
                             if let unit = item.unit {
-                                Text(unit).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                                Text(unit).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                             }
                         }
                     }
@@ -166,13 +166,13 @@ struct NoopSessionRingRow: View {
                                                 endAngle: .degrees(360 * max(0.02, min(1, fraction)))),
                                 style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                    Text(value).font(NoopHTMLFont.outfit(21, weight: .semibold)).foregroundStyle(colors.last ?? NoopHTMLColor.ink)
+                    Text(value).font(NoopHTMLFont.outfit(NoopType.title3, weight: .semibold)).foregroundStyle(colors.last ?? NoopHTMLColor.ink)
                         .monospacedDigit().minimumScaleFactor(0.6)
                 }
                 .frame(width: 62, height: 62)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title).font(NoopHTMLFont.sans(16.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(line).font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(title).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(line).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -212,7 +212,7 @@ struct NoopSessionHeart: View {
             } else if loaded {
                 NoopSessionHeading(title: "Heart")
                 Text("No heart rate was recorded during this session.")
-                    .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                    .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
             }
         }
         .task(id: "\(start):\(end)") { await load() }
@@ -274,12 +274,12 @@ struct NoopSessionHeart: View {
                 .sensoryFeedback(.selection, trigger: picked?.ts)
                 .chartYAxis {
                     AxisMarks(position: .trailing, values: floors) { _ in
-                        AxisValueLabel().font(NoopHTMLFont.sans(10)).foregroundStyle(NoopHTMLColor.faint)
+                        AxisValueLabel().font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                     }
                 }
                 .chartXAxis {
                     AxisMarks(values: [date(start), date((start + end) / 2), date(end)]) { _ in
-                        AxisValueLabel(format: .dateTime.hour().minute()).font(NoopHTMLFont.sans(10)).foregroundStyle(NoopHTMLColor.faint)
+                        AxisValueLabel(format: .dateTime.hour().minute()).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                     }
                 }
                 .frame(height: 190)
@@ -297,8 +297,8 @@ struct NoopSessionHeart: View {
     @ViewBuilder private var scrubLabel: some View {
         if let p = picked {
             HStack(spacing: 6) {
-                Text("\(Int(p.bpm.rounded())) bpm").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                Text(AppClock.hourMinuteFormatter().string(from: date(p.ts))).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                Text("\(Int(p.bpm.rounded())) bpm").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                Text(AppClock.hourMinuteFormatter().string(from: date(p.ts))).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             }
             .monospacedDigit()
             .padding(.horizontal, 10).padding(.vertical, 5)
@@ -310,10 +310,10 @@ struct NoopSessionHeart: View {
 
     private func figure(_ label: String, _ bpm: Double) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+            Text(label).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text("\(Int(bpm.rounded()))").font(NoopHTMLFont.outfit(24, weight: .medium)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
-                Text("bpm").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                Text("\(Int(bpm.rounded()))").font(NoopHTMLFont.outfit(NoopType.title2, weight: .medium)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+                Text("bpm").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -344,7 +344,7 @@ struct NoopSessionHeart: View {
                     Text("Time").frame(width: 56, alignment: .trailing)
                     Text("bpm").frame(width: 72, alignment: .trailing)
                 }
-                .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.faint).padding(.bottom, 6)
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).padding(.bottom, 6)
                 ForEach((0..<minutes.count).reversed(), id: \.self) { i in
                     let m = minutes[i]
                     let range: String = i == 0
@@ -352,7 +352,7 @@ struct NoopSessionHeart: View {
                         : i == zones.count ? ">\(Int(zones[i - 1].lower))"
                         : "\(Int(zones[i - 1].lower))–\(Int(zones[i - 1].upper))"
                     HStack(spacing: 10) {
-                        Text("\(i)").font(NoopHTMLFont.sans(16, weight: .semibold))
+                        Text("\(i)").font(NoopHTMLFont.sans(NoopType.body, weight: .semibold))
                             .foregroundStyle(m > 0 ? NoopHTMLColor.ink : NoopHTMLColor.faint).frame(width: 20, alignment: .leading)
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
@@ -366,7 +366,7 @@ struct NoopSessionHeart: View {
                         Text(clock(m)).frame(width: 56, alignment: .trailing)
                         Text(range).foregroundStyle(NoopHTMLColor.faint).frame(width: 72, alignment: .trailing)
                     }
-                    .font(NoopHTMLFont.sans(14.5, weight: .medium)).monospacedDigit()
+                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).monospacedDigit()
                     .foregroundStyle(m > 0 ? NoopHTMLColor.ink : NoopHTMLColor.faint)
                     .frame(height: 46)
                     if i > 0 { Divider().overlay(NoopHTMLColor.border) }
@@ -385,9 +385,9 @@ struct NoopSessionHeart: View {
                 NoopSessionCardTitle(symbol: "arrow.down.heart.fill", title: "Heart rate recovery")
                 if let r = recovery, r.hasMeasurement {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(drop1.map { "−\($0)" } ?? "—").font(NoopHTMLFont.outfit(34, weight: .medium))
+                        Text(drop1.map { "−\($0)" } ?? "—").font(NoopHTMLFont.outfit(NoopType.title1, weight: .medium))
                             .foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
-                        Text("bpm in the first minute").font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                        Text("bpm in the first minute").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     }
                     HStack(spacing: 18) {
                         step("End", r.endHR)
@@ -397,7 +397,7 @@ struct NoopSessionHeart: View {
                     }
                 } else {
                     Text("Shown when a session ends at Zone 3 or above and the strap stays on for a few minutes after.")
-                        .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 VStack(spacing: 6) {
@@ -410,7 +410,7 @@ struct NoopSessionHeart: View {
                     }
                     HStack(spacing: 3) {
                         ForEach(bands, id: \.0) { b in
-                            Text(b.0).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.faint)
+                            Text(b.0).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
@@ -421,8 +421,8 @@ struct NoopSessionHeart: View {
 
     private func step(_ label: String, _ bpm: Int) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(NoopHTMLFont.sans(11.5)).foregroundStyle(NoopHTMLColor.copy)
-            Text("\(bpm)").font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+            Text(label).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+            Text("\(bpm)").font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
         }
     }
 

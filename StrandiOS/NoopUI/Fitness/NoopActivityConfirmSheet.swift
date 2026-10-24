@@ -88,11 +88,11 @@ struct NoopActivityConfirmSheet: View {
         NoopHTMLCard(radius: 20, padding: 16, tint: NoopHTMLColor.volt) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(detected ? "What was it?" : "Change activity")
-                    .font(NoopHTMLFont.sans(16, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    .font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 Text(suggestions.isEmpty
                      ? "Pick what you did. Each answer teaches Noop how your sessions look."
                      : "Ranked by how much this looks like your past sessions.")
-                    .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                     .fixedSize(horizontal: false, vertical: true)
                 NoopFlowLayout(spacing: 8) {
                     ForEach(choices, id: \.self) { item in chip(item) }
@@ -110,9 +110,9 @@ struct NoopActivityConfirmSheet: View {
         return Button { pick(item) } label: {
             HStack(spacing: 6) {
                 Image(systemName: NoopFitnessCardioLive.symbol(for: item)).font(.system(size: 12, weight: .semibold))
-                Text(item).font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                Text(item).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
             }
-            .padding(.horizontal, 13).frame(minHeight: 38)
+            .padding(.horizontal, 14).frame(minHeight: 40)
             .foregroundStyle(lit ? NoopHTMLColor.voltInk : NoopHTMLColor.ink)
             .background(lit ? NoopHTMLColor.volt : Color.white.opacity(0.07), in: Capsule())
         }
@@ -122,9 +122,9 @@ struct NoopActivityConfirmSheet: View {
     private var changeRow: some View {
         Button { withAnimation(NoopMotion.swap) { changing = true } } label: {
             HStack {
-                Text("Activity").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                Text("Activity").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                 Spacer()
-                Text("Change").font(NoopHTMLFont.sans(13.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                Text("Change").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
             }
             .padding(.horizontal, 16).frame(minHeight: 48)
             .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -151,14 +151,14 @@ struct NoopActivityConfirmSheet: View {
     private var actions: some View {
         VStack(spacing: 10) {
             Button { editing = true } label: {
-                Text("Edit time or activity").font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                Text("Edit time or activity").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .foregroundStyle(NoopHTMLColor.ink)
                     .background(Color.white.opacity(0.08), in: Capsule())
             }
             .buttonStyle(NoopHTMLPressStyle())
             Button(role: .destructive) { confirmDelete = true } label: {
-                Text(detected ? "Not an activity — delete" : "Delete session").font(NoopHTMLFont.sans(14, weight: .semibold))
+                Text(detected ? "Not an activity — delete" : "Delete session").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                     .frame(maxWidth: .infinity, minHeight: 46)
             }
             .foregroundStyle(NoopHTMLColor.red)
@@ -248,7 +248,7 @@ struct NoopSessionEditSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     NoopSectionLabel("Activity")
                     TextField("What did you do?", text: $sport)
-                        .font(NoopHTMLFont.sans(15, weight: .medium))
+                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium))
                         .foregroundStyle(NoopHTMLColor.ink)
                         .padding(.horizontal, 14).frame(minHeight: 48)
                         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -256,8 +256,8 @@ struct NoopSessionEditSheet: View {
                         ForEach(choices, id: \.self) { item in
                             let on = item.caseInsensitiveCompare(sport) == .orderedSame
                             Button { sport = item } label: {
-                                Text(item).font(NoopHTMLFont.sans(13, weight: .semibold))
-                                    .padding(.horizontal, 12).frame(minHeight: 34)
+                                Text(item).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                                    .padding(.horizontal, 14).frame(minHeight: 36)
                                     .foregroundStyle(on ? NoopHTMLColor.voltInk : NoopHTMLColor.ink)
                                     .background(on ? NoopHTMLColor.volt : Color.white.opacity(0.07), in: Capsule())
                             }
@@ -275,13 +275,13 @@ struct NoopSessionEditSheet: View {
                 .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 HStack {
-                    Text("Duration").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                    Text("Duration").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     Spacer()
                     Text(end > start ? NoopFitnessHome.duration(end.timeIntervalSince(start)) : "—")
-                        .font(NoopHTMLFont.outfit(20)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+                        .font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
                 }
                 Text("Heart rate, effort and energy come from the strap for the window you save.")
-                    .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.faint)
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Button {
@@ -289,7 +289,7 @@ struct NoopSessionEditSheet: View {
                     onSave(draft)
                     dismiss()
                 } label: {
-                    Text("Save").font(NoopHTMLFont.sans(15, weight: .semibold))
+                    Text("Save").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                         .frame(maxWidth: .infinity, minHeight: 52)
                         .foregroundStyle(NoopHTMLColor.voltInk)
                         .background(NoopHTMLColor.volt.opacity(draft == nil ? 0.35 : 1), in: Capsule())
@@ -305,7 +305,7 @@ struct NoopSessionEditSheet: View {
 
     private func timeRow(_ label: String, _ date: Binding<Date>) -> some View {
         HStack {
-            Text(label).font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.ink)
+            Text(label).font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.ink)
             Spacer()
             DatePicker("", selection: date, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
                 .labelsHidden()
