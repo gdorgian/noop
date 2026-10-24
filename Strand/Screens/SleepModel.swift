@@ -382,10 +382,11 @@ extension SleepModel {
     /// would only raise it for under-18s. One need across every debt surface, agreeing with the engine.
     /// (#242; need-unification from #464 by @vishk23. The descriptive `sleepNeedMin` still drives the
     /// non-debt "hours vs needed" performance tile.)
+    /// A need the wearer set by hand (`SleepNeedPrefs`) replaces the estimate.
     static func debtNeedMin(days: [DailyMetric]) -> Double {
-        AnalyticsEngine.Rest.personalizedNeedHours(
+        SleepNeedPrefs.resolve(estimatedMinutes: AnalyticsEngine.Rest.personalizedNeedHours(
             nightlyHours: days.compactMap { $0.totalSleepMin.map { $0 / 60.0 } },
-            age: nil) * 60.0
+            age: nil) * 60.0)
     }
 
     // MARK: Per-tile series (latest, typical mean, sparkline history)

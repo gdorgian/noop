@@ -543,6 +543,8 @@ struct NoopVerifiedAppShell: View {
     @StateObject private var instrumentStore = NoopInstrumentLiveStore()
     @StateObject private var liftFlow = NoopLiftFlowModel()
     @StateObject private var restStore = NoopRestStore()
+    /// A hand-set sleep need changes every sleep-debt figure, so the loads that read it key on it.
+    @AppStorage(SleepNeedPrefs.key) private var sleepNeedUserMinutes = 0
     @StateObject private var dayStore = NoopDayStore()
     @StateObject private var trendsStore = NoopTrendsStore()
     @StateObject private var youStore = NoopYouStore()
@@ -805,11 +807,11 @@ struct NoopVerifiedAppShell: View {
 
     private var youLoadKey: String? {
         Self.canonicalYouRoutes.contains(navigation.route)
-            ? "\(navigation.route.rawValue)-\(repo.loaded)-\(repo.refreshSeq)" : nil
+            ? "\(navigation.route.rawValue)-\(repo.loaded)-\(repo.refreshSeq)-\(sleepNeedUserMinutes)" : nil
     }
 
     private var trendsLoadKey: String? {
-        Self.canonicalPictureRoutes.contains(navigation.route) ? "\(repo.loaded)-\(repo.refreshSeq)" : nil
+        Self.canonicalPictureRoutes.contains(navigation.route) ? "\(repo.loaded)-\(repo.refreshSeq)-\(sleepNeedUserMinutes)" : nil
     }
 
     private var agesLoadKey: String? {
@@ -829,11 +831,11 @@ struct NoopVerifiedAppShell: View {
     private var dayLoadKey: String? {
         // The five-minute bucket keeps "the day so far" moving between syncs, as returning to Today did.
         Self.canonicalDayRoutes.contains(navigation.route)
-            ? "\(repo.loaded)-\(repo.refreshSeq)-\(profileSignature)-\(Int(Date().timeIntervalSince1970) / 300)" : nil
+            ? "\(repo.loaded)-\(repo.refreshSeq)-\(profileSignature)-\(sleepNeedUserMinutes)-\(Int(Date().timeIntervalSince1970) / 300)" : nil
     }
 
     private var restLoadKey: String? {
-        Self.canonicalNightRoutes.contains(navigation.route) ? "\(repo.loaded)-\(repo.refreshSeq)" : nil
+        Self.canonicalNightRoutes.contains(navigation.route) ? "\(repo.loaded)-\(repo.refreshSeq)-\(sleepNeedUserMinutes)" : nil
     }
 
     // MARK: Journal — the + sheets write the wearer's record
