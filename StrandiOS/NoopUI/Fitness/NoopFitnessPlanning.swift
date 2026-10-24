@@ -461,7 +461,7 @@ struct NoopFitnessCalendarScreen: View {
                     NoopSectionLabel(selected.formatted(.dateTime.weekday(.wide).day().month(.wide)))
                     Spacer()
                     if Calendar.current.startOfDay(for: selected) >= Calendar.current.startOfDay(for: Date()) {
-                        NoopFitnessIconButton(glyph: .plus) { planningDay = true }
+                        NoopFitnessIconButton(glyph: .plus, compact: true) { planningDay = true }
                             .accessibilityLabel("Plan a routine on this day")
                     }
                 }

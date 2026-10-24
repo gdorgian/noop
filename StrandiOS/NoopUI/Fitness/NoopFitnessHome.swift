@@ -278,7 +278,7 @@ struct NoopFitnessHome: View {
         switch section {
         case .activity:
             sectionTitle(Calendar.current.isDateInToday(selectedDay) ? "Today" : Self.dayTitle(selectedDay)) {
-                NoopFitnessIconButton(glyph: .plus) { navigation.plus() }
+                NoopFitnessIconButton(glyph: .plus, compact: true) { navigation.plus() }
                     .accessibilityLabel("Start or log")
             }
             if Calendar.current.isDateInToday(selectedDay) { NoopActivityOffer().padding(.bottom, 10) }
@@ -301,7 +301,7 @@ struct NoopFitnessHome: View {
             sectionTitle("Routines") {
                 if !s.routines.isEmpty {
                     Button("See all") { allRoutines = true }
-                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
                 }
                 Menu {
                     Button { newRoutine() } label: { Label("New routine", systemImage: "plus") }
@@ -309,7 +309,7 @@ struct NoopFitnessHome: View {
                     Button { allRoutines = true } label: { Label("All routines", systemImage: "list.bullet") }
                     Button { navigation.push(.liftImport) } label: { Label("Import from another app", systemImage: "square.and.arrow.down") }
                 } label: {
-                    NoopFitnessIconGlyph(glyph: .plus)
+                    NoopFitnessIconGlyph(glyph: .plus, compact: true)
                 }
                 .accessibilityLabel("Routines")
             }
@@ -656,25 +656,27 @@ extension View {
 
 struct NoopFitnessIconGlyph: View {
     let glyph: NoopCanonicalGlyphName
+    var compact = false
 
     var body: some View {
-        NoopCanonicalGlyph(name: glyph, size: 17, color: NoopHTMLColor.inkSoft)
-            .frame(width: 40, height: 40)
+        NoopCanonicalGlyph(name: glyph, size: compact ? 13 : 17, color: NoopHTMLColor.inkSoft)
+            .frame(width: compact ? 30 : 40, height: compact ? 30 : 40)
             .background(Color.white.opacity(0.06), in: Circle())
             .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+            .noopHitTarget()
     }
 }
 
 struct NoopFitnessIconButton: View {
     let glyph: NoopCanonicalGlyphName
+    /// Beside a section label: a 30 pt circle sized to the label beside it, with the full 44 pt hit area.
+    /// The 40 pt default belongs to the page header, beside the screen title.
+    var compact = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            NoopCanonicalGlyph(name: glyph, size: 17, color: NoopHTMLColor.inkSoft)
-                .frame(width: 40, height: 40)
-                .background(Color.white.opacity(0.06), in: Circle())
-                .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+            NoopFitnessIconGlyph(glyph: glyph, compact: compact)
         }
         .buttonStyle(NoopHTMLPressStyle())
     }
