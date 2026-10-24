@@ -301,11 +301,21 @@ struct NoopAct2Screens: View {
     var displayName: String? = nil
     @EnvironmentObject private var updateStore: UpdateStore
     @EnvironmentObject private var profile: ProfileStore
+    @EnvironmentObject private var repo: Repository
     @ObservedObject private var planStore = CoachPlanStore.shared
 
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     @SceneStorage("noop.act2.day-rail-open") private var dayRailOpen = false
     @SceneStorage("noop.act2.heart-point") private var selectedHeartPoint = 23
+    /// The heart chart's zoomed window; nil shows the whole day as 24 means. Pinch sets it, a drag pans
+    /// it, double-tap or "Whole day" clears it. Zoomed points are re-read at the window's resolution,
+    /// down to single seconds, so zooming shows real detail rather than stretched means.
+    @State private var heartWindow: ClosedRange<Date>?
+    @State private var zoomedHeart: [(time: Date, bpm: Double)] = []
+    /// The window and the moment under the cursor when a pinch or pan began.
+    @State private var heartGestureAnchor: (window: ClosedRange<Date>, focus: Date)?
+    /// The moment to keep selected once the next zoomed read lands.
+    @State private var heartFocus: Date?
     @SceneStorage("noop.act2.stress-level") private var selectedStress = 0
     @SceneStorage("noop.act3.rest-day") private var restDay = false
     @State private var todayPulseAnchor = Date()
@@ -1888,10 +1898,10 @@ struct NoopAct2Screens: View {
     }
 
     private var dayScreen: some View {
-        let values = todayHeartValues ?? []
+        let series = heartWindow == nil ? todayHeartSeries : (zoomedHeart.count > 1 ? zoomedHeart : todayHeartSeries)
+        let values = day == nil ? (todayHeartValues ?? []) : (series?.map { min(104, max(50, $0.bpm)) } ?? [])
         let point = min(max(selectedHeartPoint, 0), max(0, values.count - 1))
         let nearest = nearestMark(to: point)
-        let series = todayHeartSeries
         return NoopScreen(topInset: 58) {
             VStack(spacing: 0) {
                 Act2BackBar(label: "The day so far", action: { back(to: .today) })
@@ -1923,11 +1933,31 @@ struct NoopAct2Screens: View {
 
                     if !values.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
-                            NoopSectionLabel("Drag along the day")
-                            Act2ScrubbableDayChart(values: values, selected: $selectedHeartPoint, resting: todayRestingLine)
-                                .frame(height: 150)
                             HStack {
-                                let axis = dayAxis ?? (day == nil ? dayContext.axis : ["", "", "", ""])
+                                NoopSectionLabel(day == nil ? "Drag along the day"
+                                                 : heartWindow == nil ? "Drag along the day \u{00B7} pinch to zoom"
+                                                 : "Drag to move \u{00B7} hold to read")
+                                Spacer()
+                                if heartWindow != nil {
+                                    Button("Whole day") { resetHeartZoom(series: series, point: point) }
+                                        .font(NoopHTMLFont.sans(12, weight: .semibold))
+                                        .foregroundStyle(NoopHTMLColor.blueLight)
+                                        .buttonStyle(NoopPlainHitStyle())
+                                }
+                            }
+                            Act2ScrubbableDayChart(values: values, selected: $selectedHeartPoint, resting: todayRestingLine,
+                                                   pan: heartWindow == nil ? nil : { panHeart(by: $0, ended: $1, series: series, point: point) })
+                                .frame(height: 150)
+                                .simultaneousGesture(
+                                    MagnifyGesture()
+                                        .onChanged { zoomHeart(by: $0.magnification, series: series, point: point) }
+                                        .onEnded { _ in heartGestureAnchor = nil },
+                                    including: day == nil ? .subviews : .all)
+                                .onTapGesture(count: 2) { if heartWindow != nil { resetHeartZoom(series: series, point: point) } }
+                                .task(id: heartWindowKey) { await loadZoomedHeart() }
+                            HStack {
+                                let axis = heartWindow.map { Self.zoomAxisLabels($0) }
+                                    ?? dayAxis ?? (day == nil ? dayContext.axis : ["", "", "", ""])
                                 Text(axis[0]); Spacer()
                                 Text(axis[1]); Spacer()
                                 Text(axis[2]); Spacer()
@@ -2007,6 +2037,102 @@ struct NoopAct2Screens: View {
                 }
             }
         }
+    }
+
+    // MARK: Heart chart zoom
+
+    /// The day the chart can move within: from the day's start to now.
+    private var heartBounds: ClosedRange<Date>? {
+        guard let start = day?.dayStart, Date() > start.addingTimeInterval(Self.minHeartSpan) else { return nil }
+        return start...Date()
+    }
+
+    /// The narrowest window a pinch reaches: two minutes, already single seconds.
+    private static let minHeartSpan: TimeInterval = 120
+
+    /// Bucketed to whole seconds so a drag in progress doesn't re-read on every frame.
+    private var heartWindowKey: String {
+        guard let w = heartWindow else { return "day" }
+        return "\(Int(w.lowerBound.timeIntervalSince1970))-\(Int(w.upperBound.timeIntervalSince1970))-\(repo.refreshSeq)"
+    }
+
+    private func heartTime(_ series: [(time: Date, bpm: Double)]?, _ point: Int) -> Date? {
+        guard let series, !series.isEmpty else { return nil }
+        return series[min(max(point, 0), series.count - 1)].time
+    }
+
+    /// Pinch about the selected moment, so it stays under the finger as the window narrows or widens.
+    private func zoomHeart(by scale: CGFloat, series: [(time: Date, bpm: Double)]?, point: Int) {
+        guard let bounds = heartBounds, scale > 0 else { return }
+        if heartGestureAnchor == nil {
+            let window = heartWindow ?? bounds
+            heartGestureAnchor = (window, heartTime(series, point) ?? window.lowerBound)
+        }
+        guard let anchor = heartGestureAnchor else { return }
+        let fullSpan = bounds.upperBound.timeIntervalSince(bounds.lowerBound)
+        let anchorSpan = anchor.window.upperBound.timeIntervalSince(anchor.window.lowerBound)
+        let span = min(fullSpan, max(Self.minHeartSpan, anchorSpan / Double(scale)))
+        guard span < fullSpan else { heartWindow = nil; heartFocus = anchor.focus; return }
+        let lead = anchor.focus.timeIntervalSince(anchor.window.lowerBound) * span / anchorSpan
+        heartWindow = clampedHeartWindow(start: anchor.focus.addingTimeInterval(-lead), span: span, in: bounds)
+        heartFocus = anchor.focus
+    }
+
+    /// A drag moves the zoomed window; `fraction` is the drag as a share of the chart's width.
+    private func panHeart(by fraction: CGFloat, ended: Bool, series: [(time: Date, bpm: Double)]?, point: Int) {
+        guard let bounds = heartBounds, let current = heartWindow else { return }
+        if heartGestureAnchor == nil { heartGestureAnchor = (current, heartTime(series, point) ?? current.lowerBound) }
+        guard let anchor = heartGestureAnchor else { return }
+        let span = anchor.window.upperBound.timeIntervalSince(anchor.window.lowerBound)
+        let shift = Double(fraction) * span
+        heartWindow = clampedHeartWindow(start: anchor.window.lowerBound.addingTimeInterval(shift), span: span, in: bounds)
+        heartFocus = anchor.focus.addingTimeInterval(shift)
+        if ended { heartGestureAnchor = nil }
+    }
+
+    private func clampedHeartWindow(start: Date, span: TimeInterval, in bounds: ClosedRange<Date>) -> ClosedRange<Date> {
+        let latestStart = bounds.upperBound.addingTimeInterval(-span)
+        let lower = min(max(start, bounds.lowerBound), latestStart)
+        return lower...lower.addingTimeInterval(span)
+    }
+
+    private func resetHeartZoom(series: [(time: Date, bpm: Double)]?, point: Int) {
+        let focus = heartTime(series, point)
+        heartWindow = nil
+        heartGestureAnchor = nil
+        if let focus, let whole = todayHeartSeries { selectHeart(nearest: focus, in: whole) }
+    }
+
+    private func selectHeart(nearest time: Date, in series: [(time: Date, bpm: Double)]) {
+        guard let best = series.indices.min(by: {
+            abs(series[$0].time.timeIntervalSince(time)) < abs(series[$1].time.timeIntervalSince(time))
+        }) else { return }
+        selectedHeartPoint = best
+    }
+
+    /// Read the zoomed window at about 160 points: bucketed means when wide, raw seconds when narrow.
+    private func loadZoomedHeart() async {
+        guard let window = heartWindow else {
+            zoomedHeart = []
+            if let focus = heartFocus, let whole = todayHeartSeries { selectHeart(nearest: focus, in: whole); heartFocus = nil }
+            return
+        }
+        let result = await repo.timelineSeries(metric: .hr,
+                                               from: Int(window.lowerBound.timeIntervalSince1970),
+                                               to: Int(window.upperBound.timeIntervalSince1970),
+                                               targetPoints: 160)
+        guard !Task.isCancelled else { return }
+        zoomedHeart = result.points.map { ($0.date, $0.value) }
+        if let focus = heartFocus { selectHeart(nearest: focus, in: zoomedHeart) }
+    }
+
+    /// Four exact times across a zoomed window; seconds once the window is under ten minutes.
+    private static func zoomAxisLabels(_ window: ClosedRange<Date>) -> [String] {
+        let span = window.upperBound.timeIntervalSince(window.lowerBound)
+        let fmt = DateFormatter()
+        fmt.locale = .autoupdatingCurrent
+        fmt.setLocalizedDateFormatFromTemplate(span < 600 ? "jmmss" : "jmm")
+        return [0, 1.0 / 3, 2.0 / 3, 1].map { fmt.string(from: window.lowerBound.addingTimeInterval(span * $0)) }
     }
 
     private var dayAxis: [String]? {
@@ -3183,9 +3309,38 @@ private struct Act2ScrubbableDayChart: View {
     let values: [Double]
     @Binding var selected: Int
     var resting: Act2RestingLine = .design
+    /// Set while zoomed: a sideways drag pans the window instead of reading it (the drag as a share of
+    /// the chart width, then true on release), and touch-and-hold reads.
+    var pan: ((CGFloat, Bool) -> Void)? = nil
+    @GestureState private var holding = false
 
     var body: some View {
         GeometryReader { proxy in
+            if let pan {
+                Act2FixedHeartChart(values: values, kind: .scrub(selected), resting: resting)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        LongPressGesture(minimumDuration: 0.3)
+                            .sequenced(before: DragGesture(minimumDistance: 0))
+                            .updating($holding) { value, state, _ in
+                                guard case .second(true, let drag) = value else { return }
+                                state = true
+                                if let drag { select(at: drag.location.x, width: proxy.size.width) }
+                            }
+                    )
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 6)
+                            .onChanged { gesture in
+                                let t = gesture.translation
+                                guard !holding, abs(t.width) > abs(t.height) else { return }
+                                pan(-t.width / max(1, proxy.size.width), false)
+                            }
+                            .onEnded { gesture in
+                                guard !holding else { return }
+                                pan(-gesture.translation.width / max(1, proxy.size.width), true)
+                            }
+                    )
+            } else {
             Act2FixedHeartChart(values: values, kind: .scrub(selected), resting: resting)
                 .contentShape(Rectangle())
                 // Shared with the page's ScrollView: an exclusive zero-distance drag swallowed every
@@ -3196,11 +3351,16 @@ private struct Act2ScrubbableDayChart: View {
                         .onChanged { gesture in
                             let t = gesture.translation
                             guard abs(t.height) <= max(8, abs(t.width)) else { return }
-                            let fraction = min(1, max(0, gesture.location.x / max(1, proxy.size.width)))
-                            selected = Int((fraction * CGFloat(max(0, values.count - 1))).rounded())
+                            select(at: gesture.location.x, width: proxy.size.width)
                         }
                 )
+            }
         }
+    }
+
+    private func select(at x: CGFloat, width: CGFloat) {
+        let fraction = min(1, max(0, x / max(1, width)))
+        selected = Int((fraction * CGFloat(max(0, values.count - 1))).rounded())
     }
 }
 
