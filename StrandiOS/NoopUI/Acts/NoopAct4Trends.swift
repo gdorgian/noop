@@ -143,6 +143,9 @@ private struct NoopTrendsScreen: View {
                     waitingReason: ages?.buildReason ?? "Checking recorded signals"
                 ) { showingAges = true }
 
+                NoopTrendsMarkersSection(navigation: navigation)
+                    .padding(.top, 32)
+
                 windowControl
                     .padding(.top, 24)
 
@@ -156,21 +159,6 @@ private struct NoopTrendsScreen: View {
 
                 VStack(alignment: .leading, spacing: 9) {
                     verdictCard
-
-                    sectionLabel("What changed")
-                    ForEach(trendRows) { row in
-                        Button { openMetric(row) } label: {
-                            NoopTrendSignalCard(row: row, showsDetail: true)
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
-                        .accessibilityHint("Open interactive history for \(row.name)")
-                    }
-
-                    NoopHTMLCard(radius: 22, padding: 0) {
-                        trendLink("All signals", detail: "browse every metric and open its history", symbol: "ask", route: .instrumentIndex)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 6)
-                    }
 
                     sectionLabel("Bloodwork", color: NoopHTMLColor.warm)
                     bloodworkCard

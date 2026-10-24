@@ -40,6 +40,15 @@ struct NoopMetric: Identifiable {
     let value: (DailyMetric) -> Double?
     /// Durations in hours read as "7h 08m", the way the rest of the app writes them.
     var isDuration = false
+    /// When set, readings come from this catalogue series instead of the daily rows.
+    var series: Series? = nil
+
+    struct Series {
+        let key: String
+        let source: String
+        /// Stored value → shown value (minutes → hours for a duration).
+        var transform: (Double) -> Double = { $0 }
+    }
 
     func format(_ v: Double) -> String {
         if isDuration {
@@ -184,7 +193,25 @@ struct NoopMetricSheetRequest: Identifiable, Equatable {
     var group: String = "vitals"
     var id: String { group + "." + metricID }
 
-    var metrics: [NoopMetric] { group == "sleep" ? NoopMetric.sleep : NoopMetric.vitals }
+    var metrics: [NoopMetric] {
+        switch group {
+        case "sleep": NoopMetric.sleep
+        case "marker": MetricCatalog.all.first { $0.id == metricID }.map { [NoopMetric(marker: $0)] } ?? NoopMetric.vitals
+        default: NoopMetric.vitals
+        }
+    }
+}
+
+extension NoopMetric {
+    /// Any catalogue measure as a sheet metric: Trends' pinned markers and their See all list.
+    init(marker d: MetricDescriptor) {
+        let minutes = d.unit == "min"
+        self.init(id: d.id, title: d.title, short: d.title, unit: minutes ? "h" : d.unit, decimals: minutes ? 1 : d.decimals,
+                  higherIsBetter: d.higherIsBetter,
+                  about: d.description ?? "\(d.title), from \(d.sourceLabel).",
+                  value: { _ in nil }, isDuration: minutes,
+                  series: .init(key: d.key, source: d.source, transform: minutes ? { $0 / 60 } : { $0 }))
+    }
 }
 
 /// The period the chart shows.
@@ -205,12 +232,15 @@ struct NoopMetricSheet: View {
     @State private var range: NoopMetricRange = .month
     @State private var offset = 0
     @State private var picked: Date?
+    /// Readings of a catalogue-series metric, loaded when it is selected.
+    @State private var seriesPoints: [NoopMetricPoint] = []
 
     private var metric: NoopMetric { metrics.first { $0.id == selectedID } ?? metrics[0] }
 
     /// Every reading of the selected metric, oldest first.
     private var all: [NoopMetricPoint] {
-        days.compactMap { d in
+        if metric.series != nil { return seriesPoints }
+        return days.compactMap { d in
             guard let v = metric.value(d), let date = Self.dayFormatter.date(from: d.day) else { return nil }
             return NoopMetricPoint(date: date, value: v)
         }.sorted { $0.date < $1.date }
@@ -259,7 +289,7 @@ struct NoopMetricSheet: View {
             .scrollIndicators(.hidden)
         }
         .background(NoopHTMLColor.canvas.ignoresSafeArea())
-        .task(id: repo.refreshSeq) { await load() }
+        .task(id: "\(repo.refreshSeq)|\(selectedID)") { await load() }
         .onChange(of: selectedID) { _, _ in picked = nil; openOnLatest() }
         .onChange(of: range) { _, _ in picked = nil; offset = 0 }
         .onChange(of: offset) { _, _ in picked = nil }
@@ -390,6 +420,10 @@ struct NoopMetricSheet: View {
         // the same rows Today and Trends read. (`dailyMetrics(fromDay:)` reads imported rows only.)
         days = repo.days
         if !metrics.contains(where: { $0.id == selectedID }), let first = metrics.first { selectedID = first.id }
+        if let s = metric.series {
+            let rows = await repo.exploreSeries(key: s.key, source: s.source, fullHistory: true)
+            seriesPoints = rows.compactMap { r in Self.dayFormatter.date(from: r.day).map { NoopMetricPoint(date: $0, value: s.transform(r.value)) } }
+        }
         openOnLatest()
     }
 
