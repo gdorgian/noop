@@ -21,8 +21,13 @@ struct NoopAuraOrb: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var offsets = NoopAuraVector(Array(repeating: 0, count: 5))
+    /// The turn is held while a finger is down and carries on from there after.
     @State private var spinOffset: Double = 0
-    @State private var dragAngle: Double?
+    @State private var heldSpin: Double?
+    /// A finger on the orb, in its own coordinates. The embers are drawn to it.
+    @State private var touch: CGPoint?
+    @State private var lastTouch: CGPoint?
+    @State private var touchChanged = Date.distantPast
 
     private var segmentCount: Int { NoopAuraOrbModel.segmentCount(shapeScore) }
 
@@ -51,9 +56,13 @@ struct NoopAuraOrb: View {
                 // Embers.
                 TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: paused || reduceMotion)) { timeline in
                     let t = (paused || reduceMotion) ? 4.0 : NoopAuraOrbModel.clock(timeline.date)
-                    let spin = (dragAngle ?? NoopAuraOrbModel.naturalSpin(t)) + spinOffset
+                    let spin = heldSpin ?? (NoopAuraOrbModel.naturalSpin(t) + spinOffset)
+                    let since = timeline.date.timeIntervalSince(touchChanged)
+                    // Eases in over half a second while held, back out over a second after release.
+                    let pull = touch != nil ? NoopAuraMath.smooth(since / 0.5) : 1 - NoopAuraMath.smooth(since / 1.0)
                     Canvas { context, size in
-                        NoopAuraEmbers.draw(in: &context, size: size, t: t, spin: spin, scale: scale)
+                        NoopAuraEmbers.draw(in: &context, size: size, t: t, spin: spin, scale: scale,
+                                            attractor: lastTouch, pull: pull)
                     }
                 }
                 .clipShape(shape)
@@ -64,7 +73,7 @@ struct NoopAuraOrb: View {
                 if drift > 0 {
                     TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: paused || reduceMotion)) { timeline in
                         let t = (paused || reduceMotion) ? 4.0 : NoopAuraOrbModel.clock(timeline.date)
-                        let spin = (dragAngle ?? NoopAuraOrbModel.naturalSpin(t)) + spinOffset
+                        let spin = heldSpin ?? (NoopAuraOrbModel.naturalSpin(t) + spinOffset)
                         Canvas { context, size in
                             NoopAuraDrift.draw(in: &context, size: size, t: t, spin: spin, scale: scale,
                                                rim: side / 2 - NoopAuraOrbModel.inset(shapeScore) * scale,
@@ -76,8 +85,16 @@ struct NoopAuraOrb: View {
                 }
             }
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
-            .modifier(NoopAuraSpinGesture(center: CGPoint(x: geo.size.width / 2, y: geo.size.height / 2),
-                                          dragAngle: $dragAngle, spinOffset: $spinOffset))
+            .modifier(NoopAuraTouch(touch: $touch))
+            .onChange(of: touch) { old, new in
+                let natural = NoopAuraOrbModel.naturalSpin(NoopAuraOrbModel.clock(Date()))
+                if let new { lastTouch = CGPoint(x: new.x - (geo.size.width - side) / 2, y: new.y - (geo.size.height - side) / 2) }
+                if (old == nil) != (new == nil) {
+                    touchChanged = Date()
+                    if new != nil { heldSpin = natural + spinOffset }
+                    else { spinOffset = (heldSpin ?? natural) - natural; heldSpin = nil }
+                }
+            }
         }
         .task(id: segmentCount) { await morph() }
         .accessibilityHidden(true)
@@ -206,9 +223,11 @@ struct NoopAmoebaShape: Shape {
 }
 
 /// Embers: each lives two to three and a half seconds, born in the lit band and drawn a little toward
-/// the core while it shrinks to half; brighter over the rim than over the dark well.
+/// the core while it shrinks to half; brighter over the rim than over the dark well. A finger moves
+/// the point they are drawn to from the core to itself, so they gather under it and clear elsewhere.
 private enum NoopAuraEmbers {
-    static func draw(in context: inout GraphicsContext, size: CGSize, t: Double, spin: Double, scale: CGFloat) {
+    static func draw(in context: inout GraphicsContext, size: CGSize, t: Double, spin: Double, scale: CGFloat,
+                     attractor: CGPoint?, pull: Double) {
         let c = CGPoint(x: size.width / 2, y: size.height / 2)
         let r = Double(min(size.width, size.height)) / 2
         context.blendMode = .plusLighter
@@ -219,7 +238,15 @@ private enum NoopAuraEmbers {
             let start = 0.45 + 0.50 * sqrt(h(3))
             let dist = start * (1 - 0.22 * p * p) * r
             let angle = h(4) * 2 * .pi + spin + (h(5) - 0.5) * 0.35 * p
-            let x = c.x + CGFloat(cos(angle) * dist), y = c.y + CGFloat(sin(angle) * dist)
+            var x = c.x + CGFloat(cos(angle) * dist), y = c.y + CGFloat(sin(angle) * dist)
+            if let attractor, pull > 0.001 {
+                // Each ember goes most of the way, so they bunch around the finger rather than on it.
+                let k = CGFloat(pull * (0.6 + 0.32 * h(8)))
+                let spread = CGFloat(r) * 0.16 * CGFloat(h(9))
+                let tx = attractor.x + CGFloat(cos(h(10) * 2 * .pi + t * 0.8)) * spread
+                let ty = attractor.y + CGFloat(sin(h(10) * 2 * .pi + t * 0.8)) * spread
+                x += (tx - x) * k; y += (ty - y) * k
+            }
             let big = h(6) > 0.86
             let s = Double(scale) * (big ? 4.5 + 5 * h(7) : 1.4 + 2.6 * h(7)) * (1 - 0.5 * p)
             let band = 0.18 + 0.82 * NoopAuraMath.step(0.42, 0.8, dist / r)
@@ -280,18 +307,16 @@ enum NoopAuraMath {
     static func step(_ a: Double, _ b: Double, _ x: Double) -> Double { smooth((x - a) / (b - a)) }
 }
 
-// MARK: - Spin
+// MARK: - Touch
 
-/// A sideways drag turns the ember field with the finger; vertical drags are left to the page's
-/// scroll. On release the field keeps the angle it was left at and carries on turning from there.
-private struct NoopAuraSpinGesture: ViewModifier {
-    let center: CGPoint
-    @Binding var dragAngle: Double?
-    @Binding var spinOffset: Double
+/// Hold, then drag: a short still press begins it, so a swipe that starts on the orb fails it and the
+/// page scrolls. Reports the finger in the orb's coordinates; nil when lifted.
+private struct NoopAuraTouch: ViewModifier {
+    @Binding var touch: CGPoint?
 
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
-            content.gesture(NoopAuraSpinRecognizer(center: center, dragAngle: $dragAngle, spinOffset: $spinOffset))
+            content.gesture(NoopAuraTouchRecognizer(touch: $touch))
         } else {
             content
         }
@@ -299,46 +324,20 @@ private struct NoopAuraSpinGesture: ViewModifier {
 }
 
 @available(iOS 18.0, *)
-private struct NoopAuraSpinRecognizer: UIGestureRecognizerRepresentable {
-    let center: CGPoint
-    @Binding var dragAngle: Double?
-    @Binding var spinOffset: Double
+private struct NoopAuraTouchRecognizer: UIGestureRecognizerRepresentable {
+    @Binding var touch: CGPoint?
 
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        var startAngle = 0.0
-        var startSpin = 0.0
-        func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
-            guard let pan = g as? UIPanGestureRecognizer else { return true }
-            let v = pan.velocity(in: pan.view)
-            return abs(v.x) > abs(v.y) * 1.2
-        }
+    func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
+        let press = UILongPressGestureRecognizer()
+        press.minimumPressDuration = 0.12
+        press.allowableMovement = 10
+        return press
     }
 
-    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
-
-    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
-        let pan = UIPanGestureRecognizer()
-        pan.delegate = context.coordinator
-        return pan
-    }
-
-    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
-        let p = context.converter.localLocation
-        let angle = atan2(Double(p.y - center.y), Double(p.x - center.x))
-        let natural = NoopAuraOrbModel.naturalSpin(NoopAuraOrbModel.clock(Date()))
+    func handleUIGestureRecognizerAction(_ recognizer: UILongPressGestureRecognizer, context: Context) {
         switch recognizer.state {
-        case .began:
-            context.coordinator.startAngle = angle
-            context.coordinator.startSpin = natural + spinOffset
-            spinOffset = 0
-            dragAngle = context.coordinator.startSpin
-        case .changed:
-            var delta = angle - context.coordinator.startAngle
-            if delta > .pi { delta -= 2 * .pi } else if delta < -.pi { delta += 2 * .pi }
-            dragAngle = context.coordinator.startSpin + delta
-        default:
-            spinOffset = (dragAngle ?? natural) - natural
-            dragAngle = nil
+        case .began, .changed: touch = context.converter.localLocation
+        default: touch = nil
         }
     }
 }
