@@ -233,14 +233,108 @@ struct NoopFitnessLastTimeSheet: View {
     }
 }
 
+/// How an exercise's targets move from session to session: one card per method, then only the settings
+/// that method uses.
+struct NoopFitnessProgressionSheet: View {
+    let exercise: String
+    @Binding var configuration: ProgressionConfiguration
+    let done: () -> Void
+
+    private static let methods: [(ProgressionPolicy, String, String)] = [
+        (.off, "Off", "Targets stay as you set them."),
+        (.doubleProgression, "Double progression", "Add reps up to the top of the range, then add weight and start again."),
+        (.linear, "Linear", "Add weight every session you complete all your reps."),
+        (.greyskullLP, "Linear with AMRAP", "Linear, with a last set taken to as many reps as you can."),
+        (.time, "Time", "Add seconds to each set after a session you complete."),
+    ]
+
+    private var usesWeight: Bool { [.linear, .doubleProgression, .greyskullLP].contains(configuration.policy) }
+
+    var body: some View {
+        NoopFitnessCompactSheet(title: "Progression", subtitle: exercise) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(spacing: 8) {
+                        ForEach(Self.methods, id: \.0) { policy, name, line in
+                            method(policy, name, line)
+                        }
+                    }
+                    if configuration.policy == .doubleProgression {
+                        HStack(spacing: 12) {
+                            NoopFitnessStepper(label: "From", value: "\(configuration.repsMin)",
+                                               decrement: { configuration.repsMin -= 1 },
+                                               increment: { configuration.repsMin += 1; configuration.repsMax = max(configuration.repsMax, configuration.repsMin) },
+                                               canDecrement: configuration.repsMin > 1, canIncrement: configuration.repsMin < 100)
+                            NoopFitnessStepper(label: "To", value: "\(configuration.repsMax)",
+                                               decrement: { configuration.repsMax -= 1; configuration.repsMin = min(configuration.repsMin, configuration.repsMax) },
+                                               increment: { configuration.repsMax += 1 },
+                                               canDecrement: configuration.repsMax > 1, canIncrement: configuration.repsMax < 100)
+                        }
+                    }
+                    if usesWeight {
+                        NoopFitnessStepper(label: "Add each time", value: "\(LiftFormat.trim(configuration.weightIncrementKg)) kg",
+                                           decrement: { configuration.weightIncrementKg = max(0.5, configuration.weightIncrementKg - 0.5) },
+                                           increment: { configuration.weightIncrementKg = min(20, configuration.weightIncrementKg + 0.5) },
+                                           canDecrement: configuration.weightIncrementKg > 0.5,
+                                           canIncrement: configuration.weightIncrementKg < 20)
+                        NoopFitnessStepper(label: "Lighten after", value: "\(configuration.failuresBeforeDeload) missed",
+                                           decrement: { configuration.failuresBeforeDeload -= 1 },
+                                           increment: { configuration.failuresBeforeDeload += 1 },
+                                           canDecrement: configuration.failuresBeforeDeload > 1,
+                                           canIncrement: configuration.failuresBeforeDeload < 10)
+                    }
+                    if configuration.policy == .time {
+                        NoopFitnessStepper(label: "Add each time", value: "\(configuration.durationIncrementS)s",
+                                           decrement: { configuration.durationIncrementS = max(1, configuration.durationIncrementS - 5) },
+                                           increment: { configuration.durationIncrementS = min(120, configuration.durationIncrementS + 5) },
+                                           canDecrement: configuration.durationIncrementS > 1,
+                                           canIncrement: configuration.durationIncrementS < 120)
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+        } actions: {
+            NoopFitnessActionButton(title: "Done", action: done)
+        }
+        .animation(NoopMotion.swap, value: configuration.policy)
+        .sensoryFeedback(.selection, trigger: configuration.policy)
+    }
+
+    private func method(_ policy: ProgressionPolicy, _ name: String, _ line: String) -> some View {
+        let on = configuration.policy == policy
+        return Button { configuration.policy = policy } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18)).foregroundStyle(on ? NoopHTMLColor.volt : NoopHTMLColor.muted)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name).font(NoopHTMLFont.sans(14.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(line).font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(on ? 0.08 : 0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(NoopHTMLColor.volt.opacity(on ? 0.5 : 0), lineWidth: 1))
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
 /// A routine's upcoming sessions, read as a plan ("Mon, Wed, Fri at 6:00 PM · until 30 Dec") with the
 /// next few dates under it, never every date of a 26-week repeat in a list.
 struct NoopFitnessScheduleSummary: View {
     let upcoming: [NoopFitnessSettings.Plan]
     let remove: (NoopFitnessSettings.Plan) -> Void
+    /// Puts back a session skipped by mistake.
+    let restore: (NoopFitnessSettings.Plan) -> Void
     let stopRepeating: () -> Void
     let edit: () -> Void
     @State private var expanded = false
+    @State private var skipped: NoopFitnessSettings.Plan?
 
     private var cal: Calendar { Calendar.current }
 
@@ -290,6 +384,21 @@ struct NoopFitnessScheduleSummary: View {
                 }
             }
             .padding(.top, 4)
+
+            if let skipped {
+                HStack {
+                    Text("Skipped \(skipped.date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)))")
+                        .font(NoopHTMLFont.sans(13)).foregroundStyle(NoopHTMLColor.copy)
+                    Spacer()
+                    Button("Undo") {
+                        withAnimation(NoopMotion.swap) { restore(skipped); self.skipped = nil }
+                    }
+                    .font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                }
+                .padding(.horizontal, 12).frame(height: 40)
+                .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             if upcoming.count > 3 {
                 Button {
@@ -343,14 +452,24 @@ struct NoopFitnessScheduleSummary: View {
                     .font(NoopHTMLFont.sans(12)).foregroundStyle(next ? NoopHTMLColor.volt : NoopHTMLColor.copy)
             }
             Spacer(minLength: 0)
+            Button { skip(plan) } label: {
+                Text("Skip").font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
+                    .padding(.horizontal, 14).frame(height: 32)
+                    .background(Color.white.opacity(0.07), in: Capsule())
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+            .accessibilityLabel("Skip \(plan.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))")
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
         .contextMenu {
-            Button(role: .destructive) { remove(plan) } label: { Label("Skip this one", systemImage: "calendar.badge.minus") }
+            Button { skip(plan) } label: { Label("Skip this one", systemImage: "forward.end") }
         }
-        .modifier(NoopSwipeToDelete { remove(plan) })
-        .accessibilityAction(named: "Skip this one") { remove(plan) }
+        .modifier(NoopSwipeToDelete { skip(plan) })
+    }
+
+    private func skip(_ plan: NoopFitnessSettings.Plan) {
+        withAnimation(NoopMotion.swap) { remove(plan); skipped = plan }
     }
 
     private func relative(_ plan: NoopFitnessSettings.Plan) -> String {

@@ -247,7 +247,8 @@ struct NoopFitnessRoutineScreen: View {
                 if !upcoming.isEmpty {
                     NoopFitnessScheduleSummary(
                         upcoming: upcoming,
-                        remove: { p in withAnimation(NoopMotion.swap) { settings.remove(p) } },
+                        remove: { p in settings.remove(p) },
+                        restore: { p in settings.plans.append(p) },
                         stopRepeating: {
                             guard let id = navigation.fitnessRoutineID else { return }
                             withAnimation(NoopMotion.swap) { settings.removeUpcoming(routineID: id) }

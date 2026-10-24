@@ -31,7 +31,7 @@ struct NoopFitnessExerciseChoice: Identifiable, Equatable {
                            equipment: choice.equipment, isYours: true, definition: definition)
             return choice
         }
-        let known = (TrainingStarterCatalog.exercises + BundledExerciseCatalog.exercises).first {
+        let known = TrainingExerciseLibrary.all.first {
             NoopFitnessExercisePicker.fold($0.title) == NoopFitnessExercisePicker.fold(row.name)
         }
         return .init(name: row.name, primary: row.primaryMuscle, secondaries: row.secondaryMuscles,
@@ -68,7 +68,7 @@ struct NoopFitnessExerciseChoice: Identifiable, Equatable {
         }
     }
 
-    static let catalogue = (TrainingStarterCatalog.exercises + BundledExerciseCatalog.exercises).map { choice($0) }
+    static let catalogue = TrainingExerciseLibrary.all.map { choice($0) }
 }
 
 /// Search the local catalogue, inspect a movement, and add selections in the order they were chosen.
@@ -93,8 +93,28 @@ struct NoopFitnessExercisePicker: View {
 
     static func rank(_ name: String, _ q: String) -> Int? {
         let n = fold(name)
-        guard n.contains(q) else { return nil }
-        return (n == q ? 0 : n.hasPrefix(q) ? 1 : 2) * 1000 + n.count
+        if n.contains(q) { return (n == q ? 0 : n.hasPrefix(q) ? 1 : 2) * 1000 + n.count }
+        // Every word typed, in any order: "split squat bulgarian", "curl ez".
+        let words = q.split(separator: " ")
+        guard words.count > 1, words.allSatisfy({ n.contains($0) }) else { return nil }
+        return 3000 + n.count
+    }
+
+    /// Gym names the catalogue spells differently, so typing the common one still finds the movement.
+    static let synonyms: [String: String] = [
+        "hex bar": "trap bar", "hexbar": "trap bar", "rdl": "romanian deadlift", "ohp": "overhead press",
+        "skull crusher": "skullcrusher", "trx": "suspension", "pec fly": "pec deck", "stairmaster": "stair climber",
+        "ez bar": "ez", "db": "dumbbell", "bb": "barbell", "kb": "kettlebell"
+    ]
+
+    /// The best rank of the choice's name or any of its aliases, for the query or its common-name rewrite.
+    static func rank(_ choice: NoopFitnessExerciseChoice, _ q: String) -> Int? {
+        var queries = [q]
+        for (from, to) in synonyms where q.contains(from) { queries.append(q.replacingOccurrences(of: from, with: to)) }
+        let names = [choice.name] + (choice.definition?.aliases ?? [])
+        return queries.flatMap { query in names.enumerated().compactMap { index, name in
+            rank(name, query).map { $0 + (index == 0 ? 0 : 500) }
+        } }.min()
     }
 
     private var choices: [NoopFitnessExerciseChoice] {
@@ -106,12 +126,12 @@ struct NoopFitnessExercisePicker: View {
     private var results: [NoopFitnessExerciseChoice] {
         let q = Self.fold(query.trimmingCharacters(in: .whitespacesAndNewlines))
         return choices.filter { c in
-            (q.isEmpty || Self.rank(c.name, q) != nil)
+            (q.isEmpty || Self.rank(c, q) != nil)
                 && (groups.isEmpty || groups.contains(c.primary?.rawValue ?? ""))
                 && (equipment.isEmpty || !equipment.isDisjoint(with: c.definition?.equipmentIds ?? []))
         }.sorted {
-            let a = q.isEmpty ? 0 : Self.rank($0.name, q) ?? 0
-            let b = q.isEmpty ? 0 : Self.rank($1.name, q) ?? 0
+            let a = q.isEmpty ? 0 : Self.rank($0, q) ?? 0
+            let b = q.isEmpty ? 0 : Self.rank($1, q) ?? 0
             return a == b ? $0.name.localizedStandardCompare($1.name) == .orderedAscending : a < b
         }
     }
@@ -329,7 +349,9 @@ struct NoopFitnessRoutineEditor: View {
                         Task { await save() }
                     }
                 }
-                .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 8)
+                .padding(.horizontal, 20).padding(.top, 12)
+                // The Fitness act draws behind the home indicator; sit where the tab bar sits.
+                .padding(.bottom, 30)
                 .background(LinearGradient(colors: [NoopHTMLColor.canvas.opacity(0), NoopHTMLColor.canvas],
                                            startPoint: .top, endPoint: .center).ignoresSafeArea())
             }
@@ -354,9 +376,10 @@ struct NoopFitnessRoutineEditor: View {
         .sheet(isPresented: $reorder) { reorderSheet }
         .sheet(isPresented: Binding(get: { progressionID != nil }, set: { if !$0 { progressionID = nil } })) {
             if let index = lines.firstIndex(where: { $0.id == progressionID }) {
-                NoopFitnessProgressionEditor(configuration: Binding(
+                NoopFitnessProgressionSheet(exercise: lines[index].choice.name, configuration: Binding(
                     get: { lines[index].plan.progression ?? .init() },
-                    set: { lines[index].plan.progression = $0 })).noopSheet()
+                    set: { lines[index].plan.progression = $0 }), done: { progressionID = nil })
+                    .noopSheet([.large])
             }
         }
         .sheet(isPresented: Binding(get: { restID != nil }, set: { if !$0 { restID = nil } })) {
@@ -778,26 +801,6 @@ struct NoopFitnessRoutineEditor: View {
     }
 }
 
-struct NoopFitnessProgressionEditor: View {
-    @Binding var configuration: ProgressionConfiguration
-    @Environment(\.dismiss) private var dismiss
-    var body: some View {
-        Form {
-            Section {
-                Picker("Progression", selection: $configuration.policy) {
-                    ForEach(ProgressionPolicy.allCases, id: \.self) { Text($0.rawValue.replacingOccurrences(of: "_", with: " ").capitalized).tag($0) }
-                }
-                Stepper("Load increase: \(configuration.weightIncrementKg, specifier: "%.1f") kg", value: $configuration.weightIncrementKg, in: 0.5...20, step: 0.5)
-                Stepper("Minimum reps: \(configuration.repsMin)", value: $configuration.repsMin, in: 1...configuration.repsMax)
-                Stepper("Maximum reps: \(configuration.repsMax)", value: $configuration.repsMax, in: configuration.repsMin...100)
-                Stepper("Time increase: \(configuration.durationIncrementS)s", value: $configuration.durationIncrementS, in: 1...120)
-                Stepper("Failures before deload: \(configuration.failuresBeforeDeload)", value: $configuration.failuresBeforeDeload, in: 1...10)
-            }.listRowBackground(NoopHTMLColor.card)
-            Button("Done") { dismiss() }
-        }.scrollContentBackground(.hidden).background(NoopHTMLColor.canvas)
-            .foregroundStyle(NoopHTMLColor.ink).tint(NoopHTMLColor.volt).font(NoopHTMLFont.sans(14))
-    }
-}
 #endif
 
 /// Swipe a row left to delete it, the way Mail and Reminders do: the row follows the finger over a red

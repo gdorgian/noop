@@ -452,7 +452,7 @@ extension NoopFitnessExerciseChoice {
     /// The catalogue entry for a logged exercise name, so a record can show the exercise's picture.
     static func lookup(_ name: String) -> NoopFitnessExerciseChoice? {
         let key = NoopFitnessExercisePicker.fold(name)
-        guard let known = (TrainingStarterCatalog.exercises + BundledExerciseCatalog.exercises)
+        guard let known = TrainingExerciseLibrary.all
             .first(where: { NoopFitnessExercisePicker.fold($0.title) == key }) else { return nil }
         return .choice(known)
     }

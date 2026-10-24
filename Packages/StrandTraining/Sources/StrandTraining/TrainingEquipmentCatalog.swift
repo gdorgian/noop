@@ -7,14 +7,14 @@ public enum TrainingEquipmentCatalog {
         "barbell", "ez-bar", "trap-bar", "smith-machine", "dumbbell", "kettlebell", "cable", "machine",
         "band", "bench", "pull-up-bar", "dip-bar", "squat-rack", "weight-belt", "box", "medicine-ball",
         "sled", "rings", "bodyweight", "stability-ball", "bosu-ball", "foam-roller", "ab-wheel",
-        "rope", "tire", "hammer"
+        "rope", "tire", "hammer", "suspension-trainer", "sandbag", "plate", "jump-rope"
     ]
 
     /// Implements that carry external load. Benches, racks and belts support a lift without being the
     /// load, which is why a weight-and-repetitions exercise is not defined by them.
     public static let loadBearing: Set<String> = [
         "barbell", "ez-bar", "trap-bar", "smith-machine", "dumbbell", "kettlebell", "cable", "machine",
-        "band", "medicine-ball", "sled"
+        "band", "medicine-ball", "sled", "sandbag", "plate"
     ]
 
     public static func canonical(_ id: String) -> String {
@@ -35,6 +35,9 @@ public enum TrainingEquipmentCatalog {
         case "exercise-ball", "swiss-ball": return "stability-ball"
         case "wheel-roller": return "ab-wheel"
         case "roller": return "foam-roller"
+        case "trx", "suspension", "suspension-straps": return "suspension-trainer"
+        case "weight-plate", "plates": return "plate"
+        case "skipping-rope": return "jump-rope"
         default: return key
         }
     }
