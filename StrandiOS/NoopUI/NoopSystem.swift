@@ -11,24 +11,27 @@ import SwiftUI
 
 // MARK: - Tokens
 
-/// The type scale: eight steps named after the iOS text styles they stand in for. Nothing below 11 pt.
+/// The type scale. The roles are the 11.7 handoff's (`NoopSpecType`: caption, subline, row label, row
+/// title, card title…), set larger than the handoff draws them — the owner chose a roomier, Bevel-like
+/// read (24 Oct 2026) — so the hierarchy is the designer's and the sizes are Apple-sized. Every screen
+/// uses a step, never a number, so the whole app moves together when a step changes.
 enum NoopType {
-    /// Uppercase section labels, chart axes, badges.
-    static let eyebrow: CGFloat = 11
-    /// Secondary lines under a value or row: units, dates.
-    static let caption: CGFloat = 12
-    /// Supporting copy and metadata; small-control labels.
-    static let footnote: CGFloat = 13
-    /// Row titles, buttons, table values.
-    static let subhead: CGFloat = 15
-    /// Primary body text and card titles.
-    static let body: CGFloat = 17
-    /// Values inside cards.
-    static let title3: CGFloat = 22
-    /// Page and hero values.
-    static let title2: CGFloat = 28
-    /// Screen titles and the largest numbers.
-    static let title1: CGFloat = 34
+    /// Uppercase section captions, chart axes, badges. (Handoff caption 10.)
+    static let eyebrow: CGFloat = 12
+    /// Sub-lines under a row or value: units, dates, explanations. (Handoff subline 11.5.)
+    static let caption: CGFloat = 14
+    /// Row labels and supporting copy. (Handoff rowLabel / body 13.5.)
+    static let footnote: CGFloat = 15
+    /// Row titles, button labels, table values. (Handoff cardTitle 14, buttonLabel 12.5.)
+    static let subhead: CGFloat = 17
+    /// Card titles and primary values in a row. (Handoff rowFigure 17.)
+    static let body: CGFloat = 18
+    /// Values inside cards, section heads. (Handoff sectionHead 19, headline 23.)
+    static let title3: CGFloat = 24
+    /// Page values and screen titles. (Handoff screenTitle 25.)
+    static let title2: CGFloat = 30
+    /// The largest numbers.
+    static let title1: CGFloat = 36
 }
 
 /// Spacing on a 4 pt grid. Gaps between things use these and nothing else.
