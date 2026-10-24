@@ -89,24 +89,45 @@ struct NoopEditableSections<Section: View>: View {
     @State private var dragStartMid: CGFloat = 0
     @State private var dragTranslation: CGFloat = 0
     @State private var frames: [String: CGRect] = [:]
-    /// Where the page sits on screen, so the drop lands in the middle of what is in view.
+    /// Where the page sits on screen, so a save's wave starts in the middle of what is in view.
     @State private var screenFrame: CGRect = .zero
+    /// The wave running through the page after a drop or a save, and how far through it is (0 to 1),
+    /// animated linearly so every section reads its own push from the same moment.
+    @State private var wave: NoopSurfaceWave?
+    @State private var waveProgress: Double = 0
 
     var body: some View {
         VStack(spacing: spacing) {
             ForEach(editing.active ? editing.draft : layout.order, id: \.self) { id in
-                if editing.active {
-                    editable(id)
-                } else if !isEmpty(id) {
-                    section(id)
+                Group {
+                    if editing.active {
+                        editable(id)
+                    } else if !isEmpty(id) {
+                        section(id)
+                    }
                 }
+                // Each section's place in the page, measured before any carry or wave moves it.
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .onAppear { frames[id] = proxy.frame(in: .named("noop.sections")) }
+                            .onChange(of: proxy.frame(in: .named("noop.sections"))) { _, frame in frames[id] = frame }
+                    }
+                }
+                .modifier(NoopWaveMotion(wave: wave, id: id, frame: frames[id], progress: waveProgress))
+                // Layering and removal belong to the ForEach's own children, or the lifted card
+                // would draw under the sections after it.
+                .zIndex(dragging == id ? 1 : 0)
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
             }
             foot.padding(.top, 14)
         }
         .coordinateSpace(name: "noop.sections")
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { screenFrame = $0 }
-        .modifier(NoopDropRipple(trigger: editing.saves, origin: CGPoint(
-            x: screenFrame.width / 2, y: UIScreen.main.bounds.midY - screenFrame.minY)))
+        .onChange(of: editing.saves) {
+            let middle = UIScreen.main.bounds.midY - screenFrame.minY
+            send(NoopSurfaceWave(origin: CGRect(x: 0, y: middle, width: screenFrame.width, height: 0)))
+        }
         // Leaving the page mid-edit (another tab) drops the unsaved edit rather than keeping it open.
         .onDisappear { if editing.active { editing.active = false } }
         #if DEBUG
@@ -162,15 +183,25 @@ struct NoopEditableSections<Section: View>: View {
                 .accessibilityLabel("Remove \(info?.title ?? id)")
             }
         }
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("noop.sections")) } action: { frames[id] = $0 }
         .offset(y: dragging == id ? dragStartMid + dragTranslation - (frames[id]?.midY ?? dragStartMid) : 0)
-        .zIndex(dragging == id ? 1 : 0)
-        .transition(.scale(scale: 0.92).combined(with: .opacity))
         .modifier(NoopReorderPress { phase in carry(id, phase) })
         .accessibilityElement(children: .contain)
         .accessibilityLabel(info?.title ?? id)
         .accessibilityAction(named: "Move up") { move(id, by: -1) }
         .accessibilityAction(named: "Move down") { move(id, by: 1) }
+    }
+
+    /// Starts a wave and clears it once it has died away, so the page stops redrawing.
+    private func send(_ newWave: NoopSurfaceWave) {
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
+            wave = newWave
+            waveProgress = 0
+        }
+        DispatchQueue.main.async {
+            withAnimation(.linear(duration: NoopSurfaceWave.duration)) { waveProgress = 1 }
+        }
     }
 
     /// One place up or down, for VoiceOver, which cannot hold and carry.
@@ -210,6 +241,11 @@ struct NoopEditableSections<Section: View>: View {
                 dragging = nil
                 dragTranslation = 0
             }
+            // It lands like a drop: the page moves out from its edges, and the phone feels it.
+            NoopDropHaptic.play(strength: 0.7)
+            if let landed = frames[id] {
+                send(NoopSurfaceWave(origin: landed, delay: 0.12, source: id))
+            }
         }
     }
 
@@ -244,6 +280,29 @@ struct NoopEditableSections<Section: View>: View {
                 withAnimation(.easeInOut(duration: 0.22)) { editing.active = true }
             }
         }
+    }
+}
+
+/// A section's share of the wave: nudged along the page and breathing in scale as it passes.
+private struct NoopWaveMotion: ViewModifier, Animatable {
+    var wave: NoopSurfaceWave?
+    var id: String
+    var frame: CGRect?
+    var progress: Double
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let motion = reduceMotion || progress >= 1 ? nil
+            : wave?.motion(of: id, frame: frame, elapsed: progress * NoopSurfaceWave.duration)
+        content
+            .scaleEffect(motion?.scale ?? 1)
+            .offset(y: motion?.dy ?? 0)
     }
 }
 
@@ -330,7 +389,6 @@ private struct NoopReorderRecognizer: UIGestureRecognizerRepresentable {
             link?.invalidate()
             link = nil
             scrolling = false
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.8)
             onChange(.ended)
         }
 

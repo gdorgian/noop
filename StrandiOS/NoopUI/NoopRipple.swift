@@ -1,86 +1,40 @@
 import CoreHaptics
 import SwiftUI
 
-// MARK: - Drop ripple
+// MARK: - Surface wave
 //
-// Saving a page lands like a drop in a bowl of water: the surface dips under the drop and rebounds a
-// few times, settling, while rings of light run out from where it fell and fade as they spread. The
-// phone feels the drop and then each ring. Drawn with SwiftUI alone, so building the app needs no
-// shader toolchain.
+// Dropping a section, or saving a page, moves the page itself like water taking a drop. Nothing is
+// drawn: the section that landed squashes and rebounds, and a wave runs out from its edges through
+// the sections around it, each nudged away and springing back as the wave reaches it, the nearest
+// first and hardest, the farthest last and faintest. The phone feels the drop, then the rings.
 
-struct NoopDropRipple: ViewModifier {
-    /// Each change sends one drop.
-    var trigger: Int
-    /// Where it lands, in the modified view's own coordinates.
-    var origin: CGPoint
+struct NoopSurfaceWave: Equatable {
+    /// Where the drop landed, in the page's own coordinates; a zero-height rect for a point.
+    var origin: CGRect
+    /// Seconds to wait before the wave starts, so a dropped section settles into its place first.
+    var delay: TimeInterval = 0
+    /// The section that landed, which squashes rather than moving away.
+    var source: String?
 
-    static let duration: TimeInterval = 2.2
+    static let duration: TimeInterval = 2.0
+    /// Points a second the wave front travels, and how far the nearest section is pushed.
+    private static let speed: Double = 900
+    private static let push: Double = 18
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func body(content: Content) -> some View {
-        if reduceMotion {
-            content
-        } else {
-            content.keyframeAnimator(initialValue: 0.0, trigger: trigger) { view, elapsed in
-                view.modifier(NoopRippleFrame(origin: origin, elapsed: elapsed))
-            } keyframes: { _ in
-                MoveKeyframe(0)
-                LinearKeyframe(Self.duration, duration: Self.duration)
-            }
+    /// Where a section is `elapsed` seconds after the wave was sent.
+    func motion(of id: String, frame: CGRect?, elapsed: TimeInterval) -> (dy: CGFloat, scale: CGFloat) {
+        let t = elapsed - delay
+        guard t > 0, t < Self.duration else { return (0, 1) }
+        if id == source {
+            return (0, 1 - 0.05 * sin(12 * t) * exp(-3.8 * t))
         }
-    }
-}
-
-private struct NoopRippleFrame: ViewModifier {
-    var origin: CGPoint
-    var elapsed: TimeInterval
-
-    /// Rings leave the drop one after another and travel at this many points a second.
-    private static let ringDelays: [Double] = [0, 0.12, 0.25, 0.4]
-    private static let speed: Double = 620
-
-    private var running: Bool { elapsed > 0 && elapsed < NoopDropRipple.duration }
-
-    /// The surface's give: a dip, then smaller rebounds.
-    private var give: Double { running ? -0.026 * sin(12 * elapsed) * exp(-2.8 * elapsed) : 0 }
-
-    func body(content: Content) -> some View {
-        content
-            .visualEffect { view, proxy in
-                view.scaleEffect(1 + give, anchor: UnitPoint(x: origin.x / max(1, proxy.size.width),
-                                                             y: origin.y / max(1, proxy.size.height)))
-            }
-            .overlay {
-                if running {
-                    Canvas { context, size in
-                        context.blendMode = .plusLighter
-                        let reach = Double(max(size.width, UIScreen.main.bounds.height))
-                        // The splash where it fell.
-                        let splash = max(0, 1 - elapsed / 0.35)
-                        if splash > 0 {
-                            let r = 18 + 40 * (1 - splash)
-                            context.fill(Path(ellipseIn: CGRect(x: origin.x - r, y: origin.y - r, width: 2 * r, height: 2 * r)),
-                                         with: .radialGradient(Gradient(colors: [.white.opacity(0.4 * splash), .clear]),
-                                                               center: origin, startRadius: 0, endRadius: r))
-                        }
-                        for (i, delay) in Self.ringDelays.enumerated() {
-                            let t = elapsed - delay
-                            guard t > 0 else { continue }
-                            let radius = Self.speed * t * (1 - 0.18 * min(1, t))
-                            let fade = exp(-1.7 * t) * max(0, 1 - radius / reach) * (1 - 0.18 * Double(i))
-                            guard fade > 0.01 else { continue }
-                            let ring = Path(ellipseIn: CGRect(x: origin.x - radius, y: origin.y - radius,
-                                                              width: 2 * radius, height: 2 * radius))
-                            var glow = context
-                            glow.addFilter(.blur(radius: 6 + 10 * t))
-                            glow.stroke(ring, with: .color(.white.opacity(0.55 * fade)), lineWidth: 12 + 16 * t)
-                            context.stroke(ring, with: .color(.white.opacity(0.85 * fade)), lineWidth: 2)
-                        }
-                    }
-                    .allowsHitTesting(false)
-                }
-            }
+        guard let frame else { return (0, 1) }
+        let gap = Double(max(0, max(frame.minY - origin.maxY, origin.minY - frame.maxY)))
+        let arrived = t - gap / Self.speed
+        guard arrived > 0 else { return (0, 1) }
+        let swing = sin(11 * arrived) * exp(-3.4 * arrived) / (1 + gap / 700)
+        let away: Double = frame.midY >= origin.midY ? 1 : -1
+        return (CGFloat(away * Self.push * swing), CGFloat(1 + 0.02 * swing))
     }
 }
 
@@ -89,8 +43,9 @@ private struct NoopRippleFrame: ViewModifier {
 enum NoopDropHaptic {
     @MainActor private static var engine: CHHapticEngine?
 
+    /// `strength` scales every part of it: 1 for a save, less for a section set down.
     @MainActor
-    static func play() {
+    static func play(strength: Float = 1) {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else {
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
             return
@@ -103,21 +58,21 @@ enum NoopDropHaptic {
                 engine = made
             }
             try engine?.start()
-            try engine?.makePlayer(with: pattern()).start(atTime: CHHapticTimeImmediate)
+            try engine?.makePlayer(with: pattern(strength)).start(atTime: CHHapticTimeImmediate)
         } catch {
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         }
     }
 
-    private static func pattern() throws -> CHHapticPattern {
+    private static func pattern(_ strength: Float) throws -> CHHapticPattern {
         func tap(_ time: TimeInterval, _ intensity: Float, _ sharpness: Float) -> CHHapticEvent {
             CHHapticEvent(eventType: .hapticTransient, parameters: [
-                CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity),
+                CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity * strength),
                 CHHapticEventParameter(parameterID: .hapticSharpness, value: sharpness)
             ], relativeTime: time)
         }
         let swell = CHHapticEvent(eventType: .hapticContinuous, parameters: [
-            CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.45),
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.45 * strength),
             CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.08)
         ], relativeTime: 0.02, duration: 0.5)
         let fade = CHHapticParameterCurve(parameterID: .hapticIntensityControl, controlPoints: [
