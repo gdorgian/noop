@@ -22,6 +22,8 @@ struct NoopAct1Screens: View {
     @State private var showHypnogram = NoopContentPolicy.allowsPrototypeContent
         && CommandLine.arguments.contains("--noop-hypnogram")
     @State private var selectedStage: Int?
+    @StateObject private var restLayout = NoopPageLayout(page: "rest", catalog: NoopAct1Screens.restSections)
+    @State private var restEditing = NoopPageEditing()
     @SceneStorage("noop.act1.selected-bedtime") private var selectedBedtime = 2
     @SceneStorage("noop.act1.smart-wake") private var smartWake = true
     /// Minutes past midnight for the wake time, stepped in fives. Nil until the user moves it, so
@@ -75,178 +77,208 @@ struct NoopAct1Screens: View {
                 }
                 .padding(.bottom, 20)
 
-                VStack(spacing: 10) {
-                    restSectionLabel("Your sleep")
-                    if let rest, rest.phase != .ready {
-                        restAbsentCard(rest.phase)
-                    } else {
-                    Button { if rest == nil { navigation.push(.why) } } label: {
-                        VStack(spacing: 2) {
-                            HStack(alignment: .firstTextBaseline) {
-                                NoopSectionLabel("Against your need", color: Color(hex: 0x8B958F))
-                                Spacer()
-                                Text(restNight.map { "asleep \($0.asleepWindow)" } ?? selectedNight.window)
-                                    .font(NoopHTMLFont.sans(NoopType.eyebrow))
-                                    .foregroundStyle(NoopHTMLColor.faint)
-                                    .monospacedDigit()
-                            }
+                NoopEditableSections(layout: restLayout, editing: $restEditing) { id in restSection(id) }
+            }
+        }
+        .noopEditBar($restEditing, layout: restLayout)
+    }
 
-                            if let rest, let night = restNight {
-                                let delta = NoopRestRecord.delta(asleepMin: night.asleepMin, needMin: rest.needMin)
-                                Act1SleepRing(
-                                    hours: NoopRestRecord.duration(night.asleepMin),
-                                    delta: delta.text,
-                                    progress: min(1, night.asleepMin / max(1, rest.needMin)),
-                                    selectedStage: selectedStage,
-                                    slices: night.slices,
-                                    needCaption: "the ring closes at your need \u{00B7} \(NoopRestRecord.duration(rest.needMin))",
-                                    closes: delta.closes,
-                                    measured: true
-                                )
-                            } else {
+    /// Rest's sections in their default order.
+    static let restSections: [NoopPageSection] = [
+        NoopPageSection(id: "night", title: "Your sleep", detail: "Last night against your need"),
+        NoopPageSection(id: "seven", title: "Your last seven", detail: "Seven nights against your need"),
+        NoopPageSection(id: "shape", title: "The shape of it", detail: "The night's stages, timeline or lanes"),
+        NoopPageSection(id: "overtime", title: "Over time", detail: "Sleep debt, consistency and history"),
+        NoopPageSection(id: "next", title: "Your next sleep", detail: "Evening journal and tonight")
+    ]
+
+    @ViewBuilder
+    private func restSection(_ id: String) -> some View {
+        switch id {
+        case "night":
+            VStack(spacing: 10) {
+                restSectionLabel("Your sleep")
+                if let rest, rest.phase != .ready {
+                    restAbsentCard(rest.phase)
+                } else {
+                Button { if rest == nil { navigation.push(.why) } } label: {
+                    VStack(spacing: 2) {
+                        HStack(alignment: .firstTextBaseline) {
+                            NoopSectionLabel("Against your need", color: Color(hex: 0x8B958F))
+                            Spacer()
+                            Text(restNight.map { "asleep \($0.asleepWindow)" } ?? selectedNight.window)
+                                .font(NoopHTMLFont.sans(NoopType.eyebrow))
+                                .foregroundStyle(NoopHTMLColor.faint)
+                                .monospacedDigit()
+                        }
+
+                        if let rest, let night = restNight {
+                            let delta = NoopRestRecord.delta(asleepMin: night.asleepMin, needMin: rest.needMin)
                             Act1SleepRing(
-                                hours: selectedNight.hours,
-                                delta: selectedNight.delta,
-                                progress: min(1, selectedNight.value / 7.083),
-                                selectedStage: selectedStage
+                                hours: NoopRestRecord.duration(night.asleepMin),
+                                delta: delta.text,
+                                progress: min(1, night.asleepMin / max(1, rest.needMin)),
+                                selectedStage: selectedStage,
+                                slices: night.slices,
+                                needCaption: "the ring closes at your need \u{00B7} \(NoopRestRecord.duration(rest.needMin))",
+                                closes: delta.closes,
+                                measured: true
                             )
-                            }
-
-                            HStack(spacing: 10) {
-                                Text(restRingRead)
-                                    .font(NoopHTMLFont.sans(NoopType.caption))
-                                    .foregroundStyle(NoopHTMLColor.inkSoft)
-                                    .multilineTextAlignment(.leading)
-                                Spacer(minLength: 4)
-                                if rest == nil {
-                                    NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.nightLight)
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-                            .padding(.top, 6)
+                        } else {
+                        Act1SleepRing(
+                            hours: selectedNight.hours,
+                            delta: selectedNight.delta,
+                            progress: min(1, selectedNight.value / 7.083),
+                            selectedStage: selectedStage
+                        )
                         }
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    }
 
-                    if let bed = restNight?.bed {
-                        inBedCard(bed)
+                        HStack(spacing: 10) {
+                            Text(restRingRead)
+                                .font(NoopHTMLFont.sans(NoopType.caption))
+                                .foregroundStyle(NoopHTMLColor.inkSoft)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 4)
+                            if rest == nil {
+                                NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.nightLight)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                        .padding(.top, 6)
                     }
-                    sevenNightsCard
-                        .opacity(restAbsent ? 0.38 : 1)
-                        .allowsHitTesting(!restAbsent)
-                    sleepShapeCard
-                        .opacity(restAbsent ? 0.38 : 1)
-                        .allowsHitTesting(!restAbsent)
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                }
 
-                    // Why a real night went the way it did needs a causes engine the app does not have;
-                    // production shows no door into an empty screen.
-                    if rest == nil {
-                        Act1LinkRow(
-                            title: restWhyTitle,
-                            // Production has no approved sentence for why a real night went the way it did;
-                            // the row keeps its door and drops the claim (listed for design).
-                            detail: rest == nil ? selectedNight.reason : nil,
-                            glyph: .read
-                        ) { navigation.push(.why) }
-                        .opacity(restAbsent ? 0.38 : 1)
-                        .allowsHitTesting(!restAbsent)
-                    }
-
-                    restSectionLabel("Over time")
-                        .padding(.top, 8)
-
-                    Act1LinkRow(
-                        title: "Sleep debt",
-                        detail: rest != nil ? nil : selectedNightOffset == 0
-                            ? "1h 20m behind over a fortnight. Two ordinary nights clears it."
-                            : "The running balance as it stood after this sleep.",
-                        glyph: .scale
-                    ) { navigation.push(.debt) }
+                if let bed = restNight?.bed {
+                    inBedCard(bed)
+                }
+            }
+        case "seven":
+            VStack(spacing: 10) {
+                sevenNightsCard
+                    .opacity(restAbsent ? 0.38 : 1)
+                    .allowsHitTesting(!restAbsent)
+            }
+        case "shape":
+            VStack(spacing: 10) {
+                sleepShapeCard
                     .opacity(restAbsent ? 0.38 : 1)
                     .allowsHitTesting(!restAbsent)
 
+                // Why a real night went the way it did needs a causes engine the app does not have;
+                // production shows no door into an empty screen.
+                if rest == nil {
                     Act1LinkRow(
-                        title: "Sleep consistency",
-                        detail: "Your sleep timing across nights",
+                        title: restWhyTitle,
+                        // Production has no approved sentence for why a real night went the way it did;
+                        // the row keeps its door and drops the claim (listed for design).
+                        detail: rest == nil ? selectedNight.reason : nil,
                         glyph: .read
-                    ) { navigation.push(.rhythm) }
+                    ) { navigation.push(.why) }
                     .opacity(restAbsent ? 0.38 : 1)
                     .allowsHitTesting(!restAbsent)
+                }
+            }
+        case "overtime":
+            VStack(spacing: 10) {
+                restSectionLabel("Over time")
+                    .padding(.top, 8)
 
-                    Act1LinkRow(title: "Sleep history", detail: "daily values, periods and recorded nights", glyph: .read) {
-                        navigation.instrumentOverviewWindow = nil
-                        navigation.instrumentMetricKey = "sleep"
-                        navigation.push(.instrumentMetric)
+                Act1LinkRow(
+                    title: "Sleep debt",
+                    detail: rest != nil ? nil : selectedNightOffset == 0
+                        ? "1h 20m behind over a fortnight. Two ordinary nights clears it."
+                        : "The running balance as it stood after this sleep.",
+                    glyph: .scale
+                ) { navigation.push(.debt) }
+                .opacity(restAbsent ? 0.38 : 1)
+                .allowsHitTesting(!restAbsent)
+
+                Act1LinkRow(
+                    title: "Sleep consistency",
+                    detail: "Your sleep timing across nights",
+                    glyph: .read
+                ) { navigation.push(.rhythm) }
+                .opacity(restAbsent ? 0.38 : 1)
+                .allowsHitTesting(!restAbsent)
+
+                Act1LinkRow(title: "Sleep history", detail: "daily values, periods and recorded nights", glyph: .read) {
+                    navigation.instrumentOverviewWindow = nil
+                    navigation.instrumentMetricKey = "sleep"
+                    navigation.push(.instrumentMetric)
+                }
+            }
+        case "next":
+            VStack(spacing: 10) {
+                restSectionLabel("Your next sleep")
+                    .padding(.top, 8)
+                if navigation.nightJournalSaved {
+                    savedJournalRow
+                } else {
+                    Act1LinkRow(title: "Evening journal", detail: "Add context before your next sleep", glyph: .read) {
+                        navigation.show(.nightJournal)
                     }
+                }
 
-                    restSectionLabel("Your next sleep")
-                        .padding(.top, 8)
-                    if navigation.nightJournalSaved {
-                        savedJournalRow
-                    } else {
-                        Act1LinkRow(title: "Evening journal", detail: "Add context before your next sleep", glyph: .read) {
-                            navigation.show(.nightJournal)
-                        }
-                    }
-
-                    Button { navigation.push(.tonight) } label: {
-                        VStack(alignment: .leading, spacing: 11) {
-                            NoopSectionLabel(isNightWorker ? "Before you sleep" : "Tonight", color: NoopHTMLColor.blue)
-                            // Production needs an armed alarm and a verified in-bed-to-sleep interval;
-                            // the current sleep record has no in-bed start, so this is only a door.
-                            if !activeBedtimes.isEmpty {
-                            Text("Lights out by \(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].time)")
+                Button { navigation.push(.tonight) } label: {
+                    VStack(alignment: .leading, spacing: 11) {
+                        NoopSectionLabel(isNightWorker ? "Before you sleep" : "Tonight", color: NoopHTMLColor.blue)
+                        // Production needs an armed alarm and a verified in-bed-to-sleep interval;
+                        // the current sleep record has no in-bed start, so this is only a door.
+                        if !activeBedtimes.isEmpty {
+                        Text("Lights out by \(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].time)")
+                            .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
+                            .tracking(-0.675)
+                            .frame(minHeight: 29.7, alignment: .top)
+                        Text(rest == nil && selectedBedtime == 2
+                             ? "Clears twenty minutes of debt before your \(alarmTime) alarm."
+                             : "\(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].length) before your \(alarmTime) alarm.")
+                            .font(NoopHTMLFont.sans(NoopType.footnote))
+                            .foregroundStyle(Color(hex: 0xB7C3C9))
+                            .noopAct1LineBox(fontSize: 13, ratio: 1.5)
+                        } else if rest != nil && behavior.smartAlarmEnabled {
+                            // No bedtime to show, but an armed alarm is a decision already made.
+                            Text("Wake by \(alarmSetText)")
                                 .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
                                 .tracking(-0.675)
                                 .frame(minHeight: 29.7, alignment: .top)
-                            Text(rest == nil && selectedBedtime == 2
-                                 ? "Clears twenty minutes of debt before your \(alarmTime) alarm."
-                                 : "\(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].length) before your \(alarmTime) alarm.")
+                            Text("Armed on the strap.")
                                 .font(NoopHTMLFont.sans(NoopType.footnote))
                                 .foregroundStyle(Color(hex: 0xB7C3C9))
                                 .noopAct1LineBox(fontSize: 13, ratio: 1.5)
-                            } else if rest != nil && behavior.smartAlarmEnabled {
-                                // No bedtime to show, but an armed alarm is a decision already made.
-                                Text("Wake by \(alarmSetText)")
-                                    .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
-                                    .tracking(-0.675)
-                                    .frame(minHeight: 29.7, alignment: .top)
-                                Text("Armed on the strap.")
-                                    .font(NoopHTMLFont.sans(NoopType.footnote))
-                                    .foregroundStyle(Color(hex: 0xB7C3C9))
-                                    .noopAct1LineBox(fontSize: 13, ratio: 1.5)
-                            }
-                            HStack(spacing: 7) {
-                                Text("Decide it")
-                                NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.blueInk)
-                            }
-                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                            .foregroundStyle(NoopHTMLColor.blueInk)
-                            .padding(.horizontal, 14)
-                            .frame(height: 38)
-                            .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 14))
-                            .padding(.top, 2)
                         }
-                        .padding(.horizontal, 18)
-                        .padding(.top, 19)
-                        .padding(.bottom, 17)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background {
-                            NoopCSSLinearGradient(
-                                colors: [NoopHTMLColor.blue.opacity(0.17), NoopHTMLColor.blue.opacity(0.03)]
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
+                        HStack(spacing: 7) {
+                            Text("Decide it")
+                            NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.blueInk)
                         }
-                        .overlay(RoundedRectangle(cornerRadius: 24).stroke(NoopHTMLColor.blue.opacity(0.3), lineWidth: 0.5))
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.blueInk)
+                        .padding(.horizontal, 14)
+                        .frame(height: 38)
+                        .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 14))
+                        .padding(.top, 2)
                     }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    .padding(.top, 4)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 19)
+                    .padding(.bottom, 17)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background {
+                        NoopCSSLinearGradient(
+                            colors: [NoopHTMLColor.blue.opacity(0.17), NoopHTMLColor.blue.opacity(0.03)]
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 24))
+                    }
+                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(NoopHTMLColor.blue.opacity(0.3), lineWidth: 0.5))
                 }
+                .buttonStyle(NoopHTMLPressStyle())
+                .padding(.top, 4)
             }
+        default:
+            EmptyView()
         }
     }
 
