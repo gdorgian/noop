@@ -119,3 +119,100 @@ half4 noopTouchRipple(float2 position, SwiftUI::Layer layer, float2 origin, floa
     c.rgb += half(0.10 * band * fade) * c.a;
     return c;
 }
+
+// MARK: - Flow rings
+//
+// Three concentric rings (outermost first) as continuous bands. Each fills clockwise from the top to
+// its `fills` value, shaded from `from` to `to` colour along its length, with a rounded head and a
+// soft band of light travelling along the filled part toward the head. `reveal` grows every fill
+// from zero with a slight overshoot handled by the caller.
+
+static float arcMask(float angle01, float fill, float distToRing, float halfWidth, float radius) {
+    // Body of the arc.
+    float body = step(angle01, fill) * smoothstep(halfWidth + 0.75, halfWidth - 0.75, distToRing);
+    return body;
+}
+
+[[ stitchable ]]
+half4 noopFlowRings(float2 position, half4 color, float2 size, float time,
+                    float fill0, float fill1, float fill2,
+                    half4 from0, half4 to0, half4 from1, half4 to1, half4 from2, half4 to2) {
+    float2 c = size * 0.5;
+    float2 p = position - c;
+    float r = length(p);
+    float R = min(size.x, size.y) * 0.5;
+    float halfWidth = R * 0.075;
+    float radii[3] = { R - halfWidth - 2.0, R - halfWidth * 3.0 - 8.0, R - halfWidth * 5.0 - 14.0 };
+    float fills[3] = { fill0, fill1, fill2 };
+    half4 froms[3] = { from0, from1, from2 };
+    half4 tos[3] = { to0, to1, to2 };
+
+    // Angle from the top, clockwise, 0…1.
+    float a = atan2(p.x, -p.y);
+    float a01 = a < 0.0 ? a / (2.0 * M_PI_F) + 1.0 : a / (2.0 * M_PI_F);
+
+    half4 out = half4(0);
+    for (int i = 0; i < 3; i++) {
+        float d = abs(r - radii[i]);
+        // Track.
+        float track = smoothstep(halfWidth + 0.75, halfWidth - 0.75, d);
+        out = mix(out, half4(1, 1, 1, 1) * 0.06h, half(track) * (1.0h - out.a));
+        float f = clamp(fills[i], 0.0, 1.0);
+        if (f <= 0.001) { continue; }
+        // Rounded ends: distance to the start and head cap centres.
+        float headA = f * 2.0 * M_PI_F;
+        float2 head = float2(sin(headA), -cos(headA)) * radii[i];
+        float2 start = float2(0.0, -radii[i]);
+        float capH = smoothstep(halfWidth + 0.75, halfWidth - 0.75, length(p - head));
+        float capS = smoothstep(halfWidth + 0.75, halfWidth - 0.75, length(p - start));
+        float body = arcMask(a01, f, d, halfWidth, radii[i]);
+        float m = max(body, max(capH, capS));
+        if (m <= 0.0) { continue; }
+        float along = clamp(a01 / f, 0.0, 1.0);
+        if (capS > body && a01 > 0.5) { along = 0.0; }
+        half4 col = mix(froms[i], tos[i], half(along));
+        // Light travelling toward the head, once every few seconds, slower on inner rings.
+        float pulse = fract(time * (0.22 - 0.04 * float(i)) + float(i) * 0.31);
+        float glow = exp(-pow((along - pulse) * 9.0, 2.0)) * 0.35;
+        // A little shading across the band so it reads as a rounded tube.
+        float across = (r - radii[i]) / halfWidth;
+        float tube = 1.0 - 0.18 * across * across;
+        col.rgb = col.rgb * half(tube) + half(glow);
+        out = mix(out, half4(col.rgb, 1.0h), half(m));
+    }
+    return out;
+}
+
+// MARK: - Layered liquid
+//
+// Sleep as sediment in a glass: four layers from the bottom (deep, REM, light, awake), each as thick
+// as its share of the night, filled to `level`. The top surface tilts and sloshes like `noopLiquid`;
+// the boundaries between layers move far less, as a denser liquid would. `b1…b3` are the cumulative
+// fractions of the fill at which each layer ends.
+
+[[ stitchable ]]
+half4 noopLayeredLiquid(float2 position, half4 color, float2 size, float time, float level,
+                        float tilt, float slosh, float b1, float b2, float b3,
+                        half4 c0, half4 c1, half4 c2, half4 c3) {
+    float2 uv = position / size;
+    float x = uv.x - 0.5;
+    float wave = slosh * (0.03 * sin(x * 9.0 + time * 3.0) + 0.015 * sin(x * 17.0 - time * 4.1))
+               + 0.004 * sin(x * 6.0 + time * 1.2);
+    float surface = 1.0 - level + tilt * x + wave;
+    float d = uv.y - surface;
+    if (d < -0.012) { return half4(0); }
+
+    // Height above the floor as a fraction of the fill, with damped boundary motion.
+    float inner = tilt * x * 0.85 + wave * 0.25;
+    float h = (1.0 - uv.y + inner) / max(level, 0.001);
+    half4 c = h < b1 ? c0 : (h < b2 ? c1 : (h < b3 ? c2 : c3));
+    // A soft seam where two layers meet.
+    float seam = min(min(abs(h - b1), abs(h - b2)), abs(h - b3)) * level * size.y;
+    c.rgb = mix(c.rgb, c.rgb * 1.25h, half(exp(-seam * seam / 6.0) * 0.6));
+    // Darker toward the floor, lit along the surface.
+    c.rgb *= half(0.72 + 0.28 * clamp(h, 0.0, 1.0));
+    float men = smoothstep(-0.012, 0.0, d) * (1.0 - smoothstep(0.0, 0.018, d));
+    c.rgb += half3(0.7, 0.8, 1.0) * half(men * 0.8);
+    float alpha = smoothstep(-0.012, 0.004, d);
+    return half4(c.rgb * half(alpha), half(alpha));
+}

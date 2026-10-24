@@ -58,8 +58,8 @@ struct NoopSleepDialSection: View {
                             Canvas { context, size in draw(&context, size, reveal: reveal) }
                         }
                         VStack(spacing: 2) {
-                            Text(NoopRestRecord.duration(night.asleepMin))
-                                .font(NoopHTMLFont.outfit(NoopType.title1, weight: .regular)).monospacedDigit()
+                            NoopCountUp(value: night.asleepMin, format: { NoopRestRecord.duration($0) },
+                                        font: NoopHTMLFont.outfit(NoopType.title1, weight: .regular))
                                 .foregroundStyle(NoopHTMLColor.ink)
                             Text(needMin > 0 ? "of \(NoopRestRecord.duration(needMin)) needed" : "asleep")
                                 .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
@@ -337,5 +337,102 @@ struct NoopSleepAuroraSection: View {
         }
         .buttonStyle(NoopHTMLPressStyle())
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: Glass
+
+/// Last night as layered liquid in a glass: deep settled at the bottom, then REM, light and awake,
+/// filled to the night against the need. A fine line marks the need. The liquid keeps level as the
+/// phone tilts and sloshes when it moves; the layers below barely stir.
+struct NoopSleepGlassSection: View {
+    let night: NoopRestRecord.Night
+    let needMin: Double
+    let action: () -> Void
+
+    @State private var level: Double = 0
+    @State private var onScreen = true
+    @State private var lastTilt: Double = 0
+    @State private var slosh: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The glass holds a little more than the need, so a night over it still fits.
+    private var capacity: Double { max(night.asleepMin + night.stages.awake, needMin * 1.15, 1) }
+
+    var body: some View {
+        Button(action: action) {
+            NoopSlotCard(tint: Color(hex: 0x5D6BC4)) {
+                HStack(alignment: .center, spacing: 22) {
+                    glass.frame(width: 110, height: 190)
+                    VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            NoopCountUp(value: night.asleepMin, format: { NoopRestRecord.duration($0) },
+                                        font: NoopHTMLFont.outfit(NoopType.title1, weight: .light))
+                                .foregroundStyle(NoopHTMLColor.ink)
+                            Text(noopNeedLine(night.asleepMin, needMin)).font(NoopHTMLFont.sans(NoopType.caption))
+                                .foregroundStyle(NoopHTMLColor.copy)
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach([0, 1, 2, 3], id: \.self) { stage in
+                                HStack(spacing: 8) {
+                                    RoundedRectangle(cornerRadius: 2).fill(NoopSleepPalette.stage[stage]).frame(width: 10, height: 10)
+                                    Text(NoopSleepPalette.names[stage]).font(NoopHTMLFont.sans(NoopType.caption))
+                                        .foregroundStyle(NoopHTMLColor.copy)
+                                    Spacer(minLength: 4)
+                                    Text(NoopRestRecord.duration(NoopSleepPalette.minutes(night.stages, stage)))
+                                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).monospacedDigit()
+                                        .foregroundStyle(NoopHTMLColor.ink)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .onAppear {
+            if reduceMotion { level = 1; return }
+            withAnimation(.spring(response: 1.6, dampingFraction: 0.75)) { level = 1 }
+        }
+    }
+
+    private var glass: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !onScreen || reduceMotion)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600)
+            let tilt = reduceMotion ? 0 : LiquidMotion.shared.tilt
+            let s = night.stages
+            let total = max(1, s.deep + s.rem + s.light + s.awake)
+            let fill = min(1, (s.deep + s.rem + s.light + s.awake) / capacity) * level
+            ZStack {
+                RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Color.white.opacity(0.04))
+                Rectangle()
+                    .colorEffect(ShaderLibrary.noopLayeredLiquid(
+                        .float2(CGSize(width: 110, height: 190)), .float(Float(t)), .float(Float(fill)),
+                        .float(Float(-tan(tilt) * 110 / 190)), .float(Float(slosh + 0.25 * max(0, 1 - level))),
+                        .float(Float(s.deep / total)), .float(Float((s.deep + s.rem) / total)),
+                        .float(Float((s.deep + s.rem + s.light) / total)),
+                        .color(NoopSleepPalette.stage[3]), .color(NoopSleepPalette.stage[2]),
+                        .color(NoopSleepPalette.stage[1]), .color(Color(hex: 0x9AA0B8))))
+                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                if needMin > 0 {
+                    GeometryReader { g in
+                        let y = g.size.height * (1 - needMin / capacity)
+                        Rectangle().fill(Color.white.opacity(0.55)).frame(width: g.size.width - 20, height: 1)
+                            .position(x: g.size.width / 2, y: y)
+                        Text("need").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color.white.opacity(0.6))
+                            .position(x: g.size.width - 24, y: y - 9)
+                    }
+                }
+                RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+            }
+            .onChange(of: timeline.date) {
+                let turn = abs(tilt - lastTilt)
+                slosh = min(1.4, slosh * 0.94 + turn * 9)
+                lastTilt = tilt
+            }
+        }
+        .onAppear { LiquidMotion.shared.acquire() }
+        .onDisappear { LiquidMotion.shared.release() }
+        .modifier(NoopSlotVisibility(onScreen: $onScreen))
     }
 }

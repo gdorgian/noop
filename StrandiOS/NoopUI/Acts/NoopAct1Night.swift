@@ -86,6 +86,7 @@ struct NoopAct1Screens: View {
     /// Rest's sections in their default order.
     static let restSections: [NoopPageSection] = [
         NoopPageSection(id: "night", title: "Your sleep", detail: "Last night against your need"),
+        NoopPageSection(id: "night-glass", title: "Sleep · Glass", detail: "The night as layered liquid, filled toward your need"),
         NoopPageSection(id: "night-aurora", title: "Sleep · Aurora", detail: "The night as curtains of light, as tall as the sleep was deep"),
         NoopPageSection(id: "night-dial", title: "Sleep · Dial", detail: "The night on a clock face, cut into its stages"),
         NoopPageSection(id: "night-performance", title: "Sleep · Performance", detail: "One gauge of sleep against need, with stage rows"),
@@ -99,10 +100,11 @@ struct NoopAct1Screens: View {
     @ViewBuilder
     private func restSection(_ id: String) -> some View {
         switch id {
-        case "night-aurora", "night-dial", "night-performance", "night-ledger":
+        case "night-aurora", "night-dial", "night-performance", "night-ledger", "night-glass":
             if let rest, let night = restNight {
                 switch id {
                 case "night-aurora": NoopSleepAuroraSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
+                case "night-glass": NoopSleepGlassSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
                 case "night-dial": NoopSleepDialSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
                 case "night-performance": NoopSleepPerformanceSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
                 default: NoopSleepLedgerSection(night: night, needMin: rest.needMin) { navigation.push(.why) }

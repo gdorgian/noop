@@ -24,6 +24,18 @@ struct NoopRingValues: Equatable {
     var strainFill: Double { min(1, max(0, (strain ?? 0) / 21)) }
     var sleepFill: Double { min(1, max(0, sleep ?? 0)) }
 
+    /// The same readings with every ring drawn `k` of the way: how the draw-in grows them.
+    func scaled(_ k: Double) -> NoopRingValues {
+        var v = self
+        v.recovery = recovery.map { $0 * k }
+        v.strain = strain.map { $0 * k }
+        v.sleep = sleep.map { $0 * k }
+        return v
+    }
+
+    /// A draw-in with a slight overshoot, from an eased 0…1.
+    static func spring(_ x: Double) -> Double { x + 0.1 * sin(.pi * x) * x }
+
     static let recoveryColor = Color(hex: 0x3DE6A5)
     static let strainCool = NoopHTMLColor.blue
     static let strainHot = Color(hex: 0xFF8A3D)
@@ -55,15 +67,21 @@ struct NoopTodayRings: View {
                 ZStack {
                     switch style {
                     case .living:
-                        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !onScreen || reduceMotion)) { timeline in
-                            Canvas { context, size in
-                                NoopLivingRings.draw(in: &context, size: size, values: values,
-                                                     t: reduceMotion ? 2 : timeline.date.timeIntervalSinceReferenceDate
-                                                        .truncatingRemainder(dividingBy: 3600))
-                            }
+                        NoopSlotClock { t, reveal in
+                            let v = values.scaled(NoopRingValues.spring(reveal))
+                            Rectangle().colorEffect(ShaderLibrary.noopFlowRings(
+                                .float2(CGSize(width: 252, height: 252)), .float(Float(t)),
+                                .float(Float(v.recoveryFill)), .float(Float(v.strainFill)), .float(Float(v.sleepFill)),
+                                .color(Color(hex: 0x1FC98A)), .color(Color(hex: 0x8FFFD0)),
+                                .color(Color(hex: 0xFFC46B)), .color(NoopRingValues.strainHot),
+                                .color(Color(hex: 0x6F7BFF)), .color(NoopRingValues.sleepColor)))
                         }
                     default:
-                        Canvas { context, size in NoopSegmentedRings.draw(in: &context, size: size, values: values) }
+                        NoopSlotClock { _, reveal in
+                            Canvas { context, size in
+                                NoopSegmentedRings.draw(in: &context, size: size, values: values.scaled(NoopRingValues.spring(reveal)))
+                            }
+                        }
                     }
                     centre
                 }
@@ -82,10 +100,11 @@ struct NoopTodayRings: View {
 
     private var centre: some View {
         VStack(spacing: 0) {
-            Text(values.recovery.map { "\(Int($0.rounded()))" } ?? "—")
-                .font(NoopHTMLFont.outfit(NoopType.title1))
-                .monospacedDigit()
-                .foregroundStyle(NoopHTMLColor.ink)
+            if let r = values.recovery {
+                NoopCountUp(value: r, font: NoopHTMLFont.outfit(NoopType.title1)).foregroundStyle(NoopHTMLColor.ink)
+            } else {
+                Text("—").font(NoopHTMLFont.outfit(NoopType.title1)).foregroundStyle(NoopHTMLColor.faint)
+            }
             Text("RECOVERY")
                 .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                 .tracking(1.2)
@@ -134,66 +153,6 @@ private enum NoopRingGeometry {
         return [r - 10, r - 34, r - 58]
     }
     static let band: CGFloat = 16
-}
-
-// MARK: Living
-
-private enum NoopLivingRings {
-    static func draw(in context: inout GraphicsContext, size: CGSize, values: NoopRingValues, t: Double) {
-        let c = CGPoint(x: size.width / 2, y: size.height / 2)
-        let radii = NoopRingGeometry.radii(size)
-        let rings: [(fill: Double, colors: (Color, Color), speed: Double)] = [
-            (values.recoveryFill, (NoopRingValues.recoveryColor, Color(hex: 0x8FFFD0)), 0.10),
-            (values.strainFill, (NoopRingValues.strainCool, NoopRingValues.strainHot), 0.16),
-            (values.sleepFill, (Color(hex: 0x6F7BFF), NoopRingValues.sleepColor), 0.07)
-        ]
-        context.blendMode = .plusLighter
-        for (k, ring) in rings.enumerated() {
-            let r = Double(radii[k])
-            // The track: fine dots all the way round.
-            let dots = Int(r * 2 * .pi / 6)
-            for i in 0..<dots {
-                let a = Double(i) / Double(dots) * 2 * .pi - .pi / 2
-                let p = CGPoint(x: c.x + CGFloat(cos(a) * r), y: c.y + CGFloat(sin(a) * r))
-                context.fill(Path(ellipseIn: CGRect(x: p.x - 1, y: p.y - 1, width: 2, height: 2)),
-                             with: .color(.white.opacity(0.07)))
-            }
-            guard ring.fill > 0.005 else { continue }
-            let sweep = ring.fill * 2 * .pi
-            let breathe = 1 + 0.06 * sin(t * 0.9 + Double(k) * 1.7)
-            // The band: specks flowing toward the head, denser and brighter as they near it.
-            let count = Int(60 + 220 * ring.fill)
-            for i in 0..<count {
-                let h = { (n: Int) in NoopAuraMath.hash(k * 7919 + i * 31 + n) }
-                let along = (h(1) + t * ring.speed * (0.6 + 0.8 * h(2))).truncatingRemainder(dividingBy: 1)
-                let f = pow(along, 0.8)
-                let a = -.pi / 2 + f * sweep
-                let spread = Double(NoopRingGeometry.band) / 2 * breathe
-                let off = (h(3) - 0.5) * 2 * spread * (0.35 + 0.65 * (1 - f * 0.4))
-                let rr = r + off
-                let p = CGPoint(x: c.x + CGFloat(cos(a) * rr), y: c.y + CGFloat(sin(a) * rr))
-                let s = 1.1 + 2.2 * h(4) * (0.5 + f)
-                let alpha = (0.25 + 0.7 * f) * (1 - abs(off) / (spread + 1) * 0.6)
-                let color = mix(ring.colors.0, ring.colors.1, f)
-                context.fill(Path(ellipseIn: CGRect(x: p.x - s / 2, y: p.y - s / 2, width: s, height: s)),
-                             with: .color(color.opacity(alpha)))
-            }
-            // The head: a soft glint where the score ends.
-            let ha = -.pi / 2 + sweep
-            let hp = CGPoint(x: c.x + CGFloat(cos(ha) * r), y: c.y + CGFloat(sin(ha) * r))
-            let g = 10 * breathe
-            context.fill(Path(ellipseIn: CGRect(x: hp.x - g, y: hp.y - g, width: 2 * g, height: 2 * g)),
-                         with: .radialGradient(Gradient(colors: [ring.colors.1.opacity(0.9), ring.colors.1.opacity(0)]),
-                                               center: hp, startRadius: 0, endRadius: g))
-            context.fill(Path(ellipseIn: CGRect(x: hp.x - 2.5, y: hp.y - 2.5, width: 5, height: 5)), with: .color(.white))
-        }
-    }
-
-    private static func mix(_ a: Color, _ b: Color, _ t: Double) -> Color {
-        let ra = UIColor(a).cgColor.components ?? [0, 0, 0, 1], rb = UIColor(b).cgColor.components ?? [0, 0, 0, 1]
-        func ch(_ i: Int) -> Double { Double(ra[min(i, ra.count - 1)] + (rb[min(i, rb.count - 1)] - ra[min(i, ra.count - 1)]) * t) }
-        return Color(red: ch(0), green: ch(1), blue: ch(2))
-    }
 }
 
 // MARK: Segmented
@@ -314,13 +273,18 @@ private struct NoopDonutRings: View {
     private func column(_ title: String, fill: Double, value: Double?, colors: [Color], target: ClosedRange<Double>?) -> some View {
         VStack(spacing: 12) {
             ZStack {
-                Canvas { context, size in
-                    NoopDonut.draw(in: &context, size: size, fill: fill, colors: colors, target: target)
+                NoopSlotClock { _, reveal in
+                    Canvas { context, size in
+                        NoopDonut.draw(in: &context, size: size, fill: fill * NoopRingValues.spring(reveal), colors: colors,
+                                       target: target.map { $0.lowerBound * reveal...$0.upperBound * reveal })
+                    }
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 1) {
-                    Text(value.map { "\(Int($0.rounded()))" } ?? "--")
-                        .font(NoopHTMLFont.sans(NoopType.title2, weight: .semibold))
-                        .monospacedDigit()
+                    if let value {
+                        NoopCountUp(value: value, font: NoopHTMLFont.sans(NoopType.title2, weight: .semibold))
+                    } else {
+                        Text("--").font(NoopHTMLFont.sans(NoopType.title2, weight: .semibold))
+                    }
                     Text("%").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                 }
                 .foregroundStyle(value == nil ? NoopHTMLColor.faint : NoopHTMLColor.ink)
@@ -423,9 +387,11 @@ private struct NoopDialRings: View {
         VStack(spacing: 14) {
             ZStack {
                 Circle().stroke(Color.white.opacity(0.1), lineWidth: 7)
-                Circle().trim(from: 0, to: fill)
-                    .stroke(color, style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
+                NoopSlotClock { _, reveal in
+                    Circle().trim(from: 0, to: min(1, fill * NoopRingValues.spring(reveal)))
+                        .stroke(color, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text(text ?? "--").font(NoopHTMLFont.sans(NoopType.title2, weight: .heavy)).monospacedDigit()
                     if percent { Text("%").font(NoopHTMLFont.sans(NoopType.subhead, weight: .heavy)) }
@@ -457,7 +423,15 @@ private struct NoopGyroRings: View {
     let action: () -> Void
 
     @State private var onScreen = true
+    @State private var appeared: Date?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// 0…1 over the first 1.6 s on screen, eased out.
+    private func gyroReveal(_ now: Date) -> Double {
+        if reduceMotion { return 1 }
+        let x = min(1, max(0, (appeared.map { now.timeIntervalSince($0) } ?? 0) / 1.6))
+        return 1 - pow(1 - x, 3)
+    }
 
     var body: some View {
         Button(action: action) {
@@ -465,14 +439,16 @@ private struct NoopGyroRings: View {
                 ZStack {
                     TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !onScreen || reduceMotion)) { timeline in
                         Canvas { context, size in
-                            NoopGyro.draw(in: &context, size: size, values: values,
+                            NoopGyro.draw(in: &context, size: size, values: values.scaled(NoopRingValues.spring(gyroReveal(timeline.date))),
                                           t: reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600))
                         }
                     }
                     VStack(spacing: 0) {
-                        Text(values.recovery.map { "\(Int($0.rounded()))" } ?? "—")
-                            .font(NoopHTMLFont.outfit(NoopType.title1)).monospacedDigit()
-                            .foregroundStyle(NoopHTMLColor.ink)
+                        if let r = values.recovery {
+                            NoopCountUp(value: r, font: NoopHTMLFont.outfit(NoopType.title1)).foregroundStyle(NoopHTMLColor.ink)
+                        } else {
+                            Text("—").font(NoopHTMLFont.outfit(NoopType.title1)).foregroundStyle(NoopHTMLColor.faint)
+                        }
                         Text("RECOVERY").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.2)
                             .foregroundStyle(NoopHTMLColor.muted)
                     }
@@ -489,6 +465,7 @@ private struct NoopGyroRings: View {
         }
         .buttonStyle(NoopHTMLPressStyle())
         .modifier(NoopGyroVisibility(onScreen: $onScreen))
+        .onAppear { if appeared == nil { appeared = Date() } }
     }
 
     private func legend(_ title: String, _ value: String?, _ color: Color) -> some View {

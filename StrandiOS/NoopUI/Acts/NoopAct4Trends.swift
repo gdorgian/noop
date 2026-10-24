@@ -155,6 +155,7 @@ private struct NoopTrendsScreen: View {
     static let trendsSections: [NoopPageSection] = [
         NoopPageSection(id: "hero", title: "Body age", detail: "The orb, your body age and pace of aging"),
         NoopPageSection(id: "markers", title: "Markers", detail: "The measures you pinned"),
+        NoopPageSection(id: "markers-tiles", title: "Markers · Tiles", detail: "Your pinned measures as a grid of tiles"),
         NoopPageSection(id: "changes", title: "What changed", detail: "The window's verdict, six weeks to a year"),
         NoopPageSection(id: "bloodwork", title: "Bloodwork", detail: "Your lab results"),
         NoopPageSection(id: "explore", title: "Explore", detail: "Compare signals and relationships"),
@@ -175,6 +176,9 @@ private struct NoopTrendsScreen: View {
             ) { showingAges = true }
         case "markers":
             NoopTrendsMarkersSection(navigation: navigation)
+                .padding(.top, 32)
+        case "markers-tiles":
+            NoopTrendsMarkersSection(navigation: navigation, tiles: true)
                 .padding(.top, 32)
         case "changes":
             VStack(alignment: .leading, spacing: 0) {

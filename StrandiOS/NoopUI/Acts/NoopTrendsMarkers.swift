@@ -89,6 +89,8 @@ final class NoopMarkerStore: ObservableObject {
 
 struct NoopTrendsMarkersSection: View {
     @ObservedObject var navigation: NoopNavigation
+    /// Rows (the default) or a two-column grid of tiles.
+    var tiles = false
     @EnvironmentObject private var repo: Repository
     @StateObject private var store = NoopMarkerStore()
     @AppStorage(NoopMarkers.storageKey) private var pinnedRaw = ""
@@ -114,6 +116,19 @@ struct NoopTrendsMarkersSection: View {
             }
             .padding(.horizontal, 2)
 
+            if tiles {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(Array(pinned.enumerated()), id: \.element) { index, id in
+                        if let d = NoopMarkers.descriptor(id) {
+                            Button { navigation.metricSheet = NoopMetricSheetRequest(metricID: id, group: "marker") } label: {
+                                NoopMarkerTile(row: NoopMarkerRow(descriptor: d, reading: store.readings[id], loaded: store.loaded),
+                                               delay: Double(index) * 0.07)
+                            }
+                            .buttonStyle(NoopHTMLPressStyle())
+                        }
+                    }
+                }
+            } else {
             ForEach(pinned, id: \.self) { id in
                 if let d = NoopMarkers.descriptor(id) {
                     Button { navigation.metricSheet = NoopMetricSheetRequest(metricID: id, group: "marker") } label: {
@@ -121,6 +136,7 @@ struct NoopTrendsMarkersSection: View {
                     }
                     .buttonStyle(NoopHTMLPressStyle())
                 }
+            }
             }
 
             if pinned.isEmpty {
@@ -193,13 +209,13 @@ struct NoopMarkerRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var value: String {
+    fileprivate var value: String {
         guard let v = reading?.latest else { return "\u{2014}" }
         let unit = metric.shownUnit
         return metric.format(v) + (unit.isEmpty ? "" : (unit == "%" ? "%" : " \(unit)"))
     }
 
-    @ViewBuilder private var status: some View {
+    @ViewBuilder fileprivate var status: some View {
         if let v = reading?.latest, let zone = metric.zones.first(where: { $0.range.contains(v) }) {
             Text(zone.label).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(zone.color)
         } else {
@@ -436,6 +452,68 @@ struct NoopMarkersBrowseSheet: View {
                 .environmentObject(repo)
                 .environment(\.noopAccent, accent)
                 .noopSheet()
+        }
+    }
+}
+
+/// A pinned marker as a tile: its name, where it stands, its value large, and its last ninety days
+/// as a line that draws in, each tile a beat after the one before.
+private struct NoopMarkerTile: View {
+    let row: NoopMarkerRow
+    let delay: Double
+
+    @State private var drawn: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(row.descriptor.title)
+                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
+                .foregroundStyle(NoopHTMLColor.copy)
+                .lineLimit(1)
+            Text(row.value)
+                .font(NoopHTMLFont.outfit(NoopType.title3))
+                .monospacedDigit()
+                .foregroundStyle(NoopHTMLColor.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            spark.frame(height: 34)
+            row.status.font(NoopHTMLFont.sans(NoopType.caption, weight: .medium)).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+        .onAppear {
+            guard drawn == 0 else { return }
+            if reduceMotion { drawn = 1; return }
+            withAnimation(.spring(response: 1.0, dampingFraction: 0.95).delay(delay)) { drawn = 1 }
+        }
+    }
+
+    private var spark: some View {
+        let line = row.reading?.line ?? []
+        return GeometryReader { g in
+            if line.count >= 2, let lo = line.min(), let hi = line.max() {
+                let span = max(hi - lo, 0.0001)
+                let path = Path { p in
+                    for (i, v) in line.enumerated() {
+                        let pt = CGPoint(x: g.size.width * CGFloat(i) / CGFloat(line.count - 1),
+                                         y: g.size.height * (1 - CGFloat((v - lo) / span)) * 0.9 + 2)
+                        if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+                    }
+                }
+                ZStack {
+                    path.trimmedPath(from: 0, to: drawn)
+                        .stroke(Color.white.opacity(0.8), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                    if drawn > 0.98, let last = line.last {
+                        let y = g.size.height * (1 - CGFloat((last - lo) / span)) * 0.9 + 2
+                        Circle().fill(Color.white).frame(width: 5, height: 5).position(x: g.size.width, y: y)
+                    }
+                }
+            } else {
+                Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1).frame(maxHeight: .infinity)
+            }
         }
     }
 }
