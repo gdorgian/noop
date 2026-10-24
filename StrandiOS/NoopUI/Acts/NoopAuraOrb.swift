@@ -24,10 +24,12 @@ struct NoopAuraOrb: View {
     /// The turn is held while a finger is down and carries on from there after.
     @State private var spinOffset: Double = 0
     @State private var heldSpin: Double?
-    /// A finger on the orb, in its own coordinates. The embers are drawn to it.
+    /// A finger on the orb, in its own coordinates. While it is down, embers are born there.
     @State private var touch: CGPoint?
-    @State private var lastTouch: CGPoint?
-    @State private var touchChanged = Date.distantPast
+    /// Where embers were being born, over the last few seconds: each mark holds from its time until
+    /// the next. A nil point is the centre. An ember keeps the birthplace it had, so one born under the
+    /// finger flies on from there after the finger has moved or lifted.
+    @State private var emitterTrail: [(t: Double, p: CGPoint?)] = []
 
     private var segmentCount: Int { NoopAuraOrbModel.segmentCount(shapeScore) }
 
@@ -57,12 +59,15 @@ struct NoopAuraOrb: View {
                 TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: paused || reduceMotion)) { timeline in
                     let t = (paused || reduceMotion) ? 4.0 : NoopAuraOrbModel.clock(timeline.date)
                     let spin = heldSpin ?? (NoopAuraOrbModel.naturalSpin(t) + spinOffset)
-                    let since = timeline.date.timeIntervalSince(touchChanged)
-                    // Eases in over half a second while held, back out over a second after release.
-                    let pull = touch != nil ? NoopAuraMath.smooth(since / 0.5) : 1 - NoopAuraMath.smooth(since / 1.0)
+                    let trail = emitterTrail
                     Canvas { context, size in
-                        NoopAuraEmbers.draw(in: &context, size: size, t: t, spin: spin, scale: scale,
-                                            attractor: lastTouch, pull: pull)
+                        let centre = CGPoint(x: size.width / 2, y: size.height / 2)
+                        // Where the finger has been in the last two seconds: specks there are pushed aside.
+                        let pushes = trail.compactMap { m in m.p.map { (t: m.t, p: $0) } }.filter { t - $0.t < 2 }
+                        NoopAuraEmbers.draw(in: &context, size: size, t: t, spin: spin, scale: scale, tint: palette.bottom,
+                                            pushes: pushes) { born in
+                            trail.last { $0.t <= born }?.p ?? centre
+                        }
                     }
                 }
                 .clipShape(shape)
@@ -88,9 +93,11 @@ struct NoopAuraOrb: View {
             .modifier(NoopAuraTouch(touch: $touch))
             .onChange(of: touch) { old, new in
                 let natural = NoopAuraOrbModel.naturalSpin(NoopAuraOrbModel.clock(Date()))
-                if let new { lastTouch = CGPoint(x: new.x - (geo.size.width - side) / 2, y: new.y - (geo.size.height - side) / 2) }
+                let now = NoopAuraOrbModel.clock(Date())
+                let local = new.map { CGPoint(x: $0.x - (geo.size.width - side) / 2, y: $0.y - (geo.size.height - side) / 2) }
+                emitterTrail.removeAll { now - $0.t > 8 || $0.t > now }
+                emitterTrail.append((t: now, p: local))
                 if (old == nil) != (new == nil) {
-                    touchChanged = Date()
                     if new != nil { heldSpin = natural + spinOffset }
                     else { spinOffset = (heldSpin ?? natural) - natural; heldSpin = nil }
                 }
@@ -222,43 +229,54 @@ struct NoopAmoebaShape: Shape {
     }
 }
 
-/// Embers: each lives two to three and a half seconds, born in the lit band and drawn a little toward
-/// the core while it shrinks to half; brighter over the rim than over the dark well. A finger moves
-/// the point they are drawn to from the core to itself, so they gather under it and clear elsewhere.
+/// Embers, as WHOOP's particle system emits them: born tiny at the emission point, under the age
+/// unless a finger is down, then thrown outward in a slow spiral, slowing as they go, growing on the
+/// way and fading out near the rim, the whole field turning once every thirty seconds. Each lives two
+/// and a half to four seconds. `emitter` gives the birthplace for a birth time.
 private enum NoopAuraEmbers {
     static func draw(in context: inout GraphicsContext, size: CGSize, t: Double, spin: Double, scale: CGFloat,
-                     attractor: CGPoint?, pull: Double) {
-        let c = CGPoint(x: size.width / 2, y: size.height / 2)
+                     tint: Color = .white, pushes: [(t: Double, p: CGPoint)] = [], emitter: (Double) -> CGPoint) {
+        let centre = CGPoint(x: size.width / 2, y: size.height / 2)
         let r = Double(min(size.width, size.height)) / 2
         context.blendMode = .plusLighter
-        for i in 0..<260 {
+        for i in 0..<230 {
             let h = { (k: Int) in NoopAuraMath.hash(i * 13 + k) }
-            let life = 2 + 1.5 * h(1)
+            let life = 2.5 + 1.5 * h(1)
             let p = ((t + h(2) * life * 7) / life).truncatingRemainder(dividingBy: 1)
-            let start = 0.45 + 0.50 * sqrt(h(3))
-            let dist = start * (1 - 0.22 * p * p) * r
-            let angle = h(4) * 2 * .pi + spin + (h(5) - 0.5) * 0.35 * p
-            var x = c.x + CGFloat(cos(angle) * dist), y = c.y + CGFloat(sin(angle) * dist)
-            if let attractor, pull > 0.001 {
-                // Each ember goes most of the way, so they bunch around the finger rather than on it.
-                let k = CGFloat(pull * (0.6 + 0.32 * h(8)))
-                let spread = CGFloat(r) * 0.16 * CGFloat(h(9))
-                let tx = attractor.x + CGFloat(cos(h(10) * 2 * .pi + t * 0.8)) * spread
-                let ty = attractor.y + CGFloat(sin(h(10) * 2 * .pi + t * 0.8)) * spread
-                x += (tx - x) * k; y += (ty - y) * k
+            let origin = emitter(t - p * life)
+            let travel = 1 - (1 - p) * (1 - p)
+            // From the age they start on a ring clear of the number and its label; from a finger, at it.
+            let fromAge = abs(origin.x - centre.x) < 0.5 && abs(origin.y - centre.y) < 0.5
+            let start = fromAge ? 0.4 : 0.03
+            let dist = r * (start + (0.5 + 0.48 * sqrt(h(3)) - start) * travel)
+            let angle = h(4) * 2 * .pi + spin + (h(5) < 0.5 ? 1 : -1) * 0.5 * travel
+            var x = origin.x + CGFloat(cos(angle) * dist), y = origin.y + CGFloat(sin(angle) * dist)
+            // The finger repels, as WHOOP's negative attraction does: a speck that was already out when
+            // the finger passed is pushed to the edge of a clear ring around that point, like sand.
+            let born = t - p * life
+            let clear = r * (0.17 + 0.05 * h(8))
+            for m in pushes where m.t > born + 0.1 {
+                let dx = Double(x - m.p.x), dy = Double(y - m.p.y)
+                let d = (dx * dx + dy * dy).squareRoot()
+                guard d < clear else { continue }
+                let ux = d > 0.001 ? dx / d : cos(h(9) * 2 * .pi), uy = d > 0.001 ? dy / d : sin(h(9) * 2 * .pi)
+                x = m.p.x + CGFloat(ux * clear); y = m.p.y + CGFloat(uy * clear)
             }
-            let big = h(6) > 0.86
-            let s = Double(scale) * (big ? 4.5 + 5 * h(7) : 1.4 + 2.6 * h(7)) * (1 - 0.5 * p)
-            let band = 0.18 + 0.82 * NoopAuraMath.step(0.42, 0.8, dist / r)
-            let alpha = NoopAuraMath.step(0, 0.15, p) * (1 - NoopAuraMath.step(0.7, 1, p)) * band * (big ? 0.5 : 0.95)
+            let big = h(6) > 0.88
+            let grown = 0.2 + 0.8 * travel
+            let s = Double(scale) * (big ? 4.5 + 4.5 * h(7) : 1.3 + 2.4 * h(7)) * grown
+            // They fade in as they appear and out before the rim, in the orb's own light colour.
+            let alpha = NoopAuraMath.step(0, 0.18, p) * (1 - NoopAuraMath.step(0.72, 1, p)) * (big ? 0.45 : 0.95)
             guard alpha > 0.02 else { continue }
             let rect = CGRect(x: x - s / 2, y: y - s / 2, width: s, height: s)
             if big {
+                // A soft out-of-focus glint: a lit middle fading to its edge.
                 context.fill(Path(ellipseIn: rect), with: .radialGradient(
-                    Gradient(colors: [.white.opacity(alpha), .white.opacity(alpha * 0.25)]),
+                    Gradient(colors: [tint.opacity(alpha), tint.opacity(alpha * 0.55), tint.opacity(0)]),
                     center: CGPoint(x: x, y: y), startRadius: 0, endRadius: s / 2))
             } else {
-                context.fill(Path(ellipseIn: rect), with: .color(.white.opacity(alpha)))
+                context.fill(Path(ellipseIn: rect), with: .color(tint.opacity(alpha)))
+                context.fill(Path(ellipseIn: rect.insetBy(dx: s * 0.3, dy: s * 0.3)), with: .color(.white.opacity(alpha * 0.5)))
             }
         }
     }
@@ -286,7 +304,7 @@ private enum NoopAuraDrift {
             let alpha = fade * (big ? 0.45 : 0.8)
             guard alpha > 0.02 else { continue }
             let rect = CGRect(x: x - s / 2, y: y - s / 2, width: s, height: s)
-            let color = h(9) > 0.5 ? Color.white : tint
+            let color = h(9) > 0.85 ? Color.white : tint
             if big {
                 context.fill(Path(ellipseIn: rect.insetBy(dx: -s * 0.6, dy: -s * 0.6)), with: .radialGradient(
                     Gradient(colors: [color.opacity(alpha), color.opacity(0)]),
