@@ -2810,14 +2810,18 @@ private struct Act2VitalDeltaChip: View {
     let text: String
     let outside: Bool
     var good = true
+    /// Handoff primitive §6 and the Act 2 drawing: two states only — aura inside your zone, amber outside
+    /// it — as the hue at 12 % with a 0.5 pt border of the hue. (`good` is kept for callers; a move inside
+    /// the zone is not a finding, so it does not get a colour of its own.)
     var body: some View {
+        let hue = outside ? NoopHTMLColor.warm : NoopHTMLColor.blue
         Text(text)
             .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
-            .foregroundStyle(outside ? Color(hex: 0xF3C888) : good ? NoopHTMLColor.blueLight : Color(hex: 0xC6CEC9))
+            .foregroundStyle(outside ? Color(hex: 0xF3C888) : NoopHTMLColor.blueLight)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
-            .background(outside ? Color(hex: 0xF2B45C).opacity(0.13) : good ? NoopHTMLColor.blue.opacity(0.13) : Color.white.opacity(0.06),
-                        in: RoundedRectangle(cornerRadius: 8))
+            .background(hue.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(hue.opacity(0.26), lineWidth: 0.5))
     }
 }
 
