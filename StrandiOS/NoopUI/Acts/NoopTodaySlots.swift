@@ -12,7 +12,7 @@ import SwiftUI
 // and still under Reduce Motion.
 
 /// Shared appearance and pause logic for the animated slots.
-private struct NoopSlotClock<Content: View>: View {
+struct NoopSlotClock<Content: View>: View {
     @ViewBuilder var content: (_ t: Double, _ reveal: Double) -> Content
 
     @State private var onScreen = true
@@ -36,14 +36,14 @@ private struct NoopSlotClock<Content: View>: View {
     }
 }
 
-private struct NoopSlotVisibility: ViewModifier {
+struct NoopSlotVisibility: ViewModifier {
     @Binding var onScreen: Bool
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) { content.onScrollVisibilityChange(threshold: 0.02) { onScreen = $0 } } else { content }
     }
 }
 
-private struct NoopSlotCard<Content: View>: View {
+struct NoopSlotCard<Content: View>: View {
     var tint: Color
     @ViewBuilder var content: Content
     var body: some View {
