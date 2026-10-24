@@ -323,6 +323,8 @@ struct NoopAct2Screens: View {
     @State private var heartScrub: Int?
     @State private var heartChartWidth: CGFloat = 1
     @State private var showReleaseNotes = false
+    @StateObject private var todayLayout = NoopPageLayout(page: "today", catalog: NoopAct2Screens.todaySections)
+    @State private var todayEditing = NoopPageEditing()
     var body: some View {
         Group {
             switch navigation.route {
@@ -439,6 +441,47 @@ struct NoopAct2Screens: View {
                     .padding(.top, 12)
                 }
 
+                NoopEditableSections(layout: todayLayout, editing: $todayEditing,
+                                     isEmpty: todaySectionEmpty) { id in todaySection(id) }
+                    .padding(.top, 4)
+            }
+        }
+        .noopEditBar($todayEditing, layout: todayLayout)
+        .onAppear {
+            todayPulseAnchor = Date()
+            #if DEBUG
+            if CommandLine.arguments.contains("--noop-open-stress") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { showingStress = true }
+            }
+            #endif
+        }
+    }
+
+    /// Today's sections in their default order. The header and the look-back banner stay above them.
+    static let todaySections: [NoopPageSection] = [
+        NoopPageSection(id: "breathe", title: "Breathing orb", detail: "Your pulse as a breathing sphere; tap it to breathe"),
+        NoopPageSection(id: "sleep", title: "Last night", detail: "Sleep against your need"),
+        NoopPageSection(id: "coach", title: "Svea", detail: "Your morning read and the conversation"),
+        NoopPageSection(id: "day", title: "Your day", detail: "Heart rate from bedtime to now, with stress"),
+        NoopPageSection(id: "energy", title: "Energy", detail: "What today has cost"),
+        NoopPageSection(id: "vitals", title: "Vitals", detail: "Five signals, each against your own zone"),
+        NoopPageSection(id: "stress", title: "Stress", detail: "Shown until today has a scored stress line"),
+        NoopPageSection(id: "logged", title: "Logged today", detail: "What you logged for today")
+    ]
+
+    private func todaySectionEmpty(_ id: String) -> Bool {
+        switch id {
+        case "stress": return !(day == nil || (day?.stressTimeline.allSatisfy { $0.level == nil } ?? true))
+        case "logged": return !navigation.dayLogSaved
+        default: return false
+        }
+    }
+
+    @ViewBuilder
+    private func todaySection(_ id: String) -> some View {
+        switch id {
+        case "breathe":
+            VStack(spacing: 10) {
                 // Production has no charge left to draw, so the gauge and its door to Charge are absent;
                 // the orb is Breathe's door either way.
                 Button { navigation.push(day == nil ? .charge : .breathe) } label: {
@@ -463,235 +506,226 @@ struct NoopAct2Screens: View {
                         .accessibilityLabel("Breathe")
                         .accessibilityAddTraits(.isButton)
                 }
-
-                VStack(spacing: 10) {
-                    if day == nil {
-                    Button { navigation.push(.charge) } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 8) {
-                                Text(dayContext.chargeLabel)
-                                    .font(NoopHTMLFont.outfit(NoopType.title3))
-                                    .tracking(-0.38)
-                                Act2CSSChevron(size: 7, color: NoopHTMLColor.muted)
-                            }
-                            Text(dayContext.chargeLine)
-                                .font(NoopHTMLFont.sans(NoopType.footnote))
-                                .foregroundStyle(NoopHTMLColor.copy)
-                                // CSS 13.5px / 1.55 = 20.925pt per line. Instrument Sans'
-                                // native 13.5pt line is 16.47pt; center the remaining leading.
-                                .lineSpacing(4.455)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(minHeight: 41.85, alignment: .leading)
+                if day == nil {
+                Button { navigation.push(.charge) } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
+                            Text(dayContext.chargeLabel)
+                                .font(NoopHTMLFont.outfit(NoopType.title3))
+                                .tracking(-0.38)
+                            Act2CSSChevron(size: 7, color: NoopHTMLColor.muted)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 2)
-                        .padding(.bottom, 8)
+                        Text(dayContext.chargeLine)
+                            .font(NoopHTMLFont.sans(NoopType.footnote))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                            // CSS 13.5px / 1.55 = 20.925pt per line. Instrument Sans'
+                            // native 13.5pt line is 16.47pt; center the remaining leading.
+                            .lineSpacing(4.455)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(minHeight: 41.85, alignment: .leading)
                     }
-                    .buttonStyle(NoopPlainHitStyle())
-                    }
-
-                    if let day, let night = day.rest.latest, day.rest.needMin > 0 {
-                        NoopTodayNightCard(night: night, needMin: day.rest.needMin,
-                                           nightWorker: isNightWorker) { navigation.push(.rest) }
-                    } else if day == nil || todayLastSleepLine != nil {
-                    HStack(spacing: 12) {
-                        Act2Glyph(.moon, size: 19, color: NoopHTMLColor.night)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(todayLastSleepLine ?? (isNightWorker ? "Last sleep · 7h 12m, 7m over your need" : "Last night · 7h 12m, 7m over your need"))
-                                .font(NoopHTMLFont.sans(NoopType.footnote))
-                                .foregroundStyle(NoopHTMLColor.inkSoft)
-                            if day == nil {
-                            Text(isNightWorker ? "Deep came early, before the heat. Nothing to fix." : "Deep came early. Nothing to fix.")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 2)
+                    .padding(.bottom, 8)
+                }
+                .buttonStyle(NoopPlainHitStyle())
+                }
+            }
+        case "sleep":
+            VStack(spacing: 10) {
+                if let day, let night = day.rest.latest, day.rest.needMin > 0 {
+                    NoopTodayNightCard(night: night, needMin: day.rest.needMin,
+                                       nightWorker: isNightWorker) { navigation.push(.rest) }
+                } else if day == nil || todayLastSleepLine != nil {
+                HStack(spacing: 12) {
+                    Act2Glyph(.moon, size: 19, color: NoopHTMLColor.night)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(todayLastSleepLine ?? (isNightWorker ? "Last sleep · 7h 12m, 7m over your need" : "Last night · 7h 12m, 7m over your need"))
+                            .font(NoopHTMLFont.sans(NoopType.footnote))
+                            .foregroundStyle(NoopHTMLColor.inkSoft)
+                        if day == nil {
+                        Text(isNightWorker ? "Deep came early, before the heat. Nothing to fix." : "Deep came early. Nothing to fix.")
+                            .font(NoopHTMLFont.sans(NoopType.caption))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
+                        } else if let note = todayLastSleepNote {
+                            Text(note)
                                 .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(Color(hex: 0x7F8A85))
-                            } else if let note = todayLastSleepNote {
-                                Text(note)
-                                    .font(NoopHTMLFont.sans(NoopType.caption))
-                                    .foregroundStyle(Color(hex: 0x7F8A85))
-                            }
                         }
-                        Spacer()
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(NoopHTMLColor.night.opacity(0.09), in: RoundedRectangle(cornerRadius: 20))
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.night.opacity(0.2), lineWidth: 0.5))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(NoopHTMLColor.night.opacity(0.09), in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.night.opacity(0.2), lineWidth: 0.5))
+                }
+                // Rest left the tab bar for Fitness (22 Oct 2026). With a night on record the sleep
+                // card above is its door; this row stays for a phone with no night yet.
+                if day?.rest.latest == nil || (day?.rest.needMin ?? 0) <= 0 {
+                act2DestinationRow(
+                    title: "Rest",
+                    detail: "Last night, tonight and sleep debt",
+                    glyph: .moon,
+                    tint: NoopHTMLColor.night,
+                    value: nil,
+                    valueColor: NoopHTMLColor.nightLight
+                ) { navigation.push(.rest) }
+                }
+            }
+        case "coach":
+            Button { navigation.push(.coach) } label: {
+                HStack(spacing: 13) {
+                    Act2SveaOrb()
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(day == nil || day?.briefWrittenAt != nil
+                             ? "Svea has read your morning" : "Ask Svea")
+                            .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                        Text(todaySveaSubtitle)
+                            .font(NoopHTMLFont.sans(NoopType.caption))
+                            .foregroundStyle(Color(hex: 0xB7C3C9))
+                            // CSS 12px / 1.5 = two 18pt line boxes.
+                            .lineSpacing(3.36)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(minHeight: 36, alignment: .leading)
                     }
-
-                    Button { navigation.push(.coach) } label: {
-                        HStack(spacing: 13) {
-                            Act2SveaOrb()
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(day == nil || day?.briefWrittenAt != nil
-                                     ? "Svea has read your morning" : "Ask Svea")
-                                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                                Text(todaySveaSubtitle)
-                                    .font(NoopHTMLFont.sans(NoopType.caption))
-                                    .foregroundStyle(Color(hex: 0xB7C3C9))
-                                    // CSS 12px / 1.5 = two 18pt line boxes.
-                                    .lineSpacing(3.36)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(minHeight: 36, alignment: .leading)
-                            }
-                            Spacer(minLength: 4)
-                            Act2CSSChevron(size: 8, color: Color(hex: 0xA9B4E0))
+                    Spacer(minLength: 4)
+                    Act2CSSChevron(size: 8, color: Color(hex: 0xA9B4E0))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background {
+                    NoopCSSLinearGradient(
+                        colors: [NoopHTMLColor.night.opacity(0.16), NoopHTMLColor.night.opacity(0.03)]
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                }
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.night.opacity(0.3), lineWidth: 0.5))
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+        case "day":
+            VStack(spacing: 10) {
+                if let day {
+                    NoopTodayDayRibbon(points: day.ribbonPoints, sleep: day.ribbonSleep,
+                                       sessions: day.ribbonSessions, resting: todayResting?.value,
+                                       liveBPM: liveBPM, stress: day.stressTimeline,
+                                       onStress: { showingStress = true }) { navigation.push(.heart) }
+                        .sheet(isPresented: $showingStress) {
+                            NoopStressSheet(timeline: day.stressTimeline, scoredHours: day.stressScoredHours,
+                                            sleep: day.ribbonSleep, sessions: day.ribbonSessions,
+                                            personal: day.stressPersonal,
+                                            onBreathe: { navigation.push(.breathe) })
+                                .noopSheet()
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background {
-                            NoopCSSLinearGradient(
-                                colors: [NoopHTMLColor.night.opacity(0.16), NoopHTMLColor.night.opacity(0.03)]
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                    // A session the strap caught but nobody logged sits right under the line it shows on.
+                    if !isHistorical { NoopActivityOffer() }
+                } else {
+                Button { navigation.push(.day) } label: {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .firstTextBaseline) {
+                            NoopSectionLabel("The day so far")
+                            Spacer()
+                            Text(todaySpan ?? (day == nil ? dayContext.span : "\u{2014}"))
+                                .font(NoopHTMLFont.sans(NoopType.eyebrow))
+                                .foregroundStyle(NoopHTMLColor.faint)
+                                .monospacedDigit()
                         }
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.night.opacity(0.3), lineWidth: 0.5))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-
-                    if let day {
-                        NoopTodayDayRibbon(points: day.ribbonPoints, sleep: day.ribbonSleep,
-                                           sessions: day.ribbonSessions, resting: todayResting?.value,
-                                           liveBPM: liveBPM, stress: day.stressTimeline,
-                                           onStress: { showingStress = true }) { navigation.push(.heart) }
-                            .sheet(isPresented: $showingStress) {
-                                NoopStressSheet(timeline: day.stressTimeline, scoredHours: day.stressScoredHours,
-                                                sleep: day.ribbonSleep, sessions: day.ribbonSessions,
-                                                personal: day.stressPersonal,
-                                                onBreathe: { navigation.push(.breathe) })
-                                    .noopSheet()
-                            }
-                        // A session the strap caught but nobody logged sits right under the line it shows on.
-                        if !isHistorical { NoopActivityOffer() }
-                    } else {
-                    Button { navigation.push(.day) } label: {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .firstTextBaseline) {
-                                NoopSectionLabel("The day so far")
-                                Spacer()
-                                Text(todaySpan ?? (day == nil ? dayContext.span : "\u{2014}"))
-                                    .font(NoopHTMLFont.sans(NoopType.eyebrow))
-                                    .foregroundStyle(NoopHTMLColor.faint)
-                                    .monospacedDigit()
-                            }
-                            if let values = todayHeartValues {
-                            Act2FixedHeartChart(values: values, kind: .mini)
-                                .frame(height: 54)
-                            }
-                            if day == nil {
-                            Text(dayContext.dayRead)
+                        if let values = todayHeartValues {
+                        Act2FixedHeartChart(values: values, kind: .mini)
+                            .frame(height: 54)
+                        }
+                        if day == nil {
+                        Text(dayContext.dayRead)
+                            .font(NoopHTMLFont.sans(NoopType.caption))
+                            .foregroundStyle(NoopHTMLColor.copy)
+                            // CSS 12.5px / 1.5 = 18.75pt line boxes.
+                            .lineSpacing(3.5)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.vertical, 1.75)
+                        } else {
+                            Text(todayHeartValues == nil
+                                 ? "No heart-rate samples were recorded for this span."
+                                 : "The line uses recorded five-minute heart-rate averages.")
                                 .font(NoopHTMLFont.sans(NoopType.caption))
                                 .foregroundStyle(NoopHTMLColor.copy)
-                                // CSS 12.5px / 1.5 = 18.75pt line boxes.
                                 .lineSpacing(3.5)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.vertical, 1.75)
-                            } else {
-                                Text(todayHeartValues == nil
-                                     ? "No heart-rate samples were recorded for this span."
-                                     : "The line uses recorded five-minute heart-rate averages.")
-                                    .font(NoopHTMLFont.sans(NoopType.caption))
-                                    .foregroundStyle(NoopHTMLColor.copy)
-                                    .lineSpacing(3.5)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .padding(.vertical, 1.75)
-                            }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
-                        .padding(.bottom, 13)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
                     }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    }
-
-                    if let day { NoopTodayEnergyCard(record: day) { navigation.push(.energy) } } else { energyCard }
-
-
-                    if day == nil {
-                    Act2TodayHeartRow(
-                        anchor: todayPulseAnchor,
-                        wakeCharge: dayContext.wakeCharge,
-                        charge: dayContext.charge,
-                        recordedBPM: dayContext.recordedPulse,
-                        isHistorical: false,
-                        measured: day != nil,
-                        liveBPM: liveBPM
-                    ) { navigation.push(.heart) }
-                    }
-
-                    // Rest left the tab bar for Fitness (22 Oct 2026). With a night on record the sleep
-                    // card above is its door; this row stays for a phone with no night yet.
-                    if day?.rest.latest == nil || (day?.rest.needMin ?? 0) <= 0 {
-                    act2DestinationRow(
-                        title: "Rest",
-                        detail: "Last night, tonight and sleep debt",
-                        glyph: .moon,
-                        tint: NoopHTMLColor.night,
-                        value: nil,
-                        valueColor: NoopHTMLColor.nightLight
-                    ) { navigation.push(.rest) }
-                    }
-
-                    act2DestinationRow(
-                        title: "Vitals",
-                        detail: "Five signals, each against your own zone",
-                        glyph: .lungs,
-                        tint: todayVitalsOut > 0 ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue,
-                        value: todayVitalsValue,
-                        valueColor: todayVitalsOut > 0 ? Color(hex: 0xF3C888) : NoopHTMLColor.blueLight
-                    ) { navigation.push(.vitals) }
-
-                    // With a scored day the stress strip on Your day is the way in; the row stays for the
-                    // demo and for a day with nothing scored yet.
-                    if day == nil || (day?.stressTimeline.allSatisfy { $0.level == nil } ?? true) {
-                    act2DestinationRow(
-                        title: "Stress",
-                        detail: "Four steps, not a traffic light",
-                        glyph: .spark,
-                        tint: todayStressStep >= 2 ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue,
-                        value: todayStressValue,
-                        valueColor: todayStressStep >= 2 ? Color(hex: 0xF3C888) : NoopHTMLColor.blueLight
-                    ) { navigation.push(.stress) }
-                    }
-
-                    if navigation.dayLogSaved {
-                        VStack(alignment: .leading, spacing: 9) {
-                            NoopSectionLabel("Logged today")
-                            NoopFlowLayout(spacing: 6) {
-                                ForEach(navigation.dayLogChips, id: \.self) { chip in
-                                    Text(chip)
-                                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                                        .foregroundStyle(NoopHTMLColor.blueLight)
-                                        .padding(.horizontal, 11)
-                                        .padding(.vertical, 6)
-                                        .background(NoopHTMLColor.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
-                                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(NoopHTMLColor.blue.opacity(0.22), lineWidth: 0.5))
-                                        .transition(.opacity.combined(with: .move(edge: .top)))
-                                }
-                            }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 13)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                }
+                if day == nil {
+                Act2TodayHeartRow(
+                    anchor: todayPulseAnchor,
+                    wakeCharge: dayContext.wakeCharge,
+                    charge: dayContext.charge,
+                    recordedBPM: dayContext.recordedPulse,
+                    isHistorical: false,
+                    measured: day != nil,
+                    liveBPM: liveBPM
+                ) { navigation.push(.heart) }
+                }
+            }
+        case "energy":
+            if let day { NoopTodayEnergyCard(record: day) { navigation.push(.energy) } } else { energyCard }
+        case "vitals":
+            act2DestinationRow(
+                title: "Vitals",
+                detail: "Five signals, each against your own zone",
+                glyph: .lungs,
+                tint: todayVitalsOut > 0 ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue,
+                value: todayVitalsValue,
+                valueColor: todayVitalsOut > 0 ? Color(hex: 0xF3C888) : NoopHTMLColor.blueLight
+            ) { navigation.push(.vitals) }
+        case "stress":
+            // With a scored day the stress strip on Your day is the way in; the row stays for the
+            // demo and for a day with nothing scored yet.
+            if day == nil || (day?.stressTimeline.allSatisfy { $0.level == nil } ?? true) {
+            act2DestinationRow(
+                title: "Stress",
+                detail: "Four steps, not a traffic light",
+                glyph: .spark,
+                tint: todayStressStep >= 2 ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue,
+                value: todayStressValue,
+                valueColor: todayStressStep >= 2 ? Color(hex: 0xF3C888) : NoopHTMLColor.blueLight
+            ) { navigation.push(.stress) }
+            }
+        case "logged":
+            if navigation.dayLogSaved {
+                VStack(alignment: .leading, spacing: 9) {
+                    NoopSectionLabel("Logged today")
+                    NoopFlowLayout(spacing: 6) {
+                        ForEach(navigation.dayLogChips, id: \.self) { chip in
+                            Text(chip)
+                                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.blueLight)
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 6)
+                                .background(NoopHTMLColor.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                                .overlay(RoundedRectangle(cornerRadius: 9).stroke(NoopHTMLColor.blue.opacity(0.22), lineWidth: 0.5))
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 20))
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.blue.opacity(0.18), lineWidth: 0.5))
-                        .animation(.easeInOut(duration: 0.18), value: navigation.dayLogChips)
                     }
                 }
-                .padding(.top, 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.blue.opacity(0.18), lineWidth: 0.5))
+                .animation(.easeInOut(duration: 0.18), value: navigation.dayLogChips)
             }
-        }
-        .onAppear {
-            todayPulseAnchor = Date()
-            #if DEBUG
-            if CommandLine.arguments.contains("--noop-open-stress") {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { showingStress = true }
-            }
-            #endif
+        default:
+            EmptyView()
         }
     }
 
