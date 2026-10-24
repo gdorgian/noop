@@ -195,7 +195,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     var hidesBottomBar: Bool {
         switch self {
         case .ready, .live, .intervals, .onboard, .pair, .bplayer, .bsweep,
-             .liftLive, .liftProgram, .liftEdit, .liftImport, .liftReview: true
+             .liftLive, .liftProgram, .liftEdit, .liftImport, .liftReview, .fitnessRoutineEdit: true
         default: false
         }
     }

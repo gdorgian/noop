@@ -359,6 +359,9 @@ struct NoopFitnessPlanSheet: View {
     let routines: [NoopFitnessSnapshot.Routine]
     var fixedRoutineID: String? = nil
     var day: Date? = nil
+    /// The routine's upcoming sessions when changing its schedule: the sheet opens on their pattern and
+    /// saving replaces them, rather than adding a second set of dates beside them.
+    var replacing: [NoopFitnessSettings.Plan] = []
     @EnvironmentObject private var settings: NoopFitnessSettings
     @Environment(\.dismiss) private var dismiss
     @State private var routineID: String?
@@ -430,6 +433,17 @@ struct NoopFitnessPlanSheet: View {
                 plan.weekdays = [wd]
                 plan.start = Calendar.current.startOfDay(for: day)
             }
+            if let first = replacing.first, let last = replacing.last {
+                let cal = Calendar.current
+                plan.weekly = replacing.count > 1
+                plan.once = first.date
+                plan.weekdays = Set(replacing.map { (cal.component(.weekday, from: $0.date) + 5) % 7 + 1 })
+                plan.start = cal.startOfDay(for: first.date)
+                plan.includesTime = first.includesTime != false
+                if plan.includesTime { plan.time = first.date }
+                let weeks = (cal.dateComponents([.day], from: plan.start, to: last.date).day ?? 0) / 7 + 1
+                plan.weeks = [4, 8, 12, 26].first { $0 >= weeks } ?? 26
+            }
         }
     }
 
@@ -438,6 +452,7 @@ struct NoopFitnessPlanSheet: View {
     private func save() {
         guard let id = routineID else { return }
         let name = routines.first { $0.id == id }?.name ?? "Routine"
+        if !replacing.isEmpty { settings.removeUpcoming(routineID: id) }
         settings.schedule(routineID: id, name: name, dates: plan.dates, includesTime: plan.includesTime)
         dismiss()
     }

@@ -244,12 +244,26 @@ struct NoopFitnessRoutineEditor: View {
     @State private var history: History?
     @State private var toast: String?
     @State private var feedback = 0
+    /// The set field being typed in, as "<set id>.<w|r>"; drives the bar above the number pad.
+    @FocusState private var focusedField: String?
 
     private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
     private var isNew: Bool { navigation.fitnessRoutineID == nil }
     private var spring: Animation? { reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.85) }
+    private var typedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// What an unnamed routine is saved as: its muscles ("Quads & Glutes"), else its first exercise.
+    private var suggestedName: String {
+        var muscles: [String] = []
+        for line in lines {
+            guard let m = line.choice.primary?.displayName, !muscles.contains(m) else { continue }
+            muscles.append(m)
+        }
+        if (1...2).contains(muscles.count) { return muscles.joined(separator: " & ") }
+        if muscles.count > 2 { return "Full body" }
+        return lines.first?.choice.name ?? "Routine"
+    }
     private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !lines.isEmpty
+        !lines.isEmpty
             && (isNew || loaded) && lines.allSatisfy { line in
                 !line.plan.sets.isEmpty && line.plan.sets.allSatisfy { set in
                     (set.targetWeightKg.map { $0.isFinite && $0 >= 0 } ?? true)
@@ -272,7 +286,8 @@ struct NoopFitnessRoutineEditor: View {
                     } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
                 }
                 Text(isNew ? "New routine" : "Edit routine").font(NoopHTMLFont.sheetTitle)
-                TextField("Routine name", text: $name)
+                TextField(lines.isEmpty ? "Routine name" : suggestedName, text: $name)
+                    .focused($focusedField, equals: "name").submitLabel(.done)
                     .font(NoopHTMLFont.sans(17, weight: .medium)).padding(15)
                     .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16))
                 if lines.isEmpty {
@@ -289,21 +304,38 @@ struct NoopFitnessRoutineEditor: View {
                             .accessibilityLabel("Superset")
                     }
                 }
-                NoopFitnessPanel {
-                    Toggle("Put it on the calendar", isOn: $planIt)
-                    if planIt { NoopFitnessRepeatEditor(plan: $repeatPlan) }
+                // An already-scheduled routine keeps its schedule on the routine page; a second plan here
+                // would add a duplicate set of dates.
+                if isNew || !settings.plans.contains(where: {
+                    $0.routineID == navigation.fitnessRoutineID && $0.isUpcoming(asOf: Date())
+                }) {
+                    NoopFitnessPanel {
+                        Toggle("Put it on the calendar", isOn: $planIt)
+                        if planIt { NoopFitnessRepeatEditor(plan: $repeatPlan) }
+                    }
                 }
                 if let error { Text(error).foregroundStyle(NoopHTMLColor.red) }
             }
         }
         .font(NoopHTMLFont.sans(14)).foregroundStyle(NoopHTMLColor.ink).tint(NoopHTMLColor.volt)
+        .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 16) {
-                Button("Add exercise") { openPicker() }.frame(maxWidth: .infinity)
-                Button(saving ? "Saving…" : "Save") { Task { await save() } }
-                    .frame(maxWidth: .infinity).buttonStyle(.borderedProminent)
-                    .foregroundStyle(NoopHTMLColor.voltInk).disabled(!canSave || saving)
-            }.padding(16).background(NoopHTMLColor.canvas)
+            // Hidden while typing: the bar above the number pad carries Done, and the pad would otherwise
+            // push these two up into the set being edited.
+            if focusedField == nil {
+                HStack(spacing: 10) {
+                    NoopFitnessActionButton(title: "Add exercise", weight: .secondary) { openPicker() }
+                    NoopFitnessActionButton(title: saving ? "Saving…" : "Save", enabled: canSave && !saving) {
+                        Task { await save() }
+                    }
+                }
+                .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 8)
+                .background(LinearGradient(colors: [NoopHTMLColor.canvas.opacity(0), NoopHTMLColor.canvas],
+                                           startPoint: .top, endPoint: .center).ignoresSafeArea())
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) { keypadBar }
         }
         .overlay(alignment: .top) {
             if let toast { Text(toast).padding(12).background(NoopHTMLColor.cardRaised, in: Capsule()).padding(.top, 50) }
@@ -329,45 +361,35 @@ struct NoopFitnessRoutineEditor: View {
         }
         .sheet(isPresented: Binding(get: { restID != nil }, set: { if !$0 { restID = nil } })) {
             if let index = lines.firstIndex(where: { $0.id == restID }) {
-                VStack(spacing: 20) {
-                    Text("Rest timer").font(NoopHTMLFont.sheetTitle)
-                    Stepper("\(lines[index].plan.restSeconds) seconds", value: $lines[index].plan.restSeconds, in: 0...900, step: 15)
-                    Button("Apply to all sets") {
-                        for set in lines[index].plan.sets.indices {
-                            lines[index].plan.sets[set].restSeconds = lines[index].plan.restSeconds
-                        }
-                        restID = nil
-                    }.buttonStyle(.borderedProminent)
-                }.padding(20).noopSheet()
+                NoopFitnessRestSheet(exercise: lines[index].choice.name, seconds: Binding(
+                    get: { lines[index].plan.restSeconds },
+                    set: { value in
+                        lines[index].plan.restSeconds = value
+                        for set in lines[index].plan.sets.indices { lines[index].plan.sets[set].restSeconds = value }
+                    }), done: { restID = nil })
+                .noopSheet([.height(400)])
             }
         }
         .sheet(isPresented: Binding(get: { repRangeID != nil }, set: { if !$0 { repRangeID = nil } })) {
-            VStack(spacing: 20) {
-                Text("Target rep range").font(NoopHTMLFont.sheetTitle)
-                Stepper("Minimum: \(repsLow)", value: $repsLow, in: 1...repsHigh)
-                Stepper("Maximum: \(repsHigh)", value: $repsHigh, in: repsLow...100)
-                Button("Apply to all sets") {
-                    if let index = lines.firstIndex(where: { $0.id == repRangeID }) {
-                        for set in lines[index].plan.sets.indices {
-                            lines[index].plan.sets[set].repsMin = repsLow
-                            lines[index].plan.sets[set].repsMax = repsHigh
-                        }
+            NoopFitnessRepRangeSheet(exercise: lines.first { $0.id == repRangeID }?.choice.name ?? "",
+                                     low: $repsLow, high: $repsHigh) {
+                if let index = lines.firstIndex(where: { $0.id == repRangeID }) {
+                    for set in lines[index].plan.sets.indices {
+                        lines[index].plan.sets[set].repsMin = repsLow
+                        lines[index].plan.sets[set].repsMax = repsHigh
                     }
-                    repRangeID = nil
-                }.buttonStyle(.borderedProminent)
-            }.padding(20).noopSheet()
+                }
+                repRangeID = nil
+            }
+            .noopSheet([.height(430)])
         }
         .sheet(item: $history) { value in
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Last session on \(value.date.formatted(date: .abbreviated, time: .omitted))").font(NoopHTMLFont.sheetTitle)
-                ForEach(Array(value.sets.enumerated()), id: \.element.id) { index, set in
-                    Text("\(index + 1) · \(set.targetWeightKg.map { LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units)) } ?? "—") \(LiftFormat.weightUnit(units)) · \(set.repsMin.map(String.init) ?? "—") reps")
-                }
-                Button("Use these sets") {
-                    if let index = lines.firstIndex(where: { $0.id == value.lineID }) { lines[index].plan.sets = value.sets }
-                    history = nil
-                }.buttonStyle(.borderedProminent)
-            }.padding(20).noopSheet()
+            NoopFitnessLastTimeSheet(exercise: lines.first { $0.id == value.lineID }?.choice.name ?? "",
+                                     date: value.date, sets: value.sets, units: units) {
+                if let index = lines.firstIndex(where: { $0.id == value.lineID }) { lines[index].plan.sets = value.sets }
+                history = nil
+            }
+            .noopSheet([.height(CGFloat(250 + min(value.sets.count, 8) * 41))])
         }
         .alert("Delete this routine?", isPresented: $confirmDelete) {
             Button("Cancel", role: .cancel) {}
@@ -380,68 +402,95 @@ struct NoopFitnessRoutineEditor: View {
         let value = line.wrappedValue
         let index = lines.firstIndex { $0.id == value.id } ?? 0
         let timed = value.choice.definition?.mode == .duration || value.choice.definition?.mode == .distanceDuration
+        let bodyweight = Self.isBodyweight(value.choice)
+        let setCount = value.plan.sets.count
         return NoopFitnessPanel {
             HStack {
                 NoopExerciseMedia(choice: value.choice, thumbnail: true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(value.choice.name).font(NoopHTMLFont.sans(15, weight: .semibold))
-                    Text(value.choice.equipment ?? value.choice.muscleLine).font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
+                    Text("\(bodyweight ? "Bodyweight" : value.choice.equipment ?? value.choice.muscleLine) · \(setCount) \(setCount == 1 ? "set" : "sets")")
+                        .font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
                 }
                 Spacer(minLength: 0)
                 Button { restID = value.id } label: { Image(systemName: "timer").frame(width: 32, height: 44) }.accessibilityLabel("Rest timer")
                 Menu {
-                    Button("Replace exercise") { replacement = value.id; picking = true }
-                    Button("Create superset") { link(index) }.disabled(index + 1 >= lines.count)
-                    if value.plan.supersetId != nil { Button("Remove superset") { unlink(value.plan.supersetId) } }
-                    Button(value.pounds ? "Convert to kg" : "Convert to lb") { line.pounds.wrappedValue.toggle() }
-                    Button("About exercise") { detail = value.choice }
-                    Button("Add exercise above") { openPicker(at: index) }
-                    Button("Add exercise below") { openPicker(at: index + 1) }
-                    if !timed {
-                        Button("Target rep range") {
-                            repsLow = min(100, max(1, value.plan.sets.first?.repsMin ?? 6))
-                            repsHigh = min(100, max(repsLow, value.plan.sets.first?.repsMax ?? 10))
-                            repRangeID = value.id
+                    Section {
+                        if !timed { Button { openRepRange(value) } label: { Label("Target rep range", systemImage: "arrow.left.and.right") } }
+                        Button { restID = value.id } label: { Label("Rest timer", systemImage: "timer") }
+                        Button { progressionID = value.id } label: { Label("Progression", systemImage: "chart.line.uptrend.xyaxis") }
+                        Button { Task { await lastTime(value.id) } } label: { Label("Last time", systemImage: "clock.arrow.circlepath") }
+                        Button { line.pounds.wrappedValue.toggle() } label: {
+                            Label(value.pounds ? "Use kilograms" : "Use pounds", systemImage: "scalemass")
                         }
                     }
-                    Button("Last time") { Task { await lastTime(value.id) } }
-                    Button("Move up") { move(index, by: -1) }.disabled(index == 0)
-                    Button("Move down") { move(index, by: 1) }.disabled(index == lines.count - 1)
-                    Button("Duplicate") { duplicate(index) }
-                    Button("Delete", role: .destructive) {
-                        withAnimation(spring) { lines.removeAll { $0.id == value.id }; normalizeGroups(); feedback += 1 }
+                    Section {
+                        Button { replacement = value.id; picking = true } label: { Label("Replace", systemImage: "arrow.triangle.2.circlepath") }
+                        if value.plan.supersetId != nil {
+                            Button { unlink(value.plan.supersetId) } label: { Label("Remove superset", systemImage: "link.badge.minus") }
+                        } else {
+                            Button { link(index) } label: { Label("Superset with next", systemImage: "link") }
+                                .disabled(index + 1 >= lines.count)
+                        }
+                        Button { duplicate(index) } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
+                        Button { openPicker(at: index + 1) } label: { Label("Add exercise below", systemImage: "text.badge.plus") }
                     }
+                    Section {
+                        Button { move(index, by: -1) } label: { Label("Move up", systemImage: "arrow.up") }.disabled(index == 0)
+                        Button { move(index, by: 1) } label: { Label("Move down", systemImage: "arrow.down") }.disabled(index == lines.count - 1)
+                        Button { detail = value.choice } label: { Label("About this exercise", systemImage: "info.circle") }
+                    }
+                    Button(role: .destructive) {
+                        withAnimation(spring) { lines.removeAll { $0.id == value.id }; normalizeGroups(); feedback += 1 }
+                    } label: { Label("Remove exercise", systemImage: "trash") }
                 } label: { Image(systemName: "ellipsis").frame(width: 32, height: 44) }
                     .accessibilityLabel("Exercise actions")
             }
             HStack {
                 Text("SET").frame(width: 30)
-                Text(value.pounds ? "LB" : "KG").frame(maxWidth: .infinity)
+                Text(bodyweight ? (value.pounds ? "+LB" : "+KG") : (value.pounds ? "LB" : "KG")).frame(maxWidth: .infinity)
                 Text(timed ? "TIME (s)" : "REPS").frame(maxWidth: .infinity)
-                Text("REST (s)").frame(maxWidth: .infinity)
-            }.font(NoopHTMLFont.sans(10, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                Text("REST").frame(maxWidth: .infinity)
+            }.font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1).foregroundStyle(NoopHTMLColor.copy)
             ForEach(line.plan.sets) { set in
                 let number = (value.plan.sets.firstIndex { $0.id == set.wrappedValue.id } ?? 0) + 1
+                let id = set.wrappedValue.id.uuidString
                 HStack(spacing: 8) {
-                    Text("\(number)").frame(width: 30)
-                    numberField("Weight", value: Binding(get: {
+                    Text("\(number)").font(NoopHTMLFont.sans(14, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
+                        .frame(width: 30)
+                    numberField("Weight", placeholder: bodyweight ? "BW" : "—", focus: id + ".w", value: Binding(get: {
                         set.wrappedValue.targetWeightKg.map { value.pounds ? $0 * 2.2046226218 : $0 }
                     }, set: { set.wrappedValue.targetWeightKg = $0.map { value.pounds ? $0 / 2.2046226218 : $0 } }))
-                    integerField(timed ? "Seconds" : "Reps", value: Binding(get: {
-                        timed ? set.wrappedValue.targetDurationS : set.wrappedValue.repsMin
-                    }, set: {
-                        if timed { set.wrappedValue.targetDurationS = $0 }
-                        else { set.wrappedValue.repsMin = $0; set.wrappedValue.repsMax = $0 }
-                    }))
-                    integerField("Rest", value: Binding(get: { set.wrappedValue.restSeconds ?? value.plan.restSeconds },
-                                                        set: { set.wrappedValue.restSeconds = $0 }))
+                    if !timed, let low = set.wrappedValue.repsMin, let high = set.wrappedValue.repsMax, high > low {
+                        // A range is set with the range sheet, so the cell opens it rather than a number pad.
+                        Button { focusedField = nil; openRepRange(value) } label: {
+                            Text("\(low)–\(high)").font(NoopHTMLFont.sans(15, weight: .medium)).monospacedDigit()
+                                .foregroundStyle(NoopHTMLColor.ink)
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                        .accessibilityLabel("Reps, \(low) to \(high)")
+                    } else {
+                        integerField(timed ? "Seconds" : "Reps", focus: id + ".r", value: Binding(get: {
+                            timed ? set.wrappedValue.targetDurationS : set.wrappedValue.repsMin
+                        }, set: {
+                            if timed { set.wrappedValue.targetDurationS = $0 }
+                            else { set.wrappedValue.repsMin = $0; set.wrappedValue.repsMax = $0 }
+                        }))
+                    }
+                    Button { focusedField = nil; restID = value.id } label: {
+                        Text(NoopRestFormat.clock(set.wrappedValue.restSeconds ?? value.plan.restSeconds))
+                            .font(NoopHTMLFont.sans(15)).monospacedDigit().foregroundStyle(NoopHTMLColor.inkSoft)
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                            .background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    .accessibilityLabel("Rest, \(NoopRestFormat.clock(set.wrappedValue.restSeconds ?? value.plan.restSeconds))")
                 }
                 .modifier(NoopSwipeToDelete { removeSet(set.wrappedValue.id, from: value.id) })
                 .contextMenu { Button("Delete set", role: .destructive) { removeSet(set.wrappedValue.id, from: value.id) } }
                 .accessibilityAction(named: "Delete set") { removeSet(set.wrappedValue.id, from: value.id) }
-            }
-            if let set = value.plan.sets.first, let low = set.repsMin, let high = set.repsMax, high > low {
-                Text("Target range: \(low)–\(high) reps").font(NoopHTMLFont.sans(12)).foregroundStyle(NoopHTMLColor.copy)
             }
             HStack {
                 Button("Progression") { progressionID = value.id }
@@ -458,16 +507,78 @@ struct NoopFitnessRoutineEditor: View {
         }
     }
 
-    private func numberField(_ label: String, value: Binding<Double?>) -> some View {
-        TextField("—", value: value, format: .number.precision(.fractionLength(0...2)))
+    private func numberField(_ label: String, placeholder: String, focus: String, value: Binding<Double?>) -> some View {
+        TextField(placeholder, value: value, format: .number.precision(.fractionLength(0...2)))
             .keyboardType(.decimalPad).multilineTextAlignment(.center).accessibilityLabel(label)
-            .frame(maxWidth: .infinity, minHeight: 40).background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 10))
+            .font(NoopHTMLFont.sans(15, weight: .medium)).monospacedDigit()
+            .focused($focusedField, equals: focus)
+            .frame(maxWidth: .infinity, minHeight: 40)
+            .background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(NoopHTMLColor.volt.opacity(focusedField == focus ? 0.7 : 0), lineWidth: 1))
     }
 
-    private func integerField(_ label: String, value: Binding<Int?>) -> some View {
+    private func integerField(_ label: String, focus: String, value: Binding<Int?>) -> some View {
         TextField("—", value: value, format: .number).keyboardType(.numberPad)
             .multilineTextAlignment(.center).accessibilityLabel(label)
-            .frame(maxWidth: .infinity, minHeight: 40).background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 10))
+            .font(NoopHTMLFont.sans(15, weight: .medium)).monospacedDigit()
+            .focused($focusedField, equals: focus)
+            .frame(maxWidth: .infinity, minHeight: 40)
+            .background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(NoopHTMLColor.volt.opacity(focusedField == focus ? 0.7 : 0), lineWidth: 1))
+    }
+
+    private func openRepRange(_ line: Line) {
+        repsLow = min(100, max(1, line.plan.sets.first?.repsMin ?? 6))
+        repsHigh = min(100, max(repsLow, line.plan.sets.first?.repsMax ?? 10))
+        repRangeID = line.id
+    }
+
+    /// No external load: a blank weight is the body alone, and a typed one is added load (vest, belt).
+    static func isBodyweight(_ choice: NoopFitnessExerciseChoice) -> Bool {
+        switch choice.definition?.mode {
+        case .bodyweightReps?, .weightedBodyweight?, .assistedBodyweight?: return true
+        default: return false
+        }
+    }
+
+    /// Every typable field in screen order, so Next walks weight → reps → next set → next exercise.
+    private var fieldOrder: [String] {
+        lines.flatMap { line in line.plan.sets.flatMap { ["\($0.id.uuidString).w", "\($0.id.uuidString).r"] } }
+    }
+
+    /// Above the number pad: nudge the value, go to the next field, or put the pad away.
+    @ViewBuilder
+    private var keypadBar: some View {
+        if let focus = focusedField, focus != "name" {
+            Button { nudge(focus, by: -1) } label: { Image(systemName: "minus") }.accessibilityLabel("Less")
+            Button { nudge(focus, by: 1) } label: { Image(systemName: "plus") }.accessibilityLabel("More")
+            Spacer()
+            if let next = fieldOrder.firstIndex(of: focus).map({ $0 + 1 }), next < fieldOrder.count {
+                Button("Next") { focusedField = fieldOrder[next] }
+            }
+            Button("Done") { focusedField = nil }.fontWeight(.semibold)
+        }
+    }
+
+    /// −/+ on the focused field: 2.5 kg (5 lb) for weight, one rep for reps.
+    private func nudge(_ focus: String, by direction: Int) {
+        let parts = focus.split(separator: ".")
+        guard parts.count == 2, let setID = UUID(uuidString: String(parts[0])),
+              let li = lines.firstIndex(where: { $0.plan.sets.contains { $0.id == setID } }),
+              let si = lines[li].plan.sets.firstIndex(where: { $0.id == setID }) else { return }
+        let timed = lines[li].choice.definition?.mode == .duration || lines[li].choice.definition?.mode == .distanceDuration
+        if parts[1] == "w" {
+            let step = lines[li].pounds ? 5 / 2.2046226218 : 2.5
+            let next = max(0, (lines[li].plan.sets[si].targetWeightKg ?? 0) + Double(direction) * step)
+            lines[li].plan.sets[si].targetWeightKg = next > 0 ? next : nil
+        } else if timed {
+            lines[li].plan.sets[si].targetDurationS = max(5, (lines[li].plan.sets[si].targetDurationS ?? 30) + direction * 5)
+        } else {
+            let reps = max(1, (lines[li].plan.sets[si].repsMin ?? 0) + direction)
+            lines[li].plan.sets[si].repsMin = reps
+            lines[li].plan.sets[si].repsMax = reps
+        }
+        feedback += 1
     }
 
     private var reorderSheet: some View {
@@ -503,7 +614,7 @@ struct NoopFitnessRoutineEditor: View {
                     Line(choice: choice, plan: .init(exerciseId: choice.id, sets: (0..<3).map { _ in .init() }), pounds: units == .imperial)
                 }
                 lines.insert(contentsOf: new, at: min(insertion ?? lines.count, lines.count))
-                toast = "\(new.count) exercises added"
+                toast = new.count == 1 ? "1 exercise added" : "\(new.count) exercises added"
                 for line in new { Task { await prefill(line.id) } }
             }
             normalizeGroups(); feedback += 1
@@ -619,7 +730,7 @@ struct NoopFitnessRoutineEditor: View {
         defer { saving = false }
         let now = Int(Date().timeIntervalSince1970)
         let id = program?.id ?? navigation.fitnessRoutineID ?? "routine-\(UUID().uuidString)"
-        let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = typedName.isEmpty ? suggestedName : typedName
         let row = LiftProgramRow(id: id, deviceId: repo.deviceId, name: title, note: program?.note,
                                  createdAt: program?.createdAt ?? now, updatedAt: now, archived: false)
         do {

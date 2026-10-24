@@ -200,6 +200,7 @@ struct NoopFitnessRoutineScreen: View {
     @State private var program: LiftProgramRow?
     @State private var items: [LiftProgramItemRow] = []
     @State private var scheduling = false
+    @State private var rescheduling = false
     @State private var when = Calendar.current.date(bySettingHour: 18, minute: 0, second: 0,
                                                      of: Date().addingTimeInterval(86_400)) ?? Date()
     @State private var refusal: NoopRunningSession?
@@ -244,23 +245,14 @@ struct NoopFitnessRoutineScreen: View {
                 let upcoming = settings.plans.filter { $0.routineID == navigation.fitnessRoutineID && $0.isUpcoming(asOf: Date()) }
                     .sorted { $0.date < $1.date }
                 if !upcoming.isEmpty {
-                    NoopFitnessPanel(label: "Scheduled") {
-                        ForEach(upcoming) { p in
-                            HStack {
-                                Text(p.includesTime == false ? p.date.formatted(.dateTime.weekday(.wide).day().month()) : p.date.formatted(.dateTime.weekday(.wide).day().month().hour().minute()))
-                                    .font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.ink)
-                                Spacer()
-                                Button("Remove") { settings.remove(p) }
-                                    .font(NoopHTMLFont.sans(12.5, weight: .semibold)).foregroundStyle(NoopHTMLColor.red)
-                            }
-                        }
-                        if upcoming.count > 1, let id = navigation.fitnessRoutineID {
-                            Button("Stop repeating") { settings.removeUpcoming(routineID: id) }
-                                .font(NoopHTMLFont.sans(13, weight: .semibold)).foregroundStyle(NoopHTMLColor.red)
-                                .padding(.top, 4)
-                        }
-                    }
-                    .padding(.top, 12)
+                    NoopFitnessScheduleSummary(
+                        upcoming: upcoming,
+                        remove: { p in withAnimation(NoopMotion.swap) { settings.remove(p) } },
+                        stopRepeating: {
+                            guard let id = navigation.fitnessRoutineID else { return }
+                            withAnimation(NoopMotion.swap) { settings.removeUpcoming(routineID: id) }
+                        },
+                        edit: { rescheduling = true; scheduling = true })
                 }
 
                 HStack(spacing: 10) {
@@ -292,12 +284,15 @@ struct NoopFitnessRoutineScreen: View {
             Button("Delete", role: .destructive) { Task { await delete() } }
         } message: { Text("Your logged sessions will be kept.") }
         .task(id: "\(navigation.fitnessRoutineID ?? "")-\(repo.refreshSeq)") { await load() }
-        .sheet(isPresented: $scheduling) {
+        .sheet(isPresented: $scheduling, onDismiss: { rescheduling = false }) {
             NoopFitnessPlanSheet(routines: [.init(id: program?.id ?? "", name: program?.name ?? "Routine",
                                                   exercises: exerciseCount, sets: setCount)],
-                                 fixedRoutineID: navigation.fitnessRoutineID)
+                                 fixedRoutineID: navigation.fitnessRoutineID,
+                                 replacing: rescheduling ? settings.plans.filter {
+                                     $0.routineID == navigation.fitnessRoutineID && $0.isUpcoming(asOf: Date())
+                                 }.sorted { $0.date < $1.date } : [])
                 .environmentObject(settings)
-                .noopSheet()
+                .noopSheet([.height(600), .large])
         }
     }
 
@@ -321,7 +316,7 @@ struct NoopFitnessRoutineScreen: View {
                         if let high = set.repsMax, high != low { return "\(low)–\(high) reps" }
                         return "\(low) reps"
                     } ?? "—")
-                    cell("\(set.restSeconds ?? plan?.restSeconds ?? item.restSec ?? 120)s")
+                    cell(NoopRestFormat.clock(set.restSeconds ?? plan?.restSeconds ?? item.restSec ?? 120))
                 }
             }
         }
