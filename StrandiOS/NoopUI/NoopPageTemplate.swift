@@ -15,6 +15,7 @@ enum NoopPageHeroMetrics {
 }
 
 struct NoopScorePageHeader<Hero: View>: View {
+    var theme: NoopPageTheme? = nil
     let title: String
     let date: String
     let tiles: [(label: String, value: String)]
@@ -41,7 +42,7 @@ struct NoopScorePageHeader<Hero: View>: View {
                     }
                 }
             }
-            hero.frame(width: NoopPageHeroMetrics.heroSide, height: NoopPageHeroMetrics.heroSide)
+            hero.frame(maxWidth: .infinity)
             HStack(spacing: 10) {
                 ForEach(Array(tiles.enumerated()), id: \.offset) { _, tile in
                     VStack(alignment: .leading, spacing: 4) {
@@ -51,11 +52,30 @@ struct NoopScorePageHeader<Hero: View>: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+                    .noopRaisedCard(radius: 18)
                 }
             }
         }
+        .background(alignment: .top) {
+            if let theme {
+                NoopPageBackdrop(theme: theme)
+                    .frame(width: UIScreen.main.bounds.width)
+                    .offset(y: -140)
+            }
+        }
+    }
+}
+
+extension View {
+    /// A card raised off the page, as Bevel's are: a cool slate fill, a fine light edge on top and a
+    /// soft shadow below.
+    func noopRaisedCard(radius: CGFloat = 20) -> some View {
+        self
+            .background(Color(hex: 0x1C1F26), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.02)],
+                                             startPoint: .top, endPoint: .bottom), lineWidth: 0.75))
+            .shadow(color: .black.opacity(0.35), radius: 12, y: 6)
     }
 }
 
@@ -92,5 +112,89 @@ struct NoopTrendsList: View {
             }
         }
         .task(id: "\(repo.refreshSeq)|\(ids.joined(separator: ","))") { await store.load(ids: shown, repo: repo) }
+    }
+}
+
+// MARK: - Backdrop and hero pager
+
+/// A page's colours for the backdrop and its cards.
+struct NoopPageTheme {
+    let sky: Color
+    let ridge: Color
+    var stars = false
+
+    static let sleep = NoopPageTheme(sky: Color(hex: 0x7B6BE0), ridge: Color(hex: 0x3B2F7A), stars: true)
+    static let recovery = NoopPageTheme(sky: Color(hex: 0x3FC9A0), ridge: Color(hex: 0x1C4F49))
+    static let strain = NoopPageTheme(sky: Color(hex: 0xF0A04B), ridge: Color(hex: 0x5A3418))
+    static let trends = NoopPageTheme(sky: Color(hex: 0x00E59A), ridge: Color(hex: 0x15403A))
+    static let you = NoopPageTheme(sky: Color(hex: 0xE08A9B), ridge: Color(hex: 0x4A2430))
+}
+
+/// The dusk scene behind the top of a score page, drawn on the GPU and paused off screen.
+struct NoopPageBackdrop: View {
+    let theme: NoopPageTheme
+    var height: CGFloat = 520
+
+    var body: some View {
+        NoopSlotClock { t, _ in
+            GeometryReader { g in
+                Rectangle().colorEffect(ShaderLibrary.noopBackdrop(
+                    .float2(g.size), .float(Float(t)), .color(theme.sky), .color(theme.ridge), .float(theme.stars ? 1 : 0)))
+            }
+        }
+        .frame(height: height)
+        .frame(maxWidth: .infinity)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Three ways to draw a page's hero, swiped between; the choice is kept per page. Dots under the
+/// hero say which is showing, and each change ticks.
+struct NoopHeroPager<A: View, B: View, C: View>: View {
+    let page: String
+    let names: [String]
+    @ViewBuilder var first: A
+    @ViewBuilder var second: B
+    @ViewBuilder var third: C
+
+    @AppStorage private var choice: Int
+
+    init(page: String, names: [String], @ViewBuilder first: () -> A, @ViewBuilder second: () -> B, @ViewBuilder third: () -> C) {
+        self.page = page
+        self.names = names
+        self.first = first()
+        self.second = second()
+        self.third = third()
+        _choice = AppStorage(wrappedValue: 0, "noop.hero.\(page)")
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            TabView(selection: $choice) {
+                first.frame(width: NoopPageHeroMetrics.heroSide, height: NoopPageHeroMetrics.heroSide).tag(0)
+                second.frame(width: NoopPageHeroMetrics.heroSide, height: NoopPageHeroMetrics.heroSide).tag(1)
+                third.frame(width: NoopPageHeroMetrics.heroSide, height: NoopPageHeroMetrics.heroSide).tag(2)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: NoopPageHeroMetrics.heroSide)
+            .onChange(of: choice) { NoopHaptics.play(.pass) }
+            HStack(spacing: 6) {
+                ForEach(0..<3, id: \.self) { i in
+                    Capsule().fill(Color.white.opacity(i == choice ? 0.85 : 0.22))
+                        .frame(width: i == choice ? 16 : 6, height: 6)
+                }
+            }
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: choice)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Style \(choice + 1) of 3, \(names[min(choice, names.count - 1)])")
+            .accessibilityAdjustableAction { dir in
+                switch dir {
+                case .increment: choice = min(2, choice + 1)
+                case .decrement: choice = max(0, choice - 1)
+                default: break
+                }
+            }
+        }
     }
 }

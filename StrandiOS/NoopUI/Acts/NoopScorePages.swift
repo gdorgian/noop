@@ -54,10 +54,17 @@ struct NoopRecoveryPage: View {
     var body: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 28) {
-                NoopScorePageHeader(title: "Recovery", date: noopDayLabel(day?.rings.recovery == nil ? latest?.day : nil),
+                NoopScorePageHeader(theme: .recovery, title: "Recovery", date: noopDayLabel(day?.rings.recovery == nil ? latest?.day : nil),
                                     tiles: [("Resting HRV", vital("hrv")), ("Resting HR", vital("rhr"))],
                                     back: { navigation.back(or: .today) }) {
-                    NoopRecoverySphere(fill: (recovery ?? 0) / 100, color: band.light, deep: band.deep, value: recovery)
+                    NoopHeroPager(page: "recovery", names: ["Sphere", "Bloom", "Pulse"]) {
+                        NoopRecoverySphere(fill: (recovery ?? 0) / 100, color: band.light, deep: band.deep, value: recovery)
+                    } second: {
+                        NoopRecoveryBloom(fill: (recovery ?? 0) / 100, tint: band.light, deep: band.deep, value: recovery)
+                    } third: {
+                        NoopRecoveryPulse(fill: (recovery ?? 0) / 100, tint: band.light, value: recovery,
+                                          restingBPM: day?.vitals.first { $0.key == "rhr" }?.value)
+                    }
                 }
                 NoopTrendsList(navigation: navigation, ids: noopRecoveryIDs)
             }
@@ -71,6 +78,12 @@ struct NoopStrainPage: View {
     @EnvironmentObject private var repo: Repository
 
     private var strain: Double? { day?.rings.strain }
+    /// Today's target, on the strain scale: easier after a low recovery, harder after a high one.
+    private var target: ClosedRange<Double>? {
+        guard let r = day?.rings.recovery ?? noopLatest(repo, { $0.recovery })?.value else { return nil }
+        let mid = 0.2 + 0.4 * min(1, max(0, r / 100))
+        return (mid - 0.08)...(mid + 0.08)
+    }
     private var exerciseMinutes: Double {
         (day?.ribbonSessions ?? []).reduce(0) { $0 + $1.end.timeIntervalSince($1.start) / 60 }
     }
@@ -78,12 +91,19 @@ struct NoopStrainPage: View {
     var body: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 28) {
-                NoopScorePageHeader(title: "Strain", date: noopDayLabel(nil),
+                NoopScorePageHeader(theme: .strain, title: "Strain", date: noopDayLabel(nil),
                                     tiles: [("Exercise", NoopRestRecord.duration(exerciseMinutes)),
                                             ("Total energy", day?.energy?.totalBurnedSoFar
                                                 .map { "\($0.formatted(.number.precision(.fractionLength(0)))) kcal" } ?? "—")],
                                     back: { navigation.back(or: .today) }) {
-                    NoopStrainHeat(level: min(1, (strain ?? 0) / 100), value: strain)
+                    NoopHeroPager(page: "strain", names: ["Heat", "Gauge", "Day"]) {
+                        NoopStrainHeat(level: min(1, (strain ?? 0) / 100), value: strain)
+                    } second: {
+                        NoopStrainGauge(level: min(1, (strain ?? 0) / 100), value: strain, target: target)
+                    } third: {
+                        NoopStrainDayRing(points: day?.ribbonPoints ?? [], resting: day?.vitals.first { $0.key == "rhr" }?.value,
+                                          value: strain)
+                    }
                 }
                 NoopTrendsList(navigation: navigation, ids: noopStrainIDs)
             }

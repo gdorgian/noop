@@ -246,3 +246,70 @@ half4 noopHeat(float2 position, half4 color, float2 size, float time, float leve
     float a = body * inside * clamp(0.35 + heat * 0.75, 0.0, 1.0) * flicker;
     return half4(c * half(a), half(a));
 }
+
+// MARK: - Dusk backdrop
+//
+// The sky behind a score page's hero: a glow in the page's colour at the horizon, two ridges of
+// hills in silhouette (far ones lighter, near ones darker), faint stars when `stars` > 0, all fading
+// to nothing toward the bottom so the page's own colour takes over. The ridges drift a hair with
+// `time`, so the scene is alive but never busy.
+
+[[ stitchable ]]
+half4 noopBackdrop(float2 position, half4 color, float2 size, float time, half4 sky, half4 ridge, float stars) {
+    float2 uv = position / size;
+    // Sky: the page colour, brightest at the horizon line.
+    float horizon = 0.58;
+    float glow = exp(-pow((uv.y - horizon) / 0.30, 2.0));
+    // Dark at the top of the sky, lit toward the horizon, as at dusk.
+    half3 c = sky.rgb * half((0.05 + 0.40 * glow) * (0.45 + 0.55 * smoothstep(0.0, horizon, uv.y)));
+    // Stars in the upper sky.
+    if (stars > 0.0) {
+        float2 g = floor(position / 3.0);
+        float h = hash21(g);
+        float tw = 0.5 + 0.5 * sin(time * (1.0 + 3.0 * hash21(g + 7.0)) + h * 40.0);
+        float star = step(0.9965, h) * tw * smoothstep(horizon, 0.05, uv.y) * stars;
+        c += half3(star);
+    }
+    // Far ridge, then near ridge.
+    float far = horizon - 0.06 - 0.10 * fbm(float2(uv.x * 2.4 + time * 0.004, 1.7));
+    float near = horizon + 0.04 - 0.14 * fbm(float2(uv.x * 1.6 - time * 0.006 + 9.0, 4.2));
+    float inFar = smoothstep(far - 0.003, far + 0.003, uv.y);
+    float inNear = smoothstep(near - 0.003, near + 0.003, uv.y);
+    c = mix(c, ridge.rgb * 0.55h, half(inFar * 0.85));
+    c = mix(c, ridge.rgb * 0.22h, half(inNear));
+    // Fade out toward the bottom of the frame.
+    float fade = 1.0 - smoothstep(0.62, 1.0, uv.y);
+    return half4(c * half(fade), half(fade));
+}
+
+// MARK: - Bloom
+//
+// Recovery as a flower opening: `petals` soft petals around the centre, each as long as `level`
+// lets it be, layered twice (the inner layer smaller and turned half a petal) and breathing very
+// slowly. Light is brightest at each petal's spine and fades to its edge.
+
+[[ stitchable ]]
+half4 noopBloom(float2 position, half4 color, float2 size, float time, float level, half4 tint, half4 deep) {
+    float2 p = (position - size * 0.5) / (min(size.x, size.y) * 0.5);
+    float r = length(p);
+    float a = atan2(p.y, p.x);
+    float breathe = 1.0 + 0.025 * sin(time * 0.9);
+    float petals = 9.0;
+    half4 out = half4(0);
+    for (int layer = 0; layer < 2; layer++) {
+        float turn = float(layer) * (M_PI_F / petals) + time * (layer == 0 ? 0.02 : -0.03);
+        float reach = (0.28 + 0.66 * level) * (layer == 0 ? 1.0 : 0.68) * breathe;
+        float shape = pow(abs(cos((a + turn) * petals * 0.5)), 0.65);
+        float edge = reach * (0.55 + 0.45 * shape);
+        float inside = smoothstep(edge + 0.012, edge - 0.012, r);
+        float spine = pow(shape, 6.0) * (1.0 - r / max(edge, 0.001));
+        half3 c = mix(deep.rgb, tint.rgb, half(clamp(0.25 + 0.75 * (r / max(edge, 0.001)) * 0.6 + spine * 0.6, 0.0, 1.0)));
+        float alpha = inside * (layer == 0 ? 0.78 : 0.92);
+        out = half4(mix(out.rgb, c, half(alpha)), max(out.a, half(alpha)));
+    }
+    // A soft core.
+    float core = smoothstep(0.16, 0.0, r);
+    out.rgb = mix(out.rgb, tint.rgb * 1.2h, half(core * 0.6));
+    out.a = max(out.a, half(core * 0.6));
+    return half4(out.rgb * out.a, out.a);
+}
