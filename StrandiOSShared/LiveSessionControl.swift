@@ -9,6 +9,31 @@ import AppIntents
 /// here can finish a session: ending goes through the live screen and its confirmation.
 public enum LiveSessionControl {
     @MainActor public static var togglePause: (() -> Void)?
+    /// The lift banner's rest buttons: add seconds to the running rest, or end it now.
+    @MainActor public static var adjustLiftRest: ((Int) -> Void)?
+    @MainActor public static var skipLiftRest: (() -> Void)?
+}
+
+/// "+30 s" on the lift banner while a rest runs.
+struct AddLiftRestIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Add 30 seconds to the rest"
+    static let isDiscoverable = false
+
+    func perform() async throws -> some IntentResult {
+        await MainActor.run { LiveSessionControl.adjustLiftRest?(30) }
+        return .result()
+    }
+}
+
+/// "Skip" on the lift banner: the rest ends now and the next set is ready.
+struct SkipLiftRestIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "End the rest now"
+    static let isDiscoverable = false
+
+    func perform() async throws -> some IntentResult {
+        await MainActor.run { LiveSessionControl.skipLiftRest?() }
+        return .result()
+    }
 }
 
 /// End…: opens the app on the live screen, whose confirmation finishes the session. An intent rather than a

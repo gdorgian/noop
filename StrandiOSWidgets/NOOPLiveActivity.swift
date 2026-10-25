@@ -67,7 +67,7 @@ struct NOOPLiveActivity: Widget {
                                 Spacer(minLength: 8)
                                 figure(context, size: 24)
                             }
-                            track(context)
+                            if workout.hasGoal { goalBar(workout) } else { track(context) }
                             sessionControls(workout)
                         } else {
                             figure(context, size: 40)
@@ -84,7 +84,7 @@ struct NOOPLiveActivity: Widget {
                 if let workout = context.state.workout {
                     Image(systemName: workout.isPaused ? "pause.fill" : workout.symbol)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(volt)
+                        .foregroundStyle(sky)
                         .padding(.leading, 2)
                 } else {
                     heart(context, size: 14)
@@ -115,8 +115,46 @@ struct NOOPLiveActivity: Widget {
         }
     }
 
-    private let volt = Color(.sRGB, red: 210 / 255, green: 240 / 255, blue: 74 / 255, opacity: 1)
-    private let voltInk = Color(.sRGB, red: 22 / 255, green: 28 / 255, blue: 5 / 255, opacity: 1)
+    /// Cardio and every sport but weights are Aura blue across Noop Aura; weights are volt green.
+    private let sky = Color(.sRGB, red: 143 / 255, green: 211 / 255, blue: 245 / 255, opacity: 1)
+    private let skyInk = Color(.sRGB, red: 4 / 255, green: 18 / 255, blue: 26 / 255, opacity: 1)
+
+    /// The goal as a bar under the clock. A time goal fills by itself from the session's clock (no push a
+    /// second); a distance goal moves when the app pushes its hundredths. Full, it turns into a check.
+    @ViewBuilder
+    private func goalBar(_ workout: NOOPActivityAttributes.Workout) -> some View {
+        let reached = workout.goalReached == true
+        VStack(alignment: .leading, spacing: 5) {
+            Group {
+                if reached || workout.isPaused || workout.goalSeconds == nil {
+                    let f = reached ? 1 : workout.goalFraction ?? pausedFraction(workout)
+                    ProgressView(value: f)
+                } else if let s = workout.goalSeconds {
+                    ProgressView(timerInterval: workout.clockStart...workout.clockStart.addingTimeInterval(TimeInterval(s)),
+                                 countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
+                }
+            }
+            .progressViewStyle(.linear)
+            .tint(reached ? zoneColors[2] : sky)
+            .labelsHidden()
+            HStack(spacing: 5) {
+                if reached {
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 10.5, weight: .bold))
+                        .foregroundStyle(zoneColors[2])
+                }
+                Text(reached ? "Goal reached" : (workout.goalLabel ?? ""))
+                    .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(reached ? zoneColors[2] : secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private func pausedFraction(_ workout: NOOPActivityAttributes.Workout) -> Double {
+        guard let s = workout.goalSeconds, s > 0, let p = workout.pausedElapsed else { return 0 }
+        return min(1, Double(p) / Double(s))
+    }
 
     /// The session's active time: a system timer while it runs (no push a second), a still figure once paused.
     @ViewBuilder
@@ -148,9 +186,9 @@ struct NOOPLiveActivity: Widget {
             Button(intent: ToggleLiveSessionPauseIntent()) {
                 Label(workout.isPaused ? "Resume" : "Pause", systemImage: workout.isPaused ? "play.fill" : "pause.fill")
                     .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 14))
-                    .foregroundStyle(voltInk)
+                    .foregroundStyle(skyInk)
                     .frame(maxWidth: .infinity, minHeight: 40)
-                    .background(volt, in: Capsule())
+                    .background(sky, in: Capsule())
             }
             .buttonStyle(.plain)
             Button(intent: OpenLiveSessionIntent()) {
@@ -172,10 +210,10 @@ struct NOOPLiveActivity: Widget {
         return VStack(alignment: .leading, spacing: 11) {
             HStack(alignment: .center, spacing: 11) {
                 ZStack {
-                    Circle().fill(volt.opacity(workout.isPaused ? 0.1 : 0.18))
+                    Circle().fill(sky.opacity(workout.isPaused ? 0.1 : 0.18))
                     Image(systemName: workout.symbol)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(workout.isPaused ? quiet : volt)
+                        .foregroundStyle(workout.isPaused ? quiet : sky)
                 }
                 .frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 2) {
@@ -199,7 +237,8 @@ struct NOOPLiveActivity: Widget {
                 Spacer(minLength: 6)
                 sessionClock(workout, size: 32)
             }
-            if !workout.isPaused, freshBPM(context) != nil { track(context) }
+            if workout.hasGoal { goalBar(workout) }
+            else if !workout.isPaused, freshBPM(context) != nil { track(context) }
             sessionControls(workout)
         }
         .padding(.horizontal, 16)

@@ -653,6 +653,7 @@ private struct NoopLiftLiveScreen: View {
         let group = line.supersetGroup
         let next = engine.plan.indices.contains(index + 1) ? engine.plan[index + 1] : nil
         let ramp = live.warmupSuggestion(forExercise: index, incrementKg: plateStepKg)
+        let coach = done < working.count ? live.coachNote(forExercise: index, incrementKg: plateStepKg) : nil
         return VStack(alignment: .leading, spacing: 8) {
             if group != nil {
                 supersetLabel(engine: engine, index: index, group: group)
@@ -714,6 +715,7 @@ private struct NoopLiftLiveScreen: View {
                         .foregroundStyle(NoopHTMLColor.copy).frame(width: 32, height: 32).noopHitTarget()
                 }
             }
+            if let coach { coachLine(coach) }
             HStack(spacing: 8) {
                 Text("SET").lineLimit(1).frame(width: 34, alignment: .leading)
                 Text(LiftFormat.weightUnit(units).uppercased()).frame(maxWidth: .infinity)
@@ -790,6 +792,7 @@ private struct NoopLiftLiveScreen: View {
             return false
         }()
         let type = NoopLiftSetType(warmup: live.isWarmup(row), kind: live.kind(of: row))
+        VStack(spacing: 10) {
         HStack(spacing: 8) {
             Menu {
                 Picker("Set type", selection: Binding(get: { type }, set: { apply($0, to: row) })) {
@@ -851,8 +854,46 @@ private struct NoopLiftLiveScreen: View {
             .frame(width: 38)
             .accessibilityLabel(done ? "Done" : active ? "Log set \(row.setIndex)" : "Start set \(row.setIndex)")
         }
+        // While the weight is being typed, the bar as it will be loaded.
+        if active, focused == .weight, let load = plateBreakdown {
+            NoopPlateBar(load: load)
+                .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity))
+        }
+        }
         .opacity(done || active ? 1 : 0.86)
         .animation(NoopMotion.swap, value: done)
+        .animation(NoopMotion.swap, value: focused == .weight && active)
+    }
+
+    /// Today's aim for the exercise, from last time: a quiet line with its reason, under the name.
+    private func coachLine(_ note: LiftCoachNote) -> some View {
+        let unit = LiftFormat.weightUnit(units)
+        func w(_ kg: Double) -> String { LiftFormat.trim(LiftFormat.display(fromKilograms: kg, system: units)) }
+        let last = note.lastReps.map(String.init).joined(separator: ", ")
+        let (symbol, headline, reason): (String, String, String) = {
+            switch note.advice {
+            case .addWeight(let to, let by, let reps):
+                return ("arrow.up.right", "Go up to \(w(to)) \(unit) for \(reps)", "+\(w(by)) \(unit) · every set reached the top last time (\(last))")
+            case .addRep(let kg, let reps):
+                return ("plus", "\(w(kg)) \(unit) again, aim for \(reps) reps", "One more than last time (\(last))")
+            case .repeatTarget(let kg, let reps):
+                return ("arrow.counterclockwise", "Hold \(w(kg)) \(unit) for \(reps)", "Last time fell a little short (\(last)), so it is the same target")
+            }
+        }()
+        return HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol).font(.system(size: 11, weight: .bold)).foregroundStyle(NoopHTMLColor.warm)
+                .frame(width: 22, height: 22).background(NoopHTMLColor.warm.opacity(0.14), in: Circle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(headline).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    .monospacedDigit()
+                Text(reason).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
+                    .monospacedDigit().fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 9)
+        .background(NoopHTMLColor.warm.opacity(0.06), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     /// A working set's number counts working sets only: three warm-ups and then the first working set
@@ -942,23 +983,31 @@ private struct NoopLiftLiveScreen: View {
         }
     }
 
-    /// Plates per side for the typed weight on a standard bar (20 kg or 45 lb).
-    private var plateLine: String? {
+    /// Plates per side for the typed weight on the chosen bar (20 kg reads as 45 lb), largest first, and
+    /// what no plate pair can make.
+    private var plateBreakdown: NoopPlateBar.Load? {
         guard let total = Double(loadText.replacingOccurrences(of: ",", with: ".")) else { return nil }
         let metric = units == .metric
         // The chosen bar, in the units on screen: 20 kg reads as 45 lb, the way the plates are sold.
         let bar = metric ? barKg : (barKg >= 19 ? 45 : barKg >= 14 ? 35 : (LiftFormat.display(fromKilograms: barKg, system: units)).rounded())
         guard total > bar else { return nil }
         var side = (total - bar) / 2
-        let plates = metric ? [25, 20, 15, 10, 5, 2.5, 1.25] : [45, 35, 25, 10, 5, 2.5]
-        var used: [String] = []
-        for p in plates {
-            var n = 0
-            while side + 0.001 >= p { side -= p; n += 1 }
-            if n > 0 { used.append(n > 1 ? "\(n)×\(LiftFormat.trim(p))" : LiftFormat.trim(p)) }
+        var used: [Double] = []
+        for p in NoopPlateBar.plates(metric: metric) {
+            while side + 0.001 >= p { side -= p; used.append(p) }
         }
         guard !used.isEmpty else { return nil }
-        return "Each side: " + used.joined(separator: " + ") + (side > 0.01 ? " (+\(LiftFormat.trim(side)))" : "")
+        return .init(bar: bar, perSide: used, leftover: side > 0.01 ? side : 0, metric: metric)
+    }
+
+    private var plateLine: String? {
+        guard let load = plateBreakdown else { return nil }
+        var groups: [(Double, Int)] = []
+        for p in load.perSide {
+            if let i = groups.firstIndex(where: { $0.0 == p }) { groups[i].1 += 1 } else { groups.append((p, 1)) }
+        }
+        let used = groups.map { $0.1 > 1 ? "\($0.1)×\(LiftFormat.trim($0.0))" : LiftFormat.trim($0.0) }
+        return "Each side: " + used.joined(separator: " + ") + (load.leftover > 0 ? " (+\(LiftFormat.trim(load.leftover)))" : "")
     }
 
     // MARK: Bottom bar
@@ -1002,6 +1051,20 @@ private struct NoopLiftLiveScreen: View {
                 }
                 .accessibilityLabel("\(bpm) beats per minute")
             }
+            if presentation.isResting, !presentation.isReady, !allDone, !live.isPaused {
+                // More rest, in place. Ending it early is the main button: it starts the next set.
+                Button { live.adjustRest(by: 30); restBumps += 1 } label: {
+                    Text("+30").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).monospacedDigit()
+                        .foregroundStyle(NoopHTMLColor.blueLight)
+                        .frame(width: 46, height: 40)
+                        .background(NoopHTMLColor.blueLight.opacity(0.12), in: Capsule())
+                        .noopHitTarget()
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                .sensoryFeedback(.increase, trigger: restBumps)
+                .transition(.scale(scale: 0.8).combined(with: .opacity))
+                .accessibilityLabel("Add 30 seconds of rest")
+            }
             Button {
                 focused = nil
                 if allDone { ratingEffort = true; return }
@@ -1038,6 +1101,8 @@ private struct NoopLiftLiveScreen: View {
     }
 
     @State private var prototypeOpenedAt = Date()
+    /// Counts +30 taps, for their haptic.
+    @State private var restBumps = 0
 
     private static func second(_ date: Date) -> Int { Int(date.timeIntervalSince1970) }
 
@@ -3095,6 +3160,86 @@ private struct NoopLiftLastTimeSheet: View {
         .padding(22)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(NoopHTMLColor.canvas)
+    }
+}
+
+/// One side of the bar as it will be loaded: plates to scale in the competition colours, largest nearest
+/// the collar, and the sum in words beneath. It answers "what do I put on" at a glance across the gym.
+struct NoopPlateBar: View {
+    struct Load: Equatable {
+        let bar: Double
+        let perSide: [Double]
+        let leftover: Double
+        let metric: Bool
+    }
+
+    let load: Load
+
+    static func plates(metric: Bool) -> [Double] {
+        metric ? [25, 20, 15, 10, 5, 2.5, 1.25] : [45, 35, 25, 10, 5, 2.5]
+    }
+
+    /// Competition colours by size: red, blue, yellow, green, then white, black and chrome for the change.
+    private func color(_ p: Double) -> Color {
+        let rank = Self.plates(metric: load.metric).firstIndex(of: p) ?? 6
+        let metricColors = [Color(hex: 0xE5484D), Color(hex: 0x3E7BFA), Color(hex: 0xF2C94C), Color(hex: 0x3FB37F),
+                            Color(hex: 0xE8ECEB), Color(hex: 0x2B2F2E), Color(hex: 0xB8C0BE)]
+        let imperialColors = [Color(hex: 0x3E7BFA), Color(hex: 0xF2C94C), Color(hex: 0x3FB37F), Color(hex: 0xE8ECEB),
+                              Color(hex: 0xE5484D), Color(hex: 0xB8C0BE)]
+        let palette = load.metric ? metricColors : imperialColors
+        return palette[min(rank, palette.count - 1)]
+    }
+
+    /// Height by weight, so a 25 reads as the big plate it is and change plates stay small.
+    private func height(_ p: Double) -> CGFloat {
+        let largest = Self.plates(metric: load.metric).first ?? 25
+        return 22 + 30 * CGFloat(sqrt(p / largest))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 0) {
+                // The sleeve end of the bar, then the collar.
+                Capsule().fill(Color.white.opacity(0.22)).frame(width: 26, height: 6)
+                RoundedRectangle(cornerRadius: 2).fill(Color.white.opacity(0.4)).frame(width: 5, height: 20)
+                HStack(spacing: 2) {
+                    ForEach(Array(load.perSide.enumerated()), id: \.offset) { i, p in
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(color(p).gradient)
+                            .overlay(RoundedRectangle(cornerRadius: 3, style: .continuous).strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+                            .frame(width: p >= (load.metric ? 10 : 25) ? 11 : 8, height: height(p))
+                            .transition(.scale(scale: 0.4, anchor: .leading).combined(with: .opacity))
+                    }
+                }
+                .padding(.leading, 3)
+                Capsule().fill(Color.white.opacity(0.22)).frame(width: 18, height: 6)
+                Spacer(minLength: 10)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("Each side").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.muted)
+                    Text(LiftFormat.trim(load.perSide.reduce(0, +)) + (load.metric ? " kg" : " lb"))
+                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).monospacedDigit()
+                        .foregroundStyle(NoopHTMLColor.ink).contentTransition(.numericText())
+                }
+            }
+            .frame(height: 54)
+            .animation(.snappy(duration: 0.25), value: load)
+            Text(words).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).monospacedDigit()
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(words)
+    }
+
+    private var words: String {
+        var groups: [(Double, Int)] = []
+        for p in load.perSide {
+            if let i = groups.firstIndex(where: { $0.0 == p }) { groups[i].1 += 1 } else { groups.append((p, 1)) }
+        }
+        let unit = load.metric ? "kg" : "lb"
+        let plates = groups.map { $0.1 > 1 ? "\($0.1) × \(LiftFormat.trim($0.0))" : LiftFormat.trim($0.0) }.joined(separator: " + ")
+        let extra = load.leftover > 0 ? ", \(LiftFormat.trim(load.leftover * 2)) \(unit) short of a plate pair" : ""
+        return "\(LiftFormat.trim(load.bar)) \(unit) bar, then \(plates) a side\(extra)"
     }
 }
 

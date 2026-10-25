@@ -460,6 +460,26 @@ final class LiftSessionController: ObservableObject {
         persist()
     }
 
+    /// Add to (or take from) the running rest, from the sheet or the Lock Screen. A rest already run out
+    /// gets the time from now. The rest's buzzes and its alert move with it.
+    func adjustRest(by seconds: Int) {
+        guard engine != nil, !isPaused, !saveInProgress else { return }
+        let stamp = Self.unixNow
+        engine?.adjustRest(by: seconds, now: stamp)
+        now = stamp
+        warnedFor = nil
+        persist()
+    }
+
+    /// End the running rest now. The next set is ready, and starts with the next tap as always.
+    func skipRest() {
+        guard engine != nil, !isPaused, !saveInProgress else { return }
+        let stamp = Self.unixNow
+        engine?.skipRest(now: stamp)
+        now = stamp
+        persist()
+    }
+
     /// Reps x weight for a slot, as "8 x 30 kg": what the set counts as — typed numbers, else the grey
     /// ones the sheet shows.
     func setNumbers(for slot: LiftSlot, system: UnitSystem) -> String? {
@@ -535,6 +555,13 @@ final class LiftSessionController: ObservableObject {
 
     /// The warm-up ramp `insertWarmups` would put in front of an exercise, or empty when there is none to
     /// offer: something of it is done, it already has a warm-up, or no working weight is known yet.
+    /// Today's aim for an exercise from its last session (`LiftCoachNote`), or nil without one.
+    func coachNote(forExercise index: Int, incrementKg: Double) -> LiftCoachNote? {
+        guard let plan = engine?.plan, plan.indices.contains(index), let last = lastSession[plan[index].exercise] else { return nil }
+        let item = plan[index]
+        return LiftCoachNote.make(lastSession: last, item: item, incrementKg: incrementKg)
+    }
+
     func warmupSuggestion(forExercise index: Int, incrementKg: Double) -> [RoutineSetPlan] {
         guard let engine, !saveInProgress else { return [] }
         let slots = engine.slots(forExercise: index)

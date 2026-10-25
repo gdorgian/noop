@@ -51,13 +51,29 @@ public struct NOOPActivityAttributes: ActivityAttributes {
         public var clockStart: Date
         /// Whole seconds of active time when paused; nil while the clock runs.
         public var pausedElapsed: Int?
+        /// A time goal, in seconds of active time. The banner fills toward it on its own, from `clockStart`.
+        /// Every goal field is optional, so a banner started by an older build still decodes.
+        public var goalSeconds: Int?
+        /// A distance goal's progress, 0…1, pushed as the distance grows (in steps of a hundredth).
+        public var goalFraction: Double?
+        /// "of 30:00" / "2.4 of 5 km", worded app-side: the extension ships no string catalog.
+        public var goalLabel: String?
+        public var goalReached: Bool?
 
-        public init(sport: String, symbol: String, clockStart: Date, pausedElapsed: Int?) {
+        public init(sport: String, symbol: String, clockStart: Date, pausedElapsed: Int?,
+                    goalSeconds: Int? = nil, goalFraction: Double? = nil, goalLabel: String? = nil,
+                    goalReached: Bool? = nil) {
             self.sport = sport
             self.symbol = symbol
             self.clockStart = clockStart
             self.pausedElapsed = pausedElapsed
+            self.goalSeconds = goalSeconds
+            self.goalFraction = goalFraction
+            self.goalLabel = goalLabel
+            self.goalReached = goalReached
         }
+
+        public var hasGoal: Bool { goalSeconds != nil || goalFraction != nil }
 
         public var isPaused: Bool { pausedElapsed != nil }
     }

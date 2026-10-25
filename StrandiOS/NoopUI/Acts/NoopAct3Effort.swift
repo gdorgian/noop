@@ -17,6 +17,8 @@ struct NoopAct3Screens: View {
     @EnvironmentObject private var liftSession: LiftSessionController
     /// Production: the running session that refused a start, while its refusal is up.
     @State private var refusal: NoopRunningSession?
+    /// The goal and zone sheet over a running cardio session.
+    @State private var cardioGoalOpen = false
 
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     @SceneStorage("noop.act3.rest-day") private var restDay = false
@@ -2750,6 +2752,15 @@ private extension NoopAct3Screens {
                 figures: figures,
                 footnote: AppModel.isTooShortToSave(elapsedSeconds: TimeInterval(elapsed)) ? "Under a minute is not kept" : nil,
                 tooShort: AppModel.isTooShortToSave(elapsedSeconds: TimeInterval(elapsed)),
+                goalFraction: model.workoutGoalProgress(at: timeline.date),
+                goalLabel: active.goal.map { goal in
+                    switch goal {
+                    case .time(let s): "\(NoopCardioGoalText.clock(min(elapsed, s))) of \(NoopCardioGoalText.clock(s))"
+                    case .distance(let m): "\(NoopCardioGoalText.km(model.gpsRecorder.distanceM)) of \(NoopCardioGoalText.km(m)) km"
+                    }
+                },
+                goalReached: active.goalReached,
+                goalAction: { cardioGoalOpen = true },
                 pauseAction: {
                     model.toggleWorkoutPause()
                     navigation.toggleSessionPause(at: timeline.date)
@@ -2760,6 +2771,15 @@ private extension NoopAct3Screens {
                     navigation.endRecordedSession(workout: matched, row: saved)
                     NoopFitnessModel.markChanged()
                 })
+            .onChange(of: elapsed) { model.checkWorkoutGoal(at: timeline.date) }
+            }
+            .sheet(isPresented: $cardioGoalOpen) {
+                NoopCardioGoalSheet(sport: active.sport, mode: .edit, goal: active.goal, zone: active.targetZone) { goal, zone in
+                    model.setWorkoutGoal(goal)
+                    model.setWorkoutTargetZone(zone)
+                }
+                .environmentObject(profile)
+                .noopSheet()
             }
         } else {
             NoopScreen(topInset: 58) {

@@ -9,7 +9,9 @@ import StrandDesign
 /// have enough context to be safe. Every word, clock anchor and progress value comes from the same
 /// `LiftSessionController.Presentation` that feeds the in-app bar.
 struct LiftLiveActivity: Widget {
-    private let aura = NoopPalette.accent
+    /// Weights are volt green across Noop Aura; cardio and every other sport are Aura blue.
+    private let aura = Color(.sRGB, red: 210 / 255, green: 240 / 255, blue: 74 / 255, opacity: 1)
+    private let auraInk = Color(.sRGB, red: 22 / 255, green: 28 / 255, blue: 5 / 255, opacity: 1)
     private let bodyInk = Color(.sRGB, red: 198 / 255, green: 206 / 255, blue: 201 / 255, opacity: 1)
     private let disabledInk = NoopPalette.textQuiet
 
@@ -95,10 +97,59 @@ struct LiftLiveActivity: Widget {
                 }
             }
 
-            progress(state, showsLabel: true)
+            if isRunningRest(state) {
+                restBar(state)
+                restControls
+            } else {
+                progress(state, showsLabel: true)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 15)
+    }
+
+    /// A rest is counting down: not paused, not yet over.
+    private func isRunningRest(_ state: LiftActivityAttributes.ContentState) -> Bool {
+        guard state.isResting, !state.isPaused, !state.isReady, let end = state.restEndsAt else { return false }
+        return end > .now
+    }
+
+    /// The rest draining away by itself — the system animates it from the two dates, so nothing is pushed
+    /// while it runs.
+    @ViewBuilder
+    private func restBar(_ state: LiftActivityAttributes.ContentState) -> some View {
+        if let end = state.restEndsAt, end > state.stageStartedAt {
+            ProgressView(timerInterval: state.stageStartedAt...end, countsDown: true) {
+                EmptyView()
+            } currentValueLabel: { EmptyView() }
+            .progressViewStyle(.linear)
+            .tint(aura)
+            .labelsHidden()
+        }
+    }
+
+    /// +30 s and Skip act in place; they change only the rest, never a set. Starting the next set stays a
+    /// tap in the app or on the strap.
+    private var restControls: some View {
+        HStack(spacing: 8) {
+            Button(intent: AddLiftRestIntent()) {
+                Text("+30 s")
+                    .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 14))
+                    .monospacedDigit()
+                    .foregroundStyle(NoopPalette.textPrimary)
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .background(Color.white.opacity(0.13), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            Button(intent: SkipLiftRestIntent()) {
+                Label("Skip rest", systemImage: "forward.end.fill")
+                    .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 14))
+                    .foregroundStyle(auraInk)
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .background(aura, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private func expandedBottom(_ state: LiftActivityAttributes.ContentState) -> some View {
@@ -126,7 +177,12 @@ struct LiftLiveActivity: Widget {
                 }
             }
 
-            progress(state, showsLabel: false)
+            if isRunningRest(state) {
+                restBar(state)
+                restControls
+            } else {
+                progress(state, showsLabel: false)
+            }
         }
         .padding(.top, 2)
     }

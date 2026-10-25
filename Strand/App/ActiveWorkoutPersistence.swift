@@ -34,6 +34,9 @@ enum ActiveWorkoutPersistence {
         var targetZone: Int? = nil
         var pausedAtSec: Int? = nil
         var pausedDurationSec: Int? = nil
+        /// What the session is aiming for, when the wearer set a goal. Optional, so older snapshots decode.
+        var goal: CardioGoal? = nil
+        var goalReached: Bool? = nil
     }
 
     /// The single `UserDefaults` key (JSON-encoded `Snapshot`). Namespaced like `moments`/`sleepMarks`.
@@ -65,6 +68,8 @@ enum ActiveWorkoutPersistence {
             targetZone: raw.targetZone.flatMap { (1...5).contains($0) ? $0 : nil },
             pausedAtSec: raw.pausedAtSec.flatMap { $0 > 0 ? $0 : nil },
             pausedDurationSec: raw.pausedDurationSec.map { max(0, $0) },
+            goal: raw.goal.flatMap { $0.isValid ? $0 : nil },
+            goalReached: raw.goalReached,
         )
     }
 
@@ -138,5 +143,27 @@ enum PendingWorkoutSaves {
     private static func write(_ rows: [WorkoutRow], to defaults: UserDefaults) {
         if rows.isEmpty { defaults.removeObject(forKey: defaultsKey); return }
         if let data = try? JSONEncoder().encode(rows) { defaults.set(data, forKey: defaultsKey) }
+    }
+}
+
+/// A cardio session's goal: a length of time or a distance. A heart-rate zone is a separate choice
+/// (`targetZone`), because it is a way of training rather than a finish line, and the two combine.
+enum CardioGoal: Codable, Equatable, Hashable {
+    case time(seconds: Int)
+    case distance(meters: Double)
+
+    var isValid: Bool {
+        switch self {
+        case .time(let s): (60...86_400).contains(s)
+        case .distance(let m): m.isFinite && (100...500_000).contains(m)
+        }
+    }
+
+    /// 0…1 of the way there.
+    func progress(elapsedSeconds: Double, meters: Double) -> Double {
+        switch self {
+        case .time(let s): min(1, max(0, elapsedSeconds / Double(s)))
+        case .distance(let m): min(1, max(0, meters / m))
+        }
     }
 }

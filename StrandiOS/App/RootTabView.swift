@@ -10,6 +10,7 @@ struct RootTabView: View {
     @EnvironmentObject private var homeScreenQuickActions: HomeScreenQuickActionSceneDelegate
     @EnvironmentObject private var repo: Repository
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var liftSession: LiftSessionController
     @StateObject private var navigation = NoopNavigation()
     @StateObject private var liveGlance = NoopLiveGlance()
     @State private var resetInProgress = false
@@ -33,6 +34,8 @@ struct RootTabView: View {
                     model.toggleWorkoutPause()
                     navigation?.toggleSessionPause(at: Date())
                 }
+                LiveSessionControl.adjustLiftRest = { [weak liftSession] seconds in liftSession?.adjustRest(by: seconds) }
+                LiveSessionControl.skipLiftRest = { [weak liftSession] in liftSession?.skipRest() }
                 #if DEBUG
                 // `--noop-start-session <sport>`: start a recorded session at launch, so the Live Activity's
                 // controls can be checked on a simulator without walking the picker.

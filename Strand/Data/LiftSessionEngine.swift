@@ -595,6 +595,19 @@ struct LiftSessionEngine: Equatable {
         }
     }
 
+    /// Lengthen or shorten the running rest. A rest never ends before `now`: cutting it past now ends it
+    /// now, which leaves the next set ready rather than starting it — starting a set stays the lifter's tap.
+    mutating func adjustRest(by seconds: Int, now: Int) {
+        guard case .resting(let slot, let endsAt) = stage, endsAt > now || seconds > 0 else { return }
+        stage = .resting(slot, endsAt: max(now, max(endsAt, now) + seconds))
+    }
+
+    /// End the running rest now; the next set waits for the lifter's tap.
+    mutating func skipRest(now: Int) {
+        guard case .resting(let slot, let endsAt) = stage, endsAt > now else { return }
+        stage = .resting(slot, endsAt: now)
+    }
+
     private mutating func pushHistory() {
         history.append(Snapshot(plan: plan, stage: stage,
                                 sets: sets, stageStartedAt: stageStartedAt))

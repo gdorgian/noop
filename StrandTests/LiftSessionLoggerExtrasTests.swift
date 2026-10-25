@@ -158,3 +158,58 @@ final class LiftSessionLoggerExtrasTests: XCTestCase {
         XCTAssertEqual(c.engine?.sets.first?.isWarmup, true)
     }
 }
+
+final class LiftCoachNoteTests: XCTestCase {
+    private func item(low: Int? = nil, high: Int? = nil) -> LiftPlanItem {
+        LiftPlanItem(exercise: "Bench press", targetSets: 3, targetRepsLow: low, targetRepsHigh: high)
+    }
+    private func last(_ sets: [(Double?, Int?)]) -> [Int: LiftSetCarry] {
+        Dictionary(uniqueKeysWithValues: sets.enumerated().map { ($0.offset + 1, LiftSetCarry(weightKg: $0.element.0, reps: $0.element.1)) })
+    }
+
+    func testTopOfTheRangeOnEverySetAddsWeightAndDropsToTheBottom() {
+        let note = LiftCoachNote.make(lastSession: last([(80, 12), (80, 12), (80, 12)]), item: item(low: 8, high: 12), incrementKg: 2.5)
+        XCTAssertEqual(note?.advice, .addWeight(toKg: 82.5, byKg: 2.5, reps: 8))
+        XCTAssertEqual(note?.lastReps, [12, 12, 12])
+    }
+
+    func testInsideTheRangeAddsARep() {
+        let note = LiftCoachNote.make(lastSession: last([(80, 10), (80, 9), (80, 9)]), item: item(low: 8, high: 12), incrementKg: 2.5)
+        XCTAssertEqual(note?.advice, .addRep(weightKg: 80, reps: 10))
+    }
+
+    func testFallingShortHoldsTheTarget() {
+        let note = LiftCoachNote.make(lastSession: last([(80, 8), (80, 6)]), item: item(low: 8, high: 12), incrementKg: 2.5)
+        XCTAssertEqual(note?.advice, .repeatTarget(weightKg: 80, reps: 8))
+    }
+
+    func testNoTargetsReadsTheRangeFromLastTimeSoFivesAreNotAFailure() {
+        let note = LiftCoachNote.make(lastSession: last([(100, 5), (100, 5), (100, 5)]), item: item(), incrementKg: 2.5)
+        XCTAssertEqual(note?.advice, .addRep(weightKg: 100, reps: 6))
+    }
+
+    func testLighterRampSetsAreNotTheWorkAndAnEmptyLastTimeSaysNothing() {
+        let note = LiftCoachNote.make(lastSession: last([(40, 10), (60, 5), (80, 8), (80, 8)]), item: item(low: 8, high: 8), incrementKg: 2.5)
+        XCTAssertEqual(note?.advice, .addWeight(toKg: 82.5, byKg: 2.5, reps: 8))
+        XCTAssertNil(LiftCoachNote.make(lastSession: last([(nil, 8)]), item: item(), incrementKg: 2.5))
+    }
+}
+
+final class LiftRestAdjustTests: XCTestCase {
+    func testAddingAndSkippingMoveOnlyTheRest() {
+        var engine = LiftSessionEngine(plan: [LiftPlanItem(exercise: "Row", targetSets: 2, restSec: 90)], startTs: 0)
+        engine.advance(now: 10)        // first set
+        engine.advance(now: 40)        // set done, resting until 130
+        guard case .resting(_, let end) = engine.stage else { return XCTFail("not resting") }
+        XCTAssertEqual(end, 130)
+        engine.adjustRest(by: 30, now: 50)
+        guard case .resting(_, let longer) = engine.stage else { return XCTFail() }
+        XCTAssertEqual(longer, 160)
+        engine.skipRest(now: 60)
+        guard case .resting(_, let skipped) = engine.stage else { return XCTFail("skipping must not start the set") }
+        XCTAssertEqual(skipped, 60)
+        engine.adjustRest(by: 30, now: 100)
+        guard case .resting(_, let again) = engine.stage else { return XCTFail() }
+        XCTAssertEqual(again, 130, "a rest already over gets the time from now")
+    }
+}

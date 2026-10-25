@@ -162,6 +162,10 @@ final class AppModel: ObservableObject {
         var targetZone: Int? = nil
         var pausedAt: Date?
         var pausedDuration: TimeInterval = 0
+        /// A time or distance to reach, when the wearer set one.
+        var goal: CardioGoal? = nil
+        /// Set once the goal was reached and announced, so it buzzes once.
+        var goalReached = false
 
         var isPaused: Bool { pausedAt != nil }
 
@@ -914,7 +918,8 @@ final class AppModel: ObservableObject {
     /// name; callers that don't pick a sport get the catalogue default "Other", parity with Android's
     /// `startWorkout(sport:)`). The active card on Live then shows elapsed time, live HR and strain
     /// building; End scores + saves it under this sport. Confirms with a single buzz. (#519)
-    func startWorkout(sport: String = WorkoutCatalog.defaultSportName, targetZone: Int? = nil) {
+    func startWorkout(sport: String = WorkoutCatalog.defaultSportName, targetZone: Int? = nil,
+                      goal: CardioGoal? = nil) {
         guard activeWorkout == nil else { return }
         lastWorkout = nil
         let name = sport.trimmingCharacters(in: .whitespaces)
@@ -923,7 +928,8 @@ final class AppModel: ObservableObject {
         // Validated rather than trusted: a zone outside 1...5 is no target at all, and storing it would
         // let the live readout ask for a band the zone set does not have.
         let validatedTarget = targetZone.flatMap { (1...5).contains($0) ? $0 : nil }
-        activeWorkout = ActiveWorkout(start: started, sport: resolved, targetZone: validatedTarget)
+        activeWorkout = ActiveWorkout(start: started, sport: resolved, targetZone: validatedTarget,
+                                      goal: goal.flatMap { $0.isValid ? $0 : nil })
         zoneTrainingTargetZone = validatedTarget
         ZoneTrainingPrefs.setLastTargetZone(validatedTarget)
         // #524: arm GPS route recording for a distance-type sport (run / ride / walk / hike), mirroring
@@ -997,7 +1003,8 @@ final class AppModel: ObservableObject {
                 liveStrain: w.liveStrain,
                 targetZone: w.targetZone,
                 pausedAtSec: w.pausedAt.map { Int($0.timeIntervalSince1970) },
-                pausedDurationSec: Int(w.pausedDuration)))
+                pausedDurationSec: Int(w.pausedDuration),
+                goal: w.goal, goalReached: w.goalReached ? true : nil))
     }
 
     /// If a manual workout was in flight when iOS killed the app, rebuild `activeWorkout` from the durable
@@ -1015,6 +1022,8 @@ final class AppModel: ObservableObject {
         w.targetZone = snap.targetZone
         w.pausedAt = snap.pausedAtSec.map { Date(timeIntervalSince1970: TimeInterval($0)) }
         w.pausedDuration = TimeInterval(snap.pausedDurationSec ?? 0)
+        w.goal = snap.goal
+        w.goalReached = snap.goalReached ?? false
         activeWorkout = w
         zoneTrainingTargetZone = w.targetZone
 
@@ -1032,6 +1041,47 @@ final class AppModel: ObservableObject {
             )
         }
     }
+
+    /// Set, change or clear the running session's goal. A new goal can be reached again.
+    func setWorkoutGoal(_ goal: CardioGoal?) {
+        guard var w = activeWorkout else { return }
+        w.goal = goal.flatMap { $0.isValid ? $0 : nil }
+        w.goalReached = false
+        activeWorkout = w
+        persistActiveWorkout()
+        checkWorkoutGoal()
+    }
+
+    /// Set or clear the zone the running session coaches toward. The zone coach takes it from the next
+    /// reading, with the same push / ease-off / back-in-zone buzzes as a zone chosen at the start.
+    func setWorkoutTargetZone(_ zone: Int?) {
+        guard var w = activeWorkout else { return }
+        w.targetZone = zone.flatMap { (1...5).contains($0) ? $0 : nil }
+        activeWorkout = w
+        zoneTrainingTargetZone = w.targetZone
+        ZoneTrainingPrefs.setLastTargetZone(w.targetZone)
+        persistActiveWorkout()
+    }
+
+    /// How far the running session is toward its goal, 0…1, or nil without one.
+    func workoutGoalProgress(at now: Date = Date()) -> Double? {
+        guard let w = activeWorkout, let goal = w.goal else { return nil }
+        return goal.progress(elapsedSeconds: w.elapsed(at: now), meters: gpsRecorder.distanceM)
+    }
+
+    /// Announces a reached goal once: a long double buzz on the strap and a success tap on the phone.
+    /// Runs on every captured reading and from the live screen's clock, so it lands within a second either way.
+    func checkWorkoutGoal(at now: Date = Date()) {
+        guard var w = activeWorkout, !w.isPaused, !w.goalReached,
+              let p = workoutGoalProgress(at: now), p >= 1 else { return }
+        w.goalReached = true
+        activeWorkout = w
+        persistActiveWorkout()
+        buzz(loops: 3, gate: HapticPrefs.workout)
+        NotificationCenter.default.post(name: Self.workoutGoalReached, object: nil)
+    }
+
+    static let workoutGoalReached = Notification.Name("noop.workout.goalReached")
 
     func toggleWorkoutPause() {
         guard var w = activeWorkout else { return }
@@ -1208,6 +1258,7 @@ final class AppModel: ObservableObject {
         activeWorkout = w
         // Re-snapshot the durable session so a kill keeps the latest accumulated HR window (#529).
         persistActiveWorkout()
+        checkWorkoutGoal()
     }
 
     /// Drop the smoothing window and blank the hero number so a resume / re-attach shows ","

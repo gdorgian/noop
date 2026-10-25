@@ -28,6 +28,13 @@ struct NoopFitnessCardioLive: View {
     let footnote: String?
     /// Under a minute: finishing now saves nothing, and the prompt says so.
     var tooShort = false
+    /// The session's goal: how far along (0…1), in words ("12:40 of 30:00"), and whether it is reached.
+    /// With a goal, the ring around the pulse fills toward it instead of following the heart rate.
+    var goalFraction: Double? = nil
+    var goalLabel: String? = nil
+    var goalReached = false
+    /// Opens the goal and zone sheet. Nil where no goal can be set (the design fixture).
+    var goalAction: (() -> Void)? = nil
     let pauseAction: () -> Void
     let endAction: () -> Void
 
@@ -44,6 +51,7 @@ struct NoopFitnessCardioLive: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if goalAction != nil || goalLabel != nil { goalChip.padding(.top, 14) }
             Spacer(minLength: 10)
             pulse
             Spacer(minLength: 10)
@@ -65,6 +73,7 @@ struct NoopFitnessCardioLive: View {
                 .animation(.easeInOut(duration: 0.8), value: zone)
         )
         .background(NoopHTMLColor.canvas.ignoresSafeArea())
+        .sensoryFeedback(.success, trigger: goalReached) { _, reached in reached }
         .alert(tooShort ? "End without saving?" : "Finish \(sport.lowercased())?", isPresented: $confirmEnd) {
             Button("Keep going", role: .cancel) { }
             if tooShort {
@@ -101,15 +110,50 @@ struct NoopFitnessCardioLive: View {
         }
     }
 
+    /// "Set a goal", or the goal and how far along it is; a tap opens the goal sheet.
+    private var goalChip: some View {
+        Button { goalAction?() } label: {
+            HStack(spacing: 7) {
+                Image(systemName: goalReached ? "checkmark.circle.fill" : goalLabel == nil ? "flag" : "flag.checkered")
+                    .font(.system(size: 12, weight: .semibold))
+                    .contentTransition(.symbolEffect(.replace))
+                Text(goalReached ? "Goal reached" : goalLabel ?? "Set a goal")
+                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+            .foregroundStyle(goalReached ? NoopHTMLColor.green : goalLabel == nil ? NoopHTMLColor.inkSoft : NoopHTMLColor.blueLight)
+            .padding(.horizontal, 12).frame(height: 32)
+            .background((goalReached ? NoopHTMLColor.green : NoopHTMLColor.blueLight).opacity(goalLabel == nil ? 0.0 : 0.12), in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.white.opacity(goalLabel == nil ? 0.12 : 0), lineWidth: 0.6))
+            .noopHitTarget()
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .disabled(goalAction == nil)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(NoopMotion.swap, value: goalReached)
+    }
+
+    private var ringFraction: Double {
+        if let goalFraction { return goalReached ? 1 : max(0.004, goalFraction) }
+        return bpm.map { min(1, max(0.04, Double($0 - 40) / 160)) } ?? 0
+    }
+
+    private var ringTint: Color {
+        if goalReached { return NoopHTMLColor.green }
+        return goalFraction != nil ? NoopHTMLColor.blueLight : tint
+    }
+
     private var pulse: some View {
         ZStack {
             Circle().stroke(Color.white.opacity(0.06), lineWidth: 12)
             Circle()
-                .trim(from: 0, to: bpm.map { min(1, max(0.04, Double($0 - 40) / 160)) } ?? 0)
-                .stroke(AngularGradient(colors: [tint.opacity(0.5), tint], center: .center),
+                .trim(from: 0, to: ringFraction)
+                .stroke(AngularGradient(colors: [ringTint.opacity(0.5), ringTint], center: .center),
                         style: StrokeStyle(lineWidth: 12, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.6), value: bpm)
+                .shadow(color: goalReached ? NoopHTMLColor.green.opacity(0.45) : .clear, radius: 14)
+                .animation(.easeOut(duration: 0.6), value: ringFraction)
+                .animation(.easeInOut(duration: 0.5), value: goalReached)
             VStack(spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(bpm.map(String.init) ?? "—")

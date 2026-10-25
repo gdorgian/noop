@@ -66,7 +66,8 @@ final class LiveActivityController {
         // A recorded session starting, pausing, resuming or ending changes what the banner offers. Only those
         // edges: the session's samples move every second and are not the banner's business.
         model.$activeWorkout
-            .map { $0.map { [$0.sport, "\($0.start.timeIntervalSince1970)", "\($0.pausedAt?.timeIntervalSince1970 ?? 0)"] } }
+            .map { $0.map { [$0.sport, "\($0.start.timeIntervalSince1970)", "\($0.pausedAt?.timeIntervalSince1970 ?? 0)",
+                             "\(String(describing: $0.goal))", "\($0.goalReached)"] } }
             .removeDuplicates()
             .dropFirst()
             .receive(on: DispatchQueue.main)
@@ -102,16 +103,29 @@ final class LiveActivityController {
                recovery: day?.recovery.map { Int($0.rounded()) }, connected: connected, standsAside: standsAside(),
                appActive: appActive ?? (UIApplication.shared.applicationState == .active),
                effort: day?.strain.map { Int($0.rounded()) },
-               workout: Self.workout(model.activeWorkout))
+               workout: Self.workout(model.activeWorkout, meters: model.gpsRecorder.distanceM))
     }
 
     /// The running session as the banner shows it, or nil when none is recording.
-    static func workout(_ active: AppModel.ActiveWorkout?, now: Date = Date()) -> NOOPActivityAttributes.Workout? {
+    static func workout(_ active: AppModel.ActiveWorkout?, meters: Double = 0,
+                        now: Date = Date()) -> NOOPActivityAttributes.Workout? {
         guard let active else { return nil }
         let paused = active.isPaused ? Int(active.elapsed(at: now).rounded(.down)) : nil
-        return .init(sport: active.sport, symbol: NoopFitnessCardioLive.symbol(for: active.sport),
-                     clockStart: active.start.addingTimeInterval(active.pausedDuration),
-                     pausedElapsed: paused)
+        var w = NOOPActivityAttributes.Workout(sport: active.sport, symbol: NoopFitnessCardioLive.symbol(for: active.sport),
+                                               clockStart: active.start.addingTimeInterval(active.pausedDuration),
+                                               pausedElapsed: paused)
+        switch active.goal {
+        case .time(let s)?:
+            w.goalSeconds = s
+            w.goalLabel = "of \(NoopCardioGoalText.clock(s))"
+        case .distance(let m)?:
+            // In hundredths, so the banner is pushed about a hundred times over the whole distance.
+            w.goalFraction = (min(1, meters / m) * 100).rounded(.down) / 100
+            w.goalLabel = "\(NoopCardioGoalText.km(meters)) of \(NoopCardioGoalText.km(m)) km"
+        case nil: break
+        }
+        if active.goal != nil { w.goalReached = active.goalReached }
+        return w
     }
 
     /// Drive the activity from the latest live values (`LiveHRBannerLifecycle` decides start / push / end). Starts
