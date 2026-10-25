@@ -411,6 +411,9 @@ final class NoopNavigation: ObservableObject {
     @Published var addSheetPresented = false
     /// The metric the shared metric sheet (`NoopMetricSheet`) is open on; nil when closed.
     @Published var metricSheet: NoopMetricSheetRequest?
+    /// The day Recovery and Strain show, in days back from today; shared, so stepping back on one and
+    /// opening the other keeps the day.
+    @Published var scoreDayOffset = 0
     static let fitnessSheetRoutes: Set<NoopRoute> = [.fitnessDetail, .fitnessMuscles]
     /// A metric inspection keeps the presenting page mounted, including its scroll position.
     func dismissMetricSheet() {

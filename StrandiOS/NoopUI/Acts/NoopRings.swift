@@ -293,12 +293,12 @@ private struct NoopDonutRings: View {
     private func columnBody(_ title: String, fill: Double, value: Double?, colors: [Color], target: ClosedRange<Double>?) -> some View {
         VStack(spacing: 12) {
             ZStack {
-                NoopSlotClock { _, reveal in
-                    Canvas { context, size in
-                        NoopDonut.draw(in: &context, size: size, fill: fill * NoopRingValues.spring(reveal), colors: colors,
-                                       target: target.map { $0.lowerBound * reveal...$0.upperBound * reveal })
-                    }
+                // The well, track and target are drawn once; the arc and its tip are shapes animated by
+                // SwiftUI, so the draw-in never depends on a timeline being on screen.
+                Canvas { context, size in
+                    NoopDonut.draw(in: &context, size: size, fill: 0, colors: colors, target: target)
                 }
+                NoopDonutArc(fill: fill, colors: colors)
                 HStack(alignment: .firstTextBaseline, spacing: 1) {
                     if let value {
                         NoopCountUp(value: value, font: NoopHTMLFont.sans(NoopType.title2, weight: .semibold))
@@ -390,7 +390,7 @@ private struct NoopDialRings: View {
                 dial(.recovery, "Recovery", fill: values.recoveryFill, text: values.recovery.map { "\(Int($0.rounded()))" },
                      percent: true, color: recoveryColor)
                 dial(.strain, "Strain", fill: values.strainFill, text: values.strain.map { noopStrainText($0) },
-                     percent: false, color: Color(hex: 0x1E9BF0))
+                     percent: false, color: Color(hex: 0x0093E7))
             }
             .padding(.vertical, 10)
         }
@@ -398,7 +398,7 @@ private struct NoopDialRings: View {
 
     private var recoveryColor: Color {
         guard let r = values.recovery else { return .white }
-        return r >= 67 ? Color(hex: 0x2BE36A) : r >= 34 ? Color(hex: 0xF7D23E) : Color(hex: 0xF2445B)
+        return r >= 67 ? Color(hex: 0x16EC06) : r >= 34 ? Color(hex: 0xFFDE00) : Color(hex: 0xFF0026)
     }
 
     private func dial(_ metric: NoopRingMetric, _ title: String, fill: Double, text: String?, percent: Bool, color: Color) -> some View {
@@ -583,5 +583,44 @@ private enum NoopGyro {
         context.blendMode = .plusLighter
         for s in segs where s.depth >= 0 { drawSeg(s) }
         for b in beads where b.depth >= 0 { drawBead(b) }
+    }
+}
+
+/// The donut's arc: shaded from start to end, a glowing rounded tip, springing out from the top when
+/// it first appears.
+private struct NoopDonutArc: View {
+    let fill: Double
+    let colors: [Color]
+
+    @State private var drawn: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { g in
+            let side = min(g.size.width, g.size.height)
+            let r = side / 2 - 9, width: CGFloat = 12
+            let f = min(1, max(0, fill)) * drawn
+            ZStack {
+                if f > 0.004 {
+                    Circle()
+                        .trim(from: 0, to: f)
+                        .stroke(AngularGradient(stops: [.init(color: colors[0], location: 0), .init(color: colors[1], location: max(0.01, f))],
+                                                center: .center, startAngle: .degrees(-2), endAngle: .degrees(358)),
+                                style: StrokeStyle(lineWidth: width, lineCap: .round))
+                        .frame(width: 2 * r, height: 2 * r)
+                        .rotationEffect(.degrees(-90))
+                    Circle().fill(colors[1])
+                        .frame(width: width, height: width)
+                        .shadow(color: colors[1].opacity(0.9), radius: 5)
+                        .offset(y: -r)
+                        .rotationEffect(.degrees(360 * f))
+                }
+            }
+            .frame(width: g.size.width, height: g.size.height)
+        }
+        .allowsHitTesting(false)
+        .onAppear {
+            if reduceMotion { drawn = 1 } else { withAnimation(.spring(response: 1.2, dampingFraction: 0.8).delay(0.1)) { drawn = 1 } }
+        }
     }
 }

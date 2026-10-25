@@ -24,6 +24,7 @@ struct NoopAct1Screens: View {
     @State private var selectedStage: Int?
     @StateObject private var restLayout = NoopPageLayout(page: "rest", catalog: NoopAct1Screens.restSections)
     @State private var restEditing = NoopPageEditing()
+    @State private var restCalendarOpen = false
     @SceneStorage("noop.act1.selected-bedtime") private var selectedBedtime = 2
     @SceneStorage("noop.act1.smart-wake") private var smartWake = true
     /// Minutes past midnight for the wake time, stepped in fives. Nil until the user moves it, so
@@ -75,7 +76,22 @@ struct NoopAct1Screens: View {
                     NoopBatteryChip(percent: rest == nil ? 52 : battery) { navigation.push(.strap) }
                         .padding(.top, 2)
                 }
-                .padding(.bottom, 20)
+                .padding(.bottom, 14)
+
+                // The week's nights, a day at a time, or from the month sheet.
+                if rest != nil {
+                    NoopDayPill(offset: $navigation.selectedRestDay, maxBack: 6) { restCalendarOpen = true }
+                        .padding(.bottom, 18)
+                        .sheet(isPresented: $restCalendarOpen) {
+                            NoopDayCalendarSheet(offset: $navigation.selectedRestDay, maxBack: 6, title: "Sleep") { date in
+                                guard let rest, rest.needMin > 0,
+                                      let m = model.repo.days.last(where: { $0.day == Repository.localDayKey(date) })?.totalSleepMin
+                                else { return nil }
+                                return (min(1, m / rest.needMin), Color(hex: 0x9C8CFF))
+                            }
+                            .noopSheet()
+                        }
+                }
 
                 NoopEditableSections(layout: restLayout, editing: $restEditing) { id in restSection(id) }
             }

@@ -14,35 +14,56 @@ enum NoopPageHeroMetrics {
     static let gap: CGFloat = 14
 }
 
-/// A score page's fixed top: back, title and date, over the page's dusk backdrop.
+/// A score page's fixed top: back, title, and the day picker; behind it the page's dusk scene, or
+/// for the WHOOP-style family a plain slate fall-off, as that app keeps its pages.
 struct NoopScorePageTitle: View {
     let theme: NoopPageTheme
     let title: String
-    let date: String
+    @Binding var dayOffset: Int
+    var maxBack = 365
+    /// Each day's ring for the month sheet.
+    let ring: (Date) -> NoopDayRing?
     let back: () -> Void
 
+    @State private var calendarOpen = false
+    private var family: NoopHeroFamily { NoopHeroFamily.current }
+
     var body: some View {
-        ZStack {
-            VStack(spacing: 2) {
+        VStack(spacing: 10) {
+            ZStack {
                 Text(title).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink)
-                Text(date).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-            }
-            HStack {
-                Button(action: back) {
-                    NoopIconDiscShape(size: .small) {
-                        Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
+                HStack {
+                    Button(action: back) {
+                        NoopIconDiscShape(size: .small) {
+                            Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
+                        }
                     }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    .accessibilityLabel("Back")
+                    Spacer()
                 }
-                .buttonStyle(NoopHTMLPressStyle())
-                .accessibilityLabel("Back")
-                Spacer()
             }
+            NoopDayPill(offset: $dayOffset, maxBack: maxBack) { calendarOpen = true }
         }
         .padding(.bottom, NoopPageHeroMetrics.gap)
         .background(alignment: .top) {
-            NoopPageBackdrop(theme: theme)
-                .frame(width: UIScreen.main.bounds.width)
-                .offset(y: -140)
+            Group {
+                if family == .whoop {
+                    LinearGradient(colors: [Color(hex: 0x283038), Color(hex: 0x1A1F24).opacity(0.6), .clear],
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: 560)
+                } else {
+                    NoopPageBackdrop(theme: theme)
+                }
+            }
+            .frame(width: UIScreen.main.bounds.width)
+            .offset(y: -140)
+            .allowsHitTesting(false)
+        }
+        .sheet(isPresented: $calendarOpen) {
+            NoopDayCalendarSheet(offset: $dayOffset, maxBack: maxBack, title: title, ring: ring)
+                .presentationDetents([.large])
+                .noopSheet()
         }
     }
 }

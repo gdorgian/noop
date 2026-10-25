@@ -50,10 +50,10 @@ struct NoopWhoopStyleHero: View {
     private var color: Color {
         switch score.kind {
         case .sleep: return Color(hex: 0x7C93A8)
-        case .strain: return Color(hex: 0x1E9BF0)
+        case .strain: return Color(hex: 0x0093E7)
         case .recovery:
             guard let r = recovery else { return Color(hex: 0x6E7780) }
-            return r >= 67 ? Color(hex: 0x2BD94F) : r >= 34 ? Color(hex: 0xF5CF3B) : Color(hex: 0xF2445B)
+            return r >= 67 ? Color(hex: 0x16EC06) : r >= 34 ? Color(hex: 0xFFDE00) : Color(hex: 0xFF0026)
         }
     }
 
@@ -69,9 +69,10 @@ struct NoopWhoopStyleHero: View {
         let side = NoopPageHeroMetrics.heroSide
         NoopSlotClock { _, reveal in
             ZStack {
-                Circle().stroke(Color.white.opacity(0.12), lineWidth: 13)
+                // Proportions from the reference: the stroke is about a sixteenth of the ring's width.
+                Circle().stroke(Color(hex: 0x3A4148), lineWidth: 17)
                 Circle().trim(from: 0, to: min(1, score.fill) * NoopRingValues.spring(reveal))
-                    .stroke(color, style: StrokeStyle(lineWidth: 13, lineCap: .butt))
+                    .stroke(color, style: StrokeStyle(lineWidth: 17, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
