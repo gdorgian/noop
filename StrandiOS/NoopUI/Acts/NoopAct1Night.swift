@@ -79,6 +79,7 @@ struct NoopAct1Screens: View {
     /// Rest's sections in their default order.
     static let restSections: [NoopPageSection] = [
         NoopPageSection(id: "night", title: "Your sleep", detail: "Last night against your need"),
+        NoopPageSection(id: "inbed", title: "In bed and asleep", detail: "Time in bed, asleep and awake, lights out to up"),
         NoopPageSection(id: "hero-aurora", title: "Header · Aurora", detail: "The night's lights in a dark disc", onByDefault: false),
         NoopPageSection(id: "hero-glass", title: "Header · Glass", detail: "The night's stages settled in a glass", onByDefault: false),
         NoopPageSection(id: "night-glass", title: "Sleep · Glass", detail: "The night as layered liquid, filled toward your need", onByDefault: false),
@@ -187,10 +188,10 @@ struct NoopAct1Screens: View {
                 .buttonStyle(NoopHTMLPressStyle())
                 .modifier(NoopDaySwipe(offset: $navigation.selectedRestDay, maxBack: 6))
                 }
-
-                if let bed = restNight?.bed {
-                    inBedCard(bed)
-                }
+            }
+        case "inbed":
+            if let bed = restNight?.bed {
+                inBedCard(bed)
             }
         case "seven":
             VStack(spacing: 10) {

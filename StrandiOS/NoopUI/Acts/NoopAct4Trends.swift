@@ -516,21 +516,21 @@ private struct NoopA4Header<Trailing: View>: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
+            // The name first, in the same weight and size as Today's title; the window under it.
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(NoopHTMLFont.outfit(NoopType.title3, weight: .medium))
+                    .tracking(-0.4)
+                    .foregroundStyle(NoopHTMLColor.ink)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(eyebrow)
                     .font(NoopHTMLFont.sans(NoopType.footnote))
                     .foregroundStyle(NoopHTMLColor.copy)
-                    .frame(height: 16.5, alignment: .top)
-                Text(title)
-                    .font(NoopHTMLFont.outfit(NoopType.title3))
-                    .tracking(-0.46)
-                    .foregroundStyle(NoopHTMLColor.ink)
-                    .frame(minHeight: 26.45, alignment: .top)
             }
             Spacer(minLength: 0)
             trailing
         }
-        .frame(height: 46.95, alignment: .top)
+        .frame(minHeight: 46.95, alignment: .top)
         .padding(.bottom, 4)
     }
 }

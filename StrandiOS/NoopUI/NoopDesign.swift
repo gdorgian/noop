@@ -297,27 +297,30 @@ private struct NoopScrollRestoreBody<C: View>: View {
 struct NoopScreenHeader<Trailing: View>: View {
     let eyebrow: String
     let title: String
+    /// A tab's own page: the title in the same weight and size as Today's.
+    var tabRoot = false
     @ViewBuilder var trailing: Trailing
 
-    init(_ title: String, eyebrow: String, @ViewBuilder trailing: () -> Trailing) {
+    init(_ title: String, eyebrow: String, tabRoot: Bool = false, @ViewBuilder trailing: () -> Trailing) {
         self.title = title
         self.eyebrow = eyebrow
+        self.tabRoot = tabRoot
         self.trailing = trailing()
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(eyebrow)
-                    .font(NoopHTMLFont.sans(NoopType.footnote))
-                    .foregroundStyle(NoopHTMLColor.copy)
+            VStack(alignment: .leading, spacing: tabRoot ? 2 : 4) {
+                // A tab's own page leads with its name, the line under it says what it shows.
+                if !tabRoot { eyebrowText }
                 Text(title)
-                    .font(NoopHTMLFont.outfit(23, weight: .regular))
-                    .tracking(-0.45)
+                    .font(tabRoot ? NoopHTMLFont.outfit(NoopType.title3, weight: .medium) : NoopHTMLFont.outfit(23, weight: .regular))
+                    .tracking(tabRoot ? -0.4 : -0.45)
                     .foregroundStyle(NoopHTMLColor.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
                     .allowsTightening(true)
+                if tabRoot { eyebrowText }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 8)
@@ -325,6 +328,14 @@ struct NoopScreenHeader<Trailing: View>: View {
         }
         .padding(.top, 2)
         .padding(.bottom, 16)
+    }
+}
+
+extension NoopScreenHeader {
+    fileprivate var eyebrowText: some View {
+        Text(eyebrow)
+            .font(NoopHTMLFont.sans(NoopType.footnote))
+            .foregroundStyle(NoopHTMLColor.copy)
     }
 }
 
