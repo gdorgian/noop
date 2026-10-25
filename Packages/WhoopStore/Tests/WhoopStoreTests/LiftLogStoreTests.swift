@@ -722,3 +722,21 @@ final class BodyLogStoreTests: XCTestCase {
         XCTAssertTrue(deleted)
     }
 }
+
+final class WorkoutFeelStoreTests: XCTestCase {
+    func testRatingIsKeptPerSessionClampedAndReplaced() async throws {
+        let store = try await WhoopStore.inMemory()
+        try await store.upsertWorkoutFeel(.init(deviceId: "d", startTs: 1_000, rating: 7, ts: 2_000))
+        try await store.upsertWorkoutFeel(.init(deviceId: "other", startTs: 1_000, rating: 3, ts: 2_000))
+        var read = try await store.workoutFeel(deviceId: "d", startTs: 1_000)
+        XCTAssertEqual(read?.rating, 7)
+        try await store.upsertWorkoutFeel(.init(deviceId: "d", startTs: 1_000, rating: 14, ts: 3_000))
+        read = try await store.workoutFeel(deviceId: "d", startTs: 1_000)
+        XCTAssertEqual(read?.rating, 10, "a rating is 1…10")
+        XCTAssertEqual(read?.ts, 3_000)
+        let missing = try await store.workoutFeel(deviceId: "d", startTs: 5)
+        XCTAssertNil(missing)
+        let other = try await store.workoutFeel(deviceId: "other", startTs: 1_000)
+        XCTAssertEqual(other?.rating, 3)
+    }
+}

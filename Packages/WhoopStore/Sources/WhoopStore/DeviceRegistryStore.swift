@@ -178,6 +178,8 @@ public struct DeviceRegistryStore: Sendable {
         // v50-body-log: measurements and the progress-photo index. The photo files themselves live in the
         // app's documents, which the app-level reset removes (`NoopLocalReset`).
         "bodyMeasurement", "progressPhoto",
+        // v51-workout-feel: the wearer's rating of each recorded cardio session.
+        "workoutFeel",
     ]
 
     /// Permanently delete every recorded sample/derived row belonging to one device, across all

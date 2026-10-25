@@ -1216,6 +1216,16 @@ extension WhoopStore {
             try db.create(index: "idx_progressPhoto_device_ts", on: "progressPhoto",
                           columns: ["deviceId", "ts"], options: [.ifNotExists])
         }
+        // v51 (Aura): how a recorded cardio session felt, 1–10, keyed by the session's start second.
+        migrator.registerMigration("v51-workout-feel") { db in
+            try db.create(table: "workoutFeel", options: [.ifNotExists]) { t in
+                t.column("deviceId", .text).notNull()
+                t.column("startTs", .integer).notNull()     // the workout row's startTs
+                t.column("rating", .double).notNull()       // 1…10
+                t.column("ts", .integer).notNull()          // when it was given
+                t.primaryKey(["deviceId", "startTs"])
+            }
+        }
         return migrator
     }
 }
