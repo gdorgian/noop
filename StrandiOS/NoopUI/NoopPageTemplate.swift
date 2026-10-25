@@ -152,30 +152,40 @@ struct NoopPageTheme {
     let sky: Color
     let ridge: Color
     var stars = false
+    /// The landscape the Bevel-style family paints behind this page (see `noopScene`).
+    var scene: Float = 0
 
-    static let sleep = NoopPageTheme(sky: Color(hex: 0x7B6BE0), ridge: Color(hex: 0x3B2F7A), stars: true)
-    static let recovery = NoopPageTheme(sky: Color(hex: 0x3FC9A0), ridge: Color(hex: 0x1C4F49))
-    static let strain = NoopPageTheme(sky: Color(hex: 0xF0A04B), ridge: Color(hex: 0x5A3418))
-    static let trends = NoopPageTheme(sky: Color(hex: 0x00E59A), ridge: Color(hex: 0x15403A))
-    static let you = NoopPageTheme(sky: Color(hex: 0xE08A9B), ridge: Color(hex: 0x4A2430))
+    static let sleep = NoopPageTheme(sky: Color(hex: 0x7B6BE0), ridge: Color(hex: 0x3B2F7A), stars: true, scene: 0)
+    static let recovery = NoopPageTheme(sky: Color(hex: 0x3FC9A0), ridge: Color(hex: 0x1C4F49), scene: 1)
+    static let strain = NoopPageTheme(sky: Color(hex: 0xF0A04B), ridge: Color(hex: 0x5A3418), scene: 2)
+    static let trends = NoopPageTheme(sky: Color(hex: 0x00E59A), ridge: Color(hex: 0x15403A), scene: 3)
+    static let you = NoopPageTheme(sky: Color(hex: 0xE08A9B), ridge: Color(hex: 0x4A2430), scene: 4)
 }
 
-/// The dusk scene behind the top of a score page, drawn on the GPU and paused off screen.
+/// The dusk scene behind the top of a score page, drawn on the GPU and paused off screen. The
+/// Bevel-style family paints a full landscape instead.
 struct NoopPageBackdrop: View {
     let theme: NoopPageTheme
     var height: CGFloat = 520
 
+    private var painted: Bool { NoopHeroFamily.current == .bevel }
+
     var body: some View {
         NoopSlotClock { t, reveal in
             GeometryReader { g in
-                Rectangle().colorEffect(ShaderLibrary.noopBackdrop(
-                    .float2(g.size), .float(Float(t)), .color(theme.sky), .color(theme.ridge), .float(theme.stars ? 1 : 0)))
-                    .opacity(reveal)
+                if painted {
+                    Rectangle().colorEffect(ShaderLibrary.noopScene(.float2(g.size), .float(Float(t)), .float(theme.scene)))
+                        .opacity(reveal)
+                } else {
+                    Rectangle().colorEffect(ShaderLibrary.noopBackdrop(
+                        .float2(g.size), .float(Float(t)), .color(theme.sky), .color(theme.ridge), .float(theme.stars ? 1 : 0)))
+                        .opacity(reveal)
+                }
             }
         }
-        .frame(height: height)
+        .frame(height: painted ? height + 80 : height)
         .frame(maxWidth: .infinity)
-        .noopStretchesOnPull(height: height)
+        .noopStretchesOnPull(height: painted ? height + 80 : height)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
