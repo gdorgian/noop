@@ -37,7 +37,6 @@ struct NoopExerciseSummary: View {
 
     @State private var metric: Metric = .max
     @State private var window: Window = .year
-    @State private var selected: LiftRecords.SessionPoint?
 
     private var metrics: [Metric] { exercise.isBodyweight ? [.reps] : Metric.allCases }
 
@@ -51,7 +50,7 @@ struct NoopExerciseSummary: View {
                     if metrics.count > 1 {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: NoopSpace.xs) {
-                                ForEach(metrics, id: \.self) { m in NoopChip(title: m.rawValue, isOn: metric == m) { metric = m; selected = nil } }
+                                ForEach(metrics, id: \.self) { m in NoopChip(title: m.rawValue, isOn: metric == m) { metric = m } }
                             }
                         }
                     }
@@ -85,20 +84,16 @@ struct NoopExerciseSummary: View {
         }
     }
 
-    private var points: [(point: LiftRecords.SessionPoint, value: Double)] {
-        let cutoff: Int? = switch window {
-        case .quarter: Int(Date().addingTimeInterval(-91 * 86_400).timeIntervalSince1970)
-        case .year: Int(Date().addingTimeInterval(-365 * 86_400).timeIntervalSince1970)
-        case .all: nil
-        }
-        return exercise.sessions.filter { cutoff == nil || $0.startTs >= cutoff! }.compactMap { p in
+    private var points: [NoopTrendPoint] {
+        exercise.sessions.compactMap { p in
             let v: Double? = switch metric {
             case .max: p.bestOneRepMaxKg
             case .heaviest: p.heaviestKg
             case .volume: p.volumeKg
             case .reps: Double(p.totalReps)
             }
-            return v.map { (p, metric == .reps ? $0 : LiftFormat.display(fromKilograms: $0, system: units)) }
+            return v.map { NoopTrendPoint(id: p.sessionId, ts: p.startTs,
+                                          value: metric == .reps ? $0 : LiftFormat.display(fromKilograms: $0, system: units)) }
         }
     }
 
@@ -107,10 +102,42 @@ struct NoopExerciseSummary: View {
     }
 
     private var chartCard: some View {
-        let pts = points
-        let shown = selected.flatMap { s in pts.first { $0.point.sessionId == s.sessionId } } ?? pts.last
-        let change = (pts.first?.value).flatMap { first in pts.last.map { $0.value - first } }
-        return NoopSessionCard {
+        NoopTrendChartCard(points: NoopTrendPoint.within(window, points), label: label)
+            .animation(NoopMotion.swap, value: metric)
+            .animation(NoopMotion.swap, value: window)
+    }
+}
+
+/// One session's value on a trend line.
+struct NoopTrendPoint: Equatable {
+    let id: String
+    /// Unix seconds.
+    let ts: Int
+    let value: Double
+
+    var date: Date { Date(timeIntervalSince1970: Double(ts)) }
+
+    static func within(_ window: NoopExerciseSummary.Window, _ points: [NoopTrendPoint]) -> [NoopTrendPoint] {
+        let days: Double? = switch window { case .quarter: 91; case .year: 365; case .all: nil }
+        guard let days else { return points }
+        let cutoff = Int(Date().addingTimeInterval(-days * 86_400).timeIntervalSince1970)
+        return points.filter { $0.ts >= cutoff }
+    }
+}
+
+/// A trend over sessions: the latest (or touched) value large, the change across the window, and a line
+/// you can drag along to read any session.
+struct NoopTrendChartCard: View {
+    let points: [NoopTrendPoint]
+    let label: (Double) -> String
+    var tint: Color = NoopHTMLColor.volt
+
+    @State private var selected: NoopTrendPoint?
+
+    var body: some View {
+        let shown = selected ?? points.last
+        let change = (points.first?.value).flatMap { first in points.last.map { $0.value - first } }
+        NoopSessionCard {
             VStack(alignment: .leading, spacing: NoopSpace.s) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -118,11 +145,11 @@ struct NoopExerciseSummary: View {
                             .font(NoopHTMLFont.outfit(NoopType.title3, weight: .regular)).monospacedDigit()
                             .foregroundStyle(NoopHTMLColor.ink)
                             .contentTransition(.numericText())
-                        Text(shown.map { NoopExerciseFormat.date($0.point.startTs) } ?? "No sessions in this window")
+                        Text(shown.map { NoopExerciseFormat.date($0.ts) } ?? "No sessions in this window")
                             .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                     }
                     Spacer()
-                    if selected == nil, let change, pts.count > 1, abs(change) > 0.05 {
+                    if selected == nil, let change, points.count > 1, abs(change) > 0.05 {
                         Text("\(change > 0 ? "+" : "−")\(label(abs(change)))")
                             .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).monospacedDigit()
                             .foregroundStyle(change > 0 ? NoopHTMLColor.green : NoopHTMLColor.copy)
@@ -130,34 +157,32 @@ struct NoopExerciseSummary: View {
                             .background((change > 0 ? NoopHTMLColor.green : Color.white).opacity(0.10), in: Capsule())
                     }
                 }
-                if pts.count < 2 {
+                if points.count < 2 {
                     Text("A trend needs two sessions in this window.")
                         .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
                         .frame(maxWidth: .infinity, minHeight: 150)
                 } else {
-                    chart(pts)
+                    chart
                 }
             }
         }
     }
 
-    private func chart(_ pts: [(point: LiftRecords.SessionPoint, value: Double)]) -> some View {
-        let tint = NoopHTMLColor.volt
-        let low = pts.map(\.value).min() ?? 0, high = pts.map(\.value).max() ?? 1
+    private var chart: some View {
+        let low = points.map(\.value).min() ?? 0, high = points.map(\.value).max() ?? 1
         let pad = max(1, (high - low) * 0.25)
         return Chart {
-            ForEach(pts, id: \.point.sessionId) { p in
-                AreaMark(x: .value("Date", Date(timeIntervalSince1970: Double(p.point.startTs))),
-                         yStart: .value("Floor", low - pad), yEnd: .value("Value", p.value))
+            ForEach(points, id: \.id) { p in
+                AreaMark(x: .value("Date", p.date), yStart: .value("Floor", low - pad), yEnd: .value("Value", p.value))
                     .foregroundStyle(LinearGradient(colors: [tint.opacity(0.22), tint.opacity(0)], startPoint: .top, endPoint: .bottom))
                     .interpolationMethod(.monotone)
-                LineMark(x: .value("Date", Date(timeIntervalSince1970: Double(p.point.startTs))), y: .value("Value", p.value))
+                LineMark(x: .value("Date", p.date), y: .value("Value", p.value))
                     .foregroundStyle(tint)
                     .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
                     .interpolationMethod(.monotone)
-                PointMark(x: .value("Date", Date(timeIntervalSince1970: Double(p.point.startTs))), y: .value("Value", p.value))
-                    .foregroundStyle(selected?.sessionId == p.point.sessionId ? NoopHTMLColor.ink : tint)
-                    .symbolSize(selected?.sessionId == p.point.sessionId ? 70 : (pts.count > 30 ? 0 : 26))
+                PointMark(x: .value("Date", p.date), y: .value("Value", p.value))
+                    .foregroundStyle(selected?.id == p.id ? NoopHTMLColor.ink : tint)
+                    .symbolSize(selected?.id == p.id ? 70 : (points.count > 30 ? 0 : 26))
             }
         }
         .chartYScale(domain: (low - pad)...(high + pad))
@@ -179,19 +204,15 @@ struct NoopExerciseSummary: View {
                     .gesture(DragGesture(minimumDistance: 0)
                         .onChanged { drag in
                             guard let plot = proxy.plotFrame else { return }
-                            let x = drag.location.x - geo[plot].origin.x
-                            guard let date: Date = proxy.value(atX: x) else { return }
-                            let nearest = pts.min { abs(Double($0.point.startTs) - date.timeIntervalSince1970)
-                                < abs(Double($1.point.startTs) - date.timeIntervalSince1970) }
-                            if nearest?.point != selected { selected = nearest?.point }
+                            guard let date: Date = proxy.value(atX: drag.location.x - geo[plot].origin.x) else { return }
+                            let nearest = points.min { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) }
+                            if nearest != selected { selected = nearest }
                         }
                         .onEnded { _ in selected = nil })
             }
         }
-        .sensoryFeedback(.selection, trigger: selected?.sessionId)
+        .sensoryFeedback(.selection, trigger: selected?.id)
         .frame(height: 170)
-        .animation(NoopMotion.swap, value: metric)
-        .animation(NoopMotion.swap, value: window)
     }
 }
 

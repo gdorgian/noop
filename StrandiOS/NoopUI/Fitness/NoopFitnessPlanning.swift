@@ -214,6 +214,10 @@ struct NoopFitnessRoutineScreen: View {
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 20)
 
+                if let id = navigation.fitnessRoutineID {
+                    NoopFitnessRoutineProgress(routineID: id).padding(.bottom, 22)
+                }
+
                 VStack(spacing: 10) {
                     ForEach(items, id: \.id) { item in exerciseCard(item) }
                 }
