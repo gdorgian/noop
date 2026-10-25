@@ -50,6 +50,12 @@ struct LiftPlanItem: Equatable {
     /// yet; finishing offers to add one.
     var addedInSession: Bool
     var routinePlan: RoutineExercise?
+    /// A superset made during the session on a line with no routine behind it. A routine line keeps
+    /// its group in `routinePlan`; read `supersetGroup`, which is whichever of the two applies.
+    var supersetId: UUID?
+
+    /// The superset this line belongs to, or nil when it stands alone.
+    var supersetGroup: UUID? { routinePlan?.supersetId ?? supersetId }
 
     /// Rest used when a program line does not specify one. Two minutes sits in the middle of the
     /// range the hypertrophy literature uses for compound work, and is only a starting value: what
@@ -68,7 +74,8 @@ struct LiftPlanItem: Equatable {
          note: String? = nil,
          programItemId: String? = nil,
          addedInSession: Bool = false,
-         routinePlan: RoutineExercise? = nil) {
+         routinePlan: RoutineExercise? = nil,
+         supersetId: UUID? = nil) {
         self.exercise = exercise
         self.primaryMuscle = primaryMuscle
         self.secondaryMuscles = secondaryMuscles
@@ -82,6 +89,7 @@ struct LiftPlanItem: Equatable {
         self.programItemId = programItemId
         self.addedInSession = addedInSession
         self.routinePlan = routinePlan
+        self.supersetId = supersetId
     }
 }
 
@@ -231,10 +239,10 @@ struct LiftSessionEngine: Equatable {
     }
 
     private func nextSlot(after slot: LiftSlot, excludingCurrent: Bool) -> LiftSlot? {
-        let group = planItem(for: slot)?.routinePlan?.supersetId
+        let group = planItem(for: slot)?.supersetGroup
         let candidates: [LiftSlot]
         if let group {
-            candidates = plan.indices.filter { plan[$0].routinePlan?.supersetId == group }
+            candidates = plan.indices.filter { plan[$0].supersetGroup == group }
                 .flatMap { slots(forExercise: $0) }
                 .sorted { ($0.setIndex, $0.exerciseIndex) < ($1.setIndex, $1.exerciseIndex) }
         } else {
@@ -453,6 +461,78 @@ struct LiftSessionEngine: Equatable {
         pushHistory()
         plan[index].targetSets -= 1
         return true
+    }
+
+    // MARK: - Warm-up sets placed before the working ones
+
+    /// Whether warm-up sets can still go in front of an exercise's working sets: nothing of it done
+    /// yet, and room on the line. Once a set is done its number is history — sliding sets in ahead of
+    /// it would renumber what was already recorded.
+    func canInsertLeadingSets(_ count: Int, intoExercise index: Int) -> Bool {
+        guard count > 0, plan.indices.contains(index),
+              plan[index].targetSets + count <= LiftSessionEngine.maxSetsPerExercise else { return false }
+        return !slots(forExercise: index).contains { isCompleted($0) }
+    }
+
+    /// Put `sets` in front of an exercise's working sets, renumbering the working ones after them.
+    ///
+    /// The line becomes routine-backed if it was not: every set gets its own planned numbers, the new
+    /// ones from `sets` and the working ones from `workingTargets` — what each working set was showing
+    /// before, so nothing on screen moves except the rows that slid down. A line without per-set
+    /// targets would otherwise carry the warm-up's light weight onto the first working set.
+    ///
+    /// Not undoable, and it empties the undo stack: an earlier snapshot names slots by number, and every
+    /// working set of this line just changed number. Returns false when `canInsertLeadingSets` says no.
+    @discardableResult
+    mutating func insertLeadingSets(_ sets: [RoutineSetPlan], workingTargets: [RoutineSetPlan],
+                                    intoExercise index: Int) -> Bool {
+        guard canInsertLeadingSets(sets.count, intoExercise: index) else { return false }
+        history.removeAll()
+        var line = plan[index]
+        var routine = line.routinePlan ?? RoutineExercise(exerciseId: line.exercise, sets: workingTargets,
+                                                          restSeconds: line.restSec, supersetId: line.supersetId,
+                                                          note: line.note)
+        if line.routinePlan == nil { line.supersetId = nil }
+        routine.sets.insert(contentsOf: sets, at: 0)
+        line.routinePlan = routine
+        line.targetSets += sets.count
+        plan[index] = line
+        if case .working(let current) = stage, current.exerciseIndex == index {
+            stage = .working(LiftSlot(exerciseIndex: index, setIndex: current.setIndex + sets.count))
+        }
+        return true
+    }
+
+    // MARK: - Supersets made during the session
+
+    /// Put two neighbouring lines in one superset, joining the group either already belongs to. The
+    /// session then alternates between them set by set (`slotAfter`). Undoable.
+    @discardableResult
+    mutating func linkSuperset(_ index: Int) -> Bool {
+        guard plan.indices.contains(index), plan.indices.contains(index + 1) else { return false }
+        pushHistory()
+        let group = plan[index].supersetGroup ?? plan[index + 1].supersetGroup ?? UUID()
+        let joining = Set([plan[index].supersetGroup, plan[index + 1].supersetGroup].compactMap { $0 })
+        for i in plan.indices where i == index || i == index + 1 || plan[i].supersetGroup.map(joining.contains) == true {
+            setGroup(group, at: i)
+        }
+        return true
+    }
+
+    /// Take a line out of its superset. A group left with one line dissolves. Undoable.
+    @discardableResult
+    mutating func unlinkSuperset(_ index: Int) -> Bool {
+        guard plan.indices.contains(index), let group = plan[index].supersetGroup else { return false }
+        pushHistory()
+        setGroup(nil, at: index)
+        let rest = plan.indices.filter { plan[$0].supersetGroup == group }
+        if rest.count == 1 { setGroup(nil, at: rest[0]) }
+        return true
+    }
+
+    private mutating func setGroup(_ group: UUID?, at index: Int) {
+        if plan[index].routinePlan != nil { plan[index].routinePlan?.supersetId = group; plan[index].supersetId = nil }
+        else { plan[index].supersetId = group }
     }
 
     // MARK: - Adding an exercise

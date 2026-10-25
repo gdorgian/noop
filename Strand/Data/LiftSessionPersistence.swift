@@ -42,6 +42,14 @@ enum LiftSessionPersistence {
         /// as absent and the session resumes with nothing pending, which is exactly right.
         var pendingValues: [PendingValue]?
         var pendingWarmups: [SlotBox]?
+        /// Drop and failure marks (Aura). Optional for the same reason as the two above.
+        var setKinds: [SlotKind]? = nil
+
+        struct SlotKind: Codable, Equatable {
+            var exerciseIndex: Int
+            var setIndex: Int
+            var kind: String
+        }
 
         struct PendingValue: Codable, Equatable {
             var exerciseIndex: Int
@@ -75,6 +83,8 @@ enum LiftSessionPersistence {
             /// could be added, which decodes to nil: a line from the program.
             var addedInSession: Bool?
             var routinePlan: RoutineExercise? = nil
+            /// A superset made during the session on a line without a routine (Aura).
+            var supersetId: UUID? = nil
         }
 
         /// The stage as a flat, forward-compatible record rather than an encoded enum: a persisted
@@ -147,6 +157,7 @@ enum LiftSessionPersistence {
                          programName: String?,
                          pendingValues: [LiftSlot: LiftSessionController.PendingSetValues],
                          pendingWarmups: Set<LiftSlot>,
+                         setKinds: [LiftSlot: LiftSetKind] = [:],
                          isPaused: Bool = false,
                          pausedAt: Int? = nil,
                          totalPausedSec: Int = 0) -> Snapshot {
@@ -167,7 +178,8 @@ enum LiftSessionPersistence {
                                   note: $0.note,
                                   programItemId: $0.programItemId,
                                   // Written only when true, so a session nobody added to encodes as before.
-                                  addedInSession: $0.addedInSession ? true : nil, routinePlan: $0.routinePlan)
+                                  addedInSession: $0.addedInSession ? true : nil, routinePlan: $0.routinePlan,
+                                  supersetId: $0.supersetId)
             },
             stage: box(engine.stage),
             sets: engine.sets.map {
@@ -190,7 +202,23 @@ enum LiftSessionPersistence {
                 },
             pendingWarmups: pendingWarmups
                 .sorted { ($0.exerciseIndex, $0.setIndex) < ($1.exerciseIndex, $1.setIndex) }
-                .map { Snapshot.SlotBox(exerciseIndex: $0.exerciseIndex, setIndex: $0.setIndex) })
+                .map { Snapshot.SlotBox(exerciseIndex: $0.exerciseIndex, setIndex: $0.setIndex) },
+            setKinds: setKinds.isEmpty ? nil : setKinds
+                .sorted { ($0.key.exerciseIndex, $0.key.setIndex) < ($1.key.exerciseIndex, $1.key.setIndex) }
+                .map { Snapshot.SlotKind(exerciseIndex: $0.key.exerciseIndex, setIndex: $0.key.setIndex,
+                                         kind: $0.value.rawValue) })
+    }
+
+    /// The drop and failure marks, back as the controller holds them. A kind this build does not know
+    /// is dropped: the set stays an ordinary one rather than stranding the session.
+    static func setKinds(from s: Snapshot) -> [LiftSlot: LiftSetKind] {
+        var out: [LiftSlot: LiftSetKind] = [:]
+        for k in s.setKinds ?? [] {
+            if let kind = LiftSetKind(rawValue: k.kind) {
+                out[LiftSlot(exerciseIndex: k.exerciseIndex, setIndex: k.setIndex)] = kind
+            }
+        }
+        return out
     }
 
     /// The numbers typed in advance, back as the controller holds them.
@@ -224,7 +252,8 @@ enum LiftSessionPersistence {
                          targetWeightKg: $0.targetWeightKg,
                          note: $0.note,
                          programItemId: $0.programItemId,
-                         addedInSession: $0.addedInSession ?? false, routinePlan: $0.routinePlan)
+                         addedInSession: $0.addedInSession ?? false, routinePlan: $0.routinePlan,
+                         supersetId: $0.supersetId)
         }
         let sets = s.sets.map {
             LiftRecordedSet(exerciseIndex: $0.exerciseIndex, setIndex: $0.setIndex,

@@ -1187,6 +1187,11 @@ extension WhoopStore {
             try db.alter(table: "liftExercise") { $0.add(column: "definitionJSON", .text) }
             try db.alter(table: "liftProgramItem") { $0.add(column: "planJSON", .text) }
         }
+        // v49: a working set can be a drop set or a set taken to failure. Nullable, so every row
+        // written before stays an ordinary set and an older backup restores unchanged.
+        migrator.registerMigration("v49-lift-set-kind") { db in
+            try db.alter(table: "liftSet") { $0.add(column: "setKind", .text) }
+        }
         return migrator
     }
 }

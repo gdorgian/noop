@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UserNotifications
 import WhoopStore
 import StrandAnalytics
 import StrandTraining
@@ -87,6 +88,11 @@ final class LiftSessionController: ObservableObject {
     /// number the user typed for this set is better evidence than the one the sheet guessed for it.
     @Published private(set) var pendingValues: [LiftSlot: PendingSetValues] = [:]
 
+    /// Sets marked a drop set or a set taken to failure, performed or not. Held per slot like a warm-up
+    /// mark, and written onto the set when the session is saved. A slot is never both a warm-up and
+    /// one of these: marking one clears the other.
+    @Published private(set) var setKinds: [LiftSlot: LiftSetKind] = [:]
+
     /// What a user typed into a set that has not happened yet. All optional: a row where only the
     /// weight was typed keeps carrying its reps.
     struct PendingSetValues: Equatable {
@@ -147,6 +153,15 @@ final class LiftSessionController: ObservableObject {
         guard engine == nil else { return false }
         let stamp = Int(Date().timeIntervalSince1970)
         engine = LiftSessionEngine(plan: plan, startTs: stamp)
+        // A routine plans its warm-ups as warm-ups; the session counts them that way from the start,
+        // so they stay out of volume without the lifter marking each one again.
+        pendingWarmups = Set(plan.indices.flatMap { index in
+            (plan[index].routinePlan?.sets ?? []).enumerated()
+                .filter { $0.offset < plan[index].targetSets && $0.element.phase == .warmup }
+                .map { LiftSlot(exerciseIndex: index, setIndex: $0.offset + 1) }
+        })
+        setKinds = [:]
+        Self.askForRestAlertsIfUndecided()
         self.programId = programId
         self.programName = programName
         warnedFor = nil
@@ -187,6 +202,7 @@ final class LiftSessionController: ObservableObject {
         // to prevent, whether it is lost to a blur or to a relaunch.
         pendingValues = LiftSessionPersistence.pendingValues(from: snapshot)
         pendingWarmups = LiftSessionPersistence.pendingWarmups(from: snapshot)
+        setKinds = LiftSessionPersistence.setKinds(from: snapshot)
         isPaused = snapshot.isPaused ?? false
         pausedAt = isPaused ? (snapshot.pausedAt ?? snapshot.stageStartedAt) : nil
         totalPausedSec = max(0, snapshot.totalPausedSec ?? 0)
@@ -241,8 +257,10 @@ final class LiftSessionController: ObservableObject {
         lastStrapStepAt = nil
         pendingWarmups = []
         pendingValues = [:]
+        setKinds = [:]
         isPresented = false
         setStrapHandler(nil)
+        scheduleRestAlert(endsAt: nil)
     }
 
     /// The handler runs SYNCHRONOUSLY, inside the frame handling that delivered the tap. It used to hop
@@ -428,10 +446,13 @@ final class LiftSessionController: ObservableObject {
             pausedAt = nil
             isPaused = false
             now = actualNow
+            scheduleRestAlert(endsAt: restEndsAt)
         } else {
             pausedAt = actualNow
             now = actualNow
             isPaused = true
+            // A held rest is not running out, so nothing may announce its end.
+            scheduleRestAlert(endsAt: nil)
         }
         warnedFor = nil
         persist()
@@ -482,7 +503,7 @@ final class LiftSessionController: ObservableObject {
     /// remembered for when it does not yet.
     func setWarmup(_ slot: LiftSlot, _ isWarmup: Bool) {
         guard !saveInProgress else { return }
-        if isWarmup { pendingWarmups.insert(slot) } else { pendingWarmups.remove(slot) }
+        if isWarmup { pendingWarmups.insert(slot); setKinds.removeValue(forKey: slot) } else { pendingWarmups.remove(slot) }
         if let row = engine?.recordedSet(for: slot) {
             engine?.updateSet(slot, weightKg: row.weightKg, reps: row.reps,
                               rpe: row.rpe, isWarmup: isWarmup)
@@ -493,6 +514,79 @@ final class LiftSessionController: ObservableObject {
     func isWarmup(_ slot: LiftSlot) -> Bool {
         if let row = engine?.recordedSet(for: slot) { return row.isWarmup }
         return pendingWarmups.contains(slot)
+    }
+
+    /// Mark a slot a drop set or a failure set, or back to an ordinary one (nil). A kind makes the set
+    /// a working set, so it clears a warm-up mark.
+    func setKind(_ slot: LiftSlot, _ kind: LiftSetKind?) {
+        guard !saveInProgress, engine?.planItem(for: slot) != nil else { return }
+        if let kind {
+            setKinds[slot] = kind
+            if isWarmup(slot) { setWarmup(slot, false) }
+        } else {
+            setKinds.removeValue(forKey: slot)
+        }
+        persist()
+    }
+
+    func kind(of slot: LiftSlot) -> LiftSetKind? { setKinds[slot] }
+
+    /// The warm-up ramp `insertWarmups` would put in front of an exercise, or empty when there is none to
+    /// offer: something of it is done, it already has a warm-up, or no working weight is known yet.
+    func warmupSuggestion(forExercise index: Int, incrementKg: Double) -> [RoutineSetPlan] {
+        guard let engine, !saveInProgress else { return [] }
+        let slots = engine.slots(forExercise: index)
+        guard !slots.contains(where: isWarmup), let first = slots.first else { return [] }
+        let weight = pendingValues[first]?.weightKg ?? values(of: first).weightKg
+        let ramp = WarmupPlanner.suggestedSets(firstWorkSetKg: weight, mode: .weightReps, incrementKg: incrementKg)
+        guard engine.canInsertLeadingSets(ramp.count, intoExercise: index) else { return [] }
+        let rest = engine.plan[index].routinePlan?.warmupRestSeconds ?? LiftSessionController.warmupRestSec
+        return ramp.map { var set = $0; set.restSeconds = rest; return set }
+    }
+
+    /// Rest after a warm-up set when the routine names none: a ramp set is light, and the working
+    /// sets are what the long rest is for.
+    static let warmupRestSec = 60
+
+    /// Put a warm-up ramp in front of an exercise's working sets (`warmupSuggestion`). Every number,
+    /// mark and kind already given to its working sets moves down with them. Returns how many sets went in.
+    @discardableResult
+    func insertWarmups(intoExercise index: Int, incrementKg: Double) -> Int {
+        guard let engine else { return 0 }
+        let ramp = warmupSuggestion(forExercise: index, incrementKg: incrementKg)
+        guard !ramp.isEmpty else { return 0 }
+        let working = engine.slots(forExercise: index).map { slot -> RoutineSetPlan in
+            let shown = values(of: slot)
+            let line = engine.planItem(for: slot)
+            return RoutineSetPlan(targetWeightKg: shown.weightKg, repsMin: shown.reps,
+                                  repsMax: line?.targetRepsHigh ?? shown.reps, restSeconds: line?.restSec)
+        }
+        guard self.engine?.insertLeadingSets(ramp, workingTargets: working, intoExercise: index) == true else { return 0 }
+        let n = ramp.count
+        func moved(_ slot: LiftSlot) -> LiftSlot {
+            slot.exerciseIndex == index ? LiftSlot(exerciseIndex: index, setIndex: slot.setIndex + n) : slot
+        }
+        pendingValues = Dictionary(uniqueKeysWithValues: pendingValues.map { (moved($0.key), $0.value) })
+        setKinds = Dictionary(uniqueKeysWithValues: setKinds.map { (moved($0.key), $0.value) })
+        pendingWarmups = Set(pendingWarmups.map(moved))
+        for set in 1...n { pendingWarmups.insert(LiftSlot(exerciseIndex: index, setIndex: set)) }
+        persist()
+        return n
+    }
+
+    /// Superset a line with the one after it, or take it out of its superset.
+    @discardableResult
+    func linkSuperset(_ index: Int) -> Bool {
+        guard !saveInProgress, engine?.linkSuperset(index) == true else { return false }
+        persist()
+        return true
+    }
+
+    @discardableResult
+    func unlinkSuperset(_ index: Int) -> Bool {
+        guard !saveInProgress, engine?.unlinkSuperset(index) == true else { return false }
+        persist()
+        return true
     }
 
     /// Carry a pre-marked warm-up, and any numbers typed in advance, onto the set just recorded.
@@ -564,6 +658,7 @@ final class LiftSessionController: ObservableObject {
         // back would return them silently, from input the user gave a set they then removed.
         pendingWarmups.remove(dropped)
         pendingValues.removeValue(forKey: dropped)
+        setKinds.removeValue(forKey: dropped)
         persist()
         return true
     }
@@ -627,6 +722,7 @@ final class LiftSessionController: ObservableObject {
         var startTs: Int?
         var endTs: Int?
         var restSec: Int?
+        var kind: LiftSetKind? = nil
     }
 
     /// The sets the session saves — every slot on the sheet.
@@ -649,7 +745,8 @@ final class LiftSessionController: ObservableObject {
             let shown = values(of: set.slot)
             return FinishedSet(slot: set.slot, weightKg: shown.weightKg, reps: shown.reps,
                                rpe: set.rpe ?? planned(set.slot), isWarmup: set.isWarmup,
-                               startTs: set.startTs, endTs: set.endTs, restSec: set.restSec)
+                               startTs: set.startTs, endTs: set.endTs, restSec: set.restSec,
+                               kind: set.isWarmup ? nil : setKinds[set.slot])
         }
         for slot in engine.allSlots where !engine.isCompleted(slot) {
             let typed = pendingValues[slot]
@@ -659,7 +756,8 @@ final class LiftSessionController: ObservableObject {
                                    reps: completingUnfinished ? typed?.reps ?? grey.reps : 0,
                                    rpe: completingUnfinished ? typed?.rpe ?? planned(slot) : nil,
                                    isWarmup: pendingWarmups.contains(slot),
-                                   startTs: nil, endTs: nil, restSec: nil))
+                                   startTs: nil, endTs: nil, restSec: nil,
+                                   kind: pendingWarmups.contains(slot) ? nil : setKinds[slot]))
         }
         return out
     }
@@ -812,9 +910,10 @@ final class LiftSessionController: ObservableObject {
 
     /// Re-arm the rest's timers when the rest changed — a new rest, a rest undone or cut short, no rest.
     private func scheduleRestTimers() {
-        let endsAt: Int? = { if case .resting(_, let end) = engine?.stage { return end }; return nil }()
+        let endsAt = restEndsAt
         guard endsAt != scheduledRestEnd else { return }
         scheduledRestEnd = endsAt
+        scheduleRestAlert(endsAt: endsAt)
         restTimers.forEach { $0.cancel() }
         restTimers = []
         guard let endsAt else { return }
@@ -823,6 +922,73 @@ final class LiftSessionController: ObservableObject {
         if let end = times.end {
             restTimers.append(after(end) { $0.restDidEnd() })
         }
+    }
+
+    /// When the running rest ends, or nil when nothing is resting.
+    private var restEndsAt: Int? {
+        if case .resting(_, let end) = engine?.stage { return end }
+        return nil
+    }
+
+    // MARK: - Rest alert
+    //
+    // The strap buzzes when a rest runs out, but only a strap that is on the wrist and connected — and
+    // the screen says so only while it is looked at. A phone in a pocket, or a lifter with no strap,
+    // had nothing. One local notification, scheduled for the instant the rest ends and replaced whenever
+    // the rest changes, is the phone's own way to say it. In the app it plays as a sound only: the
+    // screen is already showing "Rest done" (`NotificationPresenter`).
+
+    static let restAlertId = "noop.lift.rest"
+    static let restAlertCategory = "noop.lift.rest"
+    /// On unless turned off. UserDefaults rather than a store column: it is a device preference.
+    static let restAlertsKey = "lift.restAlerts"
+    static var restAlertsEnabled: Bool {
+        UserDefaults.standard.object(forKey: restAlertsKey) as? Bool ?? true
+    }
+
+    /// Ask once, at the start of a session — the moment the lifter can see why a phone would ask.
+    private static func askForRestAlertsIfUndecided() {
+        #if os(iOS)
+        guard restAlertsEnabled else { return }
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .notDetermined else { return }
+            center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
+        #endif
+    }
+
+    /// Re-arm (or remove) the alert for the rest running now — after the setting changed.
+    func refreshRestAlert() { scheduleRestAlert(endsAt: restEndsAt) }
+
+    /// Replace the pending rest alert with one for `endsAt`, or just remove it when nil.
+    func scheduleRestAlert(endsAt: Int?) {
+        #if os(iOS)
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.restAlertId])
+        guard let endsAt, !isPaused, Self.restAlertsEnabled, let engine else { return }
+        let seconds = endsAt - Self.unixNow
+        guard seconds >= 2 else { return }
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "Rest is over")
+        if let next = engine.upcomingSlot, let line = engine.planItem(for: next) {
+            content.body = isWarmup(next)
+                ? String(localized: "Next: \(line.exercise), warm-up")
+                : String(localized: "Next: \(line.exercise), set \(next.setIndex)")
+        } else {
+            content.body = String(localized: "Every set is done. Finish when you are ready.")
+        }
+        content.sound = .default
+        content.categoryIdentifier = Self.restAlertCategory
+        content.threadIdentifier = Self.restAlertCategory
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(seconds), repeats: false)
+        let request = UNNotificationRequest(identifier: Self.restAlertId, content: content, trigger: trigger)
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+            else { return }
+            center.add(request)
+        }
+        #endif
     }
 
     /// When a rest's warning and end fire, in unix seconds. The warning comes `restWarningLeadSec` before the
@@ -869,6 +1035,7 @@ final class LiftSessionController: ObservableObject {
                                             programName: programName,
                                             pendingValues: pendingValues,
                                             pendingWarmups: pendingWarmups,
+                                            setKinds: setKinds,
                                             isPaused: isPaused,
                                             pausedAt: pausedAt,
                                             totalPausedSec: totalPausedSec))

@@ -461,6 +461,7 @@ private struct NoopLiftLiveScreen: View {
     @State private var lastTimeFor: NoopLiftExerciseName?
     @FocusState private var focused: Field?
     @EnvironmentObject private var heart: LiveState
+    @AppStorage(LiftSessionController.restAlertsKey) private var restAlerts = true
 
     private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
     private var presentation: LiftSessionController.Presentation? { live.presentation(system: units) }
@@ -489,17 +490,24 @@ private struct NoopLiftLiveScreen: View {
 
     private enum Field: Hashable { case weight, reps }
 
+    private static func exerciseAnchor(_ index: Int) -> String { "lift-exercise-\(index)" }
+
+    /// One warm-up step on the bar: 2.5 kg, or 5 lb.
+    private var plateStepKg: Double { units == .metric ? 2.5 : LiftFormat.kilograms(fromDisplay: 5, system: units) }
+
     private func session(engine: LiftSessionEngine,
                          presentation: LiftSessionController.Presentation,
                          slot: LiftSlot,
                          item: LiftPlanItem) -> some View {
         ZStack(alignment: .bottom) {
+            ScrollViewReader { scroll in
             NoopScreen(bottomInset: 120, topInset: 54) {
                 VStack(alignment: .leading, spacing: 14) {
                     liveHeader(presentation)
                     ForEach(Array(engine.plan.enumerated()), id: \.offset) { index, line in
                         exerciseBlock(engine: engine, index: index, line: line, current: slot,
                                       isResting: presentation.isResting)
+                            .id(Self.exerciseAnchor(index))
                     }
                     Button { addingExercise = true } label: {
                         HStack(spacing: 8) {
@@ -515,6 +523,14 @@ private struct NoopLiftLiveScreen: View {
                         .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
                         .frame(maxWidth: .infinity).multilineTextAlignment(.center)
                 }
+            }
+            // The next set is on another exercise — the other half of a superset, or the next line
+            // once one is finished: bring it into view, so the lifter never hunts for the row to tap.
+            // Not while a number is being typed, which would pull the field out from under the finger.
+            .onChange(of: slot.exerciseIndex) { _, index in
+                guard focused == nil else { return }
+                withAnimation(NoopMotion.swap) { scroll.scrollTo(Self.exerciseAnchor(index), anchor: UnitPoint(x: 0.5, y: 0.12)) }
+            }
             }
             liveBar(engine: engine, presentation: presentation, slot: slot, item: item)
                 .padding(.horizontal, 14).padding(.bottom, 10)
@@ -593,6 +609,12 @@ private struct NoopLiftLiveScreen: View {
                 }
                 Button { live.undo() } label: { Label("Undo last step", systemImage: "arrow.uturn.backward") }
                     .disabled(!(live.engine?.canUndo ?? false))
+                Toggle(isOn: Binding(get: { restAlerts }, set: { on in
+                    restAlerts = on
+                    live.refreshRestAlert()
+                })) {
+                    Label("Alert when rest ends", systemImage: "bell")
+                }
                 Divider()
                 Button(role: .destructive) { confirmDiscard = true } label: { Label("Discard workout", systemImage: "trash") }
             } label: {
@@ -610,9 +632,16 @@ private struct NoopLiftLiveScreen: View {
     private func exerciseBlock(engine: LiftSessionEngine, index: Int, line: LiftPlanItem,
                                current: LiftSlot, isResting: Bool) -> some View {
         let slots = engine.slots(forExercise: index)
-        let done = slots.filter { engine.isCompleted($0) }.count
+        let working = slots.filter { !live.isWarmup($0) }
+        let done = working.filter { engine.isCompleted($0) }.count
         let isCurrent = current.exerciseIndex == index
+        let group = line.supersetGroup
+        let next = engine.plan.indices.contains(index + 1) ? engine.plan[index + 1] : nil
+        let ramp = live.warmupSuggestion(forExercise: index, incrementKg: plateStepKg)
         return VStack(alignment: .leading, spacing: 8) {
+            if group != nil {
+                supersetLabel(engine: engine, index: index, group: group)
+            }
             HStack(spacing: 11) {
                 NoopCanonicalGlyph(name: .weight, size: 16, color: isCurrent ? NoopHTMLColor.warm : NoopHTMLColor.copy)
                     .frame(width: 36, height: 36)
@@ -621,7 +650,7 @@ private struct NoopLiftLiveScreen: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(line.exercise).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                         .lineLimit(1)
-                    Text(exerciseMeta(line, done: done, of: slots.count))
+                    Text(exerciseMeta(line, done: done, of: working.count, warmups: slots.count - working.count))
                         .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineLimit(1)
                 }
                 Spacer(minLength: 4)
@@ -637,10 +666,25 @@ private struct NoopLiftLiveScreen: View {
                     Button { _ = live.addSet(toExercise: index) } label: { Label("Add a set", systemImage: "plus") }
                     Button { _ = live.removeSet(fromExercise: index) } label: { Label("Remove the last set", systemImage: "minus") }
                         .disabled(slots.count <= 1 || engine.isCompleted(slots.last ?? current))
-                    if isCurrent {
-                        Button { live.setWarmup(current, !live.isWarmup(current)) } label: {
-                            Label(live.isWarmup(current) ? "Count set \(current.setIndex) as working" : "Mark set \(current.setIndex) as warm-up",
+                    Button { _ = live.insertWarmups(intoExercise: index, incrementKg: plateStepKg) } label: {
+                        if let top = ramp.last?.targetWeightKg, let first = ramp.first?.targetWeightKg {
+                            Label("Add \(ramp.count) warm-up sets, \(LiftFormat.trim(LiftFormat.display(fromKilograms: first, system: units)))–\(LiftFormat.trim(LiftFormat.display(fromKilograms: top, system: units))) \(LiftFormat.weightUnit(units))",
                                   systemImage: "flame")
+                        } else {
+                            Label("Add warm-up sets", systemImage: "flame")
+                        }
+                    }
+                    .disabled(ramp.isEmpty)
+                    Section {
+                        if let next, group == nil || group != next.supersetGroup {
+                            Button { live.linkSuperset(index) } label: {
+                                Label("Superset with \(next.exercise)", systemImage: "link")
+                            }
+                        }
+                        if group != nil {
+                            Button { live.unlinkSuperset(index) } label: {
+                                Label("Remove from superset", systemImage: "minus.circle")
+                            }
                         }
                     }
                     Button { lastTimeFor = .init(name: line.exercise) } label: { Label("Last time", systemImage: "clock.arrow.circlepath") }
@@ -676,10 +720,40 @@ private struct NoopLiftLiveScreen: View {
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
             .strokeBorder(isCurrent ? NoopHTMLColor.warm.opacity(0.28) : NoopHTMLColor.border, lineWidth: isCurrent ? 0.8 : 0.5))
+        .overlay(alignment: .leading) {
+            // A superset reads as one block: the same rail down every line in it.
+            if group != nil {
+                Capsule().fill(NoopHTMLColor.night).frame(width: 3).padding(.vertical, 20).offset(x: -1.5)
+            }
+        }
+        .animation(NoopMotion.swap, value: group)
     }
 
-    private func exerciseMeta(_ line: LiftPlanItem, done: Int, of total: Int) -> String {
+    /// Above a superset line: which group it is in, and where the session goes after this line's set.
+    private func supersetLabel(engine: LiftSessionEngine, index: Int, group: UUID?) -> some View {
+        let members = engine.plan.indices.filter { engine.plan[$0].supersetGroup == group }
+        let position = (members.firstIndex(of: index) ?? 0) + 1
+        let letter = String(UnicodeScalar(UInt8(64 + min(26, supersetOrdinal(engine: engine, group: group)))))
+        return HStack(spacing: 6) {
+            Image(systemName: "link").font(.system(size: 10, weight: .bold))
+            Text("SUPERSET \(letter) · \(position) OF \(members.count)")
+                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1)
+        }
+        .foregroundStyle(NoopHTMLColor.nightLight)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Superset \(letter), exercise \(position) of \(members.count). Sets alternate between them.")
+    }
+
+    /// Supersets are lettered in the order they appear on the sheet: A, B, C.
+    private func supersetOrdinal(engine: LiftSessionEngine, group: UUID?) -> Int {
+        var seen: [UUID] = []
+        for line in engine.plan { if let g = line.supersetGroup, !seen.contains(g) { seen.append(g) } }
+        return (group.flatMap { seen.firstIndex(of: $0) } ?? 0) + 1
+    }
+
+    private func exerciseMeta(_ line: LiftPlanItem, done: Int, of total: Int, warmups: Int) -> String {
         var parts = ["\(done) of \(total) sets"]
+        if warmups > 0 { parts.append("\(warmups) warm-up") }
         let muscles = LiftMuscleSummary.line(primary: line.primaryMuscle, secondaries: line.secondaryMuscles)
         if !muscles.isEmpty { parts.append(muscles) }
         return parts.joined(separator: " · ")
@@ -694,20 +768,31 @@ private struct NoopLiftLiveScreen: View {
             if case .resting(let s, _) = engine.stage { return s == row }
             return false
         }()
+        let type = NoopLiftSetType(warmup: live.isWarmup(row), kind: live.kind(of: row))
         HStack(spacing: 8) {
-            Button { lastTimeFor = .init(name: engine.planItem(for: row)?.exercise ?? "") } label: {
+            Menu {
+                Picker("Set type", selection: Binding(get: { type }, set: { apply($0, to: row) })) {
+                    ForEach(NoopLiftSetType.allCases, id: \.self) { option in
+                        Label(option.title, systemImage: option.symbol).tag(option)
+                    }
+                }
+                Divider()
+                Button { lastTimeFor = .init(name: engine.planItem(for: row)?.exercise ?? "") } label: {
+                    Label("Last time", systemImage: "clock.arrow.circlepath")
+                }
+            } label: {
                 ZStack {
-                    Circle().fill(done ? NoopHTMLColor.green.opacity(0.16) : Color.clear)
-                    Circle().strokeBorder(active ? NoopHTMLColor.warm : done ? .clear : Color.white.opacity(0.12), lineWidth: 1.2)
-                    Text(live.isWarmup(row) ? "W" : "\(row.setIndex)")
+                    Circle().fill(done ? NoopHTMLColor.green.opacity(0.16) : type.tint.map { $0.opacity(0.14) } ?? Color.clear)
+                    Circle().strokeBorder(active ? NoopHTMLColor.warm : done ? .clear : type.tint?.opacity(0.5) ?? Color.white.opacity(0.12), lineWidth: 1.2)
+                    Text(type.letter ?? "\(workingNumber(row, engine: engine))")
                         .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                        .foregroundStyle(done ? NoopHTMLColor.green : active ? NoopHTMLColor.warm : NoopHTMLColor.inkSoft)
+                        .foregroundStyle(type.tint ?? (done ? NoopHTMLColor.green : active ? NoopHTMLColor.warm : NoopHTMLColor.inkSoft))
                 }
                 .frame(width: 30, height: 30)
+                .contentTransition(.numericText())
             }
-            .buttonStyle(NoopHTMLPressStyle())
             .frame(width: 34, alignment: .leading)
-            .accessibilityLabel("Set \(row.setIndex), see last time")
+            .accessibilityLabel("\(type.title) set \(row.setIndex). Change the set type or see last time.")
             if active {
                 field($loadText, placeholder: values.weightKg.map { LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units)) } ?? "—",
                       focus: .weight, slot: row)
@@ -747,6 +832,21 @@ private struct NoopLiftLiveScreen: View {
         }
         .opacity(done || active ? 1 : 0.86)
         .animation(NoopMotion.swap, value: done)
+    }
+
+    /// A working set's number counts working sets only: three warm-ups and then the first working set
+    /// read W W W 1, the way a lifter counts them.
+    private func workingNumber(_ row: LiftSlot, engine: LiftSessionEngine) -> Int {
+        max(1, (1...row.setIndex).filter { !live.isWarmup(LiftSlot(exerciseIndex: row.exerciseIndex, setIndex: $0)) }.count)
+    }
+
+    private func apply(_ type: NoopLiftSetType, to row: LiftSlot) {
+        switch type {
+        case .working: live.setKind(row, nil); live.setWarmup(row, false)
+        case .warmup: live.setWarmup(row, true)
+        case .drop: live.setKind(row, .drop)
+        case .failure: live.setKind(row, .failure)
+        }
     }
 
     /// Under a set: the rest running after it, or the rest that was taken.
@@ -861,7 +961,7 @@ private struct NoopLiftLiveScreen: View {
                         } else if warmup {
                             Text("Start when you are ready").foregroundStyle(NoopHTMLColor.copy)
                         } else {
-                            Text("Set \(slot.setIndex) · \(liftClock(inSet))").foregroundStyle(NoopHTMLColor.copy)
+                            Text("\(live.isWarmup(slot) ? "Warm-up" : "Set \(workingNumber(slot, engine: engine))") · \(liftClock(inSet))").foregroundStyle(NoopHTMLColor.copy)
                         }
                     }
                     .font(NoopHTMLFont.sans(NoopType.caption, weight: .medium)).monospacedDigit()
@@ -1017,7 +1117,8 @@ private struct NoopLiftLiveScreen: View {
                 let shown = live.values(of: set.slot)
                 return .init(slot: set.slot, weightKg: shown.weightKg, reps: shown.reps,
                              rpe: set.rpe, isWarmup: set.isWarmup, startTs: set.startTs,
-                             endTs: set.endTs, restSec: set.restSec)
+                             endTs: set.endTs, restSec: set.restSec,
+                             kind: set.isWarmup ? nil : live.kind(of: set.slot))
             }
         } else {
             finished = live.setsToSave(completingUnfinished: false)
@@ -1052,7 +1153,7 @@ private struct NoopLiftLiveScreen: View {
                 secondaryMuscles: line?.secondaryMuscles ?? [], setIndex: value.slot.setIndex,
                 weightKg: value.weightKg, reps: value.reps, rpe: value.rpe,
                 isWarmup: value.isWarmup, startTs: value.startTs, endTs: value.endTs,
-                restSec: value.restSec, note: nil
+                restSec: value.restSec, note: nil, setKind: value.kind
             )
         }
         let workout = WorkoutRow(
@@ -1128,6 +1229,57 @@ private struct NoopLiftLiveScreen: View {
         let detail = [liftWeight(values.weightKg, system: units), values.reps.map { "× \($0)" }]
             .compactMap { $0 }.joined(separator: " ")
         return "Next: set \(nextIndex) of \(item.targetSets)\(detail.isEmpty ? "" : ", \(detail)"). The strap will buzz once when the clock runs out."
+    }
+}
+
+/// What kind of set a row is, as the live sheet and the session detail show it.
+private enum NoopLiftSetType: CaseIterable, Hashable {
+    case working, warmup, drop, failure
+
+    init(warmup: Bool, kind: LiftSetKind?) {
+        if warmup { self = .warmup; return }
+        switch kind {
+        case .drop: self = .drop
+        case .failure: self = .failure
+        case nil: self = .working
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .working: "Working"
+        case .warmup: "Warm-up"
+        case .drop: "Drop set"
+        case .failure: "Failure"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .working: "number"
+        case .warmup: "flame"
+        case .drop: "arrow.down.right"
+        case .failure: "bolt"
+        }
+    }
+
+    /// The letter in place of the set number. A working set shows its number.
+    var letter: String? {
+        switch self {
+        case .working: nil
+        case .warmup: "W"
+        case .drop: "D"
+        case .failure: "F"
+        }
+    }
+
+    var tint: Color? {
+        switch self {
+        case .working: nil
+        case .warmup: NoopHTMLColor.warm
+        case .drop: NoopHTMLColor.nightLight
+        case .failure: NoopHTMLColor.red
+        }
     }
 }
 
@@ -2003,10 +2155,12 @@ struct NoopLiftDetailScreen: View {
                         .padding(.top, 4)
                         ForEach(rows, id: \.id) { row in
                             HStack(spacing: 8) {
-                                Text(row.isWarmup ? "W" : "\(row.setIndex)")
+                                let type = NoopLiftSetType(warmup: row.isWarmup, kind: row.setKind)
+                                Text(type.letter ?? "\(rows.prefix { $0.id != row.id }.filter { !$0.isWarmup }.count + 1)")
                                     .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                                    .foregroundStyle(row.isWarmup ? Color(hex: 0xF2B45C) : NoopHTMLColor.ink)
-                                    .frame(width: 36, height: 36).background(Color.white.opacity(0.06), in: Circle())
+                                    .foregroundStyle(type.tint ?? NoopHTMLColor.ink)
+                                    .frame(width: 36, height: 36).background((type.tint ?? .white).opacity(type.tint == nil ? 0.06 : 0.14), in: Circle())
+                                    .accessibilityLabel("\(type.title) set")
                                 pill(row.weightKg.map { LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units)) } ?? "—")
                                 pill(row.reps.map { "\($0) reps" } ?? "—", trophy: prSets.contains(row.id))
                                 pill(row.restSec.map { liftClock($0) } ?? "—", dim: true)

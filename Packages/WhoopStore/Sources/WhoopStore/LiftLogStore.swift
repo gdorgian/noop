@@ -247,6 +247,16 @@ public struct LiftSessionRow: Equatable, Codable, Sendable {
     }
 }
 
+/// How a working set was performed, beyond its numbers. A warm-up is not one of these: it has its own
+/// flag (`LiftSetRow.isWarmup`) because it changes what the set counts towards, while a drop set or a
+/// set taken to failure is still a working set and counts like one. Nil on a row is an ordinary set.
+public enum LiftSetKind: String, Codable, CaseIterable, Sendable {
+    /// Weight stripped straight after the previous set, no rest between.
+    case drop
+    /// Taken until another clean rep was not possible.
+    case failure
+}
+
 /// One set. Stored as its own row rather than folded into the session, because per-exercise history
 /// ("what did I lift for this last time") has to be answerable from an index.
 public struct LiftSetRow: Equatable, Codable, Sendable {
@@ -274,6 +284,8 @@ public struct LiftSetRow: Equatable, Codable, Sendable {
     /// Rest ACTUALLY taken after this set, seconds — not the target from the program.
     public var restSec: Int?
     public var note: String?
+    /// Drop set or failure set (v49). Nil for an ordinary set, and for every row written before v49.
+    public var setKind: LiftSetKind?
 
     public init(
         id: String,
@@ -291,7 +303,8 @@ public struct LiftSetRow: Equatable, Codable, Sendable {
         startTs: Int?,
         endTs: Int?,
         restSec: Int?,
-        note: String?
+        note: String?,
+        setKind: LiftSetKind? = nil
     ) {
         self.id = id
         self.deviceId = deviceId
@@ -310,6 +323,7 @@ public struct LiftSetRow: Equatable, Codable, Sendable {
         self.endTs = endTs
         self.restSec = restSec
         self.note = note
+        self.setKind = setKind
     }
 
     /// Volume for this set: weight x reps, in kilograms. Nil unless BOTH are present, and zero for a
@@ -336,7 +350,8 @@ public struct LiftSetRow: Equatable, Codable, Sendable {
             startTs: row["startTs"],
             endTs: row["endTs"],
             restSec: row["restSec"],
-            note: row["note"]
+            note: row["note"],
+            setKind: LiftSetKind(rawValue: row["setKind"] ?? "")
         )
     }
 }
@@ -657,8 +672,8 @@ extension WhoopStore {
                 try db.execute(sql: """
                     INSERT INTO liftSet
                         (id, deviceId, sessionId, ord, exercise, primaryMuscle, secondaryMuscles,
-                         setIndex, weightKg, reps, rpe, isWarmup, startTs, endTs, restSec, note)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         setIndex, weightKg, reps, rpe, isWarmup, startTs, endTs, restSec, note, setKind)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         ord = excluded.ord,
                         exercise = excluded.exercise,
@@ -672,13 +687,14 @@ extension WhoopStore {
                         startTs = excluded.startTs,
                         endTs = excluded.endTs,
                         restSec = excluded.restSec,
-                        note = excluded.note
+                        note = excluded.note,
+                        setKind = excluded.setKind
                     """, arguments: [
                         r.id, r.deviceId, r.sessionId, r.ord, r.exercise,
                         r.primaryMuscle?.rawValue,
                         LiftMuscle.encodeList(r.secondaryMuscles, excluding: r.primaryMuscle),
                         r.setIndex, r.weightKg, r.reps, r.rpe, r.isWarmup,
-                        r.startTs, r.endTs, r.restSec, r.note,
+                        r.startTs, r.endTs, r.restSec, r.note, r.setKind?.rawValue,
                     ])
                 n += db.changesCount
             }
@@ -700,14 +716,14 @@ extension WhoopStore {
                 try db.execute(sql: """
                     INSERT INTO liftSet
                         (id, deviceId, sessionId, ord, exercise, primaryMuscle, secondaryMuscles,
-                         setIndex, weightKg, reps, rpe, isWarmup, startTs, endTs, restSec, note)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         setIndex, weightKg, reps, rpe, isWarmup, startTs, endTs, restSec, note, setKind)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, arguments: [
                         r.id, r.deviceId, r.sessionId, r.ord, r.exercise,
                         r.primaryMuscle?.rawValue,
                         LiftMuscle.encodeList(r.secondaryMuscles, excluding: r.primaryMuscle),
                         r.setIndex, r.weightKg, r.reps, r.rpe, r.isWarmup,
-                        r.startTs, r.endTs, r.restSec, r.note,
+                        r.startTs, r.endTs, r.restSec, r.note, r.setKind?.rawValue,
                     ])
             }
             return rows.count

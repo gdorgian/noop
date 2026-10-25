@@ -31,6 +31,12 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        // The rest alert is for a phone in a pocket. With NOOP open the lift screen already shows the
+        // rest is done, so it only sounds.
+        if notification.request.content.categoryIdentifier == "noop.lift.rest" {
+            completionHandler([.sound])
+            return
+        }
         completionHandler([.banner, .sound, .list])
     }
 

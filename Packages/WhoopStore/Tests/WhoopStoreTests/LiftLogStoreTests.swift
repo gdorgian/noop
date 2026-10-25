@@ -36,6 +36,34 @@ final class LiftLogStoreTests: XCTestCase {
         XCTAssertNil(legacy.planJSON)
     }
 
+    func testSetKindMigrationAndRoundTrip() async throws {
+        let store = try await WhoopStore.inMemory()
+        let columns = try await store.columnNamesForTest(table: "liftSet")
+        XCTAssertTrue(columns.contains("setKind"))
+        let scope = UUID().uuidString
+        func set(_ id: String, _ ord: Int, _ kind: LiftSetKind?) -> LiftSetRow {
+            LiftSetRow(id: id, deviceId: scope, sessionId: "s", ord: ord, exercise: "Bench", primaryMuscle: .chest,
+                       setIndex: ord + 1, weightKg: 80, reps: 8, rpe: nil, isWarmup: false,
+                       startTs: nil, endTs: nil, restSec: nil, note: nil, setKind: kind)
+        }
+        let rows = [set("a", 0, nil), set("b", 1, .drop), set("c", 2, .failure)]
+        try await store.replaceLiftSessionSets(sessionId: "s", rows: rows)
+        var kinds = try await store.liftSets(sessionId: "s").map(\.setKind)
+        XCTAssertEqual(kinds, [nil, .drop, .failure])
+        var changed = rows[1]
+        changed.setKind = nil
+        try await store.upsertLiftSets([changed])
+        kinds = try await store.liftSets(sessionId: "s").map(\.setKind)
+        XCTAssertEqual(kinds, [nil, nil, .failure])
+        // A set encoded before v49 has no key at all and decodes as an ordinary set.
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(rows[2])) as? [String: Any])
+        json.removeValue(forKey: "setKind")
+        let legacy = try JSONDecoder().decode(LiftSetRow.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(legacy.setKind)
+        // A drop or failure set is still a working set: it counts towards volume.
+        XCTAssertEqual(rows[1].volumeKg, 640)
+    }
+
     // MARK: - v46 migration (additive: five new tables + indexes, nothing dropped)
 
     func testV46CreatesLiftLogTables() async throws {
