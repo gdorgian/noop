@@ -1004,9 +1004,11 @@ struct NoopAct2Screens: View {
                     NoopBatteryChip(percent: day == nil ? 52 : battery) { navigation.push(.strap) }
                     Button { navigation.push(.inbox) } label: {
                         ZStack(alignment: .topTrailing) {
-                            NoopIconDiscShape(size: .small) {
-                                NoopCanonicalGlyph(name: .bell, size: NoopControlSize.small.icon, color: NoopHTMLColor.inkSoft)
-                            }
+                            NoopCanonicalGlyph(name: .bell, size: NoopControlSize.small.icon, color: NoopHTMLColor.inkSoft)
+                                .frame(width: NoopControlSize.small.height, height: NoopControlSize.small.height)
+                                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 11))
+                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
+                                .noopHitTarget()
                             if inboxUnreadCount > 0 {
                                 Text("\(min(inboxUnreadCount, 99))")
                                     .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .bold))
