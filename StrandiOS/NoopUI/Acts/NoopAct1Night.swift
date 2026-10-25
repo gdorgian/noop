@@ -91,6 +91,8 @@ struct NoopAct1Screens: View {
     /// Rest's sections in their default order.
     static let restSections: [NoopPageSection] = [
         NoopPageSection(id: "night", title: "Your sleep", detail: "Last night against your need"),
+        NoopPageSection(id: "hero-aurora", title: "Header · Aurora", detail: "The night's lights in a dark disc", onByDefault: false),
+        NoopPageSection(id: "hero-glass", title: "Header · Glass", detail: "The night's stages settled in a glass", onByDefault: false),
         NoopPageSection(id: "night-glass", title: "Sleep · Glass", detail: "The night as layered liquid, filled toward your need", onByDefault: false),
         NoopPageSection(id: "night-aurora", title: "Sleep · Aurora", detail: "The night as curtains of light, as tall as the sleep was deep", onByDefault: false),
         NoopPageSection(id: "night-dial", title: "Sleep · Dial", detail: "The night on a clock face, cut into its stages", onByDefault: false),
@@ -108,6 +110,18 @@ struct NoopAct1Screens: View {
         switch id {
         case "trends":
             NoopTrendsList(navigation: navigation, ids: noopSleepTrendIDs).padding(.top, 18)
+        case "hero-aurora", "hero-glass":
+            if let rest, let night = restNight {
+                Group {
+                    if id == "hero-aurora" {
+                        NoopSleepAuroraHero(night: night, needMin: rest.needMin, side: NoopPageHeroMetrics.heroSide)
+                    } else {
+                        NoopSleepGlassHero(night: night, needMin: rest.needMin)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
         case "night-aurora", "night-dial", "night-performance", "night-ledger", "night-glass":
             if let rest, let night = restNight {
                 switch id {
@@ -138,21 +152,25 @@ struct NoopAct1Screens: View {
                         if let rest, let night = restNight {
                             let delta = NoopRestRecord.delta(asleepMin: night.asleepMin, needMin: rest.needMin)
                             // Rest's own ring first; the aurora and the glass are the other two heroes.
-                            NoopHeroPager(page: "sleep", names: ["Ring", "Aurora", "Glass"], side: 290) {
+                            // The header follows the ring style on Today; Rest's own ring is Noop's.
+                            let performance = min(1, night.asleepMin / max(1, rest.needMin))
+                            let score = NoopHeroScore(kind: .sleep, fill: performance, text: "\(Int((performance * 100).rounded()))")
+                            switch NoopHeroFamily.current {
+                            case .whoop:
+                                NoopWhoopStyleHero(score: score).frame(maxWidth: .infinity).padding(.vertical, 8)
+                            case .bevel:
+                                NoopBevelStyleHero(score: score).frame(maxWidth: .infinity).padding(.vertical, 8)
+                            case .noop:
                                 Act1SleepRing(
                                     hours: NoopRestRecord.duration(night.asleepMin),
                                     delta: delta.text,
-                                    progress: min(1, night.asleepMin / max(1, rest.needMin)),
+                                    progress: performance,
                                     selectedStage: selectedStage,
                                     slices: night.slices,
                                     needCaption: "the ring closes at your need \u{00B7} \(NoopRestRecord.duration(rest.needMin))",
                                     closes: delta.closes,
                                     measured: true
                                 )
-                            } second: {
-                                NoopSleepAuroraHero(night: night, needMin: rest.needMin, side: 276)
-                            } third: {
-                                NoopSleepGlassHero(night: night, needMin: rest.needMin)
                             }
                         } else {
                         Act1SleepRing(

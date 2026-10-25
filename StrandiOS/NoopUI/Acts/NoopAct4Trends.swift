@@ -154,6 +154,8 @@ private struct NoopTrendsScreen: View {
     /// as it did before it was editable.
     static let trendsSections: [NoopPageSection] = [
         NoopPageSection(id: "hero", title: "Body age", detail: "The orb, your body age and pace of aging"),
+        NoopPageSection(id: "hero-rings", title: "Body age · Tree rings", detail: "One ring per year, amber past your real age", onByDefault: false),
+        NoopPageSection(id: "hero-field", title: "Body age · Field", detail: "A breathing field in the orb's colours", onByDefault: false),
         NoopPageSection(id: "markers", title: "Markers", detail: "The measures you pinned"),
         NoopPageSection(id: "markers-tiles", title: "Markers · Tiles", detail: "Your pinned measures as a grid of tiles", onByDefault: false),
         NoopPageSection(id: "changes", title: "What changed", detail: "The window's verdict, six weeks to a year"),
@@ -166,8 +168,9 @@ private struct NoopTrendsScreen: View {
     @ViewBuilder
     private func trendsSection(_ id: String) -> some View {
         switch id {
-        case "hero":
+        case "hero", "hero-rings", "hero-field":
             NoopTrendsHero(
+                style: id == "hero-rings" ? 1 : id == "hero-field" ? 2 : 0,
                 bodyAge: ages?.bodyAge,
                 chronoAge: ages?.chronoAge ?? 0,
                 pace: ages?.pace,

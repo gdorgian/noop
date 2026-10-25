@@ -28,8 +28,10 @@ struct NoopSlotClock<Content: View>: View {
             let x = min(1, max(0, since / revealDuration))
             // Ease out: quick start, long settle.
             let reveal = 1 - pow(1 - x, 3)
+            // A paused clock (off screen, or reported so while a section was being added) shows the
+            // finished drawing: a draw-in frozen at its first frame would read as no data.
             content(reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600),
-                    reduceMotion ? 1 : reveal)
+                    reduceMotion || !onScreen ? 1 : reveal)
         }
         .onAppear { if appeared == nil { appeared = Date() } }
         .modifier(NoopSlotVisibility(onScreen: $onScreen))

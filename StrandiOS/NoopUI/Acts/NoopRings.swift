@@ -360,9 +360,8 @@ private enum NoopDonut {
         }
         guard fill > 0.004 else { return }
         // The arc, shaded along its length, with a glowing tip.
-        let gradient = Gradient(colors: [colors[0], colors[1]])
-        let shading = GraphicsContext.Shading.conicGradient(gradient, center: c, angle: .radians(-.pi / 2))
-        context.stroke(arc(0, fill), with: shading, style: StrokeStyle(lineWidth: width, lineCap: .round))
+        context.stroke(arc(0, fill), with: noopArcShading(colors[0], colors[1], center: c, fill: fill, radius: r, lineWidth: width),
+                       style: StrokeStyle(lineWidth: width, lineCap: .round))
         let a = -.pi / 2 + fill * 2 * .pi
         let tip = CGPoint(x: c.x + CGFloat(cos(a)) * r, y: c.y + CGFloat(sin(a)) * r)
         var glow = context
@@ -453,7 +452,7 @@ private struct NoopGyroRings: View {
 
     /// 0…1 over the first 1.6 s on screen, eased out.
     private func gyroReveal(_ now: Date) -> Double {
-        if reduceMotion { return 1 }
+        if reduceMotion || !onScreen { return 1 }
         let x = min(1, max(0, (appeared.map { now.timeIntervalSince($0) } ?? 0) / 1.6))
         return 1 - pow(1 - x, 3)
     }

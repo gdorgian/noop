@@ -14,53 +14,65 @@ enum NoopPageHeroMetrics {
     static let gap: CGFloat = 14
 }
 
-struct NoopScorePageHeader<Hero: View>: View {
-    var theme: NoopPageTheme? = nil
+/// A score page's fixed top: back, title and date, over the page's dusk backdrop.
+struct NoopScorePageTitle: View {
+    let theme: NoopPageTheme
     let title: String
     let date: String
-    let tiles: [(label: String, value: String)]
-    var back: (() -> Void)? = nil
-    @ViewBuilder var hero: Hero
+    let back: () -> Void
 
     var body: some View {
-        VStack(spacing: NoopPageHeroMetrics.gap) {
-            ZStack {
-                VStack(spacing: 2) {
-                    Text(title).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(date).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                }
-                if let back {
-                    HStack {
-                        Button(action: back) {
-                            NoopIconDiscShape(size: .small) {
-                                Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
-                            }
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
-                        .accessibilityLabel("Back")
-                        Spacer()
-                    }
-                }
+        ZStack {
+            VStack(spacing: 2) {
+                Text(title).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink)
+                Text(date).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             }
-            hero.frame(maxWidth: .infinity)
-            HStack(spacing: 10) {
-                ForEach(Array(tiles.enumerated()), id: \.offset) { _, tile in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tile.label).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                        Text(tile.value).font(NoopHTMLFont.outfit(NoopType.title3)).monospacedDigit()
-                            .foregroundStyle(NoopHTMLColor.ink).lineLimit(1).minimumScaleFactor(0.7)
+            HStack {
+                Button(action: back) {
+                    NoopIconDiscShape(size: .small) {
+                        Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .noopRaisedCard(radius: 18)
                 }
+                .buttonStyle(NoopHTMLPressStyle())
+                .accessibilityLabel("Back")
+                Spacer()
             }
         }
+        .padding(.bottom, NoopPageHeroMetrics.gap)
         .background(alignment: .top) {
-            if let theme {
-                NoopPageBackdrop(theme: theme)
-                    .frame(width: UIScreen.main.bounds.width)
-                    .offset(y: -140)
+            NoopPageBackdrop(theme: theme)
+                .frame(width: UIScreen.main.bounds.width)
+                .offset(y: -140)
+        }
+    }
+}
+
+/// A score page's hero, centred at the standard size.
+struct NoopScoreHero<Content: View>: View {
+    @ViewBuilder var content: Content
+    var body: some View {
+        content
+            .frame(width: NoopPageHeroMetrics.heroSide, height: NoopPageHeroMetrics.heroSide)
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, NoopPageHeroMetrics.gap)
+    }
+}
+
+/// Two figures under the hero, as raised cards.
+struct NoopStatTiles: View {
+    let tiles: [(label: String, value: String)]
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ForEach(Array(tiles.enumerated()), id: \.offset) { _, tile in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tile.label).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                    Text(tile.value).font(NoopHTMLFont.outfit(NoopType.title3)).monospacedDigit()
+                        .foregroundStyle(NoopHTMLColor.ink).lineLimit(1).minimumScaleFactor(0.7)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .noopRaisedCard(radius: 18)
             }
         }
     }
@@ -147,59 +159,5 @@ struct NoopPageBackdrop: View {
         .frame(maxWidth: .infinity)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-    }
-}
-
-/// Three ways to draw a page's hero, swiped between; the choice is kept per page. Dots under the
-/// hero say which is showing, and each change ticks.
-struct NoopHeroPager<A: View, B: View, C: View>: View {
-    let page: String
-    let names: [String]
-    /// The hero's square side; a page whose own hero is a different size passes it.
-    var side: CGFloat = NoopPageHeroMetrics.heroSide
-    @ViewBuilder var first: A
-    @ViewBuilder var second: B
-    @ViewBuilder var third: C
-
-    @AppStorage private var choice: Int
-
-    init(page: String, names: [String], side: CGFloat = NoopPageHeroMetrics.heroSide,
-         @ViewBuilder first: () -> A, @ViewBuilder second: () -> B, @ViewBuilder third: () -> C) {
-        self.page = page
-        self.names = names
-        self.side = side
-        self.first = first()
-        self.second = second()
-        self.third = third()
-        _choice = AppStorage(wrappedValue: 0, "noop.hero.\(page)")
-    }
-
-    var body: some View {
-        VStack(spacing: 8) {
-            TabView(selection: $choice) {
-                first.frame(width: side, height: side).tag(0)
-                second.frame(width: side, height: side).tag(1)
-                third.frame(width: side, height: side).tag(2)
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: side)
-            .onChange(of: choice) { NoopHaptics.play(.pass) }
-            HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { i in
-                    Capsule().fill(Color.white.opacity(i == choice ? 0.85 : 0.22))
-                        .frame(width: i == choice ? 16 : 6, height: 6)
-                }
-            }
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: choice)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Style \(choice + 1) of 3, \(names[min(choice, names.count - 1)])")
-            .accessibilityAdjustableAction { dir in
-                switch dir {
-                case .increment: choice = min(2, choice + 1)
-                case .decrement: choice = max(0, choice - 1)
-                default: break
-                }
-            }
-        }
     }
 }

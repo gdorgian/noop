@@ -51,23 +51,60 @@ struct NoopRecoveryPage: View {
         return String(format: "%.\(v.decimals)f", v.value) + " " + v.unit
     }
 
+    /// The page's sections: the header that follows Today's ring style, Noop's other two drawings
+    /// waiting in Add section, the figures and the Trends list.
+    static let sections: [NoopPageSection] = [
+        NoopPageSection(id: "hero", title: "Header", detail: "Matches the ring style on Today"),
+        NoopPageSection(id: "hero-bloom", title: "Header · Bloom", detail: "A flower that opens as far as the score", onByDefault: false),
+        NoopPageSection(id: "hero-pulse", title: "Header · Pulse", detail: "One ring, with pulses at your resting heart rate", onByDefault: false),
+        NoopPageSection(id: "hero-sphere", title: "Header · Sphere", detail: "Liquid in a glass, filled to the score", onByDefault: false),
+        NoopPageSection(id: "tiles", title: "Resting HRV and heart rate", detail: "Last night's two figures"),
+        NoopPageSection(id: "trends", title: "Trends", detail: "Recovery and its signals as charts")
+    ]
+    @StateObject private var layout = NoopPageLayout(page: "recovery", catalog: NoopRecoveryPage.sections)
+    @State private var editing = NoopPageEditing()
+
+    private var score: NoopHeroScore {
+        NoopHeroScore(kind: .recovery, fill: (recovery ?? 0) / 100, text: recovery.map { "\(Int($0.rounded()))" })
+    }
+
     var body: some View {
         NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 28) {
-                NoopScorePageHeader(theme: .recovery, title: "Recovery", date: noopDayLabel(day?.rings.recovery == nil ? latest?.day : nil),
-                                    tiles: [("Resting HRV", vital("hrv")), ("Resting HR", vital("rhr"))],
-                                    back: { navigation.back(or: .today) }) {
-                    NoopHeroPager(page: "recovery", names: ["Sphere", "Bloom", "Pulse"]) {
-                        NoopRecoverySphere(fill: (recovery ?? 0) / 100, color: band.light, deep: band.deep, value: recovery)
-                    } second: {
-                        NoopRecoveryBloom(fill: (recovery ?? 0) / 100, tint: band.light, deep: band.deep, value: recovery)
-                    } third: {
-                        NoopRecoveryPulse(fill: (recovery ?? 0) / 100, tint: band.light, value: recovery,
-                                          restingBPM: day?.vitals.first { $0.key == "rhr" }?.value)
-                    }
-                }
-                NoopTrendsList(navigation: navigation, ids: noopRecoveryIDs)
+            VStack(alignment: .leading, spacing: 0) {
+                NoopScorePageTitle(theme: .recovery, title: "Recovery", date: noopDayLabel(day?.rings.recovery == nil ? latest?.day : nil),
+                                   back: { navigation.back(or: .today) })
+                NoopEditableSections(layout: layout, editing: $editing, spacing: 0) { id in section(id) }
             }
+        }
+        .noopEditBar($editing, layout: layout)
+    }
+
+    @ViewBuilder
+    private func section(_ id: String) -> some View {
+        let fill = (recovery ?? 0) / 100
+        switch id {
+        case "hero":
+            NoopScoreHero {
+                switch NoopHeroFamily.current {
+                case .whoop: NoopWhoopStyleHero(score: score, recovery: recovery)
+                case .bevel: NoopBevelStyleHero(score: score)
+                case .noop: NoopRecoverySphere(fill: fill, color: band.light, deep: band.deep, value: recovery)
+                }
+            }
+        case "hero-bloom":
+            NoopScoreHero { NoopRecoveryBloom(fill: fill, tint: band.light, deep: band.deep, value: recovery) }
+        case "hero-pulse":
+            NoopScoreHero {
+                NoopRecoveryPulse(fill: fill, tint: band.light, value: recovery, restingBPM: day?.vitals.first { $0.key == "rhr" }?.value)
+            }
+        case "hero-sphere":
+            NoopScoreHero { NoopRecoverySphere(fill: fill, color: band.light, deep: band.deep, value: recovery) }
+        case "tiles":
+            NoopStatTiles(tiles: [("Resting HRV", vital("hrv")), ("Resting HR", vital("rhr"))]).padding(.bottom, 28)
+        case "trends":
+            NoopTrendsList(navigation: navigation, ids: noopRecoveryIDs)
+        default:
+            EmptyView()
         }
     }
 }
@@ -90,25 +127,68 @@ struct NoopStrainPage: View {
         (day?.ribbonSessions ?? []).reduce(0) { $0 + $1.end.timeIntervalSince($1.start) / 60 }
     }
 
+    static let sections: [NoopPageSection] = [
+        NoopPageSection(id: "hero", title: "Header", detail: "Matches the ring style on Today"),
+        NoopPageSection(id: "hero-gauge", title: "Header · Gauge", detail: "A gauge with today's target and a needle", onByDefault: false),
+        NoopPageSection(id: "hero-day", title: "Header · Day", detail: "Today's heart rate wrapped round a ring", onByDefault: false),
+        NoopPageSection(id: "hero-heat", title: "Header · Heat", detail: "Heat rising as high as the strain", onByDefault: false),
+        NoopPageSection(id: "tiles", title: "Exercise and energy", detail: "Today's two figures"),
+        NoopPageSection(id: "trends", title: "Trends", detail: "Strain and its parts as charts")
+    ]
+    @StateObject private var layout = NoopPageLayout(page: "strain", catalog: NoopStrainPage.sections)
+    @State private var editing = NoopPageEditing()
+
+    private var level: Double { min(1, (strain ?? 0) / 100) }
+    private var score: NoopHeroScore {
+        let scale = noopEffortScale
+        let factor = UnitFormatter.effortValue(100, scale: scale) / 100
+        return NoopHeroScore(kind: .strain, fill: level, text: strain.map(noopStrainText), suffix: "",
+                             target: target,
+                             targetText: target.map { t in
+                                 let lo = t.lowerBound * 100 * factor, hi = t.upperBound * 100 * factor
+                                 return scale == .whoop ? String(format: "%.1f – %.1f", lo, hi) : "\(Int(lo.rounded())) – \(Int(hi.rounded()))"
+                             })
+    }
+
     var body: some View {
         NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 28) {
-                NoopScorePageHeader(theme: .strain, title: "Strain", date: noopDayLabel(day?.rings.strain == nil ? latestStrain?.day : nil),
-                                    tiles: [("Exercise", NoopRestRecord.duration(exerciseMinutes)),
-                                            ("Total energy", day?.energy?.totalBurnedSoFar
-                                                .map { "\($0.formatted(.number.precision(.fractionLength(0)))) kcal" } ?? "—")],
-                                    back: { navigation.back(or: .today) }) {
-                    NoopHeroPager(page: "strain", names: ["Heat", "Gauge", "Day"]) {
-                        NoopStrainHeat(level: min(1, (strain ?? 0) / 100), value: strain)
-                    } second: {
-                        NoopStrainGauge(level: min(1, (strain ?? 0) / 100), value: strain, target: target)
-                    } third: {
-                        NoopStrainDayRing(points: day?.ribbonPoints ?? [], resting: day?.vitals.first { $0.key == "rhr" }?.value,
-                                          value: strain)
-                    }
-                }
-                NoopTrendsList(navigation: navigation, ids: noopStrainIDs)
+            VStack(alignment: .leading, spacing: 0) {
+                NoopScorePageTitle(theme: .strain, title: "Strain", date: noopDayLabel(day?.rings.strain == nil ? latestStrain?.day : nil),
+                                   back: { navigation.back(or: .today) })
+                NoopEditableSections(layout: layout, editing: $editing, spacing: 0) { id in section(id) }
             }
+        }
+        .noopEditBar($editing, layout: layout)
+    }
+
+    @ViewBuilder
+    private func section(_ id: String) -> some View {
+        switch id {
+        case "hero":
+            NoopScoreHero {
+                switch NoopHeroFamily.current {
+                case .whoop: NoopWhoopStyleHero(score: score)
+                case .bevel: NoopBevelStyleHero(score: score)
+                case .noop: NoopStrainHeat(level: level, value: strain)
+                }
+            }
+        case "hero-gauge":
+            NoopScoreHero { NoopStrainGauge(level: level, value: strain, target: target) }
+        case "hero-day":
+            NoopScoreHero {
+                NoopStrainDayRing(points: day?.ribbonPoints ?? [], resting: day?.vitals.first { $0.key == "rhr" }?.value, value: strain)
+            }
+        case "hero-heat":
+            NoopScoreHero { NoopStrainHeat(level: level, value: strain) }
+        case "tiles":
+            NoopStatTiles(tiles: [("Exercise", NoopRestRecord.duration(exerciseMinutes)),
+                                  ("Total energy", day?.energy?.totalBurnedSoFar
+                                      .map { "\($0.formatted(.number.precision(.fractionLength(0)))) kcal" } ?? "—")])
+                .padding(.bottom, 28)
+        case "trends":
+            NoopTrendsList(navigation: navigation, ids: noopStrainIDs)
+        default:
+            EmptyView()
         }
     }
 }

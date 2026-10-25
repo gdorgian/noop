@@ -7,6 +7,8 @@ import SwiftUI
 // orb's glow, closed by the door to Your ages.
 
 struct NoopTrendsHero: View {
+    /// Which drawing holds the age: 0 the orb, 1 tree rings, 2 a breathing field.
+    var style = 0
     var bodyAge: Double?
     var chronoAge: Int
     var pace: AgingPace.Result?
@@ -16,7 +18,9 @@ struct NoopTrendsHero: View {
     var openAges: () -> Void
 
     /// Edge to edge: the orb's frame is the full screen width, past the page gutters.
-    private var orbSide: CGFloat { UIScreen.main.bounds.width }
+    /// Sized so the visible orb (the frame less its inset for the moving outline) matches the other
+    /// pages' heroes; the drifting specks still reach past it.
+    private var orbSide: CGFloat { min(UIScreen.main.bounds.width, NoopPageHeroMetrics.heroSide / 0.79) }
     /// How far the card rises behind the orb.
     private var overlap: CGFloat { orbSide * 0.36 }
     /// Type inside the orb follows its size.
@@ -36,9 +40,6 @@ struct NoopTrendsHero: View {
         return min(max(0.3 + (yearsDifference ?? 0) / 12, 0), 1)
     }
 
-    /// Which drawing holds the age: the orb, tree rings, or a breathing field. Swiped sideways.
-    @AppStorage("noop.hero.trends") private var style = 0
-
     var body: some View {
         ZStack(alignment: .top) {
             paceCard
@@ -46,23 +47,6 @@ struct NoopTrendsHero: View {
             Color.clear
                 .frame(height: orbSide)
                 .overlay { orb.frame(width: orbSide, height: orbSide) }
-                .simultaneousGesture(DragGesture(minimumDistance: 30).onEnded { g in
-                    guard abs(g.translation.width) > 60, abs(g.translation.width) > abs(g.translation.height) * 1.6 else { return }
-                    withAnimation(.easeInOut(duration: 0.35)) { style = (style + (g.translation.width < 0 ? 1 : 2)) % 3 }
-                    NoopHaptics.play(.pass)
-                })
-            HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { i in
-                    Capsule().fill(Color.white.opacity(i == style ? 0.85 : 0.22)).frame(width: i == style ? 16 : 6, height: 6)
-                }
-            }
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: style)
-            .padding(.top, orbSide * 0.935)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Style \(style + 1) of 3")
-            .accessibilityAdjustableAction { dir in
-                if dir == .increment { style = min(2, style + 1) } else if dir == .decrement { style = max(0, style - 1) }
-            }
         }
     }
 

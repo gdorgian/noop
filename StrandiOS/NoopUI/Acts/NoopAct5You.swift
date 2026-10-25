@@ -536,6 +536,8 @@ private extension NoopAct5Screens {
     /// You's sections in their default order; each carries the space above it.
     static let youSections: [NoopPageSection] = [
         NoopPageSection(id: "portrait", title: "Your clock", detail: "Your name and your usual sleep window"),
+        NoopPageSection(id: "portrait-sky", title: "Header · Sky", detail: "Your day as sky on a 24-hour dial", onByDefault: false),
+        NoopPageSection(id: "portrait-ring", title: "Header · Portrait", detail: "You inside a ring that fills as your need is learned", onByDefault: false),
         NoopPageSection(id: "body", title: "Your body", detail: "Your record and your zones"),
         NoopPageSection(id: "journey", title: "Your journey", detail: "Your goal, everything you logged and bloodwork")
     ]
@@ -546,17 +548,10 @@ private extension NoopAct5Screens {
         case "portrait":
             VStack(spacing: 2) {
                 if let you {
-                    NoopHeroPager(page: "you", names: ["Clock", "Sky", "Portrait"], side: 300) {
-                        NoopBodyClock(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour,
-                                      showsNow: true,
-                                      initials: NoopYouRecord.initials(profile.displayName),
-                                      photo: profile.avatarImage)
-                    } second: {
-                        NoopYouSky(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour)
-                    } third: {
-                        NoopYouPortrait(initials: NoopYouRecord.initials(profile.displayName), photo: profile.avatarImage,
-                                        needMin: you.needMin, needNights: you.needNights)
-                    }
+                    NoopBodyClock(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour,
+                                  showsNow: true,
+                                  initials: NoopYouRecord.initials(profile.displayName),
+                                  photo: profile.avatarImage)
                     if let name = profile.displayName {
                         Text(name)
                             .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
@@ -584,6 +579,19 @@ private extension NoopAct5Screens {
                     .lineSpacing(3)
                     .frame(maxWidth: 300)
                 }
+            }
+        case "portrait-sky", "portrait-ring":
+            if let you {
+                Group {
+                    if id == "portrait-sky" {
+                        NoopYouSky(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour)
+                    } else {
+                        NoopYouPortrait(initials: NoopYouRecord.initials(profile.displayName), photo: profile.avatarImage,
+                                        needMin: you.needMin, needNights: you.needNights)
+                    }
+                }
+                .frame(width: 300, height: 300)
+                .frame(maxWidth: .infinity)
             }
         case "body":
             VStack(alignment: .leading, spacing: 9) {
