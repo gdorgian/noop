@@ -23,6 +23,23 @@ enum NoopHeroFamily: String {
     }
 }
 
+extension NoopHeroFamily {
+    /// A day's ring colour in the month sheet, in this family's own colours, so the sheet reads like
+    /// the header it was opened from.
+    func dayColor(_ kind: NoopHeroScore.Kind, _ value: Double) -> Color {
+        switch (kind, self) {
+        case (.recovery, .whoop):
+            return value >= 67 ? Color(hex: 0x16EC06) : value >= 34 ? Color(hex: 0xFFDE00) : Color(hex: 0xFF0026)
+        case (.recovery, _):
+            return value >= 67 ? Color(hex: 0x5BF0A6) : value >= 34 ? Color(hex: 0xF7D86A) : Color(hex: 0xF57A72)
+        case (.strain, .whoop): return Color(hex: 0x0093E7)
+        case (.strain, _): return Color(hex: 0xF0A43C)
+        case (.sleep, .whoop): return Color(hex: 0x7C93A8)
+        case (.sleep, _): return Color(hex: 0x9C8CFF)
+        }
+    }
+}
+
 /// What a score header shows: the figure, its fill, its colours and its word.
 struct NoopHeroScore {
     enum Kind { case recovery, strain, sleep }

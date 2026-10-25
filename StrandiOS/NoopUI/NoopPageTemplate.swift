@@ -23,7 +23,8 @@ struct NoopScorePageTitle: View {
     var maxBack = 365
     /// Each day's ring for the month sheet.
     let ring: (Date) -> NoopDayRing?
-    let back: () -> Void
+    /// Nil for a tab's own page, which has nowhere to go back to.
+    var back: (() -> Void)? = nil
 
     @State private var calendarOpen = false
     private var family: NoopHeroFamily { NoopHeroFamily.current }
@@ -32,6 +33,7 @@ struct NoopScorePageTitle: View {
         VStack(spacing: 10) {
             ZStack {
                 Text(title).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink)
+                if let back {
                 HStack {
                     Button(action: back) {
                         NoopIconDiscShape(size: .small) {
@@ -41,6 +43,7 @@ struct NoopScorePageTitle: View {
                     .buttonStyle(NoopHTMLPressStyle())
                     .accessibilityLabel("Back")
                     Spacer()
+                }
                 }
             }
             NoopDayPill(offset: $dayOffset, maxBack: maxBack) { calendarOpen = true }
@@ -62,8 +65,7 @@ struct NoopScorePageTitle: View {
         }
         .sheet(isPresented: $calendarOpen) {
             NoopDayCalendarSheet(offset: $dayOffset, maxBack: maxBack, title: title, ring: ring)
-                .presentationDetents([.large])
-                .noopSheet()
+                .noopSheet([.height(NoopDayCalendarSheet.height)])
         }
     }
 }

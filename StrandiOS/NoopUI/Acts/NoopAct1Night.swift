@@ -24,7 +24,6 @@ struct NoopAct1Screens: View {
     @State private var selectedStage: Int?
     @StateObject private var restLayout = NoopPageLayout(page: "rest", catalog: NoopAct1Screens.restSections)
     @State private var restEditing = NoopPageEditing()
-    @State private var restCalendarOpen = false
     @SceneStorage("noop.act1.selected-bedtime") private var selectedBedtime = 2
     @SceneStorage("noop.act1.smart-wake") private var smartWake = true
     /// Minutes past midnight for the wake time, stepped in fives. Nil until the user moves it, so
@@ -62,43 +61,17 @@ struct NoopAct1Screens: View {
     private var restScreen: some View {
         NoopScreen(topInset: 58) {
             VStack(spacing: 0) {
-                HStack(alignment: .top, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(restHeaderLabel)
-                            .font(NoopHTMLFont.sans(NoopType.footnote))
-                            .foregroundStyle(NoopHTMLColor.copy)
-                        Text("Rest")
-                            .font(NoopHTMLFont.outfit(NoopType.title3, weight: .regular))
-                            .tracking(-0.46)
-                            .frame(minHeight: 26.45, alignment: .top)
-                    }
-                    Spacer(minLength: 8)
-                    NoopBatteryChip(percent: rest == nil ? 52 : battery) { navigation.push(.strap) }
-                        .padding(.top, 2)
-                }
-                .padding(.bottom, 14)
-
-                // The week's nights, a day at a time, or from the month sheet.
-                if rest != nil {
-                    NoopDayPill(offset: $navigation.selectedRestDay, maxBack: 6) { restCalendarOpen = true }
-                        .padding(.bottom, 18)
-                        .sheet(isPresented: $restCalendarOpen) {
-                            NoopDayCalendarSheet(offset: $navigation.selectedRestDay, maxBack: 6, title: "Sleep") { date in
-                                guard let rest, rest.needMin > 0,
-                                      let m = model.repo.days.last(where: { $0.day == Repository.localDayKey(date) })?.totalSleepMin
-                                else { return nil }
-                                return (min(1, m / rest.needMin), Color(hex: 0x9C8CFF))
-                            }
-                            .noopSheet()
-                        }
+                // The same top as Recovery and Strain: title, the day pill, the month sheet.
+                NoopScorePageTitle(theme: .sleep, title: "Sleep", dayOffset: $navigation.selectedRestDay, maxBack: 6) { date in
+                    guard let rest, rest.needMin > 0,
+                          // Today's daily row is written later; until then it is last night's record.
+                          let m = Calendar.current.isDateInToday(date) ? rest.latest?.asleepMin
+                              : model.repo.days.last(where: { $0.day == Repository.localDayKey(date) })?.totalSleepMin
+                    else { return nil }
+                    return (min(1, m / rest.needMin), NoopHeroFamily.current.dayColor(.sleep, m))
                 }
 
                 NoopEditableSections(layout: restLayout, editing: $restEditing) { id in restSection(id) }
-            }
-            .background(alignment: .top) {
-                NoopPageBackdrop(theme: .sleep)
-                    .frame(width: UIScreen.main.bounds.width)
-                    .offset(y: -110)
             }
         }
         .noopEditBar($restEditing, layout: restLayout)
@@ -150,20 +123,11 @@ struct NoopAct1Screens: View {
             }
         case "night":
             VStack(spacing: 10) {
-                restSectionLabel("Your sleep")
                 if let rest, rest.phase != .ready {
                     restAbsentCard(rest.phase)
                 } else {
                 Button { if rest == nil { navigation.push(.why) } } label: {
                     VStack(spacing: 2) {
-                        HStack(alignment: .firstTextBaseline) {
-                            NoopSectionLabel("Against your need", color: Color(hex: 0x8B958F))
-                            Spacer()
-                            Text(restNight.map { "asleep \($0.asleepWindow)" } ?? selectedNight.window)
-                                .font(NoopHTMLFont.sans(NoopType.eyebrow))
-                                .foregroundStyle(NoopHTMLColor.faint)
-                                .monospacedDigit()
-                        }
 
                         if let rest, let night = restNight {
                             let delta = NoopRestRecord.delta(asleepMin: night.asleepMin, needMin: rest.needMin)
@@ -198,10 +162,16 @@ struct NoopAct1Screens: View {
                         }
 
                         HStack(spacing: 10) {
-                            Text(restRingRead)
-                                .font(NoopHTMLFont.sans(NoopType.caption))
-                                .foregroundStyle(NoopHTMLColor.inkSoft)
-                                .multilineTextAlignment(.leading)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(restNight.map { "Asleep \($0.asleepWindow)" } ?? selectedNight.window)
+                                    .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .medium))
+                                    .foregroundStyle(NoopHTMLColor.faint)
+                                    .monospacedDigit()
+                                Text(restRingRead)
+                                    .font(NoopHTMLFont.sans(NoopType.caption))
+                                    .foregroundStyle(NoopHTMLColor.inkSoft)
+                                    .multilineTextAlignment(.leading)
+                            }
                             Spacer(minLength: 4)
                             if rest == nil {
                                 NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.nightLight)
@@ -215,6 +185,7 @@ struct NoopAct1Screens: View {
                     }
                 }
                 .buttonStyle(NoopHTMLPressStyle())
+                .modifier(NoopDaySwipe(offset: $navigation.selectedRestDay, maxBack: 6))
                 }
 
                 if let bed = restNight?.bed {

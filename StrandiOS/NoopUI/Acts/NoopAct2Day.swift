@@ -325,6 +325,9 @@ struct NoopAct2Screens: View {
     @State private var showReleaseNotes = false
     @StateObject private var todayLayout = NoopPageLayout(page: "today", catalog: NoopAct2Screens.todaySections)
     @State private var todayEditing = NoopPageEditing()
+    @State private var activityStatus = NoopActivityStatusState.load()
+    @State private var activityStatusOpen = false
+    @State private var todayCalendarOpen = false
     var body: some View {
         Group {
             switch navigation.route {
@@ -461,6 +464,9 @@ struct NoopAct2Screens: View {
         }
     }
 
+    /// The breathing room under the rings, before whatever section the wearer put next.
+    static let ringsGap: CGFloat = 18
+
     /// Today's sections in their default order. The header and the look-back banner stay above them.
     static let todaySections: [NoopPageSection] = [
         NoopPageSection(id: "rings-gyro", title: "Rings · Gyro", detail: "Three orbits turning around a glowing core", onByDefault: false),
@@ -528,14 +534,19 @@ struct NoopAct2Screens: View {
             NoopVitalsConstellation(vitals: day?.vitals ?? []) { navigation.push(.vitals) }
         case "rings-gyro":
             NoopTodayRings(values: todayRings, style: .gyro, open: openRing)
+                .padding(.bottom, Self.ringsGap)
         case "rings-donuts":
             NoopTodayRings(values: todayRings, style: .donuts, open: openRing)
+                .padding(.bottom, Self.ringsGap)
         case "rings-dials":
             NoopTodayRings(values: todayRings, style: .dials, open: openRing)
+                .padding(.bottom, Self.ringsGap)
         case "rings":
             NoopTodayRings(values: todayRings, style: .living, open: openRing)
+                .padding(.bottom, Self.ringsGap)
         case "rings-segmented":
             NoopTodayRings(values: todayRings, style: .segmented, open: openRing)
+                .padding(.bottom, Self.ringsGap)
         case "breathe":
             VStack(spacing: 10) {
                 if !isHistorical {
@@ -794,15 +805,6 @@ struct NoopAct2Screens: View {
 
     // MARK: - Today, measured (production shell)
 
-    /// "Hi, {name}" by day, "Evening, {name}" for a night worker — the HTML's two greetings.
-    private var todayGreeting: String? {
-        guard day != nil else { return dayContext.eyebrow }
-        guard let name = displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
-            return isNightWorker ? "Evening" : "Hi"
-        }
-        return isNightWorker ? "Evening, \(name)" : "Hi, \(name)"
-    }
-
     /// "Last night · 6h 37m, 1h 23m short of your need". The HTML's template is the over case; the
     /// short case keeps its words and names the direction. A night older than a day and a half is
     /// dated instead of called last night.
@@ -957,67 +959,66 @@ struct NoopAct2Screens: View {
     }
 
     private var todayHeader: some View {
-        // One row for the greeting and the controls, centred on each other; the line under it has
-        // the full width (23 Oct 2026).
-        VStack(alignment: .leading, spacing: 6) {
-        HStack(alignment: .center, spacing: 14) {
-            Text(todayGreeting ?? "")
-                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium))
-                .foregroundStyle(NoopHTMLColor.copy)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: 9) {
-                NoopBatteryChip(percent: day == nil ? 52 : battery) { navigation.push(.strap) }
-                // Past days read only recorded values; production does not open the navigator until
-                // every Today figure has its recorded counterpart wired (spec 50 §7).
+        // The date opens the calendar; under it the wearer's status, then the band and the updates in
+        // one capsule (25 Oct 2026).
+        VStack(alignment: .leading, spacing: 14) {
+            Button {
+                NoopHaptics.play(.tick)
                 if day == nil {
-                Button {
                     withAnimation(.easeInOut(duration: 0.18)) { dayRailOpen.toggle() }
-                } label: {
-                    HStack(spacing: 6) {
-                        Act2Glyph(.calendar, size: 15, color: dayRailOpen || isHistorical ? NoopHTMLColor.blueLight : Color(hex: 0x8B958F))
-                        Text(selectedTodayOffset == 0 ? "Today" : selectedTodayOffset == 1 ? "Yesterday" : dayContext.shortLabel)
-                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                            .foregroundStyle(dayRailOpen || isHistorical ? NoopHTMLColor.blueLight : NoopHTMLColor.inkSoft)
-                    }
-                    .padding(.horizontal, 11)
-                    .frame(height: NoopControlSize.small.height)
-                    .background(dayRailOpen || isHistorical ? NoopHTMLColor.blue.opacity(0.14) : Color.white.opacity(0.06), in: Capsule())
-                    .overlay(Capsule().stroke(dayRailOpen || isHistorical ? NoopHTMLColor.blue.opacity(0.34) : Color.white.opacity(0.1), lineWidth: 0.5))
+                } else {
+                    todayCalendarOpen = true
                 }
-                .buttonStyle(NoopPlainHitStyle())
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(todayTitle)
+                        .font(NoopHTMLFont.outfit(NoopType.title3, weight: .medium))
+                        .tracking(-0.4)
+                        .foregroundStyle(NoopHTMLColor.ink)
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                    Image(systemName: "chevron.down").font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(NoopHTMLColor.faint)
+                        .rotationEffect(.degrees(dayRailOpen ? 180 : 0))
                 }
-
-                Button { navigation.push(.inbox) } label: {
-                    ZStack(alignment: .topTrailing) {
-                        NoopIconDiscShape(size: .small) {
-                            NoopCanonicalGlyph(name: .bell, size: NoopControlSize.small.icon, color: NoopHTMLColor.inkSoft)
-                        }
-
-                        if inboxUnreadCount > 0 {
-                            Text("\(min(inboxUnreadCount, 99))")
-                                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .bold))
-                                .foregroundStyle(Color(hex: 0x03212F))
-                                .monospacedDigit()
-                                .padding(.horizontal, 4)
-                                .frame(minWidth: 16, minHeight: 16)
-                                .background(NoopHTMLColor.blue, in: Capsule())
-                                .overlay(Capsule().stroke(NoopHTMLColor.canvas, lineWidth: 1.5))
-                                .offset(x: 4, y: -4)
-                        }
-                    }
-                    .frame(width: 32, height: 32)
-                }
-                .buttonStyle(NoopPlainHitStyle())
-                .accessibilityLabel(
-                    inboxUnreadCount > 0
-                        ? "Updates, \(inboxUnreadCount) unread"
-                        : "Updates"
-                )
+                .contentShape(Rectangle())
             }
-            .fixedSize(horizontal: true, vertical: false)
-        }
+            .buttonStyle(NoopHTMLPressStyle())
+            .accessibilityLabel("\(todayTitle), open the calendar")
+
+            HStack(spacing: 10) {
+                NoopActivityStatusChip(state: activityStatus) { activityStatusOpen = true }
+
+                HStack(spacing: 4) {
+                    NoopBatteryChip(percent: day == nil ? 52 : battery, bare: true) { navigation.push(.strap) }
+                    Rectangle().fill(NoopHTMLColor.borderStrong).frame(width: 0.5, height: 20)
+                    Button { navigation.push(.inbox) } label: {
+                        ZStack(alignment: .topTrailing) {
+                            NoopCanonicalGlyph(name: .bell, size: NoopControlSize.small.icon, color: NoopHTMLColor.inkSoft)
+                                .frame(width: 36, height: 36)
+                            if inboxUnreadCount > 0 {
+                                Text("\(min(inboxUnreadCount, 99))")
+                                    .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .bold))
+                                    .foregroundStyle(Color(hex: 0x03212F))
+                                    .monospacedDigit()
+                                    .padding(.horizontal, 4)
+                                    .frame(minWidth: 16, minHeight: 16)
+                                    .background(NoopHTMLColor.blue, in: Capsule())
+                                    .overlay(Capsule().stroke(NoopHTMLColor.canvas, lineWidth: 1.5))
+                                    .offset(x: 2, y: 0)
+                            }
+                        }
+                        .noopHitTarget()
+                    }
+                    .buttonStyle(NoopPlainHitStyle())
+                    .accessibilityLabel(inboxUnreadCount > 0 ? "Updates, \(inboxUnreadCount) unread" : "Updates")
+                }
+                .padding(.leading, 6).padding(.trailing, 5)
+                .frame(height: 46)
+                .background(Color.white.opacity(0.06), in: Capsule())
+                .overlay(Capsule().strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
+                .fixedSize()
+            }
+
             // The breathing prompt belongs to the orb and moves with it; a past day keeps its header.
             if isHistorical {
                 Text(dayContext.header)
@@ -1028,6 +1029,29 @@ struct NoopAct2Screens: View {
             }
         }
         .padding(.bottom, 4)
+        .sheet(isPresented: $activityStatusOpen) {
+            NoopActivityStatusSheet(state: $activityStatus)
+                .noopSheet([.height(NoopActivityStatusSheet.height)])
+        }
+        .sheet(isPresented: $todayCalendarOpen) {
+            // Today keeps no history of its own yet, so a past day opens its Recovery.
+            NoopDayCalendarSheet(offset: Binding(get: { 0 }, set: { picked in
+                guard picked > 0 else { return }
+                navigation.scoreDayOffset = picked
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { navigation.push(.recovery) }
+            }), title: "Recovery") { date in
+                repo.days.last { $0.day == Repository.localDayKey(date) }?.recovery
+                    .map { (min(1, $0 / 100), NoopHeroFamily.current.dayColor(.recovery, $0)) }
+            }
+            .noopSheet([.height(NoopDayCalendarSheet.height)])
+        }
+    }
+
+    /// "Today, October 25"; a looked-back day by its own date.
+    private var todayTitle: String {
+        if day == nil, isHistorical { return dayContext.date }
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMM d")
+        return "Today, " + f.string(from: Date())
     }
 
     private func act2DestinationRow(

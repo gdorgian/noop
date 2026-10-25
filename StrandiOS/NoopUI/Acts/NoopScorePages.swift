@@ -24,11 +24,6 @@ private func noopDayKey(_ offset: Int) -> String {
     return Repository.localDayKey(d)
 }
 
-private func noopRecoveryColor(_ r: Double?) -> Color {
-    guard let r else { return Color(hex: 0x6E7780) }
-    return r >= 67 ? Color(hex: 0x16EC06) : r >= 34 ? Color(hex: 0xFFDE00) : Color(hex: 0xFF0026)
-}
-
 struct NoopRecoveryPage: View {
     @ObservedObject var navigation: NoopNavigation
     let day: NoopDayRecord?
@@ -69,7 +64,7 @@ struct NoopRecoveryPage: View {
                 NoopScorePageTitle(theme: .recovery, title: "Recovery", dayOffset: $navigation.scoreDayOffset,
                                    ring: { date in
                                        repo.days.last { $0.day == Repository.localDayKey(date) }?.recovery
-                                           .map { (min(1, $0 / 100), noopRecoveryColor($0)) }
+                                           .map { (min(1, $0 / 100), NoopHeroFamily.current.dayColor(.recovery, $0)) }
                                    },
                                    back: { navigation.back(or: .today) })
                 NoopEditableSections(layout: layout, editing: $editing, spacing: 0) { id in section(id) }
@@ -102,158 +97,17 @@ struct NoopRecoveryPage: View {
             NoopScoreHero { NoopRecoverySphere(fill: fill, color: band.light, deep: band.deep, value: recovery) }
                 .id("sphere-\(offset)").modifier(NoopDaySwipe(offset: $navigation.scoreDayOffset))
         case "tiles":
-            if NoopHeroFamily.current == .whoop {
-                NoopEmergingStats(rows: whoopRows, footer: footer)
-                    .padding(.top, -34)
-                    .padding(.bottom, 28)
-            } else {
-                NoopStatTiles(tiles: [("Resting HRV", hrv.map { "\(Int($0.rounded())) ms" } ?? "—"),
-                                      ("Resting HR", rhr.map { "\(Int($0.rounded())) bpm" } ?? "—")])
-                    .padding(.bottom, 28)
-            }
+            NoopStatTiles(tiles: [("Resting HRV", hrv.map { "\(Int($0.rounded())) ms" } ?? "—"),
+                                  ("Resting HR", rhr.map { "\(Int($0.rounded())) bpm" } ?? "—")])
+                .padding(.bottom, 28)
         case "trends":
             NoopTrendsList(navigation: navigation, ids: noopRecoveryIDs)
         default:
             EmptyView()
         }
     }
-
-    // MARK: Emerging stats (WHOOP style)
-
-    /// The thirty days before the shown day.
-    private var baseline: [DailyMetric] {
-        let key = noopDayKey(offset)
-        return Array(repo.days.filter { $0.day < key }.suffix(30))
-    }
-
-    private func mean(_ v: (DailyMetric) -> Double?) -> Double? {
-        let xs = baseline.compactMap(v)
-        return xs.isEmpty ? nil : xs.reduce(0, +) / Double(xs.count)
-    }
-
-    private var whoopRows: [NoopEmergingStats.Row] {
-        // Today's daily row is written later; until then today reads from the live day record.
-        let sleepNow = offset == 0 ? (day?.rest.latest?.asleepMin ?? metric?.totalSleepMin) : metric?.totalSleepMin
-        let respNow = offset == 0 ? (day?.vitals.first { $0.key == "resp" }?.value ?? metric?.respRateBpm) : metric?.respRateBpm
-        return [
-            .init(icon: "waveform.path.ecg", title: "HEART RATE VARIABILITY", value: hrv, baseline: mean { $0.avgHrv },
-                  format: { "\(Int($0.rounded()))" }, higherIsBetter: true),
-            .init(icon: "heart", title: "RESTING HEART RATE", value: rhr, baseline: mean { $0.restingHr.map(Double.init) },
-                  format: { "\(Int($0.rounded()))" }, higherIsBetter: false),
-            .init(icon: "lungs", title: "RESPIRATORY RATE", value: respNow, baseline: mean { $0.respRateBpm },
-                  format: { String(format: "%.1f", $0) }, higherIsBetter: false),
-            .init(icon: "moon", title: "HOURS OF SLEEP", value: sleepNow, baseline: mean { $0.totalSleepMin },
-                  format: { NoopRestRecord.duration($0) }, higherIsBetter: true)
-        ]
-    }
-
-    private var footer: String {
-        let d = Calendar.current.date(byAdding: .day, value: -offset, to: Calendar.current.startOfDay(for: Date())) ?? Date()
-        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("EEE MMM d")
-        return "\(f.string(from: d)) vs. last 30 days"
-    }
 }
 
-/// A card that rises out of the ring above it, a small notch pointing up at the ring: one row per
-/// signal with the day's figure, its thirty-day mean under it, and an arrow coloured by whether the
-/// move is good.
-struct NoopEmergingStats: View {
-    struct Row {
-        let icon: String
-        let title: String
-        let value: Double?
-        let baseline: Double?
-        let format: (Double) -> String
-        let higherIsBetter: Bool
-    }
-
-    let rows: [Row]
-    let footer: String
-
-    @State private var risen = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { i, row in
-                rowView(row)
-                if i < rows.count - 1 { Divider().overlay(Color.white.opacity(0.08)).padding(.horizontal, 16) }
-            }
-            HStack(spacing: 8) {
-                HStack(spacing: 1) {
-                    Image(systemName: "arrowtriangle.up.fill").foregroundStyle(Color(hex: 0x2EE6B0))
-                    Image(systemName: "arrowtriangle.down.fill").foregroundStyle(Color(hex: 0xF5A623))
-                }
-                .font(.system(size: 8))
-                Text(footer).font(NoopHTMLFont.sans(NoopType.caption, weight: .medium)).foregroundStyle(NoopHTMLColor.copy)
-                Spacer()
-            }
-            .padding(.horizontal, 14).frame(height: 40)
-            .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .padding(.horizontal, 14).padding(.vertical, 14)
-        }
-        .padding(.top, 10)
-        .background {
-            NoopNotchedCard(radius: 18, notch: 12)
-                .fill(LinearGradient(colors: [Color(hex: 0x2C333A), Color(hex: 0x22282E)], startPoint: .top, endPoint: .bottom))
-                .shadow(color: .black.opacity(0.45), radius: 16, y: 8)
-        }
-        .overlay { NoopNotchedCard(radius: 18, notch: 12).stroke(Color.white.opacity(0.08), lineWidth: 0.75) }
-        .offset(y: risen ? 0 : 40)
-        .opacity(risen ? 1 : 0)
-        .onAppear {
-            if reduceMotion { risen = true } else { withAnimation(.spring(response: 0.7, dampingFraction: 0.85).delay(0.25)) { risen = true } }
-        }
-    }
-
-    private func rowView(_ row: Row) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: row.icon).font(.system(size: 15, weight: .regular)).foregroundStyle(NoopHTMLColor.copy).frame(width: 22)
-            Text(row.title).font(NoopHTMLFont.sans(NoopType.caption, weight: .bold)).tracking(1.4).foregroundStyle(NoopHTMLColor.ink)
-                .lineLimit(1).minimumScaleFactor(0.8)
-            Spacer(minLength: 6)
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(row.value.map(row.format) ?? "—").font(NoopHTMLFont.sans(NoopType.title3, weight: .bold)).monospacedDigit()
-                    .foregroundStyle(NoopHTMLColor.ink)
-                if let b = row.baseline {
-                    Text(row.format(b)).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).monospacedDigit()
-                        .foregroundStyle(NoopHTMLColor.muted)
-                }
-            }
-            arrow(row).frame(width: 12)
-        }
-        .padding(.horizontal, 16).frame(height: 64)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(row.title.capitalized) \(row.value.map(row.format) ?? "not measured")\(row.baseline.map { ", 30-day mean \(row.format($0))" } ?? "")")
-    }
-
-    @ViewBuilder
-    private func arrow(_ row: Row) -> some View {
-        if let v = row.value, let b = row.baseline, abs(v - b) > 0.0001 {
-            let up = v > b
-            let good = up == row.higherIsBetter
-            Image(systemName: up ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill").font(.system(size: 9))
-                .foregroundStyle(good ? Color(hex: 0x2EE6B0) : Color(hex: 0xF5A623))
-        }
-    }
-}
-
-/// A rounded card with a small triangular notch at the top centre.
-struct NoopNotchedCard: Shape {
-    let radius: CGFloat
-    let notch: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        var p = Path(roundedRect: rect, cornerRadius: radius, style: .continuous)
-        var tip = Path()
-        tip.move(to: CGPoint(x: rect.midX - notch, y: rect.minY + 0.5))
-        tip.addLine(to: CGPoint(x: rect.midX, y: rect.minY - notch))
-        tip.addLine(to: CGPoint(x: rect.midX + notch, y: rect.minY + 0.5))
-        tip.closeSubpath()
-        p.addPath(tip)
-        return p
-    }
-}
 
 struct NoopStrainPage: View {
     @ObservedObject var navigation: NoopNavigation
@@ -303,7 +157,7 @@ struct NoopStrainPage: View {
                 NoopScorePageTitle(theme: .strain, title: "Strain", dayOffset: $navigation.scoreDayOffset,
                                    ring: { date in
                                        repo.days.last { $0.day == Repository.localDayKey(date) }?.strain
-                                           .map { (min(1, $0 / 100), Color(hex: 0xF0A43C)) }
+                                           .map { (min(1, $0 / 100), NoopHeroFamily.current.dayColor(.strain, $0)) }
                                    },
                                    back: { navigation.back(or: .today) })
                 NoopEditableSections(layout: layout, editing: $editing, spacing: 0) { id in section(id) }

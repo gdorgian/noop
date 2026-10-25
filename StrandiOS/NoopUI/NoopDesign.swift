@@ -369,6 +369,8 @@ struct NoopBatteryChip: View {
     /// place and its door to the strap screen, and prints an em dash over an empty cell — absent is
     /// never drawn as 0% or as a remembered number (copy law rule 11).
     var percent: Int?
+    /// Inside another capsule: no capsule of its own unless the charge is low.
+    var bare = false
     var action: (() -> Void)?
 
     private var isLow: Bool { percent.map { $0 <= 20 } ?? false }
@@ -419,12 +421,12 @@ struct NoopBatteryChip: View {
             .padding(.horizontal, 11)
             .frame(height: NoopControlSize.small.height)
             .background(
-                isLow ? NoopHTMLColor.warm.opacity(0.12) : Color.white.opacity(0.06),
+                isLow ? NoopHTMLColor.warm.opacity(0.12) : Color.white.opacity(bare ? 0 : 0.06),
                 in: Capsule()
             )
             .overlay(
                 Capsule().stroke(
-                    isLow ? NoopHTMLColor.warm.opacity(0.34) : Color.white.opacity(0.10),
+                    isLow ? NoopHTMLColor.warm.opacity(0.34) : Color.white.opacity(bare ? 0 : 0.10),
                     lineWidth: 0.5
                 )
             )
