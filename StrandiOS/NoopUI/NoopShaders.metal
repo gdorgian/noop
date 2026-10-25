@@ -243,7 +243,7 @@ half4 noopHeat(float2 position, half4 color, float2 size, float time, float leve
     half3 hot   = half3(1.00, 0.93, 0.78);
     half3 c = heat < 0.55 ? mix(ember, flame, half(heat / 0.55)) : mix(flame, hot, half((heat - 0.55) / 0.45));
     float flicker = 0.8 + 0.35 * n2;
-    float a = body * inside * clamp(0.35 + heat * 0.75, 0.0, 1.0) * flicker;
+    float a = body * inside * clamp(0.35 + heat * 0.75, 0.0, 1.0) * flicker * smoothstep(0.0, 0.03, level);
     return half4(c * half(a), half(a));
 }
 

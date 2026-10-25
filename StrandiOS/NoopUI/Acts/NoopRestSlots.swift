@@ -396,6 +396,8 @@ struct NoopSleepGlass: View {
     @State private var onScreen = true
     @State private var lastTilt: Double = 0
     @State private var slosh: Double = 0
+    /// Whether this view holds the shared tilt sensor, so appear and disappear stay paired.
+    @State private var holdsMotion = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The glass holds a little more than the need, so a night over it still fits.
@@ -436,8 +438,8 @@ struct NoopSleepGlass: View {
                 lastTilt = tilt
             }
         }
-        .onAppear { LiquidMotion.shared.acquire() }
-        .onDisappear { LiquidMotion.shared.release() }
+        .onAppear { if !holdsMotion { holdsMotion = true; LiquidMotion.shared.acquire() } }
+        .onDisappear { if holdsMotion { holdsMotion = false; LiquidMotion.shared.release() } }
         .modifier(NoopSlotVisibility(onScreen: $onScreen))
         .onAppear {
             if reduceMotion { level = 1 } else { withAnimation(.spring(response: 1.6, dampingFraction: 0.75)) { level = 1 } }

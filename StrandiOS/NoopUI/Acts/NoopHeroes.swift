@@ -130,10 +130,10 @@ struct NoopStrainGauge: View {
                 needle.addLine(to: CGPoint(x: c.x + CGFloat(cos(a)) * (R + 6), y: c.y + CGFloat(sin(a)) * (R + 6)))
                 context.stroke(needle, with: .color(.white), style: StrokeStyle(lineWidth: 3, lineCap: .round))
             }
-            .overlay { noopHeroFigure(value.map { String(format: "%.0f", $0) }, "STRAIN").offset(y: 10) }
+            .overlay { noopHeroFigure(value.map { noopStrainText($0) }, "STRAIN").offset(y: 10) }
         }
         .frame(width: side, height: side)
-        .accessibilityLabel(value.map { "Strain \(Int($0.rounded())) of 100" } ?? "No strain yet")
+        .accessibilityLabel(value.map { "Strain \(noopStrainText($0)) of \(UnitFormatter.effortScaleMax(noopEffortScale))" } ?? "No strain yet")
     }
 }
 
@@ -184,7 +184,7 @@ struct NoopStrainDayRing: View {
                 let np = CGPoint(x: c.x + CGFloat(cos(na)) * (inner - 10), y: c.y + CGFloat(sin(na)) * (inner - 10))
                 context.fill(Path(ellipseIn: CGRect(x: np.x - 3, y: np.y - 3, width: 6, height: 6)), with: .color(.white))
             }
-            .overlay { noopHeroFigure(value.map { String(format: "%.0f", $0) }, "STRAIN") }
+            .overlay { noopHeroFigure(value.map { noopStrainText($0) }, "STRAIN") }
         }
         .frame(width: side, height: side)
         .accessibilityLabel(value.map { "Strain \(Int($0.rounded())) of 100, with today's heart rate around it" } ?? "No strain yet")

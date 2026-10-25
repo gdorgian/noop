@@ -77,7 +77,9 @@ struct NoopStrainPage: View {
     let day: NoopDayRecord?
     @EnvironmentObject private var repo: Repository
 
-    private var strain: Double? { day?.rings.strain }
+    /// Today's strain; before the day is scored, the newest scored day's, with its date in the header.
+    private var latestStrain: (value: Double, day: String)? { noopLatest(repo) { $0.strain } }
+    private var strain: Double? { day?.rings.strain ?? latestStrain?.value }
     /// Today's target, on the strain scale: easier after a low recovery, harder after a high one.
     private var target: ClosedRange<Double>? {
         guard let r = day?.rings.recovery ?? noopLatest(repo, { $0.recovery })?.value else { return nil }
@@ -91,7 +93,7 @@ struct NoopStrainPage: View {
     var body: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 28) {
-                NoopScorePageHeader(theme: .strain, title: "Strain", date: noopDayLabel(nil),
+                NoopScorePageHeader(theme: .strain, title: "Strain", date: noopDayLabel(day?.rings.strain == nil ? latestStrain?.day : nil),
                                     tiles: [("Exercise", NoopRestRecord.duration(exerciseMinutes)),
                                             ("Total energy", day?.energy?.totalBurnedSoFar
                                                 .map { "\($0.formatted(.number.precision(.fractionLength(0)))) kcal" } ?? "—")],
@@ -124,6 +126,8 @@ private struct NoopRecoverySphere: View {
     @State private var onScreen = true
     @State private var lastTilt: Double = 0
     @State private var slosh: Double = 0
+    /// Whether this view holds the shared tilt sensor, so appear and disappear stay paired.
+    @State private var holdsMotion = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -177,10 +181,10 @@ private struct NoopRecoverySphere: View {
             }
         }
         .onAppear {
-            LiquidMotion.shared.acquire()
+            if !holdsMotion { holdsMotion = true; LiquidMotion.shared.acquire() }
             if reduceMotion { level = 1 } else { withAnimation(.spring(response: 1.5, dampingFraction: 0.72)) { level = 1 } }
         }
-        .onDisappear { LiquidMotion.shared.release() }
+        .onDisappear { if holdsMotion { holdsMotion = false; LiquidMotion.shared.release() } }
         .modifier(NoopSlotVisibility(onScreen: $onScreen))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(value.map { "Recovery \(Int($0.rounded())) percent" } ?? "Recovery not measured yet")
@@ -211,7 +215,7 @@ private struct NoopStrainHeat: View {
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 0) {
                     if let value {
-                        NoopCountUp(value: value, format: { String(format: "%.0f", $0) },
+                        NoopCountUp(value: value, format: { noopStrainText($0) },
                                     font: NoopHTMLFont.outfit(NoopType.title1 + 14, weight: .light))
                             .foregroundStyle(NoopHTMLColor.ink)
                     } else {
@@ -224,6 +228,6 @@ private struct NoopStrainHeat: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(value.map { "Strain \(String(format: "%.0f", $0)) of 100" } ?? "No strain yet")
+        .accessibilityLabel(value.map { "Strain \(noopStrainText($0)) of \(UnitFormatter.effortScaleMax(noopEffortScale))" } ?? "No strain yet")
     }
 }

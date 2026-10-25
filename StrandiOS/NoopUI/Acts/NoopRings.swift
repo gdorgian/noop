@@ -44,6 +44,14 @@ struct NoopRingValues: Equatable {
 
 enum NoopRingStyle { case living, segmented, donuts, dials, gyro }
 
+/// Strain as the wearer chose to read it: the stored 0–100 value on the app's 0–100 or WHOOP's 0–21
+/// scale (You › Units), one decimal.
+func noopStrainText(_ v: Double) -> String { UnitFormatter.effortDisplay(v, scale: noopEffortScale) }
+
+var noopEffortScale: EffortScale {
+    EffortScale(rawValue: UserDefaults.standard.string(forKey: UnitPrefs.effortScaleKey) ?? "") ?? .hundred
+}
+
 /// Which score a ring or its label opens.
 enum NoopRingMetric { case recovery, strain, sleep }
 
@@ -121,7 +129,7 @@ struct NoopTodayRings: View {
         HStack(alignment: .top, spacing: 0) {
             Button { open(.recovery) } label: { row("Recovery", values.recovery.map { "\(Int($0.rounded()))%" }, NoopRingValues.recoveryColor) }
                 .buttonStyle(NoopHTMLPressStyle())
-            Button { open(.strain) } label: { row("Strain", values.strain.map { String(format: "%.0f", $0) }, NoopRingValues.strainHot) }
+            Button { open(.strain) } label: { row("Strain", values.strain.map { noopStrainText($0) }, NoopRingValues.strainHot) }
                 .buttonStyle(NoopHTMLPressStyle())
             Button { open(.sleep) } label: { row("Sleep", values.sleepMinutes.map { NoopRestRecord.duration($0) }, NoopRingValues.sleepColor) }
                 .buttonStyle(NoopHTMLPressStyle())
@@ -148,7 +156,7 @@ struct NoopTodayRings: View {
     private var accessibilityText: String {
         var parts: [String] = []
         parts.append(values.recovery.map { "Recovery \(Int($0.rounded())) percent" } ?? "Recovery not measured")
-        parts.append(values.strain.map { "strain \(String(format: "%.0f", $0))" } ?? "no strain yet")
+        parts.append(values.strain.map { "strain \(noopStrainText($0))" } ?? "no strain yet")
         parts.append(values.sleepMinutes.map { "sleep \(NoopRestRecord.duration($0))" } ?? "no sleep recorded")
         return parts.joined(separator: ", ")
     }
@@ -382,7 +390,7 @@ private struct NoopDialRings: View {
                      percent: true, color: Color(hex: 0x7FA6C4))
                 dial(.recovery, "Recovery", fill: values.recoveryFill, text: values.recovery.map { "\(Int($0.rounded()))" },
                      percent: true, color: recoveryColor)
-                dial(.strain, "Strain", fill: values.strainFill, text: values.strain.map { String(format: "%.0f", $0) },
+                dial(.strain, "Strain", fill: values.strainFill, text: values.strain.map { noopStrainText($0) },
                      percent: false, color: Color(hex: 0x1E9BF0))
             }
             .padding(.vertical, 10)
@@ -474,7 +482,7 @@ private struct NoopGyroRings: View {
                 HStack(spacing: 0) {
                     Button { open(.recovery) } label: { legend("Recovery", values.recovery.map { "\(Int($0.rounded()))%" }, NoopGyro.colors[0]) }
                         .buttonStyle(NoopHTMLPressStyle())
-                    Button { open(.strain) } label: { legend("Strain", values.strain.map { String(format: "%.0f", $0) }, NoopGyro.colors[1]) }
+                    Button { open(.strain) } label: { legend("Strain", values.strain.map { noopStrainText($0) }, NoopGyro.colors[1]) }
                         .buttonStyle(NoopHTMLPressStyle())
                     Button { open(.sleep) } label: { legend("Sleep", values.sleepMinutes.map { NoopRestRecord.duration($0) }, NoopGyro.colors[2]) }
                         .buttonStyle(NoopHTMLPressStyle())
