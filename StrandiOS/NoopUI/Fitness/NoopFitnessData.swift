@@ -156,6 +156,19 @@ struct NoopFitnessHistory {
         return out
     }
 
+    /// Working sets per group in the seven days ending `day`: a direct set counts 1, a helper muscle ½
+    /// (`StrengthTotals.setsPerGroup`). Warm-ups were never loaded here.
+    func setsByGroup(asOf day: Date) -> [FitnessMuscleGroup: Double] {
+        StrengthTotals.setsPerGroup(scoredSets.map(\.set).filter { inWeek($0.date, ending: day) })
+    }
+
+    /// The same count for each of the `weeks` seven-day blocks ending `day`, oldest first.
+    func weeklySetsByGroup(weeks: Int, endingAt day: Date) -> [[FitnessMuscleGroup: Double]] {
+        (0..<weeks).reversed().map { back in
+            setsByGroup(asOf: Calendar.current.date(byAdding: .day, value: -7 * back, to: day) ?? day)
+        }
+    }
+
     func setsByGroup(days: Int) -> [FitnessMuscleGroup: Double] {
         StrengthTotals.setsPerGroup(scoredSets.map(\.set).filter { inPeriod($0.date, days: days) })
     }

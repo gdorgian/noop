@@ -260,8 +260,41 @@ struct NoopFitnessLoadHistoryChart: View {
 
 // MARK: - Muscle groups
 
+/// Six weeks of one muscle's working sets as small bars, the 10–20 range drawn behind them; this week
+/// is the last, brighter bar.
+struct NoopFitnessWeeklySetBars: View {
+    let weeks: [Double]
+    let range: ClosedRange<Double>
+
+    var body: some View {
+        let ceiling = max(range.upperBound + 4, weeks.max() ?? 0)
+        let h: CGFloat = 32
+        ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous).fill(NoopHTMLColor.green.opacity(0.07))
+                .frame(height: h * CGFloat((range.upperBound - range.lowerBound) / ceiling))
+                .offset(y: -h * CGFloat(range.lowerBound / ceiling))
+            HStack(alignment: .bottom, spacing: 4) {
+                ForEach(Array(weeks.enumerated()), id: \.offset) { i, n in
+                    let isNow = i == weeks.count - 1
+                    let tint: Color = n > range.upperBound ? NoopHTMLColor.warm : n >= range.lowerBound ? NoopHTMLColor.green : NoopHTMLColor.inkSoft
+                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .fill(tint.opacity(n == 0 ? 0.2 : isNow ? 0.95 : 0.45))
+                        .frame(width: 7, height: max(2, h * CGFloat(min(n, ceiling) / ceiling)))
+                }
+            }
+        }
+        .frame(width: CGFloat(weeks.count) * 11, height: h, alignment: .bottom)
+        .accessibilityElement()
+        .accessibilityLabel("Last six weeks: \(weeks.map { String(format: "%.0f", $0) }.joined(separator: ", ")) sets")
+    }
+}
+
 struct NoopFitnessMuscleGroupsScreen: View {
-    enum Mode: String, CaseIterable { case freshness = "Freshness", load = "Muscular load", volume = "Volume" }
+    enum Mode: String, CaseIterable { case freshness = "Freshness", sets = "Sets", load = "Muscular load", volume = "Volume" }
+
+    /// The weekly working-set range the growth research centres on: clear gains from about ten hard sets a
+    /// week per muscle, with returns flattening past about twenty. A reference line, not a target.
+    static let setRange: ClosedRange<Double> = 10...20
 
     @ObservedObject var navigation: NoopNavigation
     @ObservedObject var fitness: NoopFitnessModel
@@ -284,14 +317,18 @@ struct NoopFitnessMuscleGroupsScreen: View {
         let fresh = Dictionary(uniqueKeysWithValues: h.freshness(asOf: day).map { ($0.group, $0) })
         let values: [FitnessMuscleGroup: Double] = switch mode {
         case .freshness: fresh.mapValues(\.percent)
+        case .sets: h.setsByGroup(asOf: day)
         case .load: h.loadByGroup(asOf: day)
         case .volume: h.volumeByGroup(asOf: day)
         }
         let top = max(values.values.max() ?? 1, 0.0001)
+        let weekly = mode == .sets ? h.weeklySetsByGroup(weeks: 6, endingAt: day) : []
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 6) {
-                ForEach(Mode.allCases, id: \.self) { m in
-                    chip(m.rawValue, selected: mode == m) { withAnimation(NoopMotion.swap) { mode = m; filter = nil } }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Mode.allCases, id: \.self) { m in
+                        chip(m.rawValue, selected: mode == m) { withAnimation(NoopMotion.swap) { mode = m; filter = nil } }
+                    }
                 }
             }
             NoopFitnessBodyMap(color: { g in color(g, mode: mode, values: values, fresh: fresh, top: top) })
@@ -347,6 +384,9 @@ struct NoopFitnessMuscleGroupsScreen: View {
                         if mode == .freshness, let r = fresh[g] {
                             NoopFitnessDotMeter(percent: r.untracked ? 0 : r.percent, color: NoopFitnessFreshnessCard.color(r.status))
                         }
+                        if mode == .sets {
+                            NoopFitnessWeeklySetBars(weeks: weekly.map { $0[g] ?? 0 }, range: Self.setRange)
+                        }
                     }
                     .padding(14)
                     .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -355,6 +395,7 @@ struct NoopFitnessMuscleGroupsScreen: View {
             }
             Text(mode == .freshness
                  ? "Freshness falls with each set and with the leg work in cardio, and recovers at each muscle's own pace — about a day and a half to halve for legs and lower back, less for arms, calves and abs."
+                 : mode == .sets ? "Working sets in the seven days shown: a set counts once for its main muscle and half for each helper. Most growth studies see clear gains from about 10 hard sets a week per muscle, with less to gain past about 20. The bars are the last six weeks."
                  : mode == .load ? "Muscular load per muscle: hard sets count in full, easy ones less, helpers half."
                  : "Weight moved, credited to each exercise's main muscle.")
                 .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
@@ -370,6 +411,12 @@ struct NoopFitnessMuscleGroupsScreen: View {
             if r.untracked { return "No sets logged yet" }
             let status = r.status == .calibrating ? "Calibrating" : r.status.rawValue.capitalized
             return "\(status) · \(Int(r.percent.rounded()))%"
+        case .sets:
+            let n = values[g] ?? 0
+            let count = n == n.rounded() ? "\(Int(n))" : String(format: "%.1f", n)
+            let place = n == 0 ? "none this week" : n < Self.setRange.lowerBound ? "under 10"
+                : n > Self.setRange.upperBound ? "over 20" : "in the 10–20 range"
+            return "\(count) \(n == 1 ? "set" : "sets") · \(place)"
         case .load: return String(format: "%.0f load", values[g] ?? 0)
         case .volume: return NoopFitnessFormat.kg(values[g] ?? 0)
         }
@@ -381,6 +428,11 @@ struct NoopFitnessMuscleGroupsScreen: View {
         switch mode {
         case .freshness:
             return NoopFitnessFreshnessCard.color(fresh[g]?.status ?? .calibrating).opacity(0.85)
+        case .sets:
+            let n = values[g] ?? 0
+            if n <= 0 { return Color.white.opacity(0.1) }
+            if n < Self.setRange.lowerBound { return NoopHTMLColor.green.opacity(0.22 + 0.4 * n / Self.setRange.lowerBound) }
+            return n > Self.setRange.upperBound ? NoopHTMLColor.warm.opacity(0.85) : NoopHTMLColor.green.opacity(0.9)
         case .load, .volume:
             let v = (values[g] ?? 0) / top
             return v <= 0 ? Color.white.opacity(0.1) : (mode == .load ? NoopHTMLColor.warm : NoopHTMLColor.blush).opacity(0.25 + 0.7 * v)
