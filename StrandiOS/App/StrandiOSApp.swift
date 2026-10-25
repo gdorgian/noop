@@ -482,6 +482,8 @@ struct StrandiOSApp: App {
                     )
                     await PlanReconciliationCoordinator.reconcile(repo: model.repo)
                     await GoalTrackingStore.shared.refresh(repo: model.repo)
+                    // Resting floor and held peaks for the zones; throttled to a few times a day.
+                    await model.personalZones.refresh(repo: model.repo, profile: model.profile)
                     await WidgetSnapshot.publish(from: model)
                     // Push the wrist on the SAME refresh as the Home-screen widget so the watch, the
                     // widget and Today never disagree about which day they describe. Without this the

@@ -124,7 +124,7 @@ struct NoopAct5Screens: View {
         Group {
             switch navigation.route {
             case .record: recordScreen
-            case .zones: zonesScreen
+            case .zones: NoopZonesScreen(navigation: navigation, zones: model.personalZones)
             case .history: historyScreen
             case .strap: strapScreen
             case .notifs: notificationsScreen

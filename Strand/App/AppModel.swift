@@ -80,6 +80,8 @@ final class AppModel: ObservableObject {
     let repo: Repository
     /// User profile (age/sex/body/HR-max) for zones, calories, baselines.
     let profile = ProfileStore()
+    /// The measured zone anchors: resting floor and held peaks (`PersonalZonesModel`).
+    let personalZones = PersonalZonesModel()
     /// Behaviour settings: double-tap action, wear automation, zone coaching, smart alarm, illness watch.
     let behavior = BehaviorStore()
     // MARK: HR coaching engines (restored with `LiveSessionRunner`'s contract)
