@@ -178,7 +178,6 @@ struct NoopTodayDayRibbon: View {
                             .foregroundStyle(NoopHTMLColor.faint)
                     }
                     Spacer()
-                    livePill
                     NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                 }
                 .contentShape(Rectangle())
@@ -201,21 +200,6 @@ struct NoopTodayDayRibbon: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-    }
-
-    private var livePill: some View {
-        let shown = liveBPM ?? points.last.map { Int($0.bpm.rounded()) }
-        return HStack(spacing: 5) {
-            NoopTodayBeatDot(live: liveBPM != nil)
-            Text(shown.map(String.init) ?? "\u{2014}")
-                .font(NoopHTMLFont.outfit(NoopType.body)).monospacedDigit()
-                .foregroundStyle(NoopHTMLColor.ink)
-            Text(liveBPM != nil ? "now" : "last")
-                .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
-        }
-        .padding(.horizontal, 10)
-        .frame(minHeight: 30)
-        .background(Color.white.opacity(0.05), in: Capsule())
     }
 
     // Built once, not once per point.
@@ -389,24 +373,6 @@ struct NoopTodayDayRibbon: View {
                 }
             }
         }
-    }
-}
-
-/// A small heart that beats while live heart rate is arriving and rests when it isn't.
-private struct NoopTodayBeatDot: View {
-    let live: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var on = false
-
-    var body: some View {
-        Image(systemName: "heart.fill")
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(live ? Color(hex: 0xF07A6A) : NoopHTMLColor.faint)
-            .scaleEffect(on ? 1.18 : 0.92)
-            .onAppear {
-                guard live, !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 0.45).repeatForever(autoreverses: true)) { on = true }
-            }
     }
 }
 #endif

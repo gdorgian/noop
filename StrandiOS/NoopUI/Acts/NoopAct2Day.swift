@@ -572,13 +572,6 @@ struct NoopAct2Screens: View {
                 .padding(.bottom, Self.ringsGap)
         case "breathe":
             VStack(spacing: 10) {
-                if !isHistorical {
-                    Text("Take four breaths first")
-                        .font(NoopHTMLFont.outfit(NoopType.title2))
-                        .tracking(-0.5)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
                 // Production has no charge left to draw, so the gauge and its door to Charge are absent;
                 // the orb is Breathe's door either way.
                 Button { navigation.push(day == nil ? .charge : .breathe) } label: {
@@ -982,8 +975,7 @@ struct NoopAct2Screens: View {
     }
 
     private var todayHeader: some View {
-        // One row: the date opens the calendar, and across from it the band and the updates in one
-        // capsule. The wearer's status is a tile on the page itself (25 Oct 2026).
+        // One row: the date opens the calendar, and across from it the band and the updates. The wearer's status is a tile on the page itself (25 Oct 2026).
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 10) {
             Button {
@@ -1006,15 +998,15 @@ struct NoopAct2Screens: View {
 
                 Spacer(minLength: 4)
 
-                HStack(spacing: 4) {
-                    NoopBatteryChip(percent: day == nil ? 52 : battery, bare: true) { navigation.push(.strap) }
-                    Rectangle().fill(NoopHTMLColor.borderStrong).frame(width: 0.5, height: 20)
+                // The band and the updates as two separate controls, each at the height of the date
+                // beside them (25 Oct 2026).
+                HStack(spacing: 9) {
+                    NoopBatteryChip(percent: day == nil ? 52 : battery) { navigation.push(.strap) }
                     Button { navigation.push(.inbox) } label: {
                         ZStack(alignment: .topTrailing) {
-                            // Sized by eye-height to the status tile's figure and the battery (25 Oct 2026):
-                            // the bell's glyph sits inside its frame, so the frame is larger.
-                            NoopCanonicalGlyph(name: .bell, size: 21, color: NoopHTMLColor.ink.opacity(0.85))
-                                .frame(width: 36, height: 36)
+                            NoopIconDiscShape(size: .small) {
+                                NoopCanonicalGlyph(name: .bell, size: NoopControlSize.small.icon, color: NoopHTMLColor.inkSoft)
+                            }
                             if inboxUnreadCount > 0 {
                                 Text("\(min(inboxUnreadCount, 99))")
                                     .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .bold))
@@ -1024,18 +1016,13 @@ struct NoopAct2Screens: View {
                                     .frame(minWidth: 16, minHeight: 16)
                                     .background(NoopHTMLColor.blue, in: Capsule())
                                     .overlay(Capsule().stroke(NoopHTMLColor.canvas, lineWidth: 1.5))
-                                    .offset(x: 2, y: 0)
+                                    .offset(x: 4, y: -4)
                             }
                         }
-                        .noopHitTarget()
                     }
                     .buttonStyle(NoopPlainHitStyle())
                     .accessibilityLabel(inboxUnreadCount > 0 ? "Updates, \(inboxUnreadCount) unread" : "Updates")
                 }
-                .padding(.leading, 6).padding(.trailing, 5)
-                .frame(minHeight: NoopActivityStatusChip.height)
-                .background(Color.white.opacity(0.06), in: Capsule())
-                .overlay(Capsule().strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                 .fixedSize()
             }
 
