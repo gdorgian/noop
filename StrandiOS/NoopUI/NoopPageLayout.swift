@@ -110,7 +110,10 @@ struct NoopEditableSections<Section: View>: View {
     @State private var dragTranslation: CGFloat = 0
     @State private var frames: [String: CGRect] = [:]
     /// Where the page sits on screen, so a save's wave starts in the middle of what is in view.
-    @State private var screenFrame: CGRect = .zero
+    /// Where the sections sit on screen, read only when Save sends its wave. Kept in a reference
+    /// rather than state: it changes on every scroll frame, and as state it re-rendered the whole
+    /// page each frame (thousands of updates a second while scrolling, profiled 25 Oct 2026).
+    @State private var screenFrame = NoopFrameBox()
     /// The wave running through the page after a drop or a save, and how far through it is (0 to 1),
     /// animated linearly so every section reads its own push from the same moment.
     @State private var wave: NoopSurfaceWave?
@@ -145,10 +148,10 @@ struct NoopEditableSections<Section: View>: View {
         // Room for Cancel and Save, so the first section's remove disc never sits under them.
         .padding(.top, editing.active ? 52 : 0)
         .coordinateSpace(name: "noop.sections")
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { screenFrame = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { screenFrame.rect = $0 }
         .onChange(of: editing.saves) {
-            let middle = UIScreen.main.bounds.midY - screenFrame.minY
-            send(NoopSurfaceWave(origin: CGRect(x: 0, y: middle, width: screenFrame.width, height: 0)))
+            let middle = UIScreen.main.bounds.midY - screenFrame.rect.minY
+            send(NoopSurfaceWave(origin: CGRect(x: 0, y: middle, width: screenFrame.rect.width, height: 0)))
         }
         // Leaving the page mid-edit (another tab) drops the unsaved edit rather than keeping it open.
         .onDisappear { if editing.active { editing.active = false } }
@@ -307,6 +310,11 @@ struct NoopEditableSections<Section: View>: View {
 }
 
 /// A section's share of the wave: nudged along the page and breathing in scale as it passes.
+/// A rectangle SwiftUI does not watch: writing it never re-renders anything.
+final class NoopFrameBox {
+    var rect: CGRect = .zero
+}
+
 private struct NoopWaveMotion: ViewModifier, Animatable {
     var wave: NoopSurfaceWave?
     var id: String
