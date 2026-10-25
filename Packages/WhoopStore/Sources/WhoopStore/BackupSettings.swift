@@ -70,6 +70,11 @@ public enum BackupSettings {
         // and live in the three keys above, but the key stays whitelisted so a backup written by
         // upstream — or by a wearer migrating from it — still carries its bands across.
         "profile.hrZoneThresholds": .string,
+        // Where an HR-max came from (a held peak the wearer accepted, or typed), the day it was seen,
+        // and a higher one they declined, so a restore does not offer it again.
+        "profile.hrMaxSource": .string,
+        "profile.hrMaxMeasuredDay": .string,
+        "profile.hrMaxDeclined": .int,
         "units.system": .string,
         "units.distance": .string,
         "units.temperature": .string,
@@ -99,6 +104,9 @@ public enum BackupSettings {
         "profile.zonePercentEdges": "profile.zonePercentEdges",
         "profile.zoneBpmEdges": "profile.zoneBpmEdges",
         "profile.hrZoneThresholds": "profile.hrZoneThresholds",
+        "profile.hrMaxSource": "profile.hrMaxSource",
+        "profile.hrMaxMeasuredDay": "profile.hrMaxMeasuredDay",
+        "profile.hrMaxDeclined": "profile.hrMaxDeclined",
         "units.system": "units.system",
         "units.distance": "units.distance",
         "units.temperature": "units.temperature",

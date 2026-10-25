@@ -874,6 +874,22 @@ extension WhoopStore {
         }
     }
 
+    /// The strap's own motion magnitude (`dynAccel`, g) averaged per UTC minute, for the daily-rhythm reading.
+    /// Aggregated in SQLite: a week is some 600,000 one-second rows and the reading needs one value a minute.
+    /// Minutes with no `dynAccel` (a WHOOP 4.0, rows banked before v31) are simply absent.
+    public func dynAccelMinuteMeans(deviceIds: [String], from: Int, to: Int) async throws -> [(minute: Int, mean: Double)] {
+        guard !deviceIds.isEmpty else { return [] }
+        let marks = Array(repeating: "?", count: deviceIds.count).joined(separator: ",")
+        return try syncRead { db in
+            try Row.fetchAll(db, sql: """
+                SELECT ts / 60 AS m, AVG(dynAccel) AS v FROM gravitySample
+                WHERE deviceId IN (\(marks)) AND ts >= ? AND ts < ? AND dynAccel IS NOT NULL
+                GROUP BY m ORDER BY m
+                """, arguments: StatementArguments(deviceIds.map { $0 as DatabaseValueConvertible } + [from, to]))
+                .map { (minute: $0["m"] as Int, mean: $0["v"] as Double) }
+        }
+    }
+
     /// Max HR sample timestamp for a device, or nil if there are none. The biometric "data frontier"
     /// used by the stuck-strap watchdog (advances iff the strap is actually logging + offloading).
     ///

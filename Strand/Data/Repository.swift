@@ -1342,6 +1342,13 @@ final class Repository: ObservableObject {
         return parts.joined(separator: "|")
     }
 
+    /// The strap's motion magnitude averaged per UTC minute over the physiology read ids (`DailyRhythm`).
+    func motionMinuteMeans(from: Int, to: Int) async -> [(minute: Int, mean: Double)] {
+        guard let store = await ensureStore() else { return [] }
+        return (try? await store.dynAccelMinuteMeans(deviceIds: rawPhysiologyReadIds(store: store),
+                                                     from: from, to: to)) ?? []
+    }
+
     func hrSamples(from: Int, to: Int, limit: Int = 8000) async -> [HRSample] {
         guard let store = await ensureStore() else { return [] }
         // UNION the active strap + canonical so the HR trend renders whether the landed day's raw sits under
@@ -3096,7 +3103,9 @@ final class Repository: ObservableObject {
             // already present, so a session that ended with an HR but no strain (sparse live HR at save)
             // still gets its Effort backfilled once the strap trace covers the window. Needs the injected
             // profile; without it the strain fill is skipped and eligibility is unchanged from before.
-            let needsStrainFill = strapNative && row.strain == nil && strainProfile != nil
+            // An imported row (Apple Health and the like) with no Effort of its own is eligible too: the strap
+            // was on the wrist through it, so its trace can score it, provided it covered most of the session.
+            let needsStrainFill = row.strain == nil && strainProfile != nil
             guard row.endTs > row.startTs, budget > 0,
                   strapNative || row.avgHr == nil || needsStrainFill else { continue }
             budget -= 1
@@ -3123,14 +3132,15 @@ final class Repository: ObservableObject {
                     // own. Resolve this on the main actor (WorkoutSource.classify) and capture the plain Bool,
                     // so the child task crosses only Sendable scalars.
                     let cls = WorkoutSource.classify(rows[idx].source)
-                    let wantStrain = (cls == .manual || cls == .detected) && rows[idx].strain == nil
+                    let strapNative = cls == .manual || cls == .detected
+                    let wantStrain = rows[idx].strain == nil
                     // #510: read HR under the workout's OWN recording strap, not a single active id. A detected
                     // row's `source` IS its computed strap id ("<base>-noop"), so a bout auto-detected on a 2nd
                     // WHOOP reads "<base>" instead of the active strap's empty window. Resolved on the main actor;
                     // only the resulting Sendable String crosses into the task.
                     let hrIds = Self.workoutHrDeviceIds(source: rows[idx].source, activeStrapId: deviceId,
                                                         importedIds: importedReadIds)
-                    group.addTask { [hrIds] in
+                    group.addTask { [hrIds, strapNative] in
                         // #836: aggregate in SQLite over the WHOLE window instead of reducing up to 8000
                         // materialised rows. The old read capped at 8000, so a workout longer than ~2h13m
                         // at 1 Hz reported the mean of its FIRST 8000 samples as the session average — wrong
@@ -3150,7 +3160,11 @@ final class Repository: ObservableObject {
                         // Reads rows ONLY for this — StrainScorer needs the series, not an aggregate. The 8000
                         // cap stays here: it bounds the strain window, not the average. (Kotlin does the same.)
                         let strain: Double?
-                        if wantStrain, let p = strainProfile {
+                        // An imported session is scored only when the strap trace covers most of it, so a
+                        // strap left on the charger halfway through never yields a falsely easy Effort.
+                        let covered = strapNative
+                            || Double(stats.n) >= Self.importedEffortCoverage * Double(endTs - startTs)
+                        if wantStrain, covered, let p = strainProfile {
                             let samples = (try? await store.hrSamples(deviceId: hrIds[0],
                                                                       from: startTs, to: endTs,
                                                                       limit: 8000)) ?? []
@@ -3186,6 +3200,10 @@ final class Repository: ObservableObject {
                               zonesJSON: row.zonesJSON, notes: row.notes, steps: row.steps)
         }
     }
+
+    /// The share of an imported session's seconds the strap trace must hold before it scores that session's
+    /// Effort. The trace runs at about 1 Hz while worn, so this reads as "worn for 80% of it".
+    nonisolated static let importedEffortCoverage = 0.8
 
     /// #510 (Kotlin twin: `WhoopRepository.workoutHrDeviceIds`). The device ids whose `hrSample` rows back a
     /// workout's Avg HR / Effort reconcile. A DETECTED row's own `source` IS its computed strap id

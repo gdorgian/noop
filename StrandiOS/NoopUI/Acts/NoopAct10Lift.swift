@@ -2531,6 +2531,7 @@ private struct NoopLiftImportScreen: View {
     @ObservedObject var flow: NoopLiftFlowModel
     @State private var choosingFile = false
     @State private var showKey = false
+    @State private var showHevy = false
     @State private var keyDraft = ""
     @State private var keySuffix: String?
     @State private var keyMessage: String?
@@ -2547,10 +2548,10 @@ private struct NoopLiftImportScreen: View {
                                note: "Everything in the export: sessions, exercises and the sets it contains.") {
                         choosingFile = true
                     }
-                    importDoor(icon: .link, title: keySuffix == nil ? "Use your Hevy key" : "Hevy key · ••••\(keySuffix!)",
-                               meta: "read-only, revocable in Hevy",
-                               note: "The key is kept in this phone’s Keychain. This build does not fetch with it yet and never writes back to Hevy.") {
-                        showKey = true
+                    importDoor(icon: .link, title: HevySync.shared.hasKey ? "Hevy · connected" : "Connect Hevy",
+                               meta: "workouts, routines and body, kept in step",
+                               note: "Every set of every workout, edits and deletions included. Your key stays in this phone’s Keychain.") {
+                        showHevy = true
                     }
                 }
 
@@ -2589,6 +2590,7 @@ private struct NoopLiftImportScreen: View {
                 flow.importError = "The file picker did not return a readable file. Nothing was added."
             }
         }
+        .sheet(isPresented: $showHevy) { NoopHevyScreen() }
     }
 
     private func importDoor(icon: NoopCanonicalGlyphName, title: String, meta: String,

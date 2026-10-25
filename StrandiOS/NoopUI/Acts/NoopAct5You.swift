@@ -103,6 +103,7 @@ struct NoopAct5Screens: View {
         "Language": "English", "Svea’s manner": "Plain"
     ]
     @State private var baselinesRestarting = false
+    @State var showRhythm = false
     @State private var settingsSearch = ""
     @State private var showingComingLater = false
     @State private var actionNotice: String?
@@ -124,7 +125,7 @@ struct NoopAct5Screens: View {
         Group {
             switch navigation.route {
             case .record: recordScreen
-            case .zones: zonesScreen
+            case .zones: NoopZonesScreen(navigation: navigation, zones: model.personalZones)
             case .history: historyScreen
             case .strap: strapScreen
             case .notifs: notificationsScreen
@@ -145,6 +146,7 @@ struct NoopAct5Screens: View {
             default: youScreen
             }
         }
+        .sheet(isPresented: $showRhythm) { NoopDailyRhythmScreen() }
         .sheet(isPresented: $showReleaseNotes) {
             WhatsNewView(presentation: .bell) {
                 showReleaseNotes = false
@@ -247,6 +249,11 @@ private extension NoopAct5Screens {
         case "Battery alerts": $behavior.batteryAlerts
         case "Off-wrist reminder": $behavior.wearAlerts
         case "Sync reminder": $behavior.syncReminder
+        case "Your night is in": noticeBinding(.morning)
+        case "Bedtime nudge": noticeBinding(.bedtime)
+        case "A new best": noticeBinding(.best)
+        case "Weekly read": noticeBinding(.weekly)
+        case "Backup reminder": noticeBinding(.backup)
         case "Power saving": $powerSavingOn
         // Stored as "pause disabled"; the switch asks the positive question.
         case "Pause the HRV stream when low": Binding(get: { !pauseHrvDisabled }, set: { pauseHrvDisabled = !$0 })
@@ -266,6 +273,15 @@ private extension NoopAct5Screens {
         case "Record protocol frames": $frameRecorderOn
         default: nil
         }
+    }
+
+    /// One of Aura's own notifications (`AuraNotices`): the switch saves, asks for permission when turned
+    /// on, and re-plans what is pending.
+    func noticeBinding(_ kind: AuraNotices.Kind) -> Binding<Bool> {
+        Binding(get: { AuraNotices.isOn(kind) }, set: { on in
+            AuraNotices.set(kind, on)
+            Task { await AuraNotices.refresh(repo: model.repo) }
+        })
     }
 
     /// The same follow-ups the classic Settings screen runs when these change.
@@ -632,6 +648,8 @@ private extension NoopAct5Screens {
 
                 dividedCard {
                     copyRow("Your zones", detail: "five bands for your effort", symbol: "chart.bar", tint: Self.blush, value: "5") { navigation.push(.zones) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    copyRow("Daily rhythm", detail: "the shape of your days, from your strap", symbol: "sun.and.horizon", tint: Self.blush) { showRhythm = true }
                 }
             }
             .padding(.top, 18)
@@ -1173,10 +1191,11 @@ private extension NoopAct5Screens {
                            plus: { profile.waistCm = profile.waistCm == 0 ? 80 : min(160, profile.waistCm + (liveImperial ? 2.54 : 1)) })
                 Divider().overlay(NoopHTMLColor.border)
                 // No observed maximum is stored, so the row speaks only of an override the wearer set.
-                stepperRow("Maximum heart rate", detail: profile.hrMaxOverride > 0 ? "manual override" : "",
+                stepperRow("Maximum heart rate",
+                           detail: profile.hrMaxOverride > 0 ? (profile.hrMaxSource == "measured" ? "held for 30 seconds, measured on you" : "manual override") : "",
                            value: profile.hrMaxOverride > 0 || profileConfirmed ? "\(profile.hrMax) bpm" : "\u{2014}",
-                           minus: { profile.hrMaxOverride = max(100, profile.hrMax - 1) },
-                           plus: { profile.hrMaxOverride = min(220, profile.hrMax + 1) })
+                           minus: { profile.setManualMax(max(100, profile.hrMax - 1)) },
+                           plus: { profile.setManualMax(min(230, profile.hrMax + 1)) })
                 Divider().overlay(NoopHTMLColor.border)
                 copyRow("Your zones", detail: "five bands, derived from the two anchors above", value: "5 zones") { navigation.push(.zones) }
                     .frame(height: 92)
@@ -3373,6 +3392,16 @@ private extension NoopAct5Screens {
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Sync reminder", detail: "A silent notice when the strap hasn’t synced for three hours, usually because Noop was swiped away. Every sync pushes it back.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Your night is in", detail: "Once last night is scored, its sleep and Charge. Not when Noop is already open.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Bedtime nudge", detail: "Thirty minutes before the bedtime that gets you your own sleep need before your usual wake. Learned per weekday after fourteen nights.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("A new best", detail: "When last night beat three months on HRV, resting pulse or Charge. Never more than one a day.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Weekly read", detail: "Sunday at seven: sleep, Charge and sessions against the week before. Off by default.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Backup reminder", detail: "Your record lives only on this phone. A quiet reminder when the last backup is a month old.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Offer a workout it spotted", detail: "Sees a probable session in your heart rate and offers to save it. It never creates one for you.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Quiet hours", detail: "Nothing buzzes between your anchor and your usual wake, whatever else is on.", tint: Self.blush)
@@ -3487,11 +3516,7 @@ private extension NoopAct5Screens {
                     VStack(spacing: 0) {
                         copyRow("Buzz for phone notifications", detail: "which apps reach your wrist, and how", symbol: "bell", tint: Self.blush) { navigation.enter(.notifs, from: .strap) }
                     Divider().overlay(NoopHTMLColor.border)
-                        toggleRow("Bedtime nudge", detail: "One buzz thirty minutes before your anchor, and nothing after it.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
                         toggleRow("Session offer", detail: "One notification a day, in the morning, with today’s recommendation.", tint: Self.blush)
-                    Divider().overlay(NoopHTMLColor.border)
-                        toggleRow("Weekly read", detail: "Sunday evening summary. Off by default because most weeks do not need one.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
                         toggleRow("Rhythm", detail: "Needs reading and ticking a page first. No alarms, no red, no condition names.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
@@ -3561,7 +3586,7 @@ private extension NoopAct5Screens {
     var settingsSearchKeywords: [String: String] {
         [
         "Strap": "your strap connection battery sensors sync manage straps pair switch forget rename band automations double tap move reminder stress check-ins illness live heart rate dynamic island lock screen",
-        "Alerts": "battery alerts charging off-wrist reminder sync reminder not synced swiped away wrist wear notification offer a workout spotted detect auto quiet hours buzz anchor wake",
+        "Alerts": "battery alerts charging off-wrist reminder sync reminder not synced swiped away night is in morning sleep charge bedtime nudge wind down new best record hrv resting weekly read week summary backup reminder wrist wear notification offer a workout spotted detect auto quiet hours buzz anchor wake",
         "Battery": "power saving sync 45 minutes low battery pause hrv stream",
         "Workouts and Today": "exercise animations media keep the screen on workout journal reminder today strip hydration water recalibrate baselines recovery hrv resting pulse respiration skin temperature restart",
         "Health and data": "apple health healthkit data permissions privacy import history nutrition backup restore noopbak export",
@@ -3570,7 +3595,7 @@ private extension NoopAct5Screens {
         "Siri and Shortcuts": "siri shortcuts sync buzz mark a moment ask svea shortcuts export healthkit-free sideloaded",
         "About": "check for updates version what’s new release notes how noop works strap limitations 4.0 5.0 mg what noop will not ask you",
         "Advanced": "lab experiments sleep staging v2 motion-aware wake continuous hrv overnight spo2 broadcast heart rate r22 deep data ecg protocol frames diagnostics strap log raw sensor data export zip experiment phase environment test centre",
-        "Coming later": "later planned buzz for phone notifications mirror bedtime nudge session offer weekly read rhythm appearance light language deutsch chart colours sleep chart card surface day-cycle sky",
+        "Coming later": "later planned buzz for phone notifications mirror session offer rhythm appearance light language deutsch chart colours sleep chart card surface day-cycle sky",
         ]
     }
 

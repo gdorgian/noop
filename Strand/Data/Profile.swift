@@ -36,6 +36,21 @@ final class ProfileStore: ObservableObject {
     // Display-only: these bands change time-in-zone, the live readout and what the coach prescribes,
     // never the Effort score. See the header of `HRZones.swift` for why that separation is load-bearing.
 
+    // ── Personal zones (PersonalZones.swift) ─────────────────────────────────────────────────
+    /// Build the automatic zones on the heart-rate reserve once a resting floor exists. Default ON:
+    /// display only, so it never changes a score, and it is what the wearer's own data says.
+    @Published var zonesFromResting: Bool { didSet { d.set(zonesFromResting, forKey: K.zonesFromResting) } }
+    /// The resting floor those zones stand on (bpm), refreshed by the app from the last fourteen nights;
+    /// 0 until there are fourteen.
+    @Published var zoneRestingFloor: Double { didSet { d.set(zoneRestingFloor, forKey: K.zoneRestingFloor) } }
+    /// Where `hrMaxOverride` came from: "measured" when it was a held peak the wearer accepted, "" when
+    /// they typed it. Lets the screen say "seen on you" rather than "set by you".
+    @Published var hrMaxSource: String { didSet { d.set(hrMaxSource, forKey: K.hrMaxSource) } }
+    /// Local day ("yyyy-MM-dd") the accepted held peak was first reached, for the screen's line.
+    @Published var hrMaxMeasuredDay: String { didSet { d.set(hrMaxMeasuredDay, forKey: K.hrMaxMeasuredDay) } }
+    /// A higher maximum the wearer turned down; it is not offered again until a higher one shows.
+    @Published var hrMaxDeclined: Int { didSet { d.set(hrMaxDeclined, forKey: K.hrMaxDeclined) } }
+
     /// `HRZoneConfig.Mode.rawValue` — "auto" (default), "percent" or "bpm".
     @Published var zoneModeRaw: String { didSet { d.set(zoneModeRaw, forKey: K.zoneMode) } }
     /// Five lower bounds as PERCENTS, `HRZoneEdges`' comma form ("55,65,75,85,92"). "" = never set.
@@ -112,6 +127,11 @@ final class ProfileStore: ObservableObject {
         static let zoneMode = "profile.zoneMode"
         static let zonePercentEdges = "profile.zonePercentEdges"
         static let zoneBpmEdges = "profile.zoneBpmEdges"
+        static let zonesFromResting = "profile.zonesFromResting"
+        static let zoneRestingFloor = "profile.zoneRestingFloor"
+        static let hrMaxSource = "profile.hrMaxSource"
+        static let hrMaxMeasuredDay = "profile.hrMaxMeasuredDay"
+        static let hrMaxDeclined = "profile.hrMaxDeclined"
         /// Upstream ryanbr/noop's single custom-zone key. READ ONLY here — see the import in `init`.
         static let hrZoneThresholds = "profile.hrZoneThresholds"
         static let stepScale = "profile.stepTicksPerStep"
@@ -152,6 +172,11 @@ final class ProfileStore: ObservableObject {
         heightCm = d.object(forKey: K.height) as? Double ?? 178
         waistCm = d.object(forKey: K.waist) as? Double ?? 0
         hrMaxOverride = d.object(forKey: K.hrMax) as? Int ?? 0
+        zonesFromResting = d.object(forKey: K.zonesFromResting) as? Bool ?? true
+        zoneRestingFloor = d.object(forKey: K.zoneRestingFloor) as? Double ?? 0
+        hrMaxSource = d.string(forKey: K.hrMaxSource) ?? ""
+        hrMaxMeasuredDay = d.string(forKey: K.hrMaxMeasuredDay) ?? ""
+        hrMaxDeclined = d.object(forKey: K.hrMaxDeclined) as? Int ?? 0
         var mode = d.string(forKey: K.zoneMode) ?? HRZoneConfig.Mode.auto.rawValue
         let percentRaw = d.string(forKey: K.zonePercentEdges) ?? ""
         var bpmRaw = d.string(forKey: K.zoneBpmEdges) ?? ""
@@ -306,8 +331,34 @@ final class ProfileStore: ObservableObject {
     /// readout used the profile's HRmax while `Repository.workoutZoneMinutes` built its zones from age
     /// alone and `HealthView` carried its own hardcoded table: three answers for one question.
     var hrZoneSet: HRZoneSet {
-        HRZones.zones(config: hrZoneConfig, maxHR: Double(hrMax),
-                      autoSource: hrMaxOverride > 0 ? "manual" : "tanaka")
+        if let personal = personalZoneSet { return personal }
+        return HRZones.zones(config: hrZoneConfig, maxHR: Double(hrMax),
+                             autoSource: hrMaxOverride > 0 ? "manual" : "tanaka")
+    }
+
+    /// The automatic zones on the heart-rate reserve, when the wearer is on automatic zones, has not
+    /// turned this off and fourteen nights have given a resting floor. Source "reserve".
+    var personalZoneSet: HRZoneSet? {
+        guard hrZoneConfig.mode == .auto, zonesFromResting, zoneRestingFloor > 0,
+              let bounds = ReserveZones.lowerBounds(resting: zoneRestingFloor, maxHR: Double(hrMax))
+        else { return nil }
+        let set = HRZones.zones(config: HRZoneConfig(mode: .bpm, percentLowerBounds: [], bpmLowerBounds: bounds),
+                                maxHR: Double(hrMax), autoSource: "reserve")
+        return HRZoneSet(zones: set.zones, maxHR: set.maxHR, source: "reserve")
+    }
+
+    /// Take a held peak as the maximum. Effort scores from it from now on; days already scored keep theirs.
+    func acceptMeasuredMax(_ bpm: Int, day: String) {
+        hrMaxOverride = bpm
+        hrMaxSource = "measured"
+        hrMaxMeasuredDay = day
+    }
+
+    /// Set the maximum by hand, or clear it (0) back to the estimate.
+    func setManualMax(_ bpm: Int) {
+        hrMaxOverride = bpm
+        hrMaxSource = ""
+        hrMaxMeasuredDay = ""
     }
 
     // MARK: Upstream compatibility — flat bpm thresholds

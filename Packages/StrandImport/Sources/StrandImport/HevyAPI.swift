@@ -91,10 +91,16 @@ public enum HevyAPI {
         public let weightKg: Double?
         public let fatPercent: Double?
         public let leanMassKg: Double?
+        /// Tape measurements in centimetres, keyed by Hevy's field name ("waist", "left_bicep_cm" …).
+        public var circumferencesCm: [String: Double] = [:]
 
-        /// True when the entry carries none of the three figures NOOP could use, which is the case
-        /// for an entry that only recorded circumferences.
-        public var isEmpty: Bool { weightKg == nil && fatPercent == nil && leanMassKg == nil }
+        /// True when the entry carries nothing NOOP stores.
+        public var isEmpty: Bool { weightKg == nil && fatPercent == nil && leanMassKg == nil && circumferencesCm.isEmpty }
+
+        /// Hevy's tape fields, in the order its app lists them.
+        public static let circumferenceFields = ["neck_cm", "shoulder_cm", "chest_cm", "left_bicep_cm", "right_bicep_cm",
+                                                 "left_forearm_cm", "right_forearm_cm", "abdomen", "waist", "hips",
+                                                 "left_thigh", "right_thigh", "left_calf", "right_calf"]
     }
 
     /// Whose account a key belongs to. Worth a call before an import, so a wrong key fails with
@@ -191,12 +197,15 @@ public enum HevyAPI {
         parsePage(data, key: "body_measurements") { dict in
             guard let date = (dict["date"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !date.isEmpty else { return nil }
-            let entry = BodyMeasurement(
+            var entry = BodyMeasurement(
                 date: date,
                 weightKg: positive(dict["weight_kg"]),
                 fatPercent: LiftingImporter.jsonDouble(dict["fat_percent"]),
                 leanMassKg: positive(dict["lean_mass_kg"])
             )
+            for field in BodyMeasurement.circumferenceFields {
+                if let cm = positive(dict[field]) { entry.circumferencesCm[field] = cm }
+            }
             return entry.isEmpty ? nil : entry
         }
     }
@@ -219,6 +228,227 @@ public enum HevyAPI {
         let dict = (root["data"] as? [String: Any]) ?? root
         guard let id = dict["id"] as? String, !id.isEmpty else { return nil }
         return UserInfo(id: id, name: dict["name"] as? String, url: dict["url"] as? String)
+    }
+
+    // MARK: - Workouts with every set (GET /v1/workouts, /v1/workouts/events)
+
+    /// One logged set, as Hevy recorded it. `type` is `normal`, `warmup`, `dropset` or `failure`.
+    public struct WorkoutSet: Sendable, Equatable {
+        public let index: Int
+        public let type: String
+        public let weightKg: Double?
+        public let reps: Int?
+        public let distanceMeters: Double?
+        public let durationSeconds: Double?
+        public let rpe: Double?
+        public var isWarmup: Bool { type == "warmup" }
+    }
+
+    /// One exercise inside a workout, in the order it was done.
+    public struct WorkoutExercise: Sendable, Equatable {
+        public let index: Int
+        public let title: String
+        public let templateId: String?
+        public let supersetId: Int?
+        public let notes: String?
+        public let sets: [WorkoutSet]
+    }
+
+    /// A whole workout: unlike `LiftingImporter`'s summary, every exercise and set survives, so a Hevy
+    /// session can stand beside one logged in Noop and feed the same records, muscles and volume.
+    public struct Workout: Sendable, Equatable {
+        public let id: String
+        public let title: String
+        public let description: String?
+        public let routineId: String?
+        public let start: Date
+        public let end: Date
+        public let updatedAt: Date?
+        public let exercises: [WorkoutExercise]
+    }
+
+    /// A change since a moment: a workout in its current form, or the id of one that is gone.
+    public enum WorkoutChange: Sendable, Equatable {
+        case updated(Workout)
+        case deleted(id: String)
+    }
+
+    public static func parseWorkouts(data: Data, zone: TimeZone = .current) -> Page<Workout> {
+        parsePage(data, key: "workouts") { workout(from: $0, zone: zone) }
+    }
+
+    public static func parseWorkoutChanges(data: Data, zone: TimeZone = .current) -> Page<WorkoutChange> {
+        parsePage(data, key: "events") { (dict: [String: Any]) -> WorkoutChange? in
+            switch (dict["type"] as? String)?.lowercased() {
+            case "updated":
+                return (dict["workout"] as? [String: Any]).flatMap { workout(from: $0, zone: zone) }.map { .updated($0) }
+            case "deleted":
+                guard let id = dict["id"] as? String, !id.isEmpty else { return nil }
+                return .deleted(id: id)
+            default:
+                return nil
+            }
+        }
+    }
+
+    public static func workout(from w: [String: Any], zone: TimeZone) -> Workout? {
+        guard let id = w["id"] as? String, !id.isEmpty,
+              let start = (w["start_time"] as? String).flatMap({ LiftingImporter.parseDate($0, zone: zone) }),
+              let end = (w["end_time"] as? String).flatMap({ LiftingImporter.parseDate($0, zone: zone) }),
+              end >= start else { return nil }
+        let exercises = ((w["exercises"] as? [Any]) ?? []).enumerated().compactMap { offset, raw -> WorkoutExercise? in
+            guard let e = raw as? [String: Any],
+                  let title = (e["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !title.isEmpty else { return nil }
+            let sets = ((e["sets"] as? [Any]) ?? []).enumerated().compactMap { i, rawSet -> WorkoutSet? in
+                guard let s = rawSet as? [String: Any] else { return nil }
+                return WorkoutSet(
+                    index: index(s["index"], fallback: i),
+                    type: ((s["type"] as? String) ?? "normal").lowercased(),
+                    weightKg: LiftingImporter.jsonDouble(s["weight_kg"]).flatMap { $0 >= 0 && $0 < 2_000 ? $0 : nil },
+                    reps: LiftingImporter.boundedReps(LiftingImporter.jsonDouble(s["reps"])),
+                    distanceMeters: positive(s["distance_meters"]),
+                    durationSeconds: positive(s["duration_seconds"]),
+                    rpe: LiftingImporter.jsonDouble(s["rpe"]).flatMap { (1...10).contains($0) ? $0 : nil })
+            }
+            return WorkoutExercise(index: index(e["index"], fallback: offset), title: title,
+                                   templateId: e["exercise_template_id"] as? String,
+                                   supersetId: LiftingImporter.jsonDouble(e["superset_id"]).map { Int($0) },
+                                   notes: (e["notes"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+                                   sets: sets.sorted { $0.index < $1.index })
+        }
+        return Workout(id: id, title: (w["title"] as? String) ?? "Workout",
+                       description: (w["description"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+                       routineId: w["routine_id"] as? String, start: start, end: end,
+                       updatedAt: (w["updated_at"] as? String).flatMap { LiftingImporter.parseDate($0, zone: zone) },
+                       exercises: exercises.sorted { $0.index < $1.index })
+    }
+
+    // MARK: - Routines (GET /v1/routines)
+
+    public struct RoutineSet: Sendable, Equatable {
+        public let type: String
+        public let weightKg: Double?
+        public let reps: Int?
+        public let repRangeLow: Int?
+        public let repRangeHigh: Int?
+        public let durationSeconds: Double?
+    }
+
+    public struct RoutineExercise: Sendable, Equatable {
+        public let index: Int
+        public let title: String
+        public let templateId: String?
+        public let restSeconds: Int?
+        public let notes: String?
+        public let sets: [RoutineSet]
+    }
+
+    public struct Routine: Sendable, Equatable {
+        public let id: String
+        public let title: String
+        public let exercises: [RoutineExercise]
+    }
+
+    public static func parseRoutines(data: Data) -> Page<Routine> {
+        parsePage(data, key: "routines") { r in
+            guard let id = r["id"] as? String, !id.isEmpty else { return nil }
+            let exercises = ((r["exercises"] as? [Any]) ?? []).enumerated().compactMap { offset, raw -> RoutineExercise? in
+                guard let e = raw as? [String: Any], let title = e["title"] as? String, !title.isEmpty else { return nil }
+                let sets = ((e["sets"] as? [Any]) ?? []).compactMap { $0 as? [String: Any] }.map { s -> RoutineSet in
+                    let range = s["rep_range"] as? [String: Any]
+                    return RoutineSet(type: ((s["type"] as? String) ?? "normal").lowercased(),
+                                      weightKg: positive(s["weight_kg"]),
+                                      reps: LiftingImporter.boundedReps(LiftingImporter.jsonDouble(s["reps"])),
+                                      repRangeLow: LiftingImporter.boundedReps(LiftingImporter.jsonDouble(range?["start"])),
+                                      repRangeHigh: LiftingImporter.boundedReps(LiftingImporter.jsonDouble(range?["end"])),
+                                      durationSeconds: positive(s["duration_seconds"]))
+                }
+                return RoutineExercise(index: index(e["index"], fallback: offset), title: title,
+                                       templateId: e["exercise_template_id"] as? String,
+                                       restSeconds: LiftingImporter.jsonDouble(e["rest_seconds"]).map { Int($0) },
+                                       notes: (e["notes"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+                                       sets: sets)
+            }
+            return Routine(id: id, title: (r["title"] as? String) ?? "Routine",
+                           exercises: exercises.sorted { $0.index < $1.index })
+        }
+    }
+
+    // MARK: - Writing (POST /v1/workouts)
+
+    /// One set to send.
+    public struct OutgoingSet: Sendable, Equatable {
+        public let type: String
+        public let weightKg: Double?
+        public let reps: Int?
+        public let durationSeconds: Int?
+        public let rpe: Double?
+        public init(type: String, weightKg: Double?, reps: Int?, durationSeconds: Int?, rpe: Double?) {
+            self.type = type; self.weightKg = weightKg; self.reps = reps
+            self.durationSeconds = durationSeconds; self.rpe = rpe
+        }
+    }
+
+    /// One exercise to send: its Hevy template and its sets.
+    public struct OutgoingExercise: Sendable, Equatable {
+        public let templateId: String
+        public let notes: String?
+        public let sets: [OutgoingSet]
+        public init(templateId: String, notes: String?, sets: [OutgoingSet]) {
+            self.templateId = templateId; self.notes = notes; self.sets = sets
+        }
+    }
+
+    /// The JSON body Hevy expects to create a workout. RPE is snapped to the values Hevy accepts
+    /// (6, 7, 7.5 … 10) and dropped outside them, since an unaccepted value fails the whole request.
+    public static func workoutBody(title: String, description: String?, start: Date, end: Date,
+                                   exercises: [OutgoingExercise]) -> Data? {
+        let iso = ISO8601DateFormatter()
+        let allowed: [Double] = [6, 7, 7.5, 8, 8.5, 9, 9.5, 10]
+        let body: [String: Any] = [
+            "workout": [
+                "title": title,
+                "description": description as Any,
+                "start_time": iso.string(from: start),
+                "end_time": iso.string(from: end),
+                "is_private": false,
+                "exercises": exercises.map { e -> [String: Any] in
+                    [
+                        "exercise_template_id": e.templateId,
+                        "notes": e.notes as Any,
+                        "sets": e.sets.map { s -> [String: Any] in
+                            var out: [String: Any] = ["type": s.type]
+                            if let w = s.weightKg { out["weight_kg"] = w }
+                            if let r = s.reps { out["reps"] = r }
+                            if let d = s.durationSeconds { out["duration_seconds"] = d }
+                            if let rpe = s.rpe, let snapped = allowed.min(by: { abs($0 - rpe) < abs($1 - rpe) }),
+                               abs(snapped - rpe) <= 0.25 { out["rpe"] = snapped }
+                            return out
+                        }
+                    ]
+                }
+            ]
+        ]
+        return try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+    }
+
+    // MARK: - Names
+
+    /// Hevy writes the equipment last in parentheses ("Bench Press (Barbell)"); gym speech and Noop's
+    /// catalogue put it first ("Barbell Bench Press"). Both are tried when matching an exercise.
+    public static func equipmentFirst(_ title: String) -> String {
+        let t = title.trimmingCharacters(in: .whitespaces)
+        guard t.hasSuffix(")"), let open = t.lastIndex(of: "(") else { return t }
+        let equipment = t[t.index(after: open)..<t.index(before: t.endIndex)].trimmingCharacters(in: .whitespaces)
+        let name = t[..<open].trimmingCharacters(in: .whitespaces)
+        guard !equipment.isEmpty, !name.isEmpty else { return t }
+        return "\(equipment) \(name)"
+    }
+
+    private static func index(_ any: Any?, fallback: Int) -> Int {
+        guard let d = LiftingImporter.jsonDouble(any), d >= 0, d < 1e5 else { return fallback }
+        return Int(d)
     }
 
     // MARK: - Shared
