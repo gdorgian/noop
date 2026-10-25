@@ -174,6 +174,19 @@ struct NoopEditableSections<Section: View>: View {
                     }
                 }
                 .modifier(NoopWaveMotion(wave: wave, id: id, frame: frames[id], progress: waveProgress))
+                // Like the Home Screen: hold any section to start editing and carry it in the same
+                // press; while editing, a short hold is enough. The press sits on the page's own
+                // element, so it survives the switch into editing mid-gesture.
+                .modifier(NoopReorderPress(enabled: editing.active && !id.hasPrefix(Self.besidePrefix),
+                                           holdSeconds: 0.18) { phase in carry(id, phase) })
+                // Outside editing, a hold on any section starts it, alongside the section's own taps.
+                .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                    guard !editing.active else { return }
+                    NoopHaptics.prepare()
+                    NoopHaptics.play(.enterEdit)
+                    editing.draft = layout.order
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { editing.active = true }
+                }, including: editing.active ? .subviews : .all)
                 // Layering and removal belong to the ForEach's own children, or the lifted card
                 // would draw under the sections after it.
                 .zIndex(dragging == id ? 1 : 0)
@@ -223,8 +236,9 @@ struct NoopEditableSections<Section: View>: View {
                 RoundedRectangle(cornerRadius: 22, style: .continuous).fill(NoopHTMLColor.canvas)
             }
         }
-        .scaleEffect(dragging == id ? 1.03 : 1)
-        .shadow(color: .black.opacity(dragging == id ? 0.5 : 0), radius: 18, y: 8)
+        .scaleEffect(dragging == id ? 1.06 : 1)
+        .opacity(dragging == id ? 0.94 : 1)
+        .shadow(color: .black.opacity(dragging == id ? 0.55 : 0), radius: 22, y: 12)
         .overlay(alignment: .topLeading) {
             if (info?.removable ?? true) && dragging == nil {
                 Button {
@@ -244,9 +258,10 @@ struct NoopEditableSections<Section: View>: View {
                 .accessibilityLabel("Remove \(info?.title ?? id)")
             }
         }
+        .modifier(NoopJiggle(active: editing.active && dragging != id, seed: id.hashValue,
+                             amplitude: (layout.section(id)?.half ?? false) ? 1.1 : 0.35))
         .offset(x: dragging == id ? dragStartMid.x + dragTranslation.width - (frames[id]?.midX ?? dragStartMid.x) : 0,
                 y: dragging == id ? dragStartMid.y + dragTranslation.height - (frames[id]?.midY ?? dragStartMid.y) : 0)
-        .modifier(NoopReorderPress { phase in carry(id, phase) })
         .accessibilityElement(children: .contain)
         .accessibilityLabel(info?.title ?? id)
         .accessibilityAction(named: "Move up") { move(id, by: -1) }
@@ -279,19 +294,27 @@ struct NoopEditableSections<Section: View>: View {
     private func carry(_ id: String, _ phase: NoopReorderPress.Phase) {
         switch phase {
         case .began:
+            if !editing.active {
+                NoopHaptics.prepare()
+                editing.draft = layout.order
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { editing.active = true }
+            }
+            guard editing.draft.contains(id) else { return }
             NoopHaptics.play(.lift)
-            withAnimation(.easeOut(duration: 0.15)) {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
                 dragging = id
                 dragStartMid = frames[id].map { CGPoint(x: $0.midX, y: $0.midY) } ?? .zero
                 dragTranslation = .zero
             }
         case .moved(let delta):
+            guard dragging == id else { return }
             dragTranslation = delta
             let point = CGPoint(x: dragStartMid.x + delta.width, y: dragStartMid.y + delta.height)
             let others = editing.draft.filter { $0 != id }
             let target = others.filter { Self.isBefore(frames[$0], point) }.count
             if editing.draft.firstIndex(of: id) != target {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                // The others make way the way Home Screen icons do: a quick, soft spring.
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
                     var order = others
                     order.insert(id, at: min(target, order.count))
                     editing.draft = order
@@ -299,7 +322,8 @@ struct NoopEditableSections<Section: View>: View {
                 NoopHaptics.play(.pass)
             }
         case .ended:
-            withAnimation(.spring(duration: 0.3)) {
+            guard dragging == id else { return }
+            withAnimation(.spring(response: 0.36, dampingFraction: 0.72)) {
                 dragging = nil
                 dragTranslation = .zero
             }
@@ -475,13 +499,35 @@ private struct NoopWaveMotion: ViewModifier, Animatable {
 /// and the page scrolls. Reports how far the finger has moved vertically since the press began.
 private struct NoopReorderPress: ViewModifier {
     enum Phase { case began, moved(CGSize), ended }
+    var enabled = true
+    var holdSeconds: Double = 0.35
     let onChange: (Phase) -> Void
 
     func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
-            content.gesture(NoopReorderRecognizer(onChange: onChange))
+        if #available(iOS 18.0, *), enabled {
+            content.gesture(NoopReorderRecognizer(holdSeconds: holdSeconds, onChange: onChange))
         } else {
             content
+        }
+    }
+}
+
+/// The Home Screen's jiggle while a page is being edited: each section rocks a little on its own
+/// beat, tiles more than whole cards.
+private struct NoopJiggle: ViewModifier {
+    let active: Bool
+    let seed: Int
+    let amplitude: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        // One timeline that pauses rather than two branches, so a section keeps its own state
+        // as editing starts and ends.
+        let rocking = active && !reduceMotion
+        TimelineView(.animation(minimumInterval: nil, paused: !rocking)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            let phase = Double(abs(seed % 1000)) / 1000 * .pi * 2
+            content.rotationEffect(.degrees(rocking ? amplitude * sin(t * 2 * .pi * 3.4 + phase) : 0))
         }
     }
 }
@@ -491,17 +537,19 @@ private struct NoopReorderPress: ViewModifier {
 /// section moves with it.
 @available(iOS 18.0, *)
 private struct NoopReorderRecognizer: UIGestureRecognizerRepresentable {
+    var holdSeconds: Double
     let onChange: (NoopReorderPress.Phase) -> Void
 
     func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
         let press = UILongPressGestureRecognizer()
-        press.minimumPressDuration = 0.35
+        press.minimumPressDuration = holdSeconds
         press.allowableMovement = 10
         return press
     }
 
     func updateUIGestureRecognizer(_ recognizer: UILongPressGestureRecognizer, context: Context) {
         context.coordinator.onChange = onChange
+        recognizer.minimumPressDuration = holdSeconds
     }
 
     func handleUIGestureRecognizerAction(_ recognizer: UILongPressGestureRecognizer, context: Context) {
