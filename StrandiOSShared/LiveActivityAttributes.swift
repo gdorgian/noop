@@ -20,11 +20,14 @@ public struct NOOPActivityAttributes: ActivityAttributes {
         public var lastSampledAt: Date?
         public var zoneNumber: Int?
         public var ceilingBPM: Int?
+        /// The recorded session this banner is following, when one is running. Optional so a banner
+        /// started by an older build still decodes, and shows no controls.
+        public var workout: Workout?
 
         public init(bpm: Int?, recovery: Int?, bonded: Bool, effort: Int? = nil,
                     sampledAt: Date? = nil, lastBPM: Int? = nil,
                     lastSampledAt: Date? = nil, zoneNumber: Int? = nil,
-                    ceilingBPM: Int? = nil) {
+                    ceilingBPM: Int? = nil, workout: Workout? = nil) {
             self.bpm = bpm
             self.recovery = recovery
             self.bonded = bonded
@@ -34,7 +37,29 @@ public struct NOOPActivityAttributes: ActivityAttributes {
             self.lastSampledAt = lastSampledAt
             self.zoneNumber = zoneNumber
             self.ceilingBPM = ceilingBPM
+            self.workout = workout
         }
+    }
+
+    /// A recorded cardio session, as the banner needs it: its name, its clock, and whether it is paused.
+    public struct Workout: Codable, Hashable {
+        public var sport: String
+        /// SF Symbol for the sport.
+        public var symbol: String
+        /// The session's start shifted by every paused stretch, so a system timer counting up from it
+        /// reads the active time without a push each second.
+        public var clockStart: Date
+        /// Whole seconds of active time when paused; nil while the clock runs.
+        public var pausedElapsed: Int?
+
+        public init(sport: String, symbol: String, clockStart: Date, pausedElapsed: Int?) {
+            self.sport = sport
+            self.symbol = symbol
+            self.clockStart = clockStart
+            self.pausedElapsed = pausedElapsed
+        }
+
+        public var isPaused: Bool { pausedElapsed != nil }
     }
 
     /// Static title shown for the session.

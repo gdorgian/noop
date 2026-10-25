@@ -150,6 +150,9 @@ struct StrandiOSApp: App {
         let liveActivity = LiveActivityController()
         liveActivity.follow(model, standsAside: { [weak liftActivity] in liftActivity?.isShowing == true })
         _liveActivity = State(initialValue: liveActivity)
+        // The banner's Pause/Resume reaches the recorder even before a screen is built (the shell adds its
+        // own clock to this once it appears).
+        LiveSessionControl.togglePause = { [weak model] in model?.toggleWorkoutPause() }
         // A gym session keeps ONE banner on the Lock Screen, its own — as the live-HR banner already
         // stands aside for it. A sync started in the foreground mid-session starts no sync banner.
         // Held back only for a gym banner that will actually show: with its switch off, a session leaves the
@@ -333,6 +336,16 @@ struct StrandiOSApp: App {
                     // so a refresh storm can't burn the ~50/day complication transfer budget.
                     Task { await watch.pushLatest(from: model) }
                 }
+                // A lift, a manual session or a routine saved outside the repository's refresh diff still
+                // changes what the Workouts and Consistency widgets draw.
+                // The first publish at launch can run before the store has loaded, and an empty store never
+                // bumps `refreshSeq`, so the panels are published once more the moment it is ready.
+                .onReceive(model.repo.$loaded.removeDuplicates().filter { $0 }) { _ in
+                    Task { await WidgetPanelsPublisher.publish(from: model, force: true) }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NoopFitnessModel.changed)) { _ in
+                    Task { await WidgetPanelsPublisher.publish(from: model, force: true) }
+                }
                 // #114: strap battery % and connection are LIVE (model.live), not repo-cache, so they never
                 // bump refreshSeq — the widget's battery would otherwise never move while the app is open
                 // (the "battery not updating" report). Republish on those too, foreground-gated. Both are
@@ -388,6 +401,9 @@ struct StrandiOSApp: App {
                 .onOpenURL { url in
                     if url.host == "import-health" {
                         model.handleHealthImportURL(url)
+                    } else if url.host == WidgetLink.host {
+                        // A widget or Live Activity tap: the shell owns navigation, so hand it the link.
+                        NotificationCenter.default.post(name: .noopOpenWidgetLink, object: url)
                     }
                 }
                 .alert("Import Apple Health data?", isPresented: healthImportAlertPresented) {
@@ -559,6 +575,9 @@ private struct iOSRootView: View {
         // DEBUG-only: `--demo-screen <name>` renders one screen full-bleed (gates bypassed) so a
         // seeded simulator build can be screenshotted deterministically for verification + marketing.
         // No-op in Release (whole branch is #if DEBUG) and when the arg is absent.
+        if let board = WidgetBoard.requested {
+            return AnyView(board)
+        }
         if let demo = DemoScreens.requested {
             // Inherit the app appearance (set via the Theme picker, or `-theme.appearance light|dark`
             // in the launch arguments) so demo/marketing shots can be taken in either scheme.

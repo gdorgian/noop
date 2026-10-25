@@ -27,7 +27,13 @@ struct NOOPLiveActivity: Widget {
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: NOOPActivityAttributes.self) { context in
-            lockScreen(context)
+            Group {
+                if let workout = context.state.workout {
+                    sessionLockScreen(context, workout: workout)
+                } else {
+                    lockScreen(context)
+                }
+            }
                 .activityBackgroundTint(Color(.sRGB, red: 10 / 255, green: 13 / 255, blue: 13 / 255, opacity: 0.86))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
@@ -55,9 +61,19 @@ struct NOOPLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 9) {
-                        figure(context, size: 40)
-                        track(context)
-                        status(context)
+                        if let workout = context.state.workout {
+                            HStack(alignment: .firstTextBaseline) {
+                                sessionClock(workout, size: 34)
+                                Spacer(minLength: 8)
+                                figure(context, size: 24)
+                            }
+                            track(context)
+                            sessionControls(workout)
+                        } else {
+                            figure(context, size: 40)
+                            track(context)
+                            status(context)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 8)
@@ -65,10 +81,21 @@ struct NOOPLiveActivity: Widget {
                     .padding(.bottom, 4)
                 }
             } compactLeading: {
-                heart(context, size: 14)
-                    .padding(.leading, 2)
+                if let workout = context.state.workout {
+                    Image(systemName: workout.isPaused ? "pause.fill" : workout.symbol)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(volt)
+                        .padding(.leading, 2)
+                } else {
+                    heart(context, size: 14)
+                        .padding(.leading, 2)
+                }
             } compactTrailing: {
-                if let bpm = freshBPM(context) {
+                if let workout = context.state.workout, freshBPM(context) == nil {
+                    sessionClock(workout, size: 14)
+                        .frame(maxWidth: 58)
+                        .padding(.trailing, 2)
+                } else if let bpm = freshBPM(context) {
                     Text(bpm.formatted())
                         .font(.custom(NoopSpecType.Face.outfitRegular, fixedSize: 14))
                         .tracking(-0.27)
@@ -85,6 +112,101 @@ struct NOOPLiveActivity: Widget {
                 minimalMark(context)
             }
             .keylineTint(heartRed)
+        }
+    }
+
+    private let volt = Color(.sRGB, red: 210 / 255, green: 240 / 255, blue: 74 / 255, opacity: 1)
+    private let voltInk = Color(.sRGB, red: 22 / 255, green: 28 / 255, blue: 5 / 255, opacity: 1)
+
+    /// The session's active time: a system timer while it runs (no push a second), a still figure once paused.
+    @ViewBuilder
+    private func sessionClock(_ workout: NOOPActivityAttributes.Workout, size: CGFloat) -> some View {
+        Group {
+            if let paused = workout.pausedElapsed {
+                Text(Self.clock(paused))
+            } else {
+                Text(timerInterval: workout.clockStart...Date.distantFuture, countsDown: false)
+            }
+        }
+        .font(.custom(NoopSpecType.Face.outfitLight, fixedSize: size))
+        .tracking(-size * 0.03)
+        .monospacedDigit()
+        .foregroundStyle(workout.isPaused ? secondary : .white)
+        .multilineTextAlignment(.trailing)
+        .lineLimit(1)
+    }
+
+    static func clock(_ seconds: Int) -> String {
+        let h = seconds / 3600, m = (seconds % 3600) / 60, s = seconds % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+    }
+
+    /// Pause/Resume acts in place; End opens the live screen, whose confirmation is what finishes a session,
+    /// so a stray tap in a pocket can pause a run but never end it.
+    private func sessionControls(_ workout: NOOPActivityAttributes.Workout) -> some View {
+        HStack(spacing: 8) {
+            Button(intent: ToggleLiveSessionPauseIntent()) {
+                Label(workout.isPaused ? "Resume" : "Pause", systemImage: workout.isPaused ? "play.fill" : "pause.fill")
+                    .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 14))
+                    .foregroundStyle(voltInk)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(volt, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            Button(intent: OpenLiveSessionIntent()) {
+                Label("End\u{2026}", systemImage: "stop.fill")
+                    .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 14))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(Color.white.opacity(0.13), in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// The banner while a recorded session runs: what you are doing and for how long, the heart rate and
+    /// zone beneath it, and the two controls.
+    private func sessionLockScreen(_ context: ActivityViewContext<NOOPActivityAttributes>,
+                                   workout: NOOPActivityAttributes.Workout) -> some View {
+        let tone = workout.isPaused ? quiet : auraTone(context)
+        return VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .center, spacing: 11) {
+                ZStack {
+                    Circle().fill(volt.opacity(workout.isPaused ? 0.1 : 0.18))
+                    Image(systemName: workout.symbol)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(workout.isPaused ? quiet : volt)
+                }
+                .frame(width: 36, height: 36)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(workout.sport)
+                        .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 15))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Group {
+                        if workout.isPaused {
+                            Text("Paused")
+                        } else if let bpm = freshBPM(context) {
+                            Text("\(bpm) bpm \u{00B7} \(zoneLabel(context))")
+                        } else {
+                            Text(context.state.bonded ? "Waiting for a reading" : "No strap connected")
+                        }
+                    }
+                    .font(.custom(NoopSpecType.Face.sansRegular, fixedSize: 12))
+                    .foregroundStyle(workout.isPaused ? secondary : zoneInk(context))
+                    .lineLimit(1)
+                }
+                Spacer(minLength: 6)
+                sessionClock(workout, size: 32)
+            }
+            if !workout.isPaused, freshBPM(context) != nil { track(context) }
+            sessionControls(workout)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(alignment: .topLeading) {
+            RadialGradient(colors: [tone.opacity(workout.isPaused ? 0.08 : 0.26), tone.opacity(0)],
+                           center: .init(x: 0.1, y: 0.2), startRadius: 4, endRadius: 200)
         }
     }
 

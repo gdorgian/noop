@@ -291,6 +291,9 @@ targets:
           - "Resources/Info.plist"
           - "Resources/NOOP.entitlements"
       - path: StrandiOSShared
+      # The panel widgets' views, for the Debug widget board (`--noop-widget-board`). Release builds leave
+      # them out of the app (EXCLUDED_SOURCE_FILE_NAMES below); they ship in the widget extension only.
+      - path: StrandiOSWidgets/Panels
       # Installed by Tools/bootstrap-nomic.sh before xcodegen. The final app contains the pinned model;
       # there is no runtime download and no model load during ordinary app launch.
       - path: Vendor/Nomic/Resources
@@ -451,6 +454,9 @@ targets:
         # Same opt-out as the macOS target: packages optimised in Debug, app code left steppable.
         Debug:
           SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+        # The panel widget views compile into the app for the Debug widget board only.
+        Release:
+          EXCLUDED_SOURCE_FILE_NAMES: "PanelKit.swift SleepWidget.swift StepsWidget.swift VitalsWidget.swift WeightWidget.swift TrainingWidgets.swift GoalWidget.swift"
     dependencies:
       - package: WhoopProtocol
       - package: WhoopStore

@@ -63,6 +63,15 @@ final class LiveActivityController {
                                     model.$bpm.map { _ in () }.eraseToAnyPublisher()])
             .sink { [weak self] in self?.refreshBanner() }
             .store(in: &cancellables)
+        // A recorded session starting, pausing, resuming or ending changes what the banner offers. Only those
+        // edges: the session's samples move every second and are not the banner's business.
+        model.$activeWorkout
+            .map { $0.map { [$0.sport, "\($0.start.timeIntervalSince1970)", "\($0.pausedAt?.timeIntervalSince1970 ?? 0)"] } }
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refreshBanner() }
+            .store(in: &cancellables)
         // The switch is the one way to be rid of the banner, so it acts at once — not at the next heart-rate tick,
         // which a strap off the wrist may not send for hours.
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
@@ -92,7 +101,17 @@ final class LiveActivityController {
         update(bpm: connected ? (model.bpm ?? model.live.heartRate) : nil,
                recovery: day?.recovery.map { Int($0.rounded()) }, connected: connected, standsAside: standsAside(),
                appActive: appActive ?? (UIApplication.shared.applicationState == .active),
-               effort: day?.strain.map { Int($0.rounded()) })
+               effort: day?.strain.map { Int($0.rounded()) },
+               workout: Self.workout(model.activeWorkout))
+    }
+
+    /// The running session as the banner shows it, or nil when none is recording.
+    static func workout(_ active: AppModel.ActiveWorkout?, now: Date = Date()) -> NOOPActivityAttributes.Workout? {
+        guard let active else { return nil }
+        let paused = active.isPaused ? Int(active.elapsed(at: now).rounded(.down)) : nil
+        return .init(sport: active.sport, symbol: NoopFitnessCardioLive.symbol(for: active.sport),
+                     clockStart: active.start.addingTimeInterval(active.pausedDuration),
+                     pausedElapsed: paused)
     }
 
     /// Drive the activity from the latest live values (`LiveHRBannerLifecycle` decides start / push / end). Starts
@@ -102,7 +121,7 @@ final class LiveActivityController {
     /// (`standsAside`). Pushed when what it shows changes, and often enough to stay fresh (`LiveHRBannerPushPolicy`,
     /// `staleAfter`).
     private func update(bpm: Int?, recovery: Int?, connected: Bool, standsAside: Bool, appActive: Bool,
-                        effort: Int?) {
+                        effort: Int?, workout: NOOPActivityAttributes.Workout?) {
         guard authInfo.areActivitiesEnabled else { return }
 
         // A banner iOS ended (after about eight hours) or the user swiped away is gone: forget it, so the next time
@@ -137,8 +156,16 @@ final class LiveActivityController {
         let switchOn = UnitPrefs.liveActivityEnabled()
         let age = startedAt.map { now.timeIntervalSince($0) }
         let step = LiveHRBannerLifecycle.step(
-            switchOn: switchOn, standsAside: standsAside, linkUp: connected,
+            // A recorded session brings the banner up even without a strap: its controls are worth having.
+            switchOn: switchOn, standsAside: standsAside, linkUp: connected || workout != nil,
             showing: activity != nil, age: age, appActive: appActive)
+        // A banner a strapless session brought up has nothing left to show once the session ends.
+        if workout == nil, !connected, activity != nil, shownState?.workout != nil, !isEnding {
+            isEnding = true
+            log("ended: its session finished and no strap is connected")
+            Task { await end() }
+            return
+        }
         switch step {
         case .nothing: return
         case .end:
@@ -161,7 +188,8 @@ final class LiveActivityController {
             bpm: shown, recovery: recovery, bonded: connected, effort: effort,
             sampledAt: shown == nil ? nil : now, lastBPM: lastShownBPM, lastSampledAt: lastShownAt,
             zoneNumber: shown.flatMap { b in model.map { $0.profile.hrZoneSet.zoneNumber(forBPM: Double(b)) } },
-            ceilingBPM: model?.liveActivityCeilingBPM)
+            ceilingBPM: model?.liveActivityCeilingBPM,
+            workout: workout)
 
         if step == .renew, activity != nil {
             // The fresh banner first, then the old one goes, so the Lock Screen is never without one; if iOS refuses
@@ -174,9 +202,12 @@ final class LiveActivityController {
         } else if let activity {
             // The number giving way to the dash (the strap off the wrist, the link dropping) is pushed at once: no
             // tick follows it, so a push skipped for spacing would leave the last number standing.
-            guard LiveHRBannerPushPolicy.due(shown: shownState, next: state, reading: \.bpm,
-                                             sinceLastPush: now.timeIntervalSince(lastPush),
-                                             staleAfter: Self.staleAfter) else { return }
+            // A session starting, pausing or ending is pushed at once, like the dash: a tap on Pause that waited
+            // for the next heart-rate tick would look ignored, and with no strap there may be no tick.
+            guard shownState?.workout != state.workout
+                    || LiveHRBannerPushPolicy.due(shown: shownState, next: state, reading: \.bpm,
+                                                  sinceLastPush: now.timeIntervalSince(lastPush),
+                                                  staleAfter: Self.staleAfter) else { return }
             if let shown = shownState, (shown.bpm == nil) != (state.bpm == nil) { logReading(state) }
             lastPush = now
             shownState = state

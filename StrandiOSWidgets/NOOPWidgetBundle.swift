@@ -344,7 +344,7 @@ struct NOOPWidgetBundle: WidgetBundle {
             NOOPRingsWidget.kind,
         ]
         precondition(
-            registeredFamilyKinds == Set(NoopWidgetFamilyRegistry.families.map(\.configurationKind)),
+            registeredFamilyKinds.union(WidgetPanels.kinds) == Set(NoopWidgetFamilyRegistry.families.map(\.configurationKind)),
             "Widget bundle and NoopWidgetFamilyRegistry have drifted"
         )
         #endif
@@ -360,6 +360,21 @@ struct NOOPWidgetBundle: WidgetBundle {
         LiftLiveActivity()
         EnergyWidget()
         NOOPRingsWidget()
+        // WidgetKit's bundle builder takes ten entries; the rest ride in a nested bundle.
+        NOOPPanelsBundle().body
+    }
+}
+
+/// The sync Live Activity and the seven panel widgets that read `WidgetPanels`.
+struct NOOPPanelsBundle: WidgetBundle {
+    var body: some Widget {
         SyncLiveActivity()
+        SleepWidget()
+        StepsWidget()
+        VitalsWidget()
+        WeightWidget()
+        WorkoutsWidget()
+        ConsistencyWidget()
+        GoalWidget()
     }
 }
