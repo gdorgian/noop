@@ -499,7 +499,12 @@ struct NoopSectionFlow: Layout {
         for (row, height) in zip(rows, heights) {
             let w = row.half ? Self.halfWidth(of: bounds.width) : bounds.width
             for (slot, member) in row.members.enumerated() {
-                let x = bounds.minX + CGFloat(slot) * (w + Self.gap)
+                var x = bounds.minX + CGFloat(slot) * (w + Self.gap)
+                // A section narrower than the page sits in its middle, as it did in the old stack.
+                if !row.half {
+                    let fitted = subviews[member].sizeThatFits(ProposedViewSize(width: w, height: nil)).width
+                    x += max(0, (w - fitted) / 2)
+                }
                 subviews[member].place(at: CGPoint(x: x, y: y), anchor: .topLeading,
                                        proposal: ProposedViewSize(width: w, height: height))
             }
