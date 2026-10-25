@@ -49,6 +49,7 @@ struct NoopScorePageTitle: View {
                     LinearGradient(colors: [Color(hex: 0x283038), Color(hex: 0x1A1F24).opacity(0.6), .clear],
                                    startPoint: .top, endPoint: .bottom)
                         .frame(height: 560)
+                        .noopStretchesOnPull(height: 560)
                 } else {
                     NoopPageBackdrop(theme: theme)
                 }
@@ -174,6 +175,7 @@ struct NoopPageBackdrop: View {
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
+        .noopStretchesOnPull(height: height)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

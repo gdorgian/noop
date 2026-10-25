@@ -753,6 +753,24 @@ private struct NoopAddSectionSheet<Section: View>: View {
             .onEnded { _ in land() }
     }
 
+    /// The same carry, driven by the system's long press so the gallery scrolls freely under a
+    /// moving finger and only a still hold picks a preview up, as the Home Screen's gallery does.
+    private func carry(_ info: NoopPageSection, _ phase: NoopCarryOutPhase) {
+        switch phase {
+        case .moved(let point):
+            if lifted == nil {
+                NoopHaptics.play(.lift)
+                editing.addBeside = nil
+                editing.incoming = info.id
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { lifted = info }
+            }
+            fingerAt = point
+            drag.point = point
+        case .ended:
+            land()
+        }
+    }
+
     private func land() {
                 guard let info = lifted else { return }
                 if !editing.draft.contains(info.id) { editing.draft.append(info.id) }
@@ -845,7 +863,6 @@ private struct NoopAddSectionSheet<Section: View>: View {
                                             GridItem(.flexible(), spacing: NoopSectionFlow.gap)],
                                   alignment: .leading, spacing: 18) {
                             ForEach(tiles) { info in
-                                Button { add(info) } label: {
                                     VStack(alignment: .leading, spacing: 8) {
                                         section(info.id).allowsHitTesting(false)
                                         HStack(spacing: 5) {
@@ -857,17 +874,14 @@ private struct NoopAddSectionSheet<Section: View>: View {
                                         .padding(.leading, 6)
                                     }
                                     .contentShape(Rectangle())
-                                }
-                                .buttonStyle(NoopHTMLPressStyle())
-                                .simultaneousGesture(carryOut(info))
-                                .accessibilityLabel("Add \(info.title)")
+                                    .modifier(NoopGalleryItem(info: info, add: add, fallback: carryOut(info)) { carry(info, $0) })
+                                    .accessibilityLabel("Add \(info.title)")
                             }
                         }
                     }
                     if editing.addBeside == nil && !sections.isEmpty {
                         if !tiles.isEmpty { NoopSectionLabel("Sections").padding(.top, 6) }
                         ForEach(sections) { info in
-                            Button { add(info) } label: {
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack {
                                         Text(info.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
@@ -883,9 +897,7 @@ private struct NoopAddSectionSheet<Section: View>: View {
                                     }
                                 }
                                 .contentShape(Rectangle())
-                            }
-                            .buttonStyle(NoopHTMLPressStyle())
-                            .simultaneousGesture(carryOut(info))
+                                .modifier(NoopGalleryItem(info: info, add: add, fallback: carryOut(info)) { carry(info, $0) })
                         }
                     }
                 }
@@ -899,6 +911,63 @@ private struct NoopAddSectionSheet<Section: View>: View {
                     in: UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
         .padding(.top, 58)
         .ignoresSafeArea(edges: .bottom)
+    }
+}
+
+/// A hold that lifts a preview out of the Add gallery. On iOS 18 it is a UIKit long press, which
+/// leaves the gallery's scroll view to take any touch that moves first; earlier systems keep the
+/// SwiftUI gesture.
+/// A preview in the Add gallery: a tap adds it, a still hold lifts it out. Not a Button, whose
+/// own touch handling would keep the hold from ever reaching the long press.
+private struct NoopGalleryItem<Fallback: Gesture>: ViewModifier {
+    let info: NoopPageSection
+    let add: (NoopPageSection) -> Void
+    let fallback: Fallback
+    let onCarry: (NoopCarryOutPhase) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onTapGesture { add(info) }
+            .modifier(NoopCarryOutPress(fallback: fallback, onChange: onCarry))
+            .accessibilityAddTraits(.isButton)
+    }
+}
+
+private enum NoopCarryOutPhase { case moved(CGPoint), ended }
+
+private struct NoopCarryOutPress<Fallback: Gesture>: ViewModifier {
+    let fallback: Fallback
+    let onChange: (NoopCarryOutPhase) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.gesture(NoopCarryOutRecognizer(onChange: onChange))
+        } else {
+            content.simultaneousGesture(fallback)
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct NoopCarryOutRecognizer: UIGestureRecognizerRepresentable {
+    let onChange: (NoopCarryOutPhase) -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
+        let press = UILongPressGestureRecognizer()
+        press.minimumPressDuration = 0.35
+        press.allowableMovement = 10
+        return press
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UILongPressGestureRecognizer, context: Context) {
+        switch recognizer.state {
+        case .began, .changed:
+            onChange(.moved(recognizer.location(in: recognizer.view?.window)))
+        case .ended, .cancelled, .failed:
+            onChange(.ended)
+        default:
+            break
+        }
     }
 }
 

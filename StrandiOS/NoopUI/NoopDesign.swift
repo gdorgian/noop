@@ -195,6 +195,7 @@ struct NoopScreen<Content: View>: View {
     @ViewBuilder var content: Content
 
     @Environment(\.noopLiveBarInset) private var liveBarInset
+    @StateObject private var overscroll = NoopOverscroll()
 
     var body: some View {
         GeometryReader { proxy in
@@ -210,6 +211,8 @@ struct NoopScreen<Content: View>: View {
                 }
                 .scrollIndicators(.hidden)
                 .modifier(NoopScrollRestore(enabled: initialScrollID == nil))
+                .modifier(NoopOverscrollReader(overscroll: overscroll))
+                .environment(\.noopOverscroll, overscroll)
                 .onAppear {
                     guard let initialScrollID else { return }
                     DispatchQueue.main.async {
@@ -223,6 +226,67 @@ struct NoopScreen<Content: View>: View {
         }
         .frame(width: UIScreen.main.bounds.width)
         .background(Color.clear)
+    }
+}
+
+/// How far a page is pulled down past its top. Only a page's backdrop reads it, to stretch with the
+/// pull as a photo header does, so the page itself is not redrawn while the finger moves.
+final class NoopOverscroll: ObservableObject {
+    @Published var pull: CGFloat = 0
+}
+
+private struct NoopOverscrollReader: ViewModifier {
+    let overscroll: NoopOverscroll
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: CGFloat.self, of: { max(0, -($0.contentOffset.y + $0.contentInsets.top)) }) { _, pull in
+                // Publish only while pulled, and once on the way back to rest.
+                if pull != overscroll.pull { overscroll.pull = pull }
+            }
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    /// Stretches a backdrop pinned to a page's top as the page is pulled down: it grows from its
+    /// bottom edge so its top stays at the top of the screen, and never shows the page behind it.
+    func noopStretchesOnPull(height: CGFloat) -> some View {
+        modifier(NoopStretchOnPull(height: height))
+    }
+}
+
+private struct NoopOverscrollKey: EnvironmentKey { static let defaultValue: NoopOverscroll? = nil }
+
+extension EnvironmentValues {
+    var noopOverscroll: NoopOverscroll? {
+        get { self[NoopOverscrollKey.self] }
+        set { self[NoopOverscrollKey.self] = newValue }
+    }
+}
+
+private struct NoopStretchOnPull: ViewModifier {
+    let height: CGFloat
+    @Environment(\.noopOverscroll) private var overscroll
+
+    func body(content: Content) -> some View {
+        if let overscroll {
+            NoopStretchBody(content: content, height: height, overscroll: overscroll)
+        } else {
+            content
+        }
+    }
+}
+
+private struct NoopStretchBody<C: View>: View {
+    let content: C
+    let height: CGFloat
+    @ObservedObject var overscroll: NoopOverscroll
+
+    var body: some View {
+        content.scaleEffect((height + overscroll.pull) / height, anchor: .bottom)
     }
 }
 
