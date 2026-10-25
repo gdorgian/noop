@@ -326,6 +326,7 @@ struct NoopAct2Screens: View {
     @StateObject private var todayLayout = NoopPageLayout(page: "today", catalog: NoopAct2Screens.todaySections)
     @State private var todayEditing = NoopPageEditing()
     @State private var activityStatus = NoopActivityStatusState.load()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var activityStatusOpen = false
     @State private var todayCalendarOpen = false
     var body: some View {
@@ -985,7 +986,7 @@ struct NoopAct2Screens: View {
             .buttonStyle(NoopHTMLPressStyle())
             .accessibilityLabel("\(todayTitle), open the calendar")
 
-            HStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
                 NoopActivityStatusChip(state: activityStatus) { activityStatusOpen = true }
 
                 HStack(spacing: 4) {
@@ -1015,7 +1016,7 @@ struct NoopAct2Screens: View {
                     .accessibilityLabel(inboxUnreadCount > 0 ? "Updates, \(inboxUnreadCount) unread" : "Updates")
                 }
                 .padding(.leading, 6).padding(.trailing, 5)
-                .frame(height: 43)
+                .frame(minHeight: NoopActivityStatusChip.height)
                 .background(Color.white.opacity(0.06), in: Capsule())
                 .overlay(Capsule().strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                 .fixedSize()
@@ -1031,6 +1032,9 @@ struct NoopAct2Screens: View {
             }
         }
         .padding(.bottom, 4)
+        // A status kept for a set time runs out on its own; read it again whenever Today comes back.
+        .onAppear { activityStatus = .load() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { activityStatus = .load() } }
         .sheet(isPresented: $activityStatusOpen) {
             NoopActivityStatusSheet(state: $activityStatus)
                 .noopFloatingSheet(height: NoopActivityStatusSheet.height)

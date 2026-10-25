@@ -1277,16 +1277,20 @@ private struct NoopSheetStyle: ViewModifier {
 }
 
 /// A short sheet that floats: the system's inset sheet with every corner rounded, on a surface lifted
-/// a shade off the page, its grabber inside. For pickers and choices that take part of the screen.
+/// a shade off the page, its grabber inside. It is as tall as its content, measured, so a longer month
+/// or larger text grows it instead of cutting the bottom off; `height` is only the first guess.
 private struct NoopFloatingSheetStyle: ViewModifier {
     let height: CGFloat
+    @State private var measured: CGFloat?
 
     func body(content: Content) -> some View {
         content
             .padding(.top, 6)
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measured = $0 }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .overlay(alignment: .top) { NoopSheetGrabber().padding(.top, 8).allowsHitTesting(false) }
-            .presentationDetents([.height(height)])
+            .presentationDetents([.height(measured ?? height)])
             .presentationDragIndicator(.hidden)
             .presentationBackground(LinearGradient(colors: [Color(hex: 0x23262D), Color(hex: 0x1B1D23)],
                                                    startPoint: .top, endPoint: .bottom))

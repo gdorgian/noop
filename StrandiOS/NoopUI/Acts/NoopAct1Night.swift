@@ -62,10 +62,11 @@ struct NoopAct1Screens: View {
             VStack(spacing: 0) {
                 // The same top as Recovery and Strain: title, the day pill, the month sheet.
                 NoopScorePageTitle(theme: .sleep, title: "Sleep", dayOffset: $navigation.selectedRestDay, maxBack: 6) { date in
+                    // The same nights the page steps through, each under the day it ended on, so the
+                    // ring under a date is the night that date opens.
+                    let key = Repository.localDayKey(date)
                     guard let rest, rest.needMin > 0,
-                          // Today's daily row is written later; until then it is last night's record.
-                          let m = Calendar.current.isDateInToday(date) ? rest.latest?.asleepMin
-                              : model.repo.days.last(where: { $0.day == Repository.localDayKey(date) })?.totalSleepMin
+                          let m = rest.slots.lazy.compactMap({ $0 }).first(where: { $0.dayKey == key })?.asleepMin
                     else { return nil }
                     return (min(1, m / rest.needMin), NoopHeroFamily.current.dayColor(.sleep, m))
                 }

@@ -78,7 +78,12 @@ struct NoopActivityStatusState {
         let status = NoopActivityStatus(rawValue: d.string(forKey: NoopActivityStatus.statusKey) ?? "") ?? .active
         let t = d.double(forKey: NoopActivityStatus.untilKey)
         let until = t > 0 ? Date(timeIntervalSince1970: t) : nil
-        if let until, until < Date() { return .init(status: .active, until: nil) }
+        if let until, until < Date() {
+            // The time ran out: back to Active, and stored so, for anything else that reads it.
+            let reset = NoopActivityStatusState(status: .active, until: nil)
+            reset.save()
+            return reset
+        }
         return .init(status: status, until: until)
     }
 
@@ -93,9 +98,12 @@ struct NoopActivityStatusState {
         let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()),
                                                    to: Calendar.current.startOfDay(for: until)).day ?? 0
         if days <= 1 { return "Until tomorrow" }
-        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("EEE MMM d")
-        return "Until \(f.string(from: until))"
+        return "Until \(Self.untilFormatter.string(from: until))"
     }
+
+    private static let untilFormatter: DateFormatter = {
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("EEE MMM d"); return f
+    }()
 }
 
 /// The status's tile: a pill in its colour, lit from the top, with the symbol in white.
@@ -125,6 +133,10 @@ struct NoopActivityStatusTile: View {
 
 /// Today's header chip: the tile, the status and how long it holds, and a chevron.
 struct NoopActivityStatusChip: View {
+    /// Bevel's measured 43 pt, plus the point two lines of this type need. The capsule beside it uses
+    /// the same, and both grow together with larger text.
+    static let height: CGFloat = 44
+
     let state: NoopActivityStatusState
     let action: () -> Void
 
@@ -144,8 +156,8 @@ struct NoopActivityStatusChip: View {
                     .foregroundStyle(NoopHTMLColor.faint)
                     .padding(.trailing, 6)
             }
-            .padding(4)
-            .frame(height: 43)
+            .padding(.horizontal, 4).padding(.vertical, 2)
+            .frame(minHeight: NoopActivityStatusChip.height)
             .background(Color.white.opacity(0.06), in: Capsule())
             .overlay(Capsule().strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
             .contentShape(Capsule())
@@ -203,8 +215,6 @@ struct NoopActivityStatusSheet: View {
             .overlay(Capsule().strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
             .opacity(choice == .active ? 0.55 : 1)
 
-            Spacer(minLength: 0)
-
             NoopActionButton(title: "Update") {
                 var next = NoopActivityStatusState(status: choice, until: nil)
                 if choice != .active, keep != .untilChanged {
@@ -215,7 +225,7 @@ struct NoopActivityStatusSheet: View {
                 NoopHaptics.play(.save)
                 dismiss()
             }
-            .padding(.bottom, 28)
+            .padding(.top, 12).padding(.bottom, 28)
         }
         .padding(.horizontal, 20)
         .onAppear {
@@ -246,7 +256,7 @@ struct NoopActivityStatusSheet: View {
                 }
                 .frame(width: 22, height: 22)
             }
-            .padding(.horizontal, 12).frame(height: 66)
+            .padding(.horizontal, 12).padding(.vertical, 10).frame(minHeight: 66)
             .background(Color.white.opacity(on ? 0.09 : 0.045), in: RoundedRectangle(cornerRadius: 33, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 33, style: .continuous)
                 .strokeBorder(Color.white.opacity(on ? 0.16 : 0.06), lineWidth: 0.75))

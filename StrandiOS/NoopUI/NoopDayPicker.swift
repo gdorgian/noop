@@ -29,7 +29,8 @@ struct NoopDayPill: View {
                     .lineLimit(1).minimumScaleFactor(0.8)
                     .foregroundStyle(NoopHTMLColor.ink)
                     .contentTransition(.numericText(countsDown: offset > 0))
-                    .frame(width: 110, height: 28)
+                    .padding(.horizontal, 10)
+                    .frame(minWidth: 110, minHeight: 28)
                     .background(Color.white.opacity(0.14), in: Capsule())
                     .contentShape(Capsule())
             }
@@ -43,10 +44,12 @@ struct NoopDayPill: View {
     }
 
     static func label(_ date: Date, offset: Int) -> String {
-        if offset == 0 { return "TODAY" }
-        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("EEE MMM d")
-        return f.string(from: date).uppercased()
+        offset == 0 ? "TODAY" : dayFormatter.string(from: date).uppercased()
     }
+
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("EEE MMM d"); return f
+    }()
 
     private func arrow(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button {
@@ -55,7 +58,7 @@ struct NoopDayPill: View {
         } label: {
             Image(systemName: symbol).font(.system(size: 13, weight: .heavy))
                 .foregroundStyle(enabled ? NoopHTMLColor.ink : NoopHTMLColor.chevronDim)
-                .frame(width: 28, height: 28)
+                .frame(minWidth: 28, minHeight: 28)
                 .noopHitTarget()
         }
         .buttonStyle(NoopHTMLPressStyle())
@@ -72,38 +75,45 @@ struct NoopDaySwipe: ViewModifier {
     @Binding var offset: Int
     var maxBack = 365
 
-    @State private var dragX: CGFloat = 0
-    @State private var tracking: Bool?
+    /// The live drag, which the system clears itself when a drag is cancelled (the scroll view takes
+    /// over, the app leaves the screen), so the header can never be left part-way across.
+    @GestureState private var drag: (x: CGFloat, horizontal: Bool?) = (0, nil)
+    /// Where the header settles from once the finger lifts.
+    @State private var settle: CGFloat = 0
+
+    private func reach(_ width: CGFloat) -> CGFloat {
+        let next = offset + (width > 0 ? 1 : -1)
+        return width * (next >= 0 && next <= maxBack ? 0.9 : 0.22)
+    }
 
     func body(content: Content) -> some View {
+        let x = drag.x + settle
         content
-            .offset(x: dragX)
-            .opacity(1 - min(0.6, abs(dragX) / 500))
+            .offset(x: x)
+            .opacity(1 - min(0.6, abs(x) / 500))
             .simultaneousGesture(DragGesture(minimumDistance: 14)
-                .onChanged { g in
-                    if tracking == nil {
-                        tracking = abs(g.translation.width) > abs(g.translation.height) * 1.4
+                .updating($drag) { g, state, _ in
+                    if state.horizontal == nil {
+                        state.horizontal = abs(g.translation.width) > abs(g.translation.height) * 1.4
                     }
-                    guard tracking == true else { return }
-                    let next = offset + (g.translation.width > 0 ? 1 : -1)
-                    let open = next >= 0 && next <= maxBack
-                    dragX = g.translation.width * (open ? 0.9 : 0.22)
+                    state.x = state.horizontal == true ? reach(g.translation.width) : 0
                 }
                 .onEnded { g in
-                    defer { tracking = nil }
-                    guard tracking == true else { return }
+                    guard abs(g.translation.width) > abs(g.translation.height) * 1.4 else { return }
+                    // The live drag clears in this same update; carry its position over so nothing jumps.
+                    settle = reach(g.translation.width)
                     let w = g.predictedEndTranslation.width
                     let next = offset + (w > 0 ? 1 : -1)
                     guard abs(w) > 90, next >= 0, next <= maxBack else {
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { dragX = 0 }
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { settle = 0 }
                         return
                     }
                     let away: CGFloat = w > 0 ? 260 : -260
                     NoopHaptics.play(.tick)
-                    withAnimation(.easeIn(duration: 0.13)) { dragX = away } completion: {
+                    withAnimation(.easeIn(duration: 0.13)) { settle = away } completion: {
                         offset = next
-                        dragX = -away
-                        withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) { dragX = 0 }
+                        settle = -away
+                        withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) { settle = 0 }
                     }
                 })
     }
@@ -125,9 +135,15 @@ struct NoopDayCalendarSheet: View {
     /// The ring for a day, or nil.
     let ring: (Date) -> NoopDayRing?
 
-    /// Tall enough for a six-week month.
-    static let height: CGFloat = 545
+    /// A first guess at the sheet's height; the sheet then sizes itself to the month it shows.
+    static let height: CGFloat = 560
     private static let rowHeight: CGFloat = 62
+    private static let monthFormatter: DateFormatter = {
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMM y"); return f
+    }()
+    private static let fullFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateStyle = .full; return f
+    }()
 
     @Environment(\.dismiss) private var dismiss
     @State private var month: Date = Calendar.current.startOfDay(for: Date())
@@ -185,14 +201,13 @@ struct NoopDayCalendarSheet: View {
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 4) {
                 ForEach(Array(cells.enumerated()), id: \.offset) { _, day in
-                    if let day { cell(day) } else { Color.clear.frame(height: Self.rowHeight) }
+                    if let day { cell(day) } else { Color.clear.frame(minHeight: Self.rowHeight) }
                 }
             }
             .id(month)
             .transition(.asymmetric(insertion: .move(edge: turn).combined(with: .opacity),
                                     removal: .move(edge: turn == .trailing ? .leading : .trailing).combined(with: .opacity)))
-            .frame(maxHeight: .infinity, alignment: .top)
-            .clipped()
+            .padding(.bottom, 16)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 20).onEnded { g in
                 guard abs(g.translation.width) > 50, abs(g.translation.width) > abs(g.translation.height) else { return }
@@ -205,7 +220,7 @@ struct NoopDayCalendarSheet: View {
     }
 
     private var monthTitle: String {
-        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMM y"); return f.string(from: month)
+        Self.monthFormatter.string(from: month)
     }
 
     private var weekdaySymbols: [String] {
@@ -275,7 +290,7 @@ struct NoopDayCalendarSheet: View {
                 }
                 .frame(width: 22, height: 22)
             }
-            .frame(maxWidth: .infinity).frame(height: Self.rowHeight)
+            .frame(maxWidth: .infinity).frame(minHeight: Self.rowHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(NoopHTMLPressStyle())
@@ -285,7 +300,6 @@ struct NoopDayCalendarSheet: View {
     }
 
     private func dayLabel(_ day: Date, _ r: NoopDayRing?) -> String {
-        let f = DateFormatter(); f.dateStyle = .full
-        return f.string(from: day) + (r.map { ", \(Int(($0.fill * 100).rounded())) percent" } ?? ", no reading")
+        Self.fullFormatter.string(from: day) + (r.map { ", \(Int(($0.fill * 100).rounded())) percent" } ?? ", no reading")
     }
 }
