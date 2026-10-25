@@ -429,6 +429,14 @@ final class AppModel: ObservableObject {
             // Keep the battery night-guard's learned bedtime warm off the same signal (throttled inside).
             self?.refreshHabitualMidsleep()
         }.store(in: &hrCancellables)
+        #if os(iOS)
+        // Aura's own notifications re-plan from the settled days: the morning read, a week of bedtime
+        // nudges, a new best, the week and the backup reminder (`AuraNotices`).
+        repo.$days.debounce(for: .seconds(3), scheduler: DispatchQueue.main).sink { [weak self] _ in
+            guard let self else { return }
+            Task { await AuraNotices.refresh(repo: self.repo) }
+        }.store(in: &hrCancellables)
+        #endif
         // Re-arm the strap's firmware alarm once the connection has SETTLED — not the instant it (re)bonds.
         // A smart-alarm time changed while the strap was away never reached it , the send is gated on bond
         // , so the strap kept the OLD time and fired at it (#59).

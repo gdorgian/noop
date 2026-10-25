@@ -172,11 +172,16 @@ enum DataBackup {
     /// cap the restore checks counts the DECOMPRESSED stream, so the zip's own size says nothing about
     /// whether it can be read back. (#1807)
     private static func exportOutcome(_ dest: URL, dbURL: URL) -> BackupResult {
+        // Any finished export counts as a backup for the "only on this phone" reminder (`AuraNotices`).
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastExportKey)
         let attrs = try? FileManager.default.attributesOfItem(atPath: dbURL.path)
         guard let bytes = (attrs?[.size] as? NSNumber)?.int64Value,
               bytes > maxBackupSQLiteBytes else { return .exported(dest) }
         return .exportedOversize(dest, bytes: bytes, limit: maxBackupSQLiteBytes)
     }
+
+    /// Seconds since 1970 of the last finished `.noopbak` export, manual or automatic.
+    static let lastExportKey = "backup.lastExportAt"
 
     /// The smallest a real database entry can be: SQLite's own file header is exactly this long, so
     /// anything shorter cannot be a database whatever else it looks like.
