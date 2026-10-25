@@ -82,17 +82,29 @@ struct NoopTodayTileView: View {
 
     private var seeded: Bool { day == nil }
 
+    @State private var sheetOpen = false
+
     var body: some View {
+        // Read again each minute, so Bedtime's countdown and the last reading's time stay true.
+        TimelineView(.everyMinute) { _ in pill }
+            .sheet(isPresented: $sheetOpen) {
+                NoopTodayTileSheet(tile: tile, navigation: navigation, day: day, liveBPM: liveBPM, weights: weights)
+                    .noopFloatingSheet(height: 560)
+            }
+            .task(id: tile == .weight ? repo.refreshSeq : -1) {
+                guard tile == .weight, !seeded, let store = await repo.storeHandle() else { return }
+                weights = ((try? await store.bodyMeasurements(deviceId: repo.deviceId)) ?? [])
+                    .filter { $0.kind == .weight }.sorted { $0.ts < $1.ts }
+            }
+    }
+
+    private var pill: some View {
         let face = face
-        NoopSlotPill(symbol: tile.symbol, tint: face.tint ?? tile.tint, title: face.title, subtitle: face.subtitle,
-                     accessory: face.accessory, accessibility: "\(tile.section.title), \(face.title), \(face.subtitle)") {
+        return NoopSlotPill(symbol: tile.symbol, tint: face.tint ?? tile.tint, title: face.title, subtitle: face.subtitle,
+                     accessory: face.accessory, accessibility: "\(tile.section.title), \(face.title), \(face.subtitle)",
+                     beat: face.beat, dimmed: face.title == "—", glow: face.glow) {
             NoopHaptics.play(.tick)
-            open()
-        }
-        .task(id: tile == .weight ? repo.refreshSeq : -1) {
-            guard tile == .weight, !seeded, let store = await repo.storeHandle() else { return }
-            weights = ((try? await store.bodyMeasurements(deviceId: repo.deviceId)) ?? [])
-                .filter { $0.kind == .weight }.sorted { $0.ts < $1.ts }
+            sheetOpen = true
         }
     }
 
@@ -101,6 +113,8 @@ struct NoopTodayTileView: View {
         var subtitle: String
         var accessory: NoopSlotPill.Accessory = .chevron
         var tint: (Color, Color)? = nil
+        var beat: Int? = nil
+        var glow = false
     }
 
     private var face: Face {
@@ -119,27 +133,11 @@ struct NoopTodayTileView: View {
         }
     }
 
-    private func open() {
-        switch tile {
-        case .heart: navigation.push(.heart)
-        case .effort: navigation.push(.strain)
-        case .steps: navigation.push(.day)
-        case .calories: navigation.push(.energy)
-        case .stress: navigation.push(.stress)
-        case .bedtime: navigation.push(.tonight)
-        case .debt: navigation.push(.debt)
-        case .workout: navigation.reset(to: .fitness)
-        case .weight: navigation.push(.fitnessBody)
-        case .cycle: navigation.reset(to: .you)
-        case .breathe: navigation.push(.breathe)
-        }
-    }
-
     // MARK: Faces
 
     private var heartFace: Face {
-        if seeded { return Face(title: "64 bpm", subtitle: "Heart rate", accessory: .live) }
-        if let liveBPM, liveBPM > 0 { return Face(title: "\(liveBPM) bpm", subtitle: "Heart rate", accessory: .live) }
+        if seeded { return Face(title: "64 bpm", subtitle: "Heart rate", accessory: .live, beat: 64) }
+        if let liveBPM, liveBPM > 0 { return Face(title: "\(liveBPM) bpm", subtitle: "Heart rate", accessory: .live, beat: liveBPM) }
         if let last = day?.dayHRPoints.last {
             let at = Date(timeIntervalSince1970: TimeInterval(last.ts))
             return Face(title: "\(Int(last.bpm.rounded())) bpm", subtitle: "At " + Self.time.string(from: at))
@@ -156,12 +154,11 @@ struct NoopTodayTileView: View {
         let low = Int((target.lowerBound * 100).rounded()), high = Int((target.upperBound * 100).rounded())
         let line = strain >= target.lowerBound * 100 && strain <= target.upperBound * 100 ? "On target"
             : strain < target.lowerBound * 100 ? "Target \(low)–\(high)" : "Past target"
-        return Face(title: "\(Int(strain.rounded()))", subtitle: line,
-                    accessory: .progress(strain / (target.upperBound * 100)))
+        return Face(title: "\(Int(strain.rounded()))", subtitle: line, accessory: .target(strain / 100, target))
     }
 
     private var stepsFace: Face {
-        if seeded { return Face(title: "6,240", subtitle: "Steps", accessory: .progress(6240 / 7900)) }
+        if seeded { return Face(title: "6,240", subtitle: "Steps", accessory: .progress(6240 / 7600)) }
         let today = Repository.localDayKey(Date())
         guard let steps = repo.days.last(where: { $0.day == today })?.steps else {
             return Face(title: "—", subtitle: "Steps today")
@@ -194,17 +191,19 @@ struct NoopTodayTileView: View {
     }
 
     private var bedtimeFace: Face {
-        if seeded { return Face(title: "22:40", subtitle: "Bedtime") }
-        guard let rest = day?.rest, rest.needMin > 0 else {
-            return Face(title: "—", subtitle: "After a night")
-        }
-        // The hour you usually wake, from the last week's nights; tonight's need counted back from it.
-        let wakes = rest.slots.compactMap { $0?.endDate }.map { Self.minuteOfDay($0) }.sorted()
-        guard !wakes.isEmpty else { return Face(title: "—", subtitle: "After a night") }
-        let wake = wakes[wakes.count / 2]
-        let bed = ((wake - Int(rest.needMin.rounded())) % 1440 + 1440) % 1440
+        guard let plan = NoopTodayTileSheet.bedtimePlan(day: day) else { return Face(title: "—", subtitle: "After a night") }
+        return bedFace(minuteOfDay: plan.bed)
+    }
+
+    /// Bedtime's face: the time, and in the last ninety minutes before it a countdown that lights up.
+    private func bedFace(minuteOfDay bed: Int) -> Face {
         let clock = Calendar.current.date(bySettingHour: bed / 60, minute: bed % 60, second: 0, of: Date()) ?? Date()
-        return Face(title: Self.time.string(from: clock), subtitle: "Bedtime")
+        let title = Self.time.string(from: clock)
+        let now = Self.minuteOfDay(Date())
+        let until = ((bed - now) % 1440 + 1440) % 1440
+        if until <= 90, until > 0 { return Face(title: title, subtitle: "In \(Self.duration(Double(until)))", glow: true) }
+        if until == 0 || until > 1440 - 120 { return Face(title: title, subtitle: "Time for bed", glow: true) }
+        return Face(title: title, subtitle: "Bedtime")
     }
 
     private var debtFace: Face {
