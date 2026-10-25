@@ -257,6 +257,18 @@ public enum LiftSetKind: String, Codable, CaseIterable, Sendable {
     case failure
 }
 
+/// A set read back with the start of the session it belongs to (`liftExerciseHistory`).
+public struct LiftHistorySet: Equatable, Sendable {
+    public var set: LiftSetRow
+    /// Unix seconds.
+    public var sessionStartTs: Int
+
+    public init(set: LiftSetRow, sessionStartTs: Int) {
+        self.set = set
+        self.sessionStartTs = sessionStartTs
+    }
+}
+
 /// One set. Stored as its own row rather than folded into the session, because per-exercise history
 /// ("what did I lift for this last time") has to be answerable from an index.
 public struct LiftSetRow: Equatable, Codable, Sendable {
@@ -777,6 +789,24 @@ extension WhoopStore {
                 WHERE sessionId = ? AND exercise = ? AND (reps IS NULL OR reps <> 0)
                 ORDER BY ord ASC
                 """, arguments: [sessionId, exercise]).map(LiftSetRow.decode)
+        }
+    }
+
+    /// Every performed set of one exercise, across every session, oldest session first and in the
+    /// order each session did them — with the session's start, so a record can say when it was set.
+    ///
+    /// Warm-ups are included (the caller decides what counts); sets with zero reps were never performed
+    /// (`LiftMetrics.isPerformed`) and are not. Served by idx_liftSet_device_exercise.
+    public func liftExerciseHistory(deviceId: String, exercise: String) async throws -> [LiftHistorySet] {
+        try syncRead { db in
+            try Row.fetchAll(db, sql: """
+                SELECT s.*, sess.startTs AS sessionStartTs FROM liftSet s
+                JOIN liftSession sess ON sess.id = s.sessionId
+                WHERE s.deviceId = ? AND s.exercise = ? AND (s.reps IS NULL OR s.reps <> 0)
+                ORDER BY sess.startTs ASC, s.ord ASC
+                """, arguments: [deviceId, exercise]).map {
+                LiftHistorySet(set: LiftSetRow.decode($0), sessionStartTs: $0["sessionStartTs"])
+            }
         }
     }
 
