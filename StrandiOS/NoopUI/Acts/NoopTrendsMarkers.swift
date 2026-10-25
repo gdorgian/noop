@@ -176,6 +176,8 @@ struct NoopMarkerRow: View {
     let descriptor: MetricDescriptor
     let reading: NoopMarkerReading?
     let loaded: Bool
+    /// Drawn as a raised card, as on the score pages; Trends' own Markers keep the flat card.
+    var raised = false
 
     private var metric: NoopMetric { NoopMetric(marker: descriptor) }
 
@@ -203,8 +205,7 @@ struct NoopMarkerRow: View {
         }
         .padding(.horizontal, NoopSpace.m)
         .padding(.vertical, 15)
-        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+        .modifier(NoopMarkerRowCard(raised: raised))
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
@@ -514,6 +515,19 @@ private struct NoopMarkerTile: View {
             } else {
                 Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1).frame(maxHeight: .infinity)
             }
+        }
+    }
+}
+
+private struct NoopMarkerRowCard: ViewModifier {
+    let raised: Bool
+    func body(content: Content) -> some View {
+        if raised {
+            content.noopRaisedCard(radius: NoopRadius.card)
+        } else {
+            content
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
         }
     }
 }

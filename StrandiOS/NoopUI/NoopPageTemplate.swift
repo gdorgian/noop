@@ -105,7 +105,7 @@ struct NoopTrendsList: View {
                     Button {
                         navigation.metricSheet = NoopMetricSheetRequest(metricID: id, group: "marker", peers: shown)
                     } label: {
-                        NoopMarkerRow(descriptor: d, reading: store.readings[id], loaded: store.loaded)
+                        NoopMarkerRow(descriptor: d, reading: store.readings[id], loaded: store.loaded, raised: true)
                     }
                     .buttonStyle(NoopHTMLPressStyle())
                 }
@@ -136,10 +136,11 @@ struct NoopPageBackdrop: View {
     var height: CGFloat = 520
 
     var body: some View {
-        NoopSlotClock { t, _ in
+        NoopSlotClock { t, reveal in
             GeometryReader { g in
                 Rectangle().colorEffect(ShaderLibrary.noopBackdrop(
                     .float2(g.size), .float(Float(t)), .color(theme.sky), .color(theme.ridge), .float(theme.stars ? 1 : 0)))
+                    .opacity(reveal)
             }
         }
         .frame(height: height)
