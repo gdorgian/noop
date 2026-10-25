@@ -38,6 +38,9 @@ enum HRCoachingHapticOwner: Equatable {
 /// in later milestones.
 @MainActor
 final class AppModel: ObservableObject {
+    /// How long after launch the analysis backstop first runs (see its loop).
+    static let backstopLaunchDelayNs: UInt64 = 60_000_000_000
+
     /// The live instance, so an AppIntent (Shortcuts) can reach the bonded strap rather than spinning
     /// up a dead second AppModel (which would start a duplicate BLE engine and never buzz). Set in
     /// init(); `weak` so an intent fired while NOOP is closed sees nil and asks the user to open it. (#42)
@@ -559,6 +562,15 @@ final class AppModel: ObservableObject {
             // history and repair sleep rejected by unmatched WRIST_OFF in one pass. Both persisted flags
             // describe that shared pass; either pending flag triggers it.
             await self.intelligence.runEffortRescoreIfNeeded()
+            // The backstop's first tick waits a minute. At launch the strap's own sync re-scores the
+            // new data straight away (a forced pass), and earlier scores are already stored, so an
+            // immediate backstop only scored the same 21 days a second time while the app was opening:
+            // half of a cold start's CPU on device (profiled 25 Oct 2026). Nothing is skipped; it runs
+            // a minute later, then on its usual cadence.
+            // The cheap signals that follow each pass read the scores already stored, so You has them
+            // from the start rather than after the wait.
+            await self.refreshV5Signals()
+            try? await Task.sleep(nanoseconds: Self.backstopLaunchDelayNs)
             while !Task.isCancelled {
                 // #547 RE-POLLUTION: a sync since the last tick may have armed a re-heal (its ingest gate
                 // dropped bad-clock records). `runTimestampHealIfNeeded` honours the pending flag even after
