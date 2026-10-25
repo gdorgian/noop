@@ -143,6 +143,42 @@ public enum LiftRecords {
         }
     }
 
+    /// One record set at a moment in the past.
+    public struct Event: Equatable, Sendable {
+        public let kind: Kind
+        public let set: LiftSetRow
+        public let sessionStartTs: Int
+    }
+
+    /// Every per-set record broken by a session that started in `[fromTs, toTs)` — each one counted when
+    /// it happened, even if a later set beat it again. Judged the way a live session judges it: against
+    /// everything before that session, so a first-ever session breaks nothing. `history` is one
+    /// exercise's sets across sessions, oldest first (`WhoopStore.liftExerciseHistory`).
+    public static func events(in history: [LiftHistorySet], fromTs: Int, toTs: Int) -> [Event] {
+        var out: [Event] = []
+        var before: [LiftHistorySet] = []
+        var order: [String] = []
+        var bySession: [String: [LiftHistorySet]] = [:]
+        for h in history {
+            if bySession[h.set.sessionId] == nil { order.append(h.set.sessionId) }
+            bySession[h.set.sessionId, default: []].append(h)
+        }
+        for id in order {
+            let sets = bySession[id] ?? []
+            guard let start = sets.first?.sessionStartTs else { continue }
+            if start >= fromTs, start < toTs {
+                var running = before
+                for h in sets {
+                    let kinds = broken(by: h.set, against: exercise(running))
+                    out += kinds.map { Event(kind: $0, set: h.set, sessionStartTs: start) }
+                    running.append(h)
+                }
+            }
+            before += sets
+        }
+        return out
+    }
+
     /// Estimated max first, then weight, then reps — the order a lifter ranks two sets in.
     private static func rank(_ s: LiftSetRow) -> (Double, Double, Int) {
         (LiftMetrics.estimatedOneRepMaxKg(weightKg: s.weightKg, reps: s.reps) ?? 0, s.weightKg ?? 0, s.reps ?? 0)

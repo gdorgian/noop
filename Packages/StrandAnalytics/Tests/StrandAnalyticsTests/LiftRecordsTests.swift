@@ -53,6 +53,17 @@ final class LiftRecordsTests: XCTestCase {
         XCTAssertEqual(LiftRecords.broken(by: set("now", 500, 200, 1, warm: true).set, against: before), [])
     }
 
+    func testEventsCountRecordsWhenTheyHappenedEvenIfBeatenLater() {
+        let history = [
+            set("a", 100, 80, 8),                         // first session: nothing to beat
+            set("b", 200, 85, 5),                         // heaviest
+            set("c", 300, 90, 3), set("c", 300, 92.5, 2), // heaviest twice in one session
+        ]
+        let october = LiftRecords.events(in: history, fromTs: 150, toTs: 350)
+        XCTAssertEqual(october.filter { $0.kind == .heaviestWeight }.map(\.set.weightKg), [85, 90, 92.5])
+        XCTAssertTrue(LiftRecords.events(in: history, fromTs: 0, toTs: 150).isEmpty, "a first session breaks nothing")
+    }
+
     func testAFirstTimeBeatsNothing() {
         XCTAssertEqual(LiftRecords.broken(by: set("now", 500, 100, 5).set, against: .empty), [])
     }

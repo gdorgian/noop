@@ -97,7 +97,33 @@ struct NoopFitnessHome: View {
             .padding(.bottom, weekOffset == 0 ? 14 : 10)
         if weekOffset == 0, !editing {
             NoopFitnessStreakRow(sessions: s.history.sessions, now: s.history.now)
+                .padding(.bottom, reviewReady(s) == nil ? 22 : 10)
+            if let last = reviewReady(s) {
+                Button {
+                    navigation.fitnessReportStart = last
+                    navigation.push(.fitnessReport)
+                } label: {
+                    HStack(spacing: 13) {
+                        Image(systemName: "sparkles").font(.system(size: 16, weight: .semibold)).foregroundStyle(NoopHTMLColor.voltInk)
+                            .frame(width: 40, height: 40).background(NoopHTMLColor.volt, in: Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Your \(last.formatted(.dateTime.month(.wide))) review")
+                                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("Workouts, records and where the sets went")
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(NoopHTMLColor.chevronDim)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 12)
+                    .background(LinearGradient(colors: [NoopHTMLColor.volt.opacity(0.12), NoopHTMLColor.card],
+                                               startPoint: .leading, endPoint: .trailing),
+                                in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.volt.opacity(0.2), lineWidth: 0.6))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
                 .padding(.bottom, 22)
+            }
         }
         if weekOffset != 0 {
             Button { withAnimation(NoopMotion.swap) { weekOffset = 0; selectedDay = Calendar.current.startOfDay(for: Date()) } } label: {
@@ -125,6 +151,17 @@ struct NoopFitnessHome: View {
             }
             .buttonStyle(NoopHTMLPressStyle())
         }
+    }
+
+    /// In the first week of a month, last month's review — when last month had any training to review.
+    private func reviewReady(_ s: NoopFitnessSnapshot) -> Date? {
+        let cal = Calendar.current
+        guard cal.component(.day, from: s.history.now) <= 7,
+              let thisMonth = cal.dateInterval(of: .month, for: s.history.now)?.start,
+              let last = cal.date(byAdding: .month, value: -1, to: thisMonth),
+              s.history.sessions.contains(where: { cal.isDate($0.start, equalTo: last, toGranularity: .month) })
+        else { return nil }
+        return last
     }
 
     private func beginEditing() {

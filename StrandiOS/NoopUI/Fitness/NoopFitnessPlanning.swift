@@ -460,6 +460,21 @@ struct NoopFitnessCalendarScreen: View {
                 }
                 let cols = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
                 monthSummary(sessions)
+                Button {
+                    navigation.fitnessReportStart = month
+                    navigation.push(.fitnessReport)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles").font(.system(size: 13, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                        Text("Review \(month.formatted(.dateTime.month(.wide)))")
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(NoopHTMLColor.chevronDim)
+                    }
+                    .padding(.horizontal, 16).frame(minHeight: 48)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
                 HStack(spacing: 8) {
                     Menu {
                         ForEach(Metric.allCases, id: \.self) { m in

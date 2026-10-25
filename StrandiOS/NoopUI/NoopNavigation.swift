@@ -136,7 +136,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case fitnessDetail = "fitness-detail", fitnessMuscles = "fitness-muscles", fitnessEdit = "fitness-edit"
     case fitnessRoutine = "fitness-routine", fitnessCalendar = "fitness-calendar"
     case fitnessRoutineEdit = "fitness-routine-edit"
-    case fitnessBody = "fitness-body"
+    case fitnessBody = "fitness-body", fitnessReport = "fitness-report"
 
     var id: String { rawValue }
 
@@ -159,7 +159,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles: .lift
         case .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit, .fitnessRoutine, .fitnessCalendar,
-             .fitnessRoutineEdit, .fitnessBody: .fitness
+             .fitnessRoutineEdit, .fitnessBody, .fitnessReport: .fitness
         }
     }
 
@@ -188,7 +188,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .session, .pick, .ready, .live, .intervals, .detail, .across,
              .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles, .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit,
-             .fitnessRoutine, .fitnessCalendar, .fitnessRoutineEdit, .fitnessBody:
+             .fitnessRoutine, .fitnessCalendar, .fitnessRoutineEdit, .fitnessBody, .fitnessReport:
             .fitness
         }
     }
@@ -673,6 +673,8 @@ final class NoopNavigation: ObservableObject {
     @Published var fitnessRoutineID: String?
     /// The exercise a strength detail page opens on; nil shows every muscle.
     @Published var fitnessExercise: String?
+    /// The month the review page opens on; consumed when it appears. Nil opens this month.
+    @Published var fitnessReportStart: Date?
     /// A lift opened from the shared workout history, by its start time (the saved workout row and the
     /// lift session share it). Consumed by `lift-detail` when it loads.
     @Published var liftDetailStartTs: Int?
@@ -1287,6 +1289,7 @@ extension NoopRoute {
         case .fitnessCalendar: "Calendar"
         case .fitnessRoutineEdit: "Edit routine"
         case .fitnessBody: "Body"
+        case .fitnessReport: "Review"
         }
     }
 }
