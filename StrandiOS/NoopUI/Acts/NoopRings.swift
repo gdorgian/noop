@@ -409,28 +409,28 @@ private struct NoopDialRings: View {
     }
 
     private func dialBody(_ title: String, fill: Double, text: String?, percent: Bool, color: Color) -> some View {
-        // WHOOP's proportions, the same as its score pages scaled down: a flat-ended arc about a
-        // sixteenth of the ring's width on a grey track, a heavy figure, and a small tracked label.
-        VStack(spacing: 10) {
+        // WHOOP's Home, measured on a 440 pt screen: an 88 pt ring with a 6 pt rounded arc on a grey
+        // track, a 28 pt heavy figure, and an 11 pt tracked label just under the ring.
+        VStack(spacing: 8) {
             ZStack {
                 Circle().stroke(Color(hex: 0x3A4148), lineWidth: 6)
                 NoopSlotClock { _, reveal in
                     Circle().trim(from: 0, to: min(1, fill * NoopRingValues.spring(reveal)))
-                        .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .butt))
+                        .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 1) {
-                    Text(text ?? "--").font(NoopHTMLFont.sans(26, weight: .heavy)).monospacedDigit()
-                    if percent { Text("%").font(NoopHTMLFont.sans(NoopType.caption, weight: .heavy)) }
+                    Text(text ?? "--").font(NoopHTMLFont.sans(28, weight: .heavy)).monospacedDigit()
+                    if percent { Text("%").font(NoopHTMLFont.sans(17, weight: .heavy)) }
                 }
                 .foregroundStyle(text == nil ? NoopHTMLColor.faint : NoopHTMLColor.ink)
             }
             .padding(3)
-            .frame(width: 96, height: 96)
+            .frame(width: 88, height: 88)
             HStack(spacing: 4) {
                 Text(title.uppercased())
-                    .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .bold))
-                    .tracking(1.3)
+                    .font(NoopHTMLFont.sans(11, weight: .bold))
+                    .tracking(2)
                     .foregroundStyle(NoopHTMLColor.ink)
                 Image(systemName: "chevron.right").font(.system(size: 9, weight: .heavy)).foregroundStyle(NoopHTMLColor.muted)
             }
