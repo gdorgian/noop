@@ -1342,6 +1342,13 @@ final class Repository: ObservableObject {
         return parts.joined(separator: "|")
     }
 
+    /// The strap's motion magnitude averaged per UTC minute over the physiology read ids (`DailyRhythm`).
+    func motionMinuteMeans(from: Int, to: Int) async -> [(minute: Int, mean: Double)] {
+        guard let store = await ensureStore() else { return [] }
+        return (try? await store.dynAccelMinuteMeans(deviceIds: rawPhysiologyReadIds(store: store),
+                                                     from: from, to: to)) ?? []
+    }
+
     func hrSamples(from: Int, to: Int, limit: Int = 8000) async -> [HRSample] {
         guard let store = await ensureStore() else { return [] }
         // UNION the active strap + canonical so the HR trend renders whether the landed day's raw sits under

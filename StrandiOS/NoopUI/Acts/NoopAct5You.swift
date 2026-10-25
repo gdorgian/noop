@@ -103,6 +103,7 @@ struct NoopAct5Screens: View {
         "Language": "English", "Svea’s manner": "Plain"
     ]
     @State private var baselinesRestarting = false
+    @State var showRhythm = false
     @State private var settingsSearch = ""
     @State private var showingComingLater = false
     @State private var actionNotice: String?
@@ -145,6 +146,7 @@ struct NoopAct5Screens: View {
             default: youScreen
             }
         }
+        .sheet(isPresented: $showRhythm) { NoopDailyRhythmScreen() }
         .sheet(isPresented: $showReleaseNotes) {
             WhatsNewView(presentation: .bell) {
                 showReleaseNotes = false
@@ -646,6 +648,8 @@ private extension NoopAct5Screens {
 
                 dividedCard {
                     copyRow("Your zones", detail: "five bands for your effort", symbol: "chart.bar", tint: Self.blush, value: "5") { navigation.push(.zones) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    copyRow("Daily rhythm", detail: "the shape of your days, from your strap", symbol: "sun.and.horizon", tint: Self.blush) { showRhythm = true }
                 }
             }
             .padding(.top, 18)
@@ -1187,10 +1191,11 @@ private extension NoopAct5Screens {
                            plus: { profile.waistCm = profile.waistCm == 0 ? 80 : min(160, profile.waistCm + (liveImperial ? 2.54 : 1)) })
                 Divider().overlay(NoopHTMLColor.border)
                 // No observed maximum is stored, so the row speaks only of an override the wearer set.
-                stepperRow("Maximum heart rate", detail: profile.hrMaxOverride > 0 ? "manual override" : "",
+                stepperRow("Maximum heart rate",
+                           detail: profile.hrMaxOverride > 0 ? (profile.hrMaxSource == "measured" ? "held for 30 seconds, measured on you" : "manual override") : "",
                            value: profile.hrMaxOverride > 0 || profileConfirmed ? "\(profile.hrMax) bpm" : "\u{2014}",
-                           minus: { profile.hrMaxOverride = max(100, profile.hrMax - 1) },
-                           plus: { profile.hrMaxOverride = min(220, profile.hrMax + 1) })
+                           minus: { profile.setManualMax(max(100, profile.hrMax - 1)) },
+                           plus: { profile.setManualMax(min(230, profile.hrMax + 1)) })
                 Divider().overlay(NoopHTMLColor.border)
                 copyRow("Your zones", detail: "five bands, derived from the two anchors above", value: "5 zones") { navigation.push(.zones) }
                     .frame(height: 92)
