@@ -36,6 +36,9 @@ struct NoopTrendsHero: View {
         return min(max(0.3 + (yearsDifference ?? 0) / 12, 0), 1)
     }
 
+    /// Which drawing holds the age: the orb, tree rings, or a breathing field. Swiped sideways.
+    @AppStorage("noop.hero.trends") private var style = 0
+
     var body: some View {
         ZStack(alignment: .top) {
             paceCard
@@ -43,6 +46,23 @@ struct NoopTrendsHero: View {
             Color.clear
                 .frame(height: orbSide)
                 .overlay { orb.frame(width: orbSide, height: orbSide) }
+                .simultaneousGesture(DragGesture(minimumDistance: 30).onEnded { g in
+                    guard abs(g.translation.width) > 60, abs(g.translation.width) > abs(g.translation.height) * 1.6 else { return }
+                    withAnimation(.easeInOut(duration: 0.35)) { style = (style + (g.translation.width < 0 ? 1 : 2)) % 3 }
+                    NoopHaptics.play(.pass)
+                })
+            HStack(spacing: 6) {
+                ForEach(0..<3, id: \.self) { i in
+                    Capsule().fill(Color.white.opacity(i == style ? 0.85 : 0.22)).frame(width: i == style ? 16 : 6, height: 6)
+                }
+            }
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: style)
+            .padding(.top, orbSide * 0.935)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Style \(style + 1) of 3")
+            .accessibilityAdjustableAction { dir in
+                if dir == .increment { style = min(2, style + 1) } else if dir == .decrement { style = max(0, style - 1) }
+            }
         }
     }
 
@@ -51,7 +71,14 @@ struct NoopTrendsHero: View {
     private var orb: some View {
         let palette = NoopAuraOrbModel.palette(colorScore)
         return ZStack {
-            NoopAuraOrb(shapeScore: shapeScore, colorScore: colorScore, paused: bodyAge == nil, drift: 0.55)
+            Group {
+                switch style {
+                case 1: NoopAgeTreeRings(bodyAge: bodyAge, chronoAge: chronoAge, palette: palette)
+                case 2: NoopAgeField(palette: palette, shapeScore: shapeScore)
+                default: NoopAuraOrb(shapeScore: shapeScore, colorScore: colorScore, paused: bodyAge == nil, drift: 0.55)
+                }
+            }
+            .transition(.opacity)
             VStack(spacing: 6) {
                 Text(bodyAge.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "\u{2014}")
                     .font(NoopHTMLFont.outfit(50 * typeScale, weight: .semibold))
