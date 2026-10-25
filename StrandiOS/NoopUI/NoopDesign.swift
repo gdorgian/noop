@@ -390,18 +390,19 @@ struct NoopBatteryChip: View {
         } label: {
             HStack(spacing: 7) {
                 // CSS uses gap:1 plus a 1pt left margin on the nub.
-                HStack(spacing: 2) {
+                // Inside Today's header capsule the battery is drawn at the eye-height of the icons
+                // beside it (25 Oct 2026); everywhere else at its original size.
+                let k: CGFloat = bare ? 1.23 : 1
+                let outline = isLow ? tint : NoopHTMLColor.ink.opacity(bare ? 0.6 : 0.4)
+                HStack(spacing: 2 * k) {
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3.4)
-                            .strokeBorder(
-                                isLow ? tint : NoopHTMLColor.ink.opacity(0.4),
-                                lineWidth: 1
-                            )
-                            .frame(width: 21, height: 11)
-                        RoundedRectangle(cornerRadius: 2.2)
+                        RoundedRectangle(cornerRadius: 3.4 * k)
+                            .strokeBorder(outline, lineWidth: bare ? 1.2 : 1)
+                            .frame(width: 21 * k, height: 11 * k)
+                        RoundedRectangle(cornerRadius: 2.2 * k)
                             .fill(tint)
-                            .frame(width: 18.6 * fillFraction, height: 8.6)
-                            .offset(x: 1.2)
+                            .frame(width: 18.6 * k * fillFraction, height: 8.6 * k)
+                            .offset(x: 1.2 * k)
                     }
                     UnevenRoundedRectangle(
                         topLeadingRadius: 0,
@@ -409,8 +410,8 @@ struct NoopBatteryChip: View {
                         bottomTrailingRadius: 1.5,
                         topTrailingRadius: 1.5
                     )
-                    .fill(isLow ? tint : NoopHTMLColor.ink.opacity(0.4))
-                    .frame(width: 1.6, height: 4.4)
+                    .fill(outline)
+                    .frame(width: 1.6 * k, height: 4.4 * k)
                 }
                 Text(percent.map { "\($0)%" } ?? "\u{2014}")
                     .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))

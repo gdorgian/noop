@@ -993,7 +993,9 @@ struct NoopAct2Screens: View {
                     Rectangle().fill(NoopHTMLColor.borderStrong).frame(width: 0.5, height: 20)
                     Button { navigation.push(.inbox) } label: {
                         ZStack(alignment: .topTrailing) {
-                            NoopCanonicalGlyph(name: .bell, size: NoopControlSize.small.icon, color: NoopHTMLColor.inkSoft)
+                            // Sized by eye-height to the status tile's figure and the battery (25 Oct 2026):
+                            // the bell's glyph sits inside its frame, so the frame is larger.
+                            NoopCanonicalGlyph(name: .bell, size: 21, color: NoopHTMLColor.ink.opacity(0.85))
                                 .frame(width: 36, height: 36)
                             if inboxUnreadCount > 0 {
                                 Text("\(min(inboxUnreadCount, 99))")
