@@ -24,7 +24,26 @@ struct RootTabView: View {
             }
         }
             .environmentObject(liveGlance)
-            .onAppear { liveGlance.bind(to: model.live) }
+            .onAppear {
+                liveGlance.bind(to: model.live)
+                // The banner's Pause/Resume does what the live screen's button does: the recorder and the
+                // shell's session clock move together.
+                LiveSessionControl.togglePause = { [weak model, weak navigation] in
+                    guard let model, model.activeWorkout != nil else { return }
+                    model.toggleWorkoutPause()
+                    navigation?.toggleSessionPause(at: Date())
+                }
+                #if DEBUG
+                // `--noop-start-session <sport>`: start a recorded session at launch, so the Live Activity's
+                // controls can be checked on a simulator without walking the picker.
+                let args = CommandLine.arguments
+                if let flag = args.firstIndex(of: "--noop-start-session"), model.activeWorkout == nil {
+                    let sport = args.indices.contains(flag + 1) ? args[flag + 1] : "Running"
+                    model.startWorkout(sport: sport)
+                    navigation.beginSession(at: model.activeWorkout?.start ?? Date())
+                }
+                #endif
+            }
             .onChange(of: router.requestedDestination) { _, destination in
                 guard let destination else { return }
                 route(destination)
@@ -40,6 +59,10 @@ struct RootTabView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .noopOpenCoachCard)) { _ in
                 navigation.reset(to: .coach)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .noopOpenWidgetLink)) { note in
+                guard let url = note.object as? URL, let link = WidgetLink(url: url) else { return }
+                openWidgetLink(link)
             }
             .onReceive(NotificationCenter.default.publisher(for: .noopDeleteAllLocalData)) { _ in
                 guard !resetInProgress else { return }
@@ -120,6 +143,23 @@ struct RootTabView: View {
         case .coach:
             navigation.reset(to: .coach)
         }
+    }
+
+    /// Open the screen a widget stands for, on a clean stack under its tab, so Back goes where the
+    /// screen's own chevron says. The live session only exists while one is recording; a stale Live
+    /// Activity tap lands on Fitness instead of an empty recorder.
+    private func openWidgetLink(_ link: WidgetLink) {
+        guard let route = NoopRoute(rawValue: link.route) else { return }
+        if route == .live, model.activeWorkout == nil {
+            navigation.reset(to: .fitness)
+            return
+        }
+        guard let parentName = link.parent, let parent = NoopRoute(rawValue: parentName), parent != route else {
+            navigation.reset(to: route)
+            return
+        }
+        navigation.reset(to: parent)
+        navigation.enter(route, from: parent)
     }
 
     private func consumeHomeScreenActionIfPossible() {

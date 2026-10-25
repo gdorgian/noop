@@ -16,6 +16,13 @@ public struct NoopWidgetFamilyDefinition: Identifiable, Hashable, Sendable {
         case liftSession
         case energy
         case rings
+        case sleep
+        case steps
+        case vitals
+        case weight
+        case workouts
+        case consistency
+        case goal
     }
 
     public let id: ID
@@ -84,6 +91,55 @@ public enum NoopWidgetFamilyRegistry {
             title: "Rings",
             detail: "recovery, effort and sleep seen at once",
             configurationKind: "NOOPRingsWidget",
+            isNew: true
+        ),
+        .init(
+            id: .sleep,
+            title: "Sleep",
+            detail: "last night against your need, stage by stage",
+            configurationKind: "SleepWidget",
+            isNew: true
+        ),
+        .init(
+            id: .steps,
+            title: "Steps",
+            detail: "today against your target, the week beside it",
+            configurationKind: "StepsWidget",
+            isNew: true
+        ),
+        .init(
+            id: .vitals,
+            title: "Vitals",
+            detail: "five overnight readings, each in or out of your zone",
+            configurationKind: "VitalsWidget",
+            isNew: true
+        ),
+        .init(
+            id: .weight,
+            title: "Weight",
+            detail: "the latest weigh-in and the trend it sits on",
+            configurationKind: "WeightWidget",
+            isNew: true
+        ),
+        .init(
+            id: .workouts,
+            title: "Workouts",
+            detail: "this week's sessions and the last one",
+            configurationKind: "WorkoutsWidget",
+            isNew: true
+        ),
+        .init(
+            id: .consistency,
+            title: "Consistency",
+            detail: "twelve weeks of training days, rest days included",
+            configurationKind: "ConsistencyWidget",
+            isNew: true
+        ),
+        .init(
+            id: .goal,
+            title: "Goal",
+            detail: "how far along, the verdict, and what today asks",
+            configurationKind: "GoalWidget",
             isNew: true
         ),
     ]
