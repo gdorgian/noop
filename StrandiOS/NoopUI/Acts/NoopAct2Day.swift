@@ -2881,20 +2881,8 @@ private struct Act2BackBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: action) {
-                ZStack {
-                    Circle().fill(Color.white.opacity(0.06))
-                    Circle().stroke(Color.white.opacity(0.09), lineWidth: 0.5)
-                    Act2CSSBackCorner(color: NoopHTMLColor.inkSoft)
-                        .offset(x: -1)
-                }
-                // CSS width/height are 34px content-box plus a 0.5px border.
-                .frame(width: 35, height: 35)
-            }
-            .buttonStyle(NoopPlainHitStyle())
-            Text(label)
-                .font(NoopHTMLFont.sans(NoopType.footnote))
-                .foregroundStyle(NoopHTMLColor.copy)
+            NoopBackButton(action: action)
+            NoopBackTitle(label)
             Spacer()
         }
         .padding(.horizontal, -2)

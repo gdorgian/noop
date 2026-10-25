@@ -2040,20 +2040,8 @@ private struct NoopSveaRouteHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: action) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.06))
-                        .overlay(Circle().stroke(Color.white.opacity(0.09), lineWidth: 0.5))
-                    NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft)
-                        .offset(x: -1)
-                }
-                .frame(width: 36, height: 36)
-            }
-            .buttonStyle(NoopHTMLPressStyle())
-            Text(label)
-                .font(NoopHTMLFont.sans(13.5))
-                .foregroundStyle(NoopHTMLColor.copy)
+            NoopBackButton(action: action)
+            NoopBackTitle(label)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 18)

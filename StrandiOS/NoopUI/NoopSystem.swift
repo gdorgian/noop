@@ -224,6 +224,42 @@ struct NoopCloseButton: View {
     }
 }
 
+/// The back control at the top of every pushed page: the close button's disc with a chevron,
+/// so back and close read as one family. Change its size or look here only.
+struct NoopBackButton: View {
+    var label = "Back"
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "chevron.left").font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(NoopHTMLColor.ink)
+                .offset(x: -1)
+                .frame(width: NoopCloseButton.side, height: NoopCloseButton.side)
+                .background(Color.white.opacity(0.13), in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+                .noopHitTarget()
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .accessibilityLabel(label)
+    }
+}
+
+/// The name beside a back button: the same size and weight as a tab page's title.
+struct NoopBackTitle: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .font(NoopHTMLFont.outfit(NoopType.title3, weight: .medium))
+            .tracking(-0.4)
+            .foregroundStyle(NoopHTMLColor.ink)
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+    }
+}
+
 /// The disc behind an icon control, for a menu label or a custom glyph: same sizes as `NoopIconButton`.
 struct NoopIconDiscShape<Content: View>: View {
     var size: NoopControlSize = .medium

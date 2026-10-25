@@ -1495,23 +1495,11 @@ private struct NoopA4BackHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: action) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.06))
-                        .overlay(Circle().stroke(Color.white.opacity(0.09), lineWidth: 0.5))
-                    NoopA4CSSChevron(direction: .left, color: NoopHTMLColor.inkSoft)
-                        .offset(x: -1)
-                }
-                .frame(width: 34, height: 34)
-            }
-            .buttonStyle(NoopPlainHitStyle())
-            Text(label)
-                .font(NoopHTMLFont.sans(NoopType.footnote))
-                .foregroundStyle(NoopHTMLColor.copy)
+            NoopBackButton(action: action)
+            NoopBackTitle(label)
             Spacer(minLength: 0)
         }
-        .frame(height: 34)
+        .frame(minHeight: NoopCloseButton.side)
         .padding(.horizontal, -2)
         .padding(.bottom, 8)
     }

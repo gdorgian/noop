@@ -4448,18 +4448,11 @@ private extension NoopAct5Screens {
             ScrollView {
                 VStack(spacing: 0) {
                     HStack {
-                        Button(action: navigation.back) {
-                            NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft)
-                                .offset(x: -1)
-                                .frame(width: 32, height: 32).noopHitTarget()
-                                .background(Color.white.opacity(0.06), in: Circle())
-                                .overlay(Circle().stroke(Color.white.opacity(0.09), lineWidth: 0.5))
-                        }
-                        .buttonStyle(NoopPlainHitStyle())
+                        NoopBackButton(action: navigation.back)
                         Spacer()
                         NoopSectionLabel(paired ? "Paired" : "Looking")
                         Spacer()
-                        Color.clear.frame(width: 34, height: 34)
+                        Color.clear.frame(width: NoopCloseButton.side, height: NoopCloseButton.side)
                     }
 
                     Spacer(minLength: 24)
@@ -4685,18 +4678,13 @@ struct NoopLivePairScreen: View {
         NoopScreen(bottomInset: 40, topInset: 56) {
             VStack(spacing: 22) {
                 HStack {
-                    Button { leave() } label: {
-                        ZStack {
-                            Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-                            NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
-                        }.frame(width: 32, height: 32).noopHitTarget()
-                    }.buttonStyle(NoopHTMLPressStyle())
+                    NoopBackButton { leave() }
                     Spacer()
                     Text(registered ? "PAIRED" : "LOOKING")
                         .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.5)
                         .foregroundStyle(Color(hex: 0x7F8A85))
                     Spacer()
-                    Color.clear.frame(width: 34, height: 34)
+                    Color.clear.frame(width: NoopCloseButton.side, height: NoopCloseButton.side)
                 }
 
                 HStack(spacing: 6) {

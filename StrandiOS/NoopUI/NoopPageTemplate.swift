@@ -35,13 +35,7 @@ struct NoopScorePageTitle: View {
                 Text(title).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink)
                 if let back {
                 HStack {
-                    Button(action: back) {
-                        NoopIconDiscShape(size: .small) {
-                            Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
-                        }
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    .accessibilityLabel("Back")
+                    NoopBackButton(action: back)
                     Spacer()
                 }
                 }

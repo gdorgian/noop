@@ -667,21 +667,9 @@ private struct NoopInstrumentBackHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: action) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.06))
-                        .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-                    NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft)
-                        .offset(x: -1)
-                }
-                .frame(width: 34, height: 34)
-            }
-            .buttonStyle(NoopPlainHitStyle())
+            NoopBackButton(action: action)
             .accessibilityLabel("Back to \(actualParent ?? label)")
-            Text(actualParent ?? label)
-                .font(NoopHTMLFont.sans(13.5))
-                .foregroundStyle(NoopHTMLColor.copy)
+            NoopBackTitle(actualParent ?? label)
             Spacer()
         }
         .padding(.horizontal, -2)

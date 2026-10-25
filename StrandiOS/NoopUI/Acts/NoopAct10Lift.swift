@@ -256,21 +256,9 @@ private struct NoopLiftBackHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: action) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.06))
-                        .overlay(Circle().strokeBorder(Color.white.opacity(0.09), lineWidth: 0.5))
-                    NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft)
-                        .offset(x: -1)
-                }
-                .frame(width: 34, height: 34)
-            }
-            .buttonStyle(NoopPlainHitStyle())
+            NoopBackButton(action: action)
 
-            Text(label)
-                .font(NoopHTMLFont.sans(NoopType.footnote))
-                .foregroundStyle(NoopHTMLColor.copy)
+            NoopBackTitle(label)
             Spacer()
         }
         .padding(.horizontal, -2)

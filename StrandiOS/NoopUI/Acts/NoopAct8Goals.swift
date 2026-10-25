@@ -415,13 +415,8 @@ private struct NoopGoalJourney: View {
         NoopScreen(bottomInset: 118, topInset: 56) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 12) {
-                    Button { navigation.back(or: .you) } label: {
-                        ZStack {
-                            Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-                            NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
-                        }.frame(width: 34, height: 34)
-                    }.buttonStyle(NoopPlainHitStyle())
-                    Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                    NoopBackButton { navigation.back(or: .you) }
+                    NoopBackTitle("You")
                     Spacer()
                     NoopGoalChangeButton { navigation.push(.setGoal) }
                 }
@@ -573,13 +568,8 @@ private struct NoopGoalJourney: View {
         return NoopScreen(bottomInset: 118, topInset: 56) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 12) {
-                    Button { navigation.back(or: .you) } label: {
-                        ZStack {
-                            Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-                            NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
-                        }.frame(width: 34, height: 34)
-                    }.buttonStyle(NoopPlainHitStyle())
-                    Text("You").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                    NoopBackButton { navigation.back(or: .you) }
+                    NoopBackTitle("You")
                     Spacer()
                     NoopGoalChangeButton { navigation.push(.setGoal) }
                 }
@@ -1612,15 +1602,8 @@ private struct NoopLabsHome: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 12) {
                     // Bloodwork is entered from Trends; search and deep links retain their origin.
-                    Button { navigation.back(or: .trends) } label: {
-                        ZStack {
-                            Circle().fill(Color.white.opacity(0.06))
-                                .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-                            NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
-                        }
-                        .frame(width: 34, height: 34)
-                    }.buttonStyle(NoopPlainHitStyle())
-                    Text(navigation.previousScreenTitle ?? "Trends").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+                    NoopBackButton { navigation.back(or: .trends) }
+                    NoopBackTitle(navigation.previousScreenTitle ?? "Trends")
                     Spacer()
                     // Add results enters the picker. It must not raise a photo-source dialogue:
                     // the picker is where the privacy sentence lives, and where the by-hand route
@@ -1782,17 +1765,9 @@ private struct NoopLabPicker: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Button { navigation.back(or: .labs) } label: {
-                ZStack {
-                    Circle().fill(Color.white.opacity(0.06))
-                        .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-                    NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
-                }
-                .frame(width: 34, height: 34)
-            }
-            .buttonStyle(NoopPlainHitStyle())
+            NoopBackButton { navigation.back(or: .labs) }
             .accessibilityLabel("Biomarkers")
-            Text("Biomarkers").font(NoopHTMLFont.sans(13.5)).foregroundStyle(NoopHTMLColor.copy)
+            NoopBackTitle("Biomarkers")
             Spacer()
         }
         .padding(.horizontal, -2)   // NoopScreen gives 20; the HTML header sits at 18
@@ -2147,19 +2122,9 @@ private struct NoopLabReview: View {
 
     private var reviewHeader: some View {
         HStack(spacing: 12) {
-            Button(action: leaveWithoutSaving) {
-                ZStack {
-                    Circle().fill(Color.white.opacity(0.06))
-                        .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-                    NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
-                }
-                .frame(width: 34, height: 34)
-            }
-            .buttonStyle(NoopPlainHitStyle())
+            NoopBackButton(action: leaveWithoutSaving)
             .accessibilityLabel("Biomarkers")
-            Text("Biomarkers")
-                .font(NoopHTMLFont.sans(13.5))
-                .foregroundStyle(NoopHTMLColor.copy)
+            NoopBackTitle("Biomarkers")
             Spacer()
         }
         .padding(.horizontal, -2)

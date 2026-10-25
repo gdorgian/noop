@@ -766,19 +766,11 @@ struct NoopAct3Screens: View {
         let canvasHeight = UIScreen.main.bounds.height
         return VStack(spacing: 0) {
             HStack {
-                Button { navigation.back(or: .session) } label: {
-                    ZStack {
-                        Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-                        NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft)
-                            .offset(x: -1)
-                    }
-                    .frame(width: 34, height: 34)
-                }
-                .buttonStyle(NoopPlainHitStyle())
+                NoopBackButton { navigation.back(or: .session) }
                 Spacer()
                 NoopSectionLabel("Ready")
                 Spacer()
-                Color.clear.frame(width: 34, height: 34)
+                Color.clear.frame(width: NoopCloseButton.side, height: NoopCloseButton.side)
             }
             .frame(width: max(0, canvasWidth - 36))
             .padding(.top, 56)
@@ -1603,23 +1595,11 @@ private struct Act3BackHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: action) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.06))
-                        .overlay(Circle().stroke(Color.white.opacity(0.09), lineWidth: 0.5))
-                    NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft)
-                        .offset(x: -1)
-                }
-                .frame(width: 34, height: 34)
-            }
-            .buttonStyle(NoopPlainHitStyle())
-            Text(label)
-                .font(NoopHTMLFont.sans(13.5))
-                .foregroundStyle(NoopHTMLColor.copy)
+            NoopBackButton(action: action)
+            NoopBackTitle(label)
             Spacer(minLength: 0)
         }
-        .frame(height: 34)
+        .frame(minHeight: NoopCloseButton.side)
         .padding(.bottom, 8)
     }
 }
@@ -2586,18 +2566,11 @@ private extension NoopAct3Screens {
         let zone = workout.targetZone
         return VStack(spacing: 0) {
             HStack {
-                Button { navigation.back(or: .session) } label: {
-                    ZStack {
-                        Circle().fill(Color.white.opacity(0.06)).overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-                        NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft).offset(x: -1)
-                    }
-                    .frame(width: 34, height: 34)
-                }
-                .buttonStyle(NoopPlainHitStyle())
+                NoopBackButton { navigation.back(or: .session) }
                 Spacer()
                 NoopSectionLabel("Ready")
                 Spacer()
-                Color.clear.frame(width: 34, height: 34)
+                Color.clear.frame(width: NoopCloseButton.side, height: NoopCloseButton.side)
             }
             .frame(width: max(0, canvasWidth - 36))
             .padding(.top, 56)

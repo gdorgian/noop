@@ -358,21 +358,8 @@ struct NoopBackHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: action) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.06))
-                        .overlay(Circle().stroke(NoopHTMLColor.borderStrong, lineWidth: 0.5))
-                    NoopFixedChevron(direction: .left, color: NoopHTMLColor.inkSoft)
-                        .offset(x: -1)
-                }
-                .frame(width: 34, height: 34)
-            }
-            .buttonStyle(NoopPlainHitStyle())
-
-            Text(realBackLabel ?? label)
-                .font(NoopHTMLFont.sans(NoopType.footnote))
-                .foregroundStyle(NoopHTMLColor.copy)
+            NoopBackButton(label: "Back to \(realBackLabel ?? label)", action: action)
+            NoopBackTitle(realBackLabel ?? label)
             Spacer()
         }
         .padding(.top, 2)
