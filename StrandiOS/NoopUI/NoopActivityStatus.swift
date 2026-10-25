@@ -113,21 +113,7 @@ struct NoopActivityStatusTile: View {
     var side: CGFloat = 34
 
     var body: some View {
-        Capsule()
-            .fill(LinearGradient(colors: [status.tint.0, status.tint.1], startPoint: .top, endPoint: .bottom))
-            .overlay {
-                // A soft sheen on the upper half, and a fine light rim.
-                Capsule().fill(LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0)], startPoint: .top, endPoint: .center))
-                    .padding(1.5)
-                Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75).blendMode(.plusLighter)
-            }
-            .overlay {
-                Image(systemName: status.symbol).font(.system(size: side * 0.44, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.22), radius: 1, y: 1)
-            }
-            .frame(width: side * 1.18, height: side)
-            .shadow(color: status.tint.1.opacity(0.45), radius: 7, y: 3)
+        NoopGlossTile(symbol: status.symbol, tint: status.tint, side: side)
     }
 }
 

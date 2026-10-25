@@ -414,9 +414,11 @@ struct NoopAct2Screens: View {
             VStack(spacing: 0) {
                 todayHeader
 
-                if dayRailOpen {
+                // The date now always opens the calendar; the seeded shell's rail stays for the
+                // design's example week. It spans the screen inside the page's own inset.
+                if dayRailOpen && day == nil {
                     dayRail
-                        .frame(width: UIScreen.main.bounds.width)
+                        .padding(.horizontal, -20)
                         .padding(.top, 12)
                         .padding(.bottom, 2)
                         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -476,6 +478,18 @@ struct NoopAct2Screens: View {
         NoopPageSection(id: "rings", title: "Rings · Living", detail: "Recovery, strain and sleep as living rings", onByDefault: false),
         NoopPageSection(id: "rings-segmented", title: "Rings · Segmented", detail: "Sleep in its stages, strain heating up, recovery on a gauge", onByDefault: false),
         NoopPageSection(id: "breathe", title: "Breathing orb", detail: "Your pulse as a breathing sphere; tap it to breathe"),
+        NoopPageSection(id: "status", title: "Activity status", detail: "Active, sick, injured or on a break, and for how long", half: true),
+        NoopTodayTile.bedtime.section,
+        NoopTodayTile.heart.section,
+        NoopTodayTile.effort.section,
+        NoopTodayTile.steps.section,
+        NoopTodayTile.calories.section,
+        NoopTodayTile.stress.section,
+        NoopTodayTile.debt.section,
+        NoopTodayTile.workout.section,
+        NoopTodayTile.weight.section,
+        NoopTodayTile.cycle.section,
+        NoopTodayTile.breathe.section,
         NoopPageSection(id: "sleep", title: "Last night", detail: "Sleep against your need"),
         NoopPageSection(id: "sleep-tide", title: "Last night · Tide", detail: "The night drawn as water, its depth the depth of sleep", onByDefault: false),
         NoopPageSection(id: "coach", title: "Svea", detail: "Your morning read and the conversation"),
@@ -523,6 +537,14 @@ struct NoopAct2Screens: View {
     @ViewBuilder
     private func todaySection(_ id: String) -> some View {
         switch id {
+        case let id where NoopTodayTile(sectionID: id) != nil:
+            NoopTodayTileView(tile: NoopTodayTile(sectionID: id)!, navigation: navigation, day: day, liveBPM: liveBPM)
+        case "status":
+            NoopSlotPill(symbol: activityStatus.status.symbol, tint: activityStatus.status.tint,
+                         title: activityStatus.status.title, subtitle: activityStatus.untilText, accessory: .menu,
+                         accessibility: "Activity status, \(activityStatus.status.title), \(activityStatus.untilText)") {
+                activityStatusOpen = true
+            }
         case "sleep-tide":
             if let day, let night = day.rest.latest {
                 NoopSleepTide(night: night, needMin: day.rest.needMin) { navigation.push(.rest) }
@@ -960,34 +982,29 @@ struct NoopAct2Screens: View {
     }
 
     private var todayHeader: some View {
-        // The date opens the calendar; under it the wearer's status, then the band and the updates in
-        // one capsule (25 Oct 2026).
+        // One row: the date opens the calendar, and across from it the band and the updates in one
+        // capsule. The wearer's status is a tile on the page itself (25 Oct 2026).
         VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 10) {
             Button {
                 NoopHaptics.play(.tick)
-                if day == nil {
-                    withAnimation(.easeInOut(duration: 0.18)) { dayRailOpen.toggle() }
-                } else {
-                    todayCalendarOpen = true
-                }
+                todayCalendarOpen = true
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(todayTitle)
                         .font(NoopHTMLFont.outfit(NoopType.title3, weight: .medium))
                         .tracking(-0.4)
                         .foregroundStyle(NoopHTMLColor.ink)
-                        .lineLimit(1).minimumScaleFactor(0.8)
+                        .lineLimit(1).minimumScaleFactor(0.7)
                     Image(systemName: "chevron.down").font(.system(size: 13, weight: .bold))
                         .foregroundStyle(NoopHTMLColor.faint)
-                        .rotationEffect(.degrees(dayRailOpen ? 180 : 0))
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(NoopHTMLPressStyle())
             .accessibilityLabel("\(todayTitle), open the calendar")
 
-            HStack(alignment: .center, spacing: 10) {
-                NoopActivityStatusChip(state: activityStatus) { activityStatusOpen = true }
+                Spacer(minLength: 4)
 
                 HStack(spacing: 4) {
                     NoopBatteryChip(percent: day == nil ? 52 : battery, bare: true) { navigation.push(.strap) }

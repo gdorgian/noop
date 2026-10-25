@@ -22,6 +22,8 @@ struct NoopPageSection: Identifiable, Hashable {
     /// Stays interactive while the page is being edited, for a section with its own controls in edit
     /// mode (hiding cards inside it, say). Others are drawn but not touchable while editing.
     var liveWhileEditing = false
+    /// A small tile that takes half the page's width; two in a row sit side by side.
+    var half = false
 }
 
 @MainActor
@@ -87,6 +89,9 @@ struct NoopPageEditing {
     var adding = false
     /// Counts saves; each one drops a ripple on the page.
     var saves = 0
+    /// Set when Add was opened from the free half beside a lone tile: the sheet offers tiles only,
+    /// and the one picked goes in beside it.
+    var addBeside: String?
 }
 
 /// Lays out a page's sections in the wearer's order. While editing, every section carries a remove
@@ -106,8 +111,8 @@ struct NoopEditableSections<Section: View>: View {
     /// finger has moved since. Each section's frame is kept so the carried one can swap places as its
     /// middle passes another's.
     @State private var dragging: String?
-    @State private var dragStartMid: CGFloat = 0
-    @State private var dragTranslation: CGFloat = 0
+    @State private var dragStartMid: CGPoint = .zero
+    @State private var dragTranslation: CGSize = .zero
     @State private var frames: [String: CGRect] = [:]
     /// Where the page sits on screen, so a save's wave starts in the middle of what is in view.
     /// Where the sections sit on screen, read only when Save sends its wave. Kept in a reference
@@ -119,16 +124,47 @@ struct NoopEditableSections<Section: View>: View {
     @State private var wave: NoopSurfaceWave?
     @State private var waveProgress: Double = 0
 
+    /// What the page draws, in order: its sections, and while editing a "+ Add" in the free half
+    /// beside a tile that has no partner.
+    private var entries: [String] {
+        let ids = editing.active ? editing.draft : layout.order.filter { !isEmpty($0) }
+        guard editing.active else { return ids }
+        var result: [String] = []
+        var index = 0
+        while index < ids.count {
+            let id = ids[index]
+            result.append(id)
+            if isHalf(id) {
+                if index + 1 < ids.count, isHalf(ids[index + 1]) {
+                    result.append(ids[index + 1])
+                    index += 1
+                } else if dragging == nil {
+                    result.append(Self.besidePrefix + id)
+                }
+            }
+            index += 1
+        }
+        return result
+    }
+
+    private static var besidePrefix: String { "noop.add-beside." }
+    private func isHalf(_ id: String) -> Bool {
+        id.hasPrefix(Self.besidePrefix) || (layout.section(id)?.half ?? false)
+    }
+
     var body: some View {
-        VStack(spacing: spacing) {
-            ForEach(editing.active ? editing.draft : layout.order, id: \.self) { id in
+        NoopSectionFlow(spacing: spacing) {
+            ForEach(entries, id: \.self) { id in
                 Group {
-                    if editing.active {
+                    if id.hasPrefix(Self.besidePrefix) {
+                        addBeside(String(id.dropFirst(Self.besidePrefix.count)))
+                    } else if editing.active {
                         editable(id)
-                    } else if !isEmpty(id) {
+                    } else {
                         section(id)
                     }
                 }
+                .layoutValue(key: NoopHalfWidth.self, value: isHalf(id))
                 // Each section's place in the page, measured before any carry or wave moves it.
                 .background {
                     GeometryReader { proxy in
@@ -163,7 +199,7 @@ struct NoopEditableSections<Section: View>: View {
             }
         }
         #endif
-        .sheet(isPresented: $editing.adding) {
+        .sheet(isPresented: $editing.adding, onDismiss: { editing.addBeside = nil }) {
             NoopAddSectionSheet(layout: layout, editing: $editing, isEmpty: isEmpty, section: section)
                 .noopSheet()
         }
@@ -208,7 +244,8 @@ struct NoopEditableSections<Section: View>: View {
                 .accessibilityLabel("Remove \(info?.title ?? id)")
             }
         }
-        .offset(y: dragging == id ? dragStartMid + dragTranslation - (frames[id]?.midY ?? dragStartMid) : 0)
+        .offset(x: dragging == id ? dragStartMid.x + dragTranslation.width - (frames[id]?.midX ?? dragStartMid.x) : 0,
+                y: dragging == id ? dragStartMid.y + dragTranslation.height - (frames[id]?.midY ?? dragStartMid.y) : 0)
         .modifier(NoopReorderPress { phase in carry(id, phase) })
         .accessibilityElement(children: .contain)
         .accessibilityLabel(info?.title ?? id)
@@ -245,14 +282,14 @@ struct NoopEditableSections<Section: View>: View {
             NoopHaptics.play(.lift)
             withAnimation(.easeOut(duration: 0.15)) {
                 dragging = id
-                dragStartMid = frames[id]?.midY ?? 0
-                dragTranslation = 0
+                dragStartMid = frames[id].map { CGPoint(x: $0.midX, y: $0.midY) } ?? .zero
+                dragTranslation = .zero
             }
-        case .moved(let dy):
-            dragTranslation = dy
-            let mid = dragStartMid + dy
+        case .moved(let delta):
+            dragTranslation = delta
+            let point = CGPoint(x: dragStartMid.x + delta.width, y: dragStartMid.y + delta.height)
             let others = editing.draft.filter { $0 != id }
-            let target = others.filter { (frames[$0]?.midY ?? .infinity) < mid }.count
+            let target = others.filter { Self.isBefore(frames[$0], point) }.count
             if editing.draft.firstIndex(of: id) != target {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     var order = others
@@ -264,7 +301,7 @@ struct NoopEditableSections<Section: View>: View {
         case .ended:
             withAnimation(.spring(duration: 0.3)) {
                 dragging = nil
-                dragTranslation = 0
+                dragTranslation = .zero
             }
             // It lands like a drop: the page moves out from its edges, and the phone feels it.
             NoopHaptics.play(.land)
@@ -274,12 +311,43 @@ struct NoopEditableSections<Section: View>: View {
         }
     }
 
+    /// Whether a section sits before the carried one's middle: one wholly above it, or one beside it
+    /// in the same row and to its left. A full-width section is passed at its middle.
+    private static func isBefore(_ frame: CGRect?, _ point: CGPoint) -> Bool {
+        guard let frame else { return false }
+        if point.y > frame.maxY { return true }
+        if point.y < frame.minY { return false }
+        let full = frame.width > UIScreen.main.bounds.width * 0.66
+        return full ? frame.midY < point.y : frame.midX < point.x
+    }
+
+    /// The free half beside a lone tile while editing: Add, offering tiles that go in beside it.
+    private func addBeside(_ id: String) -> some View {
+        Button {
+            NoopHaptics.play(.tick)
+            editing.addBeside = id
+            editing.adding = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "plus").font(.system(size: 14, weight: .semibold))
+                Text("Add").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+            }
+            .foregroundStyle(NoopHTMLColor.inkSoft)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minHeight: NoopSlotPill.height)
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.14), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .accessibilityLabel("Add a tile beside \(layout.section(id)?.title ?? id)")
+    }
+
     @ViewBuilder
     private var foot: some View {
         if editing.active {
             VStack(spacing: 12) {
                 if layout.catalog.contains(where: { !editing.draft.contains($0.id) }) {
-                    Button { editing.adding = true } label: {
+                    Button { editing.addBeside = nil; editing.adding = true } label: {
                         VStack(spacing: 6) {
                             Image(systemName: "plus").font(.system(size: 17, weight: .semibold))
                             Text("Add section").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
@@ -305,6 +373,72 @@ struct NoopEditableSections<Section: View>: View {
                 editing.draft = layout.order
                 withAnimation(.easeInOut(duration: 0.22)) { editing.active = true }
             }
+        }
+    }
+}
+
+/// Whether a section is a half-width tile, read by `NoopSectionFlow`.
+struct NoopHalfWidth: LayoutValueKey {
+    static let defaultValue = false
+}
+
+/// The page's sections top to bottom; two half-width tiles in a row share it, a lone one keeps its
+/// half and leaves the other free.
+struct NoopSectionFlow: Layout {
+    var spacing: CGFloat
+    /// The gap between two tiles in a row.
+    static let gap: CGFloat = 10
+
+    static func halfWidth(of width: CGFloat) -> CGFloat { max(0, (width - gap) / 2) }
+
+    private struct Row { var members: [Int]; var half: Bool }
+
+    private func rows(_ subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var index = 0
+        while index < subviews.count {
+            if subviews[index][NoopHalfWidth.self] {
+                if index + 1 < subviews.count, subviews[index + 1][NoopHalfWidth.self] {
+                    rows.append(Row(members: [index, index + 1], half: true))
+                    index += 2
+                } else {
+                    rows.append(Row(members: [index], half: true))
+                    index += 1
+                }
+            } else {
+                rows.append(Row(members: [index], half: false))
+                index += 1
+            }
+        }
+        return rows
+    }
+
+    private func heights(_ rows: [Row], width: CGFloat, _ subviews: Subviews) -> [CGFloat] {
+        rows.map { row in
+            let w = row.half ? Self.halfWidth(of: width) : width
+            return row.members.map { subviews[$0].sizeThatFits(ProposedViewSize(width: w, height: nil)).height }.max() ?? 0
+        }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? UIScreen.main.bounds.width - 40
+        let rows = rows(subviews)
+        let total = heights(rows, width: width, subviews).reduce(0, +) + spacing * CGFloat(max(0, rows.count - 1))
+        return CGSize(width: width, height: total)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let rows = rows(subviews)
+        let heights = heights(rows, width: bounds.width, subviews)
+        var y = bounds.minY
+        for (row, height) in zip(rows, heights) {
+            let w = row.half ? Self.halfWidth(of: bounds.width) : bounds.width
+            for (slot, member) in row.members.enumerated() {
+                let x = bounds.minX + CGFloat(slot) * (w + Self.gap)
+                subviews[member].place(at: CGPoint(x: x, y: y), anchor: .topLeading,
+                                       proposal: ProposedViewSize(width: w, height: height))
+            }
+            y += height + spacing
         }
     }
 }
@@ -340,7 +474,7 @@ private struct NoopWaveMotion: ViewModifier, Animatable {
 /// Hold, then move: a short still press picks a section up, so a swipe that starts on one fails it
 /// and the page scrolls. Reports how far the finger has moved vertically since the press began.
 private struct NoopReorderPress: ViewModifier {
-    enum Phase { case began, moved(CGFloat), ended }
+    enum Phase { case began, moved(CGSize), ended }
     let onChange: (Phase) -> Void
 
     func body(content: Content) -> some View {
@@ -387,8 +521,10 @@ private struct NoopReorderRecognizer: UIGestureRecognizerRepresentable {
         var onChange: (NoopReorderPress.Phase) -> Void
         private weak var scrollView: UIScrollView?
         private var startY: CGFloat = 0
+        private var startX: CGFloat = 0
         private var startOffset: CGFloat = 0
         private var fingerY: CGFloat = 0
+        private var fingerX: CGFloat = 0
         private var link: CADisplayLink?
         private var scrolling = false
 
@@ -403,7 +539,9 @@ private struct NoopReorderRecognizer: UIGestureRecognizerRepresentable {
         func begin(_ recognizer: UILongPressGestureRecognizer) {
             scrollView = recognizer.view?.window.flatMap { Self.pageScroller(in: $0, at: recognizer.location(in: $0)) }
             fingerY = recognizer.location(in: recognizer.view?.window).y
+            fingerX = recognizer.location(in: recognizer.view?.window).x
             startY = fingerY
+            startX = fingerX
             startOffset = scrollView?.contentOffset.y ?? 0
             onChange(.began)
             let link = CADisplayLink(target: self, selector: #selector(tick(_:)))
@@ -413,6 +551,7 @@ private struct NoopReorderRecognizer: UIGestureRecognizerRepresentable {
 
         func move(_ recognizer: UILongPressGestureRecognizer) {
             fingerY = recognizer.location(in: recognizer.view?.window).y
+            fingerX = recognizer.location(in: recognizer.view?.window).x
             report()
         }
 
@@ -442,7 +581,7 @@ private struct NoopReorderRecognizer: UIGestureRecognizerRepresentable {
         /// How far the section has travelled in the page: the finger's move plus the page's.
         private func report() {
             let scrolled = (scrollView?.contentOffset.y ?? startOffset) - startOffset
-            onChange(.moved(fingerY - startY + scrolled))
+            onChange(.moved(CGSize(width: fingerX - startX, height: fingerY - startY + scrolled)))
         }
 
         @objc private func tick(_ link: CADisplayLink) {
@@ -497,12 +636,29 @@ private struct NoopAddSectionSheet<Section: View>: View {
     let section: (String) -> Section
     @Environment(\.dismiss) private var dismiss
 
+    private var missing: [NoopPageSection] { layout.catalog.filter { !editing.draft.contains($0.id) } }
+    private var tiles: [NoopPageSection] { missing.filter(\.half) }
+    private var sections: [NoopPageSection] { missing.filter { !$0.half } }
+
+    private func add(_ info: NoopPageSection) {
+        NoopHaptics.play(.add)
+        withAnimation(.easeInOut(duration: 0.22)) {
+            if let beside = editing.addBeside, let at = editing.draft.firstIndex(of: beside) {
+                editing.draft.insert(info.id, at: at + 1)
+            } else {
+                editing.draft.append(info.id)
+            }
+        }
+        editing.addBeside = nil
+        dismiss()
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 NoopCloseButton { dismiss() }
                 Spacer()
-                Text("Add section").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                Text(editing.addBeside == nil ? "Add section" : "Add a tile").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 Spacer()
                 Color.clear.frame(width: NoopCloseButton.side, height: 1)
             }
@@ -511,29 +667,53 @@ private struct NoopAddSectionSheet<Section: View>: View {
             .padding(.bottom, 10)
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    ForEach(layout.catalog.filter { !editing.draft.contains($0.id) }) { info in
-                        Button {
-                            NoopHaptics.play(.add)
-                            withAnimation(.easeInOut(duration: 0.22)) { editing.draft.append(info.id) }
-                            dismiss()
-                        } label: {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text(info.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                                        .foregroundStyle(NoopHTMLColor.ink)
-                                    Spacer()
-                                    Image(systemName: "plus.circle.fill").font(.system(size: 20))
+                    // Tiles first, two to a row as they sit on the page; then whole sections.
+                    if !tiles.isEmpty {
+                        if editing.addBeside == nil && !sections.isEmpty { NoopSectionLabel("Tiles") }
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: NoopSectionFlow.gap),
+                                            GridItem(.flexible(), spacing: NoopSectionFlow.gap)],
+                                  alignment: .leading, spacing: 18) {
+                            ForEach(tiles) { info in
+                                Button { add(info) } label: {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        section(info.id).allowsHitTesting(false)
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "plus.circle.fill").font(.system(size: 14))
+                                            Text(info.title).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
+                                                .lineLimit(1).minimumScaleFactor(0.8)
+                                        }
                                         .foregroundStyle(NoopHTMLColor.inkSoft)
+                                        .padding(.leading, 6)
+                                    }
+                                    .contentShape(Rectangle())
                                 }
-                                if isEmpty(info.id) {
-                                    NoopSectionPlaceholder(title: info.title, detail: info.detail)
-                                } else {
-                                    section(info.id).allowsHitTesting(false)
-                                }
+                                .buttonStyle(NoopHTMLPressStyle())
+                                .accessibilityLabel("Add \(info.title)")
                             }
-                            .contentShape(Rectangle())
                         }
-                        .buttonStyle(NoopHTMLPressStyle())
+                    }
+                    if editing.addBeside == nil && !sections.isEmpty {
+                        if !tiles.isEmpty { NoopSectionLabel("Sections").padding(.top, 6) }
+                        ForEach(sections) { info in
+                            Button { add(info) } label: {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text(info.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                                            .foregroundStyle(NoopHTMLColor.ink)
+                                        Spacer()
+                                        Image(systemName: "plus.circle.fill").font(.system(size: 20))
+                                            .foregroundStyle(NoopHTMLColor.inkSoft)
+                                    }
+                                    if isEmpty(info.id) {
+                                        NoopSectionPlaceholder(title: info.title, detail: info.detail)
+                                    } else {
+                                        section(info.id).allowsHitTesting(false)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(NoopHTMLPressStyle())
+                        }
                     }
                 }
                 .padding(.horizontal, 20)

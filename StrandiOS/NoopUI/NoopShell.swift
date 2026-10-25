@@ -724,6 +724,8 @@ struct NoopVerifiedAppShell: View {
                                     battery: WidgetSnapshot.activeBatteryPct(from: model),
                                     liveBPM: live.connected ? live.heartRate : nil,
                                     displayName: profile.displayName)
+                        // Today's Next workout tile reads the plans.
+                        .environmentObject(fitnessSettings)
                 } else if Self.canonicalNightRoutes.contains(navigation.route) {
                     NoopAct1Screens(navigation: navigation, rest: restStore.record,
                                     battery: WidgetSnapshot.activeBatteryPct(from: model))
