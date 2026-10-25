@@ -13,17 +13,28 @@ import SwiftUI
 
 /// Shared appearance and pause logic for the animated slots.
 struct NoopSlotClock<Content: View>: View {
+    /// False for a drawing that only draws in and then holds still: its clock stops once the draw-in
+    /// is over, rather than redrawing the same picture 30 times a second for as long as it is on
+    /// screen (profiled on device 25 Oct 2026).
+    let continuous: Bool
     @ViewBuilder var content: (_ t: Double, _ reveal: Double) -> Content
+
+    init(continuous: Bool = true, @ViewBuilder content: @escaping (_ t: Double, _ reveal: Double) -> Content) {
+        self.continuous = continuous
+        self.content = content
+    }
 
     @State private var onScreen = true
     /// When it first came into view; the draw-in runs from there.
     @State private var appeared: Date?
+    @State private var drawnIn = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var revealDuration: Double { 1.5 }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !onScreen || reduceMotion)) { timeline in
+        let still = !continuous && drawnIn
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !onScreen || reduceMotion || still)) { timeline in
             let since = appeared.map { timeline.date.timeIntervalSince($0) } ?? 0
             let x = min(1, max(0, since / revealDuration))
             // Ease out: quick start, long settle.
@@ -31,9 +42,14 @@ struct NoopSlotClock<Content: View>: View {
             // A paused clock (off screen, or reported so while a section was being added) shows the
             // finished drawing: a draw-in frozen at its first frame would read as no data.
             content(reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600),
-                    reduceMotion || !onScreen ? 1 : reveal)
+                    reduceMotion || !onScreen || still ? 1 : reveal)
         }
         .onAppear { if appeared == nil { appeared = Date() } }
+        .task {
+            guard !continuous, !drawnIn else { return }
+            try? await Task.sleep(for: .seconds(revealDuration + 0.1))
+            drawnIn = true
+        }
         .modifier(NoopSlotVisibility(onScreen: $onScreen))
     }
 }
@@ -243,7 +259,7 @@ struct NoopSleepTide: View {
                 }
                 .buttonStyle(NoopHTMLPressStyle())
                 GeometryReader { geo in
-                    NoopSlotClock { _, reveal in
+                    NoopSlotClock(continuous: false) { _, reveal in
                         Canvas { context, size in draw(&context, size, reveal: reveal) }
                     }
                     .contentShape(Rectangle())

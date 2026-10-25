@@ -84,7 +84,7 @@ struct NoopWhoopStyleHero: View {
 
     var body: some View {
         let side = NoopPageHeroMetrics.heroSide
-        NoopSlotClock { _, reveal in
+        NoopSlotClock(continuous: false) { _, reveal in
             ZStack {
                 // Proportions from the reference: the stroke is about a sixteenth of the ring's width.
                 Circle().stroke(Color(hex: 0x3A4148), lineWidth: 17)
@@ -150,7 +150,7 @@ struct NoopBevelStyleHero: View {
     var body: some View {
         let side = NoopPageHeroMetrics.heroSide
         VStack(spacing: 10) {
-            NoopSlotClock { _, reveal in
+            NoopSlotClock(continuous: false) { _, reveal in
                 ZStack {
                     Canvas { context, size in draw(&context, size, reveal: reveal) }
                     VStack(spacing: 0) {

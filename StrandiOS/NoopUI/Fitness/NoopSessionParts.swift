@@ -450,6 +450,12 @@ struct NoopSessionHeart: View {
 
 extension NoopFitnessExerciseChoice {
     /// The catalogue entry for a logged exercise name, so a record can show the exercise's picture.
+    /// The catalogue entry for a logged exercise name, or a plain choice carrying the muscles the set
+    /// was logged under — so any logged exercise can open its page, catalogued or not.
+    static func named(_ name: String, primary: LiftMuscle?, secondaries: [LiftMuscle]) -> NoopFitnessExerciseChoice {
+        lookup(name) ?? .init(name: name, primary: primary, secondaries: secondaries, equipment: nil, isYours: true)
+    }
+
     static func lookup(_ name: String) -> NoopFitnessExerciseChoice? {
         let key = NoopFitnessExercisePicker.fold(name)
         guard let known = TrainingExerciseLibrary.all

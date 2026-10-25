@@ -94,7 +94,7 @@ struct NoopStrainGauge: View {
 
     var body: some View {
         let side = NoopPageHeroMetrics.heroSide
-        NoopSlotClock { _, reveal in
+        NoopSlotClock(continuous: false) { _, reveal in
             Canvas { context, size in
                 let c = CGPoint(x: size.width / 2, y: size.height / 2 + 10)
                 let R = size.width / 2 - 18
@@ -146,7 +146,7 @@ struct NoopStrainDayRing: View {
 
     var body: some View {
         let side = NoopPageHeroMetrics.heroSide
-        NoopSlotClock { _, reveal in
+        NoopSlotClock(continuous: false) { _, reveal in
             Canvas { context, size in
                 let c = CGPoint(x: size.width / 2, y: size.height / 2)
                 let inner = size.width / 2 * 0.52, outer = size.width / 2 - 6

@@ -54,7 +54,7 @@ struct NoopSleepDialSection: View {
                             .foregroundStyle(NoopHTMLColor.faint)
                     }
                     ZStack {
-                        NoopSlotClock { _, reveal in
+                        NoopSlotClock(continuous: false) { _, reveal in
                             Canvas { context, size in draw(&context, size, reveal: reveal) }
                         }
                         VStack(spacing: 2) {
@@ -145,7 +145,7 @@ struct NoopSleepPerformanceSection: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 22) {
-                    NoopSlotClock { _, reveal in
+                    NoopSlotClock(continuous: false) { _, reveal in
                         ZStack {
                             Circle().stroke(Color.white.opacity(0.1), lineWidth: 7)
                             Circle().trim(from: 0, to: performance * reveal)
@@ -230,7 +230,7 @@ struct NoopSleepLedgerSection: View {
                         Text(noopNeedLine(night.asleepMin, needMin)).font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.copy)
                     }
-                    NoopSlotClock { _, reveal in
+                    NoopSlotClock(continuous: false) { _, reveal in
                         GeometryReader { p in
                             HStack(spacing: 2) {
                                 ForEach([3, 2, 1, 0], id: \.self) { stage in

@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import StrandFitness
+import StrandAnalytics
 import UniformTypeIdentifiers
 import Security
 import WhoopStore
@@ -462,6 +463,10 @@ private struct NoopLiftLiveScreen: View {
     @FocusState private var focused: Field?
     @EnvironmentObject private var heart: LiveState
     @AppStorage(LiftSessionController.restAlertsKey) private var restAlerts = true
+    /// Every earlier session of each exercise on the sheet, for the records a set can break.
+    @State private var priorHistory: [String: [LiftHistorySet]] = [:]
+    @State private var celebration: NoopLiftCelebration?
+    @State private var insightsFor: NoopFitnessExerciseChoice?
 
     private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
     private var presentation: LiftSessionController.Presentation? { live.presentation(system: units) }
@@ -477,8 +482,12 @@ private struct NoopLiftLiveScreen: View {
             }
         }
         .task { await prepare() }
+        .task(id: live.engine?.plan.count) { await loadPriorHistory() }
         .onChange(of: slot) { _, _ in syncFields() }
-        .onChange(of: live.engine?.sets.count) { _, _ in syncFields() }
+        .onChange(of: live.engine?.sets.count) { old, new in
+            syncFields()
+            if (new ?? 0) > (old ?? 0) { celebrateRecords() }
+        }
         .alert("Lift not saved", isPresented: Binding(
             get: { saveError != nil }, set: { if !$0 { saveError = nil } }
         )) {
@@ -534,6 +543,18 @@ private struct NoopLiftLiveScreen: View {
             }
             liveBar(engine: engine, presentation: presentation, slot: slot, item: item)
                 .padding(.horizontal, 14).padding(.bottom, 10)
+        }
+        .overlay(alignment: .top) {
+            if let celebration {
+                NoopLiftRecordBanner(celebration: celebration)
+                    .padding(.horizontal, 14).padding(.top, 6)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .onTapGesture { withAnimation(NoopMotion.swap) { self.celebration = nil } }
+            }
+        }
+        .sensoryFeedback(.success, trigger: celebration?.id)
+        .sheet(item: $insightsFor) { choice in
+            NoopFitnessExerciseDetail(choice: choice, initialTab: .records).noopSheet()
         }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) { keypadBar(slot: slot) }
@@ -648,8 +669,14 @@ private struct NoopLiftLiveScreen: View {
                     .background((isCurrent ? NoopHTMLColor.warm : Color.white).opacity(isCurrent ? 0.14 : 0.05),
                                 in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(line.exercise).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                        .lineLimit(1)
+                    Button {
+                        insightsFor = .named(line.exercise, primary: line.primaryMuscle, secondaries: line.secondaryMuscles)
+                    } label: {
+                        Text(line.exercise).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    .accessibilityHint("Opens this exercise's records and history")
                     Text(exerciseMeta(line, done: done, of: working.count, warmups: slots.count - working.count))
                         .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineLimit(1)
                 }
@@ -1053,6 +1080,56 @@ private struct NoopLiftLiveScreen: View {
         syncFields()
     }
 
+    /// Each exercise's sessions before this one. Loaded for a line added mid-session too, so its sets can
+    /// break records as well.
+    private func loadPriorHistory() async {
+        guard let engine = live.engine, !isPrototypeSession, let store = await repo.storeHandle() else { return }
+        for name in Set(engine.plan.map(\.exercise)) where priorHistory[name] == nil {
+            let rows = (try? await store.liftExerciseHistory(deviceId: repo.deviceId, exercise: name)) ?? []
+            priorHistory[name] = rows.filter { $0.sessionStartTs < engine.startTs }
+        }
+    }
+
+    /// The set just done broke a record: say which, briefly, at the top. Judged on the numbers the set
+    /// counts as (typed, else grey) against every earlier session plus the sets already done today, so
+    /// a second heavier set today is a record too — over the first. An exercise never logged before
+    /// breaks nothing (`LiftRecords.broken`).
+    private func celebrateRecords() {
+        guard let engine = live.engine, let last = engine.sets.last, !live.isWarmup(last.slot),
+              let line = engine.planItem(for: last.slot),
+              let prior = priorHistory[line.exercise], !prior.isEmpty else { return }
+        func row(_ slot: LiftSlot, id: String) -> LiftSetRow {
+            let shown = live.values(of: slot)
+            return LiftSetRow(id: id, deviceId: repo.deviceId, sessionId: "live", ord: 0, exercise: line.exercise,
+                              primaryMuscle: line.primaryMuscle, setIndex: slot.setIndex, weightKg: shown.weightKg,
+                              reps: shown.reps, rpe: nil, isWarmup: live.isWarmup(slot), startTs: nil, endTs: nil,
+                              restSec: nil, note: nil)
+        }
+        let today = engine.sets.dropLast()
+            .filter { engine.planItem(for: $0.slot)?.exercise == line.exercise }
+            .map { LiftHistorySet(set: row($0.slot, id: "live-\($0.exerciseIndex)-\($0.setIndex)"), sessionStartTs: engine.startTs) }
+        let set = row(last.slot, id: "live-now")
+        let kinds = LiftRecords.broken(by: set, against: LiftRecords.exercise(prior + today))
+        guard let first = kinds.first else { return }
+        let shown = kinds.prefix(2).map { kind -> String in
+            switch kind {
+            case .heaviestWeight: return "Heaviest \(NoopExerciseFormat.kg(set.weightKg ?? 0, units))"
+            case .bestOneRepMax:
+                return "Est. max \(NoopExerciseFormat.kg(LiftMetrics.estimatedOneRepMaxKg(weightKg: set.weightKg, reps: set.reps) ?? 0, units))"
+            case .bestSetVolume: return "Best set \(NoopExerciseFormat.set(set.weightKg, set.reps, units))"
+            case .mostReps: return "Most reps \(set.reps ?? 0)"
+            default: return NoopExerciseFormat.title(kind)
+            }
+        }
+        let item = NoopLiftCelebration(exercise: line.exercise, lines: shown, symbol: NoopExerciseFormat.symbol(first),
+                                       more: max(0, kinds.count - 2))
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) { celebration = item }
+        Task {
+            try? await Task.sleep(nanoseconds: 3_400_000_000)
+            if celebration?.id == item.id { withAnimation(NoopMotion.swap) { celebration = nil } }
+        }
+    }
+
     private func loadLastSessionValues() async {
         guard let engine = live.engine, let store = await repo.storeHandle() else { return }
         var result: [String: [Int: LiftSetCarry]] = [:]
@@ -1229,6 +1306,43 @@ private struct NoopLiftLiveScreen: View {
         let detail = [liftWeight(values.weightKg, system: units), values.reps.map { "× \($0)" }]
             .compactMap { $0 }.joined(separator: " ")
         return "Next: set \(nextIndex) of \(item.targetSets)\(detail.isEmpty ? "" : ", \(detail)"). The strap will buzz once when the clock runs out."
+    }
+}
+
+/// A record a set just broke, as the live screen announces it.
+struct NoopLiftCelebration: Equatable {
+    let id = UUID()
+    let exercise: String
+    let lines: [String]
+    let symbol: String
+    let more: Int
+}
+
+/// The banner that drops in when a set breaks a record, and leaves on its own.
+private struct NoopLiftRecordBanner: View {
+    let celebration: NoopLiftCelebration
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "trophy.fill").font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(NoopHTMLColor.voltInk)
+                .frame(width: 40, height: 40).background(NoopHTMLColor.volt, in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text("New record · \(celebration.exercise)")
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    .lineLimit(1)
+                Text(celebration.lines.joined(separator: " · ") + (celebration.more > 0 ? " · +\(celebration.more)" : ""))
+                    .font(NoopHTMLFont.sans(NoopType.caption)).monospacedDigit().foregroundStyle(NoopHTMLColor.volt)
+                    .lineLimit(1).minimumScaleFactor(0.85)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, 10).padding(.trailing, 16).padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(NoopHTMLColor.cardRaised.opacity(0.9), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(NoopHTMLColor.volt.opacity(0.35), lineWidth: 0.8))
+        .shadow(color: NoopHTMLColor.volt.opacity(0.18), radius: 18, y: 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isStaticText)
     }
 }
 
@@ -1878,6 +1992,7 @@ struct NoopLiftDetailScreen: View {
     @State private var records: [NoopLiftRecord] = []
     @State private var rating = false
     @State private var newRpe = 6.0
+    @State private var insightsFor: NoopFitnessExerciseChoice?
 
     @State private var matched: WorkoutRow?
 
@@ -1899,6 +2014,9 @@ struct NoopLiftDetailScreen: View {
             }
         }
         .task { await load(); await loadMatched() }
+        .sheet(item: $insightsFor) { choice in
+            NoopFitnessExerciseDetail(choice: choice, initialTab: .records).noopSheet()
+        }
         .sheet(isPresented: $rating) {
             NoopLiftEffortSheet(rating: $newRpe) {
                 rating = false
@@ -2129,6 +2247,9 @@ struct NoopLiftDetailScreen: View {
                 let choice = NoopFitnessExerciseChoice.lookup(exercise)
                 NoopSessionCard {
                     VStack(alignment: .leading, spacing: 10) {
+                        Button {
+                            insightsFor = .named(exercise, primary: rows.first?.primaryMuscle, secondaries: rows.first?.secondaryMuscles ?? [])
+                        } label: {
                         HStack(spacing: 13) {
                             if let choice {
                                 NoopExerciseMedia(choice: choice, thumbnail: true, tile: 60)
@@ -2144,7 +2265,14 @@ struct NoopLiftDetailScreen: View {
                                       "\(n) \(n == 1 ? "set" : "sets")"].compactMap { $0 }.joined(separator: " · "))
                                     .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                             }
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(NoopHTMLColor.chevronDim)
                         }
+                        .contentShape(Rectangle())
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                        .accessibilityHint("Opens this exercise's records and history")
                         HStack(spacing: 8) {
                             Text("SET").frame(width: 36)
                             Text(LiftFormat.weightUnit(units).uppercased()).frame(maxWidth: .infinity)

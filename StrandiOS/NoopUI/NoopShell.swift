@@ -509,39 +509,38 @@ enum NoopAmbient {
 /// ambient the seeded one does.
 struct NoopNightAmbientGlow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var bright = false
 
     var body: some View {
-        NoopAnimatedTimeline(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion) { timeline in
-            let elapsed = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 9)
-            let wave = (1 - cos(elapsed / 9 * 2 * .pi)) / 2
-            VStack {
-                Ellipse()
-                    .fill(
-                        RadialGradient(
-                            stops: [
-                                .init(color: NoopHTMLColor.night.opacity(0.20), location: 0),
-                                .init(color: NoopHTMLColor.night.opacity(0), location: 0.70)
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 312
-                        )
+        VStack {
+            Ellipse()
+                .fill(
+                    RadialGradient(
+                        stops: [
+                            .init(color: NoopHTMLColor.night.opacity(0.20), location: 0),
+                            .init(color: NoopHTMLColor.night.opacity(0), location: 0.70)
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 312
                     )
-                    .frame(width: 470, height: 430)
-                    .blur(radius: 18)
-                    .opacity(reduceMotion ? 0.72 : 0.55 + wave * 0.35)
-                    .offset(y: -170)
-                Spacer()
-            }
-            // The 470 pt ellipse is wider than the phone. A flexible frame lets it draw past the
-            // edges without widening the shell, which pushed the + sheets and the terms gate off-screen.
-            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                )
+                .frame(width: 470, height: 430)
+                .blur(radius: 18)
+                .offset(y: -170)
+            Spacer()
         }
+        // The 470 pt ellipse is wider than the phone. A flexible frame lets it draw past the
+        // edges without widening the shell, which pushed the + sheets and the terms gate off-screen.
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .ignoresSafeArea()
-        // The pulse redraws the blurred glow every frame. On the GPU it is cheap; on the CPU it was a
-        // quarter of the main thread on every Rest screen (profiled on device 25 Oct 2026). The group
-        // spans the whole screen, so it clips only what the screen already clips.
+        // Drawn once on the GPU; the nine-second breath is only its opacity, animated by the system,
+        // so nothing is redrawn per frame (a quarter of the main thread before, profiled 25 Oct 2026).
+        // The group spans the whole screen, so it clips only what the screen already clips.
         .drawingGroup()
+        .opacity(reduceMotion ? 0.72 : bright ? 0.90 : 0.55)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 4.5).repeatForever(autoreverses: true), value: bright)
+        .onAppear { bright = true }
         .allowsHitTesting(false)
     }
 }

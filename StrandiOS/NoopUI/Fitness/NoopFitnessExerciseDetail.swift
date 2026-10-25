@@ -5,9 +5,16 @@ import WhoopStore
 
 struct NoopFitnessExerciseDetail: View {
     let choice: NoopFitnessExerciseChoice
+    var initialTab: NoopExerciseInsightsTab = .summary
     @State private var guide = false
+    @State private var tab: NoopExerciseInsightsTab = .summary
+    @StateObject private var insights = NoopExerciseInsightsModel()
+    @EnvironmentObject private var repo: Repository
+    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
     @AppStorage(ExerciseMediaStore.enabledKey) private var animations = false
     @Environment(\.dismiss) private var dismiss
+
+    private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
 
     var body: some View {
         ScrollView {
@@ -18,36 +25,52 @@ struct NoopFitnessExerciseDetail: View {
                     Button("Done") { dismiss() }
                 }
                 Text(choice.equipment ?? "Equipment not specified").foregroundStyle(NoopHTMLColor.copy)
-                NoopExerciseMedia(choice: choice)
-                if !animations {
-                    NoopActionButton(title: "Show animations", variant: .secondary, size: .medium) { animations = true }
-                    Text("Downloads exercise media from GitHub and keeps an offline cache on this phone.")
-                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                }
-                Picker("Exercise details", selection: $guide) {
-                    Text("About").tag(false)
-                    Text("Guide").tag(true)
-                }.pickerStyle(.segmented)
-                if guide {
-                    let steps = instructions
-                    if steps.isEmpty { Text("No instructions are available for this exercise.").foregroundStyle(NoopHTMLColor.copy) }
-                    ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                        HStack(alignment: .top, spacing: 12) {
-                            Text("\(index + 1)").foregroundStyle(NoopHTMLColor.volt)
-                            Text(step).frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                } else {
-                    chips("Equipment", values: choice.definition?.equipmentIds.map { $0.replacingOccurrences(of: "-", with: " ").capitalized } ?? [])
-                    chips("Primary muscles", values: choice.definition?.primaryMuscleId.map { [muscleName($0)] } ?? choice.primary.map { [$0.displayName] } ?? [])
-                    chips("Secondary muscles", values: choice.definition?.secondaryMuscleIds.map(muscleName) ?? choice.secondaries.map(\.displayName))
-                    NoopSectionLabel("How to log")
-                    Text(logTip).foregroundStyle(NoopHTMLColor.copy)
+                NoopTabs(options: [("Summary", NoopExerciseInsightsTab.summary), ("Records", .records),
+                                   ("History", .history), ("How to", .howTo)], selection: $tab)
+                switch tab {
+                case .summary: NoopExerciseSummary(exercise: insights.exercise, units: units)
+                case .records: NoopExerciseRecordsView(exercise: insights.exercise, units: units)
+                case .history: NoopExerciseHistoryView(history: insights.history, exercise: insights.exercise, units: units)
+                case .howTo: howTo
                 }
             }.padding(20)
         }
         .font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.ink)
         .tint(NoopHTMLColor.volt).background(NoopHTMLColor.canvas)
+        .task {
+            tab = initialTab
+            await insights.load(name: choice.name, repo: repo)
+        }
+    }
+
+    @ViewBuilder
+    private var howTo: some View {
+        NoopExerciseMedia(choice: choice)
+        if !animations {
+            NoopActionButton(title: "Show animations", variant: .secondary, size: .medium) { animations = true }
+            Text("Downloads exercise media from GitHub and keeps an offline cache on this phone.")
+                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+        }
+        Picker("Exercise details", selection: $guide) {
+            Text("About").tag(false)
+            Text("Guide").tag(true)
+        }.pickerStyle(.segmented)
+        if guide {
+            let steps = instructions
+            if steps.isEmpty { Text("No instructions are available for this exercise.").foregroundStyle(NoopHTMLColor.copy) }
+            ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                HStack(alignment: .top, spacing: 12) {
+                    Text("\(index + 1)").foregroundStyle(NoopHTMLColor.volt)
+                    Text(step).frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        } else {
+            chips("Equipment", values: choice.definition?.equipmentIds.map { $0.replacingOccurrences(of: "-", with: " ").capitalized } ?? [])
+            chips("Primary muscles", values: choice.definition?.primaryMuscleId.map { [muscleName($0)] } ?? choice.primary.map { [$0.displayName] } ?? [])
+            chips("Secondary muscles", values: choice.definition?.secondaryMuscleIds.map(muscleName) ?? choice.secondaries.map(\.displayName))
+            NoopSectionLabel("How to log")
+            Text(logTip).foregroundStyle(NoopHTMLColor.copy)
+        }
     }
 
     private var instructions: [String] {

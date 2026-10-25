@@ -90,7 +90,7 @@ struct NoopTodayRings: View {
                                 .color(Color(hex: 0x6F7BFF)), .color(NoopRingValues.sleepColor)))
                         }
                     default:
-                        NoopSlotClock { _, reveal in
+                        NoopSlotClock(continuous: false) { _, reveal in
                             Canvas { context, size in
                                 NoopSegmentedRings.draw(in: &context, size: size, values: values.scaled(NoopRingValues.spring(reveal)))
                             }
@@ -427,7 +427,7 @@ private struct NoopDialRings: View {
                         .stroke(Color(hex: 0x5A5F62), style: StrokeStyle(lineWidth: 6, lineCap: .butt))
                         .rotationEffect(.degrees(-90))
                 }
-                NoopSlotClock { _, reveal in
+                NoopSlotClock(continuous: false) { _, reveal in
                     Circle().trim(from: 0, to: min(1, fill * NoopRingValues.spring(reveal)))
                         .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .rotationEffect(.degrees(-90))
