@@ -152,6 +152,22 @@ struct RootTabView: View {
     /// screen's own chevron says. The live session only exists while one is recording; a stale Live
     /// Activity tap lands on Fitness instead of an empty recorder.
     private func openWidgetLink(_ link: WidgetLink) {
+        // A start link from the Train widget: the same one-session rule as every start button. A session
+        // already running is opened instead.
+        if link.route == "start-sport" || link.route == "start-routine", let item = link.item {
+            if let running = NoopRunningSession.current(app: model, lift: liftSession, navigation: navigation) {
+                running.go(navigation: navigation, lift: liftSession)
+                return
+            }
+            navigation.reset(to: .fitness)
+            if link.route == "start-sport" {
+                _ = NoopCardioStarter.start(item, app: model, live: liftSession, navigation: navigation)
+            } else {
+                Task { _ = await NoopFitnessRoutineStarter.start(routineID: item, repo: repo, live: liftSession,
+                                                                   app: model, navigation: navigation) }
+            }
+            return
+        }
         guard let route = NoopRoute(rawValue: link.route) else { return }
         if route == .live, model.activeWorkout == nil {
             navigation.reset(to: .fitness)

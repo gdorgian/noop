@@ -119,35 +119,35 @@ struct NOOPLiveActivity: Widget {
     private let sky = Color(.sRGB, red: 143 / 255, green: 211 / 255, blue: 245 / 255, opacity: 1)
     private let skyInk = Color(.sRGB, red: 4 / 255, green: 18 / 255, blue: 26 / 255, opacity: 1)
 
-    /// The goal as a bar under the clock. A time goal fills by itself from the session's clock (no push a
-    /// second); a distance goal moves when the app pushes its hundredths. Full, it turns into a check.
+    /// The goal as a small ring and its words. A time goal's ring fills by itself from the session's clock
+    /// (no push a second); a distance goal moves when the app pushes its hundredths. Reached, a check.
+    /// A ring, not a bar: a linear ProgressView given the unbounded width some Live Activity regions propose
+    /// lays out at a NaN origin and kills the extension (26 Oct 2026). A ring has a fixed size.
     @ViewBuilder
     private func goalBar(_ workout: NOOPActivityAttributes.Workout) -> some View {
         let reached = workout.goalReached == true
-        VStack(alignment: .leading, spacing: 5) {
+        HStack(spacing: 8) {
             Group {
-                if reached || workout.isPaused || workout.goalSeconds == nil {
-                    let f = reached ? 1 : workout.goalFraction ?? pausedFraction(workout)
-                    ProgressView(value: f)
+                if reached {
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(zoneColors[2])
+                } else if workout.isPaused || workout.goalSeconds == nil {
+                    ProgressView(value: workout.goalFraction ?? pausedFraction(workout))
+                        .progressViewStyle(.circular)
                 } else if let s = workout.goalSeconds {
                     ProgressView(timerInterval: workout.clockStart...workout.clockStart.addingTimeInterval(TimeInterval(s)),
                                  countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
+                        .progressViewStyle(.circular)
                 }
             }
-            .progressViewStyle(.linear)
-            .tint(reached ? zoneColors[2] : sky)
-            .labelsHidden()
-            HStack(spacing: 5) {
-                if reached {
-                    Image(systemName: "checkmark.circle.fill").font(.system(size: 10.5, weight: .bold))
-                        .foregroundStyle(zoneColors[2])
-                }
-                Text(reached ? "Goal reached" : (workout.goalLabel ?? ""))
-                    .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 11))
-                    .monospacedDigit()
-                    .foregroundStyle(reached ? zoneColors[2] : secondary)
-                    .lineLimit(1)
-            }
+            .tint(sky)
+            .frame(width: 20, height: 20)
+            Text(reached ? "Goal reached" : (workout.goalLabel ?? ""))
+                .font(.custom(NoopSpecType.Face.sansSemiBold, fixedSize: 12))
+                .monospacedDigit()
+                .foregroundStyle(reached ? zoneColors[2] : secondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
         }
     }
 

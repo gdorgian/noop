@@ -238,8 +238,35 @@ public struct WidgetPanels: Codable, Equatable, Sendable {
         /// Days trained among the last 28.
         public var trained28: Int
 
+        /// A sport or routine the Train widget starts in one tap.
+        public struct Start: Codable, Equatable, Sendable {
+            public var title: String
+            public var symbol: String
+            /// The sport's catalogue name, or the routine's id.
+            public var key: String
+            public var strength: Bool
+            public init(title: String, symbol: String, key: String, strength: Bool) {
+                self.title = title
+                self.symbol = symbol
+                self.key = key
+                self.strength = strength
+            }
+        }
+
+        // The Train widget. Optional, so a payload written before it existed still decodes.
+        /// Recent sports, newest first, then routines: what one tap starts.
+        public var starts: [Start]?
+        public var streakWeeks: Int?
+        public var weekStrengthMinutes: Int?
+        public var weekCardioMinutes: Int?
+
         public init(weekMinutes: [Int?], weekSessions: [Int], weekLetters: [String], todayIndex: Int,
-                    last: Session?, grid: [Int?], trained28: Int) {
+                    last: Session?, grid: [Int?], trained28: Int, starts: [Start]? = nil, streakWeeks: Int? = nil,
+                    weekStrengthMinutes: Int? = nil, weekCardioMinutes: Int? = nil) {
+            self.starts = starts
+            self.streakWeeks = streakWeeks
+            self.weekStrengthMinutes = weekStrengthMinutes
+            self.weekCardioMinutes = weekCardioMinutes
             self.weekMinutes = weekMinutes
             self.weekSessions = weekSessions
             self.weekLetters = weekLetters
@@ -315,7 +342,7 @@ public struct WidgetPanels: Codable, Equatable, Sendable {
 
     /// Widget kinds that read this payload, reloaded together when it changes.
     public static let kinds = ["SleepWidget", "StepsWidget", "VitalsWidget", "WeightWidget",
-                               "WorkoutsWidget", "ConsistencyWidget", "GoalWidget"]
+                               "WorkoutsWidget", "TrainWidget", "ConsistencyWidget", "GoalWidget"]
 
     public static func load() -> WidgetPanels? {
         guard let defaults = UserDefaults(suiteName: WidgetSnapshot.suiteName),

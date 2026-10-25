@@ -383,3 +383,166 @@ struct TrainingGrid: View {
         .accessibilityLabel("Trained \(days.compactMap { $0 }.filter { $0 > 0 }.count) days in the last \(weeks) weeks")
     }
 }
+
+// MARK: - Train
+
+/// The fastest way into a session: your streak, this week's weights and cardio as the two colours of
+/// Fitness, and your recent sports and routines, each a tap from a running session.
+struct TrainWidget: Widget {
+    static let kind = "TrainWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: Self.kind, provider: PanelsProvider()) { entry in
+            TrainWidgetView(entry: entry)
+        }
+        .configurationDisplayName("Train")
+        .description("Start a sport or a routine in one tap, with your streak and this week beside it.")
+        .supportedFamilies([.systemSmall, .systemMedium])
+        .contentMarginsDisabled()
+    }
+}
+
+struct TrainWidgetView: View {
+    @Environment(\.widgetFamily) private var systemFamily
+    var familyOverride: WidgetFamily? = nil
+    private var family: WidgetFamily { familyOverride ?? systemFamily }
+    let entry: PanelsEntry
+
+    private var training: WidgetPanels.Training? { entry.panels?.training }
+    private var starts: [WidgetPanels.Training.Start] { training?.starts ?? [] }
+
+    /// This week's minutes, unless the published week is over.
+    private var week: (strength: Int, cardio: Int) {
+        guard let training, let updated = entry.panels?.updated, sameWeek(updated, entry.date) else { return (0, 0) }
+        return (training.weekStrengthMinutes ?? 0, training.weekCardioMinutes ?? 0)
+    }
+
+    private func link(_ s: WidgetPanels.Training.Start) -> WidgetLink {
+        s.strength ? .startRoutine(s.key) : .startSport(s.key)
+    }
+
+    var body: some View {
+        if family == .systemMedium {
+            medium.panelChrome(tint: PanelInk.blueLight, link: .workouts)
+        } else {
+            small.panelChrome(tint: PanelInk.blueLight, link: starts.first.map(link) ?? .workouts)
+        }
+    }
+
+    // MARK: Small: the one you do most, a tap away
+
+    private var small: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            streakLine
+            Spacer(minLength: 6)
+            if let first = starts.first {
+                tile(first, big: true)
+                let total = week.strength + week.cardio
+                Text(total > 0 ? "\(PanelFormat.duration(Double(total))) this week" : "Tap to start")
+                    .font(PanelType.sans(12)).foregroundStyle(PanelInk.copy).lineLimit(1)
+                    .padding(.top, 3)
+            } else {
+                Text("Record a session and it appears here, one tap from starting again.")
+                    .font(PanelType.sans(12)).foregroundStyle(PanelInk.quiet).lineLimit(3)
+            }
+        }
+    }
+
+    // MARK: Medium: the week, and four ways in
+
+    private var medium: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 0) {
+                streakLine
+                Spacer(minLength: 6)
+                let total = week.strength + week.cardio
+                PanelFigure(value: total > 0 ? PanelFormat.duration(Double(total)) : "0m", size: 30, dim: total == 0)
+                Text("this week").font(PanelType.sans(12)).foregroundStyle(PanelInk.copy)
+                split.padding(.top, 9)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Grid(horizontalSpacing: 7, verticalSpacing: 7) {
+                let shown = Array(starts.prefix(4))
+                GridRow {
+                    ForEach(Array(shown.prefix(2).enumerated()), id: \.offset) { _, s in
+                        Link(destination: link(s).url) { tile(s, big: false) }
+                    }
+                }
+                if shown.count > 2 {
+                    GridRow {
+                        ForEach(Array(shown.dropFirst(2).enumerated()), id: \.offset) { _, s in
+                            Link(destination: link(s).url) { tile(s, big: false) }
+                        }
+                    }
+                }
+            }
+            .frame(width: 168)
+        }
+    }
+
+    private var streakLine: some View {
+        let weeks = training?.streakWeeks ?? 0
+        return HStack(spacing: 5) {
+            Image(systemName: weeks > 0 ? "flame.fill" : "flame")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(weeks > 0 ? PanelInk.warm : PanelInk.quiet)
+                .widgetAccentable()
+            Text(weeks > 0 ? "\(weeks)-week streak" : "Train")
+                .font(PanelType.strong(11)).tracking(0.9).textCase(.uppercase)
+                .foregroundStyle(PanelInk.kicker).lineLimit(1)
+        }
+    }
+
+    /// This week's minutes as the two colours of Fitness, weights beneath cardio's blue.
+    private var split: some View {
+        let total = max(1, week.strength + week.cardio)
+        return VStack(alignment: .leading, spacing: 5) {
+            GeometryReader { g in
+                HStack(spacing: 2) {
+                    if week.strength > 0 {
+                        Capsule().fill(PanelInk.volt).frame(width: max(4, g.size.width * CGFloat(week.strength) / CGFloat(total)))
+                    }
+                    if week.cardio > 0 {
+                        Capsule().fill(PanelInk.blueLight)
+                    }
+                    if week.strength + week.cardio == 0 { Capsule().fill(PanelInk.track) }
+                }
+            }
+            .frame(height: 5)
+            HStack(spacing: 10) {
+                dot(PanelInk.volt, week.strength)
+                dot(PanelInk.blueLight, week.cardio)
+            }
+        }
+    }
+
+    private func dot(_ color: Color, _ minutes: Int) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 5, height: 5)
+            Text(minutes > 0 ? PanelFormat.duration(Double(minutes)) : "—")
+                .font(PanelType.sans(11)).foregroundStyle(PanelInk.copy).monospacedDigit()
+        }
+    }
+
+    private func tile(_ s: WidgetPanels.Training.Start, big: Bool) -> some View {
+        let tint = s.strength ? PanelInk.volt : PanelInk.blueLight
+        return VStack(alignment: .leading, spacing: big ? 8 : 5) {
+            Image(systemName: s.symbol)
+                .font(.system(size: big ? 22 : 15, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: big ? 44 : 30, height: big ? 44 : 30)
+                .background(tint.opacity(0.16), in: Circle())
+                .widgetAccentable()
+            HStack(spacing: 4) {
+                Text(s.title).font(PanelType.strong(big ? 15 : 12)).foregroundStyle(PanelInk.primary)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                if big {
+                    Image(systemName: "play.fill").font(.system(size: 9, weight: .bold)).foregroundStyle(tint)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(big ? 0 : 9)
+        .background(big ? Color.clear : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+    }
+}

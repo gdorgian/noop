@@ -21,6 +21,7 @@ public struct NoopWidgetFamilyDefinition: Identifiable, Hashable, Sendable {
         case vitals
         case weight
         case workouts
+        case train
         case consistency
         case goal
     }
@@ -126,6 +127,13 @@ public enum NoopWidgetFamilyRegistry {
             title: "Workouts",
             detail: "this week's sessions and the last one",
             configurationKind: "WorkoutsWidget",
+            isNew: true
+        ),
+        .init(
+            id: .train,
+            title: "Train",
+            detail: "start a sport or a routine in one tap, beside your streak",
+            configurationKind: "TrainWidget",
             isNew: true
         ),
         .init(

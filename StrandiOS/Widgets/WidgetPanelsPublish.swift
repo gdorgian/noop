@@ -236,6 +236,30 @@ enum WidgetPanelsPublisher {
             calendar.date(byAdding: .day, value: -back, to: today).map { (countByDay[$0] ?? 0) > 0 } ?? false
         }.count
         let last = sessions.max { $0.start < $1.start }
+
+        // The Train widget: recent sports, then routines; the streak; this week's two colours.
+        var starts: [WidgetPanels.Training.Start] = []
+        for row in rows.sorted(by: { $0.startTs > $1.startTs }) where CardioModality.of(sport: row.sport) != .strength {
+            let name = row.sport
+            guard !name.isEmpty, !["detected", "other", "activity"].contains(name.lowercased()),
+                  WorkoutCatalog.sport(named: name) != nil,
+                  !starts.contains(where: { $0.key.caseInsensitiveCompare(name) == .orderedSame }) else { continue }
+            starts.append(.init(title: name, symbol: NoopFitnessCardioLive.symbol(for: name), key: name, strength: false))
+            if starts.count == 3 { break }
+        }
+        for name in ["Running", "Walking", "Cycling"] where starts.count < 3 && !starts.contains(where: { $0.key == name }) {
+            starts.append(.init(title: name, symbol: NoopFitnessCardioLive.symbol(for: name), key: name, strength: false))
+        }
+        if let store = await repo.storeHandle() {
+            let programs = ((try? await store.liftPrograms(deviceId: repo.deviceId)) ?? [])
+                .sorted { $0.updatedAt > $1.updatedAt }
+            for p in programs.prefix(2) {
+                starts.append(.init(title: p.name, symbol: "dumbbell.fill", key: p.id, strength: true))
+            }
+        }
+        let thisWeek = sessions.filter { $0.start >= monday }
+        let streak = TrainingStreak.reading(sessionDates: sessions.map(\.start), now: now)
+
         return .init(
             weekMinutes: weekDays.map { $0 > today ? nil : (minutesByDay[$0] ?? 0) },
             weekSessions: weekDays.map { countByDay[$0] ?? 0 },
@@ -246,7 +270,11 @@ enum WidgetPanelsPublisher {
             last: last.map { .init(title: $0.title, strength: $0.strength, symbol: $0.symbol,
                                    start: $0.start, minutes: $0.minutes) },
             grid: grid,
-            trained28: trained28)
+            trained28: trained28,
+            starts: starts,
+            streakWeeks: streak.weeks,
+            weekStrengthMinutes: thisWeek.filter(\.strength).reduce(0) { $0 + $1.minutes },
+            weekCardioMinutes: thisWeek.filter { !$0.strength }.reduce(0) { $0 + $1.minutes })
     }
 
     private static func symbol(_ kind: FitnessCardioKind) -> String {

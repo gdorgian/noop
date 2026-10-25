@@ -44,6 +44,7 @@ struct WidgetBoard: View {
                 row(PanelInk.blue) { VitalsWidgetView(familyOverride: $0, renderingOverride: mode, entry: entry) }
                 row(PanelInk.blush) { WeightWidgetView(familyOverride: $0, renderingOverride: mode, entry: entry) }
                 row(PanelInk.volt) { WorkoutsWidgetView(familyOverride: $0, renderingOverride: mode, entry: entry) }
+                row(PanelInk.blueLight) { TrainWidgetView(familyOverride: $0, entry: entry) }
                 row(PanelInk.volt) { ConsistencyWidgetView(familyOverride: $0, renderingOverride: mode, entry: entry) }
                 row(PanelInk.warm) { GoalWidgetView(familyOverride: $0, renderingOverride: mode, entry: entry) }
                 Text("Lock Screen").font(.caption.monospaced()).foregroundStyle(.secondary)

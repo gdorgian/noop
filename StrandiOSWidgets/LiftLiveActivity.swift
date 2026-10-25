@@ -98,7 +98,6 @@ struct LiftLiveActivity: Widget {
             }
 
             if isRunningRest(state) {
-                restBar(state)
                 restControls
             } else {
                 progress(state, showsLabel: true)
@@ -112,20 +111,6 @@ struct LiftLiveActivity: Widget {
     private func isRunningRest(_ state: LiftActivityAttributes.ContentState) -> Bool {
         guard state.isResting, !state.isPaused, !state.isReady, let end = state.restEndsAt else { return false }
         return end > .now
-    }
-
-    /// The rest draining away by itself — the system animates it from the two dates, so nothing is pushed
-    /// while it runs.
-    @ViewBuilder
-    private func restBar(_ state: LiftActivityAttributes.ContentState) -> some View {
-        if let end = state.restEndsAt, end > state.stageStartedAt {
-            ProgressView(timerInterval: state.stageStartedAt...end, countsDown: true) {
-                EmptyView()
-            } currentValueLabel: { EmptyView() }
-            .progressViewStyle(.linear)
-            .tint(aura)
-            .labelsHidden()
-        }
     }
 
     /// +30 s and Skip act in place; they change only the rest, never a set. Starting the next set stays a
@@ -178,7 +163,6 @@ struct LiftLiveActivity: Widget {
             }
 
             if isRunningRest(state) {
-                restBar(state)
                 restControls
             } else {
                 progress(state, showsLabel: false)

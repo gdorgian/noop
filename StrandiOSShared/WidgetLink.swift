@@ -11,10 +11,13 @@ public struct WidgetLink: Equatable, Sendable {
 
     public let route: String
     public let parent: String?
+    /// What the link acts on, for a start link: the sport name or the routine id.
+    public let item: String?
 
-    public init(route: String, parent: String? = nil) {
+    public init(route: String, parent: String? = nil, item: String? = nil) {
         self.route = route
         self.parent = parent
+        self.item = item
     }
 
     public init?(url: URL) {
@@ -22,8 +25,9 @@ public struct WidgetLink: Equatable, Sendable {
         let route = url.pathComponents.dropFirst().first ?? ""
         guard !route.isEmpty else { return nil }
         self.route = route
-        parent = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems?.first { $0.name == "from" }?.value
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        parent = items?.first { $0.name == "from" }?.value
+        item = items?.first { $0.name == "item" }?.value
     }
 
     public var url: URL {
@@ -31,7 +35,10 @@ public struct WidgetLink: Equatable, Sendable {
         components.scheme = Self.scheme
         components.host = Self.host
         components.path = "/" + route
-        if let parent { components.queryItems = [URLQueryItem(name: "from", value: parent)] }
+        var items: [URLQueryItem] = []
+        if let parent { items.append(URLQueryItem(name: "from", value: parent)) }
+        if let item { items.append(URLQueryItem(name: "item", value: item)) }
+        if !items.isEmpty { components.queryItems = items }
         return components.url ?? URL(string: "noop://open")!
     }
 
@@ -43,6 +50,9 @@ public struct WidgetLink: Equatable, Sendable {
     public static let consistency = WidgetLink(route: "fitness-calendar", parent: "fitness")
     public static let goal = WidgetLink(route: "goal", parent: "you")
     public static let liveSession = WidgetLink(route: "live", parent: "fitness")
+    /// Start a recorded session of a sport, or a saved routine, as the Fitness tiles do.
+    public static func startSport(_ name: String) -> WidgetLink { WidgetLink(route: "start-sport", item: name) }
+    public static func startRoutine(_ id: String) -> WidgetLink { WidgetLink(route: "start-routine", item: id) }
 }
 
 public extension Notification.Name {

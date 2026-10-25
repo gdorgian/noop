@@ -374,6 +374,7 @@ struct NOOPPanelsBundle: WidgetBundle {
         VitalsWidget()
         WeightWidget()
         WorkoutsWidget()
+        TrainWidget()
         ConsistencyWidget()
         GoalWidget()
     }
