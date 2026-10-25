@@ -92,6 +92,8 @@ struct NoopPageEditing {
     /// Set when Add was opened from the free half beside a lone tile: the sheet offers tiles only,
     /// and the one picked goes in beside it.
     var addBeside: String?
+    /// A section being dragged out of the Add sheet onto the page.
+    var incoming: String?
 }
 
 /// Lays out a page's sections in the wearer's order. While editing, every section carries a remove
@@ -112,7 +114,9 @@ struct NoopEditableSections<Section: View>: View {
     /// middle passes another's.
     @State private var dragging: String?
     @State private var dragStartMid: CGPoint = .zero
-    @State private var dragTranslation: CGSize = .zero
+    /// How far the finger has moved, kept out of the page's own state: it changes every frame of a
+    /// carry, and as state it redrew every section on the page each frame.
+    @StateObject private var carryMotion = NoopCarryMotion()
     @State private var frames: [String: CGRect] = [:]
     /// Where the page sits on screen, so a save's wave starts in the middle of what is in view.
     /// Where the sections sit on screen, read only when Save sends its wave. Kept in a reference
@@ -123,6 +127,8 @@ struct NoopEditableSections<Section: View>: View {
     /// animated linearly so every section reads its own push from the same moment.
     @State private var wave: NoopSurfaceWave?
     @State private var waveProgress: Double = 0
+    /// Where a section carried out of the Add sheet is, on screen.
+    @StateObject private var incomingDrag = NoopIncomingDrag()
 
     /// What the page draws, in order: its sections, and while editing a "+ Add" in the free half
     /// beside a tile that has no partner.
@@ -197,6 +203,11 @@ struct NoopEditableSections<Section: View>: View {
         // Room for Cancel and Save, so the first section's remove disc never sits under them.
         .padding(.top, editing.active ? 52 : 0)
         .coordinateSpace(name: "noop.sections")
+        // A section carried out of the Add sheet: the page makes room under the finger as it moves.
+        // Only this small observer follows the finger, so the page is not redrawn every frame.
+        .background(NoopIncomingObserver(drag: incomingDrag) { point in
+            place(incomingAt: CGPoint(x: point.x - screenFrame.rect.minX, y: point.y - screenFrame.rect.minY))
+        })
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { screenFrame.rect = $0 }
         .onChange(of: editing.saves) {
             let middle = UIScreen.main.bounds.midY - screenFrame.rect.minY
@@ -212,9 +223,15 @@ struct NoopEditableSections<Section: View>: View {
             }
         }
         #endif
-        .sheet(isPresented: $editing.adding, onDismiss: { editing.addBeside = nil }) {
-            NoopAddSectionSheet(layout: layout, editing: $editing, isEmpty: isEmpty, section: section)
-                .noopSheet()
+        .fullScreenCover(isPresented: $editing.adding, onDismiss: {
+            editing.addBeside = nil
+            // Landed: the page answers with its wave from where it went.
+            if let id = incomingDrag.landed, let frame = frames[id] {
+                send(NoopSurfaceWave(origin: frame, delay: 0.05, source: id))
+            }
+            incomingDrag.landed = nil
+        }) {
+            NoopAddSectionSheet(layout: layout, editing: $editing, drag: incomingDrag, isEmpty: isEmpty, section: section)
         }
     }
 
@@ -237,7 +254,8 @@ struct NoopEditableSections<Section: View>: View {
             }
         }
         .scaleEffect(dragging == id ? 1.06 : 1)
-        .opacity(dragging == id ? 0.94 : 1)
+        // The gap a section coming from the Add sheet will land in; the drag itself carries its look.
+        .opacity(editing.incoming == id ? 0 : dragging == id ? 0.94 : 1)
         .shadow(color: .black.opacity(dragging == id ? 0.55 : 0), radius: 22, y: 12)
         .overlay(alignment: .topLeading) {
             if (info?.removable ?? true) && dragging == nil {
@@ -260,8 +278,9 @@ struct NoopEditableSections<Section: View>: View {
         }
         .modifier(NoopJiggle(active: editing.active && dragging != id, seed: id.hashValue,
                              amplitude: (layout.section(id)?.half ?? false) ? 1.1 : 0.35))
-        .offset(x: dragging == id ? dragStartMid.x + dragTranslation.width - (frames[id]?.midX ?? dragStartMid.x) : 0,
-                y: dragging == id ? dragStartMid.y + dragTranslation.height - (frames[id]?.midY ?? dragStartMid.y) : 0)
+        .modifier(NoopCarryOffset(motion: carryMotion, active: dragging == id,
+                                  base: CGSize(width: dragStartMid.x - (frames[id]?.midX ?? dragStartMid.x),
+                                               height: dragStartMid.y - (frames[id]?.midY ?? dragStartMid.y))))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(info?.title ?? id)
         .accessibilityAction(named: "Move up") { move(id, by: -1) }
@@ -304,11 +323,11 @@ struct NoopEditableSections<Section: View>: View {
             withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
                 dragging = id
                 dragStartMid = frames[id].map { CGPoint(x: $0.midX, y: $0.midY) } ?? .zero
-                dragTranslation = .zero
+                carryMotion.translation = .zero
             }
         case .moved(let delta):
             guard dragging == id else { return }
-            dragTranslation = delta
+            carryMotion.translation = delta
             let point = CGPoint(x: dragStartMid.x + delta.width, y: dragStartMid.y + delta.height)
             let others = editing.draft.filter { $0 != id }
             let target = others.filter { Self.isBefore(frames[$0], point) }.count
@@ -325,7 +344,7 @@ struct NoopEditableSections<Section: View>: View {
             guard dragging == id else { return }
             withAnimation(.spring(response: 0.36, dampingFraction: 0.72)) {
                 dragging = nil
-                dragTranslation = .zero
+                carryMotion.translation = .zero
             }
             // It lands like a drop: the page moves out from its edges, and the phone feels it.
             NoopHaptics.play(.land)
@@ -333,6 +352,28 @@ struct NoopEditableSections<Section: View>: View {
                 send(NoopSurfaceWave(origin: landed, delay: 0.12, source: id))
             }
         }
+    }
+
+    /// The gallery layer appears at once; its own panel springs up and its dim fades in.
+    static func presentGallery(_ editing: Binding<NoopPageEditing>) {
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) { editing.wrappedValue.adding = true }
+    }
+
+    /// Puts the section coming from the Add sheet where the finger is, the rest making way.
+    private func place(incomingAt point: CGPoint) {
+        guard let id = editing.incoming else { return }
+        let others = editing.draft.filter { $0 != id }
+        let target = others.filter { Self.isBefore(frames[$0], point) }.count
+        guard editing.draft.firstIndex(of: id) != target else { return }
+        let first = !editing.draft.contains(id)
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            var order = others
+            order.insert(id, at: min(target, order.count))
+            editing.draft = order
+        }
+        NoopHaptics.play(first ? .lift : .pass)
     }
 
     /// Whether a section sits before the carried one's middle: one wholly above it, or one beside it
@@ -350,7 +391,7 @@ struct NoopEditableSections<Section: View>: View {
         Button {
             NoopHaptics.play(.tick)
             editing.addBeside = id
-            editing.adding = true
+            NoopEditableSections.presentGallery($editing)
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "plus").font(.system(size: 14, weight: .semibold))
@@ -371,7 +412,7 @@ struct NoopEditableSections<Section: View>: View {
         if editing.active {
             VStack(spacing: 12) {
                 if layout.catalog.contains(where: { !editing.draft.contains($0.id) }) {
-                    Button { editing.addBeside = nil; editing.adding = true } label: {
+                    Button { editing.addBeside = nil; NoopEditableSections.presentGallery($editing) } label: {
                         VStack(spacing: 6) {
                             Image(systemName: "plus").font(.system(size: 17, weight: .semibold))
                             Text("Add section").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
@@ -680,9 +721,53 @@ private struct NoopSectionPlaceholder: View {
 private struct NoopAddSectionSheet<Section: View>: View {
     @ObservedObject var layout: NoopPageLayout
     @Binding var editing: NoopPageEditing
+    let drag: NoopIncomingDrag
     let isEmpty: (String) -> Bool
     let section: (String) -> Section
     @Environment(\.dismiss) private var dismiss
+    /// The section held and being carried out onto the page, and where the finger is.
+    @State private var lifted: NoopPageSection?
+    @State private var fingerAt: CGPoint = .zero
+    @State private var sheetOrigin: CGPoint = .zero
+    /// The panel is up; it springs in after the layer appears and drops before it goes.
+    @State private var shown = false
+    /// Down while a preview is held; a touch the system takes away still lands what it carried.
+    @GestureState private var holding = false
+
+    /// Hold a preview to lift it; the sheet steps aside and it follows the finger onto the page.
+    private func carryOut(_ info: NoopPageSection) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.3)
+            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
+            .updating($holding) { _, state, _ in state = true }
+            .onChanged { value in
+                guard case .second(true, let moving) = value, let moving else { return }
+                if lifted == nil {
+                    NoopHaptics.play(.lift)
+                    editing.addBeside = nil
+                    editing.incoming = info.id
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { lifted = info }
+                }
+                fingerAt = moving.location
+                drag.point = moving.location
+            }
+            .onEnded { _ in land() }
+    }
+
+    private func land() {
+                guard let info = lifted else { return }
+                if !editing.draft.contains(info.id) { editing.draft.append(info.id) }
+                drag.landed = info.id
+                drag.point = nil
+                NoopHaptics.play(.land)
+                // The layer goes at once, so the tile seems to drop straight into its place.
+                var still = Transaction()
+                still.disablesAnimations = true
+                withTransaction(still) {
+                    editing.incoming = nil
+                    lifted = nil
+                    editing.adding = false
+                }
+    }
 
     private var missing: [NoopPageSection] { layout.catalog.filter { !editing.draft.contains($0.id) } }
     private var tiles: [NoopPageSection] { missing.filter(\.half) }
@@ -698,13 +783,51 @@ private struct NoopAddSectionSheet<Section: View>: View {
             }
         }
         editing.addBeside = nil
-        dismiss()
+        close()
+    }
+
+    /// Down and away like a sheet, then the layer goes.
+    private func close() {
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.92)) { shown = false }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) { editing.adding = false }
+        }
     }
 
     var body: some View {
+        // A full-screen layer with a panel drawn as a sheet, so the panel can slide away while a
+        // section is carried out of it and the page shows underneath, as the Home Screen's gallery does.
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(lifted == nil && shown ? 0.4 : 0)
+                .ignoresSafeArea()
+                .onTapGesture { close() }
+            panel
+                .offset(y: lifted == nil && shown ? 0 : UIScreen.main.bounds.height)
+        }
+        .onAppear { withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { shown = true } }
+        .overlay(alignment: .topLeading) {
+            if let lifted {
+                let width = UIScreen.main.bounds.width - 40
+                section(lifted.id).allowsHitTesting(false)
+                    .frame(width: lifted.half ? NoopSectionFlow.halfWidth(of: width) : width)
+                    .scaleEffect(1.06)
+                    .shadow(color: .black.opacity(0.55), radius: 22, y: 12)
+                    .position(x: fingerAt.x - sheetOrigin.x, y: fingerAt.y - sheetOrigin.y)
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+        }
+        .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { sheetOrigin = $0 }
+        .presentationBackground(.clear)
+        .animation(.spring(response: 0.42, dampingFraction: 0.88), value: lifted == nil)
+        .onChange(of: holding) { _, down in if !down { land() } }
+    }
+
+    private var panel: some View {
         VStack(spacing: 0) {
             HStack {
-                NoopCloseButton { dismiss() }
+                NoopCloseButton { close() }
                 Spacer()
                 Text(editing.addBeside == nil ? "Add section" : "Add a tile").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 Spacer()
@@ -736,6 +859,7 @@ private struct NoopAddSectionSheet<Section: View>: View {
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(NoopHTMLPressStyle())
+                                .simultaneousGesture(carryOut(info))
                                 .accessibilityLabel("Add \(info.title)")
                             }
                         }
@@ -761,14 +885,55 @@ private struct NoopAddSectionSheet<Section: View>: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(NoopHTMLPressStyle())
+                            .simultaneousGesture(carryOut(info))
                         }
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
             }
+            .scrollDisabled(lifted != nil)
         }
-        .background(NoopHTMLColor.canvas)
+        .frame(maxWidth: .infinity)
+        .background(NoopHTMLColor.canvas,
+                    in: UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
+        .padding(.top, 58)
+        .ignoresSafeArea(edges: .bottom)
+    }
+}
+
+/// The finger's travel during a carry, read only by the carried section's offset.
+final class NoopCarryMotion: ObservableObject {
+    @Published var translation: CGSize = .zero
+}
+
+/// Moves the carried section with the finger, one to one, without redrawing the page around it.
+private struct NoopCarryOffset: ViewModifier {
+    @ObservedObject var motion: NoopCarryMotion
+    let active: Bool
+    /// Where it was picked up against where its slot now is.
+    let base: CGSize
+
+    func body(content: Content) -> some View {
+        content.offset(x: active ? base.width + motion.translation.width : 0,
+                       y: active ? base.height + motion.translation.height : 0)
+    }
+}
+
+/// A section being carried out of the Add sheet: where the finger is on screen, and what landed.
+final class NoopIncomingDrag: ObservableObject {
+    @Published var point: CGPoint?
+    var landed: String?
+}
+
+/// Follows the finger for the page without redrawing the page.
+private struct NoopIncomingObserver: View {
+    @ObservedObject var drag: NoopIncomingDrag
+    let moved: (CGPoint) -> Void
+
+    var body: some View {
+        Color.clear
+            .onChange(of: drag.point) { _, point in if let point { moved(point) } }
     }
 }
 
