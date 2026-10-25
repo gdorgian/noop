@@ -75,7 +75,7 @@ struct NoopAct5Screens: View {
     @State private var buzz = "Normal"
     @State private var enabled: Set<String> = [
         "Continuous pulse", "Temperature", "Blood oxygen", "Stay connected in the background",
-        "Apple Health", "Bedtime nudge", "Session offer", "Battery alerts", "Off-wrist reminder", "Journal reminder",
+        "Apple Health", "Bedtime nudge", "Session offer", "Battery alerts", "Off-wrist reminder", "Sync reminder", "Journal reminder",
         "Day-cycle sky", "Sky behind cards", "Pause the HRV stream when low", "Sleep staging V2",
         "Overnight only", "Messages", "Phone calls", "Calendar", "WhatsApp", "Reminders",
         "Only when the phone is locked", "Follow iPhone Focus", "Hold them during quiet hours",
@@ -246,6 +246,7 @@ private extension NoopAct5Screens {
         case "Live heart rate in the Dynamic Island": $liveActivityOn
         case "Battery alerts": $behavior.batteryAlerts
         case "Off-wrist reminder": $behavior.wearAlerts
+        case "Sync reminder": $behavior.syncReminder
         case "Power saving": $powerSavingOn
         // Stored as "pause disabled"; the switch asks the positive question.
         case "Pause the HRV stream when low": Binding(get: { !pauseHrvDisabled }, set: { pauseHrvDisabled = !$0 })
@@ -274,6 +275,9 @@ private extension NoopAct5Screens {
         case "Overnight only": model.ble.setKeepRealtimeForData(PuffinExperiment.keepRealtimeForDataEnabled)
         case "SpO₂ strap estimate": Task { await model.intelligence.analyzeRecent(); await model.repo.refresh() }
         case "Illness early warning": if behavior.illnessWatch { IllnessNotifier.requestAuthorization() }
+        case "Sync reminder":
+            if behavior.syncReminder { SyncReminder.requestAuthorization() }
+            model.rearmSyncReminder()
         default: break
         }
     }
@@ -3367,6 +3371,8 @@ private extension NoopAct5Screens {
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Off-wrist reminder", detail: "One notice when the strap has been off your wrist for ten minutes. Not while it charges.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
+                    toggleRow("Sync reminder", detail: "A silent notice when the strap hasn’t synced for three hours, usually because Noop was swiped away. Every sync pushes it back.", tint: Self.blush)
+                    Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Offer a workout it spotted", detail: "Sees a probable session in your heart rate and offers to save it. It never creates one for you.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Quiet hours", detail: "Nothing buzzes between your anchor and your usual wake, whatever else is on.", tint: Self.blush)
@@ -3555,7 +3561,7 @@ private extension NoopAct5Screens {
     var settingsSearchKeywords: [String: String] {
         [
         "Strap": "your strap connection battery sensors sync manage straps pair switch forget rename band automations double tap move reminder stress check-ins illness live heart rate dynamic island lock screen",
-        "Alerts": "battery alerts charging off-wrist reminder wrist wear notification offer a workout spotted detect auto quiet hours buzz anchor wake",
+        "Alerts": "battery alerts charging off-wrist reminder sync reminder not synced swiped away wrist wear notification offer a workout spotted detect auto quiet hours buzz anchor wake",
         "Battery": "power saving sync 45 minutes low battery pause hrv stream",
         "Workouts and Today": "exercise animations media keep the screen on workout journal reminder today strip hydration water recalibrate baselines recovery hrv resting pulse respiration skin temperature restart",
         "Health and data": "apple health healthkit data permissions privacy import history nutrition backup restore noopbak export",

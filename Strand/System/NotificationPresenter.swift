@@ -37,6 +37,11 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
             completionHandler([.sound])
             return
         }
+        // With Noop open the strap is about to sync anyway: the reminder only joins the list.
+        if notification.request.identifier == SyncReminderPolicy.identifier {
+            completionHandler([.list])
+            return
+        }
         completionHandler([.banner, .sound, .list])
     }
 

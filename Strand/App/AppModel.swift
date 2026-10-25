@@ -486,6 +486,15 @@ final class AppModel: ObservableObject {
                 Task { [weak self] in await self?.refreshAfterCompletedBackfill() }
             }
             .store(in: &hrCancellables)
+        #if os(iOS)
+        // Every completed sync moves the "strap hasn't synced" reminder three hours on, at the moment the
+        // strap says it is done rather than after the re-score, which iOS may suspend in the background.
+        live.$lastSyncedAt
+            .compactMap { $0 }
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.rearmSyncReminder() }
+            .store(in: &hrCancellables)
+        #endif
 
         moments = (UserDefaults.standard.array(forKey: "moments") as? [Double] ?? [])
             .map { Date(timeIntervalSince1970: $0) }
@@ -856,6 +865,15 @@ final class AppModel: ObservableObject {
         await healthWriteBack?()
         #endif
     }
+
+    #if os(iOS)
+    /// Move the "strap hasn't synced" reminder three hours on, or withdraw it when its switch is off. Called on
+    /// every completed sync and whenever Noop comes on screen or leaves it (`SyncReminderPolicy`).
+    func rearmSyncReminder() {
+        SyncReminder.rearm(enabled: behavior.syncReminder, lastSyncedAt: live.lastSyncedAt,
+                           log: { [live] line in live.append(log: AppModel.stamped(line)) })
+    }
+    #endif
 
     /// Fold a fresh reading into the smoothing window and republish a stable bpm.
     /// Prefers the strap's reported HR; falls back to 60000/R-R. Clamps to a plausible
