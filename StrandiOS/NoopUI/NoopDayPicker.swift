@@ -112,6 +112,10 @@ struct NoopDaySwipe: ViewModifier {
 /// One day's ring in the month sheet: how full, in which colour; nil for a day with no reading.
 typealias NoopDayRing = (fill: Double, color: Color)
 
+/// A month at a time: close, the page's name and Today along the top, the month between its arrows,
+/// then each day as its number over its ring. The chosen day's number sits on a white disc, today's
+/// is in the accent, and days that cannot be opened keep only a faint number. A sideways swipe on the
+/// grid turns the month.
 struct NoopDayCalendarSheet: View {
     @Binding var offset: Int
     var maxBack = 365
@@ -119,11 +123,13 @@ struct NoopDayCalendarSheet: View {
     /// The ring for a day, or nil.
     let ring: (Date) -> NoopDayRing?
 
-    /// The sheet's height: a month of six weeks with its header and the Today row.
-    static let height: CGFloat = 600
+    /// Tall enough for a six-week month.
+    static let height: CGFloat = 545
+    private static let rowHeight: CGFloat = 62
 
     @Environment(\.dismiss) private var dismiss
     @State private var month: Date = Calendar.current.startOfDay(for: Date())
+    @State private var turn: Edge = .trailing
 
     private var calendar: Calendar { var c = Calendar.current; c.firstWeekday = 2; return c }
     private var today: Date { calendar.startOfDay(for: Date()) }
@@ -131,46 +137,68 @@ struct NoopDayCalendarSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            ZStack {
+                Text(title).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                HStack {
+                    Button { dismiss() } label: {
+                        NoopIconDiscShape(size: .small) { Image(systemName: "xmark").font(.system(size: 13, weight: .semibold)) }
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    .accessibilityLabel("Close")
+                    Spacer()
+                    Button {
+                        NoopHaptics.play(.tick)
+                        offset = 0
+                        dismiss()
+                    } label: {
+                        Text("Today").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                            .foregroundStyle(offset == 0 ? NoopHTMLColor.faint : NoopHTMLColor.blueLight)
+                            .padding(.horizontal, 14).frame(height: NoopControlSize.small.height)
+                            .background(Color.white.opacity(0.06), in: Capsule())
+                            .noopHitTarget()
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    .disabled(offset == 0)
+                }
+            }
+            .padding(.top, 22)
+
             HStack {
-                Text(monthTitle).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink)
-                Spacer()
                 monthArrow("chevron.left", enabled: canGoBack) { shift(-1) }
+                Spacer()
+                Text(monthTitle).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink)
+                    .contentTransition(.opacity)
+                Spacer()
                 monthArrow("chevron.right", enabled: canGoForward) { shift(1) }
             }
-            .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 12)
+            .padding(.top, 18).padding(.bottom, 16)
+
             HStack(spacing: 0) {
-                ForEach(weekdaySymbols, id: \.self) { d in
-                    Text(d).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted).frame(maxWidth: .infinity)
+                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, d in
+                    Text(d).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(0.6)
+                        .foregroundStyle(NoopHTMLColor.faint).frame(maxWidth: .infinity)
                 }
             }
-            .padding(.horizontal, 12).padding(.bottom, 8)
-            ScrollView {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 8) {
-                    ForEach(Array(cells.enumerated()), id: \.offset) { _, day in
-                        if let day { cell(day) } else { Color.clear.frame(height: Self.cellHeight) }
-                    }
+            .padding(.bottom, 8)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 4) {
+                ForEach(Array(cells.enumerated()), id: \.offset) { _, day in
+                    if let day { cell(day) } else { Color.clear.frame(height: Self.rowHeight) }
                 }
-                .padding(.horizontal, 12).padding(.vertical, 12)
-                .id(month)
-                .transition(.opacity)
             }
-            HStack {
-                Button {
-                    offset = 0
-                    dismiss()
-                } label: {
-                    Text("Today").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
-                        .padding(.horizontal, 20).frame(height: 44)
-                        .background(Color.white.opacity(0.06), in: Capsule())
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-                Spacer()
-                Text(title).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.muted)
-            }
-            .padding(.horizontal, 20).padding(.bottom, 18).padding(.top, 6)
+            .id(month)
+            .transition(.asymmetric(insertion: .move(edge: turn).combined(with: .opacity),
+                                    removal: .move(edge: turn == .trailing ? .leading : .trailing).combined(with: .opacity)))
+            .frame(maxHeight: .infinity, alignment: .top)
+            .clipped()
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 20).onEnded { g in
+                guard abs(g.translation.width) > 50, abs(g.translation.width) > abs(g.translation.height) else { return }
+                if g.translation.width < 0, canGoForward { shift(1) }
+                if g.translation.width > 0, canGoBack { shift(-1) }
+            })
         }
-        .background(NoopHTMLColor.canvas)
-        .animation(.snappy(duration: 0.25), value: month)
+        .padding(.horizontal, 18)
         .onAppear { month = calendar.date(from: calendar.dateComponents([.year, .month], from: selected)) ?? today }
     }
 
@@ -179,7 +207,7 @@ struct NoopDayCalendarSheet: View {
     }
 
     private var weekdaySymbols: [String] {
-        let s = calendar.shortWeekdaySymbols
+        let s = calendar.veryShortWeekdaySymbols
         return Array(s[(calendar.firstWeekday - 1)...] + s[..<(calendar.firstWeekday - 1)])
     }
 
@@ -195,61 +223,63 @@ struct NoopDayCalendarSheet: View {
     private var canGoForward: Bool { (calendar.date(byAdding: .month, value: 1, to: month) ?? today) <= today }
 
     private func shift(_ by: Int) {
-        if let m = calendar.date(byAdding: .month, value: by, to: month) {
-            NoopHaptics.play(.tick)
-            month = m
-        }
+        guard let m = calendar.date(byAdding: .month, value: by, to: month) else { return }
+        NoopHaptics.play(.tick)
+        turn = by > 0 ? .trailing : .leading
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.88)) { month = m }
     }
 
     private func monthArrow(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(enabled ? NoopHTMLColor.ink : NoopHTMLColor.chevronDim)
-                .frame(width: 40, height: 40)
-                .background(Color.white.opacity(enabled ? 0.07 : 0.02), in: Circle())
+            NoopIconDiscShape(size: .small) {
+                Image(systemName: symbol).font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(enabled ? NoopHTMLColor.ink : NoopHTMLColor.chevronDim)
+            }
         }
         .buttonStyle(NoopHTMLPressStyle())
         .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.4)
+        .accessibilityLabel(symbol == "chevron.left" ? "Previous month" : "Next month")
     }
-
-    private static let cellHeight: CGFloat = 62
 
     @ViewBuilder
     private func cell(_ day: Date) -> some View {
-        let future = day > today
-        let tooOld = day < oldest
+        let closed = day > today || day < oldest
         let isSelected = calendar.isDate(day, inSameDayAs: selected)
         let isToday = calendar.isDate(day, inSameDayAs: today)
-        let r = future || tooOld ? nil : ring(day)
+        let r = closed ? nil : ring(day)
         Button {
             offset = calendar.dateComponents([.day], from: day, to: today).day ?? 0
             NoopHaptics.play(.pass)
             dismiss()
         } label: {
-            VStack(spacing: 6) {
+            VStack(spacing: 5) {
+                Text("\(calendar.component(.day, from: day))")
+                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: isSelected || isToday ? .bold : .medium)).monospacedDigit()
+                    .foregroundStyle(isSelected ? NoopHTMLColor.canvas
+                                     : closed ? NoopHTMLColor.faint.opacity(0.6)
+                                     : isToday ? NoopHTMLColor.blueLight : NoopHTMLColor.inkSoft)
+                    .frame(width: 30, height: 30)
+                    .background { if isSelected { Circle().fill(NoopHTMLColor.ink) } }
                 ZStack {
-                    // A day that cannot be opened keeps only its number.
-                    Circle().stroke(Color.white.opacity(future || tooOld ? 0 : 0.09), lineWidth: 3.5)
-                    if let r {
-                        Circle().trim(from: 0, to: max(0.03, min(1, r.fill)))
-                            .stroke(r.color, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
+                    if !closed {
+                        Circle().stroke(Color.white.opacity(0.08), lineWidth: 3.5)
+                        if let r {
+                            Circle().trim(from: 0, to: max(0.03, min(1, r.fill)))
+                                .stroke(r.color, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
                     }
                 }
-                .frame(width: 24, height: 24)
-                Text("\(calendar.component(.day, from: day))")
-                    .font(NoopHTMLFont.sans(NoopType.caption, weight: isSelected || isToday ? .bold : .medium)).monospacedDigit()
-                    .foregroundStyle(future || tooOld ? NoopHTMLColor.faint : isSelected || isToday ? NoopHTMLColor.ink : NoopHTMLColor.inkSoft)
+                .frame(width: 22, height: 22)
             }
-            .frame(maxWidth: .infinity).frame(height: Self.cellHeight)
-            .background(isSelected ? Color.white.opacity(0.12) : Color.white.opacity(future || tooOld ? 0 : 0.035), in: Capsule())
-            .overlay {
-                if isToday && !isSelected { Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 1) }
-            }
+            .frame(maxWidth: .infinity).frame(height: Self.rowHeight)
+            .contentShape(Rectangle())
         }
         .buttonStyle(NoopHTMLPressStyle())
-        .disabled(future || tooOld)
+        .disabled(closed)
         .accessibilityLabel(dayLabel(day, r))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func dayLabel(_ day: Date, _ r: NoopDayRing?) -> String {

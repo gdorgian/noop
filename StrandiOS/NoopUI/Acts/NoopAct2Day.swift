@@ -465,7 +465,7 @@ struct NoopAct2Screens: View {
     }
 
     /// The breathing room under the rings, before whatever section the wearer put next.
-    static let ringsGap: CGFloat = 18
+    static let ringsGap: CGFloat = 34
 
     /// Today's sections in their default order. The header and the look-back banner stay above them.
     static let todaySections: [NoopPageSection] = [
@@ -1031,7 +1031,7 @@ struct NoopAct2Screens: View {
         .padding(.bottom, 4)
         .sheet(isPresented: $activityStatusOpen) {
             NoopActivityStatusSheet(state: $activityStatus)
-                .noopSheet([.height(NoopActivityStatusSheet.height)])
+                .noopFloatingSheet(height: NoopActivityStatusSheet.height)
         }
         .sheet(isPresented: $todayCalendarOpen) {
             // Today keeps no history of its own yet, so a past day opens its Recovery.
@@ -1043,7 +1043,7 @@ struct NoopAct2Screens: View {
                 repo.days.last { $0.day == Repository.localDayKey(date) }?.recovery
                     .map { (min(1, $0 / 100), NoopHeroFamily.current.dayColor(.recovery, $0)) }
             }
-            .noopSheet([.height(NoopDayCalendarSheet.height)])
+            .noopFloatingSheet(height: NoopDayCalendarSheet.height)
         }
     }
 

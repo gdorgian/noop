@@ -65,7 +65,7 @@ struct NoopScorePageTitle: View {
         }
         .sheet(isPresented: $calendarOpen) {
             NoopDayCalendarSheet(offset: $dayOffset, maxBack: maxBack, title: title, ring: ring)
-                .noopSheet([.height(NoopDayCalendarSheet.height)])
+                .noopFloatingSheet(height: NoopDayCalendarSheet.height)
         }
     }
 }

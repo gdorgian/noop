@@ -98,23 +98,28 @@ struct NoopActivityStatusState {
     }
 }
 
-/// The status's tile: a rounded square in its colour with the symbol in white.
+/// The status's tile: a pill in its colour, lit from the top, with the symbol in white.
 struct NoopActivityStatusTile: View {
     let status: NoopActivityStatus
+    /// The pill's height; it is a little wider than tall.
     var side: CGFloat = 34
 
     var body: some View {
-        RoundedRectangle(cornerRadius: side * 0.36, style: .continuous)
-            .fill(LinearGradient(colors: [status.tint.0, status.tint.1], startPoint: .topLeading, endPoint: .bottomTrailing))
-            .overlay(RoundedRectangle(cornerRadius: side * 0.36, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75).blendMode(.plusLighter))
+        Capsule()
+            .fill(LinearGradient(colors: [status.tint.0, status.tint.1], startPoint: .top, endPoint: .bottom))
             .overlay {
-                Image(systemName: status.symbol).font(.system(size: side * 0.46, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
+                // A soft sheen on the upper half, and a fine light rim.
+                Capsule().fill(LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0)], startPoint: .top, endPoint: .center))
+                    .padding(1.5)
+                Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75).blendMode(.plusLighter)
             }
-            .frame(width: side, height: side)
-            .shadow(color: status.tint.1.opacity(0.35), radius: 6, y: 2)
+            .overlay {
+                Image(systemName: status.symbol).font(.system(size: side * 0.44, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.22), radius: 1, y: 1)
+            }
+            .frame(width: side * 1.42, height: side)
+            .shadow(color: status.tint.1.opacity(0.45), radius: 7, y: 3)
     }
 }
 
@@ -210,7 +215,7 @@ struct NoopActivityStatusSheet: View {
                 NoopHaptics.play(.save)
                 dismiss()
             }
-            .padding(.bottom, 12)
+            .padding(.bottom, 28)
         }
         .padding(.horizontal, 20)
         .onAppear {
