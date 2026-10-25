@@ -33,7 +33,7 @@ final class LiftSessionTimingTests: XCTestCase {
         XCTAssertEqual(changes, 0, "a running set changes nothing the session publishes; its clock ticks by itself")
     }
 
-    /// A rest's end is the one moment the words change with time alone, and the warning buzz still comes.
+    /// A rest's end is the one moment the words change with time alone; the warning buzz comes, then the end's.
     func testARestsEndIsPublishedOnceAndItsWarningBuzzes() {
         var buzzes: [UInt8] = []
         let c = LiftSessionController(buzz: { buzzes.append($0) }, setStrapHandler: { _ in })
@@ -46,7 +46,8 @@ final class LiftSessionTimingTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(3.2))
         watching.cancel()
         XCTAssertEqual(changes, 1, "the rest's end, once")
-        XCTAssertEqual(buzzes, [LiftSessionController.restWarningBuzzes], "the warning, once")
+        XCTAssertEqual(buzzes, [LiftSessionController.restWarningBuzzes, LiftSessionController.restEndBuzzes],
+                       "the warning once, then the end")
         XCTAssertEqual(c.presentation(system: .metric)?.status, "Ready for the next set")
     }
 

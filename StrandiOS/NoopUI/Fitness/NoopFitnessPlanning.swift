@@ -265,6 +265,28 @@ struct NoopFitnessRoutineScreen: View {
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 20)
 
+                HStack(spacing: 10) {
+                    Button { scheduling = true } label: {
+                        Text("Schedule")
+                            .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                            .frame(maxWidth: .infinity).frame(minHeight: 52)
+                            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    Button { Task { await start() } } label: {
+                        HStack(spacing: 8) {
+                            NoopCanonicalGlyph(name: .play, size: 15, color: NoopHTMLColor.voltInk)
+                            Text("Start").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                        }
+                        .foregroundStyle(NoopHTMLColor.voltInk)
+                        .frame(maxWidth: .infinity).frame(minHeight: 52)
+                        .background(NoopHTMLColor.volt, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(NoopHTMLPressStyle())
+                    .disabled(items.isEmpty)
+                    .opacity(items.isEmpty ? 0.5 : 1)
+                }
+                .padding(.bottom, 22)
                 if let id = navigation.fitnessRoutineID {
                     NoopFitnessRoutineProgress(routineID: id).padding(.bottom, 22)
                 }
@@ -294,28 +316,6 @@ struct NoopFitnessRoutineScreen: View {
                         edit: { rescheduling = true; scheduling = true })
                 }
 
-                HStack(spacing: 10) {
-                    Button { scheduling = true } label: {
-                        Text("Schedule")
-                            .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                            .frame(maxWidth: .infinity).frame(minHeight: 52)
-                            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    Button { Task { await start() } } label: {
-                        HStack(spacing: 8) {
-                            NoopCanonicalGlyph(name: .play, size: 15, color: NoopHTMLColor.voltInk)
-                            Text("Start").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                        }
-                        .foregroundStyle(NoopHTMLColor.voltInk)
-                        .frame(maxWidth: .infinity).frame(minHeight: 52)
-                        .background(NoopHTMLColor.volt, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    .disabled(items.isEmpty)
-                    .opacity(items.isEmpty ? 0.5 : 1)
-                }
-                .padding(.top, 16)
             }
         }
         .alert("Delete this routine?", isPresented: $deleting) {

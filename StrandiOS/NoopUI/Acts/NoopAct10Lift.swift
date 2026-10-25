@@ -544,7 +544,9 @@ private struct NoopLiftLiveScreen: View {
             }
             }
             liveBar(engine: engine, presentation: presentation, slot: slot, item: item)
-                .padding(.horizontal, 14).padding(.bottom, 10)
+                // Clear of the home indicator: this screen runs edge to edge, so the bar keeps the same
+                // distance from the bottom the tab bar does on every other screen.
+                .padding(.horizontal, 14).padding(.bottom, 26)
         }
         .overlay(alignment: .top) {
             if let celebration {
@@ -618,7 +620,9 @@ private struct NoopLiftLiveScreen: View {
                 }
             }
             Spacer()
-            Button { showFinish = true } label: {
+            Button {
+                if live.engine?.allCompleted == true { ratingEffort = true } else { showFinish = true }
+            } label: {
                 Text("Finish").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.warmInk)
                     .padding(.horizontal, 18).frame(minHeight: 40)
@@ -974,6 +978,8 @@ private struct NoopLiftLiveScreen: View {
     private func liveBar(engine: LiftSessionEngine, presentation: LiftSessionController.Presentation,
                          slot: LiftSlot, item: LiftPlanItem) -> some View {
         let warmup = engine.stage == .warmup
+        // Every set done: the bar stops offering a next set and offers the finish line instead.
+        let allDone = engine.allCompleted
         // Only the words tick. The button stays outside the once-a-second redraw, so a press that
         // spans a tick is never cancelled.
         return HStack(spacing: 12) {
@@ -982,10 +988,12 @@ private struct NoopLiftLiveScreen: View {
                 let remaining = presentation.heldClockSeconds ?? engine.restRemaining(now: nowSec)
                 let inSet = max(0, nowSec - engine.stageStartedAt)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(warmup ? "Warm-up" : item.exercise)
+                    Text(allDone ? "Every set done" : warmup ? "Warm-up" : item.exercise)
                         .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
                     Group {
-                        if presentation.isResting {
+                        if allDone {
+                            Text("Finish to save the workout").foregroundStyle(NoopHTMLColor.green)
+                        } else if presentation.isResting {
                             Text((remaining ?? 0) > 0 ? "Rest \(liftClock(remaining ?? 0))" : "Ready for the next set")
                                 .foregroundStyle(NoopHTMLColor.blueLight)
                         } else if warmup {
@@ -1008,30 +1016,37 @@ private struct NoopLiftLiveScreen: View {
             }
             Button {
                 focused = nil
+                if allDone { ratingEffort = true; return }
                 if !presentation.isResting { writeFields(slot: slot) }
                 live.advance()
             } label: {
                 ZStack {
-                    Circle().fill(presentation.isResting ? NoopHTMLColor.blueLight : NoopHTMLColor.warm)
-                    if presentation.isResting || warmup {
+                    Circle().fill(allDone ? NoopHTMLColor.green : presentation.isResting ? NoopHTMLColor.blueLight : NoopHTMLColor.warm)
+                    if allDone {
+                        Image(systemName: "flag.checkered").font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(NoopHTMLColor.canvas)
+                            .transition(.scale.combined(with: .opacity))
+                    } else if presentation.isResting || warmup {
                         NoopCanonicalGlyph(name: .play, size: 17, color: NoopHTMLColor.blueInk)
                     } else {
                         NoopCanonicalGlyph(name: .check, size: 19, color: NoopHTMLColor.warmInk)
                     }
                 }
                 .frame(width: 54, height: 54)
-                .shadow(color: (presentation.isResting ? NoopHTMLColor.blueLight : NoopHTMLColor.warm).opacity(0.3), radius: 12, y: 6)
+                .shadow(color: (allDone ? NoopHTMLColor.green : presentation.isResting ? NoopHTMLColor.blueLight : NoopHTMLColor.warm).opacity(0.3), radius: 12, y: 6)
+                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: allDone)
             }
             .buttonStyle(NoopHTMLPressStyle())
             .disabled(live.isPaused || saving)
             .opacity(live.isPaused ? 0.45 : 1)
-            .accessibilityLabel(presentation.isResting ? "Start the next set" : warmup ? "Start the first set" : "Log set \(slot.setIndex)")
+            .accessibilityLabel(allDone ? "Finish the workout" : presentation.isResting ? "Start the next set" : warmup ? "Start the first set" : "Log set \(slot.setIndex)")
         }
         .padding(.leading, 18).padding(.trailing, 8).padding(.vertical, 8)
         .background(.ultraThinMaterial, in: Capsule())
         .background(NoopHTMLColor.cardRaised.opacity(0.85), in: Capsule())
         .overlay(Capsule().strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
         .sensoryFeedback(.success, trigger: engine.completedWorkingSets)
+        .sensoryFeedback(.impact(weight: .heavy), trigger: allDone)
     }
 
     @State private var prototypeOpenedAt = Date()

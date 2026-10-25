@@ -131,6 +131,8 @@ final class LiftSessionController: ObservableObject {
     /// mistaken for each other on a wrist that has been knocked about all session.
     static let advanceConfirmBuzzes: UInt8 = 1
     static let restWarningBuzzes: UInt8 = 3
+    /// Two pulses when a rest runs out.
+    static let restEndBuzzes: UInt8 = 2
     /// How long before the rest ends the warning fires.
     static let restWarningLeadSec = 5
     /// A strap double-tap this soon after the last one the session acted on is taken as a knock. See
@@ -1030,6 +1032,12 @@ final class LiftSessionController: ObservableObject {
     /// The rest is over: the one moment a session's words change with time alone — on screen and, through
     /// `changesSettled`, on the Lock Screen, "Resting after set 2" becomes "Ready for the next set".
     private func restDidEnd() {
+        // The strap says the rest is over, not only the screen: two pulses, distinct from the one that
+        // confirms a tap and the three that warn of the end. Not for the rest left once every set is
+        // done — nothing follows it.
+        if !isPaused, engine?.allCompleted == false, case .resting = engine?.stage {
+            buzz(LiftSessionController.restEndBuzzes)
+        }
         objectWillChange.send()
     }
 
