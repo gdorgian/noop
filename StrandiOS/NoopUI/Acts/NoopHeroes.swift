@@ -289,3 +289,122 @@ struct NoopAgeField: View {
         }
     }
 }
+
+// MARK: You
+
+/// The day as sky on a 24-hour dial (midnight at the top): night indigo, dawn rose, day blue, dusk
+/// amber, with your usual sleep window laid over it and the sun or moon where the hour is now.
+struct NoopYouSky: View {
+    let onsetHour: Double?
+    let wakeHour: Double?
+
+    private static let sky: [(hour: Double, color: Color)] = [
+        (0, Color(hex: 0x0B0E2A)), (4.5, Color(hex: 0x1C1B4A)), (6, Color(hex: 0xE58A9B)), (8, Color(hex: 0x6FB7F0)),
+        (13, Color(hex: 0x4FA3EA)), (18, Color(hex: 0xF2A65A)), (20, Color(hex: 0x6B3F8C)), (22, Color(hex: 0x141640)), (24, Color(hex: 0x0B0E2A))
+    ]
+
+    var body: some View {
+        NoopSlotClock { t, reveal in
+            Canvas { context, size in
+                let c = CGPoint(x: size.width / 2, y: size.height / 2)
+                let R = min(size.width, size.height) / 2 - 34
+                func angle(_ h: Double) -> Double { h / 24 * 2 * .pi - .pi / 2 }
+                // The sky band.
+                let stops = Self.sky.map { Gradient.Stop(color: $0.color, location: $0.hour / 24) }
+                var band = Path()
+                band.addArc(center: c, radius: R, startAngle: .radians(angle(0)), endAngle: .radians(angle(24 * reveal)), clockwise: false)
+                context.stroke(band, with: .conicGradient(Gradient(stops: stops), center: c, angle: .radians(-.pi / 2)),
+                               style: StrokeStyle(lineWidth: 26, lineCap: .butt))
+                // Hour marks and four numerals.
+                for h in 0..<24 {
+                    let a = angle(Double(h)), major = h % 6 == 0
+                    var tick = Path()
+                    tick.move(to: CGPoint(x: c.x + CGFloat(cos(a)) * (R - 20), y: c.y + CGFloat(sin(a)) * (R - 20)))
+                    tick.addLine(to: CGPoint(x: c.x + CGFloat(cos(a)) * (R - (major ? 30 : 25)), y: c.y + CGFloat(sin(a)) * (R - (major ? 30 : 25))))
+                    context.stroke(tick, with: .color(.white.opacity(major ? 0.4 : 0.15)), lineWidth: 1)
+                    if major {
+                        let p = CGPoint(x: c.x + CGFloat(cos(a)) * (R - 44), y: c.y + CGFloat(sin(a)) * (R - 44))
+                        context.draw(Text(String(format: "%02d", h)).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
+                                        .foregroundStyle(NoopHTMLColor.muted), at: p)
+                    }
+                }
+                // The usual sleep window, a fine bright arc just inside the sky.
+                if let on = onsetHour, let off = wakeHour {
+                    let end = off < on ? off + 24 : off
+                    var win = Path()
+                    win.addArc(center: c, radius: R - 16, startAngle: .radians(angle(on)),
+                               endAngle: .radians(angle(on + (end - on) * reveal)), clockwise: false)
+                    context.stroke(win, with: .color(Color(hex: 0xC9C2FF)), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                }
+                // Now: sun by day, moon by night, riding the band.
+                let comps = Calendar.current.dateComponents([.hour, .minute], from: Date())
+                let now = Double(comps.hour ?? 0) + Double(comps.minute ?? 0) / 60
+                let day = now >= 6.5 && now < 19.5
+                let a = angle(now)
+                let p = CGPoint(x: c.x + CGFloat(cos(a)) * R, y: c.y + CGFloat(sin(a)) * R)
+                let g = 16 + 2 * sin(t * 1.2)
+                context.fill(Path(ellipseIn: CGRect(x: p.x - g, y: p.y - g, width: 2 * g, height: 2 * g)),
+                             with: .radialGradient(Gradient(colors: [(day ? Color(hex: 0xFFE7A0) : Color.white).opacity(0.7), .clear]),
+                                                   center: p, startRadius: 0, endRadius: g))
+                context.fill(Path(ellipseIn: CGRect(x: p.x - 6, y: p.y - 6, width: 12, height: 12)),
+                             with: .color(day ? Color(hex: 0xFFE7A0) : .white))
+            }
+            .overlay {
+                VStack(spacing: 0) {
+                    Text(AppClock.hourMinuteFormatter().string(from: Date()))
+                        .font(NoopHTMLFont.outfit(NoopType.title3, weight: .light)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
+                    Text("NOW").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.4)
+                        .foregroundStyle(NoopHTMLColor.muted)
+                }
+            }
+        }
+        .accessibilityLabel("Your day as sky, with your usual sleep window")
+    }
+}
+
+/// You, at the centre of a ring that fills as Noop learns your sleep need: full at ninety nights.
+struct NoopYouPortrait: View {
+    let initials: String?
+    let photo: Image?
+    let needMin: Double
+    let needNights: Int
+
+    private static let blush = Color(hex: 0xE08A9B)
+    private var learned: Double { min(1, Double(needNights) / Double(NoopRestRecord.needSolidNights)) }
+
+    var body: some View {
+        NoopSlotClock { t, reveal in
+            ZStack {
+                Circle().stroke(Color.white.opacity(0.07), lineWidth: 8).padding(20)
+                Circle().trim(from: 0, to: learned * NoopRingValues.spring(reveal))
+                    .stroke(AngularGradient(colors: [Self.blush.opacity(0.6), Self.blush], center: .center),
+                            style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .rotationEffect(.degrees(-90)).padding(20)
+                Circle().fill(Self.blush.opacity(0.08 + 0.04 * sin(t * 0.9))).padding(46)
+                Group {
+                    if let photo {
+                        photo.resizable().scaledToFill()
+                    } else if let initials, !initials.isEmpty {
+                        Text(initials).font(NoopHTMLFont.outfit(56, weight: .light)).foregroundStyle(NoopHTMLColor.ink)
+                    } else {
+                        Image(systemName: "person.fill").font(.system(size: 52, weight: .light))
+                            .foregroundStyle(Self.blush.opacity(0.8))
+                    }
+                }
+                .frame(width: 132, height: 132)
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 1))
+                .offset(y: -14)
+                VStack(spacing: 2) {
+                    Text(needMin > 0 ? "a \(NoopRestRecord.duration(needMin)) need" : "learning your need")
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text("\(min(needNights, NoopRestRecord.needSolidNights)) of \(NoopRestRecord.needSolidNights) nights")
+                        .font(NoopHTMLFont.sans(NoopType.caption)).monospacedDigit().foregroundStyle(NoopHTMLColor.copy)
+                }
+                .offset(y: 84)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Sleep need learned from \(needNights) of \(NoopRestRecord.needSolidNights) nights")
+    }
+}

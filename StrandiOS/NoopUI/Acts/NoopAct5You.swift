@@ -524,6 +524,11 @@ private extension NoopAct5Screens {
                 .zIndex(1)
                 NoopEditableSections(layout: youLayout, editing: $youEditing, spacing: 0) { id in youSection(id) }
             }
+            .background(alignment: .top) {
+                NoopPageBackdrop(theme: .you)
+                    .frame(width: UIScreen.main.bounds.width)
+                    .offset(y: -110)
+            }
         }
         .noopEditBar($youEditing, layout: youLayout)
     }
@@ -541,10 +546,17 @@ private extension NoopAct5Screens {
         case "portrait":
             VStack(spacing: 2) {
                 if let you {
-                    NoopBodyClock(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour,
-                                  showsNow: true,
-                                  initials: NoopYouRecord.initials(profile.displayName),
-                                  photo: profile.avatarImage)
+                    NoopHeroPager(page: "you", names: ["Clock", "Sky", "Portrait"], side: 300) {
+                        NoopBodyClock(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour,
+                                      showsNow: true,
+                                      initials: NoopYouRecord.initials(profile.displayName),
+                                      photo: profile.avatarImage)
+                    } second: {
+                        NoopYouSky(onsetHour: you.usualOnsetHour, wakeHour: you.usualWakeHour)
+                    } third: {
+                        NoopYouPortrait(initials: NoopYouRecord.initials(profile.displayName), photo: profile.avatarImage,
+                                        needMin: you.needMin, needNights: you.needNights)
+                    }
                     if let name = profile.displayName {
                         Text(name)
                             .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
