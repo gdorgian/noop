@@ -26,6 +26,8 @@ struct NoopFitnessCardioLive: View {
     let recent: [Int]
     let figures: [Figure]
     let footnote: String?
+    /// Under a minute: finishing now saves nothing, and the prompt says so.
+    var tooShort = false
     let pauseAction: () -> Void
     let endAction: () -> Void
 
@@ -63,11 +65,17 @@ struct NoopFitnessCardioLive: View {
                 .animation(.easeInOut(duration: 0.8), value: zone)
         )
         .background(NoopHTMLColor.canvas.ignoresSafeArea())
-        .alert("End the session?", isPresented: $confirmEnd) {
+        .alert(tooShort ? "End without saving?" : "Finish \(sport.lowercased())?", isPresented: $confirmEnd) {
             Button("Keep going", role: .cancel) { }
-            Button("End session", action: endAction)
+            if tooShort {
+                Button("Discard", role: .destructive, action: endAction)
+            } else {
+                Button("Finish", action: endAction)
+            }
         } message: {
-            Text("It is saved with its heart rate, Effort and route.")
+            Text(tooShort
+                 ? "Under a minute is not kept. Keep going to save it."
+                 : "It is saved with its heart rate, Effort and route. Then rate how hard it was.")
         }
     }
 
@@ -206,6 +214,7 @@ struct NoopFitnessCardioLive: View {
     }
 
     static func symbol(for sport: String) -> String {
+        if let exact = NoopSportGroups.exactSymbol(sport) { return exact }
         let s = sport.lowercased()
         if s.contains("treadmill") { return "figure.run.treadmill" }
         if s.contains("run") { return "figure.run" }

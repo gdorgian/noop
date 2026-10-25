@@ -174,10 +174,12 @@ struct NoopFitnessAddSheet: View {
             .environmentObject(repo)
             .noopSheet()
         }
-        .confirmationDialog("Start a session", isPresented: $showAll, titleVisibility: .visible) {
-            ForEach(WorkoutCatalog.all.filter { s in !Self.quick.contains { $0.name == s.name } && s.name != "Strength" }) { s in
-                Button(s.name) { startCardio(s.name) }
+        .sheet(isPresented: $showAll) {
+            NoopSportPickerSheet { sport in
+                showAll = false
+                startCardio(sport)
             }
+            .noopSheet()
         }
     }
 
@@ -188,10 +190,8 @@ struct NoopFitnessAddSheet: View {
             withAnimation(NoopMotion.swap) { refusal = running }
             return
         }
-        app.startWorkout(sport: sport)
-        navigation.beginSession(at: app.activeWorkout?.start ?? Date())
         dismiss()
-        navigation.push(.live)
+        _ = NoopCardioStarter.start(sport, app: app, live: live, navigation: navigation)
     }
 
     private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {

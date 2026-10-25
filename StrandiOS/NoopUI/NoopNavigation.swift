@@ -443,6 +443,8 @@ final class NoopNavigation: ObservableObject {
     @Published var historyWorkout: NoopWorkout?
     /// Production: the stored session `detail` shows (a row tapped, or the one just saved).
     @Published var liveDetailRow: WorkoutRow?
+    /// A cardio session just saved: Fitness shows "How hard was that?" and then the session.
+    @Published var cardioFinish: WorkoutRow?
 
     /// `plumbing/data` is one screen with two doors and three transient states between them.
     /// Reading, written and rejected are what the screen BECOMES during an import — never routes.
@@ -557,14 +559,13 @@ final class NoopNavigation: ObservableObject {
         }
         // Upstream 12.0 discards a session under a minute (#2278): there is no row to land on, so the
         // wearer goes back to Session rather than to an empty detail screen.
-        guard row != nil else {
-            sessionStartedAt = nil
-            sessionPaused = false
-            sessionPausedElapsed = 0
-            reset(to: .fitness)
-            return
-        }
-        finishSessionArrival()
+        // A finished session goes back to Fitness, where it now sits in Today, and asks how it felt the
+        // way a finished lift does. Under a minute nothing was saved and there is nothing to ask about.
+        sessionStartedAt = nil
+        sessionPaused = false
+        sessionPausedElapsed = 0
+        reset(to: .fitness)
+        cardioFinish = row
     }
 
     private func finishSessionArrival() {
@@ -878,7 +879,15 @@ final class NoopNavigation: ObservableObject {
     /// A tab-level arrival. It did not come from anywhere, so it crossfades rather than rises,
     /// and the tab bar's tint travels over the same 200 ms — that tint move is the only signal
     /// that the tab changed, and without it a crossfade reads as a dropped frame.
+    /// Screens retired by Fitness (25 Oct 2026): the old "Today's session" picker, its ready page and the
+    /// Lift Log's Programs list. Their routes stay so deep links, widgets and back gestures still resolve;
+    /// every one of them now lands on Fitness, where training starts.
+    static func retired(_ route: NoopRoute) -> Bool {
+        [.session, .pick, .ready, .liftLibrary].contains(route)
+    }
+
     func reset(to route: NoopRoute) {
+        let route = Self.retired(route) ? .fitness : route
         if route == .instrumentMetric { presentMetricSheet(); return }
         metricSheetPresented = false
         fitnessSheet = nil
@@ -930,6 +939,7 @@ final class NoopNavigation: ObservableObject {
     }
 
     func push(_ route: NoopRoute) {
+        if Self.retired(route) { reset(to: .fitness); return }
         pendingSheetTransition = nil
         overlay = nil
         if route == .instrumentMetric { presentMetricSheet(); return }
@@ -979,6 +989,7 @@ final class NoopNavigation: ObservableObject {
     }
 
     func replace(with route: NoopRoute) {
+        if Self.retired(route) { reset(to: .fitness); return }
         if route == .instrumentMetric { push(route); return }
         metricSheetPresented = false
         fitnessSheet = nil

@@ -10,12 +10,13 @@ import StrandTraining
 @MainActor
 final class NoopFitnessSettings: ObservableObject {
     enum Section: String, CaseIterable, Codable, Identifiable {
-        case activity, routines, load, cardio, strength
+        case activity, routines, sports, load, cardio, strength
         var id: String { rawValue }
         var title: String {
             switch self {
             case .activity: "Activity"
             case .routines: "Routines"
+            case .sports: "Cardio and sports"
             case .load: "Training load"
             case .cardio: "Cardio"
             case .strength: "Strength"
@@ -66,9 +67,14 @@ final class NoopFitnessSettings: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let stored = defaults.data(forKey: Self.key).flatMap { try? JSONDecoder().decode(Stored.self, from: $0) }
-        // A section added in a later build joins at the end rather than vanishing.
-        let order = stored?.sections ?? Section.allCases
-        sections = order + Section.allCases.filter { !order.contains($0) }
+        // A section added in a later build joins after the section it follows by default, rather than
+        // vanishing or sinking to the bottom of the page.
+        var order = stored?.sections ?? Section.allCases
+        for (index, section) in Section.allCases.enumerated() where !order.contains(section) {
+            let before = Section.allCases[..<index].last { order.contains($0) }
+            order.insert(section, at: before.flatMap { order.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
+        }
+        sections = order
         hidden = Set(stored?.hidden ?? [])
         plans = stored?.plans ?? []
     }

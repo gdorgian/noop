@@ -122,14 +122,14 @@ struct NoopAct10Screens: View {
     var body: some View {
         switch navigation.route {
         case .liftLive: NoopLiftLiveScreen(navigation: navigation, flow: flow)
-        case .liftLibrary: NoopLiftLibraryScreen(navigation: navigation, flow: flow)
         case .liftProgram: NoopLiftProgramScreen(navigation: navigation, flow: flow)
         case .liftDetail: NoopLiftDetailScreen(navigation: navigation, flow: flow)
         case .liftEdit: NoopLiftEditScreen(navigation: navigation, flow: flow)
         case .liftImport: NoopLiftImportScreen(navigation: navigation, flow: flow)
         case .liftReview: NoopLiftReviewScreen(navigation: navigation, flow: flow)
         case .liftMuscles: NoopLiftMusclesScreen(navigation: navigation, flow: flow)
-        default: NoopLiftLibraryScreen(navigation: navigation, flow: flow)
+        // The Programs list was retired for Fitness; navigation sends its route there, and so does this.
+        default: Color.clear.onAppear { navigation.reset(to: .fitness) }
         }
     }
 }
@@ -1412,253 +1412,6 @@ private enum NoopLiftSetType: CaseIterable, Hashable {
         case .drop: NoopHTMLColor.nightLight
         case .failure: NoopHTMLColor.red
         }
-    }
-}
-
-// MARK: - lift-library
-
-private struct NoopLiftLibraryScreen: View {
-    @ObservedObject var navigation: NoopNavigation
-    @ObservedObject var flow: NoopLiftFlowModel
-    @EnvironmentObject private var repo: Repository
-    @EnvironmentObject private var live: LiftSessionController
-    @EnvironmentObject private var app: AppModel
-    @State private var showArchived = false
-    /// The session that refused this start, while its refusal is up.
-    @State private var refusal: NoopRunningSession?
-
-    private var programs: [LiftProgramRow] {
-        if !flow.programs.isEmpty || !NoopContentPolicy.allowsPrototypeContent { return flow.programs }
-        return NoopLiftDemo.programs
-    }
-    private var archived: [LiftProgramRow] {
-        if !flow.archivedPrograms.isEmpty || !NoopContentPolicy.allowsPrototypeContent { return flow.archivedPrograms }
-        return NoopLiftDemo.archivedPrograms
-    }
-
-    var body: some View {
-        NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 14) {
-                NoopLiftBackHeader(label: "Fitness") { navigation.back(or: .fitness) }
-                NoopLiftTitle(
-                    title: "Programs",
-                    subtitle: programs.isEmpty
-                        ? "A program is a list of lines you keep. Every target on a line is optional, and a line that is only an exercise name is a finished line."
-                        : "A list of lines you keep. Every target is optional — an exercise name can be a finished line."
-                )
-
-                if !flow.isLoaded && !NoopContentPolicy.allowsPrototypeContent {
-                    NoopHTMLCard { ProgressView().tint(NoopHTMLColor.blueLight).frame(maxWidth: .infinity) }
-                } else if programs.isEmpty {
-                    NoopHTMLCard {
-                        Text("Nothing here yet. A program is a list of lines you keep — write one, or bring your programs across from Hevy.")
-                            .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
-                            .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
-                    }
-                } else {
-                    VStack(spacing: 9) {
-                        ForEach(Array(programs.enumerated()), id: \.element.id) { index, program in
-                            programCard(program, featured: index == 0)
-                        }
-                    }
-                }
-
-                VStack(spacing: 9) {
-                    NoopLiftDoor(icon: .plus, title: "Write a program", subtitle: "a name is enough to start with") {
-                        navigation.selectedLiftProgramID = nil
-                        flow.selectedProgram = nil
-                        flow.programItems = []
-                        navigation.push(.liftProgram)
-                    }
-                    NoopLiftDoor(icon: .file, title: "Bring sessions in from Hevy", subtitle: "adds what it reads, changes nothing you have") {
-                        navigation.push(.liftImport)
-                    }
-                }
-
-                if !archived.isEmpty {
-                    archivedCard
-                }
-
-                Text("A program is something you keep rather than somewhere you go. Start one here, or from Routines on Fitness, where you can also plan it on the calendar.")
-                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                    .lineSpacing(4)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    NoopSectionLabel("Where the exercises come from")
-                    Text("Exercise data: ExerciseDB v1 via hasaneyldrm/exercises-dataset, MIT licence. Exercise media is not included and is not covered by that licence.")
-                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
-                        .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 2)
-            }
-        }
-        .task { await flow.refresh(repo: repo) }
-        .overlay {
-            if let refusal {
-                NoopSessionRefusal(session: refusal,
-                                   goToIt: { self.refusal = nil; refusal.go(navigation: navigation, lift: live) },
-                                   notNow: { withAnimation(NoopMotion.swap) { self.refusal = nil } })
-            }
-        }
-    }
-
-    private var archivedCard: some View {
-        VStack(spacing: 4) {
-            Button {
-                withAnimation(NoopMotion.swap) { showArchived.toggle() }
-            } label: {
-                HStack {
-                    Text(showArchived ? "Archived · \(archived.count)" : "Show \(archived.count) archived programs")
-                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.blueLight)
-                    Spacer()
-                    NoopChevron().rotationEffect(.degrees(showArchived ? -90 : 0))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(NoopPlainHitStyle())
-            if showArchived {
-                ForEach(archived, id: \.id) { program in
-                    HStack(spacing: 11) {
-                        NoopCanonicalGlyph(name: .weight, size: 17, color: NoopHTMLColor.copy)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(program.name).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
-                            Text("kept with its session history")
-                                .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
-                        }
-                        Spacer()
-                        Text("read-only")
-                            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
-                    }
-                    .padding(.vertical, 11).opacity(0.38)
-                    .overlay(alignment: .top) { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) }
-                    .contentShape(Rectangle()).onTapGesture { open(program) }
-                }
-                Text("An archived program keeps every session you did on it. Restore it to change a line.")
-                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                    .lineSpacing(3)
-            }
-        }
-        .padding(.horizontal, 16).padding(.vertical, 14)
-        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-    }
-
-    private func programCard(_ program: LiftProgramRow, featured: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            Button { open(program) } label: {
-                HStack(alignment: .top, spacing: 12) {
-                    NoopCanonicalGlyph(name: .weight, size: 21,
-                                       color: featured ? NoopHTMLColor.blue : NoopHTMLColor.copy.opacity(0.82))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(program.name).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                        Text(programMeta(program)).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    if featured {
-                        Text("next up")
-                            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
-                            .padding(.horizontal, 7).padding(.vertical, 3)
-                            .background(NoopHTMLColor.blue.opacity(0.13), in: RoundedRectangle(cornerRadius: 6))
-                    }
-                }
-            }
-            .buttonStyle(NoopPlainHitStyle())
-            HStack(spacing: 8) {
-                NoopLiftActionButton(title: featured ? "Start it" : "Start", accent: featured) {
-                    Task { await start(program) }
-                }
-                Button { open(program) } label: {
-                    Text("Open")
-                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.inkSoft)
-                        .padding(.horizontal, 16).frame(minHeight: 44)
-                        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
-                        .overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-            }
-            if featured {
-                Text("Targets are optional. Any line may remain only an exercise name.")
-                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-            }
-        }
-        .padding(.horizontal, 16).padding(.vertical, 15)
-        .background(featured ? NoopHTMLColor.blue.opacity(0.08) : NoopHTMLColor.card,
-                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .strokeBorder(featured ? NoopHTMLColor.blue.opacity(0.30) : NoopHTMLColor.border, lineWidth: 0.5))
-    }
-
-    private func open(_ program: LiftProgramRow) {
-        navigation.selectedLiftProgramID = program.id
-        flow.selectedProgram = program
-        if NoopContentPolicy.allowsPrototypeContent && program.id.hasPrefix("noop-demo") {
-            flow.programItems = NoopLiftDemo.items
-        }
-        navigation.push(.liftProgram)
-    }
-
-    private func start(_ program: LiftProgramRow) async {
-        // One session at a time, a lift or a cardio session alike (spec 90 §9.1): refuse, never swap.
-        if let running = NoopRunningSession.current(app: app, lift: live, navigation: navigation) {
-            withAnimation(NoopMotion.swap) { refusal = running }
-            return
-        }
-        let items: [LiftProgramItemRow]
-        if NoopContentPolicy.allowsPrototypeContent && program.id.hasPrefix("noop-demo") {
-            items = NoopLiftDemo.items
-        } else if let store = await repo.storeHandle() {
-            items = (try? await store.liftProgramItems(programId: program.id)) ?? []
-        } else { items = [] }
-        guard !items.isEmpty else {
-            navigation.selectedLiftProgramID = program.id
-            flow.selectedProgram = program
-            flow.programItems = []
-            navigation.push(.liftProgram)
-            return
-        }
-        let vocabulary: [LiftExerciseRow]
-        if let store = await repo.storeHandle() {
-            vocabulary = (try? await store.liftExercises(deviceId: repo.deviceId)) ?? []
-        } else { vocabulary = [] }
-        let plan = items.map { row in
-            let known = vocabulary.first { $0.name == row.exercise }
-            return LiftPlanItem(
-                exercise: row.exercise, primaryMuscle: known?.primaryMuscle,
-                secondaryMuscles: known?.secondaryMuscles ?? [], targetSets: row.targetSets,
-                restSec: row.restSec, targetRepsLow: row.targetRepsLow,
-                targetRepsHigh: row.targetRepsHigh, targetRpe: row.targetRpe,
-                targetWeightKg: row.targetWeightKg, note: row.note, programItemId: row.id
-            )
-        }
-        // The database reads above suspend this task. A cardio or another lift may have started
-        // meanwhile; recheck at the last possible moment, then claim the one session synchronously.
-        if let running = NoopRunningSession.current(app: app, lift: live, navigation: navigation) {
-            withAnimation(NoopMotion.swap) { refusal = running }
-            return
-        }
-        guard live.start(plan: plan, programId: program.id, programName: program.name) else {
-            if let running = NoopRunningSession.current(app: app, lift: live, navigation: navigation) {
-                withAnimation(NoopMotion.swap) { refusal = running }
-            }
-            return
-        }
-        // The Aura session has no warm-up step: set 1 is running when the screen opens, so the first
-        // "Log the set" (or strap double-tap) logs it, as the screen says. Without this the first press
-        // only started the set and nothing on the screen moved.
-        live.advance()
-        navigation.replace(with: .liftLive)
-    }
-
-    private func programMeta(_ program: LiftProgramRow) -> String {
-        if NoopContentPolicy.allowsPrototypeContent && program.id.hasPrefix("noop-demo") {
-            switch program.name {
-            case "Upper A": return "6 lines · last done Tuesday"
-            case "Lower A": return "5 lines · last done a week ago"
-            case "Deadlift only": return "1 line · last done in July"
-            default: break
-            }
-        }
-        return program.note?.isEmpty == false ? program.note! : "saved program"
     }
 }
 
@@ -3360,7 +3113,22 @@ private struct NoopLiftLastTimeSheet: View {
 /// "How hard was that?" — the session's effort on a 1–10 dial, saved with the lift.
 struct NoopLiftEffortSheet: View {
     @Binding var rating: Double
+    /// A cardio session reads in its own words and Aura blue; a lift keeps the warm save.
+    var cardio = false
     let save: () -> Void
+
+    private static let cardioWords: [(String, String)] = [
+        ("Barely anything", "Could have kept going all day."),
+        ("Very easy", "Breathing calm the whole way."),
+        ("Easy", "Could hold a full conversation."),
+        ("Comfortable", "Some work, nothing that asked much."),
+        ("Moderate", "Talking in sentences, not paragraphs."),
+        ("Working", "Steady effort that needed focus."),
+        ("Hard", "A few words at a time."),
+        ("Very hard", "Holding the pace took everything."),
+        ("Near the limit", "Little or nothing left by the end."),
+        ("Everything you had", "Could not have gone any harder."),
+    ]
 
     private static let words: [(String, String)] = [
         ("Barely anything", "Could have done it all again without noticing."),
@@ -3376,8 +3144,10 @@ struct NoopLiftEffortSheet: View {
     ]
 
     private var value: Int { min(10, max(1, Int(rating.rounded()))) }
+    private var phrases: [(String, String)] { cardio ? Self.cardioWords : Self.words }
 
     static func word(_ v: Int) -> String { words[min(10, max(1, v)) - 1].0 }
+    static func cardioWord(_ v: Int) -> String { cardioWords[min(10, max(1, v)) - 1].0 }
 
     private func color(_ v: Double) -> Color {
         v < 4 ? NoopHTMLColor.blueLight : v < 7 ? NoopHTMLColor.warm : v < 9 ? NoopHTMLColor.amber : NoopHTMLColor.red
@@ -3387,21 +3157,25 @@ struct NoopLiftEffortSheet: View {
         VStack(spacing: 18) {
             Text("How hard was that?").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                 .padding(.top, 34)
-            Text("Your own read of the whole session. It sits beside the heart-rate figures, which cannot see a heavy set.")
+            Text(cardio
+                 ? "Your own read of the whole session. It sits beside the heart rate, which cannot feel the legs or the heat."
+                 : "Your own read of the whole session. It sits beside the heart-rate figures, which cannot see a heavy set.")
                 .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                 .multilineTextAlignment(.center).padding(.horizontal, 26)
             dial.frame(width: 280, height: 280).padding(.top, 10)
             VStack(spacing: 4) {
-                Text(Self.words[value - 1].0).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(color(rating))
-                Text(Self.words[value - 1].1).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+                Text(phrases[value - 1].0).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(color(rating))
+                Text(phrases[value - 1].1).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     .multilineTextAlignment(.center)
             }
             .animation(NoopMotion.swap, value: value)
             Spacer()
             Button(action: save) {
-                Text("Save workout").font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.warmInk)
+                Text("Save workout").font(NoopHTMLFont.sans(NoopType.body, weight: .semibold))
+                    .foregroundStyle(cardio ? NoopHTMLColor.blueInk : NoopHTMLColor.warmInk)
                     .frame(maxWidth: .infinity).frame(minHeight: 56)
-                    .background(NoopHTMLColor.warm, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(cardio ? NoopHTMLColor.blueLight : NoopHTMLColor.warm,
+                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(NoopHTMLPressStyle())
             .padding(.horizontal, 22).padding(.bottom, 18)
@@ -3458,7 +3232,7 @@ struct NoopLiftEffortSheet: View {
             }.onEnded { _ in withAnimation(NoopMotion.swap) { rating = rating.rounded() } })
             .accessibilityElement()
             .accessibilityLabel("Effort")
-            .accessibilityValue("\(value) of 10, \(Self.words[value - 1].0)")
+            .accessibilityValue("\(value) of 10, \(phrases[value - 1].0)")
             .accessibilityAdjustableAction { d in
                 rating = d == .increment ? min(10, rating.rounded() + 1) : max(1, rating.rounded() - 1)
             }

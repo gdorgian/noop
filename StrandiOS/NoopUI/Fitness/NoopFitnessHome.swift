@@ -177,6 +177,7 @@ struct NoopFitnessHome: View {
         switch section {
         case .activity: "The sessions and plans of the chosen day"
         case .routines: "Your routines, to start in one tap"
+        case .sports: "Your sports, to start in one tap, and every other one"
         case .load: "Cardio and muscular load against your normal"
         case .cardio: "Active time, energy, VO₂ max, recovery, focus and zones"
         case .strength: "Sets, volume and how fresh each muscle is"
@@ -263,6 +264,9 @@ struct NoopFitnessHome: View {
             }
             .buttonStyle(NoopHTMLPressStyle())
             .padding(.bottom, 20)
+        case .sports:
+            sectionTitle("Cardio and sports")
+            NoopFitnessSportsSection(navigation: navigation, workouts: s.history.workouts)
         case .routines:
             sectionTitle("Routines") {
                 if !s.routines.isEmpty {
@@ -862,15 +866,10 @@ struct NoopFitnessSessionRow: View {
         return .run
     }
 
-    /// One colour per kind of session, the same on the strip, the rows and the calendar.
+    /// Two colours across Fitness, the same on the strip, the rows and the calendar: weights are green
+    /// (volt), cardio and every other sport Aura blue. The glyph tells the sports apart.
     static func tint(_ session: NoopFitnessSession) -> Color {
-        switch glyph(session) {
-        case .weight: NoopHTMLColor.volt
-        case .wave: NoopHTMLColor.blueLight
-        case .bike: NoopHTMLColor.blue
-        case .walk: NoopHTMLColor.green
-        default: NoopHTMLColor.blush
-        }
+        glyph(session) == .weight ? NoopHTMLColor.volt : NoopHTMLColor.blueLight
     }
 }
 

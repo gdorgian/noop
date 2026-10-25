@@ -21,6 +21,8 @@ struct NoopSessionHero: View {
     var source: String = "Noop Aura"
     var badge: String? = nil
     var tint: Color = NoopHTMLColor.volt
+    /// The symbol's colour on the tinted disc.
+    var ink: Color = NoopHTMLColor.voltInk
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -34,7 +36,7 @@ struct NoopSessionHero: View {
                     .shadow(color: tint.opacity(0.35), radius: 10, y: 4)
                     .frame(width: 72, height: 72)
                 Image(systemName: symbol).font(.system(size: 31, weight: .semibold))
-                    .foregroundStyle(NoopHTMLColor.voltInk)
+                    .foregroundStyle(ink)
             }
             .frame(width: 100, height: 100)
             .padding(.leading, -14)

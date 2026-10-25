@@ -800,6 +800,12 @@ struct NoopVerifiedAppShell: View {
         .sheet(isPresented: Binding(get: { navigation.fitnessSheet != nil }, set: { if !$0 { navigation.fitnessSheet = nil } })) {
             NoopFitnessSheet(navigation: navigation, fitness: fitnessStore)
         }
+        .sheet(item: Binding(get: { navigation.cardioFinish.map(NoopTappedActivity.init) },
+                             set: { navigation.cardioFinish = $0?.row })) { item in
+            NoopCardioFinishSheet(row: item.row)
+                .environmentObject(repo)
+                .noopSheet()
+        }
         .sheet(item: Binding(get: { tappedActivity.map(NoopTappedActivity.init) }, set: { tappedActivity = $0?.row })) { item in
             NoopActivityConfirmSheet(row: item.row)
                 .environmentObject(repo)

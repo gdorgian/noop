@@ -2723,7 +2723,10 @@ private extension NoopAct3Screens {
         var figures: [NoopFitnessCardioLive.Figure] = []
         if model.gpsRecorder.isRecording {
             figures.append(.init(label: "km", value: String(format: "%.2f", model.gpsRecorder.distanceM / 1000)))
-            figures.append(.init(label: "pace /km", value: model.gpsRecorder.paceSecPerKm.map {
+            // Pace over the first few metres is noise (a GPS jitter of 2 m in 7 s read as 48692:20 /km):
+            // shown from 50 m on, and never slower than an hour a kilometre.
+            let pace = model.gpsRecorder.distanceM >= 50 ? model.gpsRecorder.paceSecPerKm.flatMap { $0 > 0 && $0 < 3600 ? $0 : nil } : nil
+            figures.append(.init(label: "pace /km", value: pace.map {
                 String(format: "%d:%02d", Int($0) / 60, Int($0) % 60) } ?? "—"))
         }
         figures.append(.init(label: "avg bpm", value: active.avgHr > 0 ? "\(active.avgHr)" : "—"))
@@ -2773,6 +2776,7 @@ private extension NoopAct3Screens {
                 recent: samples.suffix(300).map(\.bpm),
                 figures: figures,
                 footnote: AppModel.isTooShortToSave(elapsedSeconds: TimeInterval(elapsed)) ? "Under a minute is not kept" : nil,
+                tooShort: AppModel.isTooShortToSave(elapsedSeconds: TimeInterval(elapsed)),
                 pauseAction: {
                     model.toggleWorkoutPause()
                     navigation.toggleSessionPause(at: timeline.date)

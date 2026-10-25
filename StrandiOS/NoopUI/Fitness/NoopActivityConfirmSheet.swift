@@ -20,6 +20,10 @@ struct NoopActivityConfirmSheet: View {
     @State private var editing = false
     @State private var confirmDelete = false
     @State private var working = false
+    /// The wearer's own 1–10 read of the session, when one was given.
+    @State private var feel: Double?
+    @State private var rating = 6.0
+    @State private var ratingOpen = false
 
     /// Common answers after the learned ones, so a first-ever detection still has one-tap choices.
     static let common = ["Strength", "Running", "Walking", "Cycling", "Swimming", "HIIT", "Yoga", "Dancing",
@@ -44,13 +48,15 @@ struct NoopActivityConfirmSheet: View {
                 NoopSessionHero(symbol: NoopFitnessCardioLive.symbol(for: row.sport),
                                 kind: detected ? "Detected activity" : kindLine, title: title, when: when,
                                 source: detected ? "Noop Aura · detected from heart rate" : "Noop Aura",
-                                badge: detected ? "unconfirmed" : nil)
+                                badge: detected ? "unconfirmed" : nil,
+                                tint: accent, ink: isStrength ? NoopHTMLColor.voltInk : NoopHTMLColor.blueInk)
                 if detected || changing { picker } else { changeRow }
                 NoopSessionHeading(title: "Workout details")
                 if let strain = row.strain, strain > 0 {
                     let e = NoopSessionEffort.describe(strain)
                     NoopSessionRingRow(value: e.value, fraction: e.fraction, title: "Effort", line: e.line)
                 }
+                if !detected { feelRow }
                 NoopSessionFigures(items: figures)
                 NoopSessionHeart(start: row.startTs, end: row.endTs, source: row.source)
                 actions
@@ -61,6 +67,19 @@ struct NoopActivityConfirmSheet: View {
         }
         .task {
             suggestions = await repo.personalActivitySuggestions(start: row.startTs, end: row.endTs)
+        }
+        .task {
+            guard let store = await repo.storeHandle() else { return }
+            feel = (try? await store.workoutFeel(deviceId: repo.deviceId, startTs: row.startTs))?.rating
+        }
+        .sheet(isPresented: $ratingOpen) {
+            NoopLiftEffortSheet(rating: $rating, cardio: true) {
+                let value = rating.rounded()
+                ratingOpen = false
+                withAnimation(NoopMotion.swap) { feel = value }
+                Task { await NoopCardioFeel.save(value, startTs: row.startTs, repo: repo) }
+            }
+            .noopSheet()
         }
         .confirmationDialog(detected ? "Delete this detected activity?" : "Delete this session?",
                             isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -115,13 +134,47 @@ struct NoopActivityConfirmSheet: View {
             HStack {
                 Text("Activity").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                 Spacer()
-                Text("Change").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                Text("Change").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(accent)
             }
             .padding(.horizontal, 16).frame(minHeight: 48)
             .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(NoopHTMLPressStyle())
     }
+
+    private var feelRow: some View {
+        Button {
+            rating = feel ?? 6
+            ratingOpen = true
+        } label: {
+            if let feel {
+                let v = Int(feel)
+                NoopSessionRingRow(value: "\(v)", fraction: feel / 10, title: "How it felt",
+                                   line: "\(NoopLiftEffortSheet.cardioWord(v)) · your own read, out of 10",
+                                   colors: [NoopHTMLColor.blueLight, feel < 4 ? NoopHTMLColor.blueLight : feel < 7 ? NoopHTMLColor.warm
+                                            : feel < 9 ? NoopHTMLColor.amber : NoopHTMLColor.red], chevron: true)
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: "gauge.with.dots.needle.67percent").font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.blueLight)
+                        .frame(width: 40, height: 40).background(NoopHTMLColor.blueLight.opacity(0.14), in: Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("How hard was it?").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                        Text("Rate it 1–10, beside what the strap measured").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                    }
+                    Spacer(minLength: 0)
+                    NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
+                }
+                .padding(14)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+    }
+
+    /// Weights are green across Fitness; cardio and every other sport are Aura blue.
+    private var isStrength: Bool { kindLine == "Strength training" }
+    private var accent: Color { isStrength ? NoopHTMLColor.volt : NoopHTMLColor.blueLight }
 
     private var kindLine: String {
         let t = row.sport.lowercased()
@@ -297,5 +350,43 @@ struct NoopSessionEditSheet: View {
                 .tint(NoopHTMLColor.volt)
         }
         .frame(minHeight: 52)
+    }
+}
+
+/// Saves the wearer's rating of a cardio session beside its workout row.
+enum NoopCardioFeel {
+    @MainActor static func save(_ rating: Double, startTs: Int, repo: Repository) async {
+        guard let store = await repo.storeHandle() else { return }
+        try? await store.upsertWorkoutFeel(.init(deviceId: repo.deviceId, startTs: startTs, rating: rating,
+                                                 ts: Int(Date().timeIntervalSince1970)))
+    }
+}
+
+/// What a finished cardio session opens on, the way a finished lift does: "How hard was that?" first,
+/// then the session as it was saved. The workout is already saved when this appears; the rating rides beside it.
+struct NoopCardioFinishSheet: View {
+    let row: WorkoutRow
+    @EnvironmentObject private var repo: Repository
+    @State private var rating = 6.0
+    @State private var rated = false
+
+    var body: some View {
+        ZStack {
+            if rated {
+                NoopActivityConfirmSheet(row: row)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            } else {
+                NoopLiftEffortSheet(rating: $rating, cardio: true) {
+                    let value = rating.rounded()
+                    Task {
+                        await NoopCardioFeel.save(value, startTs: row.startTs, repo: repo)
+                        withAnimation(NoopMotion.swap) { rated = true }
+                    }
+                }
+                .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+        }
+        .background(NoopHTMLColor.canvas.ignoresSafeArea())
+        .sensoryFeedback(.success, trigger: rated)
     }
 }
