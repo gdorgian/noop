@@ -538,6 +538,10 @@ struct NoopNightAmbientGlow: View {
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
         .ignoresSafeArea()
+        // The pulse redraws the blurred glow every frame. On the GPU it is cheap; on the CPU it was a
+        // quarter of the main thread on every Rest screen (profiled on device 25 Oct 2026). The group
+        // spans the whole screen, so it clips only what the screen already clips.
+        .drawingGroup()
         .allowsHitTesting(false)
     }
 }
