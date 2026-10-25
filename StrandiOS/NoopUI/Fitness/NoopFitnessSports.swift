@@ -198,11 +198,13 @@ struct NoopSportTile: View {
     let sport: String
     var detail: String? = nil
     let action: () -> Void
+    @State private var taps = 0
 
     var body: some View {
-        Button(action: action) {
+        Button { taps += 1; action() } label: {
             VStack(spacing: 8) {
                 Image(systemName: NoopFitnessCardioLive.symbol(for: sport))
+                    .symbolEffect(.bounce, value: taps)
                     .font(.system(size: 20, weight: .medium)).foregroundStyle(NoopHTMLColor.blueLight)
                     .frame(width: 44, height: 44)
                     .background(NoopHTMLColor.blueLight.opacity(0.13), in: Circle())
@@ -220,6 +222,7 @@ struct NoopSportTile: View {
             .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
         }
         .buttonStyle(NoopHTMLPressStyle())
+        .sensoryFeedback(.impact(weight: .medium), trigger: taps)
         .accessibilityLabel("Start \(sport)")
     }
 }
