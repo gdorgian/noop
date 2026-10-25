@@ -10,10 +10,11 @@ import StrandTraining
 @MainActor
 final class NoopFitnessSettings: ObservableObject {
     enum Section: String, CaseIterable, Codable, Identifiable {
-        case activity, routines, sports, load, cardio, strength
+        case week, activity, routines, sports, load, cardio, strength
         var id: String { rawValue }
         var title: String {
             switch self {
+            case .week: "This week"
             case .activity: "Activity"
             case .routines: "Routines"
             case .sports: "Cardio and sports"

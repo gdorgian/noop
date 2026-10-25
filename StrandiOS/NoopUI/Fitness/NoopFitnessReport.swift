@@ -4,7 +4,7 @@ import StrandFitness
 import StrandAnalytics
 import WhoopStore
 
-/// A month, or a year, in training: what was done, how it compares with the period before, the muscles
+/// A week, a month or a year in training: what was done, how it compares with the period before, the muscles
 /// and exercises it went to, and every record it set — with a card to share.
 ///
 /// Built from the same history the Fitness page reads (sessions of every kind, working sets) plus each
@@ -14,23 +14,32 @@ struct NoopFitnessReportScreen: View {
     @ObservedObject var fitness: NoopFitnessModel
     @EnvironmentObject private var repo: Repository
     @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
-    @State private var year = false
+    enum Span: Hashable { case week, month, year }
+    @State private var span: Span = .month
     @State private var start: Date = NoopFitnessReport.monthStart(Date())
+    private var year: Bool { span == .year }
     @State private var records: [NoopFitnessReport.Record] = []
     @State private var shareImage: Image?
 
     private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
-    private var cal: Calendar { Calendar.current }
+    /// Weeks start on Monday, as the Fitness week strip does.
+    private var cal: Calendar { var c = Calendar.current; c.firstWeekday = 2; return c }
+    private var unit: Calendar.Component {
+        switch span { case .week: .weekOfYear; case .month: .month; case .year: .year }
+    }
     private var period: DateInterval {
-        cal.dateInterval(of: year ? .year : .month, for: start) ?? DateInterval(start: start, duration: 86_400 * 30)
+        cal.dateInterval(of: unit, for: start) ?? DateInterval(start: start, duration: 86_400 * 30)
     }
     private var previous: DateInterval {
-        let back = cal.date(byAdding: year ? .year : .month, value: -1, to: period.start) ?? period.start
-        return cal.dateInterval(of: year ? .year : .month, for: back) ?? period
+        let back = cal.date(byAdding: unit, value: -1, to: period.start) ?? period.start
+        return cal.dateInterval(of: unit, for: back) ?? period
+    }
+    private var spanWord: String {
+        switch span { case .week: "week"; case .month: "month"; case .year: "year" }
     }
 
     var body: some View {
-        NoopFitnessPage(navigation: navigation, title: year ? "Year in review" : "Month in review") {
+        NoopFitnessPage(navigation: navigation, title: "\(spanWord.capitalized) in review") {
             if let h = fitness.snapshot?.history {
                 content(h)
             } else {
@@ -39,6 +48,7 @@ struct NoopFitnessReportScreen: View {
         }
         .onAppear {
             if let asked = navigation.fitnessReportStart { start = asked; navigation.fitnessReportStart = nil }
+            if navigation.fitnessReportWeek { span = .week; navigation.fitnessReportWeek = false }
         }
         // Keyed on the history too: opened straight onto this page, the history arrives after it appears.
         .task(id: "\(period.start.timeIntervalSince1970)-\(repo.refreshSeq)-\(fitness.snapshot?.history.now.timeIntervalSince1970 ?? 0)") {
@@ -51,17 +61,17 @@ struct NoopFitnessReportScreen: View {
         let now = NoopFitnessReport.summary(h, period)
         let before = NoopFitnessReport.summary(h, previous)
         VStack(alignment: .leading, spacing: 20) {
-            NoopTabs(options: [("Month", false), ("Year", true)], selection: $year)
+            NoopTabs(options: [("Week", Span.week), ("Month", .month), ("Year", .year)], selection: $span)
             HStack {
-                step(.left) { start = cal.date(byAdding: year ? .year : .month, value: -1, to: period.start) ?? start }
+                step(.left) { start = cal.date(byAdding: unit, value: -1, to: period.start) ?? start }
                 Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                     .frame(maxWidth: .infinity)
                 step(.right, enabled: period.end <= Date()) {
-                    start = cal.date(byAdding: year ? .year : .month, value: 1, to: period.start) ?? start
+                    start = cal.date(byAdding: unit, value: 1, to: period.start) ?? start
                 }
             }
             if now.workouts == 0 {
-                NoopExerciseEmpty(text: "No workouts in \(title). Pick another \(year ? "year" : "month") with the arrows.")
+                NoopExerciseEmpty(text: "No workouts in \(title). Pick another \(spanWord) with the arrows.")
             } else {
                 hero(now, before)
                 days(h)
@@ -74,7 +84,15 @@ struct NoopFitnessReportScreen: View {
     }
 
     private var title: String {
-        year ? period.start.formatted(.dateTime.year()) : period.start.formatted(.dateTime.month(.wide).year())
+        switch span {
+        case .year: return period.start.formatted(.dateTime.year())
+        case .month: return period.start.formatted(.dateTime.month(.wide).year())
+        case .week:
+            let last = period.end.addingTimeInterval(-1)
+            let sameMonth = cal.isDate(period.start, equalTo: last, toGranularity: .month)
+            return "\(period.start.formatted(.dateTime.month(.abbreviated).day())) – "
+                + (sameMonth ? last.formatted(.dateTime.day()) : last.formatted(.dateTime.month(.abbreviated).day()))
+        }
     }
 
     // MARK: Hero
@@ -89,8 +107,15 @@ struct NoopFitnessReportScreen: View {
     private func days(_ h: NoopFitnessHistory) -> some View {
         let sessions = h.sessions.filter { period.contains($0.start) }
         VStack(alignment: .leading, spacing: 10) {
-            NoopSectionLabel(year ? "Workouts by month" : "Training days")
-            if year {
+            NoopSectionLabel(year ? "Workouts by month" : span == .week ? "Day by day" : "Training days")
+            if span == .week {
+                let week = (0..<7).compactMap { i -> NoopFitnessSnapshot.WeekDay? in
+                    guard let d = cal.date(byAdding: .day, value: i, to: period.start) else { return nil }
+                    return .init(date: d, sessions: sessions.filter { cal.isDate($0.start, inSameDayAs: d) })
+                }
+                NoopFitnessWeekMixCard(week: week, history: h.sessions, now: min(h.now, period.end))
+                    .padding(.bottom, -22)
+            } else if year {
                 let counts = (0..<12).map { m -> Int in
                     let monthStart = cal.date(byAdding: .month, value: m, to: period.start) ?? period.start
                     return sessions.filter { cal.isDate($0.start, equalTo: monthStart, toGranularity: .month) }.count
@@ -256,7 +281,7 @@ struct NoopFitnessReportScreen: View {
     private var shareLabel: some View {
         HStack(spacing: 8) {
             Image(systemName: "square.and.arrow.up").font(.system(size: 14, weight: .semibold))
-            Text("Share \(year ? "your year" : "your month")").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+            Text("Share your \(spanWord)").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
         }
         .foregroundStyle(NoopHTMLColor.ink)
         .frame(maxWidth: .infinity).frame(minHeight: 52)

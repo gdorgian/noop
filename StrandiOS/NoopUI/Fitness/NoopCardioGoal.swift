@@ -194,6 +194,7 @@ struct NoopCardioGoalSheet: View {
                 .accessibilityElement(children: .combine)
                 stepButton("plus", label: "More", action: plus)
             }
+            .padding(.horizontal, NoopSpace.m)
             HStack(spacing: NoopSpace.xs) {
                 ForEach(Array(presets.enumerated()), id: \.offset) { _, p in
                     NoopChip(title: p.0, isOn: p.1, action: p.2)

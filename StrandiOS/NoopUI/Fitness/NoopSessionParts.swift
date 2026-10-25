@@ -23,9 +23,14 @@ struct NoopSessionHero: View {
     var tint: Color = NoopHTMLColor.volt
     /// The symbol's colour on the tinted disc.
     var ink: Color = NoopHTMLColor.voltInk
+    /// Just saved: the ring closes around the disc once (`NoopCelebrationRing`).
+    var celebrate = false
+    /// A card to share, beside the disc.
+    var share: NoopShareContent? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
             ZStack {
                 Circle().fill(RadialGradient(colors: [tint.opacity(0.42), tint.opacity(0)], center: .center,
                                              startRadius: 20, endRadius: 50))
@@ -37,10 +42,15 @@ struct NoopSessionHero: View {
                     .frame(width: 72, height: 72)
                 Image(systemName: symbol).font(.system(size: 31, weight: .semibold))
                     .foregroundStyle(ink)
+                    .symbolEffect(.bounce, value: celebrate)
+                if celebrate { NoopCelebrationRing(tint: tint) }
             }
             .frame(width: 100, height: 100)
             .padding(.leading, -14)
             .padding(.top, 6)
+            Spacer()
+            if let share { NoopShareButton(content: share).padding(.top, 14) }
+            }
             HStack(spacing: 8) {
                 Text(kind).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(tint)
                 if let badge {

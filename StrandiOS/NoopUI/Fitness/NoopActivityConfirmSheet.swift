@@ -9,6 +9,8 @@ import WhoopStore
 /// from, so the choices are, over time, the wearer's own activities ranked by how much this looks like them.
 struct NoopActivityConfirmSheet: View {
     let row: WorkoutRow
+    /// Opened straight after the session was saved: the finish ring closes once around its icon.
+    var justFinished = false
     var onDone: () -> Void = {}
 
     @EnvironmentObject private var repo: Repository
@@ -24,6 +26,8 @@ struct NoopActivityConfirmSheet: View {
     @State private var feel: Double?
     @State private var rating = 6.0
     @State private var ratingOpen = false
+    @State private var route: (points: [RouteMath.LatLng], meters: Double, splits: [RouteSplits.Split])?
+    @State private var compare: (count: Int, lines: [NoopCompareCard.Line])?
 
     /// Common answers after the learned ones, so a first-ever detection still has one-tap choices.
     static let common = ["Strength", "Running", "Walking", "Cycling", "Swimming", "HIIT", "Yoga", "Dancing",
@@ -49,7 +53,8 @@ struct NoopActivityConfirmSheet: View {
                                 kind: detected ? "Detected activity" : kindLine, title: title, when: when,
                                 source: detected ? "Noop Aura · detected from heart rate" : "Noop Aura",
                                 badge: detected ? "unconfirmed" : nil,
-                                tint: accent, ink: isStrength ? NoopHTMLColor.voltInk : NoopHTMLColor.blueInk)
+                                tint: accent, ink: isStrength ? NoopHTMLColor.voltInk : NoopHTMLColor.blueInk,
+                                celebrate: justFinished, share: detected ? nil : shareContent)
                 if detected || changing { picker } else { changeRow }
                 NoopSessionHeading(title: "Workout details")
                 if let strain = row.strain, strain > 0 {
@@ -58,6 +63,14 @@ struct NoopActivityConfirmSheet: View {
                 }
                 if !detected { feelRow }
                 NoopSessionFigures(items: figures)
+                if let compare, !compare.lines.isEmpty {
+                    NoopCompareCard(sport: row.sport, count: compare.count, lines: compare.lines)
+                        .transition(.opacity)
+                }
+                if let route {
+                    NoopRouteCard(points: route.points, distanceM: route.meters).transition(.opacity)
+                    if route.splits.count >= 2 { NoopSplitsCard(splits: route.splits).transition(.opacity) }
+                }
                 NoopSessionHeart(start: row.startTs, end: row.endTs, source: row.source)
                 actions
             }
@@ -72,6 +85,7 @@ struct NoopActivityConfirmSheet: View {
             guard let store = await repo.storeHandle() else { return }
             feel = (try? await store.workoutFeel(deviceId: repo.deviceId, startTs: row.startTs))?.rating
         }
+        .task(id: "\(row.startTs)|\(row.sport)") { await loadExtras() }
         .sheet(isPresented: $ratingOpen) {
             NoopLiftEffortSheet(rating: $rating, cardio: true) {
                 let value = rating.rounded()
@@ -172,6 +186,18 @@ struct NoopActivityConfirmSheet: View {
         .buttonStyle(NoopHTMLPressStyle())
     }
 
+    private var shareContent: NoopShareContent {
+        var figures: [(value: String, label: String)] = [(NoopFitnessHome.duration(Double(row.endTs - row.startTs)), "time")]
+        if let d = row.distanceM, d > 100 { figures.append((NoopCardioGoalText.km(d), "km")) }
+        if let hr = row.avgHr { figures.append(("\(hr)", "avg bpm")) }
+        if let strain = row.strain, strain > 0 { figures.append((String(format: "%.1f", strain), "Effort")) }
+        else if let kcal = row.energyKcal, kcal > 0 { figures.append(("\(Int(kcal.rounded()))", "kcal")) }
+        return NoopShareContent(symbol: NoopFitnessCardioLive.symbol(for: row.sport), tint: accent,
+                                ink: isStrength ? NoopHTMLColor.voltInk : NoopHTMLColor.blueInk,
+                                kind: kindLine, title: title, when: when, figures: figures,
+                                route: route?.points ?? [])
+    }
+
     /// Weights are green across Fitness; cardio and every other sport are Aura blue.
     private var isStrength: Bool { kindLine == "Strength training" }
     private var accent: Color { isStrength ? NoopHTMLColor.volt : NoopHTMLColor.blueLight }
@@ -239,6 +265,27 @@ struct NoopActivityConfirmSheet: View {
             await model.intelligence.analyzeRecent()
             await finish()
         }
+    }
+
+    /// The route and its splits, from the phone's own route store, and the last five sessions of this sport.
+    @MainActor private func loadExtras() async {
+        let key = RouteStore.key(startTs: row.startTs, sport: row.sport)
+        if let stored = RouteStore.load(startTs: row.startTs, sport: row.sport) {
+            let line = RouteMath.decode(stored.polyline)
+            if line.count >= 2 {
+                let points = RoutePointStore.load(for: key) ?? []
+                withAnimation(NoopMotion.swap) {
+                    route = (line, stored.distanceM, RouteSplits.splits(points))
+                }
+            }
+        }
+        guard !detected, !unnamed else { return }
+        let recent = (await repo.workoutRows(days: 180))
+            .filter { $0.sport.caseInsensitiveCompare(row.sport) == .orderedSame && $0.startTs < row.startTs }
+            .sorted { $0.startTs > $1.startTs }
+            .prefix(5)
+        let lines = NoopCompareCard.lines(for: row, recent: Array(recent))
+        withAnimation(NoopMotion.swap) { compare = (recent.count, lines) }
     }
 
     @MainActor private func finish() async {
@@ -373,7 +420,7 @@ struct NoopCardioFinishSheet: View {
     var body: some View {
         ZStack {
             if rated {
-                NoopActivityConfirmSheet(row: row)
+                NoopActivityConfirmSheet(row: row, justFinished: true)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             } else {
                 NoopLiftEffortSheet(rating: $rating, cardio: true) {

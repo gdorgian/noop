@@ -1331,6 +1331,7 @@ private struct NoopLiftLiveScreen: View {
         flow.selectedSession = sessionRow
         flow.sessionSets = rows
         navigation.selectedLiftSessionID = sessionID
+        navigation.justFinishedLiftID = sessionID
         navigation.liftDetailReturnRoute = .fitness
         navigation.land(on: .liftDetail, over: .fitness)
     }
@@ -1814,6 +1815,8 @@ struct NoopLiftDetailScreen: View {
     private var heaviest: LiftSetRow? { working.filter { $0.weightKg != nil }.max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) } }
 
     @State private var records: [NoopLiftRecord] = []
+    /// Opened straight after saving: the hero's ring closes once.
+    @State private var celebrating = false
     @State private var rating = false
     @State private var newRpe = 6.0
     @State private var insightsFor: NoopFitnessExerciseChoice?
@@ -1857,12 +1860,36 @@ struct NoopLiftDetailScreen: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { navigation.push(route) }
     }
 
+    /// The card "Share" sends: the lift's time, sets, volume and records.
+    private func shareContent(_ record: LiftSessionRow) -> NoopShareContent {
+        let minutes = max(1, ((record.endTs ?? record.startTs) - record.startTs) / 60)
+        var figures: [(value: String, label: String)] = [
+            (minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes) min", "time"),
+            ("\(working.count)", working.count == 1 ? "set" : "sets"),
+        ]
+        if volume > 0 {
+            figures.append((LiftFormat.trim((LiftFormat.display(fromKilograms: volume, system: units)).rounded()),
+                            "\(LiftFormat.weightUnit(units)) lifted"))
+        }
+        if !records.isEmpty { figures.append(("\(records.count)", records.count == 1 ? "record" : "records")) }
+        return NoopShareContent(symbol: "figure.strengthtraining.traditional", tint: NoopHTMLColor.volt,
+                                ink: NoopHTMLColor.voltInk, kind: "Strength training",
+                                title: record.programName ?? "A lift", when: detailSubtitle(record), figures: figures)
+    }
+
     private var content: some View {
             VStack(alignment: .leading, spacing: 14) {
                 if let record {
                     NoopSessionHero(symbol: "figure.strengthtraining.traditional", kind: "Strength training",
                                     title: record.programName ?? "A lift", when: detailSubtitle(record),
-                                    source: "Noop Aura · recorded live")
+                                    source: "Noop Aura · recorded live",
+                                    celebrate: celebrating, share: shareContent(record))
+                        .onAppear {
+                            if navigation.justFinishedLiftID == record.id {
+                                celebrating = true
+                                navigation.justFinishedLiftID = nil
+                            }
+                        }
                     if !records.isEmpty { recordsStrip }
                     NoopSessionHeading(title: "Workout details")
                     if let strain = matched?.strain, strain > 0 {

@@ -123,8 +123,6 @@ struct NoopFitnessSportsSection: View {
     @EnvironmentObject private var live: LiftSessionController
     @State private var refusal: NoopRunningSession?
     @State private var choosing = false
-    /// The sport whose goal sheet is open, from a long press on its tile.
-    @State private var goalSport: NoopIdentifiedSport?
 
     /// Up to six: the cardio sports done most recently, then the starters to fill the row.
     private var shown: [(sport: String, last: Date?)] {
@@ -152,8 +150,7 @@ struct NoopFitnessSportsSection: View {
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                 ForEach(shown, id: \.sport) { item in
-                    NoopSportTile(sport: item.sport, detail: item.last.map(Self.ago),
-                                  withGoal: { goalSport = .init(name: item.sport) }) { start(item.sport) }
+                    NoopSportTile(sport: item.sport, detail: item.last.map(Self.ago)) { start(item.sport) }
                 }
             }
             Button { choosing = true } label: {
@@ -179,12 +176,6 @@ struct NoopFitnessSportsSection: View {
             }
             .noopSheet()
         }
-        .sheet(item: $goalSport) { s in
-            NoopCardioGoalSheet(sport: s.name, zone: ZoneTrainingPrefs.lastTargetZone()) { goal, zone in
-                start(s.name, goal: goal, zone: zone)
-            }
-            .noopSheet()
-        }
     }
 
     private func start(_ sport: String, goal: CardioGoal? = nil, zone: Int? = nil) {
@@ -203,16 +194,9 @@ struct NoopFitnessSportsSection: View {
 }
 
 /// One sport to start: its figure on a blue disc, the name, and when it was last done.
-struct NoopIdentifiedSport: Identifiable {
-    let name: String
-    var id: String { name }
-}
-
 struct NoopSportTile: View {
     let sport: String
     var detail: String? = nil
-    /// Opens the goal sheet; offered on a long press so one tap still starts at once.
-    var withGoal: (() -> Void)? = nil
     let action: () -> Void
 
     var body: some View {
@@ -236,14 +220,7 @@ struct NoopSportTile: View {
             .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
         }
         .buttonStyle(NoopHTMLPressStyle())
-        .contextMenu {
-            if let withGoal {
-                Button(action: action) { Label("Start now", systemImage: "play.fill") }
-                Button(action: withGoal) { Label("Start with a goal…", systemImage: "flag.checkered") }
-            }
-        }
         .accessibilityLabel("Start \(sport)")
-        .accessibilityAction(named: "Start with a goal") { withGoal?() }
     }
 }
 

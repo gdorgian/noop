@@ -96,9 +96,14 @@ struct NoopFitnessHome: View {
             .sensoryFeedback(.selection, trigger: weekOffset)
             .padding(.bottom, weekOffset == 0 ? 14 : 10)
         if weekOffset == 0, !editing {
+            let review = reviewReady(s)
+            let weekly = review == nil ? weekReviewReady(s) : nil
             NoopFitnessStreakRow(sessions: s.history.sessions, now: s.history.now)
-                .padding(.bottom, reviewReady(s) == nil ? 22 : 10)
-            if let last = reviewReady(s) {
+                .padding(.bottom, review == nil && weekly == nil ? 22 : 10)
+            if let weekly {
+                weekReviewCard(weekly, s)
+            }
+            if let last = review {
                 Button {
                     navigation.fitnessReportStart = last
                     navigation.push(.fitnessReport)
@@ -153,6 +158,58 @@ struct NoopFitnessHome: View {
         }
     }
 
+    /// Monday to Wednesday, last week's review — when last week had any training.
+    private func weekReviewReady(_ s: NoopFitnessSnapshot) -> Date? {
+        var cal = Calendar.current
+        cal.firstWeekday = 2
+        let weekday = (cal.component(.weekday, from: s.history.now) + 5) % 7   // Monday 0
+        guard weekday <= 2,
+              let thisWeek = cal.dateInterval(of: .weekOfYear, for: s.history.now)?.start,
+              let last = cal.date(byAdding: .weekOfYear, value: -1, to: thisWeek),
+              s.history.sessions.contains(where: { $0.start >= last && $0.start < thisWeek }) else { return nil }
+        return last
+    }
+
+    /// The week just gone in one line, the split shown as the two colours side by side.
+    private func weekReviewCard(_ monday: Date, _ s: NoopFitnessSnapshot) -> some View {
+        let end = Calendar.current.date(byAdding: .day, value: 7, to: monday) ?? monday
+        let sessions = s.history.sessions.filter { $0.start >= monday && $0.start < end }
+        let lift = sessions.filter { $0.kind == .strength }.reduce(0) { $0 + $1.durationS }
+        let cardio = sessions.filter { $0.kind == .cardio }.reduce(0) { $0 + $1.durationS }
+        let total = max(1, lift + cardio)
+        return Button {
+            navigation.fitnessReportStart = monday
+            navigation.fitnessReportWeek = true
+            navigation.push(.fitnessReport)
+        } label: {
+            HStack(spacing: 13) {
+                ZStack {
+                    Circle().trim(from: 0, to: lift / total)
+                        .stroke(NoopHTMLColor.volt, style: StrokeStyle(lineWidth: 4, lineCap: .butt))
+                    Circle().trim(from: lift / total, to: 1)
+                        .stroke(NoopHTMLColor.blueLight, style: StrokeStyle(lineWidth: 4, lineCap: .butt))
+                }
+                .rotationEffect(.degrees(-90))
+                .frame(width: 34, height: 34)
+                .padding(3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Your week in review").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text("\(sessions.count) \(sessions.count == 1 ? "workout" : "workouts") · \(NoopFitnessHome.duration(lift + cardio)) · records and where it went")
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(NoopHTMLColor.chevronDim)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .background(LinearGradient(colors: [NoopHTMLColor.blueLight.opacity(0.10), NoopHTMLColor.card, NoopHTMLColor.volt.opacity(0.08)],
+                                       startPoint: .leading, endPoint: .trailing),
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.6))
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .padding(.bottom, 22)
+    }
+
     /// In the first week of a month, last month's review — when last month had any training to review.
     private func reviewReady(_ s: NoopFitnessSnapshot) -> Date? {
         let cal = Calendar.current
@@ -175,6 +232,7 @@ struct NoopFitnessHome: View {
 
     static func sectionDetail(_ section: NoopFitnessSettings.Section) -> String {
         switch section {
+        case .week: "Weights and cardio, day by day, against last week"
         case .activity: "The sessions and plans of the chosen day"
         case .routines: "Your routines, to start in one tap"
         case .sports: "Your sports, to start in one tap, and every other one"
@@ -243,6 +301,11 @@ struct NoopFitnessHome: View {
     @ViewBuilder
     private func section(_ section: NoopFitnessSettings.Section, _ s: NoopFitnessSnapshot) -> some View {
         switch section {
+        case .week:
+            if weekOffset == 0 {
+                sectionTitle("This week")
+                NoopFitnessWeekMixCard(week: s.week, history: s.history.sessions, now: s.history.now)
+            }
         case .activity:
             sectionTitle(Calendar.current.isDateInToday(selectedDay) ? "Today" : Self.dayTitle(selectedDay)) {
                 NoopFitnessIconButton(glyph: .plus, compact: true) { navigation.plus() }

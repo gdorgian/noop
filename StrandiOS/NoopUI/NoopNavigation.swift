@@ -445,6 +445,8 @@ final class NoopNavigation: ObservableObject {
     @Published var liveDetailRow: WorkoutRow?
     /// A cardio session just saved: Fitness shows "How hard was that?" and then the session.
     @Published var cardioFinish: WorkoutRow?
+    /// The lift just saved, so its page opens with the finish ring once.
+    var justFinishedLiftID: String?
 
     /// `plumbing/data` is one screen with two doors and three transient states between them.
     /// Reading, written and rejected are what the screen BECOMES during an import — never routes.
@@ -676,6 +678,8 @@ final class NoopNavigation: ObservableObject {
     @Published var fitnessExercise: String?
     /// The month the review page opens on; consumed when it appears. Nil opens this month.
     @Published var fitnessReportStart: Date?
+    /// Open the review on a week rather than a month.
+    var fitnessReportWeek = false
     /// A lift opened from the shared workout history, by its start time (the saved workout row and the
     /// lift session share it). Consumed by `lift-detail` when it loads.
     @Published var liftDetailStartTs: Int?
