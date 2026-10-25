@@ -1013,7 +1013,7 @@ struct NoopAct2Screens: View {
                     .accessibilityLabel(inboxUnreadCount > 0 ? "Updates, \(inboxUnreadCount) unread" : "Updates")
                 }
                 .padding(.leading, 6).padding(.trailing, 5)
-                .frame(height: 46)
+                .frame(height: 43)
                 .background(Color.white.opacity(0.06), in: Capsule())
                 .overlay(Capsule().strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
                 .fixedSize()

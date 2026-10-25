@@ -118,7 +118,7 @@ struct NoopActivityStatusTile: View {
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.22), radius: 1, y: 1)
             }
-            .frame(width: side * 1.42, height: side)
+            .frame(width: side * 1.18, height: side)
             .shadow(color: status.tint.1.opacity(0.45), radius: 7, y: 3)
     }
 }
@@ -131,7 +131,7 @@ struct NoopActivityStatusChip: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                NoopActivityStatusTile(status: state.status, side: 34)
+                NoopActivityStatusTile(status: state.status, side: 35)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(state.status.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.ink)
@@ -144,8 +144,8 @@ struct NoopActivityStatusChip: View {
                     .foregroundStyle(NoopHTMLColor.faint)
                     .padding(.trailing, 6)
             }
-            .padding(5)
-            .frame(height: 46)
+            .padding(4)
+            .frame(height: 43)
             .background(Color.white.opacity(0.06), in: Capsule())
             .overlay(Capsule().strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
             .contentShape(Capsule())
