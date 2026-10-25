@@ -949,6 +949,33 @@ public enum SleepStager {
         return (out, attempts)
     }
 
+    /// Longest active run between two sleep runs that `bridgeShortStirs` joins on a dense night.
+    public static let shortStirBridgeMaxMin: Int = 20
+
+    /// Dense-night twin of the sparse bridge's case 2: joins sleep, one active run of at most
+    /// `shortStirBridgeMaxMin`, sleep — when the pulse across the stir stays in the sleep band and the
+    /// strap did not call a pulse-confirmed "up" inside it. A restless quarter-hour (turning over, a REM
+    /// twitch) otherwise splits one night in two, and the gap reads as awake: one morning a 15-minute
+    /// stir at a sleeping pulse split a night Fitbit on the same wrist scored as unbroken sleep. The
+    /// stager still stages the joined span, so real waking inside it is kept as wake.
+    static func bridgeShortStirs(_ periods: [Period], hr: [HRSample], baseline: Double?,
+                                 bandSleepState: [(ts: Int, state: Int)]) -> [Period] {
+        var out: [Period] = []
+        for p in periods {
+            if p.stage == "sleep", out.count >= 2, let stir = out.last, stir.stage == "active",
+               out[out.count - 2].stage == "sleep",
+               stir.end - stir.start <= shortStirBridgeMaxMin * 60,
+               hrSleepBandAcross(stir.start, stir.end, hr: hr, baseline: baseline),
+               bandUpCut(start: stir.start, end: stir.end, bandSleepState: bandSleepState, hr: hr) == nil {
+                out.removeLast()
+                out[out.count - 1] = Period(stage: "sleep", start: out[out.count - 1].start, end: p.end)
+                continue
+            }
+            out.append(p)
+        }
+        return out
+    }
+
     /// Sparse-gravity bridge (#308): merge two SLEEP runs when the intervening HR stays in the sleep
     /// band — so a real night fragmented by gravity dropouts is re-stitched into one continuous in-bed
     /// span BEFORE the minSleepMin gate drops the pieces. A no-op when `sparse == false`, so the dense
@@ -1597,6 +1624,9 @@ public enum SleepStager {
         let bridgeResult = bridgeSparseSleepTraced(runs, sparse: bridgeEnabled, hr: hrS, baseline: baseline)
         let bridgeAttempts = bridgeResult.1
         runs = bridgeResult.0
+        if !bridgeEnabled {
+            runs = bridgeShortStirs(runs, hr: hrS, baseline: baseline, bandSleepState: bandSleepState)
+        }
         // Sleep & Rest test mode (E3): record the bridge result, so a night rescued from fragmentation
         // is visible. Emitted whenever the bridge was ENABLED (sparse, or #1937's fragmented-to-nothing
         // night) and only when tracing. Side-effect-only.

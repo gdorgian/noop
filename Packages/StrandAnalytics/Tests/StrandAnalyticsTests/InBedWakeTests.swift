@@ -88,6 +88,16 @@ final class InBedWakeTests: XCTestCase {
         XCTAssertEqual(edges(ms).afterWakeMin, 0)   // without it, still and barely raised stays sleep
     }
 
+    func testStrapUpAtASleepingPulseStaysSleep() {
+        // The strap calls "up" for the last 70 minutes while the pulse stays at the sleeping level.
+        let up = stride(from: t0 + 440 * 60, to: t0 + 510 * 60, by: 5).map { (ts: $0, state: 3) }
+        let flat = night { m in m >= 440 ? Minute(bpm: 52, moving: false, stage: "light") : nil }
+        XCTAssertEqual(edges(flat, band: up).afterWakeMin, 0)
+        // Getting up lifts the pulse with it: the strap's call stands.
+        let risen = night { m in m >= 440 ? Minute(bpm: 64, moving: false, stage: "light") : nil }
+        XCTAssertEqual(edges(risen, band: up).afterWakeMin, 70, accuracy: 3)
+    }
+
     func testNoHeartRateLeavesTheNightAlone() {
         let ms = night { _ in Minute(bpm: nil, moving: false, stage: "light") }
         XCTAssertEqual(edges(ms), InBedWake.Edges(latencyMin: 0, afterWakeMin: 0))

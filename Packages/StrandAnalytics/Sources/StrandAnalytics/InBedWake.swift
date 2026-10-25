@@ -16,7 +16,8 @@ import WhoopProtocol
 //      inside a still, atonic body.
 //   2. Micro-movement. An awake person shifts, holds a phone, turns a page: small wrist movements most
 //      minutes. Asleep, the wrist is still between occasional turn-overs.
-//   3. The strap's own per-second sleep state (WHOOP 5.0 / MG), when it was recorded: "wake" or "up".
+//   3. The strap's own per-second sleep state (WHOOP 5.0 / MG), when it was recorded: "wake", or "up"
+//      when the pulse rose with it.
 // A minute is AWAKE-LIKE when the strap says awake, or the pulse is well above the sleeping level, or the
 // pulse is above it while the wrist moves. It is SLEEP-LIKE when the strap says asleep, or the pulse is at
 // the sleeping level with a still wrist. Anything else is undecided.
@@ -110,7 +111,7 @@ public enum InBedWake {
         let sleepMoves = (0..<n).compactMap { staged[$0] ? move[$0] : nil }.sorted()
         let moveLine: Double? = sleepMoves.count >= 30
             ? max(minMoveG, sleepMoves[sleepMoves.count / 2] * moveMultiple) : nil
-        let band = perMinuteBand(bandSleepState, start: start, n: n)
+        let band = perMinuteBand(pulseCheckedBand(bandSleepState, hr: hr), start: start, n: n)
 
         let evidence: [Evidence] = (0..<n).map { m in
             if let b = band[m] {
@@ -207,6 +208,30 @@ public enum InBedWake {
             sum[m] += (dx * dx + dy * dy + dz * dz).squareRoot()
         }
         return (0..<n).map { count[$0] >= 2 ? sum[$0] : nil }
+    }
+
+    /// The strap's states with every "up" run the pulse does not confirm dropped (the same check as
+    /// `SleepStager.bandUpCut`). The strap calls "up" while the wearer lies still and asleep — 70 minutes
+    /// of it one morning at a sleeping pulse, while Fitbit on the same wrist scored REM and light — so an
+    /// unconfirmed "up" is left to the pulse and movement evidence instead of counting as awake.
+    static func pulseCheckedBand(_ band: [(ts: Int, state: Int)], hr: [HRSample]) -> [(ts: Int, state: Int)] {
+        let sorted = band.sorted { $0.ts < $1.ts }
+        var out: [(ts: Int, state: Int)] = [], run: [(ts: Int, state: Int)] = []
+        func flush() {
+            if let first = run.first, SleepStager.hrConfirmsUp(at: first.ts, hr: hr) { out += run }
+            run = []
+        }
+        for b in sorted {
+            if b.state == bandUp {
+                if let last = run.last, b.ts - last.ts > SleepStager.bandUpMaxGapS { flush() }
+                run.append(b)
+            } else {
+                flush()
+                out.append(b)
+            }
+        }
+        flush()
+        return out
     }
 
     static func perMinuteBand(_ band: [(ts: Int, state: Int)], start: Int, n: Int) -> [Int?] {
