@@ -67,6 +67,9 @@ final class NoopDataFlow: ObservableObject {
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var backupBusy = false
     @Published var notice: (title: String, message: String)?
+    /// Set when a picked backup is past the restore size ceiling; the screen asks before going ahead.
+    @Published var oversizeRestore: String?
+    private var oversizeBackup: URL?
 
     var isReading: Bool { if case .reading = phase { return true }; return false }
 
@@ -300,23 +303,58 @@ final class NoopDataFlow: ObservableObject {
         guard !backupBusy, !isReading else { return }
         backupBusy = true
         Task {
-            let result = await DataBackup.runImport()
-            backupBusy = false
-            switch result {
-            case .cancelled, .exported, .exportedOversize: return
-            case .imported:
-                notice = ("Restored", "The backup replaced the record on this phone. Quit and reopen Noop for it to take effect.")
-            // The size ceiling is a decompression guard against a hostile archive, and a backup the
-            // wearer just picked out of their own files is a different threat model. Upstream offers to
-            // go ahead anyway; Noop Aura has no designed confirmation for that yet, so this says plainly
-            // what stopped rather than pretending the file was broken.
-            case .restoreTooLarge(let name, _):
-                notice = ("That backup is too large to restore",
-                          "\(name) is bigger than the size Noop will unpack on its own. Nothing on this phone was changed.")
-            case .failure(let message):
-                notice = ("Nothing was restored", message)
+            guard let picked = await DocumentPicker.importFile(DataBackup.backupContentTypes()) else {
+                backupBusy = false
+                return
             }
+            await restore(picked, allowOversize: false)
         }
+    }
+
+    /// The wearer confirmed a backup past the size ceiling. The file they already picked is reused, so a
+    /// multi-gigabyte backup is not copied in a second time and no picker has to rise from a closing alert.
+    func restoreOversizeBackup() {
+        guard let file = oversizeBackup, !backupBusy else { return }
+        oversizeBackup = nil
+        oversizeRestore = nil
+        backupBusy = true
+        Task { await restore(file, allowOversize: true) }
+    }
+
+    func dropOversizeBackup() {
+        if let file = oversizeBackup { Self.removePickedCopy(file) }
+        oversizeBackup = nil
+        oversizeRestore = nil
+    }
+
+    private func restore(_ file: URL, allowOversize: Bool) async {
+        // Unzip, copy and snapshot run tens of seconds on a big record; keep them off the main actor.
+        let result = await Task.detached(priority: .utility) {
+            DataBackup.restore(from: file, allowOversize: allowOversize)
+        }.value
+        backupBusy = false
+        switch result {
+        case .cancelled, .exported, .exportedOversize: return
+        case .imported:
+            if allowOversize { Self.removePickedCopy(file) }
+            notice = ("Restored", "The backup replaced the record on this phone. Quit and reopen Noop for it to take effect.")
+        // The size ceiling is a decompression guard against a hostile archive, and a backup the wearer
+        // just picked out of their own files is a different threat model, so they may go ahead. (#1807)
+        case .restoreTooLarge(let name, let limit):
+            let cap = ByteCountFormatter.string(fromByteCount: limit, countStyle: .file)
+            oversizeBackup = file
+            oversizeRestore = "\(name) is larger than the \(cap) Noop restores without asking. That limit is there to stop a damaged or hostile file from filling this phone; a backup you made yourself is not that. Restoring needs free space for the whole record. Nothing on this phone has changed yet."
+        case .failure(let message):
+            if allowOversize { Self.removePickedCopy(file) }
+            notice = ("Nothing was restored", message)
+        }
+    }
+
+    /// The picker hands back a copy in this app's temporary folder; only that copy is ever removed.
+    private static func removePickedCopy(_ file: URL) {
+        let tmp = FileManager.default.temporaryDirectory.standardizedFileURL.path
+        guard file.standardizedFileURL.path.hasPrefix(tmp) else { return }
+        try? FileManager.default.removeItem(at: file)
     }
 }
 
@@ -444,6 +482,15 @@ struct NoopDataScreen: View {
             Button("OK") { flow.notice = nil }
         } message: {
             Text(flow.notice?.message ?? "")
+        }
+        .alert("This backup is larger than usual", isPresented: Binding(
+            get: { flow.oversizeRestore != nil },
+            set: { if !$0 { flow.oversizeRestore = nil } }
+        )) {
+            Button("Restore anyway") { flow.restoreOversizeBackup() }
+            Button("Cancel", role: .cancel) { flow.dropOversizeBackup() }
+        } message: {
+            Text(flow.oversizeRestore ?? "")
         }
     }
 

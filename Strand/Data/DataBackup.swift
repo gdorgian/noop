@@ -392,11 +392,11 @@ enum DataBackup {
     /// validation, GRDB-origin rejection (a foreign-but-valid SQLite is refused), a timestamped
     /// sidecar snapshot of the current store, and rollback-on-failure so a failed restore leaves the
     /// live database untouched.
-    static func restore(from pickedSource: URL) -> BackupResult {
+    static func restore(from pickedSource: URL, allowOversize: Bool = false) -> BackupResult {
         let dbPath: String
         do { dbPath = try StorePaths.defaultDatabasePath() }
         catch { return .failure(String(localized: "Couldn't locate the NOOP database. \(error.localizedDescription)")) }
-        return restore(from: pickedSource, toDatabaseAt: dbPath)
+        return restore(from: pickedSource, toDatabaseAt: dbPath, allowOversize: allowOversize)
     }
 
     /// The hardened restore core, with the destination database path injected so it is unit-testable
@@ -610,7 +610,7 @@ enum DataBackup {
 
     /// Content types accepted by the export/import panels. Includes the new `.noopbak` (ZIP),
     /// generic ZIP, and legacy `.sqlite` / `.database` types so older backups keep working.
-    private static func backupContentTypes() -> [UTType] {
+    static func backupContentTypes() -> [UTType] {
         var types: [UTType] = []
         if let noopbak = UTType(filenameExtension: "noopbak") { types.append(noopbak) }
         types.append(.zip)
