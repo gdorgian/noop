@@ -201,11 +201,16 @@ struct NoopMetricSheetRequest: Identifiable, Equatable {
     var metricID: String
     /// Which chips open beside it: "vitals" or "sleep".
     var group: String = "vitals"
+    /// For group "marker": the other catalogue ids to offer as chips beside it, in order (a page's
+    /// whole Trends list). Empty opens the one measure alone.
+    var peers: [String] = []
     var id: String { group + "." + metricID }
 
     var metrics: [NoopMetric] {
         switch group {
         case "sleep": NoopMetric.sleep
+        case "marker" where !peers.isEmpty:
+            peers.compactMap { id in MetricCatalog.all.first { $0.id == id }.map(NoopMetric.init(marker:)) }
         case "marker": MetricCatalog.all.first { $0.id == metricID }.map { [NoopMetric(marker: $0)] } ?? NoopMetric.vitals
         default: NoopMetric.vitals
         }
@@ -213,6 +218,9 @@ struct NoopMetricSheetRequest: Identifiable, Equatable {
 }
 
 extension NoopMetric {
+    /// Percent measures the store keeps as a 0–1 fraction; read back as a percentage.
+    static let fractionKeys: Set<String> = ["sleep_efficiency"]
+
     /// Any catalogue measure as a sheet metric: Trends' pinned markers and their See all list.
     init(marker d: MetricDescriptor) {
         let minutes = d.unit == "min"
@@ -221,7 +229,8 @@ extension NoopMetric {
                   higherIsBetter: d.higherIsBetter, zones: norms?.zones ?? [], scale: norms?.scale,
                   about: d.description ?? "\(d.title), from \(d.sourceLabel).",
                   value: { _ in nil }, isDuration: minutes,
-                  series: .init(key: d.key, source: d.source, transform: minutes ? { $0 / 60 } : { $0 }),
+                  series: .init(key: d.key, source: d.source, transform: minutes ? { $0 / 60 }
+                                : d.unit == "%" && Self.fractionKeys.contains(d.key) ? { $0 <= 1 ? $0 * 100 : $0 } : { $0 }),
                   zoneCaption: norms?.caption)
     }
 }

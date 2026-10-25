@@ -344,6 +344,10 @@ struct NoopAct2Screens: View {
                 stressScreen
             case .heart:
                 heartScreen
+            case .recovery:
+                NoopRecoveryPage(navigation: navigation, day: day)
+            case .strain:
+                NoopStrainPage(navigation: navigation, day: day)
             case .breathe, .bcatalog, .bplayer, .bsweep, .bfound:
                 NoopBreatheScreens(navigation: navigation)
             default:
@@ -478,7 +482,15 @@ struct NoopAct2Screens: View {
     ]
 
     /// The seeded shell's rings.
-    static let demoRings = NoopRingValues(recovery: 68, strain: 11.4, sleep: 0.92, sleepMinutes: 432, sleepRuns: nil)
+    static let demoRings = NoopRingValues(recovery: 68, strain: 54, sleep: 0.92, sleepMinutes: 432, sleepRuns: nil)
+
+    private func openRing(_ metric: NoopRingMetric) {
+        switch metric {
+        case .recovery: navigation.push(.recovery)
+        case .strain: navigation.push(.strain)
+        case .sleep: navigation.push(.rest)
+        }
+    }
 
     private var todayRings: NoopRingValues {
         #if DEBUG
@@ -515,15 +527,15 @@ struct NoopAct2Screens: View {
         case "vitals-constellation":
             NoopVitalsConstellation(vitals: day?.vitals ?? []) { navigation.push(.vitals) }
         case "rings-gyro":
-            NoopTodayRings(values: todayRings, style: .gyro) { navigation.push(.rest) }
+            NoopTodayRings(values: todayRings, style: .gyro, open: openRing)
         case "rings-donuts":
-            NoopTodayRings(values: todayRings, style: .donuts) { navigation.push(.rest) }
+            NoopTodayRings(values: todayRings, style: .donuts, open: openRing)
         case "rings-dials":
-            NoopTodayRings(values: todayRings, style: .dials) { navigation.push(.rest) }
+            NoopTodayRings(values: todayRings, style: .dials, open: openRing)
         case "rings":
-            NoopTodayRings(values: todayRings, style: .living) { navigation.push(.rest) }
+            NoopTodayRings(values: todayRings, style: .living, open: openRing)
         case "rings-segmented":
-            NoopTodayRings(values: todayRings, style: .segmented) { navigation.push(.rest) }
+            NoopTodayRings(values: todayRings, style: .segmented, open: openRing)
         case "breathe":
             VStack(spacing: 10) {
                 if !isHistorical {

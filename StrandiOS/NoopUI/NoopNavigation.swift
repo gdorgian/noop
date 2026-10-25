@@ -99,7 +99,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 1
     case rest, tonight, why, debt, alarm
     // Act 2
-    case today, inbox, charge, day, energy, vitals, stress, heart
+    case today, inbox, charge, day, energy, vitals, stress, heart, recovery, strain
     case breathe, bcatalog, bplayer, bsweep, bfound
     // Act 3
     case session, pick, ready, live, intervals, detail, across
@@ -142,7 +142,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     var act: NoopAct {
         switch self {
         case .rest, .tonight, .why, .debt, .alarm: .night
-        case .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart,
+        case .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart, .recovery, .strain,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound: .day
         case .session, .pick, .ready, .live, .intervals, .detail, .across: .effort
         case .trends, .capacity, .rhythm, .year: .picture
@@ -167,7 +167,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         switch self {
         // Rest left the tab bar for Fitness (22 Oct 2026); last night is a row on Today.
         case .rest, .tonight, .why, .debt, .alarm,
-             .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart,
+             .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart, .recovery, .strain,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound,
              .coach, .gate, .setup, .consent, .memory:
             .today
@@ -1195,6 +1195,8 @@ extension NoopRoute {
         case .vitals: "Vitals"
         case .stress: "Stress"
         case .heart: "Heart"
+        case .recovery: "Recovery"
+        case .strain: "Strain"
         case .breathe: "Breathe"
         case .bcatalog: "Eighteen ways to breathe"
         case .bplayer: "Breathing"

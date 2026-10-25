@@ -649,7 +649,7 @@ struct NoopVerifiedAppShell: View {
     private static let canonicalNightRoutes: Set<NoopRoute> = [.rest, .debt, .alarm, .tonight]
 
     /// Act 2's home. Charge left and every sentence written only for the example person are absent.
-    private static let canonicalDayRoutes: Set<NoopRoute> = [.today, .vitals, .stress, .heart, .day, .inbox]
+    private static let canonicalDayRoutes: Set<NoopRoute> = [.today, .vitals, .stress, .heart, .day, .inbox, .recovery, .strain]
 
     /// Act 4's home: four weekly lines and the attendance grid from the stored daily rows. Body age
     /// stays out until its engine is chosen.

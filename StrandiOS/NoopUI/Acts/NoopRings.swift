@@ -12,7 +12,7 @@ import SwiftUI
 struct NoopRingValues: Equatable {
     /// 0–100.
     var recovery: Double?
-    /// 0–21.
+    /// 0–100 (the app's strain scale, StrainScorer).
     var strain: Double?
     /// Asleep against need, 0–1 (capped; over the need reads full).
     var sleep: Double?
@@ -21,7 +21,7 @@ struct NoopRingValues: Equatable {
     var sleepRuns: [NoopRestRecord.StageRun]?
 
     var recoveryFill: Double { min(1, max(0, (recovery ?? 0) / 100)) }
-    var strainFill: Double { min(1, max(0, (strain ?? 0) / 21)) }
+    var strainFill: Double { min(1, max(0, (strain ?? 0) / 100)) }
     var sleepFill: Double { min(1, max(0, sleep ?? 0)) }
 
     /// The same readings with every ring drawn `k` of the way: how the draw-in grows them.
@@ -44,19 +44,24 @@ struct NoopRingValues: Equatable {
 
 enum NoopRingStyle { case living, segmented, donuts, dials, gyro }
 
+/// Which score a ring or its label opens.
+enum NoopRingMetric { case recovery, strain, sleep }
+
 struct NoopTodayRings: View {
     let values: NoopRingValues
     let style: NoopRingStyle
-    var action: () -> Void = {}
+    /// Opens a score's own page; a tap on the drawing itself opens recovery.
+    var open: (NoopRingMetric) -> Void = { _ in }
+    private var action: () -> Void { { open(.recovery) } }
 
     @State private var onScreen = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         switch style {
-        case .donuts: NoopDonutRings(values: values, action: action)
-        case .dials: NoopDialRings(values: values, action: action)
-        case .gyro: NoopGyroRings(values: values, action: action)
+        case .donuts: NoopDonutRings(values: values, open: open)
+        case .dials: NoopDialRings(values: values, open: open)
+        case .gyro: NoopGyroRings(values: values, open: open)
         case .living, .segmented: concentric
         }
     }
@@ -114,9 +119,12 @@ struct NoopTodayRings: View {
 
     private var legend: some View {
         HStack(alignment: .top, spacing: 0) {
-            row("Recovery", values.recovery.map { "\(Int($0.rounded()))%" }, NoopRingValues.recoveryColor)
-            row("Strain", values.strain.map { String(format: "%.1f", $0) }, NoopRingValues.strainHot)
-            row("Sleep", values.sleepMinutes.map { NoopRestRecord.duration($0) }, NoopRingValues.sleepColor)
+            Button { open(.recovery) } label: { row("Recovery", values.recovery.map { "\(Int($0.rounded()))%" }, NoopRingValues.recoveryColor) }
+                .buttonStyle(NoopHTMLPressStyle())
+            Button { open(.strain) } label: { row("Strain", values.strain.map { String(format: "%.0f", $0) }, NoopRingValues.strainHot) }
+                .buttonStyle(NoopHTMLPressStyle())
+            Button { open(.sleep) } label: { row("Sleep", values.sleepMinutes.map { NoopRestRecord.duration($0) }, NoopRingValues.sleepColor) }
+                .buttonStyle(NoopHTMLPressStyle())
         }
     }
 
@@ -140,7 +148,7 @@ struct NoopTodayRings: View {
     private var accessibilityText: String {
         var parts: [String] = []
         parts.append(values.recovery.map { "Recovery \(Int($0.rounded())) percent" } ?? "Recovery not measured")
-        parts.append(values.strain.map { "strain \(String(format: "%.1f", $0))" } ?? "no strain yet")
+        parts.append(values.strain.map { "strain \(String(format: "%.0f", $0))" } ?? "no strain yet")
         parts.append(values.sleepMinutes.map { "sleep \(NoopRestRecord.duration($0))" } ?? "no sleep recorded")
         return parts.joined(separator: ", ")
     }
@@ -238,25 +246,24 @@ private extension View {
 
 private struct NoopDonutRings: View {
     let values: NoopRingValues
-    let action: () -> Void
+    let open: (NoopRingMetric) -> Void
 
     var body: some View {
-        Button(action: action) {
+        do {
             HStack(spacing: 0) {
-                column("Strain", fill: values.strainFill, value: values.strain.map { _ in values.strainFill * 100 },
+                column(.strain, "Strain", fill: values.strainFill, value: values.strain.map { _ in values.strainFill * 100 },
                        colors: [Color(hex: 0xFFE3A3), Color(hex: 0xF5B451)], target: strainTarget)
                 divider
-                column("Recovery", fill: values.recoveryFill, value: values.recovery,
+                column(.recovery, "Recovery", fill: values.recoveryFill, value: values.recovery,
                        colors: [Color(hex: 0xE6F27A), Color(hex: 0x9BD93A)], target: nil)
                 divider
-                column("Sleep", fill: values.sleepFill, value: values.sleep.map { min(1, $0) * 100 },
+                column(.sleep, "Sleep", fill: values.sleepFill, value: values.sleep.map { min(1, $0) * 100 },
                        colors: [Color(hex: 0xB7C8FF), Color(hex: 0x5B52E0)], target: nil)
             }
             .padding(.vertical, 18)
             .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
         }
-        .buttonStyle(NoopHTMLPressStyle())
     }
 
     /// Today's strain target, as fractions of the ring: easier after a low recovery.
@@ -270,7 +277,12 @@ private struct NoopDonutRings: View {
         Rectangle().fill(Color.white.opacity(0.07)).frame(width: 0.5).padding(.vertical, 4)
     }
 
-    private func column(_ title: String, fill: Double, value: Double?, colors: [Color], target: ClosedRange<Double>?) -> some View {
+    private func column(_ metric: NoopRingMetric, _ title: String, fill: Double, value: Double?, colors: [Color], target: ClosedRange<Double>?) -> some View {
+        Button { open(metric) } label: { columnBody(title, fill: fill, value: value, colors: colors, target: target) }
+            .buttonStyle(NoopHTMLPressStyle())
+    }
+
+    private func columnBody(_ title: String, fill: Double, value: Double?, colors: [Color], target: ClosedRange<Double>?) -> some View {
         VStack(spacing: 12) {
             ZStack {
                 NoopSlotClock { _, reveal in
@@ -361,21 +373,20 @@ private enum NoopDonut {
 
 private struct NoopDialRings: View {
     let values: NoopRingValues
-    let action: () -> Void
+    let open: (NoopRingMetric) -> Void
 
     var body: some View {
-        Button(action: action) {
+        do {
             HStack(spacing: 0) {
-                dial("Sleep", fill: values.sleepFill, text: values.sleep.map { "\(Int((min(1, $0) * 100).rounded()))" },
+                dial(.sleep, "Sleep", fill: values.sleepFill, text: values.sleep.map { "\(Int((min(1, $0) * 100).rounded()))" },
                      percent: true, color: Color(hex: 0x7FA6C4))
-                dial("Recovery", fill: values.recoveryFill, text: values.recovery.map { "\(Int($0.rounded()))" },
+                dial(.recovery, "Recovery", fill: values.recoveryFill, text: values.recovery.map { "\(Int($0.rounded()))" },
                      percent: true, color: recoveryColor)
-                dial("Strain", fill: values.strainFill, text: values.strain.map { String(format: "%.1f", $0) },
+                dial(.strain, "Strain", fill: values.strainFill, text: values.strain.map { String(format: "%.0f", $0) },
                      percent: false, color: Color(hex: 0x1E9BF0))
             }
             .padding(.vertical, 10)
         }
-        .buttonStyle(NoopHTMLPressStyle())
     }
 
     private var recoveryColor: Color {
@@ -383,7 +394,12 @@ private struct NoopDialRings: View {
         return r >= 67 ? Color(hex: 0x2BE36A) : r >= 34 ? Color(hex: 0xF7D23E) : Color(hex: 0xF2445B)
     }
 
-    private func dial(_ title: String, fill: Double, text: String?, percent: Bool, color: Color) -> some View {
+    private func dial(_ metric: NoopRingMetric, _ title: String, fill: Double, text: String?, percent: Bool, color: Color) -> some View {
+        Button { open(metric) } label: { dialBody(title, fill: fill, text: text, percent: percent, color: color) }
+            .buttonStyle(NoopHTMLPressStyle())
+    }
+
+    private func dialBody(_ title: String, fill: Double, text: String?, percent: Bool, color: Color) -> some View {
         VStack(spacing: 14) {
             ZStack {
                 Circle().stroke(Color.white.opacity(0.1), lineWidth: 7)
@@ -420,7 +436,8 @@ private struct NoopDialRings: View {
 
 private struct NoopGyroRings: View {
     let values: NoopRingValues
-    let action: () -> Void
+    let open: (NoopRingMetric) -> Void
+    private var action: () -> Void { { open(.recovery) } }
 
     @State private var onScreen = true
     @State private var appeared: Date?
@@ -455,9 +472,12 @@ private struct NoopGyroRings: View {
                 }
                 .frame(height: 260)
                 HStack(spacing: 0) {
-                    legend("Recovery", values.recovery.map { "\(Int($0.rounded()))%" }, NoopGyro.colors[0])
-                    legend("Strain", values.strain.map { String(format: "%.1f", $0) }, NoopGyro.colors[1])
-                    legend("Sleep", values.sleepMinutes.map { NoopRestRecord.duration($0) }, NoopGyro.colors[2])
+                    Button { open(.recovery) } label: { legend("Recovery", values.recovery.map { "\(Int($0.rounded()))%" }, NoopGyro.colors[0]) }
+                        .buttonStyle(NoopHTMLPressStyle())
+                    Button { open(.strain) } label: { legend("Strain", values.strain.map { String(format: "%.0f", $0) }, NoopGyro.colors[1]) }
+                        .buttonStyle(NoopHTMLPressStyle())
+                    Button { open(.sleep) } label: { legend("Sleep", values.sleepMinutes.map { NoopRestRecord.duration($0) }, NoopGyro.colors[2]) }
+                        .buttonStyle(NoopHTMLPressStyle())
                 }
             }
             .frame(maxWidth: .infinity)

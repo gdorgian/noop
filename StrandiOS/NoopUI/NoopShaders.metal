@@ -216,3 +216,33 @@ half4 noopLayeredLiquid(float2 position, half4 color, float2 size, float time, f
     float alpha = smoothstep(-0.012, 0.004, d);
     return half4(c.rgb * half(alpha), half(alpha));
 }
+
+// MARK: - Heat
+//
+// Strain as heat inside a disc: tongues of light rise from the bottom as high as `level` (0…1),
+// licking upward on noise, cool amber at the crown and white-hot at the base where the day's effort
+// is densest. Outside the disc nothing is drawn.
+
+[[ stitchable ]]
+half4 noopHeat(float2 position, half4 color, float2 size, float time, float level) {
+    float2 uv = position / size;
+    float2 p = uv * 2.0 - 1.0;
+    float r = length(p);
+    float inside = smoothstep(1.0, 0.97, r);
+    if (inside <= 0.0) { return half4(0); }
+
+    float y = 1.0 - uv.y;                         // 0 at the bottom of the disc
+    float n = fbm(float2(uv.x * 3.0, y * 2.2 - time * 0.55));
+    float n2 = fbm(float2(uv.x * 6.5 + 7.0, y * 4.0 - time * 0.9));
+    float crown = level * (0.92 + 0.22 * (n - 0.5)) + 0.05 * (n2 - 0.5);
+    float body = smoothstep(crown + 0.06, crown - 0.05, y);
+    float heat = clamp(1.0 - y / max(crown, 0.05), 0.0, 1.0);
+
+    half3 ember = half3(0.95, 0.36, 0.12);
+    half3 flame = half3(1.00, 0.66, 0.24);
+    half3 hot   = half3(1.00, 0.93, 0.78);
+    half3 c = heat < 0.55 ? mix(ember, flame, half(heat / 0.55)) : mix(flame, hot, half((heat - 0.55) / 0.45));
+    float flicker = 0.8 + 0.35 * n2;
+    float a = body * inside * clamp(0.35 + heat * 0.75, 0.0, 1.0) * flicker;
+    return half4(c * half(a), half(a));
+}

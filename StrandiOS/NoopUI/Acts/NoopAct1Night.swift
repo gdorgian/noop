@@ -94,12 +94,15 @@ struct NoopAct1Screens: View {
         NoopPageSection(id: "seven", title: "Your last seven", detail: "Seven nights against your need"),
         NoopPageSection(id: "shape", title: "The shape of it", detail: "The night's stages, timeline or lanes"),
         NoopPageSection(id: "overtime", title: "Over time", detail: "Sleep debt, consistency and history"),
-        NoopPageSection(id: "next", title: "Your next sleep", detail: "Evening journal and tonight")
+        NoopPageSection(id: "next", title: "Your next sleep", detail: "Evening journal and tonight"),
+        NoopPageSection(id: "trends", title: "Trends", detail: "Consistency, sleep score and each measure as a chart")
     ]
 
     @ViewBuilder
     private func restSection(_ id: String) -> some View {
         switch id {
+        case "trends":
+            NoopTrendsList(navigation: navigation, ids: noopSleepTrendIDs).padding(.top, 18)
         case "night-aurora", "night-dial", "night-performance", "night-ledger", "night-glass":
             if let rest, let night = restNight {
                 switch id {
