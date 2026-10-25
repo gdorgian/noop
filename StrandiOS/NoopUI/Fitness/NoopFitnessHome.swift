@@ -92,7 +92,11 @@ struct NoopFitnessHome: View {
                 withAnimation(NoopMotion.swap) { shiftWeek(v.translation.width < 0 ? 1 : -1) }
             })
             .sensoryFeedback(.selection, trigger: weekOffset)
-            .padding(.bottom, weekOffset == 0 ? 22 : 10)
+            .padding(.bottom, weekOffset == 0 ? 14 : 10)
+        if weekOffset == 0, !editing {
+            NoopFitnessStreakRow(sessions: s.history.sessions, now: s.history.now)
+                .padding(.bottom, 22)
+        }
         if weekOffset != 0 {
             Button { withAnimation(NoopMotion.swap) { weekOffset = 0; selectedDay = Calendar.current.startOfDay(for: Date()) } } label: {
                 Text(weekOffset < 0 ? "Back to this week ›" : "‹ Back to this week")
@@ -600,6 +604,72 @@ struct NoopFitnessIconButton: View {
 
 /// A session in a list: a lift opens its record; a manual or detected session opens the editor, and a
 /// long press offers to delete it. Imported history is read-only.
+/// Weeks in a row with a workout (`TrainingStreak`), the last eight weeks as dots, and what this week
+/// still needs. Short detected bouts do not count: a streak is for training the lifter chose to do.
+struct NoopFitnessStreakRow: View {
+    let sessions: [NoopFitnessSession]
+    let now: Date
+
+    private var dates: [Date] {
+        sessions.filter { !$0.detected || $0.kind == .strength || $0.durationS >= 20 * 60 }.map(\.start)
+    }
+
+    var body: some View {
+        let r = TrainingStreak.reading(sessionDates: dates, now: now)
+        let tint = r.weeks == 0 ? NoopHTMLColor.copy : r.atRisk ? NoopHTMLColor.amber : NoopHTMLColor.warm
+        HStack(spacing: 13) {
+            Image(systemName: r.weeks == 0 ? "flame" : "flame.fill")
+                .font(.system(size: 17, weight: .semibold)).foregroundStyle(tint)
+                .symbolEffect(.bounce, value: r.weeks)
+                .frame(width: 40, height: 40)
+                .background(tint.opacity(0.14), in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.weeks == 0 ? "No streak yet" : "\(r.weeks)-week streak")
+                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    .contentTransition(.numericText())
+                Text(subtitle(r)).font(NoopHTMLFont.sans(NoopType.caption))
+                    .foregroundStyle(r.atRisk ? NoopHTMLColor.amber : NoopHTMLColor.copy)
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 6)
+            HStack(spacing: 4) {
+                ForEach(Array(lastWeeks.enumerated()), id: \.offset) { i, trained in
+                    let current = i == lastWeeks.count - 1
+                    Circle()
+                        .fill(trained ? tint : Color.white.opacity(current ? 0.0 : 0.10))
+                        .overlay(Circle().strokeBorder(current && !trained ? tint.opacity(0.7) : .clear,
+                                                       style: StrokeStyle(lineWidth: 1, dash: [2, 2])))
+                        .frame(width: 8, height: 8)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func subtitle(_ r: TrainingStreak.Reading) -> String {
+        if r.weeks == 0 { return "Train once this week to start one." }
+        let best = r.best > r.weeks ? " · best \(r.best)" : ""
+        if r.thisWeekDone {
+            return "\(r.thisWeekCount) \(r.thisWeekCount == 1 ? "workout" : "workouts") this week\(best)"
+        }
+        return r.daysLeft <= 1 ? "Train today to keep it" : "Train in the next \(r.daysLeft) days to keep it"
+    }
+
+    /// Eight weeks, oldest first, this week last: whether each had a workout.
+    private var lastWeeks: [Bool] {
+        let cal = Calendar.current
+        guard let thisWeek = cal.dateInterval(of: .weekOfYear, for: now)?.start else { return [] }
+        let starts = Set(dates.filter { $0 <= now }.compactMap { cal.dateInterval(of: .weekOfYear, for: $0)?.start })
+        return (0..<8).reversed().map { back in
+            cal.date(byAdding: .weekOfYear, value: -back, to: thisWeek).map(starts.contains) ?? false
+        }
+    }
+}
+
 struct NoopFitnessSessionButton: View {
     let session: NoopFitnessSession
     @ObservedObject var navigation: NoopNavigation
