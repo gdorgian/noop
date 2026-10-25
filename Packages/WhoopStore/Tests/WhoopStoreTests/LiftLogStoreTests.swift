@@ -687,3 +687,38 @@ final class LiftLogStoreTests: XCTestCase {
                    startTs: nil, endTs: nil, restSec: nil, note: nil)
     }
 }
+
+final class BodyLogStoreTests: XCTestCase {
+    func testMeasurementsRoundTripOldestFirstAndDelete() async throws {
+        let store = try await WhoopStore.inMemory()
+        let rows = [
+            BodyMeasurementRow(id: "b", deviceId: "d", ts: 200, kind: .waist, value: 82.5),
+            BodyMeasurementRow(id: "a", deviceId: "d", ts: 100, kind: .weight, value: 80.1, note: "morning"),
+            BodyMeasurementRow(id: "x", deviceId: "other", ts: 50, kind: .weight, value: 60),
+        ]
+        try await store.upsertBodyMeasurements(rows)
+        var read = try await store.bodyMeasurements(deviceId: "d")
+        XCTAssertEqual(read.map(\.id), ["a", "b"])
+        XCTAssertEqual(read.first?.note, "morning")
+        var edited = rows[0]
+        edited.value = 81
+        try await store.upsertBodyMeasurements([edited])
+        read = try await store.bodyMeasurements(deviceId: "d")
+        XCTAssertEqual(read.last?.value, 81)
+        let deleted = try await store.deleteBodyMeasurement(id: "a")
+        XCTAssertTrue(deleted)
+        read = try await store.bodyMeasurements(deviceId: "d")
+        XCTAssertEqual(read.map(\.id), ["b"])
+    }
+
+    func testProgressPhotosNewestFirst() async throws {
+        let store = try await WhoopStore.inMemory()
+        try await store.upsertProgressPhoto(.init(id: "1", deviceId: "d", ts: 10, pose: .front, fileName: "1.jpg"))
+        try await store.upsertProgressPhoto(.init(id: "2", deviceId: "d", ts: 20, pose: nil, fileName: "2.jpg"))
+        let photos = try await store.progressPhotos(deviceId: "d")
+        XCTAssertEqual(photos.map(\.id), ["2", "1"])
+        XCTAssertEqual(photos.last?.pose, .front)
+        let deleted = try await store.deleteProgressPhoto(id: "2")
+        XCTAssertTrue(deleted)
+    }
+}

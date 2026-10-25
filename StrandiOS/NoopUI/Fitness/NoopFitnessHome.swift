@@ -33,6 +33,8 @@ struct NoopFitnessHome: View {
             VStack(alignment: .leading, spacing: 0) {
                 NoopScreenHeader("Fitness", eyebrow: Self.dayTitle(selectedDay), tabRoot: true) {
                     HStack(spacing: 8) {
+                        NoopFitnessIconButton(glyph: .ruler) { navigation.push(.fitnessBody) }
+                            .accessibilityLabel("Body measurements and photos")
                         NoopFitnessIconButton(glyph: .calendar) { navigation.push(.fitnessCalendar) }
                             .accessibilityLabel("Calendar")
                         if !editing {

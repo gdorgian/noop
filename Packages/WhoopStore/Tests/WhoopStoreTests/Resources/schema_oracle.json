@@ -53,7 +53,8 @@
     "v46-lift-log",
     "v47-rr-whoop5-fill",
     "v48-fitness-routine-plans",
-    "v49-lift-set-kind"
+    "v49-lift-set-kind",
+    "v50-body-log"
   ],
   "divergenceReasons": {
     "android-orphan-synced-column": "REAL COLUMN DRIFT: `synced` exists on Android only. GRDB's v10 note is explicit that stepSample gets no `synced` column ('unused; see StreamStore'), and v12's ppgHrSample never had one either; the Room entities copied the flag from the older per-second entities. Nothing reads it on Android — the per-row upload flag belongs to an upload path that does not exist there — so it is dead width, not divergent data. Removing it needs a Room table rebuild.",
@@ -2481,6 +2482,117 @@
         "day"
       ],
       "reason": "iOS-only analysis reuse cache: records the raw-input fingerprint, learned traits and revisions a day was scored against, so a rescore can prove a stored score is still reproducible. Android rescores unconditionally and keeps no equivalent."
+    },
+    "bodyMeasurement": {
+      "platform": "ios_only",
+      "reason": "Aura body measurement log (GRDB v50). This fork has no Android app.",
+      "columns": [
+        {
+          "name": "id",
+          "affinity": "TEXT",
+          "notNull": false,
+          "default": null
+        },
+        {
+          "name": "deviceId",
+          "affinity": "TEXT",
+          "notNull": true,
+          "default": null
+        },
+        {
+          "name": "ts",
+          "affinity": "INTEGER",
+          "notNull": true,
+          "default": null
+        },
+        {
+          "name": "kind",
+          "affinity": "TEXT",
+          "notNull": true,
+          "default": null
+        },
+        {
+          "name": "value",
+          "affinity": "REAL",
+          "notNull": true,
+          "default": null
+        },
+        {
+          "name": "note",
+          "affinity": "TEXT",
+          "notNull": false,
+          "default": null
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indices": [
+        {
+          "name": "idx_bodyMeasurement_device_kind_ts",
+          "unique": false,
+          "columns": [
+            "deviceId",
+            "kind",
+            "ts"
+          ]
+        }
+      ]
+    },
+    "progressPhoto": {
+      "platform": "ios_only",
+      "reason": "Aura progress photo index (GRDB v50); the images are files on the device.",
+      "columns": [
+        {
+          "name": "id",
+          "affinity": "TEXT",
+          "notNull": false,
+          "default": null
+        },
+        {
+          "name": "deviceId",
+          "affinity": "TEXT",
+          "notNull": true,
+          "default": null
+        },
+        {
+          "name": "ts",
+          "affinity": "INTEGER",
+          "notNull": true,
+          "default": null
+        },
+        {
+          "name": "pose",
+          "affinity": "TEXT",
+          "notNull": false,
+          "default": null
+        },
+        {
+          "name": "fileName",
+          "affinity": "TEXT",
+          "notNull": true,
+          "default": null
+        },
+        {
+          "name": "note",
+          "affinity": "TEXT",
+          "notNull": false,
+          "default": null
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indices": [
+        {
+          "name": "idx_progressPhoto_device_ts",
+          "unique": false,
+          "columns": [
+            "deviceId",
+            "ts"
+          ]
+        }
+      ]
     }
   }
 }

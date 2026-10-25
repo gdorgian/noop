@@ -43,6 +43,7 @@ struct NoopFitnessScreens: View {
         case .fitnessRoutine: NoopFitnessRoutineScreen(navigation: navigation, fitness: fitness)
         case .fitnessCalendar: NoopFitnessCalendarScreen(navigation: navigation, fitness: fitness)
         case .fitnessRoutineEdit: NoopFitnessRoutineEditor(navigation: navigation, fitness: fitness)
+        case .fitnessBody: NoopFitnessBodyScreen(navigation: navigation)
         default: NoopFitnessHome(navigation: navigation, fitness: fitness, layout: layout)
         }
     }

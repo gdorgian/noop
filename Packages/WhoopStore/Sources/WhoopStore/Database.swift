@@ -1192,6 +1192,30 @@ extension WhoopStore {
         migrator.registerMigration("v49-lift-set-kind") { db in
             try db.alter(table: "liftSet") { $0.add(column: "setKind", .text) }
         }
+        // v50 (Aura): body measurements over time, and progress photos. A photo's image is a file in the
+        // app's own documents, not a blob here; the row is what dates and orders it.
+        migrator.registerMigration("v50-body-log") { db in
+            try db.create(table: "bodyMeasurement", options: [.ifNotExists]) { t in
+                t.column("id", .text).primaryKey()
+                t.column("deviceId", .text).notNull()
+                t.column("ts", .integer).notNull()          // unix seconds the measurement was taken
+                t.column("kind", .text).notNull()           // BodyMeasurementKind raw value
+                t.column("value", .double).notNull()        // kg, %, or cm by kind
+                t.column("note", .text)
+            }
+            try db.create(index: "idx_bodyMeasurement_device_kind_ts", on: "bodyMeasurement",
+                          columns: ["deviceId", "kind", "ts"], options: [.ifNotExists])
+            try db.create(table: "progressPhoto", options: [.ifNotExists]) { t in
+                t.column("id", .text).primaryKey()
+                t.column("deviceId", .text).notNull()
+                t.column("ts", .integer).notNull()
+                t.column("pose", .text)                     // front | side | back
+                t.column("fileName", .text).notNull()       // in Documents/ProgressPhotos
+                t.column("note", .text)
+            }
+            try db.create(index: "idx_progressPhoto_device_ts", on: "progressPhoto",
+                          columns: ["deviceId", "ts"], options: [.ifNotExists])
+        }
         return migrator
     }
 }
