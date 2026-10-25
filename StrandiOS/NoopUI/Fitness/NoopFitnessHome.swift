@@ -118,7 +118,7 @@ struct NoopFitnessHome: View {
         }
         if editing {
             Button { navigation.push(.fitnessEdit) } label: {
-                Text("Activity detection settings").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                Text("Fitness settings").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.inkSoft).frame(maxWidth: .infinity).frame(minHeight: 46)
             }
             .buttonStyle(NoopHTMLPressStyle())

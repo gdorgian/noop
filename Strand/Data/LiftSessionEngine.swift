@@ -60,7 +60,12 @@ struct LiftPlanItem: Equatable {
     /// Rest used when a program line does not specify one. Two minutes sits in the middle of the
     /// range the hypertrophy literature uses for compound work, and is only a starting value: what
     /// is actually rested is measured from the taps.
-    static let defaultRestSec = 120
+    static var defaultRestSec: Int {
+        let stored = UserDefaults.standard.integer(forKey: defaultRestKey)
+        return stored > 0 ? stored : 120
+    }
+    /// The lifter's own default rest (Fitness settings); unset reads as two minutes.
+    static let defaultRestKey = "lift.defaultRestSec"
 
     init(exercise: String,
          primaryMuscle: LiftMuscle? = nil,

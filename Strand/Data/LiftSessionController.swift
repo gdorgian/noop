@@ -546,7 +546,15 @@ final class LiftSessionController: ObservableObject {
 
     /// Rest after a warm-up set when the routine names none: a ramp set is light, and the working
     /// sets are what the long rest is for.
-    static let warmupRestSec = 60
+    static var warmupRestSec: Int {
+        let stored = UserDefaults.standard.integer(forKey: warmupRestKey)
+        return stored > 0 ? stored : 60
+    }
+    static let warmupRestKey = "lift.warmupRestSec"
+    /// Bring the next exercise into view when the session moves to it (Fitness settings).
+    static let autoScrollKey = "lift.autoScroll"
+    /// The bar the plate maths assumes, in kilograms (Fitness settings); unset is the 20 kg Olympic bar.
+    static let barKgKey = "lift.barKg"
 
     /// Put a warm-up ramp in front of an exercise's working sets (`warmupSuggestion`). Every number,
     /// mark and kind already given to its working sets moves down with them. Returns how many sets went in.

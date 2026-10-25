@@ -108,6 +108,12 @@ struct NoopFitnessEditScreen: View {
     @ObservedObject var layout: NoopFitnessSettings
     @AppStorage(Repository.autoLogActivitiesKey) private var autoLog = true
     @AppStorage(ActivityNotifier.enabledKey) private var activityNotices = true
+    @AppStorage(LiftSessionController.restAlertsKey) private var restAlerts = true
+    @AppStorage(LiftSessionController.autoScrollKey) private var autoScroll = true
+    @AppStorage(LiftPlanItem.defaultRestKey) private var defaultRest = 120
+    @AppStorage(LiftSessionController.warmupRestKey) private var warmupRest = 60
+    @AppStorage(LiftSessionController.barKgKey) private var barKg = 20.0
+    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
 
     var body: some View {
         NoopFitnessPage(navigation: navigation, title: "Edit Fitness",
@@ -136,6 +142,35 @@ struct NoopFitnessEditScreen: View {
                                   subtitle: "While a session is under way, and once it has been logged, so you can confirm what it was.",
                                   isOn: $activityNotices, enabled: autoLog)
                 }
+                NoopFitnessPanel(label: "Lifting") {
+                    restRow("Rest between sets", subtitle: "For an exercise added without its own rest. Each routine line keeps the rest it was given.",
+                            value: $defaultRest, options: [60, 90, 120, 150, 180, 240, 300])
+                    restRow("Rest after a warm-up set", subtitle: "Warm-up sets are light; the long rest is for the working sets.",
+                            value: $warmupRest, options: [30, 45, 60, 90, 120])
+                    HStack(alignment: .center, spacing: NoopSpace.s) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Bar").font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                            Text("The plates shown above the number pad are worked out for this bar.")
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                        Picker("Bar", selection: $barKg) {
+                            ForEach([20.0, 15.0, 10.0], id: \.self) { kg in
+                                Text(unitSystemRaw == UnitSystem.imperial.rawValue
+                                     ? (kg == 20 ? "45 lb" : kg == 15 ? "35 lb" : "25 lb") : "\(Int(kg)) kg").tag(kg)
+                            }
+                        }
+                        .pickerStyle(.menu).tint(NoopHTMLColor.inkSoft)
+                    }
+                    .frame(minHeight: 44)
+                    NoopToggleRow(title: "Alert when rest ends",
+                                  subtitle: "A notification at the end of each rest, for a phone in a pocket. With Noop open it only sounds.",
+                                  isOn: $restAlerts)
+                    NoopToggleRow(title: "Follow the session",
+                                  subtitle: "When the next set is on another exercise, such as the other half of a superset, scroll it into view.",
+                                  isOn: $autoScroll)
+                }
                 Button {
                     layout.sections = NoopFitnessSettings.Section.allCases
                     layout.hidden = []
@@ -151,6 +186,22 @@ struct NoopFitnessEditScreen: View {
 
     private func swap(_ a: Int, _ b: Int) {
         withAnimation(NoopMotion.swap) { layout.sections.swapAt(a, b) }
+    }
+
+    private func restRow(_ title: String, subtitle: String, value: Binding<Int>, options: [Int]) -> some View {
+        HStack(alignment: .center, spacing: NoopSpace.s) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                Text(subtitle).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Picker(title, selection: value) {
+                ForEach(options, id: \.self) { Text(LiftFormat.duration($0)).tag($0) }
+            }
+            .pickerStyle(.menu).tint(NoopHTMLColor.inkSoft)
+        }
+        .frame(minHeight: 44)
     }
 
     private enum Way { case up, down }

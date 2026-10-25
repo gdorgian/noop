@@ -463,6 +463,8 @@ private struct NoopLiftLiveScreen: View {
     @FocusState private var focused: Field?
     @EnvironmentObject private var heart: LiveState
     @AppStorage(LiftSessionController.restAlertsKey) private var restAlerts = true
+    @AppStorage(LiftSessionController.autoScrollKey) private var autoScroll = true
+    @AppStorage(LiftSessionController.barKgKey) private var barKg = 20.0
     /// Every earlier session of each exercise on the sheet, for the records a set can break.
     @State private var priorHistory: [String: [LiftHistorySet]] = [:]
     @State private var celebration: NoopLiftCelebration?
@@ -537,7 +539,7 @@ private struct NoopLiftLiveScreen: View {
             // once one is finished: bring it into view, so the lifter never hunts for the row to tap.
             // Not while a number is being typed, which would pull the field out from under the finger.
             .onChange(of: slot.exerciseIndex) { _, index in
-                guard focused == nil else { return }
+                guard autoScroll, focused == nil else { return }
                 withAnimation(NoopMotion.swap) { scroll.scrollTo(Self.exerciseAnchor(index), anchor: UnitPoint(x: 0.5, y: 0.12)) }
             }
             }
@@ -952,7 +954,8 @@ private struct NoopLiftLiveScreen: View {
     private var plateLine: String? {
         guard let total = Double(loadText.replacingOccurrences(of: ",", with: ".")) else { return nil }
         let metric = units == .metric
-        let bar = metric ? 20.0 : 45.0
+        // The chosen bar, in the units on screen: 20 kg reads as 45 lb, the way the plates are sold.
+        let bar = metric ? barKg : (barKg >= 19 ? 45 : barKg >= 14 ? 35 : (LiftFormat.display(fromKilograms: barKg, system: units)).rounded())
         guard total > bar else { return nil }
         var side = (total - bar) / 2
         let plates = metric ? [25, 20, 15, 10, 5, 2.5, 1.25] : [45, 35, 25, 10, 5, 2.5]

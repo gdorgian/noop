@@ -634,7 +634,8 @@ struct NoopFitnessRoutineEditor: View {
                 lines[index].plan.progression = nil
             } else {
                 let new = choices.map { choice in
-                    Line(choice: choice, plan: .init(exerciseId: choice.id, sets: (0..<3).map { _ in .init() }), pounds: units == .imperial)
+                    Line(choice: choice, plan: .init(exerciseId: choice.id, sets: (0..<3).map { _ in .init() },
+                                                     restSeconds: LiftPlanItem.defaultRestSec), pounds: units == .imperial)
                 }
                 lines.insert(contentsOf: new, at: min(insertion ?? lines.count, lines.count))
                 toast = new.count == 1 ? "1 exercise added" : "\(new.count) exercises added"
