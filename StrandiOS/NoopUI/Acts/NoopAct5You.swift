@@ -3505,7 +3505,7 @@ private extension NoopAct5Screens {
                 .padding(.top, 8)
                 }
 
-                Text("Noop Aura \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · everything on this phone")
+                Text("Noop Aura \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "")) · everything on this phone")
                     .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
             }
         }
