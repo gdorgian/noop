@@ -2030,6 +2030,12 @@ private struct Act1SleepRing: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 250)
+        // The pulsing glow and its blur are repainted every frame; on the GPU, not the CPU, where they
+        // cost up to a fifth of the main thread (profiled 25 Oct 2026). The padding keeps the group
+        // from clipping the glow, which spills past the frame.
+        .padding(.vertical, 50)
+        .drawingGroup()
+        .padding(.vertical, -50)
     }
 
     private var deltaCloses: Bool {
