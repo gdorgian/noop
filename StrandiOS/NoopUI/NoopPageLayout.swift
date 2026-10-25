@@ -500,14 +500,11 @@ private struct NoopAddSectionSheet<Section: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button { dismiss() } label: {
-                    NoopIconDiscShape(size: .small) { Image(systemName: "xmark").font(.system(size: 12, weight: .semibold)) }
-                }
-                .buttonStyle(NoopPlainHitStyle())
+                NoopCloseButton { dismiss() }
                 Spacer()
                 Text("Add section").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 Spacer()
-                Color.clear.frame(width: NoopControlSize.small.height, height: 1)
+                Color.clear.frame(width: NoopCloseButton.side, height: 1)
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)

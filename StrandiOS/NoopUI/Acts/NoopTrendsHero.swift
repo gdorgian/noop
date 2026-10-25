@@ -261,14 +261,7 @@ struct NoopYourAgesSheet: View {
         VStack(spacing: 14) {
             HStack {
                 Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark").font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.ink)
-                        .frame(width: 36, height: 36)
-                        .background(Color.white.opacity(0.08), in: Circle())
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-                .accessibilityLabel("Close")
+                NoopCloseButton { dismiss() }
             }
             Text("Your ages")
                 .font(NoopHTMLFont.outfit(NoopType.title2))
@@ -278,6 +271,6 @@ struct NoopYourAgesSheet: View {
         }
         .padding(20)
         .background(NoopHTMLColor.canvas.ignoresSafeArea())
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(.hidden)
     }
 }

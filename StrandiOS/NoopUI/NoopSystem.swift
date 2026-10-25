@@ -68,7 +68,7 @@ enum NoopControlSize {
     /// The main action of a screen or sheet.
     case large
 
-    var height: CGFloat { switch self { case .small: 34; case .medium: 44; case .large: 48 } }
+    var height: CGFloat { switch self { case .small: 34; case .medium: 44; case .large: 52 } }
     var text: CGFloat { switch self { case .small: NoopType.footnote; case .medium, .large: NoopType.subhead } }
     var icon: CGFloat { switch self { case .small: 15; case .medium: 16; case .large: 17 } }
     var padding: CGFloat { switch self { case .small: 12; case .medium: 16; case .large: 20 } }
@@ -157,15 +157,18 @@ struct NoopActionButton: View {
         }
         .buttonStyle(NoopHTMLPressStyle())
         .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.45)
+        // A disabled primary turns a neutral grey with white text instead of fading the accent; the
+        // others still fade.
+        .opacity(enabled || variant == .primary ? 1 : 0.45)
+        .animation(.easeInOut(duration: 0.2), value: enabled)
     }
 
-    /// Handoff §7: 17 on the primary 48, 15 on the 44 secondary, a capsule on chips.
-    private var radius: CGFloat { switch size { case .large: 17; case .medium: 15; case .small: size.height / 2 } }
+    /// The primary 52 is a capsule; 15 on the 44 secondary; a capsule on chips.
+    private var radius: CGFloat { switch size { case .large: size.height / 2; case .medium: 15; case .small: size.height / 2 } }
 
     private var foreground: Color {
         switch variant {
-        case .primary: accent.ink
+        case .primary: enabled ? accent.ink : NoopHTMLColor.ink
         case .secondary: NoopHTMLColor.ink
         case .plain: accent.fill
         case .destructive: NoopHTMLColor.red
@@ -174,7 +177,7 @@ struct NoopActionButton: View {
 
     private var background: Color {
         switch variant {
-        case .primary: accent.fill
+        case .primary: enabled ? accent.fill : Color.white.opacity(0.22)
         case .secondary, .destructive: Color.white.opacity(0.07)
         case .plain: .clear
         }
@@ -193,6 +196,28 @@ struct NoopIconButton: View {
             NoopIconDiscShape(size: size) {
                 Image(systemName: systemImage).font(.system(size: size.icon, weight: .semibold))
             }
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .accessibilityLabel(label)
+    }
+}
+
+/// Every sheet's close button: one size app-wide, a 42 pt disc lifted off the sheet with a light rim,
+/// so it reads as the way out rather than as a secondary icon (Bevel's measured 42 pt, 25 Oct 2026).
+struct NoopCloseButton: View {
+    var label = "Close"
+    let action: () -> Void
+
+    static let side: CGFloat = 42
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(NoopHTMLColor.ink)
+                .frame(width: Self.side, height: Self.side)
+                .background(Color.white.opacity(0.13), in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+                .noopHitTarget()
         }
         .buttonStyle(NoopHTMLPressStyle())
         .accessibilityLabel(label)

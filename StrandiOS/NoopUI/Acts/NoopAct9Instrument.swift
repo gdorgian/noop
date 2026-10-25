@@ -1180,14 +1180,7 @@ private struct NoopInstrumentMetricScreen: View {
         NavigationStack {
             VStack(spacing: 0) {
                 HStack {
-                    Button { navigation.dismissMetricSheet() } label: {
-                        Image(systemName: "xmark").font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(NoopHTMLColor.ink)
-                            .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.07), in: Circle())
-                    }
-                    .buttonStyle(NoopPlainHitStyle())
-                    .accessibilityLabel("Close metric details")
+                    NoopCloseButton(label: "Close metric details") { navigation.dismissMetricSheet() }
                     Spacer()
                     Text(model.signal.name).font(NoopHTMLFont.sans(17, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.ink).lineLimit(1)

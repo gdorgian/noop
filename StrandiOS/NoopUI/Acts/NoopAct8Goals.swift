@@ -2609,16 +2609,9 @@ private struct NoopLabImageViewer: View {
                             }
                     )
 
-                Button(action: close) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.ink)
-                        .frame(width: 36, height: 36)
-                        .background(Color.white.opacity(0.14), in: Circle())
-                }
-                .buttonStyle(NoopPlainHitStyle())
-                .padding(.top, 54)
-                .padding(.trailing, 18)
+                NoopCloseButton(action: close)
+                    .padding(.top, 54)
+                    .padding(.trailing, 18)
             }
         }
         .preferredColorScheme(.dark)

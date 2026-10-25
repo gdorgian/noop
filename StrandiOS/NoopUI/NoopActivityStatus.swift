@@ -182,11 +182,7 @@ struct NoopActivityStatusSheet: View {
                 Text("Activity status").font(NoopHTMLFont.sans(NoopType.body, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.ink)
                 HStack {
-                    Button { dismiss() } label: {
-                        NoopIconDiscShape(size: .small) { Image(systemName: "xmark").font(.system(size: 13, weight: .semibold)) }
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    .accessibilityLabel("Close")
+                    NoopCloseButton { dismiss() }
                     Spacer()
                 }
             }
@@ -215,7 +211,7 @@ struct NoopActivityStatusSheet: View {
             .overlay(Capsule().strokeBorder(NoopHTMLColor.borderStrong, lineWidth: 0.5))
             .opacity(choice == .active ? 0.55 : 1)
 
-            NoopActionButton(title: "Update") {
+            NoopActionButton(title: "Update", enabled: hasChange) {
                 var next = NoopActivityStatusState(status: choice, until: nil)
                 if choice != .active, keep != .untilChanged {
                     next.until = Calendar.current.date(byAdding: .day, value: keep.rawValue, to: Date())
@@ -230,11 +226,21 @@ struct NoopActivityStatusSheet: View {
         .padding(.horizontal, 20)
         .onAppear {
             choice = state.status
-            if let until = state.until {
-                let days = Int((until.timeIntervalSinceNow / 86_400).rounded(.up))
-                keep = NoopActivityStatus.Keep.allCases.last { $0.rawValue <= max(1, days) && $0 != .untilChanged } ?? .day
-            }
+            keep = initialKeep
         }
+    }
+
+    /// Update lights up only once the choice differs from what is stored.
+    private var hasChange: Bool {
+        if choice != state.status { return true }
+        guard choice != .active else { return false }
+        return keep != initialKeep
+    }
+
+    private var initialKeep: NoopActivityStatus.Keep {
+        guard let until = state.until else { return .untilChanged }
+        let days = Int((until.timeIntervalSinceNow / 86_400).rounded(.up))
+        return NoopActivityStatus.Keep.allCases.last { $0.rawValue <= max(1, days) && $0 != .untilChanged } ?? .day
     }
 
     private func row(_ s: NoopActivityStatus) -> some View {
@@ -257,9 +263,9 @@ struct NoopActivityStatusSheet: View {
                 .frame(width: 22, height: 22)
             }
             .padding(.horizontal, 12).padding(.vertical, 10).frame(minHeight: 66)
-            .background(Color.white.opacity(on ? 0.09 : 0.045), in: RoundedRectangle(cornerRadius: 33, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 33, style: .continuous)
-                .strokeBorder(Color.white.opacity(on ? 0.16 : 0.06), lineWidth: 0.75))
+            // Raised on a soft shadow rather than outlined.
+            .background(Color.white.opacity(on ? 0.11 : 0.07), in: RoundedRectangle(cornerRadius: 33, style: .continuous))
+            .shadow(color: .black.opacity(0.32), radius: 10, y: 6)
         }
         .buttonStyle(NoopHTMLPressStyle())
         .accessibilityAddTraits(on ? .isSelected : [])

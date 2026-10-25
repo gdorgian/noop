@@ -11,7 +11,9 @@ enum NoopHTMLColor {
     static let cardRaised = Color(hex: 0x171C1A)
     static let ink = Color(hex: 0xEDF1EF)
     static let inkSoft = Color(hex: 0xC6CEC9)
-    static let copy = Color(hex: 0x939C97)
+    /// Sub-lines and supporting copy. Lifted from #939C97 on 25 Oct 2026: beside Bevel's measured
+    /// #C1C2C8 it read as dimmed-out rather than secondary.
+    static let copy = Color(hex: 0xABB3AE)
     static let muted = Color(hex: 0x6C7570)
     /// Quiet ink, #7F8A85 (5.5:1 on canvas). Carries captions and every other former use of #57605C
     /// since design's 20 September contrast pass retired #57605C for type. The name is kept so the
@@ -125,8 +127,11 @@ enum NoopHTMLFont {
         scaled("Outfit-Thin_ExtraLight", size)
     }
 
+    /// Instrument Sans's Regular cut is lighter and narrower than SF's, and on the dark canvas it read
+    /// as thin and unfinished next to Bevel's Medium copy (25 Oct 2026), so Regular renders as Medium.
+    /// Every other weight is as asked.
     static func sans(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        scaled("Instrument Sans", size).weight(weight)
+        scaled("Instrument Sans", size).weight(weight == .regular ? .medium : weight)
     }
 
     static func serif(_ size: CGFloat, italic: Bool = false) -> Font {
@@ -1252,22 +1257,19 @@ private struct NoopDragToDismiss: ViewModifier {
 
 // MARK: - Sheets: one engine
 
-/// The grabber every Noop sheet carries, native or overlay: small and quiet, as on iOS.
+/// Noop sheets carry no grabber (25 Oct 2026); they still swipe down to close, and those with a header
+/// carry `NoopCloseButton`. Overlay sheets that place one in their stack get nothing.
 struct NoopSheetGrabber: View {
-    var body: some View {
-        Capsule().fill(Color.white.opacity(0.24)).frame(width: 32, height: 4)
-            .accessibilityHidden(true)
-    }
+    var body: some View { EmptyView() }
 }
 
-/// Every native sheet in the app: Noop's grabber in place of the system one, the canvas behind it,
+/// Every native sheet in the app: no grabber, the canvas behind it,
 /// the same corner radius, and the system's own swipe-down to close (never disabled unless saving).
 private struct NoopSheetStyle: ViewModifier {
     let detents: Set<PresentationDetent>
 
     func body(content: Content) -> some View {
         content
-            .overlay(alignment: .top) { NoopSheetGrabber().padding(.top, 6).allowsHitTesting(false) }
             .presentationDetents(detents)
             .presentationDragIndicator(.hidden)
             .presentationCornerRadius(32)
@@ -1277,7 +1279,7 @@ private struct NoopSheetStyle: ViewModifier {
 }
 
 /// A short sheet that floats: the system's inset sheet with every corner rounded, on a surface lifted
-/// a shade off the page, its grabber inside. It is as tall as its content, measured, so a longer month
+/// a shade off the page. It is as tall as its content, measured, so a longer month
 /// or larger text grows it instead of cutting the bottom off; `height` is only the first guess.
 private struct NoopFloatingSheetStyle: ViewModifier {
     let height: CGFloat
@@ -1289,7 +1291,6 @@ private struct NoopFloatingSheetStyle: ViewModifier {
             .fixedSize(horizontal: false, vertical: true)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measured = $0 }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .overlay(alignment: .top) { NoopSheetGrabber().padding(.top, 8).allowsHitTesting(false) }
             .presentationDetents([.height(measured ?? height)])
             .presentationDragIndicator(.hidden)
             .presentationBackground(LinearGradient(colors: [Color(hex: 0x23262D), Color(hex: 0x1B1D23)],

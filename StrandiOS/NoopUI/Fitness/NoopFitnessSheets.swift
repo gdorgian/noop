@@ -66,12 +66,7 @@ struct NoopFitnessAddSheet: View {
                 HStack {
                     Text("Add").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                     Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                            .frame(width: 36, height: 36).background(Color.white.opacity(0.07), in: Circle())
-                            .noopHitTarget()
-                    }
-                    .accessibilityLabel("Close")
+                    NoopCloseButton { dismiss() }
                 }
                 if let refusal {
                     Text("\(refusal.name) is still running. Finish it before starting another session.")
@@ -359,12 +354,7 @@ struct NoopFitnessPlanSheet: View {
                 HStack {
                     Text("Plan a routine").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
                     Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                            .frame(width: 36, height: 36).background(Color.white.opacity(0.07), in: Circle())
-                            .noopHitTarget()
-                    }
-                    .accessibilityLabel("Close")
+                    NoopCloseButton { dismiss() }
                 }
                 if fixedRoutineID == nil {
                     VStack(alignment: .leading, spacing: 8) {

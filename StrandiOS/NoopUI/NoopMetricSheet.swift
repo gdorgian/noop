@@ -506,7 +506,7 @@ struct NoopMetricTopBar: View {
             Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 .lineLimit(1).padding(.horizontal, 60)
             HStack {
-                NoopIconButton(systemImage: "xmark", size: .small, label: "Close", action: close)
+                NoopCloseButton(action: close)
                 Spacer()
             }
         }

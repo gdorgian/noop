@@ -147,11 +147,7 @@ struct NoopStressSheet: View {
                     .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             }
             Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                    .frame(width: 32, height: 32).noopHitTarget().background(Color.white.opacity(0.07), in: Circle())
-            }
-            .accessibilityLabel("Close")
+            NoopCloseButton { dismiss() }
         }
         .padding(.top, 18)
     }

@@ -158,11 +158,7 @@ struct NoopDayCalendarSheet: View {
             ZStack {
                 Text(title).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                 HStack {
-                    Button { dismiss() } label: {
-                        NoopIconDiscShape(size: .small) { Image(systemName: "xmark").font(.system(size: 13, weight: .semibold)) }
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    .accessibilityLabel("Close")
+                    NoopCloseButton { dismiss() }
                     Spacer()
                     Button {
                         NoopHaptics.play(.tick)
