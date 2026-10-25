@@ -99,6 +99,11 @@ enum NoopLocalReset {
         OuraTokenStore.clear()
         #endif
 
+        // Progress photos are image files beside the database, not rows in it.
+        if let photos = NoopProgressPhotoFiles.folder {
+            try? FileManager.default.removeItem(at: photos)
+        }
+
         let notifications = UNUserNotificationCenter.current()
         notifications.removeAllPendingNotificationRequests()
         notifications.removeAllDeliveredNotifications()

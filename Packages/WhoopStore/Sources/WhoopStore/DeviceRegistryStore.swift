@@ -175,6 +175,9 @@ public struct DeviceRegistryStore: Sendable {
         // privacy defect this list exists to close, and one the deviceId-column guard test could not
         // catch for a child table keyed only by its parent.
         "liftExercise", "liftProgram", "liftProgramItem", "liftSession", "liftSet",
+        // v50-body-log: measurements and the progress-photo index. The photo files themselves live in the
+        // app's documents, which the app-level reset removes (`NoopLocalReset`).
+        "bodyMeasurement", "progressPhoto",
     ]
 
     /// Permanently delete every recorded sample/derived row belonging to one device, across all
