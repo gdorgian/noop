@@ -728,7 +728,7 @@ extension WhoopStore {
                 """, arguments: [deviceId, from, to, limit])
                 // rawByte (v31) is the whole @81 byte; nil on any pre-v31 row. `state` is unchanged, so
                 // the H7 guard and the Deep Timeline track see exactly what they saw before.
-                .map { SleepStateSample(ts: $0["ts"], state: $0["state"], rawByte: $0["rawByte"]) }
+                .map { SleepStateSample(ts: $0[0], state: $0[1], rawByte: $0[2]) }
         }
     }
 

@@ -106,24 +106,39 @@ public enum VitalBands {
     /// would be banded against an ancient still-"trusted" baseline. Malformed day keys are dropped.
     /// Pure: fixed UTC math over the day keys only (no device clock).
     public static func calendarSeries(_ rows: [(day: String, value: Double?)]) -> [Double?] {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(secondsFromGMT: 0)
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(secondsFromGMT: 0)!
-        let dates = rows.compactMap { f.date(from: $0.day) }
-        guard let first = dates.min(), let last = dates.max() else { return [] }
+        // Plain day numbers instead of a DateFormatter: the same answer, without parsing every key
+        // twice and formatting one string per calendar day of the whole history (that cost ~76 ms on
+        // the main thread at launch, profiled on device 25 Oct 2026).
+        var first = Int.max, last = Int.min
         // Last write wins for a duplicated day key, matching the dictionary the Kotlin port builds.
-        var byDay: [String: Double?] = [:]
-        for r in rows where f.date(from: r.day) != nil { byDay[r.day] = r.value }
-        var out: [Double?] = []
-        var d = first
-        while d <= last {
-            out.append(byDay[f.string(from: d)] ?? nil)
-            guard let next = cal.date(byAdding: .day, value: 1, to: d) else { break }
-            d = next
+        // Only a canonical "yyyy-MM-dd" key can be looked up again, as the formatter's output was.
+        var byDay: [Int: Double?] = [:]
+        for r in rows {
+            guard let (n, canonical) = dayNumber(r.day) else { continue }
+            first = min(first, n); last = max(last, n)
+            if canonical { byDay[n] = r.value }
         }
-        return out
+        guard first <= last else { return [] }
+        return (first...last).map { byDay[$0] ?? nil }
+    }
+
+    /// Days since 1970-01-01 (UTC, proleptic Gregorian) for a "yyyy-MM-dd" key, and whether it is in
+    /// that exact zero-padded form; nil for anything a strict POSIX formatter would not parse.
+    static func dayNumber(_ key: String) -> (Int, Bool)? {
+        let parts = key.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) }),
+              let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]),
+              parts[1].count <= 2, parts[2].count <= 2, (1...12).contains(m) else { return nil }
+        let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+        let monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]
+        guard (1...monthDays).contains(d) else { return nil }
+        // Howard Hinnant's days_from_civil.
+        let yy = m <= 2 ? y - 1 : y
+        let era = (yy >= 0 ? yy : yy - 399) / 400
+        let yoe = yy - era * 400
+        let doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1
+        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+        let canonical = key.count == 10 && parts[0].count == 4 && parts[1].count == 2 && parts[2].count == 2
+        return (era * 146_097 + doe - 719_468, canonical)
     }
 }

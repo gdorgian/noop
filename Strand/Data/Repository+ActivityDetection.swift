@@ -20,11 +20,25 @@ extension Repository {
     /// session still under way is not saved half-finished and then blocked from growing.
     static let autoLogLookbackS = 36 * 3600
     static let autoLogSettleS = 12 * 60
+    /// The last full scan's data edge, so an unchanged one is not scanned again. Bump the version when
+    /// the detector changes, so the next launch rescans what is already stored.
+    static let autoLogScannedKey = "fitness.autoLogScannedKey"
+    static let autoLogScanVersion = 1
 
     /// Scans and logs. Returns how many activities were added.
     @discardableResult
     func autoLogDetectedActivities(now: Date = Date()) async -> Int {
         guard Self.autoLogActivitiesEnabled, let store = await storeHandle() else { return 0 }
+        // A scan reads 36 hours of heart rate, motion and steps. Its answer depends only on that data
+        // and on what has been dismissed, so when neither has moved since the last full scan there is
+        // nothing new to find; this skipped most of a cold start's background work (25 Oct 2026).
+        let dismissedCount = (UserDefaults.standard.stringArray(forKey: WorkoutSource.dismissedDefaultsKey)?.count ?? 0)
+            + autoDetectDismissedSpans.count
+        let scanKey = "\(Self.autoLogScanVersion):\(await unionLatestHRSampleTs(store: store) ?? 0):\(dismissedCount)"
+        if UserDefaults.standard.string(forKey: Self.autoLogScannedKey) == scanKey { return 0 }
+        // Remembered once the scan has run to the end, so a failed save is tried again next time.
+        var scanned = true
+        defer { if scanned { UserDefaults.standard.set(scanKey, forKey: Self.autoLogScannedKey) } }
         let nowTs = Int(now.timeIntervalSince1970)
         let from = nowTs - Self.autoLogLookbackS
         let samples = await hrSamples(from: from, to: nowTs, limit: 200_000)
@@ -81,6 +95,7 @@ extension Repository {
         do {
             _ = try await store.upsertWorkouts(rows, deviceId: computedDeviceId)
         } catch {
+            scanned = false
             return 0
         }
         for row in rows { ActivityNotifier.logged(row) }

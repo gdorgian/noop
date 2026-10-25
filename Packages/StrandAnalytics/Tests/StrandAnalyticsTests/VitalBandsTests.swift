@@ -97,4 +97,51 @@ final class VitalBandsTests: XCTestCase {
         let rows: [(day: String, value: Double?)] = [("not-a-date", 1.0), ("2026-06-01", 50.0)]
         XCTAssertEqual(VitalBands.calendarSeries(rows), [50.0])
     }
+
+    /// The day-number version must give exactly what the DateFormatter version gave, including for
+    /// gaps, duplicates, leap days, malformed keys and non-padded keys.
+    func testCalendarSeriesMatchesFormatterReference() {
+        func reference(_ rows: [(day: String, value: Double?)]) -> [Double?] {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(secondsFromGMT: 0)
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = TimeZone(secondsFromGMT: 0)!
+            let dates = rows.compactMap { f.date(from: $0.day) }
+            guard let first = dates.min(), let last = dates.max() else { return [] }
+            var byDay: [String: Double?] = [:]
+            for r in rows where f.date(from: r.day) != nil { byDay[r.day] = r.value }
+            var out: [Double?] = []
+            var d = first
+            while d <= last {
+                out.append(byDay[f.string(from: d)] ?? nil)
+                guard let next = cal.date(byAdding: .day, value: 1, to: d) else { break }
+                d = next
+            }
+            return out
+        }
+        let fixed: [[(day: String, value: Double?)]] = [
+            [("2024-02-28", 1), ("2024-02-29", 2), ("2024-03-01", 3)],
+            [("2023-02-29", 1), ("2023-03-01", 2)],
+            [("2025-1-5", 1), ("2025-01-07", 2)],
+            [("2025-01-05", 1), ("2025-01-05", 9), ("2025-01-03", nil)],
+            [("garbage", 1), ("2025-13-01", 2), ("2025-00-10", 3), ("2025-01-32", 4), ("2025-01-02", 5)],
+            [("1999-12-31", 1), ("2000-01-02", 2)],
+        ]
+        for rows in fixed { XCTAssertEqual(VitalBands.calendarSeries(rows), reference(rows), "\(rows)") }
+        var rng = SystemRandomNumberGenerator()
+        for _ in 0..<300 {
+            let base = Int.random(in: 0..<20_000, using: &rng)
+            let rows: [(day: String, value: Double?)] = (0..<Int.random(in: 0..<40, using: &rng)).map { _ in
+                let n = base + Int.random(in: 0..<120, using: &rng)
+                let date = Date(timeIntervalSince1970: TimeInterval(n) * 86_400)
+                var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(secondsFromGMT: 0)!
+                let p = c.dateComponents([.year, .month, .day], from: date)
+                let key = String(format: "%04d-%02d-%02d", p.year!, p.month!, p.day!)
+                return (key, Bool.random(using: &rng) ? Double(n) : nil)
+            }
+            XCTAssertEqual(VitalBands.calendarSeries(rows), reference(rows))
+        }
+    }
 }

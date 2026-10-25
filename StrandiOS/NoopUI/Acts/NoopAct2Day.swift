@@ -1056,9 +1056,12 @@ struct NoopAct2Screens: View {
     /// "Today, October 25"; a looked-back day by its own date.
     private var todayTitle: String {
         if day == nil, isHistorical { return dayContext.date }
-        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMM d")
-        return "Today, " + f.string(from: Date())
+        return "Today, " + Self.titleFormatter.string(from: Date())
     }
+
+    private static let titleFormatter: DateFormatter = {
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMM d"); return f
+    }()
 
     private func act2DestinationRow(
         title: String,

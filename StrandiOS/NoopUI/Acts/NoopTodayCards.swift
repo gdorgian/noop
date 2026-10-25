@@ -218,8 +218,21 @@ struct NoopTodayDayRibbon: View {
         .background(Color.white.opacity(0.05), in: Capsule())
     }
 
+    // Built once, not once per point.
+    private static let areaFill = LinearGradient(colors: [Color(hex: 0x6FCFB4).opacity(0.16), Color(hex: 0x6FCFB4).opacity(0)],
+                                                 startPoint: .top, endPoint: .bottom)
+    private static let lineFill = LinearGradient(colors: [Color(hex: 0xF29A5C), Color(hex: 0xC8B27A), Color(hex: 0x6FCFB4), Color(hex: 0x5FB8A8)],
+                                                 startPoint: .top, endPoint: .bottom)
+
     private var chart: some View {
-        Chart {
+        // The scale and its floor are read once for the whole chart: as computed properties inside
+        // the loop they rescanned every point for every point (25 Oct 2026, profiled on device).
+        let domain = yDomain
+        let floor = domain.lowerBound
+        let peak = self.peak
+        let selectedPoint = self.selectedPoint
+        let now = self.now
+        return Chart {
             // Sleep and sessions as bands: a soft fill, a bright top edge, and the icon centred
             // above it, so either reads at a glance across the whole line.
             if let sleep {
@@ -239,15 +252,13 @@ struct NoopTodayDayRibbon: View {
                     }
             }
             ForEach(Array(points.enumerated()), id: \.offset) { _, p in
-                AreaMark(x: .value("Time", p.time), yStart: .value("Floor", yDomain.lowerBound), yEnd: .value("bpm", p.bpm))
+                AreaMark(x: .value("Time", p.time), yStart: .value("Floor", floor), yEnd: .value("bpm", p.bpm))
                     .interpolationMethod(.monotone)
-                    .foregroundStyle(LinearGradient(colors: [Color(hex: 0x6FCFB4).opacity(0.16), Color(hex: 0x6FCFB4).opacity(0)],
-                                                    startPoint: .top, endPoint: .bottom))
+                    .foregroundStyle(Self.areaFill)
                 LineMark(x: .value("Time", p.time), y: .value("bpm", p.bpm))
                     .interpolationMethod(.monotone)
                     .lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(LinearGradient(colors: [Color(hex: 0xF29A5C), Color(hex: 0xC8B27A), Color(hex: 0x6FCFB4), Color(hex: 0x5FB8A8)],
-                                                    startPoint: .top, endPoint: .bottom))
+                    .foregroundStyle(Self.lineFill)
             }
             if let last = points.last, selected == nil {
                 PointMark(x: .value("Time", last.time), y: .value("bpm", last.bpm))
@@ -284,7 +295,7 @@ struct NoopTodayDayRibbon: View {
         }
         .padding(.top, 22)
         .chartXScale(domain: start...max(now, start.addingTimeInterval(3600)))
-        .chartYScale(domain: yDomain)
+        .chartYScale(domain: domain)
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.white.opacity(0.05))

@@ -548,7 +548,7 @@ final class Repository: ObservableObject {
 
     /// Latest HR-sample ts across the imported union, or nil. The auto-land Today anchor (#597) uses this,
     /// so a re-added strap's live raw AND the canonical history both count toward "the most recent data day".
-    private func unionLatestHRSampleTs(store: WhoopStore) async -> Int? {
+    func unionLatestHRSampleTs(store: WhoopStore) async -> Int? {
         var latest: Int?
         for id in importedReadIds {
             if let ts = (try? await store.latestHRSampleTs(deviceId: id)) ?? nil {

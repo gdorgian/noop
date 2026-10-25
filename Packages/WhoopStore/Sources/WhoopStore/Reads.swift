@@ -75,7 +75,10 @@ extension WhoopStore {
                 """, arguments: [deviceId, from, to,
                                  deviceId, from, to,
                                  limit])
-                .map { HRSample(ts: $0["ts"], bpm: $0["bpm"]) }
+                // The sample readers take columns by position, in the SELECT's order: a lookup by name
+                // compares names case-insensitively for every column of every row, which profiled at a
+                // quarter of a second of a cold start on device (25 Oct 2026).
+                .map { HRSample(ts: $0[0], bpm: $0[1]) }
         }
     }
 
@@ -568,9 +571,9 @@ extension WhoopStore {
                                                     "whoop4Standard": RRSourceChannel.whoop4Standard.rawValue,
                                                     "lim": limit])
                 .map { row in
-                    RRInterval(ts: row["ts"], rrMs: row["rrMs"],
-                               srcChannel: (row["srcChannel"] as Int?).flatMap(RRSourceChannel.init(rawValue:)),
-                               ord: row["ord"] as Int?, seq: row["seq"])
+                    RRInterval(ts: row[0], rrMs: row[1],
+                               srcChannel: (row[2] as Int?).flatMap(RRSourceChannel.init(rawValue:)),
+                               ord: row[3] as Int?, seq: row[4])
                 }
             // A ring record served twice is stored twice: each connection anchors on its own SyncTime,
             // so the second copy lands a second or two off the first and misses the row key instead of
@@ -613,9 +616,9 @@ extension WhoopStore {
                 """, arguments: ["d": deviceId, "f": from, "t": to,
                                  "rrx": RRSourceChannel.spo2Ibi.rawValue, "lim": limit])
                 .map { row in
-                    RRInterval(ts: row["ts"], rrMs: row["rrMs"],
-                               srcChannel: (row["srcChannel"] as Int?).flatMap(RRSourceChannel.init(rawValue:)),
-                               ord: row["ord"] as Int?, seq: row["seq"])
+                    RRInterval(ts: row[0], rrMs: row[1],
+                               srcChannel: (row[2] as Int?).flatMap(RRSourceChannel.init(rawValue:)),
+                               ord: row[3] as Int?, seq: row[4])
                 }
         }
     }
@@ -688,8 +691,7 @@ extension WhoopStore {
                 // aux1Raw/aux2Raw (v31) read back nil for any pre-v31 row and for any WHOOP 4.0 record,
                 // whose layout has no such channels. No caller reads them; they are hydrated so the
                 // carrier is a faithful view of the row rather than a lossy one.
-                .map { SkinTempSample(ts: $0["ts"], raw: $0["raw"],
-                                      aux1Raw: $0["aux1Raw"], aux2Raw: $0["aux2Raw"]) }
+                .map { SkinTempSample(ts: $0[0], raw: $0[1], aux1Raw: $0[2], aux2Raw: $0[3]) }
         }
     }
 
@@ -702,7 +704,7 @@ extension WhoopStore {
                 """, arguments: [deviceId, from, to, limit])
                 // activityClass (#316, v19) reads back nil for any pre-v19 row (the column defaulted null) and
                 // for any record whose @63 byte was 0xFF/invalid/absent, an absent class stays absent.
-                .map { StepSample(ts: $0["ts"], counter: $0["counter"], activityClass: $0["activityClass"]) }
+                .map { StepSample(ts: $0[0], counter: $0[1], activityClass: $0[2]) }
         }
     }
 
@@ -715,7 +717,7 @@ extension WhoopStore {
                 WHERE deviceId = ? AND ts > ? AND ts < ?
                 ORDER BY ts ASC LIMIT ?
                 """, arguments: [deviceId, afterExclusive, endExclusive, limit]).map {
-                    StepSample(ts: $0["ts"], counter: $0["counter"], activityClass: $0["activityClass"])
+                    StepSample(ts: $0[0], counter: $0[1], activityClass: $0[2])
                 }
         }
     }
@@ -728,7 +730,7 @@ extension WhoopStore {
                 SELECT ts, counter, activityClass FROM stepSample
                 WHERE deviceId = ? AND ts < ? ORDER BY ts DESC LIMIT 1
                 """, arguments: [deviceId, before]).map {
-                    StepSample(ts: $0["ts"], counter: $0["counter"], activityClass: $0["activityClass"])
+                    StepSample(ts: $0[0], counter: $0[1], activityClass: $0[2])
                 }
         }
     }
@@ -868,8 +870,7 @@ extension WhoopStore {
                 """, arguments: [deviceId, from, to, limit])
                 // dynAccel (v31) reads back nil for any pre-v31 row and for any WHOOP 4.0 record. The
                 // sleep stager reads x/y/z only — this column is carried, never scored.
-                .map { GravitySample(ts: $0["ts"], x: $0["x"], y: $0["y"], z: $0["z"],
-                                     dynAccel: $0["dynAccel"]) }
+                .map { GravitySample(ts: $0[0], x: $0[1], y: $0[2], z: $0[3], dynAccel: $0[4]) }
         }
     }
 
