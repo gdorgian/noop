@@ -62,9 +62,12 @@ final class HevyAPITests: XCTestCase {
         let page = HevyAPI.parseBodyMeasurements(data: data("""
         {"page":1,"page_count":1,"body_measurements":[
           {"date":"2024-08-14","weight_kg":82.5,"fat_percent":16.2,"lean_mass_kg":69.1},
-          {"date":"2024-08-15","waist":80,"left_calf":38}]}
+          {"date":"2024-08-15","waist":80,"left_calf":38},
+          {"date":"2024-08-16","weight_kg":0}]}
         """))
-        XCTAssertEqual(page.items.count, 1, "an entry with only circumferences has nothing to store")
+        // Tape-only entries are kept now that Body stores circumferences; one with nothing usable is not.
+        XCTAssertEqual(page.items.count, 2)
+        XCTAssertEqual(page.items[1].circumferencesCm["waist"], 80)
         XCTAssertEqual(page.skipped, 1)
         XCTAssertEqual(page.items[0].date, "2024-08-14", "the bare calendar date is kept verbatim")
         XCTAssertEqual(page.items[0].weightKg, 82.5)
