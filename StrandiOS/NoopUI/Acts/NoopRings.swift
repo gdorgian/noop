@@ -246,6 +246,16 @@ private extension View {
     }
 }
 
+extension NoopRingValues {
+    /// Today's strain target, as fractions of the ring: easier after a low recovery, harder after a
+    /// high one. Nil until recovery is scored.
+    var strainTarget: ClosedRange<Double>? {
+        guard let r = recovery else { return nil }
+        let mid = 0.25 + 0.45 * min(1, max(0, r / 100))
+        return (mid - 0.09)...(mid + 0.09)
+    }
+}
+
 // MARK: - Donuts
 //
 // Three rings side by side in one card, each a thick arc in a recessed track whose rounded tip glows,
@@ -274,12 +284,7 @@ private struct NoopDonutRings: View {
         }
     }
 
-    /// Today's strain target, as fractions of the ring: easier after a low recovery.
-    private var strainTarget: ClosedRange<Double>? {
-        guard let r = values.recovery else { return nil }
-        let mid = 0.25 + 0.45 * min(1, max(0, r / 100))
-        return (mid - 0.09)...(mid + 0.09)
-    }
+    private var strainTarget: ClosedRange<Double>? { values.strainTarget }
 
     private var divider: some View {
         Rectangle().fill(Color.white.opacity(0.07)).frame(width: 0.5).padding(.vertical, 4)
@@ -392,7 +397,7 @@ private struct NoopDialRings: View {
                 dial(.recovery, "Recovery", fill: values.recoveryFill, text: values.recovery.map { "\(Int($0.rounded()))" },
                      percent: true, color: recoveryColor)
                 dial(.strain, "Strain", fill: values.strainFill, text: values.strain.map { noopStrainText($0) },
-                     percent: false, color: Color(hex: 0x0093E7))
+                     percent: false, color: Color(hex: 0x0093E7), target: values.strainTarget)
             }
             .padding(.vertical, 10)
         }
@@ -403,21 +408,40 @@ private struct NoopDialRings: View {
         return r >= 67 ? Color(hex: 0x16EC06) : r >= 34 ? Color(hex: 0xFFDE00) : Color(hex: 0xFF0026)
     }
 
-    private func dial(_ metric: NoopRingMetric, _ title: String, fill: Double, text: String?, percent: Bool, color: Color) -> some View {
-        Button { open(metric) } label: { dialBody(title, fill: fill, text: text, percent: percent, color: color) }
+    private func dial(_ metric: NoopRingMetric, _ title: String, fill: Double, text: String?, percent: Bool, color: Color,
+                      target: ClosedRange<Double>? = nil) -> some View {
+        Button { open(metric) } label: { dialBody(title, fill: fill, text: text, percent: percent, color: color, target: target) }
             .buttonStyle(NoopHTMLPressStyle())
     }
 
-    private func dialBody(_ title: String, fill: Double, text: String?, percent: Bool, color: Color) -> some View {
+    private func dialBody(_ title: String, fill: Double, text: String?, percent: Bool, color: Color,
+                          target: ClosedRange<Double>?) -> some View {
         // WHOOP's Home, measured on a 440 pt screen: an 88 pt ring with a 6 pt rounded arc on a grey
         // track, a 28 pt heavy figure, and an 11 pt tracked label just under the ring.
         VStack(spacing: 8) {
             ZStack {
-                Circle().stroke(Color(hex: 0x3A4148), lineWidth: 6)
+                Circle().stroke(Color(hex: 0x32383D), lineWidth: 6)
+                // Strain's target: a lighter stretch of track, under the arc.
+                if let target {
+                    Circle().trim(from: target.lowerBound, to: target.upperBound)
+                        .stroke(Color(hex: 0x5A5F62), style: StrokeStyle(lineWidth: 6, lineCap: .butt))
+                        .rotationEffect(.degrees(-90))
+                }
                 NoopSlotClock { _, reveal in
                     Circle().trim(from: 0, to: min(1, fill * NoopRingValues.spring(reveal)))
                         .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .rotationEffect(.degrees(-90))
+                }
+                // And a white tick across the track at the optimal strain, over everything.
+                if let target {
+                    GeometryReader { g in
+                        Capsule().fill(.white)
+                            .frame(width: 2, height: 9)
+                            .offset(y: -g.size.height / 2)
+                            .rotationEffect(.degrees(360 * (target.lowerBound + target.upperBound) / 2))
+                            .frame(width: g.size.width, height: g.size.height)
+                    }
+                    .allowsHitTesting(false)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 1) {
                     Text(text ?? "--").font(NoopHTMLFont.sans(28, weight: .heavy)).monospacedDigit()

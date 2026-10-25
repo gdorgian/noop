@@ -7,7 +7,9 @@ import SwiftUI
 // a month sheet where every day is a capsule holding that day's ring, so a good or bad stretch can be
 // seen before choosing a day.
 
-/// The pill: ‹ date ›, the date on a lighter inner capsule that opens the month sheet. `offset`
+/// The pill: ‹ date ›, the date on a lighter inner capsule that opens the month sheet. Measured from
+/// WHOOP's on a 440 pt screen: 166 × 28 overall, a 110 pt date capsule between two 28 pt arrow cells,
+/// the date in 11 pt bold tracked capitals. `offset`
 /// counts days back from today; it never goes past today or past `maxBack`. The pill keeps one width
 /// whatever the date says, so the arrows never move under the thumb.
 struct NoopDayPill: View {
@@ -22,21 +24,21 @@ struct NoopDayPill: View {
             arrow("chevron.left", enabled: offset < maxBack) { offset += 1 }
             Button(action: openCalendar) {
                 Text(Self.label(date, offset: offset))
-                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .bold)).tracking(1.1)
+                    .font(NoopHTMLFont.sans(11, weight: .bold)).tracking(1.6)
                     .monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.8)
                     .foregroundStyle(NoopHTMLColor.ink)
                     .contentTransition(.numericText(countsDown: offset > 0))
-                    .frame(width: 112, height: 28)
-                    .background(Color.white.opacity(0.13), in: Capsule())
+                    .frame(width: 110, height: 28)
+                    .background(Color.white.opacity(0.14), in: Capsule())
                     .contentShape(Capsule())
             }
             .buttonStyle(NoopHTMLPressStyle())
             .accessibilityLabel("\(Self.label(date, offset: offset)), open the calendar")
             arrow("chevron.right", enabled: offset > 0) { offset -= 1 }
         }
-        .padding(1)
-        .background(Color.white.opacity(0.06), in: Capsule())
+        .padding(.vertical, 0.5)
+        .background(Color.white.opacity(0.05), in: Capsule())
         .animation(.snappy(duration: 0.22), value: offset)
     }
 
@@ -51,9 +53,9 @@ struct NoopDayPill: View {
             NoopHaptics.play(.tick)
             action()
         } label: {
-            Image(systemName: symbol).font(.system(size: 12, weight: .heavy))
+            Image(systemName: symbol).font(.system(size: 13, weight: .heavy))
                 .foregroundStyle(enabled ? NoopHTMLColor.ink : NoopHTMLColor.chevronDim)
-                .frame(width: 30, height: 28)
+                .frame(width: 28, height: 28)
                 .noopHitTarget()
         }
         .buttonStyle(NoopHTMLPressStyle())
