@@ -2700,7 +2700,7 @@ private struct NoopOCRCandidateCard: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                                 .padding(.horizontal, 8)
-                                .frame(width: 132, height: 26)
+                                .frame(width: 132).frame(minHeight: 26)
                                 .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
                                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
                             Text("AS READ")

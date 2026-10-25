@@ -683,7 +683,7 @@ private struct NoopSveaCoach: View {
                 .foregroundStyle(NoopHTMLColor.inkSoft)
                 .lineLimit(1)
                 .padding(.horizontal, 13)
-                .frame(height: 35)
+                .frame(minHeight: 35)
                 .background(Color(hex: 0x171C1A, alpha: 0.90), in: RoundedRectangle(cornerRadius: 13))
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 13))
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.10), lineWidth: 0.5))
@@ -770,7 +770,7 @@ private struct NoopSveaCoach: View {
                 .foregroundStyle(selected ? Color(hex: 0xDDE3F6) : NoopHTMLColor.inkSoft)
                 .lineLimit(1)
                 .padding(.horizontal, 13)
-                .frame(height: 35)
+                .frame(minHeight: 35)
                 .background(
                     selected ? NoopHTMLColor.night.opacity(0.20) : Color(hex: 0x171C1A, alpha: 0.90),
                     in: RoundedRectangle(cornerRadius: 13)
@@ -1899,7 +1899,7 @@ private struct NoopSveaMemory: View {
                         .font(NoopHTMLFont.sans(12.5))
                         .foregroundStyle(NoopHTMLColor.copy)
                 }
-                .frame(height: 34, alignment: .top)
+                .frame(minHeight: 34, alignment: .top)
                 .offset(y: -5)
                 HStack(spacing: 7) {
                     Button(rebuilt ? "Rebuilt" : "Rebuild") {

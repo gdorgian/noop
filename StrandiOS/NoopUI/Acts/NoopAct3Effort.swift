@@ -468,7 +468,7 @@ struct NoopAct3Screens: View {
                     .font(NoopHTMLFont.sans(10.5))
                     .foregroundStyle(NoopHTMLColor.muted)
             }
-            .frame(height: 27, alignment: .center)
+            .frame(minHeight: 27, alignment: .center)
 
             Text(label)
                 .font(NoopHTMLFont.sans(11))
@@ -1080,7 +1080,7 @@ struct NoopAct3Screens: View {
                         .foregroundStyle(warm ? Color(hex: 0xF3C888) : NoopHTMLColor.ink)
                     Text(unit).font(NoopHTMLFont.sans(10.5)).foregroundStyle(NoopHTMLColor.muted)
                 }
-                .frame(height: 29)
+                .frame(minHeight: 29)
                 Text(label).font(NoopHTMLFont.sans(11)).foregroundStyle(Color(hex: 0x7F8A85))
             }
         }
@@ -1583,7 +1583,7 @@ private struct Act3HomeHeader<Trailing: View>: View {
                 Text(eyebrow)
                     .font(NoopHTMLFont.sans(13.5))
                     .foregroundStyle(NoopHTMLColor.copy)
-                    .frame(height: 16.5, alignment: .top)
+                    .frame(minHeight: 16.5, alignment: .top)
                 Text(title)
                     .font(NoopHTMLFont.outfit(23))
                     .tracking(-0.46)
@@ -1592,7 +1592,7 @@ private struct Act3HomeHeader<Trailing: View>: View {
             Spacer(minLength: 0)
             trailing
         }
-        .frame(height: 46.95, alignment: .top)
+        .frame(minHeight: 46.95, alignment: .top)
         .padding(.bottom, 4)
     }
 }
@@ -2151,7 +2151,7 @@ private struct Act3IntervalsScreen: View {
                     paused: paused
                 )
                 .padding(.horizontal, 14)
-                .frame(height: 40)
+                .frame(minHeight: 40)
                 .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.09), lineWidth: 0.5))
                 Text(isWork ? "Next: 30 seconds easy" : round >= 6 ? "Next: the last minute" : "Next: minute \(round + 1) of 6")

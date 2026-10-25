@@ -283,7 +283,7 @@ struct NoopEditableSections<Section: View>: View {
                         }
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 92)
+                        .frame(minHeight: 92)
                         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
                             .strokeBorder(Color.white.opacity(0.14), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
                         .contentShape(Rectangle())

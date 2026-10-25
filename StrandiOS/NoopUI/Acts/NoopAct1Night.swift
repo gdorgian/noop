@@ -301,7 +301,7 @@ struct NoopAct1Screens: View {
                         .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blueInk)
                         .padding(.horizontal, 14)
-                        .frame(height: 38)
+                        .frame(minHeight: 38)
                         .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 14))
                         .padding(.top, 2)
                     }
@@ -375,7 +375,7 @@ struct NoopAct1Screens: View {
                                         .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                                         .foregroundStyle(NoopHTMLColor.ink)
                                         .monospacedDigit()
-                                        .frame(height: 18)
+                                        .frame(minHeight: 18)
                                         .padding(.horizontal, selected ? 7 : 0)
                                         .background(selected ? Color(hex: 0x6E7DB8).opacity(0.9) : .clear, in: Capsule())
                                     RoundedRectangle(cornerRadius: 8)

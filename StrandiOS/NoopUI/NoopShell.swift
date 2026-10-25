@@ -2076,7 +2076,7 @@ private struct NoopNightJournalSheet: View {
                                         .foregroundStyle(selected ? NoopHTMLColor.ink : NoopHTMLColor.copy)
                                 }
                                 .padding(.horizontal, 15)
-                                .frame(height: 48)
+                                .frame(minHeight: 48)
                                 .background(selected ? Color(hex: 0xF2B45C).opacity(0.13) : Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(selected ? Color(hex: 0xF2B45C).opacity(0.45) : NoopHTMLColor.border, lineWidth: 0.5))
                             }
@@ -2185,7 +2185,7 @@ private struct NoopDayLogSheet: View {
                             .font(NoopHTMLFont.sans(12.5))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                     }
-                    .frame(height: 48, alignment: .top)
+                    .frame(minHeight: 48, alignment: .top)
 
 
                     LazyVGrid(
@@ -2437,7 +2437,7 @@ private struct NoopLoggedItemsSheet: View {
                         .font(.custom("Instrument Sans", fixedSize: 13.5).weight(.semibold))
                         .foregroundStyle(Color(hex: 0x8FEFC0))
                         .frame(maxWidth: .infinity)
-                        .frame(height: 50)
+                        .frame(minHeight: 50)
                         .background(NoopHTMLColor.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(NoopHTMLColor.green.opacity(0.3), lineWidth: 0.5))
                     }

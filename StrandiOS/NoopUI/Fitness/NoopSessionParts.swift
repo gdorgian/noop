@@ -43,7 +43,7 @@ struct NoopSessionHero: View {
                 Text(kind).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(tint)
                 if let badge {
                     Text(badge).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(tint)
-                        .padding(.horizontal, 7).frame(height: 18).background(tint.opacity(0.13), in: Capsule())
+                        .padding(.horizontal, 7).frame(minHeight: 18).background(tint.opacity(0.13), in: Capsule())
                 }
             }
             Text(title).font(NoopHTMLFont.outfit(NoopType.title1, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)

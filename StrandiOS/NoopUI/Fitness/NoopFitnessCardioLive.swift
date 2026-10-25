@@ -183,7 +183,7 @@ struct NoopFitnessCardioLive: View {
                     Text(paused ? "Resume" : "Pause").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                 }
                 .foregroundStyle(NoopHTMLColor.ink)
-                .frame(maxWidth: .infinity).frame(height: 56)
+                .frame(maxWidth: .infinity).frame(minHeight: 56)
                 .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(NoopHTMLPressStyle())
@@ -193,7 +193,7 @@ struct NoopFitnessCardioLive: View {
                     Text("Finish").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                 }
                 .foregroundStyle(NoopHTMLColor.blueInk)
-                .frame(maxWidth: .infinity).frame(height: 56)
+                .frame(maxWidth: .infinity).frame(minHeight: 56)
                 .background(NoopHTMLColor.blueLight, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(NoopHTMLPressStyle())

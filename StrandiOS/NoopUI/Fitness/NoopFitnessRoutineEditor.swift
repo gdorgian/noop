@@ -390,7 +390,7 @@ struct NoopFitnessRoutineEditor: View {
                         lines[index].plan.restSeconds = value
                         for set in lines[index].plan.sets.indices { lines[index].plan.sets[set].restSeconds = value }
                     }), done: { restID = nil })
-                .noopSheet([.height(400)])
+                .noopSheet([.height(400), .large])
             }
         }
         .sheet(isPresented: Binding(get: { repRangeID != nil }, set: { if !$0 { repRangeID = nil } })) {
@@ -404,7 +404,7 @@ struct NoopFitnessRoutineEditor: View {
                 }
                 repRangeID = nil
             }
-            .noopSheet([.height(430)])
+            .noopSheet([.height(430), .large])
         }
         .sheet(item: $history) { value in
             NoopFitnessLastTimeSheet(exercise: lines.first { $0.id == value.lineID }?.choice.name ?? "",
@@ -412,7 +412,7 @@ struct NoopFitnessRoutineEditor: View {
                 if let index = lines.firstIndex(where: { $0.id == value.lineID }) { lines[index].plan.sets = value.sets }
                 history = nil
             }
-            .noopSheet([.height(CGFloat(250 + min(value.sets.count, 8) * 41))])
+            .noopSheet([.height(CGFloat(250 + min(value.sets.count, 8) * 41)), .large])
         }
         .alert("Delete this routine?", isPresented: $confirmDelete) {
             Button("Cancel", role: .cancel) {}

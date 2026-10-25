@@ -136,7 +136,7 @@ struct NoopFitnessAddSheet: View {
                                     Text(s.name).font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                                         .lineLimit(1).minimumScaleFactor(0.75)
                                 }
-                                .frame(maxWidth: .infinity).frame(height: 84)
+                                .frame(maxWidth: .infinity).frame(minHeight: 84)
                                 .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                                 .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
                             }

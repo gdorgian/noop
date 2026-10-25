@@ -506,7 +506,7 @@ private struct NoopLiftLiveScreen: View {
                             NoopCanonicalGlyph(name: .plus, size: 14, color: NoopHTMLColor.inkSoft)
                             Text("Add exercise").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                         }
-                        .frame(maxWidth: .infinity).frame(height: 50)
+                        .frame(maxWidth: .infinity).frame(minHeight: 50)
                         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .strokeBorder(Color.white.opacity(0.14), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
                     }
@@ -666,7 +666,7 @@ private struct NoopLiftLiveScreen: View {
                     NoopCanonicalGlyph(name: .plus, size: 11, color: NoopHTMLColor.inkSoft)
                     Text("Add set").font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
                 }
-                .frame(maxWidth: .infinity).frame(height: 36)
+                .frame(maxWidth: .infinity).frame(minHeight: 36)
                 .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
             }
             .buttonStyle(NoopHTMLPressStyle())

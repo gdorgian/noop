@@ -693,7 +693,7 @@ struct NoopFitnessSessionRow: View {
                     if session.detected {
                         Text("detected")
                             .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
-                            .padding(.horizontal, 6).frame(height: 17)
+                            .padding(.horizontal, 6).frame(minHeight: 17)
                             .background(NoopHTMLColor.volt.opacity(0.12), in: Capsule())
                     }
                 }

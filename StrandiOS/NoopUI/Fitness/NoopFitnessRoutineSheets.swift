@@ -386,7 +386,7 @@ struct NoopFitnessScheduleSummary: View {
                         Image(systemName: "chevron.down").rotationEffect(.degrees(expanded ? 180 : 0))
                     }
                     .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                    .frame(maxWidth: .infinity).frame(height: 40)
+                    .frame(maxWidth: .infinity).frame(minHeight: 40)
                 }
                 .buttonStyle(NoopHTMLPressStyle())
             }
@@ -420,7 +420,7 @@ struct NoopFitnessScheduleSummary: View {
                 Text(plan.date.formatted(.dateTime.day()))
                     .font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).monospacedDigit().foregroundStyle(NoopHTMLColor.ink)
             }
-            .frame(width: 42, height: 44)
+            .frame(width: 42).frame(minHeight: 44)
             .background(Color.white.opacity(next ? 0.08 : 0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(plan.date.formatted(.dateTime.weekday(.wide)))
@@ -431,7 +431,7 @@ struct NoopFitnessScheduleSummary: View {
             Spacer(minLength: 0)
             Button { skip(plan) } label: {
                 Text("Skip").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.inkSoft)
-                    .padding(.horizontal, 14).frame(height: 32)
+                    .padding(.horizontal, 14).frame(minHeight: 32)
                     .background(Color.white.opacity(0.07), in: Capsule())
             }
             .buttonStyle(NoopHTMLPressStyle())

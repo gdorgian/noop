@@ -253,7 +253,7 @@ struct NoopFitnessRoutineScreen: View {
                             Text("Start").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                         }
                         .foregroundStyle(NoopHTMLColor.voltInk)
-                        .frame(maxWidth: .infinity).frame(height: 52)
+                        .frame(maxWidth: .infinity).frame(minHeight: 52)
                         .background(NoopHTMLColor.volt, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                     .buttonStyle(NoopHTMLPressStyle())
@@ -587,7 +587,7 @@ struct NoopFitnessCalendarScreen: View {
             Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
         }
         .foregroundStyle(NoopHTMLColor.inkSoft)
-        .padding(.horizontal, 14).frame(height: 36)
+        .padding(.horizontal, 14).frame(minHeight: 36)
         .background(Color.white.opacity(0.06), in: Capsule())
     }
 

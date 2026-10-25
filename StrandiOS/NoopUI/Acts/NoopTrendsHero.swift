@@ -142,7 +142,7 @@ struct NoopTrendsHero: View {
                     .tracking(1.6)
                     .foregroundStyle(NoopHTMLColor.ink)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 40)
+                    .frame(minHeight: 40)
                     .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(NoopHTMLPressStyle())

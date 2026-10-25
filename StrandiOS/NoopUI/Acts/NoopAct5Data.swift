@@ -895,7 +895,7 @@ struct NoopDataScreen: View {
                         }
                         .foregroundStyle(Color(hex: 0xF3A472))
                         .frame(maxWidth: .infinity)
-                        .frame(height: 52)
+                        .frame(minHeight: 52)
                         .background(NoopHTMLColor.amber.opacity(0.1), in: RoundedRectangle(cornerRadius: 17))
                         .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(NoopHTMLColor.amber.opacity(0.3), lineWidth: 0.5))
                     }

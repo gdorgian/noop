@@ -496,7 +496,7 @@ struct NoopFitnessMeasureChart: View {
                                 Text("avg \(format(average))")
                                     .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                                     .foregroundStyle(NoopHTMLColor.inkSoft)
-                                    .padding(.horizontal, 6).frame(height: 18)
+                                    .padding(.horizontal, 6).frame(minHeight: 18)
                                     .background(NoopHTMLColor.cardRaised, in: Capsule())
                             }
                     }

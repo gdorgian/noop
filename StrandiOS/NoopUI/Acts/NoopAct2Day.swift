@@ -916,7 +916,7 @@ struct NoopAct2Screens: View {
                         Text("kcal").font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                     }
-                    .frame(height: 40, alignment: .bottom)
+                    .frame(minHeight: 40, alignment: .bottom)
                     Text("spent in the hours it measured, basal and active together")
                         .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
@@ -1115,7 +1115,7 @@ struct NoopAct2Screens: View {
                             Text("\(day.number)")
                                 .font(NoopHTMLFont.outfit(NoopType.body))
                                 .foregroundStyle(selected ? NoopHTMLColor.ink : NoopHTMLColor.inkSoft)
-                                .frame(height: 17)
+                                .frame(minHeight: 17)
                         }
                         .padding(.top, 9)
                         .padding(.bottom, 10)
@@ -1963,7 +1963,7 @@ struct NoopAct2Screens: View {
                             Text("kcal").font(NoopHTMLFont.sans(NoopType.footnote))
                                 .foregroundStyle(NoopHTMLColor.copy)
                         }
-                        .frame(height: 50, alignment: .bottom)
+                        .frame(minHeight: 50, alignment: .bottom)
                         Text("Measured from the strap, which you have worn for all but one hour of the day so far.")
                             .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                             .lineSpacing(4.5).fixedSize(horizontal: false, vertical: true)
@@ -3048,7 +3048,7 @@ private struct NoopTodayEnergyCard: View {
                                 .foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                         }
                     }
-                    .frame(height: 40, alignment: .bottom)
+                    .frame(minHeight: 40, alignment: .bottom)
                     if let note = reading?.heroNote {
                         Text(note)
                             .font(NoopHTMLFont.sans(NoopType.caption))
@@ -5466,7 +5466,7 @@ struct NoopBreatheScreens: View {
                                 .font(NoopHTMLFont.sans(NoopType.subhead))
                                 .foregroundStyle(NoopHTMLColor.copy)
                         }
-                        .frame(height: 74)
+                        .frame(minHeight: 74)
                     } else {
                         Text("No clear pace")
                             .font(NoopHTMLFont.outfit(NoopType.title1, weight: .light))
