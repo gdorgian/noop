@@ -270,6 +270,7 @@ struct NoopFitnessHome: View {
                 }
                 Menu {
                     Button { newRoutine() } label: { Label("New routine", systemImage: "plus") }
+                    Button { navigation.push(.fitnessProgram) } label: { Label("Build a program for me", systemImage: "sparkles") }
                     Button { planning = true } label: { Label("Plan a routine", systemImage: "calendar.badge.plus") }
                     Button { allRoutines = true } label: { Label("All routines", systemImage: "list.bullet") }
                     Button { navigation.push(.liftImport) } label: { Label("Import from another app", systemImage: "square.and.arrow.down") }
@@ -286,6 +287,19 @@ struct NoopFitnessHome: View {
                         .padding(16)
                         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .strokeBorder(NoopHTMLColor.borderStrong, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                .padding(.bottom, 10)
+                Button { navigation.push(.fitnessProgram) } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles").font(.system(size: 13, weight: .semibold)).foregroundStyle(NoopHTMLColor.volt)
+                        Text("Or let Noop build a program for you").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                            .foregroundStyle(NoopHTMLColor.ink)
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(NoopHTMLColor.chevronDim)
+                    }
+                    .padding(.horizontal, 16).frame(minHeight: 48)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .buttonStyle(NoopHTMLPressStyle())
                 .padding(.bottom, 26)

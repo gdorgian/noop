@@ -45,6 +45,7 @@ struct NoopFitnessScreens: View {
         case .fitnessRoutineEdit: NoopFitnessRoutineEditor(navigation: navigation, fitness: fitness)
         case .fitnessBody: NoopFitnessBodyScreen(navigation: navigation)
         case .fitnessReport: NoopFitnessReportScreen(navigation: navigation, fitness: fitness)
+        case .fitnessProgram: NoopFitnessProgramBuilder(navigation: navigation, fitness: fitness).environmentObject(layout)
         default: NoopFitnessHome(navigation: navigation, fitness: fitness, layout: layout)
         }
     }
