@@ -268,9 +268,9 @@ private struct NoopDonutRings: View {
                 column(.sleep, "Sleep", fill: values.sleepFill, value: values.sleep.map { min(1, $0) * 100 },
                        colors: [Color(hex: 0xB7C8FF), Color(hex: 0x5B52E0)], target: nil)
             }
-            .padding(.vertical, 18)
-            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+            .padding(.top, 8).padding(.bottom, 12)
+            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
         }
     }
 
@@ -291,7 +291,9 @@ private struct NoopDonutRings: View {
     }
 
     private func columnBody(_ title: String, fill: Double, value: Double?, colors: [Color], target: ClosedRange<Double>?) -> some View {
-        VStack(spacing: 12) {
+        // Bevel's proportions, measured: a 112 pt ring, the figure in a medium weight a shade under
+        // white, the name in a softer grey under it.
+        VStack(spacing: 10) {
             ZStack {
                 // The well, track and target are drawn once; the arc and its tip are shapes animated by
                 // SwiftUI, so the draw-in never depends on a timeline being on screen.
@@ -301,16 +303,16 @@ private struct NoopDonutRings: View {
                 NoopDonutArc(fill: fill, colors: colors)
                 HStack(alignment: .firstTextBaseline, spacing: 1) {
                     if let value {
-                        NoopCountUp(value: value, font: NoopHTMLFont.sans(NoopType.title2, weight: .semibold))
+                        NoopCountUp(value: value, font: NoopHTMLFont.sans(27, weight: .medium))
                     } else {
-                        Text("--").font(NoopHTMLFont.sans(NoopType.title2, weight: .semibold))
+                        Text("--").font(NoopHTMLFont.sans(27, weight: .medium))
                     }
-                    Text("%").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                    Text("%").font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium))
                 }
-                .foregroundStyle(value == nil ? NoopHTMLColor.faint : NoopHTMLColor.ink)
+                .foregroundStyle(value == nil ? NoopHTMLColor.faint : NoopHTMLColor.ink.opacity(0.9))
             }
-            .frame(width: 98, height: 98)
-            Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+            .frame(width: 112, height: 112)
+            Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.inkSoft)
         }
         .frame(maxWidth: .infinity)
     }
@@ -320,7 +322,7 @@ private enum NoopDonut {
     static func draw(in context: inout GraphicsContext, size: CGSize, fill: Double, colors: [Color], target: ClosedRange<Double>?) {
         let c = CGPoint(x: size.width / 2, y: size.height / 2)
         let outer = min(size.width, size.height) / 2
-        let width: CGFloat = 12, r = outer - 9
+        let width: CGFloat = 15, r = outer - 9.5
         func arc(_ from: Double, _ to: Double, radius: CGFloat = r) -> Path {
             var p = Path()
             p.addArc(center: c, radius: radius, startAngle: .radians(-.pi / 2 + from * 2 * .pi),
@@ -407,27 +409,30 @@ private struct NoopDialRings: View {
     }
 
     private func dialBody(_ title: String, fill: Double, text: String?, percent: Bool, color: Color) -> some View {
-        VStack(spacing: 14) {
+        // WHOOP's proportions, the same as its score pages scaled down: a flat-ended arc about a
+        // sixteenth of the ring's width on a grey track, a heavy figure, and a small tracked label.
+        VStack(spacing: 10) {
             ZStack {
-                Circle().stroke(Color.white.opacity(0.1), lineWidth: 7)
+                Circle().stroke(Color(hex: 0x3A4148), lineWidth: 6)
                 NoopSlotClock { _, reveal in
                     Circle().trim(from: 0, to: min(1, fill * NoopRingValues.spring(reveal)))
-                        .stroke(color, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                        .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .butt))
                         .rotationEffect(.degrees(-90))
                 }
-                HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    Text(text ?? "--").font(NoopHTMLFont.sans(NoopType.title2, weight: .heavy)).monospacedDigit()
-                    if percent { Text("%").font(NoopHTMLFont.sans(NoopType.subhead, weight: .heavy)) }
+                HStack(alignment: .firstTextBaseline, spacing: 1) {
+                    Text(text ?? "--").font(NoopHTMLFont.sans(26, weight: .heavy)).monospacedDigit()
+                    if percent { Text("%").font(NoopHTMLFont.sans(NoopType.caption, weight: .heavy)) }
                 }
                 .foregroundStyle(text == nil ? NoopHTMLColor.faint : NoopHTMLColor.ink)
             }
-            .frame(width: 92, height: 92)
-            HStack(spacing: 5) {
+            .padding(3)
+            .frame(width: 96, height: 96)
+            HStack(spacing: 4) {
                 Text(title.uppercased())
-                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .bold))
-                    .tracking(1.6)
+                    .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .bold))
+                    .tracking(1.3)
                     .foregroundStyle(NoopHTMLColor.ink)
-                Image(systemName: "chevron.right").font(.system(size: 11, weight: .heavy)).foregroundStyle(NoopHTMLColor.muted)
+                Image(systemName: "chevron.right").font(.system(size: 9, weight: .heavy)).foregroundStyle(NoopHTMLColor.muted)
             }
         }
         .frame(maxWidth: .infinity)
@@ -598,7 +603,7 @@ private struct NoopDonutArc: View {
     var body: some View {
         GeometryReader { g in
             let side = min(g.size.width, g.size.height)
-            let r = side / 2 - 9, width: CGFloat = 12
+            let r = side / 2 - 9.5, width: CGFloat = 11
             let f = min(1, max(0, fill)) * drawn
             ZStack {
                 if f > 0.004 {
