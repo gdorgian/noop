@@ -17,7 +17,6 @@ struct NoopAct1Screens: View {
 
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     /// The stage card as lanes under the night's heart rate rather than the stepped timeline.
-    @AppStorage("noop.sleep.stageLanes") private var stageLanes = false
     @State private var nightHeart: [(time: Date, bpm: Double)] = []
     @State private var showHypnogram = NoopContentPolicy.allowsPrototypeContent
         && CommandLine.arguments.contains("--noop-hypnogram")
@@ -88,7 +87,8 @@ struct NoopAct1Screens: View {
         NoopPageSection(id: "night-performance", title: "Sleep · Performance", detail: "One gauge of sleep against need, with stage rows", onByDefault: false),
         NoopPageSection(id: "night-ledger", title: "Sleep · Ledger", detail: "The night as plain figures over a stage strip", onByDefault: false),
         NoopPageSection(id: "seven", title: "Your last seven", detail: "Seven nights against your need"),
-        NoopPageSection(id: "shape", title: "The shape of it", detail: "The night's stages, timeline or lanes"),
+        NoopPageSection(id: "shape", title: "The shape of it", detail: "The night's stages on one timeline"),
+        NoopPageSection(id: "shape-lanes", title: "Stages in lanes", detail: "Heart rate over one lane per stage"),
         NoopPageSection(id: "overtime", title: "Over time", detail: "Sleep debt, consistency and history"),
         NoopPageSection(id: "next", title: "Your next sleep", detail: "Evening journal and tonight"),
         NoopPageSection(id: "trends", title: "Trends", detail: "Consistency, sleep score and each measure as a chart")
@@ -195,6 +195,12 @@ struct NoopAct1Screens: View {
         case "seven":
             VStack(spacing: 10) {
                 sevenNightsCard
+                    .opacity(restAbsent ? 0.38 : 1)
+                    .allowsHitTesting(!restAbsent)
+            }
+        case "shape-lanes":
+            if let night = restNight, let runs = night.runs, let span = night.span, !runs.isEmpty {
+                sleepLanesCard(night, runs: runs, span: span)
                     .opacity(restAbsent ? 0.38 : 1)
                     .allowsHitTesting(!restAbsent)
             }
@@ -533,28 +539,7 @@ struct NoopAct1Screens: View {
                     .noopAct1LineBox(fontSize: 14, ratio: 1.5)
                 }
 
-                // The whole night is always drawn (23 Oct 2026): four lanes, awake to deep, with
-                // the stage rows under it; tapping a row picks that stage out of the night.
-                if let night = restNight, let runs = night.runs, let span = night.span, !runs.isEmpty {
-                    NoopTabs(options: [(label: "Timeline", value: false), (label: "Lanes", value: true)],
-                             selection: $stageLanes)
-                }
-                if stageLanes, let night = restNight, let runs = night.runs, let span = night.span, !runs.isEmpty {
-                    VStack(spacing: 7) {
-                        NoopSleepLanes(runs: runs, span: span, minutes: night.stages, heart: nightHeart,
-                                       selected: $selectedStage)
-                        HStack {
-                            Text(restAxis[0]); Spacer()
-                            Text(restAxis[1]); Spacer()
-                            Text(restAxis[2]); Spacer()
-                            Text(restAxis[3])
-                        }
-                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).monospacedDigit()
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .padding(.horizontal, 12)
-                    }
-                    .task(id: night.dayKey) { await loadNightHeart(span) }
-                } else if rest == nil || restNight != nil {
+                if rest == nil || restNight != nil {
                     if restHasTimeline || rest == nil {
                         VStack(spacing: 7) {
                             NoopStageTimeline(slices: restNight?.slices ?? Act1Hypnogram.prototypeStages,
@@ -583,6 +568,40 @@ struct NoopAct1Screens: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, 4)
                 }
+        }
+        .padding(.horizontal, 17)
+        .padding(.top, 17)
+        .padding(.bottom, 15)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+    }
+
+    /// The night as four lanes, awake to deep, under its heart rate; tapping a lane picks that stage
+    /// out of the night (its own section since 25 Oct 2026; it was a tab of the timeline before).
+    private func sleepLanesCard(_ night: NoopRestRecord.Night, runs: [NoopRestRecord.StageRun], span: ClosedRange<Date>) -> some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .firstTextBaseline) {
+                NoopSectionLabel("Stages in lanes")
+                Spacer()
+                Text(night.window)
+                    .font(NoopHTMLFont.sans(NoopType.eyebrow))
+                    .foregroundStyle(NoopHTMLColor.faint)
+                    .monospacedDigit()
+            }
+            VStack(spacing: 7) {
+                NoopSleepLanes(runs: runs, span: span, minutes: night.stages, heart: nightHeart,
+                               selected: $selectedStage)
+                HStack {
+                    Text(restAxis[0]); Spacer()
+                    Text(restAxis[1]); Spacer()
+                    Text(restAxis[2]); Spacer()
+                    Text(restAxis[3])
+                }
+                .font(NoopHTMLFont.sans(NoopType.eyebrow)).monospacedDigit()
+                .foregroundStyle(NoopHTMLColor.faint)
+                .padding(.horizontal, 12)
+            }
+            .task(id: night.dayKey) { await loadNightHeart(span) }
         }
         .padding(.horizontal, 17)
         .padding(.top, 17)
