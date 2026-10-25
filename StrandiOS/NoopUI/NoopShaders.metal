@@ -264,10 +264,13 @@ half4 noopBackdrop(float2 position, half4 color, float2 size, float time, half4 
     half3 c = sky.rgb * half((0.05 + 0.40 * glow) * (0.45 + 0.55 * smoothstep(0.0, horizon, uv.y)));
     // Stars in the upper sky.
     if (stars > 0.0) {
-        float2 g = floor(position / 3.0);
+        // One possible star per 7-point cell, round, at a random spot in the cell.
+        float2 g = floor(position / 7.0);
         float h = hash21(g);
-        float tw = 0.5 + 0.5 * sin(time * (1.0 + 3.0 * hash21(g + 7.0)) + h * 40.0);
-        float star = step(0.9965, h) * tw * smoothstep(horizon, 0.05, uv.y) * stars;
+        float2 at = (g + 0.2 + 0.6 * float2(hash21(g + 3.1), hash21(g + 5.7))) * 7.0;
+        float dot = smoothstep(1.1, 0.2, length(position - at));
+        float tw = 0.55 + 0.45 * sin(time * (0.8 + 2.0 * hash21(g + 7.0)) + h * 40.0);
+        float star = step(0.93, h) * dot * tw * smoothstep(horizon, 0.05, uv.y) * stars * 0.8;
         c += half3(star);
     }
     // Far ridge, then near ridge.

@@ -79,6 +79,11 @@ struct NoopAct1Screens: View {
 
                 NoopEditableSections(layout: restLayout, editing: $restEditing) { id in restSection(id) }
             }
+            .background(alignment: .top) {
+                NoopPageBackdrop(theme: .sleep)
+                    .frame(width: UIScreen.main.bounds.width)
+                    .offset(y: -110)
+            }
         }
         .noopEditBar($restEditing, layout: restLayout)
     }
@@ -132,16 +137,23 @@ struct NoopAct1Screens: View {
 
                         if let rest, let night = restNight {
                             let delta = NoopRestRecord.delta(asleepMin: night.asleepMin, needMin: rest.needMin)
-                            Act1SleepRing(
-                                hours: NoopRestRecord.duration(night.asleepMin),
-                                delta: delta.text,
-                                progress: min(1, night.asleepMin / max(1, rest.needMin)),
-                                selectedStage: selectedStage,
-                                slices: night.slices,
-                                needCaption: "the ring closes at your need \u{00B7} \(NoopRestRecord.duration(rest.needMin))",
-                                closes: delta.closes,
-                                measured: true
-                            )
+                            // Rest's own ring first; the aurora and the glass are the other two heroes.
+                            NoopHeroPager(page: "sleep", names: ["Ring", "Aurora", "Glass"], side: 290) {
+                                Act1SleepRing(
+                                    hours: NoopRestRecord.duration(night.asleepMin),
+                                    delta: delta.text,
+                                    progress: min(1, night.asleepMin / max(1, rest.needMin)),
+                                    selectedStage: selectedStage,
+                                    slices: night.slices,
+                                    needCaption: "the ring closes at your need \u{00B7} \(NoopRestRecord.duration(rest.needMin))",
+                                    closes: delta.closes,
+                                    measured: true
+                                )
+                            } second: {
+                                NoopSleepAuroraHero(night: night, needMin: rest.needMin, side: 276)
+                            } third: {
+                                NoopSleepGlassHero(night: night, needMin: rest.needMin)
+                            }
                         } else {
                         Act1SleepRing(
                             hours: selectedNight.hours,

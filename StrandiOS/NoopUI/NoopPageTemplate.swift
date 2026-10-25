@@ -154,15 +154,19 @@ struct NoopPageBackdrop: View {
 struct NoopHeroPager<A: View, B: View, C: View>: View {
     let page: String
     let names: [String]
+    /// The hero's square side; a page whose own hero is a different size passes it.
+    var side: CGFloat = NoopPageHeroMetrics.heroSide
     @ViewBuilder var first: A
     @ViewBuilder var second: B
     @ViewBuilder var third: C
 
     @AppStorage private var choice: Int
 
-    init(page: String, names: [String], @ViewBuilder first: () -> A, @ViewBuilder second: () -> B, @ViewBuilder third: () -> C) {
+    init(page: String, names: [String], side: CGFloat = NoopPageHeroMetrics.heroSide,
+         @ViewBuilder first: () -> A, @ViewBuilder second: () -> B, @ViewBuilder third: () -> C) {
         self.page = page
         self.names = names
+        self.side = side
         self.first = first()
         self.second = second()
         self.third = third()
@@ -172,12 +176,12 @@ struct NoopHeroPager<A: View, B: View, C: View>: View {
     var body: some View {
         VStack(spacing: 8) {
             TabView(selection: $choice) {
-                first.frame(width: NoopPageHeroMetrics.heroSide, height: NoopPageHeroMetrics.heroSide).tag(0)
-                second.frame(width: NoopPageHeroMetrics.heroSide, height: NoopPageHeroMetrics.heroSide).tag(1)
-                third.frame(width: NoopPageHeroMetrics.heroSide, height: NoopPageHeroMetrics.heroSide).tag(2)
+                first.frame(width: side, height: side).tag(0)
+                second.frame(width: side, height: side).tag(1)
+                third.frame(width: side, height: side).tag(2)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: NoopPageHeroMetrics.heroSide)
+            .frame(height: side)
             .onChange(of: choice) { NoopHaptics.play(.pass) }
             HStack(spacing: 6) {
                 ForEach(0..<3, id: \.self) { i in

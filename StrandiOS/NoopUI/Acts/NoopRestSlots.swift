@@ -291,6 +291,8 @@ struct NoopSleepAuroraSection: View {
     /// How high each stage reaches: awake barely lifts off the horizon, deep reaches the top.
     private static let height: [Float] = [0.08, 0.42, 0.62, 0.95]
 
+    var heightsForHero: [Float] { heights }
+
     /// The night's depth at 64 points, softened so the crown flows rather than steps.
     private var heights: [Float] {
         let runs = noopNightRuns(night)
@@ -350,20 +352,11 @@ struct NoopSleepGlassSection: View {
     let needMin: Double
     let action: () -> Void
 
-    @State private var level: Double = 0
-    @State private var onScreen = true
-    @State private var lastTilt: Double = 0
-    @State private var slosh: Double = 0
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    /// The glass holds a little more than the need, so a night over it still fits.
-    private var capacity: Double { max(night.asleepMin + night.stages.awake, needMin * 1.15, 1) }
-
     var body: some View {
         Button(action: action) {
             NoopSlotCard(tint: Color(hex: 0x5D6BC4)) {
                 HStack(alignment: .center, spacing: 22) {
-                    glass.frame(width: 110, height: 190)
+                    NoopSleepGlass(night: night, needMin: needMin).frame(width: 110, height: 190)
                     VStack(alignment: .leading, spacing: 10) {
                         VStack(alignment: .leading, spacing: 2) {
                             NoopCountUp(value: night.asleepMin, format: { NoopRestRecord.duration($0) },
@@ -390,13 +383,25 @@ struct NoopSleepGlassSection: View {
             }
         }
         .buttonStyle(NoopHTMLPressStyle())
-        .onAppear {
-            if reduceMotion { level = 1; return }
-            withAnimation(.spring(response: 1.6, dampingFraction: 0.75)) { level = 1 }
-        }
     }
+}
 
-    private var glass: some View {
+/// The glass itself: layered liquid filled toward the need line, springing full when it appears and
+/// keeping level as the phone tilts.
+struct NoopSleepGlass: View {
+    let night: NoopRestRecord.Night
+    let needMin: Double
+
+    @State private var level: Double = 0
+    @State private var onScreen = true
+    @State private var lastTilt: Double = 0
+    @State private var slosh: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The glass holds a little more than the need, so a night over it still fits.
+    private var capacity: Double { max(night.asleepMin + night.stages.awake, needMin * 1.15, 1) }
+
+    var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !onScreen || reduceMotion)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600)
             let tilt = reduceMotion ? 0 : LiquidMotion.shared.tilt
@@ -434,5 +439,61 @@ struct NoopSleepGlassSection: View {
         .onAppear { LiquidMotion.shared.acquire() }
         .onDisappear { LiquidMotion.shared.release() }
         .modifier(NoopSlotVisibility(onScreen: $onScreen))
+        .onAppear {
+            if reduceMotion { level = 1 } else { withAnimation(.spring(response: 1.6, dampingFraction: 0.75)) { level = 1 } }
+        }
+    }
+}
+
+// MARK: - Rest heroes
+
+/// The aurora as a round hero: the night's curtains inside a dark disc, the time asleep over them.
+struct NoopSleepAuroraHero: View {
+    let night: NoopRestRecord.Night
+    let needMin: Double
+    var side: CGFloat = 250
+
+    var body: some View {
+        let section = NoopSleepAuroraSection(night: night, needMin: needMin, action: {})
+        NoopSlotClock { t, reveal in
+            ZStack {
+                Circle().fill(RadialGradient(colors: [Color(hex: 0x141833), Color(hex: 0x05060C)], center: .center,
+                                             startRadius: 0, endRadius: side / 2))
+                Rectangle()
+                    .colorEffect(ShaderLibrary.noopAurora(.float2(CGSize(width: side, height: side)), .float(Float(t)),
+                                                         .float(Float(reveal)), .floatArray(section.heightsForHero)))
+                    .clipShape(Circle())
+                Circle().strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                VStack(spacing: 2) {
+                    NoopCountUp(value: night.asleepMin, format: { NoopRestRecord.duration($0) },
+                                font: NoopHTMLFont.outfit(NoopType.title1 + 6, weight: .light))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                    Text(noopNeedLine(night.asleepMin, needMin)).font(NoopHTMLFont.sans(NoopType.caption))
+                        .foregroundStyle(Color.white.opacity(0.7))
+                }
+                .offset(y: -side * 0.16)
+                .shadow(color: .black.opacity(0.5), radius: 8)
+            }
+        }
+        .frame(width: side, height: side)
+    }
+}
+
+/// The layered glass as a hero: the night's stages settled in a glass filled toward the need line.
+struct NoopSleepGlassHero: View {
+    let night: NoopRestRecord.Night
+    let needMin: Double
+
+    var body: some View {
+        HStack(spacing: 22) {
+            NoopSleepGlass(night: night, needMin: needMin).frame(width: 110, height: 190)
+            VStack(alignment: .leading, spacing: 4) {
+                NoopCountUp(value: night.asleepMin, format: { NoopRestRecord.duration($0) },
+                            font: NoopHTMLFont.outfit(NoopType.title1, weight: .light))
+                    .foregroundStyle(NoopHTMLColor.ink)
+                Text(noopNeedLine(night.asleepMin, needMin)).font(NoopHTMLFont.sans(NoopType.caption))
+                    .foregroundStyle(NoopHTMLColor.copy)
+            }
+        }
     }
 }
