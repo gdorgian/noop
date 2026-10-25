@@ -80,8 +80,17 @@ final class NoopMarkerStore: ObservableObject {
         let metric = NoopMetric(marker: d)
         let rows = await repo.exploreSeries(key: d.key, source: d.source, days: days)
         return rows.compactMap { r in
-            NoopMetricSheet.dayFormatter.date(from: r.day).map { NoopMetricPoint(date: $0, value: metric.series?.transform(r.value) ?? r.value) }
+            day(r.day).map { NoopMetricPoint(date: $0, value: metric.series?.transform(r.value) ?? r.value) }
         }
+    }
+
+    /// Every marker reads the same few hundred day keys; each is parsed once, not once per marker.
+    private static var parsedDays: [String: Date?] = [:]
+    private static func day(_ key: String) -> Date? {
+        if let hit = parsedDays[key] { return hit }
+        let date = NoopMetricSheet.dayFormatter.date(from: key)
+        parsedDays[key] = date
+        return date
     }
 }
 

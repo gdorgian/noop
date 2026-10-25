@@ -136,10 +136,11 @@ final class NoopAgesStore: ObservableObject {
             guard let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: end)) else { return nil }
             let ageAtEnd = ProfileStore.years(from: dateOfBirth, to: end)
             guard ageAtEnd > 0 else { return nil }
-            let days = repo.days.filter { d in
-                guard let date = parser.date(from: d.day) else { return false }
-                return date >= start && date <= end
-            }
+            // Day keys sort as text, so the window is two string comparisons: the same days as
+            // parsing every key at local midnight, without a parse per day per window (that cost a
+            // quarter of a second on the main thread opening Trends, profiled 25 Oct 2026).
+            let firstKey = Repository.localDayKey(start), lastKey = Repository.localDayKey(end)
+            let days = repo.days.filter { $0.day >= firstKey && $0.day <= lastKey && parser.date(from: $0.day) != nil }
             let from = Int(start.timeIntervalSince1970), to = Int(end.timeIntervalSince1970)
             let windowSessions = sessions.filter { $0.endTs >= from && $0.endTs <= to }
                 .map { (start: $0.effectiveStartTs, end: $0.endTs) }

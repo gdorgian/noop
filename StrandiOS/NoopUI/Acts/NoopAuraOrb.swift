@@ -56,7 +56,11 @@ struct NoopAuraOrb: View {
                     .scaleEffect(1 / q)
                     .frame(width: side, height: side)
                     .opacity(0.59)
-                // Body, then the dark well over it.
+                // Body, then the dark well over it, the lit edge and the embers, drawn together on the
+                // GPU: the outline moves every frame, and as plain layers these gradients were repainted
+                // on the CPU each frame, a fifth of the main thread on Trends (profiled 25 Oct 2026).
+                // The halo above stays outside, so the group's bounds never clip its glow.
+                ZStack {
                 shape.fill(wash)
                 shape.fill(RadialGradient(stops: [
                     .init(color: .black, location: 0),
@@ -81,6 +85,9 @@ struct NoopAuraOrb: View {
                     }
                 }
                 .clipShape(shape)
+                }
+                .frame(width: side, height: side)
+                .drawingGroup()
             }
             .frame(width: side, height: side)
             // Embers drifting out across the page, behind the orb; a background may overflow the frame.
@@ -94,6 +101,7 @@ struct NoopAuraOrb: View {
                                                rim: side / 2 - NoopAuraOrbModel.inset(shapeScore) * scale,
                                                reach: side * drift, tint: palette.bottom)
                         }
+                        .drawingGroup()
                     }
                     .frame(width: side * (1 + 2 * drift), height: side * (1 + 2 * drift))
                     .allowsHitTesting(false)
