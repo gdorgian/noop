@@ -775,9 +775,9 @@ struct NoopFitnessStreakRow: View {
     private func subtitle(_ r: TrainingStreak.Reading) -> String {
         if r.weeks == 0 { return "Train once this week to start one." }
         let best = r.best > r.weeks ? " · best \(r.best)" : ""
-        if r.thisWeekDone {
-            return "\(r.thisWeekCount) \(r.thisWeekCount == 1 ? "workout" : "workouts") this week\(best)"
-        }
+        // No count here: the streak leaves out short detected bouts, so its number would disagree with
+        // This week's session count just below it. What it owes the wearer is whether this week is kept.
+        if r.thisWeekDone { return "Kept this week\(best)" }
         return r.daysLeft <= 1 ? "Train today to keep it" : "Train in the next \(r.daysLeft) days to keep it"
     }
 

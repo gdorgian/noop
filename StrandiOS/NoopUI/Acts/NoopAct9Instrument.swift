@@ -2851,8 +2851,8 @@ struct NoopInstrumentData {
             .init(key: "cap", name: "Capacity", group: .body, unit: "ml/kg/min", decimals: 1, better: 1, threshold: 0.5),
             .init(key: "age", name: "Body age", group: .body, unit: "years", decimals: 1, better: -1, threshold: 0.4),
             .init(key: "weight", name: "Weight", group: .body, unit: "kg", decimals: 1, better: 0, threshold: 0.5),
-            .init(key: "b_drink", name: "A drink after 20:00", group: .logged, unit: "days a week", decimals: 1, better: 0, threshold: 0.4, behavior: true),
-            .init(key: "b_caff", name: "Caffeine after 14:00", group: .logged, unit: "days a week", decimals: 1, better: 0, threshold: 0.4, behavior: true),
+            .init(key: "b_drink", name: "A drink after \("20:00".noopClock)", group: .logged, unit: "days a week", decimals: 1, better: 0, threshold: 0.4, behavior: true),
+            .init(key: "b_caff", name: "Caffeine after \("14:00".noopClock)", group: .logged, unit: "days a week", decimals: 1, better: 0, threshold: 0.4, behavior: true),
             .init(key: "b_late", name: "A late meal", group: .logged, unit: "days a week", decimals: 1, better: 0, threshold: 0.4, behavior: true),
             .init(key: "b_screen", name: "Screen past midnight", group: .logged, unit: "days a week", decimals: 1, better: 0, threshold: 0.4, behavior: true),
             .init(key: "b_walk", name: "A walk over 8k steps", group: .logged, unit: "days a week", decimals: 1, better: 0, threshold: 0.4, behavior: true),
@@ -3441,8 +3441,8 @@ private extension NoopInstrumentData {
     static let lagWords = ["same night", "next morning", "two days on"]
 
     static let behaviors: [NoopInstrumentBehavior] = [
-        .init(key: "b_drink", name: "A drink after 20:00", onPhrase: "on the evenings you had one"),
-        .init(key: "b_caff", name: "Caffeine after 14:00", onPhrase: "on the days you had some"),
+        .init(key: "b_drink", name: "A drink after \("20:00".noopClock)", onPhrase: "on the evenings you had one"),
+        .init(key: "b_caff", name: "Caffeine after \("14:00".noopClock)", onPhrase: "on the days you had some"),
         .init(key: "b_hard", name: "A hard session", onPhrase: "on the days you went hard"),
         .init(key: "b_late", name: "A late meal", onPhrase: "on the nights you ate late"),
         .init(key: "b_screen", name: "Screen past midnight", onPhrase: "on the nights you were up late on a screen"),
