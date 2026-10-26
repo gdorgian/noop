@@ -210,6 +210,7 @@ struct NoopScreen<Content: View>: View {
                         .id("noop-screen-top")
                 }
                 .scrollIndicators(.hidden)
+                .modifier(NoopTopScrollEdge())
                 .modifier(NoopScrollRestore(enabled: initialScrollID == nil))
                 .modifier(NoopOverscrollReader(overscroll: overscroll))
                 .environment(\.noopOverscroll, overscroll)
@@ -226,6 +227,18 @@ struct NoopScreen<Content: View>: View {
         }
         .frame(width: UIScreen.main.bounds.width)
         .background(Color.clear)
+    }
+}
+
+/// Content scrolling up under the status bar softens into it, as it does under the system's own bars,
+/// instead of running through the clock.
+private struct NoopTopScrollEdge: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectStyle(.soft, for: .top)
+        } else {
+            content
+        }
     }
 }
 
