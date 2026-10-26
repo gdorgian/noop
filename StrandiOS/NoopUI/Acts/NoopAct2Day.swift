@@ -5256,6 +5256,10 @@ struct NoopBreatheScreens: View {
                     .tracking(-0.54)
                     .foregroundStyle(Color(hex: 0xF6FDFF))
                     .shadow(color: Color(hex: 0x041E30).opacity(0.55), radius: 8, y: 2)
+                    // The word stays inside the orb as it empties: it narrows with the orb's width.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .frame(width: 150 * (0.62 + 0.38 * b) - 18)
                 if !done && state.secondsLeft > 0 {
                     Text("\(state.secondsLeft)")
                         .font(NoopHTMLFont.outfit(NoopType.body, weight: .light))
