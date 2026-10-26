@@ -193,7 +193,7 @@ struct NoopFitnessHome: View {
                 .frame(width: 34, height: 34)
                 .padding(3)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Your week in review").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text("Last week in review").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
                     Text("\(sessions.count) \(sessions.count == 1 ? "workout" : "workouts") · \(NoopFitnessHome.duration(lift + cardio)) · records and where it went")
                         .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineLimit(1)
                 }
