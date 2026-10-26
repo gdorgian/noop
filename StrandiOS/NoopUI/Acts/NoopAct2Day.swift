@@ -839,6 +839,10 @@ struct NoopAct2Screens: View {
                 .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.blue.opacity(0.18), lineWidth: 0.5))
                 .animation(.easeInOut(duration: 0.18), value: navigation.dayLogChips)
+                // The log itself is where a tap is undone or added to.
+                .contentShape(RoundedRectangle(cornerRadius: 20))
+                .onTapGesture { navigation.show(.dayLog) }
+                .accessibilityAddTraits(.isButton)
             }
         default:
             EmptyView()

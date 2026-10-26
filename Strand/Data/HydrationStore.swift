@@ -200,6 +200,23 @@ extension Repository {
     /// Mirrors Android `HydrationStore.log`.
     @discardableResult
     func logHydration(amountMl: Int, day: String? = nil) async -> Double {
+        // Taps arrive faster than the store answers. Each log reads the total and writes total + amount,
+        // so two in flight would both read the same total and one glass would vanish: run them in order.
+        let previous = Self.hydrationLogTail
+        let task = Task { @MainActor [weak self] () -> Double in
+            _ = await previous?.value
+            return await self?.logHydrationNow(amountMl: amountMl, day: day) ?? 0
+        }
+        Self.hydrationLogTail = Task { _ = await task.value }
+        return await task.value
+    }
+
+    private static var hydrationLogTail: Task<Void, Never>?
+
+    /// Waits for every quick-add already tapped to land, so a change that follows sees them.
+    func hydrationLogsSettled() async { await Self.hydrationLogTail?.value }
+
+    private func logHydrationNow(amountMl: Int, day: String?) async -> Double {
         let dayKey = day ?? Repository.localDayKey(Date())
         guard amountMl > 0, let store = await storeHandle() else { return await hydrationTotal(day: dayKey) }
         // MANUAL total, never the combined one (#949) — see `hydrationManualTotal`.

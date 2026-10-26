@@ -985,6 +985,16 @@ struct NoopVerifiedAppShell: View {
                 let glasses = now - before
                 Task { for _ in 0..<glasses { _ = await repo.logHydration(amountMl: 250) } }
             }
+            if kind == .water, now < before {
+                // Taking a glass back (or Clear today) takes it out of the water log as well: the
+                // latest glasses this sheet put there, never a drink logged some other way.
+                let glasses = before - now
+                Task {
+                    await repo.hydrationLogsSettled()
+                    let latest = repo.hydrationEntries().filter { $0.amountMl == 250 }.suffix(glasses)
+                    for entry in latest.reversed() { _ = await repo.deleteHydrationEntry(id: entry.id) }
+                }
+            }
             Task {
                 if now > 0 {
                     await repo.saveJournalNumeric(day: day, question: kind.rawValue, value: Double(now))
