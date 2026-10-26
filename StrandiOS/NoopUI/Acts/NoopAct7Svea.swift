@@ -353,6 +353,9 @@ private struct NoopSveaCoach: View {
                 }
                 .buttonStyle(NoopHTMLPressStyle())
                 .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                // Looks as available as it is: dim until there is something to send.
+                .opacity(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.35 : 1)
+                .animation(.easeOut(duration: 0.15), value: question.isEmpty)
             }
             .padding(.leading, 16)
             .padding(.trailing, 9)

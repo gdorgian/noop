@@ -6071,9 +6071,6 @@ struct NoopPendingOption: Identifiable {
         .init(id: "pending-svea-button", page: .svea, status: .deciding, title: "Floating Svea button", symbol: "bubble.left",
               does: "A button you can drag to any corner that opens Svea from every screen.",
               why: "Aura opens Svea from the centre of the tab bar. A second door may only add clutter."),
-        .init(id: "pending-svea-today", page: .svea, status: .deciding, title: "Svea on Today", symbol: "person.crop.circle",
-              does: "Her avatar as a card on Today, with the morning suggestion.",
-              why: "Today is now edited by its own page. She may come back as a section there instead."),
         // Data and connections
         .init(id: "pending-mi-band", page: .data, status: .later, title: "Mi Band import", symbol: "figure.walk.motion",
               does: "Bring in history from a Xiaomi Mi Band through Mi Fitness.",
