@@ -111,7 +111,8 @@ struct NoopFitnessBodyScreen: View {
                             if let previous {
                                 let delta = NoopBodyFormat.display(last.value, kind, units) - NoopBodyFormat.display(previous.value, kind, units)
                                 if abs(delta) >= 0.05 {
-                                    Text("\(delta > 0 ? "+" : "−")\(NoopBodyFormat.label(abs(delta), kind, units))")
+                                    // Against the previous entry, not the chart's window: said so beside the chart's chip.
+                                    Text("\(delta > 0 ? "+" : "−")\(NoopBodyFormat.label(abs(delta), kind, units)) since last")
                                         .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).monospacedDigit()
                                         .foregroundStyle(NoopHTMLColor.copy)
                                 }

@@ -215,6 +215,8 @@ enum AppleDemoSeeder {
                 let dayStart = cal.startOfDay(for: date)
                 let start = Int(dayStart.timeIntervalSince1970) + hour * 3600 + rng.nextInt(0, 50) * 60 + k * 3600
                 let avg = Int(gauss(&rng, 138.0, 12.0))
+                // Today's evening session has not happened yet when the seed runs earlier in the day.
+                guard start + Int(durSec) <= Int(Date().timeIntervalSince1970) else { continue }
                 let src = rng.nextDouble() < 0.7 ? whoop : apple
                 let zonesJSON: String? = src == whoop ? {
                     let z = [gauss(&rng, 15.0, 5.0), gauss(&rng, 30.0, 8.0), gauss(&rng, 28.0, 8.0),

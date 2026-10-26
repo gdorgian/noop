@@ -303,7 +303,9 @@ final class NoopFitnessModel: ObservableObject {
             bodyMassKg: profile.weightKg > 0 ? profile.weightKg : nil)
 
         // Workouts: every source the Effort screens already show, newest history only.
-        let rows = await repo.workoutRows(days: Self.historyDays).filter { $0.startTs >= fromTs }
+        // Nothing that starts after now: a strap clock glitch or a bad import can date a session ahead.
+        let rows = await repo.workoutRows(days: Self.historyDays)
+            .filter { $0.startTs >= fromTs && $0.startTs <= Int(now.timeIntervalSince1970) }
         // Heart-rate streams are read only where a figure needs them: the 42-day load window. Older
         // sessions only feed the previous-period totals, which need duration and energy alone.
         let streamFromTs = nowTs - AcuteChronicLoad.chronicDays * 86_400
