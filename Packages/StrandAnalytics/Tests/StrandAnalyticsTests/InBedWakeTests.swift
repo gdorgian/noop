@@ -98,6 +98,29 @@ final class InBedWakeTests: XCTestCase {
         XCTAssertEqual(edges(risen, band: up).afterWakeMin, 70, accuracy: 3)
     }
 
+    func testStrapOnsetBoundsAStillEvening() {
+        // Two and a half hours in bed with a film: wrist still, pulse at the sleeping level. The strap reads
+        // wake and "still" by turns, then asleep from minute 160; its last "wake" is minute 152.
+        let band = (0..<510).map { m in (ts: t0 + m * 60 + 30, state: m >= 160 ? 2 : (m % 8 == 0 ? 0 : 1)) }
+        XCTAssertEqual(edges(night(), band: band).latencyMin, 153)
+        XCTAssertEqual(edges(night()).latencyMin, 0)   // pulse and movement alone call it sleep
+    }
+
+    func testStrapStillBeforeAsleepIsNotLatency() {
+        // Straight into "still" and then asleep with no "wake": nothing to bound.
+        let band = (0..<510).map { m in (ts: t0 + m * 60 + 30, state: m >= 15 ? 2 : 1) }
+        XCTAssertEqual(edges(night(), band: band).latencyMin, 0)
+    }
+
+    func testPatchyStrapStateDoesNotBound() {
+        // Strap state recorded for under 80% of the minutes before its onset.
+        let band = (0..<510).compactMap { m -> (ts: Int, state: Int)? in
+            if m < 160 { return m % 2 == 0 ? nil : (ts: t0 + m * 60 + 30, state: m % 8 == 1 ? 0 : 1) }
+            return (ts: t0 + m * 60 + 30, state: 2)
+        }
+        XCTAssertEqual(edges(night(), band: band).latencyMin, 0)
+    }
+
     func testNoHeartRateLeavesTheNightAlone() {
         let ms = night { _ in Minute(bpm: nil, moving: false, stage: "light") }
         XCTAssertEqual(edges(ms), InBedWake.Edges(latencyMin: 0, afterWakeMin: 0))

@@ -141,6 +141,8 @@ public enum InBedWake {
            dominated(evidence[0...last], share: headAwakeShare), last + 1 >= minEdgeMin {
             head = last + 1
         }
+        // The strap's own onset bounds it: lying still in bed with a film reads sleep-like above for hours.
+        if let strap = strapOnset(band) { head = max(head, strap) }
         guard head > 0 || tail < n else { return nil }
         // Never leave less than an hour of sleep: drop the head first, then the tail.
         let remaining = { (h: Int, t: Int) in (h..<max(h, t)).filter { staged[$0] }.count }
@@ -151,6 +153,28 @@ public enum InBedWake {
     }
 
     // MARK: Pieces
+
+    /// Minutes of the strap's "asleep" in a row that count as its sleep onset.
+    public static let strapSustainedAsleepMin = 10
+    /// Share of the minutes before that onset the strap must have recorded for it to bound the night.
+    public static let strapCoverage = 0.8
+
+    /// The minute after the strap's last "wake" (or pulse-confirmed "up") before its first sustained
+    /// "asleep". Going to bed the strap reads wake, then "still", then asleep. On four WHOOP 5.0 nights
+    /// (23–26 Oct 2026) sleep began within 4 minutes of that point by Fitbit, including a night spent
+    /// awake in bed from 23:00 to 03:00 at a pulse near the sleeping level, which the pulse-and-movement
+    /// rule took for sleep from 01:56. nil without a recorded strap state, or with no "wake" before onset.
+    static func strapOnset(_ band: [Int?]) -> Int? {
+        var run = 0, onset: Int?
+        for m in band.indices {
+            run = band[m] == bandAsleep ? run + 1 : 0
+            if run >= strapSustainedAsleepMin { onset = m - run + 1; break }
+        }
+        guard let onset, onset > 0 else { return nil }
+        let recorded = band[0..<onset].compactMap { $0 }.count
+        guard Double(recorded) >= Double(onset) * strapCoverage else { return nil }
+        return (0..<onset).last(where: { band[$0] == bandWake || band[$0] == bandUp }).map { $0 + 1 }
+    }
 
     static func dominated(_ e: ArraySlice<Evidence>, share: Double) -> Bool {
         let awake = e.filter { $0 == .awake }.count, asleep = e.filter { $0 == .asleep }.count
