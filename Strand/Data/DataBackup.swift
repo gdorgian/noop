@@ -598,12 +598,16 @@ enum DataBackup {
         }
     }
 
-    /// "NOOP-backup-2026-06-07.noopbak"
+    /// "Noop-Aura-backup-2026-06-07.noopbak" on iPhone (the app's name there), "NOOP-backup-…" on the Mac.
     private static func defaultBackupName() -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"
+        #if os(iOS)
+        return "Noop-Aura-backup-\(f.string(from: Date())).noopbak"
+        #else
         return "NOOP-backup-\(f.string(from: Date())).noopbak"
+        #endif
     }
 
     private static func timestamp() -> String {

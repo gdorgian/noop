@@ -659,7 +659,7 @@ struct NoopDataScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: 10) {
                     VStack(alignment: .leading, spacing: 0) {
-                        NoopSectionLabel("Last snapshot", color: Self.dim)
+                        NoopSectionLabel("Last backup", color: Self.dim)
                         Text(snapshotAge)
                             .font(NoopHTMLFont.outfit(NoopType.title3, weight: .light))
                             .tracking(-0.42)
@@ -699,7 +699,7 @@ struct NoopDataScreen: View {
                              noteColor: Self.dim, noteSize: 11.5,
                              trailing: .glyph(.upload, Self.blush.opacity(0.8), 17), padding: 14),
                     RowModel(id: "csv", title: "A readable copy · WHOOP CSV",
-                             note: "Four CSVs in a zip. Reads back into Noop, and into the Android build.",
+                             note: "Four CSVs in a zip. Reads back into Noop, and into NOOP on Android.",
                              noteColor: Self.dim, noteSize: 11.5,
                              trailing: .glyph(.upload, Self.blush.opacity(0.8), 17), padding: 14)
                 ], onTap: demo ? nil : { id in
@@ -746,15 +746,23 @@ struct NoopDataScreen: View {
         }
     }
 
+    /// The newest backup of either kind, as the backup reminder counts it: an automatic folder
+    /// snapshot or a .noopbak taken by hand.
+    private static var lastBackupMs: Int {
+        let export = Int(UserDefaults.standard.double(forKey: DataBackup.lastExportKey) * 1000)
+        return max(FolderBackup.lastBackupMs, export)
+    }
+
     private var snapshotAge: String {
         if demo { return "2 days ago" }
-        let last = FolderBackup.lastBackupMs
+        let last = Self.lastBackupMs
         return last > 0 ? NoopDataFormat.age(sinceMs: last) : "None yet"
     }
 
     private var snapshotPlace: String {
         if demo { return "iCloud Drive \u{00B7} 214 MB" }
-        return FolderBackup.folderLabel() ?? "No backup folder chosen"
+        if let folder = FolderBackup.folderLabel() { return folder }
+        return Self.lastBackupMs > 0 ? "Saved by hand \u{00B7} no backup folder chosen" : "No backup folder chosen"
     }
 
     private var snapshotNext: String {
@@ -914,11 +922,11 @@ struct NoopDataScreen: View {
 
     private var backupRouteDetail: String {
         if demo { return "Last snapshot 2 days ago \u{00B7} iCloud Drive" }
-        let last = FolderBackup.lastBackupMs
-        guard last > 0 else { return "No snapshot yet" }
+        let last = Self.lastBackupMs
+        guard last > 0 else { return "No backup yet" }
         let age = NoopDataFormat.age(sinceMs: last)
         let place = FolderBackup.folderLabel().map { " \u{00B7} \($0)" } ?? ""
-        return "Last snapshot \(age.prefix(1).lowercased() + age.dropFirst())\(place)"
+        return "Last backup \(age.prefix(1).lowercased() + age.dropFirst())\(place)"
     }
 
     private func dataFact(_ title: String, _ detail: String) -> some View {
