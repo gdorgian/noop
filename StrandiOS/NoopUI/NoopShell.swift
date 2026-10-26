@@ -2093,7 +2093,8 @@ private struct NoopNightJournalSheet: View {
                             } label: {
                                 HStack(spacing: 9) {
                                     NoopCanonicalGlyph(name: journalGlyph(item), size: 17, color: selected ? Color(hex: 0xF2B45C) : Color(hex: 0x7F8A85))
-                                    Text(item)
+                                    // The stored key stays "Coffee after 2pm"; the label follows the phone's clock.
+                                    Text(item == "Coffee after 2pm" ? "Coffee after \("14:00".noopClock)" : item)
                                         .font(NoopHTMLFont.sans(13, weight: .medium))
                                         .foregroundStyle(selected ? NoopHTMLColor.ink : NoopHTMLColor.copy)
                                 }

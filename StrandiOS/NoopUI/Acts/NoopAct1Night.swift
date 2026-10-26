@@ -2441,7 +2441,7 @@ private extension NoopAct1Screens {
             meta: "Eleven hours before lights out",
             effect: "clear",
             good: true,
-            detail: "Caffeine only shows up in your nights when it lands after 2pm. This was long clear of that."
+            detail: "Caffeine only shows up in your nights when it lands after \("14:00".noopClock). This was long clear of that."
         )
     ]
 
