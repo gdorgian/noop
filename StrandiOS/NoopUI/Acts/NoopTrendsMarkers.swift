@@ -193,7 +193,7 @@ struct NoopMarkerRow: View {
     var body: some View {
         HStack(spacing: NoopSpace.m) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(descriptor.title)
+                Text(descriptor.auraTitle)
                     .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.ink)
                     .lineLimit(1)
@@ -300,7 +300,7 @@ struct NoopMarkersEditSheet: View {
     private var addable: [MetricDescriptor] {
         MetricCatalog.all.filter { d in
             !pinned.contains(d.id) && store.withData.contains(d.id)
-                && (query.isEmpty || d.title.localizedCaseInsensitiveContains(query))
+                && (query.isEmpty || d.auraTitle.localizedCaseInsensitiveContains(query))
         }
     }
 
@@ -376,9 +376,9 @@ struct NoopMarkersEditSheet: View {
                     .foregroundStyle(isPinned ? NoopHTMLColor.red : NoopHTMLColor.green)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isPinned ? "Unpin \(d.title)" : "Pin \(d.title)")
+            .accessibilityLabel(isPinned ? "Unpin \(d.auraTitle)" : "Pin \(d.auraTitle)")
             VStack(alignment: .leading, spacing: 2) {
-                Text(d.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                Text(d.auraTitle).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
                 Text(d.sourceLabel).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
             }
         }
@@ -430,7 +430,7 @@ struct NoopMarkersBrowseSheet: View {
                             Button { open = NoopMetricSheetRequest(metricID: d.id, group: "marker") } label: {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(d.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                                        Text(d.auraTitle).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
                                         Text(d.sourceLabel).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                                     }
                                     Spacer()
@@ -477,7 +477,7 @@ private struct NoopMarkerTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(row.descriptor.title)
+            Text(row.descriptor.auraTitle)
                 .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                 .foregroundStyle(NoopHTMLColor.copy)
                 .lineLimit(1)
@@ -539,4 +539,9 @@ private struct NoopMarkerRowCard: ViewModifier {
                 .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
         }
     }
+}
+
+extension MetricDescriptor {
+    /// The catalog keeps upstream's names; Aura calls strain Effort everywhere it shows it.
+    var auraTitle: String { key == "strain" ? "Effort" : title }
 }

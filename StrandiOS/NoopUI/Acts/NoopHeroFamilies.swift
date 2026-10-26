@@ -141,7 +141,7 @@ struct NoopBevelStyleHero: View {
 
     private var word: String {
         switch score.kind {
-        case .strain: "Strain"
+        case .strain: "Effort"
         case .recovery: "Recovered"
         case .sleep: "Quality"
         }

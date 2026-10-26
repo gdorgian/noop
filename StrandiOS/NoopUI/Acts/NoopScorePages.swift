@@ -136,7 +136,7 @@ struct NoopStrainPage: View {
         NoopPageSection(id: "hero-day", title: "Header · Day", detail: "Today's heart rate wrapped round a ring", onByDefault: false),
         NoopPageSection(id: "hero-heat", title: "Header · Heat", detail: "Heat rising as high as the strain", onByDefault: false),
         NoopPageSection(id: "tiles", title: "Exercise and energy", detail: "The day's two figures"),
-        NoopPageSection(id: "trends", title: "Trends", detail: "Strain and its parts as charts")
+        NoopPageSection(id: "trends", title: "Trends", detail: "Effort and its parts as charts")
     ]
     @StateObject private var layout = NoopPageLayout(page: "strain", catalog: NoopStrainPage.sections)
     @State private var editing = NoopPageEditing()
@@ -156,7 +156,7 @@ struct NoopStrainPage: View {
     var body: some View {
         NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 0) {
-                NoopScorePageTitle(theme: .strain, title: "Strain", dayOffset: $navigation.scoreDayOffset,
+                NoopScorePageTitle(theme: .strain, title: "Effort", dayOffset: $navigation.scoreDayOffset,
                                    ring: { date in
                                        repo.days.last { $0.day == Repository.localDayKey(date) }?.strain
                                            .map { (min(1, $0 / 100), NoopHeroFamily.current.dayColor(.strain, $0)) }
@@ -320,13 +320,13 @@ private struct NoopStrainHeat: View {
                     } else {
                         Text("—").font(NoopHTMLFont.outfit(NoopType.title1 + 14, weight: .light)).foregroundStyle(NoopHTMLColor.faint)
                     }
-                    Text("STRAIN").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.4)
+                    Text("EFFORT").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.4)
                         .foregroundStyle(NoopHTMLColor.inkSoft)
                 }
                 .shadow(color: .black.opacity(0.4), radius: 6)
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(value.map { "Strain \(noopStrainText($0)) of \(UnitFormatter.effortScaleMax(noopEffortScale))" } ?? "No strain yet")
+        .accessibilityLabel(value.map { "Effort \(noopStrainText($0)) of \(UnitFormatter.effortScaleMax(noopEffortScale))" } ?? "No effort yet")
     }
 }

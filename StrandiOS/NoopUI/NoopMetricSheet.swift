@@ -225,9 +225,9 @@ extension NoopMetric {
     init(marker d: MetricDescriptor) {
         let minutes = d.unit == "min"
         let norms = NoopMarkerNorms.ranges(for: d.key, profile: .current)
-        self.init(id: d.id, title: d.title, short: d.title, unit: minutes ? "h" : d.unit, decimals: minutes ? 1 : d.decimals,
+        self.init(id: d.id, title: d.auraTitle, short: d.auraTitle, unit: minutes ? "h" : d.unit, decimals: minutes ? 1 : d.decimals,
                   higherIsBetter: d.higherIsBetter, zones: norms?.zones ?? [], scale: norms?.scale,
-                  about: d.description ?? "\(d.title), from \(d.sourceLabel).",
+                  about: d.description ?? "\(d.auraTitle), from \(d.sourceLabel).",
                   value: { _ in nil }, isDuration: minutes,
                   series: .init(key: d.key, source: d.source, transform: minutes ? { $0 / 60 }
                                 : d.unit == "%" && Self.fractionKeys.contains(d.key) ? { $0 <= 1 ? $0 * 100 : $0 } : { $0 }),

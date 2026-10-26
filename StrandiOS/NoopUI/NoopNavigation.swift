@@ -1231,7 +1231,7 @@ extension NoopRoute {
         case .stress: "Stress"
         case .heart: "Heart"
         case .recovery: "Recovery"
-        case .strain: "Strain"
+        case .strain: "Effort"
         case .breathe: "Breathe"
         case .bcatalog: "Ways to breathe"
         case .bplayer: "Breathing"

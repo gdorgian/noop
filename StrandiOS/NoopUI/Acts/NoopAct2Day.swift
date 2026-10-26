@@ -487,6 +487,12 @@ struct NoopAct2Screens: View {
             }
             #endif
         }
+        // On launch the day usually arrives after Today has appeared; ask then, not only on the next visit.
+        .onChange(of: day != nil) { _, loaded in
+            if loaded, !askingLook, !offeringBedtime {
+                offeringBedtime = AuraNotices.shouldOfferBedtime(sleeps: repo.sleeps)
+            }
+        }
     }
 
     /// The breathing room under the rings, before whatever section the wearer put next.
