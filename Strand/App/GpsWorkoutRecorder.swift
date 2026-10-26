@@ -585,6 +585,7 @@ final class GpsWorkoutRecorder: NSObject, ObservableObject {
     @discardableResult
     func stop() -> [RouteMath.LatLng] {
         manager.stopUpdatingLocation()
+        pausedAtMs = nil
         isRecording = false
         // Both End and Discard come through here, so clearing once covers both. `track` is left alone, so
         // `capturedRoute()` still returns the whole route to whoever is saving it.
@@ -593,6 +594,9 @@ final class GpsWorkoutRecorder: NSObject, ObservableObject {
         let final = track
         return final
     }
+
+    /// A route session that is paused: still this session's route, just not taking points.
+    var isPaused: Bool { pausedAtMs != nil && startMs > 0 }
 
     func pause() {
         guard isRecording else { return }

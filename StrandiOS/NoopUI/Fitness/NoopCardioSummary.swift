@@ -167,8 +167,10 @@ struct NoopCompareCard: View {
         guard !recent.isEmpty else { return [] }
         var out: [Line] = []
         func mean(_ xs: [Double]) -> Double? { xs.isEmpty ? nil : xs.reduce(0, +) / Double(xs.count) }
-        let duration = Double(row.endTs - row.startTs)
-        if let avg = mean(recent.map { Double($0.endTs - $0.startTs) }) {
+        // Moving time, as saved: a paused stretch is not part of the session.
+        func moving(_ r: WorkoutRow) -> Double { r.durationS ?? Double(r.endTs - r.startTs) }
+        let duration = moving(row)
+        if let avg = mean(recent.map(moving)) {
             let d = (duration - avg) / 60
             if abs(d) >= 2 {
                 out.append(.init(id: "time", symbol: d > 0 ? "arrow.up" : "arrow.down",
@@ -178,7 +180,7 @@ struct NoopCompareCard: View {
         if let m = row.distanceM, m > 200, duration > 0,
            let avgPace = mean(recent.compactMap { r in
                guard let rm = r.distanceM, rm > 200 else { return nil }
-               return Double(r.endTs - r.startTs) / (rm / 1000)
+               return moving(r) / (rm / 1000)
            }) {
             let pace = duration / (m / 1000)
             let d = pace - avgPace

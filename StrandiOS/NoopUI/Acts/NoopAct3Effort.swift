@@ -2696,7 +2696,8 @@ private extension NoopAct3Screens {
 
     private func liveFigures(_ active: AppModel.ActiveWorkout, inZone: String, hasBand: Bool) -> [NoopFitnessCardioLive.Figure] {
         var figures: [NoopFitnessCardioLive.Figure] = []
-        if model.gpsRecorder.isRecording {
+        // Kept while paused too, so the figures and the ring above them do not jump on Pause.
+        if model.gpsRecorder.isRecording || model.gpsRecorder.isPaused {
             figures.append(.init(label: "km", value: String(format: "%.2f", model.gpsRecorder.distanceM / 1000)))
             // Pace over the first few metres is noise (a GPS jitter of 2 m in 7 s read as 48692:20 /km):
             // shown from 50 m on, and never slower than an hour a kilometre.

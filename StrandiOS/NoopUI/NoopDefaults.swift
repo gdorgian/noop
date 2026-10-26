@@ -51,8 +51,16 @@ enum NoopDefaults {
     }
 
     /// Read once per launch: pages consult it on every draw, and the answer can only go from pending to
-    /// answered, which `lookChoiceKey` itself reports.
-    static let lookChoicePendingAtLaunch = needsLookChoice
+    /// answered, which `lookChoiceKey` itself reports. A launch that finds no page arranged is already on
+    /// the new look, and says so: otherwise a page the wearer arranges later in this build would bring
+    /// the upgrade question on the next launch, as if they had come from an older one.
+    static let lookChoicePendingAtLaunch: Bool = {
+        let pending = needsLookChoice
+        if !pending, UserDefaults.standard.string(forKey: lookChoiceKey) == nil {
+            UserDefaults.standard.set("new", forKey: lookChoiceKey)
+        }
+        return pending
+    }()
 
     static func useNewLook() {
         UserDefaults.standard.set("new", forKey: lookChoiceKey)

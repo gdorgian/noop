@@ -187,7 +187,7 @@ struct NoopActivityConfirmSheet: View {
     }
 
     private var shareContent: NoopShareContent {
-        var figures: [(value: String, label: String)] = [(NoopFitnessHome.duration(Double(row.endTs - row.startTs)), "time")]
+        var figures: [(value: String, label: String)] = [(NoopFitnessHome.duration(row.durationS ?? Double(row.endTs - row.startTs)), "time")]
         if let d = row.distanceM, d > 100 { figures.append((NoopCardioGoalText.km(d), "km")) }
         if let hr = row.avgHr { figures.append(("\(hr)", "avg bpm")) }
         if let strain = row.strain, strain > 0 { figures.append((String(format: "%.1f", strain), "Effort")) }
@@ -210,7 +210,7 @@ struct NoopActivityConfirmSheet: View {
     }
 
     private var figures: [NoopSessionFigures.Item] {
-        var items: [NoopSessionFigures.Item] = [.init(label: "Duration", value: NoopFitnessHome.duration(Double(row.endTs - row.startTs)))]
+        var items: [NoopSessionFigures.Item] = [.init(label: "Duration", value: NoopFitnessHome.duration(row.durationS ?? Double(row.endTs - row.startTs)))]
         if let hr = row.avgHr { items.append(.init(label: "Avg HR", value: "\(hr)", unit: "bpm")) }
         if let hr = row.maxHr { items.append(.init(label: "Peak HR", value: "\(hr)", unit: "bpm")) }
         if let kcal = row.energyKcal, kcal > 0 { items.append(.init(label: "Energy", value: "\(Int(kcal.rounded()))", unit: "kcal")) }
