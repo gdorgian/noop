@@ -64,7 +64,8 @@ struct NoopTrendsHero: View {
             }
             .transition(.opacity)
             VStack(spacing: 6) {
-                Text(bodyAge.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "\u{2014}")
+                // Whole years, as Your ages reads the same estimate (its band is ±5 years).
+                Text(bodyAge.map { "\(Int($0.rounded()))" } ?? "\u{2014}")
                     .font(NoopHTMLFont.outfit(50 * typeScale, weight: .semibold))
                     .tracking(-0.5)
                     .monospacedDigit()
@@ -84,14 +85,15 @@ struct NoopTrendsHero: View {
             .allowsHitTesting(false)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(bodyAge.map { "Body age \($0.formatted(.number.precision(.fractionLength(1)))), \(deltaLine)" } ?? "Body age, \(waitingReason)")
+        .accessibilityLabel(bodyAge.map { "Body age \(Int($0.rounded())), \(deltaLine)" } ?? "Body age, \(waitingReason)")
     }
 
     private var deltaLine: String {
         guard bodyAge != nil else { return waitingReason }
         guard let d = yearsDifference else { return "from the last 7 days" }
-        if abs(d) < 0.05 { return "right on your age" }
-        return "\(abs(d).formatted(.number.precision(.fractionLength(1)))) years \(d > 0 ? "older" : "younger")"
+        let years = Int(d.rounded())
+        if years == 0 { return "right on your age" }
+        return "\(abs(years)) \(abs(years) == 1 ? "year" : "years") \(years > 0 ? "older" : "younger")"
     }
 
     // MARK: Pace card
