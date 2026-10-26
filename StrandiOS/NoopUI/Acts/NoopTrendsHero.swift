@@ -253,24 +253,3 @@ private struct NoopAuraPaceRuler: View {
     }
 }
 
-/// Where Your ages will live. Its contents come next.
-struct NoopYourAgesSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(spacing: 14) {
-            HStack {
-                Spacer()
-                NoopCloseButton { dismiss() }
-            }
-            Text("Your ages")
-                .font(NoopHTMLFont.outfit(NoopType.title2))
-                .foregroundStyle(NoopHTMLColor.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Spacer()
-        }
-        .padding(20)
-        .background(NoopHTMLColor.canvas.ignoresSafeArea())
-        .presentationDragIndicator(.hidden)
-    }
-}

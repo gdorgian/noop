@@ -129,7 +129,6 @@ private struct NoopTrendsScreen: View {
     @EnvironmentObject private var repo: Repository
     @StateObject private var labBook = NoopLabBook()
     @State private var showingRecordingHistory = false
-    @State private var showingAges = false
     @StateObject private var trendsLayout = NoopPageLayout(page: "trends", catalog: NoopTrendsScreen.trendsSections)
     @State private var trendsEditing = NoopPageEditing()
     @Binding var window: NoopTrendWindow
@@ -155,7 +154,6 @@ private struct NoopTrendsScreen: View {
             guard live != nil else { return }
             await labBook.load(store: await repo.storeHandle(), deviceId: repo.deviceId)
         }
-        .sheet(isPresented: $showingAges) { NoopYourAgesSheet() }
     }
 
     /// Trends' sections in their default order; each carries the space above it, so the page reads
@@ -184,7 +182,7 @@ private struct NoopTrendsScreen: View {
                 pace: ages?.pace,
                 paceWeeks: ages?.paceWeeks ?? 0,
                 waitingReason: ages?.buildReason ?? "Checking recorded signals"
-            ) { showingAges = true }
+            ) { navigation.push(.ages) }
         case "markers":
             NoopTrendsMarkersSection(navigation: navigation)
                 .padding(.top, 32)

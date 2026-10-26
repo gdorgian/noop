@@ -144,7 +144,7 @@ struct ManualWorkoutSheet: View {
         // sheet's width and sizes to content height instead.
         .frame(maxWidth: .infinity)
         .noopSheetPresentation(largeFirst: true)
-        .background(NoopChromeSurface())
+        .background(NoopChromeSurface().ignoresSafeArea())
         // Lets the user dismiss the decimal pad (which has no return key) and reach Cancel/Add.
         .keyboardDoneToolbar($focusedField)
         #endif
@@ -469,7 +469,6 @@ struct ManualWorkoutSheet: View {
 
     private var validationNote: String? {
         guard builtRow == nil else { return nil }
-        if sport.trimmingCharacters(in: .whitespaces).isEmpty { return String(localized: "Enter a sport.") }
         if start > Date() { return String(localized: "Start can't be in the future.") }
         // The failure this feature introduces, so it gets its own line rather than the catch-all below.
         if end <= start { return String(localized: "End must be after the start.") }
@@ -492,6 +491,9 @@ struct ManualWorkoutSheet: View {
                 ? String(localized: "Distance must be 0–621 mi.")
                 : String(localized: "Distance must be 0–1,000 km.")
         }
+        // An empty Sport is not a mistake yet: Add stays disabled and the field's placeholder already
+        // asks for it, so nothing is said about it unless something else is wrong.
+        if sport.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
         return String(localized: "Check the values and try again.")
     }
 
