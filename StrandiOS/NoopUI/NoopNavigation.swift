@@ -113,6 +113,12 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case howItWorks = "how-noop-works", limitations = "strap-limitations", siri = "siri-shortcuts"
     case shortcutExport = "shortcut-export", storage, digest = "weekly-digest", report = "trends-report"
     case fused = "fused-record", hydration
+    // Settings pages (26 Oct 2026): one route each, so back, the edge swipe and a deep link behave
+    // as they do for every other Act 5 screen. The Strap page is the hub's strap card.
+    case settingsToday = "settings-today", settingsSleep = "settings-sleep", settingsFitness = "settings-fitness"
+    case settingsScores = "settings-scores", settingsYou = "settings-you", settingsStrap = "settings-strap"
+    case settingsAlerts = "settings-notifications", settingsSvea = "settings-svea", settingsData = "settings-data"
+    case settingsLook = "settings-look", settingsLater = "settings-later", settingsAbout = "settings-about"
     // Act 6
     case ages, building, driver, method, health
     // Act 7
@@ -150,7 +156,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
              .widgets, .lab, .diagnostics, .automations, .onboard, .pair, .position, .importHistory, .reading,
              .imported, .rejected, .backup,
-             .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration: .plumbing
+             .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration,
+             .settingsToday, .settingsSleep, .settingsFitness, .settingsScores, .settingsYou, .settingsStrap, .settingsAlerts, .settingsSvea, .settingsData, .settingsLook, .settingsLater, .settingsAbout: .plumbing
         case .ages, .building, .driver, .method, .health: .ages
         case .coach, .gate, .setup, .consent, .memory: .svea
         case .goal, .setGoal, .labs, .picker, .review, .marker: .goals
@@ -181,6 +188,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .widgets, .lab, .diagnostics, .automations, .onboard, .pair, .position, .importHistory, .reading,
              .imported, .rejected, .backup,
              .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration,
+             .settingsToday, .settingsSleep, .settingsFitness, .settingsScores, .settingsYou, .settingsStrap, .settingsAlerts, .settingsSvea, .settingsData, .settingsLook, .settingsLater, .settingsAbout,
              .goal, .setGoal, .labs, .picker, .review, .marker:
             .you
         // Act 10 is deliberately not a sixth tab. A lift is an effort, so it lights the same key
@@ -410,6 +418,11 @@ final class NoopNavigation: ObservableObject {
     /// it is gone, the page underneath never left). Nil when none is.
     @Published var fitnessSheet: NoopRoute?
     @Published var addSheetPresented = false
+    /// Settings search, kept across a result's round trip so Back lands on the same results.
+    @Published var settingsQuery = ""
+    /// The row a search result opened. Its page scrolls to it and glows it once.
+    @Published var settingsFocus: String?
+    @Published var settingsFocusGlowed = false
     /// The metric the shared metric sheet (`NoopMetricSheet`) is open on; nil when closed.
     @Published var metricSheet: NoopMetricSheetRequest?
     /// The day Recovery and Strain show, in days back from today; shared, so stepping back on one and
@@ -1140,7 +1153,8 @@ final class NoopNavigation: ObservableObject {
             back(or: .devices)
         case .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration:
             back(or: .settings)
-        case .widgets, .lab, .diagnostics, .automations:
+        case .widgets, .lab, .diagnostics, .automations,
+             .settingsToday, .settingsSleep, .settingsFitness, .settingsScores, .settingsYou, .settingsStrap, .settingsAlerts, .settingsSvea, .settingsData, .settingsLook, .settingsLater, .settingsAbout:
             back(or: .settings)
         case .importHistory, .backup:
             back(or: .data)
@@ -1250,6 +1264,18 @@ extension NoopRoute {
         case .backup: "Backup and sync"
         case .position: "What Noop will not ask you"
         case .settings: "Settings"
+        case .settingsToday: "Today settings"
+        case .settingsSleep: "Sleep settings"
+        case .settingsFitness: "Fitness settings"
+        case .settingsScores: "Trends and scores settings"
+        case .settingsYou: "You settings"
+        case .settingsStrap: "Strap settings"
+        case .settingsAlerts: "Notifications"
+        case .settingsSvea: "Svea settings"
+        case .settingsData: "Data and connections"
+        case .settingsLook: "Look and feel"
+        case .settingsLater: "On the way"
+        case .settingsAbout: "About Noop"
         case .widgets: "Widgets"
         case .howItWorks: "How Noop works"
         case .limitations: "Strap limitations"
