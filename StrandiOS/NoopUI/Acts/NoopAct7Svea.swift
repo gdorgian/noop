@@ -1153,6 +1153,11 @@ private struct NoopSveaSetup: View {
                             .tracking(0.52)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            // Return saves the pasted key, as the Save button beside it does.
+                            .submitLabel(.done)
+                            .onSubmit {
+                                if !keyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { saveKeyDraft() }
+                            }
                         Button(keyAction, action: handleKeyAction)
                             .font(NoopHTMLFont.sans(11.5, weight: .semibold))
                             .foregroundStyle(Color(hex: 0xA9B4E0))
