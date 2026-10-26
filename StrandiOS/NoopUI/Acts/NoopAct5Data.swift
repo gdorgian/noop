@@ -70,6 +70,9 @@ final class NoopDataFlow: ObservableObject {
     /// Set when a picked backup is past the restore size ceiling; the screen asks before going ahead.
     @Published var oversizeRestore: String?
     private var oversizeBackup: URL?
+    /// Set once a backup is picked: what the file says about itself, shown before anything is replaced.
+    @Published var confirmRestore: String?
+    private var pendingRestore: URL?
 
     var isReading: Bool { if case .reading = phase { return true }; return false }
 
@@ -307,8 +310,27 @@ final class NoopDataFlow: ObservableObject {
                 backupBusy = false
                 return
             }
-            await restore(picked, allowOversize: false)
+            // Nothing is replaced until the wearer has seen which build wrote the file and when.
+            let about = await Task.detached(priority: .utility) { DataBackup.describe(picked) }.value
+            backupBusy = false
+            pendingRestore = picked
+            confirmRestore = about.map { "This backup was \($0). It replaces everything on this phone; the current record is kept aside as a snapshot." }
+                ?? "This file does not say which build wrote it. Restoring replaces everything on this phone; the current record is kept aside as a snapshot."
         }
+    }
+
+    func restoreConfirmed() {
+        guard let file = pendingRestore, !backupBusy else { return }
+        pendingRestore = nil
+        confirmRestore = nil
+        backupBusy = true
+        Task { await restore(file, allowOversize: false) }
+    }
+
+    func dropPendingRestore() {
+        if let file = pendingRestore { Self.removePickedCopy(file) }
+        pendingRestore = nil
+        confirmRestore = nil
     }
 
     /// The wearer confirmed a backup past the size ceiling. The file they already picked is reused, so a
@@ -482,6 +504,15 @@ struct NoopDataScreen: View {
             Button("OK") { flow.notice = nil }
         } message: {
             Text(flow.notice?.message ?? "")
+        }
+        .alert("Replace everything on this phone?", isPresented: Binding(
+            get: { flow.confirmRestore != nil },
+            set: { if !$0 { flow.confirmRestore = nil } }
+        )) {
+            Button("Restore", role: .destructive) { flow.restoreConfirmed() }
+            Button("Cancel", role: .cancel) { flow.dropPendingRestore() }
+        } message: {
+            Text(flow.confirmRestore ?? "")
         }
         .alert("This backup is larger than usual", isPresented: Binding(
             get: { flow.oversizeRestore != nil },

@@ -598,6 +598,29 @@ enum DataBackup {
         }
     }
 
+    /// What a picked `.noopbak` says about itself, from its `manifest.json`: "written by Noop 12.0.0
+    /// (1220) on 26 Oct 2026". Nil for a legacy file without a manifest, or one that cannot be opened.
+    /// Reads the one small entry only; the database is not extracted.
+    static func describe(_ file: URL) -> String? {
+        guard isZipFile(at: file),
+              let archive = try? Archive(url: file, accessMode: .read),
+              let entry = archive[BackupManifest.entryName], entry.uncompressedSize < 64 * 1024 else { return nil }
+        var data = Data()
+        guard (try? archive.extract(entry, consumer: { data.append($0) })) != nil,
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        var parts: [String] = []
+        if let version = obj["appVersion"] as? String, !version.isEmpty {
+            let build = (obj["appBuild"] as? String).map { " (\($0))" } ?? ""
+            let platform = (obj["platform"] as? String) == "android" ? "NOOP on Android" : "Noop"
+            parts.append("written by \(platform) \(version)\(build)")
+        }
+        if let ms = (obj["exportedAt"] as? NSNumber)?.doubleValue, ms > 0 {
+            let date = Date(timeIntervalSince1970: ms / 1000)
+            parts.append("on \(date.formatted(date: .abbreviated, time: .shortened))")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
     /// "Noop-Aura-backup-2026-06-07.noopbak" on iPhone (the app's name there), "NOOP-backup-…" on the Mac.
     private static func defaultBackupName() -> String {
         let f = DateFormatter()
