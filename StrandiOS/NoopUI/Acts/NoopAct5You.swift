@@ -107,6 +107,8 @@ struct NoopAct5Screens: View {
     @State var showRhythm = false
     @State var showHevy = false
     @State private var settingsGlowID: String?
+    /// The not-yet option whose explanation is open.
+    @State private var pendingOption: NoopPendingOption?
     /// iOS notification permission, read when Notifications opens and again on return from iOS Settings.
     @State private var notificationAuth: UNAuthorizationStatus?
     @State private var actionNotice: String?
@@ -154,6 +156,9 @@ struct NoopAct5Screens: View {
         }
         .sheet(isPresented: $showRhythm) { NoopDailyRhythmScreen() }
         .sheet(isPresented: $showHevy) { NoopHevyScreen() }
+        .sheet(item: $pendingOption) { option in
+            pendingSheet(option).noopFloatingSheet(height: 380)
+        }
         .sheet(isPresented: $showReleaseNotes) {
             WhatsNewView(presentation: .bell) {
                 showReleaseNotes = false
@@ -3585,8 +3590,8 @@ private extension NoopAct5Screens {
         case .diagnostics:
             return "strap log, raw data, bug-report files"
         case .later:
-            let count = settingsSections(.later).reduce(0) { $0 + $1.items.count }
-            return "\(count) designed, not built yet"
+            let deciding = NoopPendingOption.all.filter { $0.status == .deciding }.count
+            return "\(NoopPendingOption.all.count - deciding) coming later · \(deciding) being decided"
         case .about:
             if case let .available(version, _, _) = updates.state { return "\(version) is out · tap to see" }
             return "version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · built on NOOP"
@@ -3664,6 +3669,13 @@ private extension NoopAct5Screens {
             Task { await readNotificationAuth() }
         }
         .onAppear {
+            #if DEBUG
+            // Visual fixture: `--noop-settings-pending <id>` opens that option's explanation.
+            if let index = CommandLine.arguments.firstIndex(of: "--noop-settings-pending"),
+               CommandLine.arguments.indices.contains(index + 1) {
+                pendingOption = NoopPendingOption.all.first { $0.id == CommandLine.arguments[index + 1] }
+            }
+            #endif
             guard let focus, !navigation.settingsFocusGlowed else { return }
             navigation.settingsFocusGlowed = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -3719,6 +3731,134 @@ private extension NoopAct5Screens {
     /// Every page's rows, in order. The page draws them, the hub reads their state and search
     /// indexes them, so the three can never disagree about what exists or where it lives.
     func settingsSections(_ page: NoopSettingsPage) -> [NoopSettingsSection] {
+        if page == .later {
+            // On the way: every pending option, grouped under the page it will live on.
+            return NoopSettingsPage.allCases.compactMap { home in
+                let options = NoopPendingOption.all.filter { $0.page == home }
+                guard !options.isEmpty else { return nil }
+                return NoopSettingsSection(title: home.title, items: options.map { pendingItem($0) })
+            }
+        }
+        let pending = NoopPendingOption.all.filter { $0.page == page }
+        guard !pending.isEmpty else { return settingsBaseSections(page) }
+        return settingsBaseSections(page) + [NoopSettingsSection(title: "Not in Aura yet", items: pending.map { pendingItem($0) })]
+    }
+
+    func pendingItem(_ option: NoopPendingOption) -> NoopSettingsItem {
+        NoopSettingsItem(id: option.id, title: option.title, detail: option.does,
+                         keywords: "later planned deciding coming " + option.why,
+                         focusable: option.page != .lab) {
+            AnyView(pendingRow(option))
+        }
+    }
+
+    /// A dimmed row for an option Aura does not have yet. A tap explains it rather than doing nothing.
+    func pendingRow(_ option: NoopPendingOption) -> some View {
+        Button { pendingOption = option } label: {
+            HStack(spacing: 13) {
+                Image(systemName: option.symbol)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color(hex: 0x5E6864))
+                    .frame(width: 21)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.title)
+                        .font(NoopHTMLFont.sans(NoopType.footnote))
+                        .foregroundStyle(Color(hex: 0x9AA39F))
+                    Text(option.does)
+                        .font(NoopHTMLFont.sans(NoopType.caption))
+                        .foregroundStyle(Color(hex: 0x6E7874))
+                        .lineSpacing(2)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                        // Same size in every row; the sheet carries the whole sentence.
+                        .minimumScaleFactor(1)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 8)
+                pendingChip(option.status)
+            }
+            .padding(.vertical, 13)
+            .frame(minHeight: 58)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .accessibilityLabel("\(option.title), \(option.status.label.lowercased()). \(option.does)")
+        .accessibilityHint("Explains why it is not in Aura yet")
+    }
+
+    func pendingChip(_ status: NoopPendingOption.Status) -> some View {
+        let deciding = status == .deciding
+        return Text(status.label)
+            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
+            .tracking(0.95)
+            .textCase(.uppercase)
+            .foregroundStyle(deciding ? Color(hex: 0xE9C68F) : Color(hex: 0x7F8A85))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background((deciding ? Self.warm.opacity(0.10) : Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(deciding ? Self.warm.opacity(0.26) : Color.white.opacity(0.09), lineWidth: 0.5))
+    }
+
+    func pendingSheet(_ option: NoopPendingOption) -> some View {
+        let fromIndex = navigation.route == .settingsLater
+        return VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: option.symbol)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(option.page.tint)
+                    .frame(width: 44, height: 44)
+                    .background(option.page.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                VStack(alignment: .leading, spacing: 5) {
+                    pendingChip(option.status)
+                    Text(option.page.title)
+                        .font(NoopHTMLFont.sans(NoopType.caption))
+                        .foregroundStyle(Color(hex: 0x7F8A85))
+                }
+                Spacer()
+            }
+            Text(option.title)
+                .font(NoopHTMLFont.outfit(NoopType.title3))
+                .foregroundStyle(NoopHTMLColor.ink)
+            VStack(alignment: .leading, spacing: 14) {
+                pendingFact("What it does", option.does)
+                pendingFact(option.status == .later ? "Why not yet" : "Why it is undecided", option.why)
+            }
+            if fromIndex {
+                Button {
+                    let target = option
+                    pendingOption = nil
+                    navigation.settingsFocus = target.page == .lab ? nil : target.id
+                    navigation.settingsFocusGlowed = false
+                    navigation.push(target.page.route)
+                } label: {
+                    Text("See it on \(option.page.title)")
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 48)
+                        .background(option.page.tint.opacity(0.18), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(option.page.tint.opacity(0.36), lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 22)
+        .padding(.bottom, 26)
+    }
+
+    func pendingFact(_ label: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            NoopSectionLabel(label)
+            Text(text)
+                .font(NoopHTMLFont.sans(NoopType.footnote))
+                .foregroundStyle(NoopHTMLColor.copy)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    func settingsBaseSections(_ page: NoopSettingsPage) -> [NoopSettingsSection] {
         // Every control on a page wears the page's colour, the same one as its tile on the hub.
         let tint = page.tint
         switch page {
@@ -3929,26 +4069,7 @@ private extension NoopAct5Screens {
             ])]
 
         case .later:
-            return [NoopSettingsSection(items: [
-                linkItem(tint, "later-buzz", "Buzz for phone notifications", "which apps reach your wrist, and how", symbol: "bell",
-                         keywords: "mirror wrist apps messages calls") { navigation.enter(.notifs, from: .strap) },
-                toggleItem(tint, "later-session-offer", "Session offer", "One notification a day, in the morning, with today’s recommendation.",
-                           keywords: "recommendation morning workout"),
-                toggleItem(tint, "later-rhythm", "Rhythm", "Needs reading and ticking a page first. No alarms, no red, no condition names.",
-                           keywords: "beat rhythm regularity"),
-                segmentItem(tint, "later-appearance", "Appearance", "dark only in this build — light is drawn but not coloured yet",
-                            choices: ["Dark", "Light", "System"], disabled: ["Light", "System"], keywords: "light dark theme"),
-                segmentItem(tint, "later-language", "Language", "English only in this build; the strings are written but not translated",
-                            choices: ["System", "English", "Deutsch"], disabled: ["System", "Deutsch"], keywords: "deutsch german translation"),
-                soonItem("later-chart-colours", "Chart colours", "a second palette for the data, leaving the chrome alone", glyph: .chart,
-                         keywords: "palette colors"),
-                soonItem("later-sleep-chart", "Sleep chart", "the hypnogram drawn as rows or as a ribbon instead", glyph: .moon,
-                         keywords: "hypnogram ribbon"),
-                soonItem("later-card-surface", "Card surface", "frosted and clear cards, so the sky shows through", glyph: .grid,
-                         keywords: "transparency frosted glass"),
-                soonItem("later-sky", "Day-cycle sky", "a backdrop that moves with the hour", glyph: .today,
-                         keywords: "background sky backdrop")
-            ])]
+            return []
 
         case .about:
             return [
@@ -4121,7 +4242,8 @@ private extension NoopAct5Screens {
     // MARK: Settings search
 
     var settingsIndex: [NoopSettingsHit] {
-        NoopSettingsPage.allCases.flatMap { page in
+        // On the way only repeats what each page already lists.
+        NoopSettingsPage.allCases.filter { $0 != .later }.flatMap { page in
             settingsSections(page).flatMap { section in
                 section.items.map { NoopSettingsHit(page: page, section: section.title, item: $0) }
             }
@@ -4775,6 +4897,14 @@ private extension NoopAct5Screens {
                     labToggle("ECG raw data", detail: "Stores the raw-ECG config key on an attested MG. One tap writes it, then Noop reads it back rather than trusting the write.", badge: "writes to strap", gate: "Waiting for your strap to identify itself as an MG. Only an MG has the electrodes, so Noop will not write this to anything else.", persistent: true)
                     Divider().overlay(NoopHTMLColor.border)
                     labToggle("Record protocol frames", detail: "Captures raw frames to a file for working out what an undocumented packet means. Local, and large.")
+                }
+
+                labGroup("Not in Aura yet", blurb: "Lab readouts the classic NOOP has. Tap one to see why it is not here.") {
+                    let options = NoopPendingOption.all.filter { $0.page == .lab }
+                    ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
+                        if index > 0 { Divider().overlay(NoopHTMLColor.border) }
+                        pendingRow(option)
+                    }
                 }
 
                 Text("If a probe here changes a reading you care about, it belongs in Settings and not in the Lab. Say so and it will move.")
@@ -5625,7 +5755,7 @@ enum NoopSettingsPage: String, CaseIterable, Identifiable {
         case .look: "Units, motion, widgets and the icon."
         case .lab: "Readings still being worked out, and probes that touch the strap."
         case .diagnostics: "The strap log, raw data and the files a bug report needs."
-        case .later: "Designed, not built yet. Shown so you know they are planned."
+        case .later: "What the classic NOOP has that Aura does not show yet. Each one also sits, dimmed, on the page it will live on. Tap one to see why it is not here."
         case .about: "This version, how Noop works, and the work it is built on."
         }
     }
@@ -5705,4 +5835,157 @@ struct NoopSettingsHit: Identifiable {
     let item: NoopSettingsItem
 
     var id: String { item.id }
+}
+
+/// An option the classic NOOP has that Aura does not show yet (26 Oct 2026). Each sits dimmed on the page
+/// it will live on, says what it does and why it is not here, and all of them are listed on On the way.
+/// Nothing here reads or writes a setting.
+struct NoopPendingOption: Identifiable {
+    enum Status {
+        /// Will be ported: the work is known.
+        case later
+        /// Might not fit Aura's design; undecided whether it comes back.
+        case deciding
+
+        var label: String { self == .later ? "Later" : "Deciding" }
+    }
+
+    let id: String
+    let page: NoopSettingsPage
+    let status: Status
+    let title: String
+    let symbol: String
+    let does: String
+    let why: String
+
+    static let all: [NoopPendingOption] = [
+        // Today
+        .init(id: "pending-key-metric-grid", page: .today, status: .deciding, title: "Key-metric grid", symbol: "square.grid.3x2",
+              does: "Choose how many columns the classic key-metric tiles use, and how many days each tile averages.",
+              why: "Aura lays Today out by editing the page instead of by a grid of tiles. Whether a grid comes back is still open."),
+        .init(id: "pending-liquid-today", page: .today, status: .deciding, title: "Liquid Today", symbol: "drop",
+              does: "The classic prototype Today, with the three scores drawn as living liquid under a time-of-day sky.",
+              why: "Aura’s Today replaced it. It may return as a look for Today, or stay retired."),
+        // Sleep
+        .init(id: "pending-day-starts", page: .sleep, status: .later, title: "When the day starts", symbol: "sunrise",
+              does: "Start each day at your main sleep instead of at midnight, so a late night counts toward the day it belongs to.",
+              why: "Every Aura page that counts a day has to follow the same choice. It comes once they all can."),
+        .init(id: "pending-hrv-window", page: .sleep, status: .later, title: "HRV window", symbol: "waveform.path.ecg",
+              does: "Read your nightly HRV over the whole night, or over deep sleep only.",
+              why: "The classic setting changes one number; in Aura, Charge, Trends and the night all read HRV and need to agree."),
+        .init(id: "pending-sleep-chart", page: .sleep, status: .later, title: "Sleep chart", symbol: "chart.bar.xaxis",
+              does: "The hypnogram drawn as rows or as a ribbon instead.",
+              why: "Designed, not built yet."),
+        // Fitness
+        .init(id: "pending-session-haptics", page: .fitness, status: .later, title: "Session buzzes", symbol: "hand.tap",
+              does: "Turn off the strap’s buzzes during a workout, a breathing session or the interval timer, each on its own.",
+              why: "Each Aura session screen buzzes through its own path, and the switches need wiring into every one."),
+        .init(id: "pending-lift-activity", page: .fitness, status: .later, title: "Lift on the Lock Screen", symbol: "dumbbell",
+              does: "Your current set and rest timer on the Lock Screen and in the Dynamic Island while you lift.",
+              why: "Being built right now. Its switch arrives with it."),
+        .init(id: "pending-live-sessions", page: .fitness, status: .deciding, title: "Live Sessions", symbol: "shield.lefthalf.filled",
+              does: "A one-tap guarded workout: the strap watches your heart rate against a band set by today’s Charge and only buzzes to correct course.",
+              why: "Aura’s session screens already cover most of it. Whether the guard returns as its own mode is open."),
+        // Trends and scores
+        .init(id: "pending-chart-colours", page: .scores, status: .later, title: "Chart colours", symbol: "paintpalette",
+              does: "A second palette for the data, leaving the rest of the app alone.",
+              why: "Designed, not built yet."),
+        .init(id: "pending-trend-style", page: .scores, status: .later, title: "Trend chart style", symbol: "chart.bar",
+              does: "Draw trend charts as lines or as bars.",
+              why: "Aura’s trend charts are drawn one way for now. The second style comes with the chart pass."),
+        .init(id: "pending-exponential-effort", page: .scores, status: .deciding, title: "Exponential effort", symbol: "function",
+              does: "Weights hard minutes more heavily, the way a training-load model does, instead of a straight line.",
+              why: "It changes every Effort score you have, so it needs a benchmark before it can be offered."),
+        // Strap
+        .init(id: "pending-phone-buzz", page: .strap, status: .later, title: "Buzz for phone notifications", symbol: "bell",
+              does: "Choose which iPhone apps buzz your strap, and how.",
+              why: "The screen is drawn. The path that carries an iPhone notification to the strap is not wired in Aura yet."),
+        .init(id: "pending-wrist-shortcuts", page: .strap, status: .later, title: "Shortcuts on and off the wrist", symbol: "arrow.triangle.branch",
+              does: "Run a Shortcut when the strap comes off (set a Focus, pause media) and another when it goes back on.",
+              why: "It works in the classic app. Aura still needs a way to pick the Shortcut."),
+        .init(id: "pending-hourly-sync", page: .strap, status: .later, title: "Hourly sync at any charge", symbol: "clock.arrow.circlepath",
+              does: "Stretches the strap’s history sync to once an hour whatever its battery, not only when low. Nothing is lost: the strap keeps it until it is read.",
+              why: "A part of Power saving that needs testing against Aura’s background sync."),
+        .init(id: "pending-sync-awake", page: .strap, status: .later, title: "Keep the screen on while syncing", symbol: "iphone",
+              does: "Holds the iPhone awake while the strap sends a long history, so the sync is not cut off.",
+              why: "Needs testing against Aura’s background sync first."),
+        .init(id: "pending-sync-activity", page: .strap, status: .later, title: "Sync on the Lock Screen", symbol: "rectangle.badge.checkmark",
+              does: "A long sync’s progress as a Live Activity.",
+              why: "Comes with the Lock Screen pass."),
+        .init(id: "pending-oura-hr", page: .strap, status: .later, title: "Oura ring all-day heart rate", symbol: "circle.circle",
+              does: "Oura ring only. Keeps the ring measuring heart rate through the day, standing it down only for your night.",
+              why: "Oura works in the classic app. Aura’s strap pages are WHOOP-first for now."),
+        // Notifications
+        .init(id: "pending-predictive-battery", page: .alerts, status: .later, title: "Recharge tonight", symbol: "battery.25",
+              does: "An early heads-up when the strap has about a day of estimated runtime left, at most once per discharge.",
+              why: "The estimate already runs. The notice needs testing on a real discharge first."),
+        .init(id: "pending-effort-target", page: .alerts, status: .later, title: "Effort target reached", symbol: "flame",
+              does: "Once a day, when today’s Effort reaches the low end of what your Charge allows.",
+              why: "Aura names that range differently. The wording and the number need to agree first."),
+        .init(id: "pending-session-offer", page: .alerts, status: .later, title: "Session offer", symbol: "figure.run",
+              does: "One notification a day, in the morning, with today’s recommendation.",
+              why: "Aura does not recommend a session yet. The notice comes with the recommendation."),
+        // Svea
+        .init(id: "pending-svea-button", page: .svea, status: .deciding, title: "Floating Svea button", symbol: "bubble.left",
+              does: "A button you can drag to any corner that opens Svea from every screen.",
+              why: "Aura opens Svea from the centre of the tab bar. A second door may only add clutter."),
+        .init(id: "pending-svea-today", page: .svea, status: .deciding, title: "Svea on Today", symbol: "person.crop.circle",
+              does: "Her avatar as a card on Today, with the morning suggestion.",
+              why: "Today is now edited by its own page. She may come back as a section there instead."),
+        // Data and connections
+        .init(id: "pending-mi-band", page: .data, status: .later, title: "Mi Band import", symbol: "figure.walk.motion",
+              does: "Bring in history from a Xiaomi Mi Band through Mi Fitness.",
+              why: "The import works in the classic app. Aura’s import screen lists WHOOP files and Apple Health first."),
+        // Look and feel
+        .init(id: "pending-distance-units", page: .look, status: .later, title: "Distance apart from units", symbol: "ruler",
+              does: "Set exercise distance and pace apart from body measurements: kilograms with miles, say.",
+              why: "Aura’s units are one switch today. The split comes with the workout pages."),
+        .init(id: "pending-skin-temp", page: .look, status: .later, title: "Skin temperature as a change", symbol: "thermometer.medium",
+              does: "Show skin temperature as degrees, or as the change from your own normal.",
+              why: "Every page that shows it needs to follow the same choice."),
+        .init(id: "pending-clock", page: .look, status: .later, title: "Clock", symbol: "clock",
+              does: "12- or 24-hour times inside Noop, whatever the iPhone itself uses.",
+              why: "Aura follows the iPhone for now."),
+        .init(id: "pending-appearance", page: .look, status: .later, title: "Appearance", symbol: "circle.lefthalf.filled",
+              does: "Light, dark, or follow the iPhone.",
+              why: "Dark only in this build. Light is drawn but not coloured yet."),
+        .init(id: "pending-language", page: .look, status: .later, title: "Language", symbol: "globe",
+              does: "Noop in your own language.",
+              why: "English only in this build. The strings are written but not translated."),
+        .init(id: "pending-day-sky", page: .look, status: .later, title: "Day-cycle sky", symbol: "sun.haze",
+              does: "A backdrop that moves with the hour.",
+              why: "Designed, not built yet."),
+        .init(id: "pending-card-surface", page: .look, status: .deciding, title: "Card surface", symbol: "square.on.square",
+              does: "Frosted or clear cards, so the backdrop shows through.",
+              why: "Clear cards trade legibility for the look. Whether that is worth it is open."),
+        .init(id: "pending-accent", page: .look, status: .deciding, title: "Accent colour", symbol: "paintbrush.pointed",
+              does: "One colour of your choice for the app’s controls.",
+              why: "Aura’s colours mean something page by page. A single accent may fight that."),
+        .init(id: "pending-background", page: .look, status: .deciding, title: "Your own background", symbol: "photo",
+              does: "A photo of your own behind the pages.",
+              why: "It would sit under Aura’s own canvas. Open whether the two can share a page."),
+        .init(id: "pending-apple-colours", page: .look, status: .deciding, title: "Apple Health colours", symbol: "heart.circle",
+              does: "Swap Noop’s palette for the colours Apple Health uses.",
+              why: "Aura has its own palette. Open whether a second one is worth keeping in step."),
+        .init(id: "pending-tab-bar", page: .look, status: .deciding, title: "Hide the tab bar while scrolling", symbol: "dock.rectangle",
+              does: "The tab bar slides away as you scroll down and back as you scroll up.",
+              why: "Aura’s tab bar floats over the page. Open whether hiding it helps or only moves things."),
+        // The Lab
+        .init(id: "pending-beat-rhythm", page: .lab, status: .later, title: "Beat Rhythm", symbol: "waveform.path",
+              does: "An experimental view of beat-to-beat regularity. It needs reading and ticking a page first: no alarms, no red, no condition names.",
+              why: "The consent page and the view need Aura’s design before it can be offered."),
+        .init(id: "pending-hrv-readiness", page: .lab, status: .later, title: "HRV readiness tiers", symbol: "gauge.with.needle",
+              does: "A read-only tier from the Plews and Altini method, beside Charge. It changes nothing else.",
+              why: "Rough and early. It comes with the Lab’s readouts."),
+        .init(id: "pending-ppg-interpolation", page: .lab, status: .later, title: "Finer heart rate from the optical signal", symbol: "point.topleft.down.to.point.bottomright.curvepath",
+              does: "Removes a step of up to about 8 bpm when Noop fills seconds the strap never reported. It never replaces a stored reading.",
+              why: "A research variant. It comes with the Lab’s readouts."),
+        .init(id: "pending-polar-log", page: .lab, status: .later, title: "Polar debug log", symbol: "doc.text",
+              does: "Writes a detailed log of a Polar sensor’s connection for a bug report.",
+              why: "Polar works in the classic app. It comes with Aura’s support for other sensors."),
+        // About
+        .init(id: "pending-auto-updates", page: .about, status: .later, title: "Check automatically", symbol: "arrow.triangle.2.circlepath",
+              does: "A quiet check for a new version once a day, and a notice when one is out.",
+              why: "Aura only asks the release page when you tap. An automatic check comes with the notice for it.")
+    ]
 }
