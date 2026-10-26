@@ -38,6 +38,7 @@ struct NoopAct5Screens: View {
     @AppStorage(PuffinExperiment.autoDetectWorkoutsKey) private var autoDetectOn = false
     @AppStorage(PuffinExperiment.journalReminderKey) private var journalReminderOn = true
     @AppStorage("workoutKeepScreenOn") private var keepScreenOn = false
+    @AppStorage(UnitPrefs.liftLiveActivityKey) private var liftActivityOn = true
     @AppStorage("notif.quietHoursEnabled") private var quietHoursOn = false
     @AppStorage("inactivity.enabled") private var inactivityOn = false
     @AppStorage(PuffinExperiment.experimentalSleepV2Key) private var sleepV2On = true
@@ -275,6 +276,7 @@ private extension NoopAct5Screens {
         case "Offer a workout it spotted": $autoDetectOn
         case "Journal reminder": $journalReminderOn
         case "Keep the screen on in a workout": $keepScreenOn
+        case "Lift on the Lock Screen": $liftActivityOn
         case "Quiet hours": $quietHoursOn
         case "Move reminder": $inactivityOn
         case "Stress check-ins": $behavior.stressCheckIn
@@ -3597,7 +3599,7 @@ private extension NoopAct5Screens {
             return "\(NoopPendingOption.all.count - deciding) coming later · \(deciding) being decided"
         case .about:
             if case let .available(version, _, _) = updates.state { return "\(version) is out · tap to see" }
-            return "version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · built on NOOP"
+            return "version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · what’s new, how it works, credits"
         }
     }
 
@@ -3891,7 +3893,7 @@ private extension NoopAct5Screens {
     static let settingsToggleDefaults: [String: Bool] = [
         "Journal reminder": true,
         "Sleep staging V2": true, "Motion-aware wake": false,
-        "Keep the screen on in a workout": false, "Offer a workout it spotted": false,
+        "Keep the screen on in a workout": false, "Offer a workout it spotted": false, "Lift on the Lock Screen": true,
         "Live heart rate in the Dynamic Island": true,
         "Power saving": false, "Pause the HRV stream when low": true,
         "Continuous HRV capture": false, "Overnight only": true, "Broadcast heart rate": false,
@@ -4024,6 +4026,8 @@ private extension NoopAct5Screens {
                 },
                 toggleItem(tint, "fitness-screen-on", "Keep the screen on in a workout", "Holds the screen awake while a manual recording runs.",
                            keywords: "awake display lock"),
+                toggleItem(tint, "fitness-lift-activity", "Lift on the Lock Screen", "Your current set and the rest timer on the Lock Screen and in the Dynamic Island while you lift.",
+                           keywords: "live activity dynamic island rest timer lifting"),
                 toggleItem(tint, "fitness-spotted", "Offer a workout it spotted", "Sees a probable session in your heart rate and offers to save it. It never creates one for you.",
                            keywords: "auto detect workouts sessions detection")
             ])]
@@ -5027,7 +5031,7 @@ private extension NoopAct5Screens {
                     labToggle("Record protocol frames", detail: "Captures raw frames to a file for working out what an undocumented packet means. Local, and large.")
                 }
 
-                labGroup("Not in Aura yet", blurb: "Lab readouts the classic NOOP has. Tap one to see why it is not here.") {
+                labGroup("Not in Aura yet", blurb: "Lab readouts the classic Noop screens have. Tap one to see why it is not here.") {
                     let options = NoopPendingOption.all.filter { $0.page == .lab }
                     ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
                         if index > 0 { Divider().overlay(NoopHTMLColor.border) }
@@ -5889,7 +5893,7 @@ enum NoopSettingsPage: String, CaseIterable, Identifiable {
         case .look: "Units, motion, widgets and the icon."
         case .lab: "Readings still being worked out, and probes that touch the strap."
         case .diagnostics: "The strap log, raw data and the files a bug report needs."
-        case .later: "What the classic NOOP has that Aura does not show yet. Each one also sits, dimmed, on the page it will live on. Tap one to see why it is not here."
+        case .later: "What the classic Noop screens have that Aura does not show yet. Each one also sits, dimmed, on the page it will live on. Tap one to see why it is not here."
         case .about: "This version, how Noop works, and the work it is built on."
         }
     }
@@ -6014,9 +6018,6 @@ struct NoopPendingOption: Identifiable {
         .init(id: "pending-session-haptics", page: .fitness, status: .later, title: "Session buzzes", symbol: "hand.tap",
               does: "Turn off the strap’s buzzes during a workout, a breathing session or the interval timer, each on its own.",
               why: "Each Aura session screen buzzes through its own path, and the switches need wiring into every one."),
-        .init(id: "pending-lift-activity", page: .fitness, status: .later, title: "Lift on the Lock Screen", symbol: "dumbbell",
-              does: "Your current set and rest timer on the Lock Screen and in the Dynamic Island while you lift.",
-              why: "Being built right now. Its switch arrives with it."),
         .init(id: "pending-live-sessions", page: .fitness, status: .deciding, title: "Live Sessions", symbol: "shield.lefthalf.filled",
               does: "A one-tap guarded workout: the strap watches your heart rate against a band set by today’s Charge and only buzzes to correct course.",
               why: "Aura’s session screens already cover most of it. Whether the guard returns as its own mode is open."),

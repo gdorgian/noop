@@ -499,9 +499,9 @@ struct NoopAct2Screens: View {
         NoopPageSection(id: "rings-dials", title: "Rings · Dials", detail: "Three plain dials, recovery coloured by its band", onByDefault: false),
         NoopPageSection(id: "rings", title: "Rings · Living", detail: "Recovery, strain and sleep as living rings", onByDefault: false),
         NoopPageSection(id: "rings-segmented", title: "Rings · Segmented", detail: "Sleep in its stages, strain heating up, recovery on a gauge", onByDefault: false),
-        // Calm defaults (26 Oct 2026): the orb header already breathes, and a status is set when it
-        // matters; both wait in Add.
-        NoopPageSection(id: "breathe", title: "Breathing orb", detail: "Your pulse as a breathing sphere; tap it to breathe", onByDefault: false),
+        // The breathing orb is Aura's recognisable look and opens Today (owner, 26 Oct 2026). Activity
+        // status is set when it matters, so it waits in Add.
+        NoopPageSection(id: "breathe", title: "Breathing orb", detail: "Your pulse as a breathing sphere; tap it to breathe"),
         NoopPageSection(id: "status", title: "Activity status", detail: "Active, sick, injured or on a break, and for how long", onByDefault: false, half: true),
         NoopTodayTile.bedtime.section,
         NoopTodayTile.heart.section,

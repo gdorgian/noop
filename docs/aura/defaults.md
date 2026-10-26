@@ -10,7 +10,7 @@ Pages show only sections marked `onByDefault`. Alternative designs stay in Add.
 
 | Page | On by default | In Add, or shown only when there is something to show |
 |---|---|---|
-| Today | Orb header, Bedtime + Effort today (tiles), Last night, Your day, Energy, Vitals | Svea (once she is set up and not off), Logged today (once something is logged), Stress (until the day has a scored stress line), Breathing orb, Activity status, every other tile and alternative design |
+| Today | Breathing orb (Aura's signature look), Effort today + Bedtime (tiles), Last night, Your day, Energy, Vitals | Svea (once she is set up and not off), Logged today (once something is logged), Stress (until the day has a scored stress line), Activity status, every other tile and alternative design |
 | Rest | Your sleep, In bed and asleep, Your last seven, Stages in lanes, Over time, Your next sleep | The shape of it, Trends, the header and sleep alternatives |
 | Trends | Body age, Markers, What changed, Explore, Your summaries | Bloodwork (once there is a lab result), Recording history, alternatives |
 | Fitness | All seven sections | Routines and Cardio and sports stay, because they are where a routine is built and a sport is started |
