@@ -398,6 +398,8 @@ final class NoopNavigation: ObservableObject {
         didSet {
             forgetScroll(from: oldValue)
             if !metricSheetPresented && !path.contains(where: { $0.act == .instrument }) { instrumentOverviewWindow = nil }
+            // A day picked on Recovery or Effort belongs to that visit; the next one opens on today.
+            if !path.contains(.recovery) && !path.contains(.strain) { scoreDayOffset = 0 }
         }
     }
     let scrollMemory = NoopScrollMemory()
