@@ -38,8 +38,10 @@ struct NoopRecoveryPage: View {
         return r >= 67 ? (Color(hex: 0x5BF0A6), Color(hex: 0x0E6B47))
             : r >= 34 ? (Color(hex: 0xF7D86A), Color(hex: 0x7A5A12)) : (Color(hex: 0xF57A72), Color(hex: 0x7A2321))
     }
-    private var hrv: Double? { offset == 0 ? (day?.vitals.first { $0.key == "hrv" }?.value ?? metric?.avgHrv) : metric?.avgHrv }
-    private var rhr: Double? { offset == 0 ? (day?.vitals.first { $0.key == "rhr" }?.value ?? metric?.restingHr.map(Double.init)) : metric?.restingHr.map(Double.init) }
+    // The day's own row first, the one its recovery was scored from, so the tiles never show another
+    // night's figures under this day's score; Today's vitals only fill in before that row exists.
+    private var hrv: Double? { metric?.avgHrv ?? (offset == 0 ? day?.vitals.first { $0.key == "hrv" }?.value : nil) }
+    private var rhr: Double? { metric?.restingHr.map(Double.init) ?? (offset == 0 ? day?.vitals.first { $0.key == "rhr" }?.value : nil) }
 
     /// The page's sections: the header that follows Today's ring style, Noop's other drawings
     /// waiting in Add section, the figures and the Trends list.
