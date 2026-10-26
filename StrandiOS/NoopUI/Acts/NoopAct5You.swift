@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import UIKit
+import UserNotifications
 import PhotosUI
 import StrandAnalytics
 import StrandDesign
@@ -106,6 +107,8 @@ struct NoopAct5Screens: View {
     @State var showRhythm = false
     @State var showHevy = false
     @State private var settingsGlowID: String?
+    /// iOS notification permission, read when Notifications opens and again on return from iOS Settings.
+    @State private var notificationAuth: UNAuthorizationStatus?
     @State private var actionNotice: String?
     @State private var labExportBusy = false
     @State private var showPhasePicker = false
@@ -3653,6 +3656,13 @@ private extension NoopAct5Screens {
                 if page == .about { settingsVersionFooter.padding(.top, 6) }
             }
         }
+        .task {
+            if page == .alerts { await readNotificationAuth() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            guard page == .alerts else { return }
+            Task { await readNotificationAuth() }
+        }
         .onAppear {
             guard let focus, !navigation.settingsFocusGlowed else { return }
             navigation.settingsFocusGlowed = true
@@ -3728,6 +3738,9 @@ private extension NoopAct5Screens {
                     labItem(tint, "sleep-wake", "Motion-aware wake", "Re-reads scored wake as light sleep when your posture was stable and there were no steps. A no-op on a sparse night.",
                             keywords: "wake refinement posture steps awake")
                 ]),
+                NoopSettingsSection(title: "Alerts", items: [
+                    alertsLinkItem(tint, "sleep-alerts", "Sleep alerts", titles: ["Your night is in", "Bedtime nudge"], focus: "alerts-night")
+                ]),
                 NoopSettingsSection(title: "Waking", items: [
                     linkItem(tint, "sleep-alarm", "Smart alarm", "a buzz in light sleep, inside the window you set", symbol: "alarm",
                              keywords: "alarm wake window wake-up") { navigation.push(.alarm) }
@@ -3756,6 +3769,9 @@ private extension NoopAct5Screens {
                                  keywords: "baselines recovery charge hrv resting pulse respiration skin temperature restart reset") {
                     AnyView(recalibrateBaselinesRow)
                 }
+            ]),
+            NoopSettingsSection(title: "Alerts", items: [
+                alertsLinkItem(tint, "scores-alerts", "Progress alerts", titles: ["A new best", "Weekly read"], focus: "alerts-best")
             ])]
 
         case .you:
@@ -3780,6 +3796,9 @@ private extension NoopAct5Screens {
                     toggleItem(tint, "strap-island", "Live heart rate in the Dynamic Island", "Also puts it on the Lock Screen while a session runs.",
                                keywords: "live activity lock screen bpm")
                 ]),
+                NoopSettingsSection(title: "Alerts", items: [
+                    alertsLinkItem(tint, "strap-alerts", "Strap alerts", titles: ["Battery alerts", "Off-wrist reminder", "Sync reminder"], focus: "alerts-battery")
+                ]),
                 NoopSettingsSection(title: "Battery", items: [
                     toggleItem(tint, "strap-power-saving", "Power saving", "Syncs every 45 minutes instead of 15 once the strap is low and discharging. Never while charging.",
                                keywords: "battery low sync 45 minutes"),
@@ -3802,6 +3821,11 @@ private extension NoopAct5Screens {
         case .alerts:
             return [
                 NoopSettingsSection(items: [
+                    NoopSettingsItem(id: "alerts-permission", title: "Notification permission",
+                                     detail: "whether iOS lets Noop’s notices through at all",
+                                     keywords: "allow permission ios banners sounds denied blocked") {
+                        AnyView(notificationPermissionRow(tint: tint))
+                    },
                     toggleItem(tint, "alerts-quiet", "Quiet hours", "Nothing buzzes between your anchor and your usual wake, whatever else is on.",
                                keywords: "do not disturb silence night buzz")
                 ]),
@@ -3828,6 +3852,14 @@ private extension NoopAct5Screens {
                 NoopSettingsSection(title: "Data", items: [
                     toggleItem(tint, "alerts-backup", "Backup reminder", "Your record lives only on this phone. A quiet reminder when the last backup is a month old.",
                                keywords: "backup month")
+                ]),
+                // The strap's own buzzes are what the strap does, so they stay in Automations. Listed here
+                // because "why did my wrist buzz" is a notifications question too.
+                NoopSettingsSection(title: "On your wrist", items: [
+                    linkItem(tint, "alerts-wrist", "Strap buzzes",
+                             "\(Self.settingsWristTitles.filter(isEnabled).count) on · move reminder, stress check-ins, illness warning and the zone buzz, set in Automations",
+                             symbol: "applewatch.radiowaves.left.and.right",
+                             keywords: "buzz haptic wrist move reminder stress illness zone ceiling") { navigation.push(.automations) }
                 ])
             ]
 
@@ -3849,7 +3881,8 @@ private extension NoopAct5Screens {
                     linkItem(tint, "data-permissions", "Data and permissions", "what is kept, what leaves, and importing history", symbol: "lock.shield",
                              keywords: "privacy recorded delete import history") { navigation.push(.data) },
                     linkItem(tint, "data-backup", "Backup and restore", "one file you keep, restored the same way", symbol: "externaldrive",
-                             keywords: "back up restore file noopbak export") { navigation.enter(.backup, from: .data) }
+                             keywords: "back up restore file noopbak export") { navigation.enter(.backup, from: .data) },
+                    alertsLinkItem(tint, "data-alerts", "Backup reminder", titles: ["Backup reminder"], focus: "alerts-backup")
                 ]),
                 NoopSettingsSection(title: "Apple", items: [
                     linkItem(tint, "data-health", "Apple Health", "what Noop writes and reads", symbol: "heart",
@@ -3948,6 +3981,82 @@ private extension NoopAct5Screens {
         }
     }
 
+    static let settingsWristTitles = ["Move reminder", "Stress check-ins", "Illness early warning", "Buzz if I go over"]
+
+    /// A page's own notices live on Notifications; the page shows how many are on and opens them there,
+    /// scrolled to the first and glowing it, so a switch is never in two places.
+    func alertsLinkItem(_ tint: Color, _ id: String, _ title: String, titles: [String], focus: String) -> NoopSettingsItem {
+        let on = titles.filter(isEnabled).count
+        let detail = titles.count == 1 ? (on == 1 ? "on" : "off") + " · in Notifications" : "\(on) of \(titles.count) on · in Notifications"
+        return NoopSettingsItem(id: id, title: title, detail: detail, keywords: "notifications alerts", focusable: true) {
+            AnyView(copyRow(title, detail: detail, symbol: "bell.badge", tint: tint) {
+                navigation.settingsFocus = focus
+                navigation.settingsFocusGlowed = false
+                navigation.push(.settingsAlerts)
+            })
+        }
+    }
+
+    /// iOS's own permission, stated plainly at the top of Notifications: every switch below is moot
+    /// without it, and a denied one can only be fixed in iOS Settings.
+    func notificationPermissionRow(tint: Color) -> some View {
+        let status = notificationAuth
+        let allowed = status == .authorized || status == .provisional || status == .ephemeral
+        let denied = status == .denied
+        let title = status == nil ? "Checking with iOS…" : allowed ? "Allowed on this iPhone" : denied ? "Turned off in iOS Settings" : "Not allowed yet"
+        let detail = allowed ? "Banners and sounds come through for every switch that is on."
+            : denied ? "Nothing below can reach you until notifications are back on for Noop."
+            : "Noop asks once, the first time a notice has something to say. You can allow it now instead."
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 13) {
+                ZStack {
+                    Circle().fill((allowed ? Self.green : denied ? Self.warm : NoopHTMLColor.faint).opacity(0.16))
+                    Image(systemName: allowed ? "checkmark" : denied ? "bell.slash.fill" : "bell.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(allowed ? Self.green : denied ? Self.warm : NoopHTMLColor.copy)
+                }
+                .frame(width: 30, height: 30)
+                .animation(.smooth(duration: 0.3), value: allowed)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            if status == .notDetermined || denied {
+                Button {
+                    if denied {
+                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
+                    } else {
+                        Task {
+                            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+                            await readNotificationAuth()
+                            await AuraNotices.refresh(repo: model.repo)
+                        }
+                    }
+                } label: {
+                    Text(denied ? "Open iOS Settings" : "Allow notifications")
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 44)
+                        .background(tint.opacity(0.2), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(tint.opacity(0.4), lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                .transition(.opacity)
+            }
+        }
+        .padding(.vertical, 14)
+        .accessibilityElement(children: .contain)
+    }
+
+    func readNotificationAuth() async {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        withAnimation(.smooth(duration: 0.3)) { notificationAuth = status }
+    }
+
     var recalibrateBaselinesRow: some View {
         actionRow(
             baselinesRestarting ? "Baselines restarting from tonight" : "Recalibrate your baselines",
@@ -3955,8 +4064,8 @@ private extension NoopAct5Screens {
                 ? "HRV, resting pulse, respiration and skin temperature all rebuild over about four nights. Your history stays where it is."
                 : "Restart the four-night build-up if a bad week — being ill, a flight — set it wrong.",
             symbol: "gauge.with.dots.needle.50percent",
-            tint: baselinesRestarting ? Self.green : Self.blush,
-            titleColor: baselinesRestarting ? Color(hex: 0x8FE3B4) : nil
+            tint: baselinesRestarting ? Self.green : NoopSettingsPage.scores.tint,
+            titleColor: baselinesRestarting ? Color(hex: 0x8FE3B4) : NoopHTMLColor.ink
         ) {
             // Production runs the real re-anchor the classic screen uses: no day is deleted,
             // only the day the four baselines re-learn from moves, then a rescore.
