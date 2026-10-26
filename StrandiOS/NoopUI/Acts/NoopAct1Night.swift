@@ -61,7 +61,7 @@ struct NoopAct1Screens: View {
         NoopScreen(topInset: 58) {
             VStack(spacing: 0) {
                 // The same top as Recovery and Strain: title, the day pill, the month sheet.
-                NoopScorePageTitle(theme: .sleep, title: "Sleep", dayOffset: $navigation.selectedRestDay, maxBack: 6) { date in
+                NoopScorePageTitle(theme: .sleep, title: "Sleep", dayOffset: restDayStep, maxBack: 6) { date in
                     // The same nights the page steps through, each under the day it ended on, so the
                     // ring under a date is the night that date opens.
                     let key = Repository.localDayKey(date)
@@ -187,7 +187,7 @@ struct NoopAct1Screens: View {
                     }
                 }
                 .buttonStyle(NoopHTMLPressStyle())
-                .modifier(NoopDaySwipe(offset: $navigation.selectedRestDay, maxBack: 6))
+                .modifier(NoopDaySwipe(offset: restDayStep, maxBack: 6))
                 }
             }
         case "inbed":
@@ -1291,6 +1291,25 @@ struct NoopAct1Screens: View {
     /// True when the production record has no night to show: the cards below the hero render at
     /// 38 % and do not respond, per the spec's empty state.
     private var restAbsent: Bool { rest.map { $0.phase != .ready } ?? false }
+
+    /// Today shows the newest night until tonight's exists (after midnight, before waking). A step back
+    /// from it then skips the day whose night Today is already showing, and a step forward onto that
+    /// day lands on Today, so the arrows and the swipe never show one night twice. A jump from the
+    /// calendar goes exactly where it was sent.
+    private var restDayStep: Binding<Int> {
+        Binding(get: { navigation.selectedRestDay }, set: { new in
+            let old = navigation.selectedRestDay
+            guard let rest, abs(new - old) == 1,
+                  rest.slots.last.map({ $0 == nil }) == true, let newest = rest.newestIndex else {
+                navigation.selectedRestDay = new
+                return
+            }
+            let shownByToday = rest.slots.count - 1 - newest
+            if old == 0, new == 1 { navigation.selectedRestDay = min(6, shownByToday + 1) }
+            else if new == shownByToday { navigation.selectedRestDay = 0 }
+            else { navigation.selectedRestDay = new }
+        })
+    }
 
     /// The strip slot the header, ring and shape card describe: the requested day when it holds a
     /// night, otherwise the newest slot with one (nil when the week holds none).
