@@ -1393,7 +1393,7 @@ private struct NoopInstrumentMetricScreen: View {
                     }
                 }
                 if model.signal.key == "recovery" {
-                    Text("Line colours follow Aura’s Charge scale for each recorded score.")
+                    Text("Line colours follow Aura’s recovery scale for each recorded score.")
                 }
                 Text("Source · \((selectedReading ?? model.readings.last)?.source ?? (model.signal.behavior ? "Recorded journal answers" : "Source details unavailable"))")
                 Text(model.signal.key == "weight" ? "The source supplies a daily aggregate. This list does not claim to show every individual weigh-in. Body-measurement unit preferences apply throughout this view." : "The period average uses recorded daily values, not a time-weighted average.")

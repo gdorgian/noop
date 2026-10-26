@@ -7,7 +7,7 @@ import WhoopStore
 
 /// Noop Aura's own notifications, scheduled from what the data says (`NoticeRules`):
 ///
-///  • Your night is in: once the night is scored, its sleep and Charge, if Noop is not already open.
+///  • Your night is in: once the night is scored, its sleep and recovery, if Noop is not already open.
 ///  • Bedtime: a quiet nudge before the bedtime that gets the wearer their own need before their usual wake,
 ///    planned a week ahead, per weekday. Off until Noop has learned the nights it needs; Today then offers it.
 ///  • A new best: a vital that beat every night of the last three months. Off by default.
@@ -111,7 +111,7 @@ enum AuraNotices {
         if let deep = night.deepMin, deep > 0 { stages.append("Deep \(duration(deep))") }
         if let rem = night.remMin, rem > 0 { stages.append("REM \(duration(rem))") }
         post(id: "noop.morning",
-             title: "\(duration(asleep)) asleep · Charge \(Int(charge.rounded()))",
+             title: "\(duration(asleep)) asleep · Recovery \(Int(charge.rounded()))",
              body: (stages.isEmpty ? "" : stages.joined(separator: ", ") + ". ") + "Your day is ready to read.",
              level: .active, center: center)
     }
@@ -162,7 +162,7 @@ enum AuraNotices {
             (last.avgHrv, prior.compactMap(\.avgHrv), true, 2, "Highest HRV in three months", "ms"),
             (last.restingHr.map(Double.init), prior.compactMap { $0.restingHr.map(Double.init) }, false, 1,
              "Lowest resting pulse in three months", "bpm"),
-            (last.recovery, prior.compactMap(\.recovery), true, 2, "Highest Charge in three months", "")
+            (last.recovery, prior.compactMap(\.recovery), true, 2, "Highest recovery in three months", "")
         ]
         for c in checks {
             guard let value = c.value,
@@ -199,7 +199,7 @@ enum AuraNotices {
         }
         if let c = a.charge {
             let delta = b.charge.map { Int((c - $0).rounded()) }
-            parts.append("Charge \(Int(c.rounded()))" + (delta.map { $0 == 0 ? "" : " (\($0 > 0 ? "+" : "−")\(abs($0)))" } ?? ""))
+            parts.append("Recovery \(Int(c.rounded()))" + (delta.map { $0 == 0 ? "" : " (\($0 > 0 ? "+" : "−")\(abs($0)))" } ?? ""))
         }
         parts.append(a.sessions == 1 ? "1 session" : "\(a.sessions) sessions")
         post(id: weeklyId, title: "Your week", body: parts.joined(separator: ", ") + ".",

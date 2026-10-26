@@ -273,19 +273,19 @@ struct NoopAct1Screens: View {
                         // Production needs an armed alarm and a verified in-bed-to-sleep interval;
                         // the current sleep record has no in-bed start, so this is only a door.
                         if !activeBedtimes.isEmpty {
-                        Text("Lights out by \(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].time)")
+                        Text("Lights out by \(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].time.noopClock)")
                             .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
                             .tracking(-0.675)
                             .frame(minHeight: 29.7, alignment: .top)
                         Text(rest == nil && selectedBedtime == 2
-                             ? "Clears twenty minutes of debt before your \(alarmTime) alarm."
-                             : "\(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].length) before your \(alarmTime) alarm.")
+                             ? "Clears twenty minutes of debt before your \(alarmTime.noopClock) alarm."
+                             : "\(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].length) before your \(alarmTime.noopClock) alarm.")
                             .font(NoopHTMLFont.sans(NoopType.footnote))
                             .foregroundStyle(Color(hex: 0xB7C3C9))
                             .noopAct1LineBox(fontSize: 13, ratio: 1.5)
                         } else if rest != nil && behavior.smartAlarmEnabled {
                             // No bedtime to show, but an armed alarm is a decision already made.
-                            Text("Wake by \(alarmSetText)")
+                            Text("Wake by \(alarmSetText.noopClock)")
                                 .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
                                 .tracking(-0.675)
                                 .frame(minHeight: 29.7, alignment: .top)
@@ -725,13 +725,13 @@ struct NoopAct1Screens: View {
                             .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                             .tracking(1.25)
                             .foregroundStyle(NoopHTMLColor.muted)
-                        Text(activeBedtimes[selectedBedtime].time)
+                        Text(activeBedtimes[selectedBedtime].time.noopClock)
                             .font(NoopHTMLFont.act1Outfit200(82))
                             .tracking(-3.69)
                             .monospacedDigit()
                             .frame(minHeight: 77.08, alignment: .top)
                             .offset(y: -13)
-                        Text("\(activeBedtimes[selectedBedtime].length) before your \(alarmTime) alarm")
+                        Text("\(activeBedtimes[selectedBedtime].length) before your \(alarmTime.noopClock) alarm")
                             .font(NoopHTMLFont.sans(NoopType.subhead))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .monospacedDigit()
@@ -750,7 +750,7 @@ struct NoopAct1Screens: View {
                                     bedtimeCommitted = false
                                 } label: {
                                     VStack(spacing: 4) {
-                                        Text(stop.time)
+                                        Text(stop.time.noopClock)
                                             .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                             .foregroundStyle(selected ? NoopHTMLColor.ink : NoopHTMLColor.copy)
                                         Text(stop.length)
@@ -810,7 +810,7 @@ struct NoopAct1Screens: View {
                             HStack(spacing: 13) {
                                 NoopCanonicalGlyph(name: .alarm, size: 21, color: NoopHTMLColor.night)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text("Wake me by \(alarmSetText)")
+                                    Text("Wake me by \(alarmSetText.noopClock)")
                                         .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
                                         .foregroundStyle(alarmArmed ? Color(hex: 0xEDF1EF) : Color(hex: 0xEDF1EF).opacity(0.38))
                                     Text(alarmArmed ? alarmFromText : "Not armed")
@@ -830,12 +830,15 @@ struct NoopAct1Screens: View {
                         tonightToggle(
                             glyph: .watch,
                             title: "Armed on the strap",
-                            detail: strapAlarmHeld && alarmArmed
+                            detail: rest != nil && !strapPaired
+                                ? "Pair a strap first. The alarm runs on it"
+                                : strapAlarmHeld && alarmArmed
                                 ? "Time saved. A 5.0 does not buzz until you allow it on the alarm screen"
                                 : "Fires with your phone off, silent, or in another room",
                             isOn: alarmArmed
                         ) {
                             if rest != nil {
+                                guard strapPaired else { return }
                                 behavior.smartAlarmEnabled.toggle()
                                 model.applySmartAlarm()
                             } else {
@@ -847,7 +850,7 @@ struct NoopAct1Screens: View {
                         Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
                         tonightToggle(
                             glyph: .bell,
-                            title: "Buzz me to wind down at \(windDownTime)",
+                            title: "Buzz me to wind down at \(windDownTime.noopClock)",
                             detail: "One buzz on the wrist. No notification.",
                             isOn: windDownBuzz
                         ) { windDownBuzz.toggle() }
@@ -862,7 +865,7 @@ struct NoopAct1Screens: View {
                         if bedtimeCommitted {
                             HStack(spacing: 12) {
                                 Act1CheckDisc(size: 18)
-                                Text("Set — lights out \(activeBedtimes[selectedBedtime].time)\(windDownBuzz ? ", buzz at \(windDownTime)" : ", no wind-down buzz")")
+                                Text("Set — lights out \(activeBedtimes[selectedBedtime].time.noopClock)\(windDownBuzz ? ", buzz at \(windDownTime.noopClock)" : ", no wind-down buzz")")
                                     .font(NoopHTMLFont.sans(NoopType.footnote))
                                     .foregroundStyle(NoopHTMLColor.inkSoft)
                                 Spacer()
@@ -1108,15 +1111,20 @@ struct NoopAct1Screens: View {
 
                     VStack(alignment: .leading, spacing: 7) {
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Text(Self.formatDebt(model.values[point]))
+                            Text(debtUnmeasured ? "\u{2014}" : Self.formatDebt(model.values[point]))
                                 .font(NoopHTMLFont.act1Outfit200(52))
                                 .tracking(-2.08)
                                 .scaleEffect(x: 1.07, y: 1, anchor: .leading)
-                                .frame(width: 163, height: 52, alignment: .topLeading)
+                                .fixedSize()
+                                .frame(height: 52, alignment: .topLeading)
+                                // The 7% stretch draws past the text's own width; keep "behind" clear of it.
+                                .padding(.trailing, 8)
                                 .offset(x: 2, y: -3)
-                            Text("behind")
-                                .font(NoopHTMLFont.sans(NoopType.footnote))
-                                .foregroundStyle(NoopHTMLColor.copy)
+                            if !debtUnmeasured {
+                                Text("behind")
+                                    .font(NoopHTMLFont.sans(NoopType.footnote))
+                                    .foregroundStyle(NoopHTMLColor.copy)
+                            }
                         }
                         Text(rest == nil ? "against your own need of 7h 05m a night"
                              : "against your need of \(rest.map { NoopRestRecord.duration($0.needMin) } ?? "") a night")
@@ -1128,6 +1136,13 @@ struct NoopAct1Screens: View {
 
                     VStack(alignment: .leading, spacing: 10) {
                         NoopSectionLabel("Running balance · \(debtRange)")
+                        if debtUnmeasured {
+                            Text("Your running balance starts with the first night the strap records.")
+                                .font(NoopHTMLFont.sans(NoopType.caption))
+                                .foregroundStyle(NoopHTMLColor.faint)
+                                .frame(maxWidth: .infinity, minHeight: 118)
+                                .multilineTextAlignment(.center)
+                        } else {
                         Act1DebtChart(
                             values: model.values,
                             selectedIndex: point,
@@ -1135,6 +1150,7 @@ struct NoopAct1Screens: View {
                             value: "\(Self.formatDebt(model.values[point])) behind"
                         ) { debtPoint = $0 }
                         .frame(height: 118)
+                        }
                         HStack {
                             Text(debtLabel(model.axis[0])); Spacer()
                             Text(debtLabel(model.axis[1])); Spacer()
@@ -1456,12 +1472,22 @@ struct NoopAct1Screens: View {
         return String(format: "%02d:%02d", m / 60, m % 60)
     }
     private var alarmSetText: String { alarmClock(alarmSetMinutes) }
+    /// The hero keeps its large digits on a 12-hour clock too; the AM/PM rides along small.
+    private var alarmHeroText: AttributedString {
+        guard !AppClock.uses24Hour else { return AttributedString(alarmSetText) }
+        let m = ((alarmSetMinutes % 1440) + 1440) % 1440
+        var digits = AttributedString("\((m / 60 + 11) % 12 + 1):\(String(format: "%02d", m % 60))")
+        var suffix = AttributedString(m < 720 ? " AM" : " PM")
+        suffix.font = NoopHTMLFont.outfit200(30)
+        digits.append(suffix)
+        return digits
+    }
     /// The one sentence every other surface reads, so the row on `tonight` and the screen itself
     /// cannot drift apart.
     private var alarmFromText: String {
         alarmWindowMinutes == 0
-            ? "Exactly \(alarmSetText), whatever stage you are in"
-            : "From \(alarmClock(alarmSetMinutes - alarmWindowMinutes)), at whichever moment you are closest to light sleep"
+            ? "Exactly \(alarmSetText.noopClock), whatever stage you are in"
+            : "From \(alarmClock(alarmSetMinutes - alarmWindowMinutes).noopClock), at whichever moment you are closest to light sleep"
     }
 
     private var alarmScreen: some View {
@@ -1482,8 +1508,8 @@ struct NoopAct1Screens: View {
                         alarmWindowPicker
                         // The strap's firmware alarm is exact; production has no light-sleep window to offer yet.
                         Text(rest != nil
-                            ? "Exact means exact — the strap wakes you at \(alarmSetText) whatever stage you are in. An earlier window needs light-sleep timing the strap does not give yet."
-                            : "Fifteen minutes is enough to find light sleep on most nights. Exact means exact — it wakes you at \(alarmSetText) whatever stage you are in.")
+                            ? "Exact means exact — the strap wakes you at \(alarmSetText.noopClock) whatever stage you are in. An earlier window needs light-sleep timing the strap does not give yet."
+                            : "Fifteen minutes is enough to find light sleep on most nights. Exact means exact — it wakes you at \(alarmSetText.noopClock) whatever stage you are in.")
                             .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                             .lineSpacing(NoopSpecType.lineSpacing(size: 11.5, cssLineHeight: 1.55, face: NoopSpecType.Face.sansRegular))
@@ -1528,7 +1554,7 @@ struct NoopAct1Screens: View {
     private var alarmHeroRow: some View {
         HStack(spacing: 16) {
             alarmStep(later: false) { setAlarm(alarmSetMinutes - 5) }
-            Text(alarmSetText)
+            Text(alarmHeroText)
                 .font(NoopHTMLFont.outfit200(82))
                 .tracking(-3.69)              // −.045em × 82
                 .monospacedDigit()
@@ -1619,7 +1645,7 @@ struct NoopAct1Screens: View {
                             Text(window == 0 ? "Exact" : "\(window) min")
                                 .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                                 .foregroundStyle(on ? Color(hex: 0xC9CEE8) : NoopHTMLColor.muted)
-                            Text(window == 0 ? alarmSetText : "from \(alarmClock(alarmSetMinutes - window))")
+                            Text(window == 0 ? alarmSetText.noopClock : "from \(alarmClock(alarmSetMinutes - window).noopClock)")
                                 .font(NoopHTMLFont.sans(NoopType.eyebrow))
                                 .monospacedDigit()
                                 .foregroundStyle(NoopHTMLColor.faint)
@@ -1774,7 +1800,14 @@ struct NoopAct1Screens: View {
         .buttonStyle(NoopPlainHitStyle())
     }
     /// Armed means the strap alarm is on, in production; the prototype keeps its own flag.
-    private var alarmArmed: Bool { rest != nil ? behavior.smartAlarmEnabled : smartWake }
+    /// A measured record with no night in it yet: there is no balance to read, not a balance of zero.
+    private var debtUnmeasured: Bool { rest.map { $0.debt.isEmpty } ?? false }
+
+    private var alarmArmed: Bool { rest != nil ? behavior.smartAlarmEnabled && strapPaired : smartWake }
+    /// The alarm lives on the strap, so with none paired it cannot be armed, whatever was saved.
+    private var strapPaired: Bool {
+        !NoopStraps.paired(model.deviceRegistry?.devices ?? []).isEmpty
+    }
 
     private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
     private var rhythmLine: String {
@@ -1804,8 +1837,8 @@ struct NoopAct1Screens: View {
             labels: labels.isEmpty ? [""] : labels,
             axis: axis,
             stats: [("Your need", NoopRestRecord.duration(rest.needMin)),
-                    ("Clear nights", "\(clear) of \(deltas.count)"),
-                    ("Paid back", NoopRestRecord.duration(paid)),
+                    ("Clear nights", deltas.isEmpty ? "\u{2014}" : "\(clear) of \(deltas.count)"),
+                    ("Paid back", deltas.isEmpty ? "\u{2014}" : NoopRestRecord.duration(paid)),
                     ("Worst night", worst > 0 ? NoopRestRecord.duration(worst) : "\u{2014}")],
             read: ""
         )
@@ -2483,4 +2516,16 @@ private extension NoopAct1Screens {
             read: "Three months ago you were routinely three hours behind. You are not any more, and that happened without a single early alarm."
         )
     ]
+}
+
+extension String {
+    /// A stored "HH:mm" in the wearer's own clock (12- or 24-hour, as `AppClock` decides).
+    /// Anything that is not a clock is returned unchanged.
+    var noopClock: String {
+        let parts = split(separator: ":")
+        guard parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]),
+              (0..<24).contains(h), (0..<60).contains(m),
+              let date = Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date()) else { return self }
+        return AppClock.hourMinute(date)
+    }
 }

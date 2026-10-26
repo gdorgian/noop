@@ -1694,7 +1694,7 @@ private extension NoopAct6Screens {
                                 .tracking(-3.5)
                                 .foregroundStyle(Color(hex: 0x3E4643))
                                 .frame(minHeight: 63, alignment: .top)
-                            Text("\u{00B1} 5 yr\nnot yet available")
+                            Text("not yet available")
                                 .font(NoopHTMLFont.sans(13))
                                 .foregroundStyle(Color(hex: 0x8B958F))
                                 .padding(.bottom, 8)

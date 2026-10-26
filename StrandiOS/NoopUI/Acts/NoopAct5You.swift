@@ -774,7 +774,7 @@ private extension NoopAct5Screens {
     /// The active strap's model, from the device registry. Nil when none is paired.
     private var liveStrapDetail: String? {
         guard let registry = model.deviceRegistry,
-              let active = registry.devices.first(where: { $0.id == registry.activeDeviceId }) else { return nil }
+              let active = NoopStraps.paired(registry.devices).first(where: { $0.id == registry.activeDeviceId }) else { return nil }
         return active.displayName
     }
 
@@ -1854,7 +1854,7 @@ private extension NoopAct5Screens {
                                         .fill(connected ? Self.green : NoopHTMLColor.faint)
                                         .frame(width: 8, height: 8)
                                         .shadow(color: connected ? Self.green.opacity(0.7) : .clear, radius: 5)
-                                    Text(connected ? "Connected and reading" : "Disconnected")
+                                    Text(connected ? "Connected and reading" : liveDevices.isEmpty ? "No strap paired" : "Disconnected")
                                         .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                                 }
                                 strapFact("Secure link", connected && live.encryptedBond ? "Encrypted" : "\u{2014}")
@@ -1862,8 +1862,10 @@ private extension NoopAct5Screens {
                             }
                         }
                         NoopStrapSyncButton(connected: connected,
+                                            paired: connected || !liveDevices.isEmpty,
                                             sync: { model.ble.syncNow() },
-                                            reconnect: { model.ble.connectFromSystem() })
+                                            reconnect: { model.ble.connectFromSystem() },
+                                            pair: { navigation.push(.pair) })
                     }
                 }
 
@@ -2051,7 +2053,7 @@ private extension NoopAct5Screens {
         }
     }
 
-    var pairedStrapCount: Int { model.deviceRegistry?.devices.count ?? 0 }
+    var pairedStrapCount: Int { NoopStraps.paired(model.deviceRegistry?.devices ?? []).count }
 
     var prototypeStrapScreen: some View {
         NoopScreen(topInset: 56) {
@@ -2478,7 +2480,7 @@ private extension NoopAct5Screens {
                     Text("An imported score never becomes your score")
                         .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blueLight)
-                    Text("Another app\u{2019}s readiness or sleep score is kept under its own name and is never shown as Charge, Effort or Rest. Noop recomputes its own from the raw pulse, variability and sleep it can see.")
+                    Text("Another app\u{2019}s readiness or sleep score is kept under its own name and is never shown as Recovery, Effort or Rest. Noop recomputes its own from the raw pulse, variability and sleep it can see.")
                         .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Color(hex: 0xB7C3C9))
                         .lineSpacing(3)
@@ -2571,7 +2573,7 @@ private extension NoopAct5Screens {
                     Text("An imported score never becomes your score")
                         .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                         .foregroundStyle(NoopHTMLColor.blueLight)
-                    Text("Another app’s readiness or sleep score is kept under its own name and is never shown as Charge, Effort or Rest. Noop recomputes its own from the raw pulse, variability and sleep it can see.")
+                    Text("Another app’s readiness or sleep score is kept under its own name and is never shown as Recovery, Effort or Rest. Noop recomputes its own from the raw pulse, variability and sleep it can see.")
                         .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Color(hex: 0xB7C3C9))
                         .lineSpacing(3)
@@ -2812,7 +2814,7 @@ private extension NoopAct5Screens {
                     Divider().overlay(NoopHTMLColor.border)
                     toggleRow("Stress check-ins", detail: "A passive haptic when stress holds high for twenty minutes. Off by default, because most people find it lands at the worst moment.", tint: Self.blush)
                     Divider().overlay(NoopHTMLColor.border)
-                    toggleRow("Illness early warning", detail: "Watches four signals against your own 28-day normal and says what it ruled out first. It appears in the charge ledger, priced like any other drain — it never takes over the screen.", tint: Self.blush)
+                    toggleRow("Illness early warning", detail: "Watches four signals against your own 28-day normal and says what it ruled out first. It shows as a quiet card and never takes over the screen.", tint: Self.blush)
                 }
 
                 automationGroup("A ceiling, and a nudge", note: "") {
@@ -3028,9 +3030,7 @@ private extension NoopAct5Screens {
 
     // MARK: Manage straps, measured
 
-    var liveDevices: [PairedDevice] {
-        (model.deviceRegistry?.devices ?? []).filter { $0.status != .archived && $0.sourceKind == .liveBLE }
-    }
+    var liveDevices: [PairedDevice] { NoopStraps.paired(model.deviceRegistry?.devices ?? []) }
 
     var liveDevicesScreen: some View {
         let registry = model.deviceRegistry
@@ -4012,7 +4012,7 @@ private extension NoopAct5Screens {
                     alertsLinkItem(tint, "sleep-alerts", "Sleep alerts", titles: ["Your night is in", "Bedtime nudge"], focus: "alerts-night")
                 ]),
                 NoopSettingsSection(title: "Waking", items: [
-                    linkItem(tint, "sleep-alarm", "Smart alarm", "a buzz in light sleep, inside the window you set", symbol: "alarm",
+                    linkItem(tint, "sleep-alarm", "Smart alarm", "a buzz on the strap at the time you set", symbol: "alarm",
                              keywords: "alarm wake window wake-up") { navigation.push(.alarm) }
                 ])
             ]
@@ -4110,15 +4110,15 @@ private extension NoopAct5Screens {
                                keywords: "not synced swiped away")
                 ]),
                 NoopSettingsSection(title: "Sleep", items: [
-                    toggleItem(tint, "alerts-night", "Your night is in", "Once last night is scored, its sleep and Charge. Not when Noop is already open.",
+                    toggleItem(tint, "alerts-night", "Your night is in", "Once last night is scored, its sleep and recovery. Not when Noop is already open.",
                                keywords: "morning sleep charge scored"),
                     toggleItem(tint, "alerts-bedtime", "Bedtime nudge", "Thirty minutes before the bedtime that gets you your own sleep need before your usual wake. Learned per weekday after fourteen nights.",
                                keywords: "wind down bedtime reminder")
                 ]),
                 NoopSettingsSection(title: "Progress", items: [
-                    toggleItem(tint, "alerts-best", "A new best", "When last night beat three months on HRV, resting pulse or Charge. Never more than one a day.",
+                    toggleItem(tint, "alerts-best", "A new best", "When last night beat three months on HRV, resting pulse or recovery. Never more than one a day.",
                                keywords: "record hrv resting personal best"),
-                    toggleItem(tint, "alerts-weekly", "Weekly read", "Sunday at seven: sleep, Charge and sessions against the week before. Off by default.",
+                    toggleItem(tint, "alerts-weekly", "Weekly read", "Sunday at seven: sleep, recovery and sessions against the week before. Off by default.",
                                keywords: "week summary sunday digest")
                 ]),
                 NoopSettingsSection(title: "Data", items: [
@@ -5658,8 +5658,10 @@ struct NoopLivePairScreen: View {
 /// when the strap last synced. A tap the strap ignores because it is already caught up reads "Up to date".
 struct NoopStrapSyncButton: View {
     let connected: Bool
+    var paired: Bool = true
     let sync: () -> Void
     let reconnect: () -> Void
+    var pair: () -> Void = {}
 
     @EnvironmentObject private var live: LiveState
     @State private var requestedAt: Date?
@@ -5681,6 +5683,7 @@ struct NoopStrapSyncButton: View {
     var body: some View {
         VStack(spacing: 8) {
             Button {
+                guard paired else { pair(); return }
                 guard connected else { reconnect(); return }
                 guard !live.backfilling, requestedAt == nil else { return }
                 outcome = nil
@@ -5744,6 +5747,7 @@ struct NoopStrapSyncButton: View {
     }
 
     private var title: String {
+        guard paired else { return "Pair a strap" }
         guard connected else { return "Reconnect" }
         switch phase {
         case .idle: return "Sync now"
@@ -5764,7 +5768,7 @@ struct NoopStrapSyncButton: View {
         case .done:
             Image(systemName: "checkmark")
         case .idle:
-            Image(systemName: "arrow.triangle.2.circlepath")
+            Image(systemName: paired ? "arrow.triangle.2.circlepath" : "plus")
         }
     }
 
@@ -5791,6 +5795,7 @@ struct NoopStrapSyncButton: View {
     private var caption: String {
         if case .done(.failed(let why)) = phase, connected { return why }
         if live.backfilling { return "Pulling stored history from the strap. Keep it close." }
+        guard paired else { return "Hold the strap close and keep it charged" }
         guard let ts = live.lastSyncedAt else { return connected ? "Not synced yet" : "Strap not connected" }
         let when = Date(timeIntervalSince1970: ts)
         if Date().timeIntervalSince(when) < 60 { return "Last synced just now" }
@@ -5884,7 +5889,7 @@ enum NoopSettingsPage: String, CaseIterable, Identifiable {
         case .today: "What sits on Today besides your numbers: the journal strip and the trackers that add their own cards."
         case .sleep: "How a night is read and how you are woken."
         case .fitness: "The workout screen, and what Noop does when it sees a session you did not start."
-        case .scores: "Charge, Effort and the baselines they are measured against."
+        case .scores: "Recovery, Effort and the baselines they are measured against."
         case .you: "Your record, your zones, and what Noop leaves out on purpose."
         case .strap: "The strap itself, its battery, and what it captures."
         case .alerts: "Every notice Noop can send, and the hours it stays quiet."
@@ -6010,7 +6015,7 @@ struct NoopPendingOption: Identifiable {
               why: "Every Aura page that counts a day has to follow the same choice. It comes once they all can."),
         .init(id: "pending-hrv-window", page: .sleep, status: .later, title: "HRV window", symbol: "waveform.path.ecg",
               does: "Read your nightly HRV over the whole night, or over deep sleep only.",
-              why: "The classic setting changes one number; in Aura, Charge, Trends and the night all read HRV and need to agree."),
+              why: "The classic setting changes one number; in Aura, Recovery, Trends and the night all read HRV and need to agree."),
         .init(id: "pending-sleep-chart", page: .sleep, status: .later, title: "Sleep chart", symbol: "chart.bar.xaxis",
               does: "The hypnogram drawn as rows or as a ribbon instead.",
               why: "Designed, not built yet."),
@@ -6019,7 +6024,7 @@ struct NoopPendingOption: Identifiable {
               does: "Turn off the strap’s buzzes during a workout, a breathing session or the interval timer, each on its own.",
               why: "Each Aura session screen buzzes through its own path, and the switches need wiring into every one."),
         .init(id: "pending-live-sessions", page: .fitness, status: .deciding, title: "Live Sessions", symbol: "shield.lefthalf.filled",
-              does: "A one-tap guarded workout: the strap watches your heart rate against a band set by today’s Charge and only buzzes to correct course.",
+              does: "A one-tap guarded workout: the strap watches your heart rate against a band set by today’s recovery and only buzzes to correct course.",
               why: "Aura’s session screens already cover most of it. Whether the guard returns as its own mode is open."),
         // Trends and scores
         .init(id: "pending-chart-colours", page: .scores, status: .later, title: "Chart colours", symbol: "paintpalette",
@@ -6055,7 +6060,7 @@ struct NoopPendingOption: Identifiable {
               does: "An early heads-up when the strap has about a day of estimated runtime left, at most once per discharge.",
               why: "The estimate already runs. The notice needs testing on a real discharge first."),
         .init(id: "pending-effort-target", page: .alerts, status: .later, title: "Effort target reached", symbol: "flame",
-              does: "Once a day, when today’s Effort reaches the low end of what your Charge allows.",
+              does: "Once a day, when today’s Effort reaches the low end of what your recovery allows.",
               why: "Aura names that range differently. The wording and the number need to agree first."),
         .init(id: "pending-session-offer", page: .alerts, status: .later, title: "Session offer", symbol: "figure.run",
               does: "One notification a day, in the morning, with today’s recommendation.",
@@ -6110,7 +6115,7 @@ struct NoopPendingOption: Identifiable {
               does: "An experimental view of beat-to-beat regularity. It needs reading and ticking a page first: no alarms, no red, no condition names.",
               why: "The consent page and the view need Aura’s design before it can be offered."),
         .init(id: "pending-hrv-readiness", page: .lab, status: .later, title: "HRV readiness tiers", symbol: "gauge.with.needle",
-              does: "A read-only tier from the Plews and Altini method, beside Charge. It changes nothing else.",
+              does: "A read-only tier from the Plews and Altini method, beside Recovery. It changes nothing else.",
               why: "Rough and early. It comes with the Lab’s readouts."),
         .init(id: "pending-ppg-interpolation", page: .lab, status: .later, title: "Finer heart rate from the optical signal", symbol: "point.topleft.down.to.point.bottomright.curvepath",
               does: "Removes a step of up to about 8 bpm when Noop fills seconds the strap never reported. It never replaces a stored reading.",
@@ -6123,4 +6128,16 @@ struct NoopPendingOption: Identifiable {
               does: "A quiet check for a new version once a day, and a notice when one is out.",
               why: "Aura only asks the release page when you tap. An automatic check comes with the notice for it.")
     ]
+}
+
+/// The straps the wearer has actually paired. A fresh install carries upstream's seed WHOOP (`my-whoop`)
+/// before any strap has been found; until a connect lands on it, it is a placeholder, not a band.
+enum NoopStraps {
+    static func paired(_ devices: [PairedDevice]) -> [PairedDevice] {
+        let everConnected = UserDefaults.standard.string(forKey: BLEManager.lastConnectedPeripheralKey) != nil
+        return devices.filter { device in
+            guard device.status != .archived, device.sourceKind == .liveBLE else { return false }
+            return device.id != "my-whoop" || device.peripheralId != nil || everConnected
+        }
+    }
 }

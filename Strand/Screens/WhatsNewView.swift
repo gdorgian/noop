@@ -1,7 +1,7 @@
 import SwiftUI
 import StrandDesign
 
-/// Aura's release sheet. The four 11.7 readings are fixed product copy from the final HTML; the
+/// Aura's release sheet. The four readings are fixed product copy for the current version; the
 /// history beneath them is always rendered from `AppChangelog`, which remains the single source of
 /// truth for version, date and release-entry text.
 struct WhatsNewView: View {
@@ -95,7 +95,7 @@ struct WhatsNewView: View {
             }
 
             VStack(alignment: .leading, spacing: 9) {
-                Text(presentation == .bell ? "What 11.7 brought." : "Noop is Noop Aura now.")
+                Text(presentation == .bell ? "What \(Self.shortVersion(AppChangelog.currentVersion)) brought." : "Noop is Noop Aura now.")
                     .font(.custom(NoopSpecType.Face.outfitLight, size: 27))
                     .tracking(-0.81)
                     .foregroundStyle(NoopPalette.textPrimary)
@@ -103,7 +103,7 @@ struct WhatsNewView: View {
 
                 Text(
                     presentation == .bell
-                        ? "The four readings from this version, and every version before it."
+                        ? "Four things worth a minute from this version, and every version before it."
                         : "The name changed because the app did. Four things are worth a minute; the rest is in the list below."
                 )
                 .font(NoopSpecType.body)
@@ -126,29 +126,35 @@ struct WhatsNewView: View {
     private var readings: some View {
         VStack(spacing: 0) {
             releaseReading(
-                icon: .lift,
-                title: "The lift",
-                detail: "Strength has its own place now: your programs, a screen built for the set you are in, and what each session actually loaded. Every target is optional — a line can be nothing but an exercise name.",
+                icon: .grid,
+                title: "Pages you arrange",
+                detail: "Hold any section to move it, remove it, or add one from the gallery. Today, Rest, Trends, Fitness, You, Recovery and Strain all work the same way.",
                 first: true
             )
             releaseReading(
                 icon: .gauge,
-                title: "What the day cost",
-                detail: "Today carries an estimate of what you spent, as a range rather than a figure. It will never set a number for you to eat against."
+                title: "Settings, rebuilt",
+                detail: "A hub of pages with your strap on top, a search that finds every setting, and a dot on anything you changed."
             )
             releaseReading(
-                icon: .trends,
-                title: "What changed",
-                detail: "Trends opens with what moved since you last looked. Twelve kinds of finding, and nothing in the list needs answering."
+                icon: .lift,
+                title: "A deeper Fitness",
+                detail: "Routines, programs, your own heart-rate zones and Hevy, with load, muscles and sessions read from what you actually did."
             )
             releaseReading(
-                icon: .mic,
-                title: "Speak to Svea",
-                detail: "Hold the mic in a conversation and talk instead of typing. Voice is how you say it; Manner is still how she writes back."
+                icon: .bell,
+                title: "Quiet notices",
+                detail: "Your night is in, battery, a sync reminder and a backup reminder. Nothing else speaks unless you turn it on."
             )
         }
         .padding(.horizontal, 22)
         .padding(.top, 20)
+    }
+
+    /// "12.0.0" -> "12.0", the way the header names a version.
+    static func shortVersion(_ version: String) -> String {
+        let parts = version.split(separator: ".")
+        return parts.count > 2 && parts[2] == "0" ? parts.prefix(2).joined(separator: ".") : version
     }
 
     private func releaseReading(
@@ -370,7 +376,7 @@ struct WhatsNewView: View {
 }
 
 private enum ReleaseReadingIcon {
-    case lift, gauge, trends, mic
+    case lift, gauge, trends, mic, grid, bell
 
     #if os(iOS)
     var canonicalName: NoopCanonicalGlyphName {
@@ -379,6 +385,8 @@ private enum ReleaseReadingIcon {
         case .gauge: .gauge
         case .trends: .trends
         case .mic: .mic
+        case .grid: .grid
+        case .bell: .bell
         }
     }
     #else
@@ -388,6 +396,8 @@ private enum ReleaseReadingIcon {
         case .gauge: "gauge.with.dots.needle.50percent"
         case .trends: "chart.bar.xaxis"
         case .mic: "mic"
+        case .grid: "square.grid.2x2"
+        case .bell: "bell"
         }
     }
     #endif

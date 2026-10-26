@@ -354,7 +354,9 @@ public enum WeeklyDigestEngine {
         if lines.isEmpty {
             let currentDays = summaries.map { $0.weekOverWeek.current.n }.max() ?? 0
             let prevDays = summaries.map { $0.weekOverWeek.previous.n }.max() ?? 0
-            if currentDays >= 1 && currentDays < minDaysForFocus {
+            if currentDays == 0 {
+                // Nothing measured this week: there is no week to call steady.
+            } else if currentDays < minDaysForFocus {
                 let dayWord = currentDays == 1 ? "day" : "days"
                 lines.append("Only \(currentDays) \(dayWord) into this week so far, too early to "
                     + "call a week-over-week trend yet.")

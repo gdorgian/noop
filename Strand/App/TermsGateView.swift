@@ -221,11 +221,39 @@ struct TermsGateView: View {
         }
     }
 
+    /// Full-syntax `AttributedString(markdown:)` drops the break between paragraphs ("§6).By installing"),
+    /// so each paragraph and list item is parsed for inline emphasis only and laid out on its own.
     private func legalText(_ markdown: String) -> some View {
-        Text((try? AttributedString(markdown: markdown)) ?? AttributedString(markdown))
-            .noopText(NoopSpecType.Role.bodySmall)
-            .foregroundStyle(NoopSpecTokens.textBody)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(Self.legalBlocks(markdown).enumerated()), id: \.offset) { _, block in
+                Text((try? AttributedString(markdown: block)) ?? AttributedString(block))
+                    .noopText(NoopSpecType.Role.bodySmall)
+                    .foregroundStyle(NoopSpecTokens.textBody)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    /// Paragraphs split on blank lines, list items split on their markers, quote markers and soft wraps removed.
+    static func legalBlocks(_ markdown: String) -> [String] {
+        var blocks: [String] = []
+        var current: [String] = []
+        func flush() {
+            if !current.isEmpty { blocks.append(current.joined(separator: " ")) }
+            current = []
+        }
+        for raw in markdown.components(separatedBy: .newlines) {
+            var line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix(">") { line = String(line.dropFirst()).trimmingCharacters(in: .whitespaces) }
+            if line.isEmpty { flush(); continue }
+            if line.hasPrefix("- ") || line.hasPrefix("* ") {
+                flush()
+                line = "•  " + line.dropFirst(2)
+            }
+            current.append(line)
+        }
+        flush()
+        return blocks
     }
 
     private var attestations: some View {

@@ -1174,9 +1174,9 @@ private struct NoopVerifiedRouteScreen: View {
     var body: some View {
         NoopScreen {
             VStack(alignment: .leading, spacing: 14) {
-                if route.hidesBottomBar {
-                    NoopBackHeader(label: route.act == .effort ? "Session" : "You", action: backAction)
-                }
+                // Every route that lands here was pushed from somewhere, so it always offers the way back.
+                NoopBackHeader(label: route.hidesBottomBar ? (route.act == .effort ? "Session" : "You") : "Today",
+                               action: backAction)
                 NoopScreenHeader(title, eyebrow: eyebrow)
 
                 if !repo.loaded {

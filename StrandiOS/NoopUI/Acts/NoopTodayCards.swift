@@ -144,7 +144,9 @@ struct NoopTodayDayRibbon: View {
 
     private var hasStress: Bool { stress.contains { $0.level != nil } }
 
-    private var start: Date { sleep?.start ?? points.first?.time ?? Date() }
+    private var start: Date { sleep?.start ?? points.first?.time ?? Calendar.current.startOfDay(for: Date()) }
+    /// Without a night or a reading there is no start to name, only the day itself.
+    private var hasRecord: Bool { sleep != nil || !points.isEmpty }
     private var now: Date { Date() }
     private var peak: (time: Date, bpm: Double)? {
         let awake = points.filter { p in sleep.map { p.time >= $0.end } ?? true }
@@ -173,7 +175,7 @@ struct NoopTodayDayRibbon: View {
                 HStack(alignment: .center, spacing: 8) {
                     VStack(alignment: .leading, spacing: 3) {
                         NoopSectionLabel("Your day")
-                        Text("\(AppClock.hourMinuteFormatter().string(from: start)) \u{2192} now")
+                        Text(hasRecord ? "\(AppClock.hourMinuteFormatter().string(from: start)) \u{2192} now" : "Since midnight")
                             .font(NoopHTMLFont.sans(NoopType.caption)).monospacedDigit()
                             .foregroundStyle(NoopHTMLColor.faint)
                     }
@@ -189,7 +191,9 @@ struct NoopTodayDayRibbon: View {
                 stats
                 if hasStress, let onStress { stressRow(onStress) }
             } else {
-                Text("No heart rate recorded since \(AppClock.hourMinuteFormatter().string(from: start)). It fills in after the next sync.")
+                Text(hasRecord
+                     ? "No heart rate recorded since \(AppClock.hourMinuteFormatter().string(from: start)). It fills in after the next sync."
+                     : "No heart rate recorded today yet. It fills in after the next sync.")
                     .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                     .fixedSize(horizontal: false, vertical: true)
             }

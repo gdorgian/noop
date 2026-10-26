@@ -550,7 +550,7 @@ struct NoopDataScreen: View {
                     }
                     .padding(.top, 18)
 
-                    Text("Your scores stay yours. Noop recomputes Rest, Charge and Effort from the raw heart rate, variability and sleep it finds. A brand’s own score is kept for reference and never shown as one of yours — so your numbers here will not match your old app’s.")
+                    Text("Your scores stay yours. Noop recomputes Rest, Recovery and Effort from the raw heart rate, variability and sleep it finds. A brand’s own score is kept for reference and never shown as one of yours — so your numbers here will not match your old app’s.")
                         .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(Self.dim)
                         .lineSpacing(3.5)
@@ -709,7 +709,7 @@ struct NoopDataScreen: View {
 
             section(
                 "On a new phone",
-                note: "There is no account and no server, so this file is the only way your history reaches another phone. That is the whole reason this screen ships with Act 5.",
+                note: "There is no account and no server, so this file is the only way your history reaches another phone.",
                 noteColor: Self.dim
             ) {
                 Button {
@@ -1237,7 +1237,7 @@ struct NoopDataScreen: View {
                     .buttonStyle(NoopHTMLPressStyle())
 
                     (
-                        Text("Rest and Charge are being recomputed from what came in. Your first fourteen days will carry a ")
+                        Text("Rest and Recovery are being recomputed from what came in. Your first fourteen days will carry a ")
                         + Text("building").font(NoopHTMLFont.serif(14, italic: true))
                         + Text(" chip while the baselines catch up.")
                     )

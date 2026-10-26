@@ -1604,7 +1604,7 @@ struct NoopAct2Screens: View {
     private func inboxWhen(_ date: Date) -> String {
         let calendar = Calendar.autoupdatingCurrent
         if calendar.isDateInToday(date) {
-            return "Today · \(Self.inboxTimeFormatter.string(from: date))"
+            return "Today · \(AppClock.hourMinute(date))"
         }
         if calendar.isDateInYesterday(date) { return "Yesterday" }
         return Self.inboxDateFormatter.string(from: date)
@@ -4211,14 +4211,6 @@ private struct Act2Vital {
 }
 
 private extension NoopAct2Screens {
-    static let inboxTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .autoupdatingCurrent
-        formatter.dateFormat = "HH:mm"
-        return formatter
-    }()
-
     static let inboxDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

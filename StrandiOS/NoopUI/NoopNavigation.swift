@@ -1233,7 +1233,7 @@ extension NoopRoute {
         case .recovery: "Recovery"
         case .strain: "Strain"
         case .breathe: "Breathe"
-        case .bcatalog: "Eighteen ways to breathe"
+        case .bcatalog: "Ways to breathe"
         case .bplayer: "Breathing"
         case .bsweep: "Finding your pace"
         case .bfound: "Your pace"

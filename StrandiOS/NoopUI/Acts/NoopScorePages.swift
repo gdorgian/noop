@@ -124,6 +124,8 @@ struct NoopStrainPage: View {
         let mid = 0.2 + 0.4 * min(1, max(0, r / 100))
         return (mid - 0.08)...(mid + 0.08)
     }
+    /// Zero minutes is a reading only once the strap has recorded some of the day.
+    private var dayRecorded: Bool { !(day?.ribbonPoints ?? []).isEmpty || !(day?.ribbonSessions ?? []).isEmpty }
     private var exerciseMinutes: Double {
         (day?.ribbonSessions ?? []).reduce(0) { $0 + $1.end.timeIntervalSince($1.start) / 60 }
     }
@@ -192,7 +194,7 @@ struct NoopStrainPage: View {
                 .id("heat-\(offset)").modifier(NoopDaySwipe(offset: $navigation.scoreDayOffset))
         case "tiles":
             if offset == 0 {
-                NoopStatTiles(tiles: [("Exercise", NoopRestRecord.duration(exerciseMinutes)),
+                NoopStatTiles(tiles: [("Exercise", dayRecorded ? NoopRestRecord.duration(exerciseMinutes) : "—"),
                                       ("Total energy", day?.energy?.totalBurnedSoFar
                                           .map { "\($0.formatted(.number.precision(.fractionLength(0)))) kcal" } ?? "—")])
                     .padding(.bottom, 28)

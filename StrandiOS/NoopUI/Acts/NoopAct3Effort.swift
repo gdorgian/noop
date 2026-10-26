@@ -1511,11 +1511,11 @@ private enum Act3AcrossFixture {
             : "all \(sessions.count)"
         let countNote: String
         if sessions.count < 3 {
-            countNote = "days, with \(sessions.count) \(sessions.count == 1 ? "session" : "sessions") in them — too few to average anything on, and Noop will not try."
+            countNote = "\(days == 1 ? "day" : "days"), with \(sessions.count) \(sessions.count == 1 ? "session" : "sessions") in them — too few to average anything on, and Noop will not try."
         } else if range == .all {
-            countNote = "days on record. There is no more history than this."
+            countNote = "\(days == 1 ? "day" : "days") on record. There is no more history than this."
         } else {
-            countNote = "days of your record, and every session inside them"
+            countNote = "\(days == 1 ? "day" : "days") of your record, and every session inside them"
         }
 
         return Act3AcrossSnapshot(
@@ -2835,6 +2835,12 @@ private extension NoopAct3Screens {
                             .padding(.horizontal, 2)
                     }
                     .padding(.top, 9)
+                } else {
+                    Text("This session is no longer on this phone.")
+                        .font(NoopHTMLFont.sans(13))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 14)
                 }
             }
         }
@@ -2981,11 +2987,11 @@ private extension NoopAct3Screens {
         }
         let countNote: String
         if sessions.count < 3 {
-            countNote = "days, with \(sessions.count) \(sessions.count == 1 ? "session" : "sessions") in them \u{2014} too few to average anything on, and Noop will not try."
+            countNote = "\(days == 1 ? "day" : "days"), with \(sessions.count) \(sessions.count == 1 ? "session" : "sessions") in them \u{2014} too few to average anything on, and Noop will not try."
         } else if range == .all || days >= history {
-            countNote = "days on record. There is no more history than this."
+            countNote = "\(days == 1 ? "day" : "days") on record. There is no more history than this."
         } else {
-            countNote = "days of your record, and every session inside them"
+            countNote = "\(days == 1 ? "day" : "days") of your record, and every session inside them"
         }
         return Act3AcrossSnapshot(
             days: days, countNote: countNote, tiles: tiles, costs: costs, sports: sports,

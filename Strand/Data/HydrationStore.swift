@@ -288,7 +288,10 @@ extension Repository {
     /// full day grid so empty days read as 0 rather than vanishing).
     func hydrationHistory(days: Int = 7, now: Date = Date()) async -> [(day: String, value: Double)] {
         let n = max(1, days)
-        let from = now.addingTimeInterval(-Double(n - 1) * 86_400)
+        // Calendar days, not 24-hour steps: a 25-hour daylight-saving day otherwise names one day twice.
+        let calendar = Calendar.current
+        func dayBack(_ k: Int) -> Date { calendar.date(byAdding: .day, value: -k, to: now) ?? now }
+        let from = dayBack(n - 1)
         let fromKey = Repository.localDayKey(from)
         let toKey = Repository.localDayKey(now)
         var byDay: [String: Double] = [:]
@@ -304,7 +307,7 @@ extension Repository {
             }
         }
         return (0..<n).map { i in
-            let key = Repository.localDayKey(now.addingTimeInterval(-Double(n - 1 - i) * 86_400))
+            let key = Repository.localDayKey(dayBack(n - 1 - i))
             return (key, byDay[key] ?? 0)
         }
     }

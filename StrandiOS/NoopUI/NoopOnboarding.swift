@@ -89,7 +89,7 @@ struct NoopOnboardingView: View {
                     .foregroundStyle(NoopHTMLColor.copy)
             }
             VStack(spacing: 9) {
-                promise("See your morning recovery", "Charge combines valid nightly inputs against your own baselines. Missing inputs stay missing.", "circle.dashed.inset.filled", NoopHTMLColor.blue)
+                promise("See your morning recovery", "Recovery combines valid nightly inputs against your own baselines. Missing inputs stay missing.", "circle.dashed.inset.filled", NoopHTMLColor.blue)
                 promise("Watch your heart, live", "Connect a WHOOP or heart-rate strap and watch each beat, variability and zones as they happen.", "waveform.path.ecg", NoopHTMLColor.blue)
                 promise("Own your data, locally", "No account is required. Data stays on this iPhone unless you explicitly enable a destination.", "lock.shield", NoopHTMLColor.green)
             }
@@ -232,7 +232,7 @@ struct NoopOnboardingView: View {
                     .lineSpacing(4)
             }
             VStack(spacing: 10) {
-                promise("Your night is in", "Once last night is scored: its sleep and Charge.", "moon.fill", NoopHTMLColor.night)
+                promise("Your night is in", "Once last night is scored: its sleep and recovery.", "moon.fill", NoopHTMLColor.night)
                 promise("Battery", "At 15%, and once when it finishes charging.", "battery.25", NoopHTMLColor.green)
                 promise("Sync reminder", "When the strap hasn't synced for three hours.", "arrow.triangle.2.circlepath", NoopHTMLColor.blue)
                 promise("Backup reminder", "Your record lives only on this phone. Once a month at most.", "externaldrive.fill", Color(hex: 0xE08A9B))
