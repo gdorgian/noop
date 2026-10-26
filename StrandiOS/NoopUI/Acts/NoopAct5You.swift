@@ -104,6 +104,7 @@ struct NoopAct5Screens: View {
     ]
     @State private var baselinesRestarting = false
     @State var showRhythm = false
+    @State var showHevy = false
     @State private var settingsSearch = ""
     @State private var showingComingLater = false
     @State private var actionNotice: String?
@@ -147,6 +148,7 @@ struct NoopAct5Screens: View {
             }
         }
         .sheet(isPresented: $showRhythm) { NoopDailyRhythmScreen() }
+        .sheet(isPresented: $showHevy) { NoopHevyScreen() }
         .sheet(isPresented: $showReleaseNotes) {
             WhatsNewView(presentation: .bell) {
                 showReleaseNotes = false
@@ -3451,6 +3453,9 @@ private extension NoopAct5Screens {
                     copyRow("Data and permissions", detail: "what is kept, what leaves, and importing history", symbol: "lock.shield", tint: Self.blush) { navigation.push(.data) }
                     Divider().overlay(NoopHTMLColor.border)
                     copyRow("Backup and restore", detail: "one file you keep, restored the same way", symbol: "externaldrive", tint: Self.blush) { navigation.enter(.backup, from: .data) }
+                    Divider().overlay(NoopHTMLColor.border)
+                    copyRow("Hevy", detail: HevySync.shared.hasKey ? "connected · workouts, routines and body in step" : "bring your Hevy workouts, routines and body in",
+                            symbol: "dumbbell", tint: Self.blush) { showHevy = true }
                 }
 
                 settingsGroup("Units and display") {
@@ -3589,7 +3594,7 @@ private extension NoopAct5Screens {
         "Alerts": "battery alerts charging off-wrist reminder sync reminder not synced swiped away night is in morning sleep charge bedtime nudge wind down new best record hrv resting weekly read week summary backup reminder wrist wear notification offer a workout spotted detect auto quiet hours buzz anchor wake",
         "Battery": "power saving sync 45 minutes low battery pause hrv stream",
         "Workouts and Today": "exercise animations media keep the screen on workout journal reminder today strip hydration water recalibrate baselines recovery hrv resting pulse respiration skin temperature restart",
-        "Health and data": "apple health healthkit data permissions privacy import history nutrition backup restore noopbak export",
+        "Health and data": "hevy lifting workouts routines api key sync apple health healthkit data permissions privacy import history nutrition backup restore noopbak export",
         "Units and display": "units metric imperial temperature celsius fahrenheit effort 0–21 0–100 reduce motion widgets app icon",
         "Svea": "svea provider key model anthropic what she may read consent memory manner plain quiet direct",
         "Siri and Shortcuts": "siri shortcuts sync buzz mark a moment ask svea shortcuts export healthkit-free sideloaded",
