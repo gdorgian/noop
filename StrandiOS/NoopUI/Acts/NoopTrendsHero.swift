@@ -173,8 +173,11 @@ struct NoopTrendsHero: View {
         let text: String
         if let pace, pace.isDefensible {
             text = pace.direction == .slower ? "slower than real time" : pace.direction == .faster ? "faster than real time" : "in step with real time"
+        } else if paceWeeks >= AgingPace.minPoints {
+            // Enough weeks, but they still disagree too much to put a number on.
+            text = "still settling"
         } else {
-            text = "\(min(paceWeeks, AgingPace.minPoints)) of \(AgingPace.minPoints) weeks"
+            text = "\(paceWeeks) of \(AgingPace.minPoints) weeks"
         }
         return HStack(spacing: 6) {
             Circle().fill(NoopHTMLColor.ink).frame(width: 6, height: 6)
