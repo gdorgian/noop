@@ -85,10 +85,10 @@ telemetry.
 
 <p align="center"><sub>One reading, from the strap to the screen. Every box links to its source. For the interactive version, download <a href="docs/aura/architecture/noop-aura-architecture.html"><code>noop-aura-architecture.html</code></a> and open it in a browser.</sub></p>
 
-## Try 11.7
+## Try it
 
-Download the **[Noop Aura 11.7.0 experimental release](https://github.com/gdorgian/noop/releases/tag/v11.7.0-aura.1104)**
-and read its notes before installing. The IPA is unsigned: sign it with your own Apple ID through a
+Download the **[newest Noop Aura release](https://github.com/gdorgian/noop/releases)** (the beta at the top is
+the newest build) and read its notes before installing. The IPA is unsigned: sign it with your own Apple ID through a
 sideloader such as AltStore or SideStore. It is not an App Store build. Keep a backup before changing
 the app's identity or reinstalling, because a differently signed app does not inherit the old one's
 database.
