@@ -47,6 +47,13 @@ struct WidgetBoard: View {
                 row(PanelInk.blueLight) { TrainWidgetView(familyOverride: $0, entry: entry) }
                 row(PanelInk.volt) { ConsistencyWidgetView(familyOverride: $0, renderingOverride: mode, entry: entry) }
                 row(PanelInk.warm) { GoalWidgetView(familyOverride: $0, renderingOverride: mode, entry: entry) }
+                Text("Lift banner").font(.caption.monospaced()).foregroundStyle(.secondary)
+                ForEach(Array(Self.liftStates.enumerated()), id: \.offset) { _, state in
+                    LiftBanner().lockScreen(state)
+                        .frame(width: 370)
+                        .background(Color(hex: "#0A0C0B"), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .environment(\.colorScheme, .dark)
+                }
                 Text("Lock Screen").font(.caption.monospaced()).foregroundStyle(.secondary)
                 lockRow { SleepWidgetView(familyOverride: $0, renderingOverride: .vibrant, entry: entry) }
                 lockRow { StepsWidgetView(familyOverride: $0, renderingOverride: .vibrant, entry: entry) }
@@ -56,6 +63,22 @@ struct WidgetBoard: View {
             .padding(16)
         }
         .background(accented ? Color(hex: "#1B2A3A") : Color(hex: "#3A3632"))
+    }
+
+    /// The lift banner's three faces: the first set (nothing done yet), a running rest, and paused.
+    static var liftStates: [LiftActivityAttributes.ContentState] {
+        let now = Date()
+        return [
+            .init(isResting: false, programName: "Lower B", exercise: "Romanian Deadlift", status: "Warm-up",
+                  detail: "8 × 10 kg", progress: "0 of 15 sets done", setsDone: 0, setsPlanned: 15,
+                  stageStartedAt: now.addingTimeInterval(-20), restEndsAt: nil),
+            .init(isResting: true, programName: "Lower B", exercise: "Romanian Deadlift", status: "Resting after set 1",
+                  detail: "6 × 60 kg", progress: "3 of 15 sets done", setsDone: 3, setsPlanned: 15,
+                  stageStartedAt: now.addingTimeInterval(-40), restEndsAt: now.addingTimeInterval(110)),
+            .init(isResting: true, isPaused: true, programName: "Lower B", exercise: "Leg Press", status: "Paused · set 2",
+                  detail: nil, progress: "5 of 15 sets done", setsDone: 5, setsPlanned: 15,
+                  stageStartedAt: now, restEndsAt: now.addingTimeInterval(60), heldClockSeconds: 61),
+        ]
     }
 
     private func tile<V: View>(_ size: CGSize, tint: Color, @ViewBuilder _ view: () -> V) -> some View {

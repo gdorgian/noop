@@ -456,7 +456,7 @@ targets:
           SWIFT_OPTIMIZATION_LEVEL: "-Onone"
         # The panel widget views compile into the app for the Debug widget board only.
         Release:
-          EXCLUDED_SOURCE_FILE_NAMES: "PanelKit.swift SleepWidget.swift StepsWidget.swift VitalsWidget.swift WeightWidget.swift TrainingWidgets.swift GoalWidget.swift"
+          EXCLUDED_SOURCE_FILE_NAMES: "PanelKit.swift SleepWidget.swift StepsWidget.swift VitalsWidget.swift WeightWidget.swift TrainingWidgets.swift GoalWidget.swift LiftBanner.swift"
     dependencies:
       - package: WhoopProtocol
       - package: WhoopStore

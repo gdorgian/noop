@@ -271,6 +271,7 @@ struct NoopSessionHeart: View {
                 }
                 .chartYScale(domain: lo...hi)
                 .chartXScale(domain: date(start)...date(end))
+                .chartPlotStyle { $0.clipped() }
                 .chartOverlay { proxy in
                     GeometryReader { geo in
                         Rectangle().fill(.clear).contentShape(Rectangle())
@@ -290,13 +291,26 @@ struct NoopSessionHeart: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: [date(start), date((start + end) / 2), date(end)]) { _ in
-                        AxisValueLabel(format: .dateTime.hour().minute()).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
+                    // Clock times for a long session; for a short one they would all read the same minute,
+                    // so the axis counts time into the session instead.
+                    AxisMarks(values: [date(start), date((start + end) / 2), date(end)]) { value in
+                        AxisValueLabel {
+                            if let d = value.as(Date.self) {
+                                Text(end - start < 20 * 60
+                                     ? Self.elapsed(Int(d.timeIntervalSince1970) - start)
+                                     : AppClock.hourMinuteFormatter().string(from: d))
+                            }
+                        }
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                     }
                 }
                 .frame(height: 190)
             }
         }
+    }
+
+    static func elapsed(_ s: Int) -> String {
+        s <= 0 ? "0:00" : String(format: "%d:%02d", s / 60, s % 60)
     }
 
     /// The bucket under the finger while the chart is held.
@@ -447,7 +461,11 @@ struct NoopSessionHeart: View {
 
     private func load() async {
         guard end > start else { return }
-        curve = await repo.workoutHrBuckets(from: start, to: end, source: source)
+        // A bucket is stamped at its floor, which for the first one falls before the session began; drawn
+        // there, the line ran off the card's left edge. Each point sits inside the session's window.
+        curve = await repo.workoutHrBuckets(from: start, to: end, source: source).map {
+            HRBucket(ts: min(end, max(start, $0.ts)), bpm: $0.bpm, minBpm: $0.minBpm, maxBpm: $0.maxBpm, conf: $0.conf)
+        }
         // Zone 0 is the time under Zone 1: the window minus what the five zones counted.
         if let zones = await repo.workoutZoneMinutes(from: start, to: end, zoneSet: zoneSet, source: source) {
             let counted = zones.reduce(0, +)

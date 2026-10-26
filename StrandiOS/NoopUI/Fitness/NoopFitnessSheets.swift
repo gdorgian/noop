@@ -52,6 +52,9 @@ struct NoopFitnessAddSheet: View {
     @State private var logging = false
     @State private var refusal: NoopRunningSession?
     @State private var showAll = false
+    /// The sport whose start sheet is up, and one picked in "Every other sport" waiting for that sheet to go.
+    @State private var starting: NoopIdentifiedSport?
+    @State private var pickedFromAll: String?
 
     private static let quick: [(name: String, symbol: String)] = [
         ("Running", "figure.run"), ("Walking", "figure.walk"), ("Cycling", "figure.outdoor.cycle"),
@@ -123,7 +126,7 @@ struct NoopFitnessAddSheet: View {
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10),
                                         GridItem(.flexible(), spacing: 10)], spacing: 10) {
                         ForEach(Self.quick, id: \.name) { s in
-                            Button { startCardio(s.name) } label: {
+                            Button { starting = .init(name: s.name) } label: {
                                 VStack(spacing: 8) {
                                     Image(systemName: s.symbol).font(.system(size: 21, weight: .medium))
                                         .foregroundStyle(NoopHTMLColor.blueLight)
@@ -174,10 +177,18 @@ struct NoopFitnessAddSheet: View {
             .environmentObject(repo)
             .noopSheet()
         }
-        .sheet(isPresented: $showAll) {
+        .sheet(isPresented: $showAll, onDismiss: {
+            if let sport = pickedFromAll { pickedFromAll = nil; starting = .init(name: sport) }
+        }) {
             NoopSportPickerSheet { sport in
+                pickedFromAll = sport
                 showAll = false
-                startCardio(sport)
+            }
+            .noopSheet()
+        }
+        .sheet(item: $starting) { s in
+            NoopCardioGoalSheet(sport: s.name, zone: ZoneTrainingPrefs.lastTargetZone()) { goal, zone in
+                startCardio(s.name, goal: goal, zone: zone)
             }
             .noopSheet()
         }
@@ -185,13 +196,13 @@ struct NoopFitnessAddSheet: View {
 
     private var allRoutines: [NoopFitnessSnapshot.Routine] { routines ?? loadedRoutines }
 
-    private func startCardio(_ sport: String) {
+    private func startCardio(_ sport: String, goal: CardioGoal?, zone: Int?) {
         if let running = NoopRunningSession.current(app: app, lift: live, navigation: navigation) {
             withAnimation(NoopMotion.swap) { refusal = running }
             return
         }
         dismiss()
-        _ = NoopCardioStarter.start(sport, app: app, live: live, navigation: navigation)
+        _ = NoopCardioStarter.start(sport, goal: goal, zone: zone, app: app, live: live, navigation: navigation)
     }
 
     private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {

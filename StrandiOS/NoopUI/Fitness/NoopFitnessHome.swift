@@ -601,6 +601,8 @@ struct NoopFitnessHome: View {
     static let cardHeight: CGFloat = 132
 
     static func duration(_ seconds: Double) -> String {
+        // Under a minute reads in seconds: "0m" said a session that happened took no time at all.
+        if seconds < 60 { return seconds >= 1 ? "\(Int(seconds))s" : "0m" }
         let m = Int(seconds / 60)
         return m >= 60 ? "\(m / 60)h \(m % 60)m" : "\(m)m"
     }

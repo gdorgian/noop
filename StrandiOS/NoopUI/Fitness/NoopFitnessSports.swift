@@ -123,6 +123,10 @@ struct NoopFitnessSportsSection: View {
     @EnvironmentObject private var live: LiftSessionController
     @State private var refusal: NoopRunningSession?
     @State private var choosing = false
+    /// The sport whose start sheet is up: a tap chooses, the sheet's Start begins.
+    @State private var starting: NoopIdentifiedSport?
+    /// Picked in "Every sport", shown once that sheet has gone.
+    @State private var pickedFromAll: String?
 
     /// Up to six: the cardio sports done most recently, then the starters to fill the row.
     private var shown: [(sport: String, last: Date?)] {
@@ -150,7 +154,7 @@ struct NoopFitnessSportsSection: View {
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                 ForEach(shown, id: \.sport) { item in
-                    NoopSportTile(sport: item.sport, detail: item.last.map(Self.ago)) { start(item.sport) }
+                    NoopSportTile(sport: item.sport, detail: item.last.map(Self.ago)) { starting = .init(name: item.sport) }
                 }
             }
             Button { choosing = true } label: {
@@ -169,10 +173,18 @@ struct NoopFitnessSportsSection: View {
             .buttonStyle(NoopHTMLPressStyle())
         }
         .padding(.bottom, 22)
-        .sheet(isPresented: $choosing) {
+        .sheet(isPresented: $choosing, onDismiss: {
+            if let sport = pickedFromAll { pickedFromAll = nil; starting = .init(name: sport) }
+        }) {
             NoopSportPickerSheet(recent: shown.filter { $0.last != nil }.map(\.sport)) { sport in
+                pickedFromAll = sport
                 choosing = false
-                start(sport)
+            }
+            .noopSheet()
+        }
+        .sheet(item: $starting) { s in
+            NoopCardioGoalSheet(sport: s.name, zone: ZoneTrainingPrefs.lastTargetZone()) { goal, zone in
+                start(s.name, goal: goal, zone: zone)
             }
             .noopSheet()
         }
@@ -194,6 +206,11 @@ struct NoopFitnessSportsSection: View {
 }
 
 /// One sport to start: its figure on a blue disc, the name, and when it was last done.
+struct NoopIdentifiedSport: Identifiable {
+    let name: String
+    var id: String { name }
+}
+
 struct NoopSportTile: View {
     let sport: String
     var detail: String? = nil
@@ -223,7 +240,8 @@ struct NoopSportTile: View {
         }
         .buttonStyle(NoopHTMLPressStyle())
         .sensoryFeedback(.impact(weight: .medium), trigger: taps)
-        .accessibilityLabel("Start \(sport)")
+        .accessibilityLabel(sport)
+        .accessibilityHint("Choose a goal and start")
     }
 }
 

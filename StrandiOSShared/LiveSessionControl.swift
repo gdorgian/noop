@@ -12,6 +12,10 @@ public enum LiveSessionControl {
     /// The lift banner's rest buttons: add seconds to the running rest, or end it now.
     @MainActor public static var adjustLiftRest: ((Int) -> Void)?
     @MainActor public static var skipLiftRest: (() -> Void)?
+    /// Pushes the lift banner at once. A Lock Screen button runs with the app in the background, which iOS
+    /// suspends again within moments: the session's own debounced push never got the chance to run, so a tap
+    /// on Skip changed the session and left the banner showing the old rest.
+    @MainActor public static var pushLiftBanner: (() -> Void)?
 }
 
 /// "+30 s" on the lift banner while a rest runs.
@@ -20,7 +24,10 @@ struct AddLiftRestIntent: LiveActivityIntent {
     static let isDiscoverable = false
 
     func perform() async throws -> some IntentResult {
-        await MainActor.run { LiveSessionControl.adjustLiftRest?(30) }
+        await MainActor.run {
+            LiveSessionControl.adjustLiftRest?(30)
+            LiveSessionControl.pushLiftBanner?()
+        }
         return .result()
     }
 }
@@ -31,7 +38,10 @@ struct SkipLiftRestIntent: LiveActivityIntent {
     static let isDiscoverable = false
 
     func perform() async throws -> some IntentResult {
-        await MainActor.run { LiveSessionControl.skipLiftRest?() }
+        await MainActor.run {
+            LiveSessionControl.skipLiftRest?()
+            LiveSessionControl.pushLiftBanner?()
+        }
         return .result()
     }
 }

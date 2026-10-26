@@ -313,6 +313,8 @@ struct StrandiOSApp: App {
                 // what is worth pushing, and the banner's clocks tick on their own. A strap step is pushed
                 // at once, with its light-up alert, below.
                 .onReceive(liftSession.changesSettled) { _ in pushLiftActivity() }
+                // The banner's own rest buttons push straight away (`LiveSessionControl.pushLiftBanner`).
+                .onAppear { LiveSessionControl.pushLiftBanner = { pushLiftActivity() } }
                 // A strap double-tap lights the Lock Screen on the step it took.
                 .onReceive(liftSession.strapStepTaken) { _ in pushLiftActivity(alert: true) }
                 // #911/#759: republish the Home/Lock-Screen widget whenever the dashboard caches actually

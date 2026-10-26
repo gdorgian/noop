@@ -531,11 +531,18 @@ private struct NoopLiftLiveScreen: View {
                 withAnimation(NoopMotion.swap) { scroll.scrollTo(Self.exerciseAnchor(index), anchor: UnitPoint(x: 0.5, y: 0.12)) }
             }
             }
-            liveBar(engine: engine, presentation: presentation, slot: slot, item: item)
-                // Clear of the home indicator: this screen runs edge to edge, so the bar keeps the same
-                // distance from the bottom the tab bar does on every other screen.
-                .padding(.horizontal, 14).padding(.bottom, 26)
+            // While a number is typed the keypad and its own bar (−, +, plates, Reps) own the bottom of
+            // the screen: the session bar steps aside rather than sit on top of them, and returns with
+            // the keyboard's own timing when the field is let go.
+            if focused == nil {
+                liveBar(engine: engine, presentation: presentation, slot: slot, item: item)
+                    // Clear of the home indicator: this screen runs edge to edge, so the bar keeps the same
+                    // distance from the bottom the tab bar does on every other screen.
+                    .padding(.horizontal, 14).padding(.bottom, 26)
+                    .transition(.opacity.combined(with: .offset(y: 24)))
+            }
         }
+        .animation(.easeOut(duration: 0.22), value: focused == nil)
         .overlay(alignment: .top) {
             if let celebration {
                 NoopLiftRecordBanner(celebration: celebration)
