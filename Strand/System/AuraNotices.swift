@@ -9,8 +9,8 @@ import WhoopStore
 ///
 ///  • Your night is in: once the night is scored, its sleep and Charge, if Noop is not already open.
 ///  • Bedtime: a quiet nudge before the bedtime that gets the wearer their own need before their usual wake,
-///    planned a week ahead, per weekday.
-///  • A new best: a vital that beat every night of the last three months.
+///    planned a week ahead, per weekday. Off until Noop has learned the nights it needs; Today then offers it.
+///  • A new best: a vital that beat every night of the last three months. Off by default.
 ///  • Your week: Sunday at seven, the week against the one before. Off by default.
 ///  • Backup: the record lives only on this phone; a reminder thirty days after the last backup.
 ///
@@ -26,8 +26,14 @@ enum AuraNotices {
         case weekly = "notices.weekly"
         case backup = "notices.backup"
 
-        /// The week is off by default: most weeks do not need a summary.
-        var defaultOn: Bool { self != .weekly }
+        /// Calm defaults (26 Oct 2026): the night and the backup are on; the bedtime nudge is offered once
+        /// it has been learned; a new best and the week are there for whoever wants them.
+        var defaultOn: Bool {
+            switch self {
+            case .morning, .backup: true
+            case .bedtime, .best, .weekly: false
+            }
+        }
     }
 
     static func isOn(_ kind: Kind) -> Bool {
@@ -37,6 +43,29 @@ enum AuraNotices {
     static func set(_ kind: Kind, _ on: Bool) {
         UserDefaults.standard.set(on, forKey: kind.rawValue)
         if on { UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in } }
+    }
+
+    /// Whether the wearer has ever answered for this notice (a switch, or the bedtime offer).
+    static func hasChoice(_ kind: Kind) -> Bool {
+        UserDefaults.standard.object(forKey: kind.rawValue) != nil
+    }
+
+    /// The main sleeps the bedtime plan reads: the last six weeks, naps left out.
+    private static func recentWakes(_ sleeps: [CachedSleepSession], now: Date) -> [NoticeRules.Wake] {
+        let cal = Calendar.current
+        let since = now.timeIntervalSince1970 - 42 * 86_400
+        return sleeps.filter { Double($0.endTs) > since && $0.endTs - $0.effectiveStartTs >= 3 * 3600 }
+            .map { s -> NoticeRules.Wake in
+                let end = Date(timeIntervalSince1970: TimeInterval(s.endTs))
+                let c = cal.dateComponents([.weekday, .hour, .minute], from: end)
+                return NoticeRules.Wake(weekday: c.weekday ?? 1, minute: (c.hour ?? 0) * 60 + (c.minute ?? 0))
+            }
+    }
+
+    /// Offer the bedtime nudge once: when it can be planned from the wearer's own nights, and only to
+    /// someone who has never answered for it.
+    static func shouldOfferBedtime(sleeps: [CachedSleepSession], now: Date = Date()) -> Bool {
+        !hasChoice(.bedtime) && recentWakes(sleeps, now: now).count >= NoticeRules.nightsNeeded
     }
 
     private static let bedtimePrefix = "noop.bedtime."
@@ -95,15 +124,8 @@ enum AuraNotices {
         center.removePendingNotificationRequests(withIdentifiers: ids)
         guard isOn(.bedtime) else { return }
         let cal = Calendar.current
-        let since = now.timeIntervalSince1970 - 42 * 86_400
         // Main sleeps only: a nap's end is not a wake time.
-        let wakes = sleeps.filter { Double($0.endTs) > since && $0.endTs - $0.effectiveStartTs >= 3 * 3600 }
-            .map { s -> NoticeRules.Wake in
-                let end = Date(timeIntervalSince1970: TimeInterval(s.endTs))
-                let c = cal.dateComponents([.weekday, .hour, .minute], from: end)
-                return NoticeRules.Wake(weekday: c.weekday ?? 1, minute: (c.hour ?? 0) * 60 + (c.minute ?? 0))
-            }
-        let usual = NoticeRules.usualWake(wakes)
+        let usual = NoticeRules.usualWake(recentWakes(sleeps, now: now))
         guard !usual.isEmpty else { return }
         let need = NoticeRules.sleepNeed(days.suffix(42).map {
             NoticeRules.Night(asleepMinutes: $0.totalSleepMin ?? 0, charge: $0.recovery)

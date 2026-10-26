@@ -31,10 +31,17 @@ final class NoopPageLayout: ObservableObject {
     let page: String
     let catalog: [NoopPageSection]
     @Published private(set) var order: [String]
+    /// Default-on sections a later build added to a page the wearer had already arranged. They are
+    /// offered on the page ("New on this page") instead of slipped in, so an arranged page never
+    /// changes behind the wearer's back (26 Oct 2026). Fresh pages simply have them.
+    @Published private(set) var suggestions: [String] = []
 
-    private var orderKey: String { "noop.layout.\(page)" }
+    private var orderKey: String { Self.orderKey(page) }
     private var knownKey: String { "noop.layout.\(page).known" }
     private var versionKey: String { "noop.layout.\(page).version" }
+    private var resetObserver: NSObjectProtocol?
+
+    static func orderKey(_ page: String) -> String { "noop.layout.\(page)" }
 
     /// Raised when the meaning of a saved layout changes. Version 2: alternative sections became
     /// off by default, so layouts saved before then (which held every section) start over.
@@ -50,24 +57,26 @@ final class NoopPageLayout: ObservableObject {
             defaults.removeObject(forKey: "noop.layout.\(page).known")
             defaults.set(Self.version, forKey: "noop.layout.\(page).version")
         }
-        guard let saved = defaults.string(forKey: "noop.layout.\(page)") else {
+        if let saved = defaults.string(forKey: "noop.layout.\(page)") {
+            let allIDs = catalog.map(\.id)
+            let known = Set((defaults.string(forKey: "noop.layout.\(page).known") ?? saved).split(separator: ",").map(String.init))
+            var result = saved.split(separator: ",").map(String.init).filter(allIDs.contains)
+            // Sections that cannot be removed are always present.
+            for (index, section) in catalog.enumerated() where !section.removable && !result.contains(section.id) {
+                result.insert(section.id, at: min(index, result.count))
+            }
+            order = result
+            suggestions = ids.filter { !known.contains($0) && !result.contains($0) }
+        } else {
             order = ids
-            return
         }
-        let allIDs = catalog.map(\.id)
-        let known = Set((defaults.string(forKey: "noop.layout.\(page).known") ?? saved).split(separator: ",").map(String.init))
-        var result = saved.split(separator: ",").map(String.init).filter(allIDs.contains)
-        // New sections go in after the nearest section above them in the default order.
-        for (index, id) in ids.enumerated() where !known.contains(id) && !result.contains(id) {
-            let before = ids[..<index].last { result.contains($0) }
-            let at = before.flatMap { result.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
-            result.insert(id, at: at)
+        resetObserver = NotificationCenter.default.addObserver(forName: Self.resetAll, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.useDefault() }
         }
-        // Sections that cannot be removed are always present.
-        for (index, section) in catalog.enumerated() where !section.removable && !result.contains(section.id) {
-            result.insert(section.id, at: min(index, result.count))
-        }
-        order = result
+    }
+
+    deinit {
+        if let resetObserver { NotificationCenter.default.removeObserver(resetObserver) }
     }
 
     func section(_ id: String) -> NoopPageSection? { catalog.first { $0.id == id } }
@@ -75,11 +84,62 @@ final class NoopPageLayout: ObservableObject {
     func save(_ newOrder: [String]) {
         order = newOrder
         UserDefaults.standard.set(newOrder.joined(separator: ","), forKey: orderKey)
-        UserDefaults.standard.set(catalog.map(\.id).joined(separator: ","), forKey: knownKey)
+        // A section still on offer stays unknown, so saving an edit does not quietly decline it.
+        UserDefaults.standard.set(catalog.map(\.id).filter { !suggestions.contains($0) }.joined(separator: ","), forKey: knownKey)
         UserDefaults.standard.set(Self.version, forKey: versionKey)
     }
 
     var defaultOrder: [String] { catalog.filter(\.onByDefault).map(\.id) }
+
+    /// Put an offered section in at its default place: after the nearest default section above it.
+    func acceptSuggestion(_ id: String) {
+        suggestions.removeAll { $0 == id }
+        var result = order
+        let ids = defaultOrder
+        if let index = ids.firstIndex(of: id), !result.contains(id) {
+            let before = ids[..<index].last { result.contains($0) }
+            let at = before.flatMap { result.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
+            result.insert(id, at: at)
+        }
+        save(result)
+    }
+
+    /// Decline an offered section: it stays in Add, and is not offered again.
+    func declineSuggestion(_ id: String) {
+        suggestions.removeAll { $0 == id }
+        save(order)
+    }
+
+    /// Forget the arrangement: the page shows its default, as on a fresh install.
+    func useDefault() {
+        UserDefaults.standard.removeObject(forKey: orderKey)
+        UserDefaults.standard.removeObject(forKey: knownKey)
+        suggestions = []
+        order = defaultOrder
+    }
+
+    /// Posted to put every open page back on its default at once (the new-look choice).
+    static let resetAll = Notification.Name("noop.layout.resetAll")
+
+    /// Whether the wearer has a saved arrangement for `page` that differs from `catalog`'s default.
+    static func hasArrangement(page: String, catalog: [NoopPageSection]) -> Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: "noop.layout.\(page).version") >= version,
+              let saved = defaults.string(forKey: orderKey(page)) else { return false }
+        let allIDs = Set(catalog.map(\.id))
+        let order = saved.split(separator: ",").map(String.init).filter(allIDs.contains)
+        return order != catalog.filter(\.onByDefault).map(\.id)
+    }
+
+    /// Every page back on its default: the saved arrangements are forgotten, and pages already open
+    /// redraw at once.
+    static func resetAllToDefault(pages: [String]) {
+        for page in pages {
+            UserDefaults.standard.removeObject(forKey: orderKey(page))
+            UserDefaults.standard.removeObject(forKey: "noop.layout.\(page).known")
+        }
+        NotificationCenter.default.post(name: resetAll, object: nil)
+    }
 }
 
 /// The edit session a page holds: the order being edited, kept apart until Save.
@@ -158,8 +218,17 @@ struct NoopEditableSections<Section: View>: View {
         id.hasPrefix(Self.besidePrefix) || (layout.section(id)?.half ?? false)
     }
 
+    /// One question at a time: while the new-look choice is open on Today, no page offers sections.
+    @AppStorage(NoopDefaults.lookChoiceKey) private var lookChoice = ""
+    private var offersSuggestions: Bool { !lookChoice.isEmpty || !NoopDefaults.lookChoicePendingAtLaunch }
+
     var body: some View {
         NoopSectionFlow(spacing: spacing) {
+            if !editing.active, offersSuggestions, let id = layout.suggestions.first, let info = layout.section(id) {
+                suggestionCard(info)
+                    .padding(.bottom, 14)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
             ForEach(entries, id: \.self) { id in
                 Group {
                     if id.hasPrefix(Self.besidePrefix) {
@@ -233,6 +302,48 @@ struct NoopEditableSections<Section: View>: View {
         }) {
             NoopAddSectionSheet(layout: layout, editing: $editing, drag: incomingDrag, isEmpty: isEmpty, section: section)
         }
+    }
+
+    /// One section a later build added, offered on a page the wearer had already arranged.
+    private func suggestionCard(_ info: NoopPageSection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(NoopHTMLColor.blueLight)
+                    .frame(width: 30, height: 30)
+                    .background(NoopHTMLColor.blue.opacity(0.14), in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("New on this page")
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
+                        .tracking(0.8)
+                        .textCase(.uppercase)
+                        .foregroundStyle(NoopHTMLColor.blueLight)
+                    Text(info.title)
+                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.ink)
+                    Text(info.detail)
+                        .font(NoopHTMLFont.sans(NoopType.caption))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 8) {
+                NoopActionButton(title: "Not now", variant: .secondary, size: .small, fullWidth: true) {
+                    NoopHaptics.play(.cancel)
+                    withAnimation(.smooth(duration: 0.3)) { layout.declineSuggestion(info.id) }
+                }
+                NoopActionButton(title: "Add it", size: .small, fullWidth: true) {
+                    NoopHaptics.play(.add)
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.86)) { layout.acceptSuggestion(info.id) }
+                }
+            }
+        }
+        .padding(16)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(NoopHTMLColor.blue.opacity(0.24), lineWidth: 0.5))
+        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder

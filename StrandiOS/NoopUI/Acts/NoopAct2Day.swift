@@ -299,6 +299,9 @@ struct NoopAct2Screens: View {
     /// The wearer's own name from Your record, for the greeting.
     var displayName: String? = nil
     @EnvironmentObject private var updateStore: UpdateStore
+    @EnvironmentObject private var coach: AICoachEngine
+    @State private var askingLook = NoopDefaults.lookChoicePendingAtLaunch && NoopDefaults.needsLookChoice
+    @State private var offeringBedtime = false
     @State private var showingStress = false
     @EnvironmentObject private var profile: ProfileStore
     @EnvironmentObject private var repo: Repository
@@ -451,6 +454,24 @@ struct NoopAct2Screens: View {
                     .padding(.top, 12)
                 }
 
+                // One question at a time, above the page and only on live data: the new look first,
+                // then the bedtime nudge once Noop has learned the nights it needs.
+                if day != nil, !isHistorical, !todayEditing.active {
+                    if askingLook {
+                        NoopNewLookCard { withAnimation(.smooth(duration: 0.3)) { askingLook = false } }
+                            .padding(.top, 12)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    } else if offeringBedtime {
+                        NoopBedtimeOfferCard { on in
+                            AuraNotices.set(.bedtime, on)
+                            Task { await AuraNotices.refresh(repo: repo) }
+                            withAnimation(.smooth(duration: 0.3)) { offeringBedtime = false }
+                        }
+                        .padding(.top, 12)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                }
+
                 NoopEditableSections(layout: todayLayout, editing: $todayEditing,
                                      isEmpty: todaySectionEmpty) { id in todaySection(id) }
                     .padding(.top, 4)
@@ -458,6 +479,7 @@ struct NoopAct2Screens: View {
         }
         .noopEditBar($todayEditing, layout: todayLayout) { navigation.push(.settingsToday) }
         .onAppear {
+            if !askingLook, day != nil { offeringBedtime = AuraNotices.shouldOfferBedtime(sleeps: repo.sleeps) }
             todayPulseAnchor = Date()
             #if DEBUG
             if CommandLine.arguments.contains("--noop-open-stress") {
@@ -477,8 +499,10 @@ struct NoopAct2Screens: View {
         NoopPageSection(id: "rings-dials", title: "Rings · Dials", detail: "Three plain dials, recovery coloured by its band", onByDefault: false),
         NoopPageSection(id: "rings", title: "Rings · Living", detail: "Recovery, strain and sleep as living rings", onByDefault: false),
         NoopPageSection(id: "rings-segmented", title: "Rings · Segmented", detail: "Sleep in its stages, strain heating up, recovery on a gauge", onByDefault: false),
-        NoopPageSection(id: "breathe", title: "Breathing orb", detail: "Your pulse as a breathing sphere; tap it to breathe"),
-        NoopPageSection(id: "status", title: "Activity status", detail: "Active, sick, injured or on a break, and for how long", half: true),
+        // Calm defaults (26 Oct 2026): the orb header already breathes, and a status is set when it
+        // matters; both wait in Add.
+        NoopPageSection(id: "breathe", title: "Breathing orb", detail: "Your pulse as a breathing sphere; tap it to breathe", onByDefault: false),
+        NoopPageSection(id: "status", title: "Activity status", detail: "Active, sick, injured or on a break, and for how long", onByDefault: false, half: true),
         NoopTodayTile.bedtime.section,
         NoopTodayTile.heart.section,
         NoopTodayTile.effort.section,
@@ -528,6 +552,8 @@ struct NoopAct2Screens: View {
         switch id {
         case "stress": return !(day == nil || (day?.stressTimeline.allSatisfy { $0.level == nil } ?? true))
         case "logged": return !navigation.dayLogSaved
+        // Svea's card is a door to a conversation; until she can answer, it is a closed one.
+        case "coach": return day != nil && (!coach.isConfigured || navigation.coachVoice == .off)
         case "sleep-tide": return day?.rest.latest == nil
         case "energy-reservoir": return day?.energy == nil
         default: return false

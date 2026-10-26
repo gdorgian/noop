@@ -16,7 +16,8 @@ enum NoopTodayTile: String, CaseIterable {
     var section: NoopPageSection {
         switch self {
         case .heart: .init(id: id, title: "Heart rate now", detail: "Your pulse, live while the strap is on", onByDefault: false, half: true)
-        case .effort: .init(id: id, title: "Effort today", detail: "Today's effort against your target", onByDefault: false, half: true)
+        // Bedtime and Effort are Today's two default tiles: tonight's plan beside today's load.
+        case .effort: .init(id: id, title: "Effort today", detail: "Today's effort against your target", half: true)
         case .steps: .init(id: id, title: "Steps", detail: "Today's steps against your usual", onByDefault: false, half: true)
         case .calories: .init(id: id, title: "Calories", detail: "What the day has burned so far", onByDefault: false, half: true)
         case .stress: .init(id: id, title: "Stress now", detail: "Where the last scored hour sat", onByDefault: false, half: true)

@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 import StrandAnalytics
 
 struct NoopOnboardingView: View {
@@ -10,6 +11,7 @@ struct NoopOnboardingView: View {
     @State private var step = 0
     @State private var schedule: OnboardingSchedule?
     @State private var scanning = false
+    @State private var notificationsAsked = false
 
     var body: some View {
         ZStack {
@@ -24,6 +26,7 @@ struct NoopOnboardingView: View {
                     case 0: promiseStep
                     case 1: scheduleStep
                     case 2: connectionStep
+                    case 3: noticesStep
                     default: doneStep
                     }
                 }
@@ -61,7 +64,7 @@ struct NoopOnboardingView: View {
     private var progressHeader: some View {
         HStack {
             HStack(spacing: 5) {
-                ForEach(0..<4, id: \.self) { index in
+                ForEach(0..<Self.stepCount, id: \.self) { index in
                     Capsule()
                         .fill(index <= step ? Color(hex: 0xE08A9B) : Color.white.opacity(0.14))
                         .frame(width: index == step ? 22 : 7, height: 7)
@@ -69,7 +72,7 @@ struct NoopOnboardingView: View {
                 }
             }
             Spacer()
-            Text("Step \(step + 1) of 4")
+            Text("Step \(step + 1) of \(Self.stepCount)")
                 .font(NoopHTMLFont.sans(11.5))
                 .foregroundStyle(Color(hex: 0x7F8A85))
         }
@@ -213,6 +216,51 @@ struct NoopOnboardingView: View {
         }
     }
 
+    private static let stepCount = 5
+
+    /// The permission is asked here, once, with the reason beside it, rather than at whatever moment
+    /// a first notice happens to have something to say (26 Oct 2026).
+    private var noticesStep: some View {
+        onboardingPage {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("A few quiet notices")
+                    .font(NoopHTMLFont.outfit(29, weight: .light))
+                    .tracking(-0.8)
+                Text("Noop speaks up rarely, and only about your strap and your record. These four are on; everything else waits in Settings › Notifications.")
+                    .font(NoopHTMLFont.sans(13.5))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .lineSpacing(4)
+            }
+            VStack(spacing: 10) {
+                promise("Your night is in", "Once last night is scored: its sleep and Charge.", "moon.fill", NoopHTMLColor.night)
+                promise("Battery", "At 15%, and once when it finishes charging.", "battery.25", NoopHTMLColor.green)
+                promise("Sync reminder", "When the strap hasn't synced for three hours.", "arrow.triangle.2.circlepath", NoopHTMLColor.blue)
+                promise("Backup reminder", "Your record lives only on this phone. Once a month at most.", "externaldrive.fill", Color(hex: 0xE08A9B))
+            }
+        } footer: {
+            VStack(spacing: 4) {
+                primaryButton(notificationsAsked ? "Continue" : "Allow notifications", enabled: true) {
+                    guard !notificationsAsked else { advance(); return }
+                    Task { @MainActor in
+                        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+                        notificationsAsked = true
+                        advance()
+                    }
+                }
+                Button("Not now") { advance() }
+                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .opacity(notificationsAsked ? 0 : 1)
+                    .disabled(notificationsAsked)
+            }
+        }
+        .task {
+            let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+            notificationsAsked = status != .notDetermined
+        }
+    }
+
     private var doneStep: some View {
         onboardingPage {
             Spacer(minLength: 34)
@@ -302,7 +350,7 @@ struct NoopOnboardingView: View {
 
     private func advance() {
         withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.3)) {
-            step = min(3, step + 1)
+            step = min(Self.stepCount - 1, step + 1)
         }
     }
 

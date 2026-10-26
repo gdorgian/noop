@@ -3895,8 +3895,8 @@ private extension NoopAct5Screens {
         "Live heart rate in the Dynamic Island": true,
         "Power saving": false, "Pause the HRV stream when low": true,
         "Continuous HRV capture": false, "Overnight only": true, "Broadcast heart rate": false,
-        "Quiet hours": false, "Battery alerts": true, "Off-wrist reminder": true, "Sync reminder": true,
-        "Your night is in": true, "Bedtime nudge": true, "A new best": true, "Weekly read": false,
+        "Quiet hours": false, "Battery alerts": true, "Off-wrist reminder": false, "Sync reminder": true,
+        "Your night is in": true, "Bedtime nudge": false, "A new best": false, "Weekly read": false,
         "Backup reminder": true,
         "Reduce motion in Noop": false
     ]
@@ -3907,7 +3907,7 @@ private extension NoopAct5Screens {
         guard measured else { return false }
         if let start = Self.settingsToggleDefaults[title] { return labControlIsOn(title) != start }
         switch title {
-        case "Units": return settingsChoice("Units") == "Imperial"
+        case "Units": return settingsChoice("Units") != (NoopDefaults.regionUnitSystem == .imperial ? "Imperial" : "Metric")
         case "Temperature":
             return settingsChoice("Temperature") != (settingsChoice("Units") == "Imperial" ? "°F" : "°C")
         case "Effort": return settingsChoice("Effort") == "0–21"
@@ -3925,7 +3925,8 @@ private extension NoopAct5Screens {
             return
         }
         switch title {
-        case "Units": unitSystemRaw = UnitSystem.metric.rawValue
+        // Removed, not written: an untouched setting follows the iPhone's region again.
+        case "Units": UserDefaults.standard.removeObject(forKey: UnitPrefs.systemKey)
         case "Temperature": temperatureRaw = ""
         case "Effort": effortScaleRaw = ""
         case "Power saving at": powerSavingPct = 20
@@ -5801,6 +5802,12 @@ struct NoopStrapSyncButton: View {
 }
 
 // MARK: - Settings pages
+
+extension NoopAct5Screens {
+    /// You's catalog, for the new-look choice (the list itself sits in a private extension).
+    static var youCatalog: [NoopPageSection] { youSections }
+}
+
 
 /// One page of Settings (26 Oct 2026). The hub lists the pages in three blocks under the strap card;
 /// each opens its own route. The Lab and Diagnostics keep the screens they already had.

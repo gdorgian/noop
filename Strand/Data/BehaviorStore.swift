@@ -152,7 +152,12 @@ final class BehaviorStore: ObservableObject {
         smartAlarmWeekdays = Set((d.array(forKey: K.alarmWeekdays) as? [Int] ?? []).filter { (1...7).contains($0) })
         illnessWatch = d.object(forKey: K.illness) as? Bool ?? false
         batteryAlerts = d.object(forKey: K.batteryAlerts) as? Bool ?? true
+        // Noop Aura starts calm (26 Oct 2026): the off-wrist notice is one a wearer asks for. macOS keeps its default.
+        #if os(iOS)
+        wearAlerts = d.object(forKey: K.wearAlerts) as? Bool ?? false
+        #else
         wearAlerts = d.object(forKey: K.wearAlerts) as? Bool ?? true
+        #endif
         batteryPredictiveAlerts = d.object(forKey: K.batteryPredictiveAlerts) as? Bool ?? true
         strainTargetNudge = d.object(forKey: K.strainTargetNudge) as? Bool ?? false
         syncReminder = d.object(forKey: K.syncReminder) as? Bool ?? true

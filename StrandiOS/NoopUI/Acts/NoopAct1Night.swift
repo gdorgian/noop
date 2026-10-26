@@ -89,11 +89,11 @@ struct NoopAct1Screens: View {
         NoopPageSection(id: "night-performance", title: "Sleep · Performance", detail: "One gauge of sleep against need, with stage rows", onByDefault: false),
         NoopPageSection(id: "night-ledger", title: "Sleep · Ledger", detail: "The night as plain figures over a stage strip", onByDefault: false),
         NoopPageSection(id: "seven", title: "Your last seven", detail: "Seven nights against your need"),
-        NoopPageSection(id: "shape", title: "The shape of it", detail: "The night's stages on one timeline"),
+        NoopPageSection(id: "shape", title: "The shape of it", detail: "The night's stages on one timeline", onByDefault: false),
         NoopPageSection(id: "shape-lanes", title: "Stages in lanes", detail: "Heart rate over one lane per stage"),
         NoopPageSection(id: "overtime", title: "Over time", detail: "Sleep debt, consistency and history"),
         NoopPageSection(id: "next", title: "Your next sleep", detail: "Evening journal and tonight"),
-        NoopPageSection(id: "trends", title: "Trends", detail: "Consistency, sleep score and each measure as a chart")
+        NoopPageSection(id: "trends", title: "Trends", detail: "Consistency, sleep score and each measure as a chart", onByDefault: false)
     ]
 
     @ViewBuilder

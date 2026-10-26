@@ -118,6 +118,11 @@ private enum NoopA4 {
     }
 }
 
+/// Trends' catalog for the new-look choice; the screen itself is private to this file.
+enum NoopTrendsCatalog {
+    static var sections: [NoopPageSection] { NoopTrendsScreen.trendsSections }
+}
+
 private struct NoopTrendsScreen: View {
     @ObservedObject var navigation: NoopNavigation
     @ObservedObject private var ageTone = NoopAgeTone.shared
@@ -137,7 +142,10 @@ private struct NoopTrendsScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 NoopA4Header(title: "Trends", eyebrow: window.span) { EmptyView() }
 
-                NoopEditableSections(layout: trendsLayout, editing: $trendsEditing, spacing: 0) { id in
+                // Bloodwork waits until there is a lab result to show (26 Oct 2026); adding one stays
+                // on You and in Goals.
+                NoopEditableSections(layout: trendsLayout, editing: $trendsEditing, spacing: 0,
+                                     isEmpty: { $0 == "bloodwork" && live != nil && labBook.markers.isEmpty }) { id in
                     trendsSection(id)
                 }
             }
@@ -162,7 +170,7 @@ private struct NoopTrendsScreen: View {
         NoopPageSection(id: "bloodwork", title: "Bloodwork", detail: "Your lab results"),
         NoopPageSection(id: "explore", title: "Explore", detail: "Compare signals and relationships"),
         NoopPageSection(id: "summaries", title: "Your summaries", detail: "Weekly digest and the trends report"),
-        NoopPageSection(id: "history", title: "Recording history", detail: "Which days the strap recorded")
+        NoopPageSection(id: "history", title: "Recording history", detail: "Which days the strap recorded", onByDefault: false)
     ]
 
     @ViewBuilder

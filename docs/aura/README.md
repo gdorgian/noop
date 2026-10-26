@@ -14,6 +14,7 @@ Everything needed to continue lives in this repository; nothing depends on files
 | Screen-by-screen QA against the 9 September handoff | [`docs/design/qa-2026-09-09`](../design/qa-2026-09-09/index.html) |
 | Everything still needed from design (44 items) | [`designer-request.md`](designer-request.md) |
 | What was tested on a real iPhone, and the result | [`device-test-2026-09-25.md`](device-test-2026-09-25.md) |
+| How Aura starts: every default, for new and upgrading users (check before each beta) | [`defaults.md`](defaults.md) |
 | Design-vs-app screenshot comparison tool | [`Tools/design-flip`](../../Tools/design-flip/README.md) |
 | Why things are built the way they are | [`docs/fork/decisions.md`](../fork/decisions.md) |
 | Release notes for 11.7.0 | [`docs/fork/releases/v11.7.0.md`](../fork/releases/v11.7.0.md) |

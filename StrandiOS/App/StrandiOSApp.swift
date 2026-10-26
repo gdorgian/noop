@@ -55,6 +55,8 @@ struct StrandiOSApp: App {
         // The redesign fonts are owned by StrandDesign's resource bundle. Register them before any
         // SwiftUI text resolves a face; the widget repeats this in its own process.
         NoopSpecType.registerFonts()
+        // Units follow the iPhone's region until the wearer picks (registered, never written).
+        NoopDefaults.register()
         #if DEBUG
         // Alternate icons are frozen exports of the same native orb drawings used by Breathe and
         // Svea. The explicit launch flag keeps asset generation out of ordinary app launches.
