@@ -117,6 +117,24 @@ struct NoopHistoryRecord {
 
     static let span = 60
 
+    /// A yes to a starter question, said as what happened: "Alcohol", not "Did you drink any alcohol?".
+    /// The wearer's own questions are shown as they wrote them.
+    static func logged(_ question: String) -> String {
+        let said: [String: String] = [
+            "Did you drink any alcohol?": "Alcohol",
+            "Did you have caffeine late in the day?": "Caffeine late in the day",
+            "Did you view a screen in bed?": "A screen in bed",
+            "Did you eat close to bedtime?": "Ate close to bedtime",
+            "Did you feel stressed?": "Felt stressed",
+            "Did you use a sauna?": "Sauna",
+            "Did you share your bed?": "Shared the bed",
+            "Did you feel sick or ill?": "Felt sick or ill",
+            "Did you take magnesium?": "Magnesium",
+            "Did you read before bed?": "Read before bed",
+        ]
+        return said[question.trimmingCharacters(in: .whitespacesAndNewlines)] ?? question
+    }
+
     static func build(sleeps: [CachedSleepSession], workouts: [WorkoutRow], journal: [JournalEntry],
                       needMin: Double, now: Date = Date(), calendar: Calendar = .current) -> NoopHistoryRecord {
         let clock = AppClock.hourMinuteFormatter()
@@ -152,7 +170,7 @@ struct NoopHistoryRecord {
         for (key, group) in Dictionary(grouping: journal.filter { $0.answeredYes }, by: { "\($0.day)|\($0.question)" }) {
             guard let first = group.first, let date = dayParser.date(from: first.day), date >= cutoff else { continue }
             _ = key
-            entries.append(.init(kind: .log, date: date.addingTimeInterval(12 * 3600), name: first.question,
+            entries.append(.init(kind: .log, date: date.addingTimeInterval(12 * 3600), name: Self.logged(first.question),
                                  detail: first.notes ?? "", value: group.count > 1 ? "\u{00D7}\(group.count)" : "",
                                  sport: nil))
         }
