@@ -163,7 +163,7 @@ final class NoopDayStore: ObservableObject {
         next.vitalsBanded = banded.count
         next.vitalsOut = banded.filter { $0.banding.band == .outOfRange }.count
         next.vitals = NoopVital.designOrder.compactMap { key in
-            readings.first { $0.key == key }.flatMap(NoopVital.init(reading:))
+            readings.first { $0.key == key }.flatMap { NoopVital(reading: $0) }
         }
 
         if UserDefaults.standard.bool(forKey: "noop.energy.profileConfirmed"), profile.age > 0,
@@ -226,7 +226,10 @@ struct NoopVital: Equatable {
 
     static let designOrder = ["rhr", "hrv", "resp", "spo2", "skin"]
 
-    init?(reading: BodyVitalReading) {
+    init?(reading: BodyVitalReading,
+          fahrenheit: Bool = UnitPrefs.resolveTemperature(
+              system: UnitSystem(rawValue: UserDefaults.standard.string(forKey: UnitPrefs.systemKey) ?? "") ?? .metric,
+              override: UserDefaults.standard.string(forKey: UnitPrefs.temperatureKey) ?? "") == .fahrenheit) {
         guard let value = reading.value, reading.banding.band != .noData else { return nil }
         let absoluteSkin = reading.key == "skin" && VitalBands.isAbsoluteSkinTemp(value)
         switch reading.key {
@@ -235,18 +238,23 @@ struct NoopVital: Equatable {
         case "resp": (name, window, unit, decimals, direction) = ("Breathing rate", "overnight average", "/min", 1, 0)
         case "spo2": (name, window, unit, decimals, direction) = ("Blood oxygen", "overnight average", "%", 0, 0)
         case "skin":
-            (name, unit, decimals, direction) = ("Skin temperature", "\u{00B0}C", 1, 0)
+            (name, unit, decimals, direction) = ("Skin temperature", fahrenheit ? "\u{00B0}F" : "\u{00B0}C", 1, 0)
             window = absoluteSkin ? "overnight average" : "deviation from your normal"
         default: return nil
         }
+        // Skin temperature is stored in °C. In °F an absolute reading takes the +32 offset; a deviation
+        // only scales, because the offset cancels in a difference.
+        let toShown: (Double) -> Double = reading.key == "skin" && fahrenheit
+            ? (absoluteSkin ? UnitFormatter.celsiusToFahrenheit : UnitFormatter.celsiusDeltaToFahrenheit)
+            : { $0 }
         key = reading.key
-        self.value = value
+        self.value = toShown(value)
         outside = reading.banding.band == .outOfRange
         if reading.banding.basis == .personal, let state = reading.personal, state.trusted {
             let reach = VitalBands.sigmaK * Baselines.sigma(state)
-            baseline = state.baseline
-            low = state.baseline - reach
-            high = state.baseline + reach
+            baseline = toShown(state.baseline)
+            low = toShown(state.baseline - reach)
+            high = toShown(state.baseline + reach)
         } else {
             baseline = nil
             let population: ClosedRange<Double> = switch reading.key {
@@ -256,8 +264,8 @@ struct NoopVital: Equatable {
             case "spo2": 95...100
             default: absoluteSkin ? 33...36 : (-0.6)...0.6
             }
-            low = population.lowerBound
-            high = population.upperBound
+            low = toShown(population.lowerBound)
+            high = toShown(population.upperBound)
         }
     }
 

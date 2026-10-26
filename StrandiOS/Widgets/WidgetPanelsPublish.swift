@@ -110,7 +110,7 @@ enum WidgetPanelsPublisher {
         let readings = BodyVitalSigns.readings(sourceRows: repo.vitalMetricRows, temperatureUnit: .celsius, now: now)
             .filter { NoopDayStore.todayVitalKeys.contains($0.key) }
         let items: [WidgetPanels.Vitals.Item] = NoopVital.designOrder.compactMap { key in
-            guard let vital = readings.first(where: { $0.key == key }).flatMap(NoopVital.init(reading:)) else {
+            guard let vital = readings.first(where: { $0.key == key }).flatMap({ NoopVital(reading: $0) }) else {
                 return nil
             }
             let scale = vital.scale

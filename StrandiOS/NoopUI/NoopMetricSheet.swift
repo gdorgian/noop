@@ -2,6 +2,7 @@
 import SwiftUI
 import Charts
 import WhoopStore
+import StrandAnalytics
 
 // NoopMetricSheet — the one template every metric opens in.
 //
@@ -225,12 +226,26 @@ extension NoopMetric {
     init(marker d: MetricDescriptor) {
         let minutes = d.unit == "min"
         let norms = NoopMarkerNorms.ranges(for: d.key, profile: .current)
-        self.init(id: d.id, title: d.auraTitle, short: d.auraTitle, unit: minutes ? "h" : d.unit, decimals: minutes ? 1 : d.decimals,
+        // Mass and temperature are stored in kg and °C; show them in the wearer's units. Neither has
+        // norm zones, so only the values and the label change.
+        let defaults = UserDefaults.standard
+        let system = UnitSystem(rawValue: defaults.string(forKey: UnitPrefs.systemKey) ?? "") ?? .metric
+        let fahrenheit = UnitPrefs.resolveTemperature(system: system,
+                                                       override: defaults.string(forKey: UnitPrefs.temperatureKey) ?? "") == .fahrenheit
+        let pounds = d.unit == "kg" && system == .imperial
+        let toF = d.unit == "°C" && fahrenheit
+        let unit = minutes ? "h" : pounds ? "lb" : toF ? "°F" : d.unit
+        let transform: (Double) -> Double = minutes ? { $0 / 60 }
+            : d.unit == "%" && Self.fractionKeys.contains(d.key) ? { $0 <= 1 ? $0 * 100 : $0 }
+            : pounds ? UnitFormatter.kgToPounds
+            // Skin temperature is either an absolute wrist reading or a deviation; only the first takes +32.
+            : toF ? { VitalBands.isAbsoluteSkinTemp($0) ? UnitFormatter.celsiusToFahrenheit($0) : UnitFormatter.celsiusDeltaToFahrenheit($0) }
+            : { $0 }
+        self.init(id: d.id, title: d.auraTitle, short: d.auraTitle, unit: unit, decimals: minutes ? 1 : d.decimals,
                   higherIsBetter: d.higherIsBetter, zones: norms?.zones ?? [], scale: norms?.scale,
                   about: d.description ?? "\(d.auraTitle), from \(d.sourceLabel).",
                   value: { _ in nil }, isDuration: minutes,
-                  series: .init(key: d.key, source: d.source, transform: minutes ? { $0 / 60 }
-                                : d.unit == "%" && Self.fractionKeys.contains(d.key) ? { $0 <= 1 ? $0 * 100 : $0 } : { $0 }),
+                  series: .init(key: d.key, source: d.source, transform: transform),
                   zoneCaption: norms?.caption)
     }
 }

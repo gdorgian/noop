@@ -382,8 +382,12 @@ enum NoopExerciseFormat {
         }
     }
 
+    /// "Oct 26" this year, "Oct 26, 2025" before it. A two-digit year read as a second day ("Oct 26, 26").
     static func date(_ ts: Int) -> String {
-        Date(timeIntervalSince1970: Double(ts)).formatted(.dateTime.day().month(.abbreviated).year(.twoDigits))
+        let d = Date(timeIntervalSince1970: Double(ts))
+        return Calendar.current.isDate(d, equalTo: Date(), toGranularity: .year)
+            ? d.formatted(.dateTime.day().month(.abbreviated))
+            : d.formatted(.dateTime.day().month(.abbreviated).year())
     }
 
     static func longDate(_ ts: Int) -> String {
