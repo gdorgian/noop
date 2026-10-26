@@ -1224,14 +1224,47 @@ public enum SleepStager {
     /// True when the pulse rose at `ts` as getting up does, or when there is too little pulse to judge
     /// (the strap's call then stands alone).
     static func hrConfirmsUp(at ts: Int, hr: [HRSample]) -> Bool {
-        func median(_ from: Int, _ to: Int) -> Double? {
-            let v = hr.filter { $0.ts >= from && $0.ts < to && $0.bpm > 25 && $0.bpm < 230 }
-                .map { Double($0.bpm) }.sorted()
-            return v.count >= 30 ? v[v.count / 2] : nil
-        }
-        guard let before = median(ts - bandUpHRBeforeS, ts - bandUpHRGuardS),
-              let after = median(ts, ts + bandUpHRAfterS) else { return true }
+        guard let before = medianBPM(hr, ts - bandUpHRBeforeS, ts - bandUpHRGuardS),
+              let after = medianBPM(hr, ts, ts + bandUpHRAfterS) else { return true }
         return after - before >= bandUpHRRiseBpm
+    }
+
+    static func medianBPM(_ hr: [HRSample], _ from: Int, _ to: Int) -> Double? {
+        let v = hr.filter { $0.ts >= from && $0.ts < to && $0.bpm > 25 && $0.bpm < 230 }
+            .map { Double($0.bpm) }.sorted()
+        return v.count >= 30 ? v[v.count / 2] : nil
+    }
+
+    /// Awake in bed on a laptop or phone barely lifts the pulse (72 to 75 one late morning) but keeps the
+    /// wrist moving: `bandUpMoveShare` of the seconds over the `bandUpMoveWindowS` after the run's start
+    /// above `bandUpMoveG` of the strap's own motion. The false "up" runs lying still in bed measured 0-7 %,
+    /// that morning 21 %.
+    static let bandUpMoveWindowS: Int = 900
+    static let bandUpMoveG: Double = 0.05
+    static let bandUpMoveShare: Double = 0.12
+
+    static func moveConfirmsUp(at ts: Int, grav: [GravitySample]) -> Bool {
+        let motion = grav.filter { $0.ts >= ts && $0.ts < ts + bandUpMoveWindowS }.compactMap(\.dynAccel)
+        guard motion.count >= bandUpMoveWindowS / 3 else { return false }
+        return Double(motion.filter { $0 > bandUpMoveG }.count) / Double(motion.count) >= bandUpMoveShare
+    }
+
+    /// An "up" run counts when the pulse rises with it or the wrist keeps moving after it.
+    static func upConfirmed(at ts: Int, hr: [HRSample], grav: [GravitySample]) -> Bool {
+        hrConfirmsUp(at: ts, hr: hr) || moveConfirmsUp(at: ts, grav: grav)
+    }
+
+    /// Seconds of pulse read at the start of a band "asleep" after a cut.
+    static let bandReturnHRS: Int = 600
+
+    /// Going back to sleep lowers the pulse. The strap called "asleep" for half an hour while the wearer lay
+    /// still watching a film, at 78 against 75 while awake on a laptop before it and 69 asleep that night, so
+    /// "asleep" after a cut reopens the night only when the pulse at its start is no higher than during the
+    /// "up". True when there is too little pulse to judge.
+    static func hrConfirmsReturn(up: Int, asleep: Int, hr: [HRSample]) -> Bool {
+        guard let awake = medianBPM(hr, up, asleep),
+              let back = medianBPM(hr, asleep, asleep + bandReturnHRS) else { return true }
+        return back <= awake
     }
 
     /// The time the strap itself says the wearer got out of bed, when it falls inside `[start, end]`: the
@@ -1240,14 +1273,16 @@ public enum SleepStager {
     /// "Up") follows the clock. nil when there is no such run; the caller then keeps the gravity end. Only
     /// ever shortens.
     static func bandUpCut(start: Int, end: Int, bandSleepState: [(ts: Int, state: Int)],
-                          hr: [HRSample] = []) -> Int? {
+                          hr: [HRSample] = [], grav: [GravitySample] = []) -> Int? {
         let inRun = bandSleepState.filter { $0.ts > start && $0.ts <= end }.sorted { $0.ts < $1.ts }
         guard !inRun.isEmpty else { return nil }
-        let hrNear = hr.filter { $0.ts >= start - bandUpHRBeforeS && $0.ts <= end + bandUpHRAfterS }
+        let hrNear = hr.filter { $0.ts >= start - bandUpHRBeforeS && $0.ts <= end + bandReturnHRS }
+        let gravNear = grav.filter { $0.ts >= start && $0.ts <= end + bandUpMoveWindowS }
         var cut: Int? = nil
         var rejected: Int? = nil   // an "up" run the pulse did not confirm; not re-checked every sample
         var upStart: Int? = nil, upPrev = 0
         var asleepAfterCut = 0, asleepPrev: Int? = nil
+        var asleepStart: Int? = nil, rejectedReturn: Int? = nil   // likewise for "asleep" after a cut
         for s in inRun {
             if s.state == bandStateUp {
                 if upStart != nil, s.ts - upPrev > bandUpMaxGapS { upStart = nil }
@@ -1255,7 +1290,7 @@ public enum SleepStager {
                 upPrev = s.ts
                 // A standing cut is kept: only sustained sleep after it (below) cancels it.
                 if cut == nil, let u = upStart, upPrev - u >= bandUpMinRunS, rejected != u {
-                    if hrConfirmsUp(at: u, hr: hrNear) {
+                    if upConfirmed(at: u, hr: hrNear, grav: gravNear) {
                         cut = u
                         asleepAfterCut = 0
                     } else {
@@ -1266,9 +1301,12 @@ public enum SleepStager {
             } else {
                 upStart = nil
                 if cut != nil, s.state == bandStateAsleep {
-                    if let a = asleepPrev, s.ts - a <= bandUpMaxGapS { asleepAfterCut += s.ts - a }
+                    if let a = asleepPrev, s.ts - a <= bandUpMaxGapS { asleepAfterCut += s.ts - a } else { asleepStart = s.ts }
                     asleepPrev = s.ts
-                    if asleepAfterCut >= bandUpReturnAsleepS { cut = nil; asleepAfterCut = 0 }
+                    if asleepAfterCut >= bandUpReturnAsleepS, let c = cut, let a0 = asleepStart, rejectedReturn != a0 {
+                        if hrConfirmsReturn(up: c, asleep: a0, hr: hrNear) { cut = nil } else { rejectedReturn = a0 }
+                        asleepAfterCut = 0
+                    }
                 } else {
                     asleepPrev = nil
                 }
@@ -1689,7 +1727,7 @@ public enum SleepStager {
         for var p in runs {
             if p.stage != "sleep" { continue }
             // The strap's own "up" closes the night; a still wrist after getting up does not extend it.
-            if let up = bandUpCut(start: p.start, end: p.end, bandSleepState: bandSleepState, hr: hrS) {
+            if let up = bandUpCut(start: p.start, end: p.end, bandSleepState: bandSleepState, hr: hrS, grav: grav) {
                 p.end = up
             }
             runIndex += 1

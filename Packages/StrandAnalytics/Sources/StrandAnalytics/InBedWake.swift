@@ -111,7 +111,7 @@ public enum InBedWake {
         let sleepMoves = (0..<n).compactMap { staged[$0] ? move[$0] : nil }.sorted()
         let moveLine: Double? = sleepMoves.count >= 30
             ? max(minMoveG, sleepMoves[sleepMoves.count / 2] * moveMultiple) : nil
-        let band = perMinuteBand(pulseCheckedBand(bandSleepState, hr: hr), start: start, n: n)
+        let band = perMinuteBand(pulseCheckedBand(bandSleepState, hr: hr, grav: grav), start: start, n: n)
 
         let evidence: [Evidence] = (0..<n).map { m in
             if let b = band[m] {
@@ -234,15 +234,16 @@ public enum InBedWake {
         return (0..<n).map { count[$0] >= 2 ? sum[$0] : nil }
     }
 
-    /// The strap's states with every "up" run the pulse does not confirm dropped (the same check as
-    /// `SleepStager.bandUpCut`). The strap calls "up" while the wearer lies still and asleep — 70 minutes
+    /// The strap's states with every "up" run neither the pulse nor a moving wrist confirms dropped (the same
+    /// check as `SleepStager.bandUpCut`). The strap calls "up" while the wearer lies still and asleep — 70 minutes
     /// of it one morning at a sleeping pulse, while Fitbit on the same wrist scored REM and light — so an
     /// unconfirmed "up" is left to the pulse and movement evidence instead of counting as awake.
-    static func pulseCheckedBand(_ band: [(ts: Int, state: Int)], hr: [HRSample]) -> [(ts: Int, state: Int)] {
+    static func pulseCheckedBand(_ band: [(ts: Int, state: Int)], hr: [HRSample],
+                                 grav: [GravitySample] = []) -> [(ts: Int, state: Int)] {
         let sorted = band.sorted { $0.ts < $1.ts }
         var out: [(ts: Int, state: Int)] = [], run: [(ts: Int, state: Int)] = []
         func flush() {
-            if let first = run.first, SleepStager.hrConfirmsUp(at: first.ts, hr: hr) { out += run }
+            if let first = run.first, SleepStager.upConfirmed(at: first.ts, hr: hr, grav: grav) { out += run }
             run = []
         }
         for b in sorted {
