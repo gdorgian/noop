@@ -188,7 +188,7 @@ struct NoopFitnessBodyScreen: View {
 
     /// Weigh-ins Apple Health brought in (the series Trends draws) join the hand-logged ones, so the
     /// page agrees with Trends. A day that already has a logged value keeps it. These rows are read-only.
-    private static func mergingHealth(_ logged: [BodyMeasurementRow], store: WhoopStore) async -> [BodyMeasurementRow] {
+    static func mergingHealth(_ logged: [BodyMeasurementRow], store: WhoopStore) async -> [BodyMeasurementRow] {
         let parser = DateFormatter()
         parser.locale = Locale(identifier: "en_US_POSIX")
         parser.dateFormat = "yyyy-MM-dd"

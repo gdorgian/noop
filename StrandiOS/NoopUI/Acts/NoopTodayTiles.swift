@@ -94,7 +94,9 @@ struct NoopTodayTileView: View {
             }
             .task(id: tile == .weight ? repo.refreshSeq : -1) {
                 guard tile == .weight, !seeded, let store = await repo.storeHandle() else { return }
-                weights = ((try? await store.bodyMeasurements(deviceId: repo.deviceId)) ?? [])
+                // Apple Health weigh-ins count too, as on Fitness › Body and the Trends weight marker.
+                let logged = (try? await store.bodyMeasurements(deviceId: repo.deviceId)) ?? []
+                weights = await NoopFitnessBodyScreen.mergingHealth(logged, store: store)
                     .filter { $0.kind == .weight }.sorted { $0.ts < $1.ts }
             }
     }
