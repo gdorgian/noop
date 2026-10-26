@@ -109,6 +109,9 @@ struct NoopAct5Screens: View {
     @State private var settingsGlowID: String?
     /// The not-yet option whose explanation is open.
     @State private var pendingOption: NoopPendingOption?
+    @State private var settingsEntered = false
+    @State private var confirmingSettingsReset = false
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     /// iOS notification permission, read when Notifications opens and again on return from iOS Settings.
     @State private var notificationAuth: UNAuthorizationStatus?
     @State private var actionNotice: String?
@@ -562,7 +565,7 @@ private extension NoopAct5Screens {
                     .offset(y: -110)
             }
         }
-        .noopEditBar($youEditing, layout: youLayout)
+        .noopEditBar($youEditing, layout: youLayout) { navigation.push(.settingsYou) }
     }
 
     /// You's sections in their default order; each carries the space above it.
@@ -3622,7 +3625,11 @@ private extension NoopAct5Screens {
                 act5BackHeader("Settings") { navigation.back(or: .settings) }
                 VStack(alignment: .leading, spacing: 14) {
                     settingsTile(page, size: 44)
+                        .scaleEffect(settingsEntered ? 1 : 0.62)
+                        .opacity(settingsEntered ? 1 : 0)
                     pageTitle(page.title, copy: page.blurb)
+                        .offset(y: settingsEntered ? 0 : 7)
+                        .opacity(settingsEntered ? 1 : 0)
                 }
                 .padding(.bottom, 5)
 
@@ -3645,6 +3652,17 @@ private extension NoopAct5Screens {
                                 if index > 0 { Divider().overlay(NoopHTMLColor.border) }
                                 item.row()
                                     .id(item.id)
+                                    .overlay(alignment: .topLeading) {
+                                        // Changed from how Noop starts: a small dot in the card's margin,
+                                        // level with the row's title.
+                                        if settingsChanged(item.title) {
+                                            Circle().fill(page.tint).frame(width: 5, height: 5)
+                                                .offset(x: -10.5, y: 19)
+                                                .transition(.scale.combined(with: .opacity))
+                                                .accessibilityHidden(true)
+                                        }
+                                    }
+                                    .animation(.smooth(duration: 0.25), value: settingsChanged(item.title))
                                     .background {
                                         // A search result's row glows once on arrival, then settles.
                                         RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -3659,8 +3677,12 @@ private extension NoopAct5Screens {
                 }
 
                 if page == .about { settingsVersionFooter.padding(.top, 6) }
+
+                settingsResetFooter(page)
             }
         }
+        // A selection tick for every switch or choice that actually changes on this page.
+        .sensoryFeedback(.selection, trigger: settingsSignature(page))
         .task {
             if page == .alerts { await readNotificationAuth() }
         }
@@ -3669,6 +3691,11 @@ private extension NoopAct5Screens {
             Task { await readNotificationAuth() }
         }
         .onAppear {
+            if systemReduceMotion || quietMotionOn {
+                settingsEntered = true
+            } else {
+                withAnimation(.spring(response: 0.46, dampingFraction: 0.78).delay(0.05)) { settingsEntered = true }
+            }
             #if DEBUG
             // Visual fixture: `--noop-settings-pending <id>` opens that option's explanation.
             if let index = CommandLine.arguments.firstIndex(of: "--noop-settings-pending"),
@@ -3855,6 +3882,106 @@ private extension NoopAct5Screens {
                 .foregroundStyle(NoopHTMLColor.copy)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// How a fresh install starts, for every switch a page can reset. Rows not listed here (links,
+    /// the app icon, Svea's manner, anything that writes to the strap beyond Broadcast) are never
+    /// marked changed and never reset.
+    static let settingsToggleDefaults: [String: Bool] = [
+        "Journal reminder": true,
+        "Sleep staging V2": true, "Motion-aware wake": false,
+        "Keep the screen on in a workout": false, "Offer a workout it spotted": false,
+        "Live heart rate in the Dynamic Island": true,
+        "Power saving": false, "Pause the HRV stream when low": true,
+        "Continuous HRV capture": false, "Overnight only": true, "Broadcast heart rate": false,
+        "Quiet hours": false, "Battery alerts": true, "Off-wrist reminder": true, "Sync reminder": true,
+        "Your night is in": true, "Bedtime nudge": true, "A new best": true, "Weekly read": false,
+        "Backup reminder": true,
+        "Reduce motion in Noop": false
+    ]
+
+    /// True when a row's stored value is not what a fresh install has. Production only: the seeded
+    /// prototype has no stored settings to compare.
+    func settingsChanged(_ title: String) -> Bool {
+        guard measured else { return false }
+        if let start = Self.settingsToggleDefaults[title] { return labControlIsOn(title) != start }
+        switch title {
+        case "Units": return settingsChoice("Units") == "Imperial"
+        case "Temperature":
+            return settingsChoice("Temperature") != (settingsChoice("Units") == "Imperial" ? "°F" : "°C")
+        case "Effort": return settingsChoice("Effort") == "0–21"
+        case "Power saving at": return powerSavingPct != 20
+        default: return false
+        }
+    }
+
+    /// Put one row back the way a fresh install has it, through the same path a tap takes, so every
+    /// side effect (a notice re-planned, the HRV stream re-armed, the strap told) runs as it would.
+    func settingsReset(_ title: String) {
+        if let start = Self.settingsToggleDefaults[title] {
+            guard labControlIsOn(title) != start else { return }
+            if title == "Broadcast heart rate" { toggleLabControl(title) } else { flip(title) }
+            return
+        }
+        switch title {
+        case "Units": unitSystemRaw = UnitSystem.metric.rawValue
+        case "Temperature": temperatureRaw = ""
+        case "Effort": effortScaleRaw = ""
+        case "Power saving at": powerSavingPct = 20
+        default: break
+        }
+    }
+
+    func settingsChangedTitles(_ page: NoopSettingsPage) -> [String] {
+        settingsBaseSections(page).flatMap(\.items).map(\.title).filter(settingsChanged)
+    }
+
+    func settingsSignature(_ page: NoopSettingsPage) -> String {
+        settingsBaseSections(page).flatMap(\.items).map { item in
+            (labControlIsOn(item.title) ? "1" : "0") + (settingsChoice(item.title) ?? "")
+        }.joined(separator: "|")
+    }
+
+    @ViewBuilder
+    func settingsResetFooter(_ page: NoopSettingsPage) -> some View {
+        let changed = settingsChangedTitles(page)
+        if !changed.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Button { confirmingSettingsReset = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.counterclockwise").font(.system(size: 13, weight: .semibold))
+                        Text("Reset \(page.title) to how Noop starts")
+                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                    }
+                    .foregroundStyle(page.tint)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 48)
+                    .background(page.tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(page.tint.opacity(0.24), lineWidth: 0.5))
+                }
+                .buttonStyle(NoopHTMLPressStyle())
+                HStack(spacing: 7) {
+                    Circle().fill(page.tint).frame(width: 5, height: 5)
+                    Text(changed.count == 1 ? "One setting here is changed from how Noop starts. Your data stays as it is."
+                         : "\(changed.count) settings here are changed from how Noop starts. Your data stays as it is.")
+                        .font(NoopHTMLFont.sans(NoopType.caption))
+                        .foregroundStyle(Color(hex: 0x7F8A85))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 2)
+            }
+            .padding(.top, 14)
+            .transition(.opacity)
+            .confirmationDialog("Reset \(page.title)?", isPresented: $confirmingSettingsReset, titleVisibility: .visible) {
+                Button(changed.count == 1 ? "Reset 1 setting" : "Reset \(changed.count) settings", role: .destructive) {
+                    withAnimation(.smooth(duration: 0.3)) { changed.forEach(settingsReset) }
+                    NoopHaptics.play(.save)
+                }
+                Button("Keep them", role: .cancel) {}
+            } message: {
+                Text(changed.joined(separator: ", "))
+            }
         }
     }
 

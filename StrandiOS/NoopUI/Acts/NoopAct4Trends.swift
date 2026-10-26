@@ -142,7 +142,7 @@ private struct NoopTrendsScreen: View {
                 }
             }
         }
-        .noopEditBar($trendsEditing, layout: trendsLayout)
+        .noopEditBar($trendsEditing, layout: trendsLayout) { navigation.push(.settingsScores) }
         .task(id: repo.deviceId) {
             guard live != nil else { return }
             await labBook.load(store: await repo.storeHandle(), deviceId: repo.deviceId)

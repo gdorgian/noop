@@ -74,7 +74,7 @@ struct NoopAct1Screens: View {
                 NoopEditableSections(layout: restLayout, editing: $restEditing) { id in restSection(id) }
             }
         }
-        .noopEditBar($restEditing, layout: restLayout)
+        .noopEditBar($restEditing, layout: restLayout) { navigation.push(.settingsSleep) }
     }
 
     /// Rest's sections in their default order.

@@ -70,7 +70,7 @@ struct NoopRecoveryPage: View {
                 NoopEditableSections(layout: layout, editing: $editing, spacing: 0) { id in section(id) }
             }
         }
-        .noopEditBar($editing, layout: layout)
+        .noopEditBar($editing, layout: layout) { navigation.push(.settingsScores) }
     }
 
     @ViewBuilder
@@ -163,7 +163,7 @@ struct NoopStrainPage: View {
                 NoopEditableSections(layout: layout, editing: $editing, spacing: 0) { id in section(id) }
             }
         }
-        .noopEditBar($editing, layout: layout)
+        .noopEditBar($editing, layout: layout) { navigation.push(.settingsScores) }
     }
 
     @ViewBuilder

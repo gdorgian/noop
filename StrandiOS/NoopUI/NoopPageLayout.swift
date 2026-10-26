@@ -1015,6 +1015,8 @@ private struct NoopIncomingObserver: View {
 struct NoopEditBar: ViewModifier {
     @Binding var editing: NoopPageEditing
     let layout: NoopPageLayout
+    /// Opens this page's own Settings (26 Oct 2026). The arrangement is kept, as Save would.
+    var settings: (() -> Void)? = nil
 
     /// The page draws under the status bar, so the bar measures it itself.
     private static var statusInset: CGFloat {
@@ -1032,6 +1034,23 @@ struct NoopEditBar: ViewModifier {
                     }
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: NoopControlSize.small.height / 2))
                     Spacer()
+                    if let settings {
+                        Button {
+                            layout.save(editing.draft)
+                            withAnimation(.easeInOut(duration: 0.22)) { editing.active = false }
+                            editing.saves += 1
+                            NoopHaptics.play(.tick)
+                            settings()
+                        } label: {
+                            NoopIconDiscShape(size: .small) {
+                                Image(systemName: "gearshape").font(.system(size: NoopControlSize.small.icon, weight: .medium))
+                            }
+                        }
+                        .buttonStyle(NoopHTMLPressStyle())
+                        .accessibilityLabel("Page settings")
+                        .accessibilityHint("Keeps this arrangement and opens the page's settings")
+                        Spacer()
+                    }
                     NoopActionButton(title: "Save", size: .small, fullWidth: false) {
                         layout.save(editing.draft)
                         withAnimation(.easeInOut(duration: 0.22)) { editing.active = false }
@@ -1058,7 +1077,8 @@ struct NoopEditBar: ViewModifier {
 }
 
 extension View {
-    func noopEditBar(_ editing: Binding<NoopPageEditing>, layout: NoopPageLayout) -> some View {
-        modifier(NoopEditBar(editing: editing, layout: layout))
+    func noopEditBar(_ editing: Binding<NoopPageEditing>, layout: NoopPageLayout,
+                     settings: (() -> Void)? = nil) -> some View {
+        modifier(NoopEditBar(editing: editing, layout: layout, settings: settings))
     }
 }

@@ -456,7 +456,7 @@ struct NoopAct2Screens: View {
                     .padding(.top, 4)
             }
         }
-        .noopEditBar($todayEditing, layout: todayLayout)
+        .noopEditBar($todayEditing, layout: todayLayout) { navigation.push(.settingsToday) }
         .onAppear {
             todayPulseAnchor = Date()
             #if DEBUG
