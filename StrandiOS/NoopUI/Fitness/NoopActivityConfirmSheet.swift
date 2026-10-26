@@ -103,6 +103,7 @@ struct NoopActivityConfirmSheet: View {
                     await finish()
                 }
             }
+            Button("Cancel", role: .cancel) {}
         } message: { Text(detected ? "It will not be detected again." : "This removes it from your record.") }
         .sheet(isPresented: $editing) {
             NoopSessionEditSheet(row: row, choices: choices) { edited in

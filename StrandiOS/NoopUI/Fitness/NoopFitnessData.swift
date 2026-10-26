@@ -232,6 +232,8 @@ struct NoopFitnessSession: Identifiable {
 final class NoopFitnessModel: ObservableObject {
     @Published private(set) var snapshot: NoopFitnessSnapshot?
     @Published private(set) var isLoading = false
+    /// Moves on every `changed` notice, so a screen already on display reloads (a deleted session leaves).
+    @Published private(set) var changeTick = 0
 
     static let periodDays = 30
     /// A year and a bit, so the detail pages can show a year and the year before it starts.
@@ -256,7 +258,11 @@ final class NoopFitnessModel: ObservableObject {
 
     init() {
         changeObserver = NotificationCenter.default.addObserver(forName: Self.changed, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.loadedSeq = nil }
+            MainActor.assumeIsolated {
+                self?.loadedSeq = nil
+                if self?.isLoading == true { self?.reloadPending = true }
+                self?.changeTick += 1
+            }
         }
     }
 
@@ -265,7 +271,19 @@ final class NoopFitnessModel: ObservableObject {
     /// Reads everything again only when the repository has new data since the last load, so stepping
     /// into a detail page and back does not re-read six weeks of heart rate.
     func load(repo: Repository, profile: ProfileStore, now: Date = Date()) async {
-        guard !isLoading else { return }
+        // A change that lands while a read is running is read again right after it, not dropped.
+        guard !isLoading else { reloadPending = true; return }
+        await loadOnce(repo: repo, profile: profile, now: now)
+        while reloadPending {
+            reloadPending = false
+            loadedSeq = nil
+            await loadOnce(repo: repo, profile: profile, now: Date())
+        }
+    }
+
+    private var reloadPending = false
+
+    private func loadOnce(repo: Repository, profile: ProfileStore, now: Date) async {
         if loadedSeq == repo.refreshSeq, snapshot != nil { return }
         // Re-read when a session or routine changed even if the repository's sequence did not.
         isLoading = true

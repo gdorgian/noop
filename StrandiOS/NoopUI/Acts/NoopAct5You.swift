@@ -189,6 +189,7 @@ struct NoopAct5Screens: View {
                         : "Nothing was marked: turn on Record protocol frames first, so there is a capture file to mark."
                 }
             }
+            Button("Cancel", role: .cancel) {}
         }
         .sheet(isPresented: $showTestCentre) {
             NavigationStack { TestCentreView() }

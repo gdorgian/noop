@@ -40,6 +40,7 @@ struct NoopHevyScreen: View {
         .confirmationDialog("Disconnect Hevy?", isPresented: $confirmingDisconnect, titleVisibility: .visible) {
             Button("Keep the sessions already here") { disconnect(remove: false) }
             Button("Remove them too", role: .destructive) { disconnect(remove: true) }
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text("Noop forgets the key. Nothing in Hevy changes.")
         }

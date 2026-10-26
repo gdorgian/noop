@@ -31,7 +31,7 @@ struct NoopFitnessScreens: View {
     @EnvironmentObject private var profile: ProfileStore
 
     var body: some View {
-        screen.task { await fitness.load(repo: repo, profile: profile) }
+        screen.task(id: "\(repo.refreshSeq)-\(fitness.changeTick)") { await fitness.load(repo: repo, profile: profile) }
     }
 
     @ViewBuilder
@@ -84,7 +84,7 @@ struct NoopFitnessSheet: View {
         // offset into the sheet, which opened at the bottom of Muscle groups.
         .environment(\.noopScrollMemory, scrollMemory)
         .environment(\.noopScrollKey, "fitness-sheet")
-        .task { await fitness.load(repo: repo, profile: profile) }
+        .task(id: "\(repo.refreshSeq)-\(fitness.changeTick)") { await fitness.load(repo: repo, profile: profile) }
         .noopSheet()
         .preferredColorScheme(.dark)
     }

@@ -835,6 +835,7 @@ struct NoopFitnessSessionButton: View {
                     await repo.refresh()
                 }
             }
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text(session.detected ? "It will not be detected again." : "This removes it from your record.")
         }
