@@ -303,6 +303,13 @@ final class UpdateStore: ObservableObject {
                               title: String = AppChangelog.releases.first?.title ?? "",
                               summary: String? = nil) {
         guard !version.isEmpty else { return }
+        // A note seeded for this version keeps the release's current title (12.0's was first posted
+        // under upstream's headline).
+        if !title.isEmpty, let index = items.firstIndex(where: {
+            $0.kind == .whatsNew && $0.message.contains(" \(version) is here") && $0.title != title
+        }) {
+            items[index].title = title
+        }
         guard d.string(forKey: K.lastSeededVersion) != version else { return }
         // Mark seeded first so a re-entrant call (or a crash mid-post) can't double-post this version.
         d.set(version, forKey: K.lastSeededVersion)

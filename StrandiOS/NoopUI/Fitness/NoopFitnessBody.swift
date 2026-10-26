@@ -127,8 +127,11 @@ struct NoopFitnessBodyScreen: View {
                     }
                     .buttonStyle(NoopHTMLPressStyle())
                     .contextMenu {
-                        Button(role: .destructive) { Task { await deleteMeasurement(last) } } label: {
-                            Label("Delete this entry", systemImage: "trash")
+                        // Apple Health's own weigh-ins are deleted in Health, not here.
+                        if !last.id.hasPrefix(Self.healthPrefix) {
+                            Button(role: .destructive) { Task { await deleteMeasurement(last) } } label: {
+                                Label("Delete this entry", systemImage: "trash")
+                            }
                         }
                     }
                 }
@@ -178,9 +181,32 @@ struct NoopFitnessBodyScreen: View {
 
     private func load() async {
         guard let store = await repo.storeHandle() else { return }
-        measurements = (try? await store.bodyMeasurements(deviceId: repo.deviceId)) ?? []
+        let logged = (try? await store.bodyMeasurements(deviceId: repo.deviceId)) ?? []
+        measurements = await Self.mergingHealth(logged, store: store)
         photos = (try? await store.progressPhotos(deviceId: repo.deviceId)) ?? []
     }
+
+    /// Weigh-ins Apple Health brought in (the series Trends draws) join the hand-logged ones, so the
+    /// page agrees with Trends. A day that already has a logged value keeps it. These rows are read-only.
+    private static func mergingHealth(_ logged: [BodyMeasurementRow], store: WhoopStore) async -> [BodyMeasurementRow] {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        var rows = logged
+        for (key, kind) in [("weight", BodyMeasurementKind.weight), ("body_fat", .bodyFat)] {
+            let loggedDays = Set(logged.filter { $0.kind == kind }.map { Repository.localDayKey(Date(timeIntervalSince1970: TimeInterval($0.ts))) })
+            let points = (try? await store.metricSeries(deviceId: "apple-health", key: key, from: "0000-00-00", to: "9999-99-99")) ?? []
+            for p in points where !loggedDays.contains(p.day) && p.value > 0 {
+                guard let day = parser.date(from: p.day) else { continue }
+                let ts = Int(day.addingTimeInterval(12 * 3600).timeIntervalSince1970)
+                rows.append(BodyMeasurementRow(id: healthPrefix + "\(key)-\(p.day)", deviceId: "apple-health",
+                                               ts: ts, kind: kind, value: p.value))
+            }
+        }
+        return rows.sorted { $0.ts < $1.ts }
+    }
+
+    static let healthPrefix = "health-"
 
     private func save(_ entries: [BodyMeasurementRow]) async {
         guard !entries.isEmpty, let store = await repo.storeHandle() else { return }

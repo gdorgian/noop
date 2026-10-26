@@ -597,7 +597,7 @@ private extension NoopAct5Screens {
                     // The prototype's line goes on to claim how tightly the need has held; no
                     // template exists for that, so only the window and the need are stated.
                     if let onset = you.usualOnsetHour, let wake = you.usualWakeHour {
-                        Text("Asleep \(NoopYouRecord.clock(onset)) \u{2192} \(NoopYouRecord.clock(wake)) \u{00B7} a \(NoopRestRecord.duration(you.needMin)) need")
+                        Text("Asleep \(NoopYouRecord.clock(onset)) \u{2192} \(NoopYouRecord.clock(wake)) \u{00B7} need \(NoopRestRecord.duration(you.needMin))")
                             .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(Color(hex: 0x8B958F))
                             .multilineTextAlignment(.center)
@@ -773,8 +773,10 @@ private extension NoopAct5Screens {
     }
     /// The active strap's model, from the device registry. Nil when none is paired.
     private var liveStrapDetail: String? {
-        guard let registry = model.deviceRegistry,
-              let active = NoopStraps.paired(registry.devices).first(where: { $0.id == registry.activeDeviceId }) else { return nil }
+        guard let registry = model.deviceRegistry else { return nil }
+        let paired = NoopStraps.paired(registry.devices)
+        // The active id can still be the unpaired seed while another band is paired: name that band.
+        guard let active = paired.first(where: { $0.id == registry.activeDeviceId }) ?? paired.first else { return nil }
         return active.displayName
     }
 

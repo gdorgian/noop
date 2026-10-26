@@ -212,7 +212,15 @@ struct NoopOnboardingView: View {
             .buttonStyle(NoopHTMLButtonStyle(kind: live.bonded ? .secondary : .primary, fullWidth: true))
             .disabled(scanning && !live.bonded)
         } footer: {
-            primaryButton("Continue", enabled: true) { advance() }
+            // One primary action per page: until a strap answers, moving on is the quiet choice.
+            if live.bonded {
+                primaryButton("Continue", enabled: true) { advance() }
+            } else {
+                Button("Set up later") { advance() }
+                    .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .frame(maxWidth: .infinity, minHeight: 54)
+            }
         }
     }
 

@@ -1390,7 +1390,9 @@ struct NoopAct2Screens: View {
             return false
         }.count
         let known = max(0, liveInboxItems.count - pending)
-        return "\(pending) to answer, and \(countWord(known)) \(known == 1 ? "thing" : "things") to know. A proposal stays here until you say yes or no to it."
+        let answer = pending == 0 ? "Nothing to answer" : "\(countWord(pending).capitalized) to answer"
+        let know = known == 0 ? "nothing new to know" : "\(countWord(known)) \(known == 1 ? "thing" : "things") to know"
+        return "\(answer), and \(know). A proposal stays here until you say yes or no to it."
     }
 
     private var inboxGroups: [Act2InboxGroup] {
