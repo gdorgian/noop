@@ -79,7 +79,8 @@ verify_bundle_metadata() {
     echo "app name metadata verification failed" >&2
     exit 1
   }
-  [[ "$widget_display" == "Noop Aura" ]] || {
+  # The widget carries no Home Screen label by design (project.yml: a blank Braille cell, U+2800).
+  [[ "$widget_display" == "Noop Aura" || "$widget_display" == $'\xe2\xa0\x80' ]] || {
     echo "widget display-name verification failed" >&2
     exit 1
   }
