@@ -131,6 +131,7 @@ struct NoopHistoryRecord {
             "Did you feel sick or ill?": "Felt sick or ill",
             "Did you take magnesium?": "Magnesium",
             "Did you read before bed?": "Read before bed",
+            "Coffee after 2pm": "Coffee after \("14:00".noopClock)",
         ]
         return said[question.trimmingCharacters(in: .whitespacesAndNewlines)] ?? question
     }
@@ -167,11 +168,13 @@ struct NoopHistoryRecord {
         }
         let dayParser = DateFormatter()
         dayParser.locale = Locale(identifier: "en_US_POSIX"); dayParser.dateFormat = "yyyy-MM-dd"
-        for (key, group) in Dictionary(grouping: journal.filter { $0.answeredYes }, by: { "\($0.day)|\($0.question)" }) {
+        // Grouped by what the row will say, so the day log's "Alcohol" and the journal's "Did you drink
+        // any alcohol?" are one line on a day, not two.
+        for (key, group) in Dictionary(grouping: journal.filter { $0.answeredYes }, by: { "\($0.day)|\(Self.logged($0.question))" }) {
             guard let first = group.first, let date = dayParser.date(from: first.day), date >= cutoff else { continue }
             _ = key
             entries.append(.init(kind: .log, date: date.addingTimeInterval(12 * 3600), name: Self.logged(first.question),
-                                 detail: first.notes ?? "", value: group.count > 1 ? "\u{00D7}\(group.count)" : "",
+                                 detail: first.notes ?? "", value: Set(group.map(\.question)).count == 1 && group.count > 1 ? "\u{00D7}\(group.count)" : "",
                                  sport: nil))
         }
 

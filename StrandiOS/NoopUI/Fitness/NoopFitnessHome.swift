@@ -876,7 +876,16 @@ struct NoopFitnessSessionRow: View {
     var body: some View {
         let tint = Self.tint(session)
         HStack(spacing: 13) {
-            NoopCanonicalGlyph(name: Self.glyph(session), size: 18, color: tint)
+            Group {
+                // Aura's drawn glyphs cover lifting, running, walking, cycling and swimming; any other
+                // sport shows its own symbol rather than a runner.
+                if Self.hasCanonicalGlyph(session) {
+                    NoopCanonicalGlyph(name: Self.glyph(session), size: 18, color: tint)
+                } else {
+                    Image(systemName: NoopFitnessCardioLive.symbol(for: session.title))
+                        .font(.system(size: 17, weight: .medium)).foregroundStyle(tint)
+                }
+            }
                 .frame(width: 44, height: 44)
                 .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
@@ -920,6 +929,12 @@ struct NoopFitnessSessionRow: View {
         showsDate
             ? session.start.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
             : session.start.formatted(date: .omitted, time: .shortened)
+    }
+
+    static func hasCanonicalGlyph(_ session: NoopFitnessSession) -> Bool {
+        if session.kind == .strength { return true }
+        let t = session.title.lowercased()
+        return ["swim", "cycl", "bike", "spin", "walk", "hik", "run", "jog"].contains { t.contains($0) }
     }
 
     static func glyph(_ session: NoopFitnessSession) -> NoopCanonicalGlyphName {
