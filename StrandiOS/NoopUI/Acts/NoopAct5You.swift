@@ -4261,7 +4261,7 @@ private extension NoopAct5Screens {
         let title = status == nil ? "Checking with iOS…" : allowed ? "Allowed on this iPhone" : denied ? "Turned off in iOS Settings" : "Not allowed yet"
         let detail = allowed ? "Banners and sounds come through for every switch that is on."
             : denied ? "Nothing below can reach you until notifications are back on for Noop."
-            : "Noop asks once, the first time a notice has something to say. You can allow it now instead."
+            : "Noop asks once, at the end of setup, and never on its own later. Allow it here whenever you want the notices below."
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 13) {
                 ZStack {
