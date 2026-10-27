@@ -92,12 +92,30 @@ final class NoopPageLayout: ObservableObject {
 
     static func isSpacer(_ id: String) -> Bool { id.hasPrefix(spacePrefix) || id.hasPrefix(dividerPrefix) }
 
-    static func newSpacerID(divider: Bool) -> String {
-        (divider ? dividerPrefix : spacePrefix) + String(UUID().uuidString.prefix(8)).lowercased()
+    /// How tall a space is. The size rides in the id (`noop.space.s.<n>`); an id without one, saved
+    /// before sizes existed, is medium.
+    enum SpaceSize: String, CaseIterable {
+        case small = "s", medium = "m", large = "l"
+        var height: CGFloat { switch self { case .small: 12; case .medium: 28; case .large: 56 } }
+        var title: String { switch self { case .small: "Small space"; case .medium: "Space"; case .large: "Large space" } }
+    }
+
+    static func spaceSize(_ id: String) -> SpaceSize {
+        let rest = id.dropFirst(spacePrefix.count)
+        guard rest.count > 2, rest.dropFirst().first == "." else { return .medium }
+        return SpaceSize(rawValue: String(rest.prefix(1))) ?? .medium
+    }
+
+    static func newSpacerID(divider: Bool, size: SpaceSize = .medium) -> String {
+        let n = String(UUID().uuidString.prefix(8)).lowercased()
+        return divider ? dividerPrefix + n : spacePrefix + size.rawValue + "." + n
     }
 
     static func spacerSection(_ id: String) -> NoopPageSection? {
-        if id.hasPrefix(spacePrefix) { return NoopPageSection(id: id, title: "Space", detail: "A blank gap between sections") }
+        if id.hasPrefix(spacePrefix) {
+            let size = spaceSize(id)
+            return NoopPageSection(id: id, title: size.title, detail: "A blank gap, \(Int(size.height)) points tall")
+        }
         if id.hasPrefix(dividerPrefix) { return NoopPageSection(id: id, title: "Divider", detail: "A thin line between sections") }
         return nil
     }
@@ -372,7 +390,8 @@ struct NoopEditableSections<Section: View>: View {
     @ViewBuilder
     private func draw(_ id: String) -> some View {
         if NoopPageLayout.isSpacer(id) {
-            NoopLayoutSpacer(divider: id.hasPrefix(NoopPageLayout.dividerPrefix), editing: editing.active)
+            NoopLayoutSpacer(divider: id.hasPrefix(NoopPageLayout.dividerPrefix),
+                             height: NoopPageLayout.spaceSize(id).height, editing: editing.active)
         } else {
             section(id)
         }
@@ -940,10 +959,9 @@ private struct NoopAddSectionSheet<Section: View>: View {
     private var tiles: [NoopPageSection] { missing.filter(\.half) }
     private var sections: [NoopPageSection] { missing.filter { !$0.half } }
     /// A fresh space and divider each time the sheet opens, so each one added is its own entry.
-    @State private var spacers: [NoopPageSection] = [
-        NoopPageLayout.spacerSection(NoopPageLayout.newSpacerID(divider: false))!,
-        NoopPageLayout.spacerSection(NoopPageLayout.newSpacerID(divider: true))!,
-    ]
+    @State private var spacers: [NoopPageSection] =
+        NoopPageLayout.SpaceSize.allCases.map { NoopPageLayout.spacerSection(NoopPageLayout.newSpacerID(divider: false, size: $0))! }
+        + [NoopPageLayout.spacerSection(NoopPageLayout.newSpacerID(divider: true))!]
 
     private func add(_ info: NoopPageSection) {
         NoopHaptics.play(.add)
@@ -1254,6 +1272,7 @@ extension View {
 /// where an empty space is, so it can be held and moved.
 struct NoopLayoutSpacer: View {
     let divider: Bool
+    var height: CGFloat = 28
     var editing = false
 
     var body: some View {
@@ -1263,7 +1282,7 @@ struct NoopLayoutSpacer: View {
                     .padding(.horizontal, 6)
                     .frame(height: 18)
             } else {
-                Color.clear.frame(height: 28)
+                Color.clear.frame(height: height)
             }
         }
         .frame(maxWidth: .infinity)
