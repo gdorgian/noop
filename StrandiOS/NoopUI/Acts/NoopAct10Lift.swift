@@ -2129,65 +2129,16 @@ struct NoopLiftDetailScreen: View {
         return credit.map { ($0.key, $0.value / total) }.sorted { $0.share > $1.share }
     }
 
-    private static let muscleColors: [Color] = [Color(hex: 0x4FB8E8), Color(hex: 0x6FCFB4), NoopHTMLColor.volt,
-                                                Color(hex: 0xB69CFF), Color(hex: 0xF2B45C), Color(hex: 0xEF7A9A)]
-
     private var musclesCard: some View {
-        let shares = Array(muscleShares.prefix(6))
-        let top = shares[0]
-        return NoopSessionCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        NoopSessionCardTitle(symbol: "chart.pie.fill", title: "Muscle breakdown")
-                        Text(top.muscle.displayName).font(NoopHTMLFont.outfit(NoopType.title2, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                        Text("\(Int((top.share * 100).rounded()))% of the work").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
-                    }
-                    Spacer()
-                    ZStack {
-                        ForEach(Array(shares.enumerated()), id: \.offset) { i, s in
-                            let before = shares.prefix(i).map(\.share).reduce(0, +)
-                            Circle().trim(from: before + 0.012, to: max(before + 0.013, before + s.share - 0.012))
-                                .stroke(Self.muscleColors[i % 6], style: StrokeStyle(lineWidth: 9, lineCap: .round))
-                                .rotationEffect(.degrees(-90))
-                        }
-                    }
-                    .frame(width: 78, height: 78)
+        NoopSessionMuscles(shares: Array(muscleShares.prefix(6))) {
+            Button { open(.liftMuscles) } label: {
+                HStack(spacing: 6) {
+                    Text("How sets are credited").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
+                    Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
                 }
-                ForEach(Array(shares.enumerated()), id: \.offset) { i, s in
-                    HStack(spacing: 12) {
-                        Group {
-                            if let group = FitnessMuscleGroup.forMuscleId(s.muscle.rawValue) {
-                                NoopFitnessMuscleThumb(group: group, tint: Self.muscleColors[i % 6]).padding(.vertical, 3)
-                            } else {
-                                Circle().fill(Self.muscleColors[i % 6]).frame(width: 10, height: 10)
-                            }
-                        }
-                        .frame(width: 38, height: 38)
-                        .background(Color.white.opacity(0.05), in: Circle())
-                        Text(s.muscle.displayName).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
-                            .frame(width: 108, alignment: .leading).lineLimit(1)
-                        GeometryReader { g in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Color.white.opacity(0.06))
-                                Capsule().fill(Self.muscleColors[i % 6]).frame(width: max(8, g.size.width * s.share / top.share))
-                            }
-                        }
-                        .frame(height: 9)
-                        Text("\(Int((s.share * 100).rounded()))%").font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.copy)
-                            .monospacedDigit().frame(width: 42, alignment: .trailing)
-                    }
-                    if i < shares.count - 1 { Divider().overlay(NoopHTMLColor.border) }
-                }
-                Button { open(.liftMuscles) } label: {
-                    HStack(spacing: 6) {
-                        Text("How sets are credited").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundStyle(NoopHTMLColor.copy).frame(maxWidth: .infinity, minHeight: 40)
-                }
-                .buttonStyle(NoopPlainHitStyle())
+                .foregroundStyle(NoopHTMLColor.copy).frame(maxWidth: .infinity, minHeight: 40)
             }
+            .buttonStyle(NoopPlainHitStyle())
         }
     }
 

@@ -30,6 +30,7 @@ struct NoopActivityConfirmSheet: View {
     @State private var ratingOpen = false
     @State private var route: (points: [RouteMath.LatLng], meters: Double, splits: [RouteSplits.Split])?
     @State private var compare: (count: Int, lines: [NoopCompareCard.Line])?
+    @State private var chartsOpen = false
 
     /// Common answers after the learned ones, so a first-ever detection still has one-tap choices.
     static let common = ["Strength", "Running", "Walking", "Cycling", "Swimming", "HIIT", "Yoga", "Dancing",
@@ -64,7 +65,9 @@ struct NoopActivityConfirmSheet: View {
                                 tint: accent, ink: isStrength ? NoopHTMLColor.voltInk : NoopHTMLColor.blueInk,
                                 celebrate: justFinished, share: detected ? nil : shareContent)
                 if detected || changing { picker } else if !imported { changeRow }
-                NoopSessionHeading(title: "Workout details")
+                NoopSessionHeading(title: "Workout details") {
+                    NoopChip(title: "Charts", systemImage: "chart.xyaxis.line", isOn: false) { chartsOpen = true }
+                }
                 if let strain = row.strain, strain > 0 {
                     let e = NoopSessionEffort.describe(strain)
                     NoopSessionRingRow(value: e.value, fraction: e.fraction, title: "Effort", line: e.line)
@@ -80,6 +83,11 @@ struct NoopActivityConfirmSheet: View {
                     if route.splits.count >= 2 { NoopSplitsCard(splits: route.splits).transition(.opacity) }
                 }
                 NoopSessionHeart(start: row.startTs, end: row.endTs, source: row.source)
+                if !unnamed, let shares = NoopCardioMuscles.shares(for: row.sport) {
+                    NoopSessionHeading(title: "Muscles")
+                    NoopSessionMuscles(shares: shares, note: "Typical split for \(row.sport.lowercased()), not measured")
+                }
+                if !detected { NoopSessionLoad(row: row) }
                 if imported {
                     Text("Imported, so it is changed where it came from. The heart rate and zones are the strap's for the same window.")
                         .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
@@ -100,6 +108,9 @@ struct NoopActivityConfirmSheet: View {
             feel = (try? await store.workoutFeel(deviceId: repo.deviceId, startTs: row.startTs))?.rating
         }
         .task(id: "\(row.startTs)|\(row.sport)") { await loadExtras() }
+        .sheet(isPresented: $chartsOpen) {
+            NoopSessionChartsSheet(row: row).noopSheet()
+        }
         .sheet(isPresented: $ratingOpen) {
             NoopLiftEffortSheet(rating: $rating, cardio: true) {
                 let value = rating.rounded()

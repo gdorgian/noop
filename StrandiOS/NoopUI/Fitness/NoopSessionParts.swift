@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import StrandAnalytics
+import StrandFitness
 import StrandTraining
 import WhoopStore
 
@@ -200,6 +201,9 @@ struct NoopSessionHeart: View {
     let start: Int
     let end: Int
     var source: String = ""
+    /// The charts page shows the heart-rate card alone, taller.
+    var chartOnly = false
+    var chartHeight: CGFloat = 190
 
     @EnvironmentObject private var repo: Repository
     @EnvironmentObject private var profile: ProfileStore
@@ -216,12 +220,14 @@ struct NoopSessionHeart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if curve.count >= 2 {
+            if curve.count >= 2, chartOnly {
+                rateCard
+            } else if curve.count >= 2 {
                 NoopSessionHeading(title: "Heart")
                 rateCard
-                if !minutes.isEmpty { zonesCard }
+                if !minutes.isEmpty { zonesCard; focusCard }
                 recoveryCard
-            } else if loaded {
+            } else if loaded, !chartOnly {
                 NoopSessionHeading(title: "Heart")
                 Text("No heart rate was recorded during this session.")
                     .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
@@ -308,7 +314,7 @@ struct NoopSessionHeart: View {
                         .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                     }
                 }
-                .frame(height: 190)
+                .frame(height: chartHeight)
                 .noopChartZoom()
             }
         }
@@ -402,6 +408,44 @@ struct NoopSessionHeart: View {
                     .frame(height: 46)
                     if i > 0 { Divider().overlay(NoopHTMLColor.border) }
                 }
+            }
+        }
+    }
+
+    /// What the session trained, from the same zone minutes and by the same rule as the Fitness tab's
+    /// Cardio focus (`CardioFocus`), so the two never disagree.
+    private var focusCard: some View {
+        let split = CardioFocus.breakdown(secondsInZones: minutes.dropFirst().map { $0 * 60 })
+        let colors: [CardioFocus.Band: Color] = [.lowAerobic: Self.zoneColors[2], .highAerobic: Self.zoneColors[3],
+                                                 .anaerobic: Self.zoneColors[5]]
+        let bands = CardioFocus.Band.allCases.reversed()
+        return NoopSessionCard {
+            VStack(alignment: .leading, spacing: 0) {
+                NoopSessionCardTitle(symbol: "scope", title: "Cardio focus").padding(.bottom, 12)
+                ForEach(Array(bands.enumerated()), id: \.offset) { i, band in
+                    let share = split.shares[band] ?? 0
+                    HStack(spacing: 10) {
+                        Text(band.title).frame(width: 104, alignment: .leading)
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.06))
+                                Capsule().fill(colors[band] ?? NoopHTMLColor.ink)
+                                    .frame(width: share > 0 ? max(8, geo.size.width * share) : 0)
+                            }
+                        }
+                        .frame(height: 8)
+                        Text("\(Int((share * 100).rounded()))%").frame(width: 46, alignment: .trailing)
+                        Text(clock(share * split.trainingSeconds / 60)).frame(width: 56, alignment: .trailing)
+                    }
+                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).monospacedDigit()
+                    .foregroundStyle(share > 0 ? NoopHTMLColor.ink : NoopHTMLColor.faint)
+                    .frame(height: 46)
+                    if i < bands.count - 1 { Divider().overlay(NoopHTMLColor.border) }
+                }
+                Text(split.dominant.map { "Mostly \($0.title.lowercased()) work." }
+                     ?? "No time at Zone 2 or above, so none of it counts as aerobic training.")
+                    .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+                    .fixedSize(horizontal: false, vertical: true).padding(.top, 10)
             }
         }
     }
@@ -515,5 +559,130 @@ enum NoopSessionEffort {
             : stored < 75 ? "High load from this session"
             : "Very high load from this session"
         return (shown, stored / 100, line)
+    }
+}
+
+/// Which muscles a session worked: the leading muscle, a ring of the shares and a row for each. A lift
+/// credits its sets; a cardio session shows the activity's typical split, said as such in `note`.
+struct NoopSessionMuscles<Footer: View>: View {
+    let shares: [(muscle: LiftMuscle, share: Double)]
+    var note: String? = nil
+    @ViewBuilder var footer: Footer
+
+    // A generic type cannot hold a static stored property, so the palette is computed.
+    static var muscleColors: [Color] {
+        [Color(hex: 0x4FB8E8), Color(hex: 0x6FCFB4), NoopHTMLColor.volt,
+         Color(hex: 0xB69CFF), Color(hex: 0xF2B45C), Color(hex: 0xEF7A9A)]
+    }
+
+    var body: some View {
+        let top = shares[0]
+        return NoopSessionCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        NoopSessionCardTitle(symbol: "chart.pie.fill", title: "Muscle breakdown")
+                        Text(top.muscle.displayName).font(NoopHTMLFont.outfit(NoopType.title2, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
+                        Text("\(Int((top.share * 100).rounded()))% of the work").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+                        if let note {
+                            Text(note).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
+                        }
+                    }
+                    Spacer()
+                    ZStack {
+                        ForEach(Array(shares.enumerated()), id: \.offset) { i, s in
+                            let before = shares.prefix(i).map(\.share).reduce(0, +)
+                            Circle().trim(from: before + 0.012, to: max(before + 0.013, before + s.share - 0.012))
+                                .stroke(Self.muscleColors[i % 6], style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                    }
+                    .frame(width: 78, height: 78)
+                }
+                ForEach(Array(shares.enumerated()), id: \.offset) { i, s in
+                    HStack(spacing: 12) {
+                        Group {
+                            if let group = FitnessMuscleGroup.forMuscleId(s.muscle.rawValue) {
+                                NoopFitnessMuscleThumb(group: group, tint: Self.muscleColors[i % 6]).padding(.vertical, 3)
+                            } else {
+                                Circle().fill(Self.muscleColors[i % 6]).frame(width: 10, height: 10)
+                            }
+                        }
+                        .frame(width: 38, height: 38)
+                        .background(Color.white.opacity(0.05), in: Circle())
+                        Text(s.muscle.displayName).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                            .frame(width: 108, alignment: .leading).lineLimit(1)
+                        GeometryReader { g in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.06))
+                                Capsule().fill(Self.muscleColors[i % 6]).frame(width: max(8, g.size.width * s.share / top.share))
+                            }
+                        }
+                        .frame(height: 9)
+                        Text("\(Int((s.share * 100).rounded()))%").font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.copy)
+                            .monospacedDigit().frame(width: 42, alignment: .trailing)
+                    }
+                    if i < shares.count - 1 { Divider().overlay(NoopHTMLColor.border) }
+                }
+                footer
+            }
+        }
+    }
+}
+
+extension NoopSessionMuscles where Footer == EmptyView {
+    init(shares: [(muscle: LiftMuscle, share: Double)], note: String? = nil) {
+        self.init(shares: shares, note: note) { EmptyView() }
+    }
+}
+
+/// A cardio session's muscles, from the same per-activity split the Fitness tab's muscular load uses
+/// (`MuscularLoad.cardioMuscleShare`). Not measured: the strap cannot see which muscles moved.
+enum NoopCardioMuscles {
+    static func shares(for sport: String) -> [(muscle: LiftMuscle, share: Double)]? {
+        var byMuscle: [LiftMuscle: Double] = [:]
+        for (id, w) in MuscularLoad.cardioMuscleShare(NoopFitnessModel.kind(sport)) {
+            if let m = NoopFitnessExerciseChoice.liftMuscle(id) { byMuscle[m, default: 0] += w }
+        }
+        let total = byMuscle.values.reduce(0, +)
+        guard total > 0, byMuscle.count >= 2 else { return nil }
+        return byMuscle.map { (muscle: $0.key, share: $0.value / total) }.sorted { $0.share > $1.share }
+    }
+}
+
+/// Where the session left the user's training: cardio and muscular load on the session's day, read
+/// from the same Fitness model and drawn with the same cards as the Fitness tab, plus what this session
+/// added to each.
+struct NoopSessionLoad: View {
+    let row: WorkoutRow
+
+    @EnvironmentObject private var repo: Repository
+    @EnvironmentObject private var profile: ProfileStore
+    @StateObject private var fitness = NoopFitnessModel()
+
+    var body: some View {
+        // A stack, not a Group: an empty Group has nothing for `.task` to attach to, so it never loaded.
+        VStack(alignment: .leading, spacing: 0) {
+            if let history = fitness.snapshot?.history {
+                let day = Date(timeIntervalSince1970: TimeInterval(row.startTs))
+                let workout = history.workouts.first { $0.startTs == row.startTs }
+                let trimp = workout?.trimp ?? 0
+                let muscular = MuscularLoad.cardioMuscleLoad(trimp: trimp, kind: NoopFitnessModel.kind(row.sport))
+                    .values.reduce(0, +)
+                VStack(alignment: .leading, spacing: 12) {
+                    NoopSessionHeading(title: "Training load")
+                    HStack(spacing: 12) {
+                        NoopFitnessLoadCard(title: "Cardio load", reading: history.load(.cardio, asOf: day), decimals: 1)
+                        NoopFitnessLoadCard(title: "Muscular load", reading: history.load(.muscular, asOf: day), decimals: 0)
+                    }
+                    if trimp > 0 {
+                        Text("This session added \(String(format: "%.1f", trimp)) to cardio load and \(Int(muscular.rounded())) to muscular load.")
+                            .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .task { await fitness.load(repo: repo, profile: profile) }
     }
 }

@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import MapKit
+import Charts
 import WhoopStore
 
 // MARK: - Route
@@ -199,4 +200,126 @@ struct NoopCompareCard: View {
         return out
     }
 }
+// MARK: - Charts
+
+/// The session's charts on one page, each taller than on the summary: heart rate, and pace when the phone
+/// recorded a timed route. Pace is the distance covered in each minute, so a stop reads as a gap, not as
+/// a crawl.
+struct NoopSessionChartsSheet: View {
+    let row: WorkoutRow
+
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
+    @AppStorage(UnitPrefs.distanceSystemKey) private var distanceSystemRaw = ""
+    @State private var pace: [(at: Date, secPerKm: Double)] = []
+    @State private var loaded = false
+
+    private var units: UnitSystem {
+        UnitPrefs.resolveDistance(system: UnitSystem(rawValue: unitSystemRaw) ?? .metric, override: distanceSystemRaw)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                NoopSheetHeader(title: "Charts") { dismiss() }
+                NoopSessionHeart(start: row.startTs, end: row.endTs, source: row.source, chartOnly: true, chartHeight: 300)
+                if pace.count >= 2 {
+                    paceCard
+                } else if loaded {
+                    Text("Pace shows when the session recorded a route on this phone.")
+                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+        }
+        .task(id: row.startTs) { load() }
+    }
+
+    private var paceCard: some View {
+        // Pace is shown per the chosen distance unit; faster sits higher, so the axis runs from slow to fast.
+        let perUnit = pace.map { units == .imperial ? $0.secPerKm / UnitFormatter.milesPerKilometer : $0.secPerKm }
+        let average = perUnit.reduce(0, +) / Double(perUnit.count)
+        let fastest = perUnit.min() ?? 0
+        let slowest = perUnit.max() ?? 0
+        return NoopSessionCard {
+            VStack(alignment: .leading, spacing: 14) {
+                NoopSessionCardTitle(symbol: "figure.run", title: "Pace")
+                HStack(spacing: 0) {
+                    figure("Avg", average)
+                    figure("Fastest", fastest)
+                    figure("Slowest", slowest)
+                }
+                Chart {
+                    ForEach(Array(zip(pace, perUnit).enumerated()), id: \.offset) { _, p in
+                        LineMark(x: .value("Time", p.0.at), y: .value("Pace", p.1))
+                            .interpolationMethod(.monotone)
+                            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                            .foregroundStyle(NoopHTMLColor.blueLight)
+                    }
+                }
+                .chartYScale(domain: .automatic(includesZero: false, reversed: true))
+                .chartYAxis {
+                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
+                        AxisValueLabel {
+                            if let v = value.as(Double.self) { Text(Self.clock(v)) }
+                        }
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 3)) { _ in
+                        AxisValueLabel(format: .dateTime.hour().minute())
+                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
+                    }
+                }
+                .frame(height: 220)
+            }
+        }
+    }
+
+    private func figure(_ label: String, _ secs: Double) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(Self.clock(secs)).font(NoopHTMLFont.outfit(NoopType.title3, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                    .monospacedDigit()
+                Text(UnitFormatter.distanceUnit(units) == "mi" ? "/mi" : "/km")
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private static func clock(_ secs: Double) -> String {
+        let s = Int(secs.rounded())
+        return "\(s / 60):" + String(format: "%02d", s % 60)
+    }
+
+    private func load() {
+        defer { loaded = true }
+        let key = RouteStore.key(startTs: row.startTs, sport: row.sport)
+        let points = (RoutePointStore.load(for: key) ?? []).sorted { $0.tMs < $1.tMs }
+        pace = Self.minutePace(points)
+    }
+
+    /// Distance covered in each whole minute of the route, as seconds per kilometre. A minute that moved
+    /// under 20 m is a stop and is left out rather than drawn as a very slow pace.
+    static func minutePace(_ points: [WorkoutRoutePoint]) -> [(at: Date, secPerKm: Double)] {
+        guard let first = points.first else { return [] }
+        var meters: [Int: Double] = [:]
+        for (a, b) in zip(points, points.dropFirst()) {
+            let minute = Int((b.tMs - first.tMs) / 60_000)
+            meters[minute, default: 0] += RouteMath.haversineMeters(.init(a.lat, a.lon), .init(b.lat, b.lon))
+        }
+        return meters.keys.sorted().compactMap { m in
+            guard let d = meters[m], d >= 20 else { return nil }
+            let at = Date(timeIntervalSince1970: TimeInterval(first.tMs) / 1000 + Double(m * 60 + 30))
+            return (at, 60 / (d / 1000))
+        }
+    }
+}
+
 #endif
