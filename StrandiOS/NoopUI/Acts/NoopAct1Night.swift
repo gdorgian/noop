@@ -4,10 +4,9 @@ import StrandDesign
 
 struct NoopAct1Screens: View {
     @ObservedObject var navigation: NoopNavigation
-    /// The production shell's measured Rest record. Nil only in the seeded Debug shell, which keeps
-    /// drawing the design's example person unchanged.
-    var rest: NoopRestRecord? = nil
-    /// The active device's charge for the header chip; ignored when `rest` is nil.
+    /// The measured Rest record.
+    let rest: NoopRestRecord
+    /// The active device's charge for the header chip.
     var battery: Int? = nil
     @EnvironmentObject private var behavior: BehaviorStore
     @EnvironmentObject private var model: AppModel
@@ -18,22 +17,16 @@ struct NoopAct1Screens: View {
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
     /// The stage card as lanes under the night's heart rate rather than the stepped timeline.
     @State private var nightHeart: [(time: Date, bpm: Double)] = []
-    @State private var showHypnogram = NoopContentPolicy.allowsPrototypeContent
-        && CommandLine.arguments.contains("--noop-hypnogram")
     @State private var selectedStage: Int?
     @State private var editingNight: NoopRestRecord.EditTarget?
     @StateObject private var restLayout = NoopPageLayout(page: "rest", catalog: NoopAct1Screens.restSections)
     @State private var restEditing = NoopPageEditing()
     @SceneStorage("noop.act1.selected-bedtime") private var selectedBedtime = 2
-    @SceneStorage("noop.act1.smart-wake") private var smartWake = true
     /// Minutes past midnight for the wake time, stepped in fives. Nil until the user moves it, so
     /// the screen shows the schedule's own anchor rather than a number nobody chose.
     @SceneStorage("noop.act1.alarm-minutes") private var alarmMinutes = -1
-    /// Index into the four windows: exact, 15, 30, 45 minutes before the set time.
-    @SceneStorage("noop.act1.alarm-window") private var alarmWindowIndex = 1
     /// Which weekdays the window is armed for, Monday first, as a 7-character mask.
     @SceneStorage("noop.act1.alarm-days") private var alarmDayMask = "1111100"
-    @SceneStorage("noop.act1.wind-down") private var windDownBuzz = true
     @SceneStorage("noop.act1.bedtime-committed") private var bedtimeCommitted = false
     @State private var expandedCause = 1
     @State private var debtRange = "14 nights"
@@ -66,7 +59,7 @@ struct NoopAct1Screens: View {
                     // The same nights the page steps through, each under the day it ended on, so the
                     // ring under a date is the night that date opens.
                     let key = Repository.localDayKey(date)
-                    guard let rest, rest.needMin > 0,
+                    guard rest.needMin > 0,
                           let n = rest.slots.lazy.compactMap({ $0 }).first(where: { $0.dayKey == key })
                     else { return nil }
                     let fill = n.score.map { $0 / 100 } ?? n.asleepMin / rest.needMin
@@ -112,7 +105,7 @@ struct NoopAct1Screens: View {
         case "trends":
             NoopTrendsList(navigation: navigation, ids: noopSleepTrendIDs).padding(.top, 18)
         case "hero-aurora", "hero-glass":
-            if let rest, let night = restNight {
+            if let night = restNight {
                 Group {
                     if id == "hero-aurora" {
                         NoopSleepAuroraHero(night: night, needMin: rest.needMin, side: NoopPageHeroMetrics.heroSide)
@@ -124,7 +117,7 @@ struct NoopAct1Screens: View {
                 .padding(.vertical, 12)
             }
         case "night-aurora", "night-dial", "night-performance", "night-ledger", "night-glass":
-            if let rest, let night = restNight {
+            if let night = restNight {
                 switch id {
                 case "night-aurora": NoopSleepAuroraSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
                 case "night-glass": NoopSleepGlassSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
@@ -135,13 +128,13 @@ struct NoopAct1Screens: View {
             }
         case "night":
             VStack(spacing: 10) {
-                if let rest, rest.phase != .ready {
+                if rest.phase != .ready {
                     restAbsentCard(rest.phase)
                 } else {
-                Button { if rest == nil { navigation.push(.why) } } label: {
+                Button {  } label: {
                     VStack(spacing: 2) {
 
-                        if let rest, let night = restNight {
+                        if let night = restNight {
                             let delta = NoopRestRecord.delta(asleepMin: night.asleepMin, needMin: rest.needMin)
                             // Rest's own ring first; the aurora and the glass are the other two heroes.
                             // The header follows the ring style on Today; Rest's own ring is Noop's.
@@ -187,9 +180,6 @@ struct NoopAct1Screens: View {
                                     .multilineTextAlignment(.leading)
                             }
                             Spacer(minLength: 4)
-                            if rest == nil {
-                                NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.nightLight)
-                            }
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 14)
@@ -200,7 +190,7 @@ struct NoopAct1Screens: View {
                 }
                 .buttonStyle(NoopHTMLPressStyle())
                 .modifier(NoopDaySwipe(offset: restDayStep, maxBack: 6))
-                if rest != nil, let edit = restNight?.edit {
+                if let edit = restNight?.edit {
                     NoopActionButton(title: edit.userEdited ? "Edit sleep times (edited)" : "Edit sleep times",
                                      systemImage: "pencil", variant: .secondary, size: .medium) {
                         editingNight = edit
@@ -209,15 +199,15 @@ struct NoopAct1Screens: View {
                 }
             }
         case "sleep-period":
-            if let rest, let night = restNight { NoopSleepPeriodSection(night: night, needMin: rest.needMin) }
+            if let night = restNight { NoopSleepPeriodSection(night: night, needMin: rest.needMin) }
         case "sleep-stages":
-            if let rest, let night = restNight { NoopSleepStagesSection(night: night, history: rest.slots.compactMap { $0 }) }
+            if let night = restNight { NoopSleepStagesSection(night: night, history: rest.slots.compactMap { $0 }) }
         case "fall-asleep":
             if let night = restNight { NoopFallAsleepSection(night: night) }
         case "sleep-vitals":
             if let night = restNight, night.span != nil { NoopSleepVitalsSection(night: night) }
         case "sleep-needed":
-            if let rest, let night = restNight { NoopSleepNeededSection(night: night, rest: rest, isLatest: restIsLatest) }
+            if let night = restNight { NoopSleepNeededSection(night: night, rest: rest, isLatest: restIsLatest) }
         case "inbed":
             if let bed = restNight?.bed {
                 inBedCard(bed)
@@ -242,17 +232,6 @@ struct NoopAct1Screens: View {
 
                 // Why a real night went the way it did needs a causes engine the app does not have;
                 // production shows no door into an empty screen.
-                if rest == nil {
-                    Act1LinkRow(
-                        title: restWhyTitle,
-                        // Production has no approved sentence for why a real night went the way it did;
-                        // the row keeps its door and drops the claim (listed for design).
-                        detail: rest == nil ? selectedNight.reason : nil,
-                        glyph: .read
-                    ) { navigation.push(.why) }
-                    .opacity(restAbsent ? 0.38 : 1)
-                    .allowsHitTesting(!restAbsent)
-                }
             }
         case "overtime":
             VStack(spacing: 10) {
@@ -261,9 +240,7 @@ struct NoopAct1Screens: View {
 
                 Act1LinkRow(
                     title: "Sleep debt",
-                    detail: rest != nil ? nil : selectedNightOffset == 0
-                        ? "1h 20m behind over a fortnight. Two ordinary nights clears it."
-                        : "The running balance as it stood after this sleep.",
+                    detail: nil,
                     glyph: .scale
                 ) { navigation.push(.debt) }
                 .opacity(restAbsent ? 0.38 : 1)
@@ -306,13 +283,13 @@ struct NoopAct1Screens: View {
                                 Text("Lights out by \(pick.time.noopClock)")
                                     .font(NoopHTMLFont.outfit(NoopType.title3, weight: .light))
                                     .foregroundStyle(NoopHTMLColor.ink)
-                                Text(rest == nil && selectedBedtime == 2
+                                Text(false && selectedBedtime == 2
                                      ? "Clears twenty minutes of debt before your \(alarmTime.noopClock) alarm."
                                      : "\(pick.length) before your \(alarmTime.noopClock) alarm.")
                                     .font(NoopHTMLFont.sans(NoopType.caption))
                                     .foregroundStyle(Color(hex: 0xB7C3C9))
                                     .lineLimit(1)
-                            } else if rest != nil && behavior.smartAlarmEnabled {
+                            } else if behavior.smartAlarmEnabled {
                                 Text("Wake by \(alarmSetText.noopClock)")
                                     .font(NoopHTMLFont.outfit(NoopType.title3, weight: .light))
                                     .foregroundStyle(NoopHTMLColor.ink)
@@ -362,9 +339,8 @@ struct NoopAct1Screens: View {
                 HStack(spacing: 8) {
                     // Production's need is the app's planning target, not a measured personal need
                     // (owner decision, 24 Sep): no "own", and no chip counting nights toward it.
-                    if rest == nil || rest?.phase == .ready {
-                        Text(rest == nil ? "dashes \u{2014} your own need, 7h 05m"
-                             : "dashes \u{2014} your need, \(rest.map { NoopRestRecord.duration($0.needMin) } ?? "")")
+                    if rest.phase == .ready {
+                        Text("dashes \u{2014} your need, \(NoopRestRecord.duration(rest.needMin))")
                             .font(NoopHTMLFont.sans(NoopType.eyebrow))
                             .foregroundStyle(NoopHTMLColor.faint)
                     }
@@ -549,22 +525,16 @@ struct NoopAct1Screens: View {
                 HStack(alignment: .firstTextBaseline) {
                     NoopSectionLabel("The shape of it")
                     Spacer()
-                    Text(restNight?.window ?? (rest == nil ? selectedNight.window : ""))
+                    Text(restNight?.window ?? (""))
                         .font(NoopHTMLFont.sans(NoopType.eyebrow))
                         .foregroundStyle(NoopHTMLColor.faint)
                         .monospacedDigit()
                 }
                 // The verdict line is written per night for the example person only; there is no
                 // approved template for a real night yet, so production omits it (listed for design).
-                if rest == nil {
-                Text(selectedNight.verdict)
-                    .font(NoopHTMLFont.sans(NoopType.subhead))
-                    .foregroundStyle(NoopHTMLColor.ink)
-                    .noopAct1LineBox(fontSize: 14, ratio: 1.5)
-                }
 
-                if rest == nil || restNight != nil {
-                    if restHasTimeline || rest == nil {
+                if restNight != nil {
+                    if restHasTimeline {
                         VStack(spacing: 7) {
                             NoopStageTimeline(slices: restNight?.slices ?? Act1Hypnogram.prototypeStages,
                                               colors: NoopTodayNightCard.stageColors, selected: selectedStage)
@@ -721,17 +691,13 @@ struct NoopAct1Screens: View {
         let drinks = navigation.nightJournalDrinks
         let drinkSummary = drinks == 0 ? "no drinks" : "\(drinks == 3 ? "3+" : String(drinks)) \(drinks == 1 ? "drink" : "drinks")"
         let count = navigation.nightJournalNotes.count
-        let noteSummary = count == 0 ? "" : ", \(count) \(count == 1 ? "note" : "notes")"
-        guard NoopContentPolicy.allowsPrototypeContent else {
-            // Release: the saved time and only the parts the wearer chose (-1 = not chosen).
-            var parts: [String] = []
-            if navigation.nightJournalMood >= 0 { parts.append("\(mood) day") }
-            if drinks >= 0 { parts.append(drinkSummary) }
-            if count > 0 { parts.append("\(count) \(count == 1 ? "note" : "notes")") }
-            let time = navigation.nightJournalSavedAt.map { " " + AppClock.hourMinuteFormatter().string(from: $0) } ?? ""
-            return "Logged\(time)" + (parts.isEmpty ? "" : " — " + parts.joined(separator: ", "))
-        }
-        return "Logged \(isNightWorker ? "06:50" : "22:41") — \(mood) day, \(drinkSummary)\(noteSummary)"
+        // The saved time and only the parts the wearer chose (-1 = not chosen).
+        var parts: [String] = []
+        if navigation.nightJournalMood >= 0 { parts.append("\(mood) day") }
+        if drinks >= 0 { parts.append(drinkSummary) }
+        if count > 0 { parts.append("\(count) \(count == 1 ? "note" : "notes")") }
+        let time = navigation.nightJournalSavedAt.map { " " + AppClock.hourMinuteFormatter().string(from: $0) } ?? ""
+        return "Logged\(time)" + (parts.isEmpty ? "" : " — " + parts.joined(separator: ", "))
     }
 
     // MARK: - Tonight
@@ -802,21 +768,14 @@ struct NoopAct1Screens: View {
                         }
 
                         VStack(spacing: 0) {
-                            if let rest {
-                            // Only shown if an in-bed-to-sleep interval becomes available. The current
-                            // detected session timeline alone cannot supply that measurement.
-                            tonightReason("Your need \u{00B7} \(NoopRestRecord.duration(rest.needMin))", note: "", value: "")
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            if let latency = rest.latencyMin {
-                                tonightReason("Falling asleep \u{00B7} \(NoopRestRecord.duration(latency))", note: "", value: "")
-                            }
-                            } else {
-                            tonightReason("Sleep debt · 1h 20m", note: "Pulls tonight twenty minutes earlier than your usual", value: "−20m", blue: true)
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            tonightReason("Yesterday · easy", note: "A walk and nothing else. Nothing extra to pay back.", value: "0")
-                            Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                            tonightReason("Your own need · 7h 05m", note: "Measured across your last ninety nights, not a population average", value: "90n")
-                            }
+                        // Only shown if an in-bed-to-sleep interval becomes available. The current
+                        // detected session timeline alone cannot supply that measurement.
+                        tonightReason("Your need \u{00B7} \(NoopRestRecord.duration(rest.needMin))", note: "", value: "")
+                        Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
+                        if let latency = rest.latencyMin {
+                            tonightReason("Falling asleep \u{00B7} \(NoopRestRecord.duration(latency))", note: "", value: "")
+                        }
+                        
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
@@ -852,73 +811,25 @@ struct NoopAct1Screens: View {
                         tonightToggle(
                             glyph: .watch,
                             title: "Armed on the strap",
-                            detail: rest != nil && !strapPaired
+                            detail: !strapPaired
                                 ? "Pair a strap first. The alarm runs on it"
                                 : strapAlarmHeld && alarmArmed
                                 ? "Time saved. A 5.0 does not buzz until you allow it on the alarm screen"
                                 : "Fires with your phone off, silent, or in another room",
                             isOn: alarmArmed
                         ) {
-                            if rest != nil {
-                                guard strapPaired else { return }
-                                behavior.smartAlarmEnabled.toggle()
-                                model.applySmartAlarm()
-                            } else {
-                                smartWake.toggle()
-                            }
+                            guard strapPaired else { return }
+                            behavior.smartAlarmEnabled.toggle()
+                            model.applySmartAlarm()
+                        
                         }
                         // The wind-down buzz is timed off lights-out, which production does not compute.
-                        if rest == nil {
-                        Divider().overlay(NoopHTMLColor.border).frame(height: 0.5)
-                        tonightToggle(
-                            glyph: .bell,
-                            title: "Buzz me to wind down at \(windDownTime.noopClock)",
-                            detail: "One buzz on the wrist. No notification.",
-                            isOn: windDownBuzz
-                        ) { windDownBuzz.toggle() }
-                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 4)
                     .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
                     .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
 
-                    if rest == nil {
-                        if bedtimeCommitted {
-                            HStack(spacing: 12) {
-                                Act1CheckDisc(size: 18)
-                                Text("Set — lights out \(activeBedtimes[selectedBedtime].time.noopClock)\(windDownBuzz ? ", buzz at \(windDownTime.noopClock)" : ", no wind-down buzz")")
-                                    .font(NoopHTMLFont.sans(NoopType.footnote))
-                                    .foregroundStyle(NoopHTMLColor.inkSoft)
-                                Spacer()
-                                Button("Change") { bedtimeCommitted = false }
-                                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                                    .foregroundStyle(NoopHTMLColor.blue)
-                            }
-                            .padding(.horizontal, 18)
-                            .frame(height: 54)
-                            .background(NoopHTMLColor.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 18))
-                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(NoopHTMLColor.blue.opacity(0.28), lineWidth: 0.5))
-                            .padding(.top, 4)
-                        } else {
-                            Button("Set tonight") { bedtimeCommitted = true }
-                                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                                .foregroundStyle(NoopHTMLColor.blueInk)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 54)
-                                .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 18))
-                                .buttonStyle(NoopHTMLPressStyle())
-                                .padding(.top, 4)
-                        }
-
-                        Text("\(rhythmLine) Nothing here is a target — miss it and the next read simply says you missed it.")
-                            .font(NoopHTMLFont.sans(NoopType.caption))
-                            .foregroundStyle(NoopHTMLColor.faint)
-                            .noopAct1LineBox(fontSize: 11.5, ratio: 1.6)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 12)
-                            .padding(.top, 2)
-                    }
                 }
             }
         }
@@ -1104,7 +1015,7 @@ struct NoopAct1Screens: View {
     // MARK: - Debt
 
     private var debtScreen: some View {
-        let model = rest.map(liveDebtModel) ?? Self.debtModels[debtRange] ?? Self.debtModels["14 nights"]!
+        let model = liveDebtModel(rest)
         let contextualPoint = max(0, model.values.count - 1 - selectedNightOffset)
         let point = min(debtPoint ?? contextualPoint, model.values.count - 1)
         return NoopScreen(topInset: 56) {
@@ -1148,8 +1059,7 @@ struct NoopAct1Screens: View {
                                     .foregroundStyle(NoopHTMLColor.copy)
                             }
                         }
-                        Text(rest == nil ? "against your own need of 7h 05m a night"
-                             : "against your need of \(rest.map { NoopRestRecord.duration($0.needMin) } ?? "") a night")
+                        Text("against your need of \(NoopRestRecord.duration(rest.needMin)) a night")
                             .font(NoopHTMLFont.sans(NoopType.footnote))
                             .foregroundStyle(NoopHTMLColor.copy)
                             .noopAct1LineBox(fontSize: 13.5, ratio: 1.55)
@@ -1209,38 +1119,6 @@ struct NoopAct1Screens: View {
 
                     // The correlates and the closing read are the example person's findings; production
                     // shows neither until they are drawn from the correlation engines (listed).
-                    if rest == nil {
-                    VStack(alignment: .leading, spacing: 0) {
-                        NoopSectionLabel("What moves it, for you")
-                            .padding(.top, 13)
-                            .padding(.bottom, 4)
-                        ForEach(Array(Self.correlates.enumerated()), id: \.offset) { index, correlate in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(correlate.0).font(NoopHTMLFont.sans(NoopType.footnote))
-                                    Text(correlate.1).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
-                                }
-                                Spacer()
-                                Text(correlate.2)
-                                    .font(NoopHTMLFont.outfit(NoopType.body))
-                                    .foregroundStyle(correlate.3 ? Color(hex: 0xF2B45C) : NoopHTMLColor.blue)
-                            }
-                            .frame(minHeight: 58)
-                            if index < Self.correlates.count - 1 { Divider().overlay(NoopHTMLColor.border).frame(height: 0.5) }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-
-                    Text(model.read)
-                        .font(NoopHTMLFont.sans(NoopType.subhead))
-                        .foregroundStyle(Color(hex: 0xB7C3C9))
-                        .noopAct1LineBox(fontSize: 14, ratio: 1.65)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 2)
-                    }
                 }
                 .padding(.top, 8)
             }
@@ -1312,7 +1190,7 @@ struct NoopAct1Screens: View {
 
     /// True when the production record has no night to show: the cards below the hero render at
     /// 38 % and do not respond, per the spec's empty state.
-    private var restAbsent: Bool { rest.map { $0.phase != .ready } ?? false }
+    private var restAbsent: Bool { rest.phase != .ready }
 
     /// Today shows the newest night until tonight's exists (after midnight, before waking). A step back
     /// from it then skips the day whose night Today is already showing, and a step forward onto that
@@ -1321,7 +1199,7 @@ struct NoopAct1Screens: View {
     private var restDayStep: Binding<Int> {
         Binding(get: { navigation.selectedRestDay }, set: { new in
             let old = navigation.selectedRestDay
-            guard let rest, abs(new - old) == 1,
+            guard abs(new - old) == 1,
                   rest.slots.last.map({ $0 == nil }) == true, let newest = rest.newestIndex else {
                 navigation.selectedRestDay = new
                 return
@@ -1336,7 +1214,6 @@ struct NoopAct1Screens: View {
     /// The strip slot the header, ring and shape card describe: the requested day when it holds a
     /// night, otherwise the newest slot with one (nil when the week holds none).
     private var restSelectedIndex: Int? {
-        guard let rest else { return selectedNightIndex }
         let requested = rest.slots.count - 1 - max(0, navigation.selectedRestDay)
         if rest.slots.indices.contains(requested), rest.slots[requested] != nil { return requested }
         return rest.newestIndex
@@ -1344,39 +1221,16 @@ struct NoopAct1Screens: View {
 
     /// The night on screen: the selected slot's, or the newest night on record when the week is empty.
     private var restNight: NoopRestRecord.Night? {
-        guard let rest else { return nil }
         if let index = restSelectedIndex { return rest.slots[index] }
         return rest.latest
     }
 
     private var restIsLatest: Bool {
-        guard let rest else { return selectedNightOffset == 0 }
         return restNight?.dayKey == rest.latest?.dayKey
-    }
-
-    private var restHeaderLabel: String {
-        guard rest != nil else {
-            return selectedNightOffset == 0 ? (isNightWorker ? "Last sleep" : "Last night") : selectedNight.date
-        }
-        guard let night = restNight else { return isNightWorker ? "Last sleep" : "Last night" }
-        // "Last night" is only true of a night that ended within the last day and a half.
-        let recent = Date().timeIntervalSince(night.endDate) < 36 * 3600
-        return restIsLatest && recent ? (isNightWorker ? "Last sleep" : "Last night") : night.longDate
-    }
-
-    private var restWhyTitle: String {
-        if rest == nil {
-            return selectedNightOffset == 0 ? (isNightWorker ? "Why that sleep" : "Why last night") : "Why \(selectedNight.shortDate)"
-        }
-        guard let night = restNight, !(restIsLatest && restHeaderLabel != night.longDate) else {
-            return isNightWorker ? "Why that sleep" : "Why last night"
-        }
-        return "Why \(night.shortDate)"
     }
 
     /// Bars for the seven-night strip, oldest → newest; hours asleep, 0 for a day with no night.
     private var restBars: [(day: String, value: Double)] {
-        guard let rest else { return Self.nights.map { ($0.day, $0.value) } }
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         return rest.slots.enumerated().map { index, night in
@@ -1386,7 +1240,7 @@ struct NoopAct1Screens: View {
         }
     }
 
-    private var restNeedHours: Double { rest.map { $0.needMin / 60 } ?? 7.083 }
+    private var restNeedHours: Double { rest.needMin / 60 }
 
     private var restStageMinutes: NoopRestRecord.StageMinutes? { restNight?.stages }
 
@@ -1396,12 +1250,12 @@ struct NoopAct1Screens: View {
     }
 
     /// A real per-epoch timeline exists, so the ring's stage order and the hypnogram are measured.
-    private var restHasTimeline: Bool { rest == nil || restNight?.slices != nil }
+    private var restHasTimeline: Bool { restNight?.slices != nil }
 
     private var restAxis: [String] { restNight?.axis ?? selectedNight.axis }
 
     private var restRingRead: String {
-        guard let rest, let night = restNight else { return ringRead }
+        guard let night = restNight else { return ringRead }
         let short = (rest.needMin - night.asleepMin) / 60
         // The template's tail ("see why…", "See what…") points at the Why page, which has no engine
         // behind measured nights yet and does not open from here; only the measured clause is kept.
@@ -1445,18 +1299,10 @@ struct NoopAct1Screens: View {
         return "A closed ring. See what the night was made of"
     }
 
-    private var windDownTime: String {
-        let parts = activeBedtimes[selectedBedtime].time.split(separator: ":").compactMap { Int($0) }
-        guard parts.count == 2 else { return "22:30" }
-        let total = (parts[0] * 60 + parts[1] - 40 + 24 * 60) % (24 * 60)
-        return String(format: "%02d:%02d", total / 60, total % 60)
-    }
-
     private var activeBedtimes: [Act1Bedtime] {
-        guard let rest else { return isNightWorker ? Self.nightShiftBedtimes : Self.bedtimes }
         return liveBedtimes(rest)
     }
-    private var alarmTime: String { rest != nil ? alarmSetText : (isNightWorker ? "15:25" : "06:25") }
+    private var alarmTime: String { alarmSetText}
 
     /// The five prototype stops can be derived only with an armed alarm and a verified interval
     /// between getting into bed and first sleep. The current store lacks in-bed start, so Release
@@ -1483,13 +1329,12 @@ struct NoopAct1Screens: View {
     }
     /// The set time. Until the user steps it, this is the anchor — not a number nobody chose.
     private var alarmSetMinutes: Int {
-        if rest != nil { return behavior.smartAlarmMinutes }
+ return behavior.smartAlarmMinutes 
         return alarmMinutes < 0 ? alarmAnchorMinutes : alarmMinutes
     }
 
     /// Production writes the strap alarm itself; the prototype only moves its own state.
     private func setAlarm(_ minutes: Int) {
-        guard rest != nil else { alarmMinutes = minutes; return }
         behavior.smartAlarmMinutes = ((minutes % 1440) + 1440) % 1440
         model.applySmartAlarm()
     }
@@ -1499,7 +1344,7 @@ struct NoopAct1Screens: View {
     private static let alarmWindows = [0, 15, 30, 45]
     /// The strap alarm has no wake window (the setting was retired, never read), so production is
     /// always exact and the three windows are drawn unavailable.
-    private var alarmWindowMinutes: Int { rest != nil ? 0 : Self.alarmWindows[min(max(alarmWindowIndex, 0), 3)] }
+    private var alarmWindowMinutes: Int { 0}
 
     private func alarmClock(_ minutes: Int) -> String {
         let m = ((minutes % 1440) + 1440) % 1440
@@ -1541,9 +1386,7 @@ struct NoopAct1Screens: View {
                     VStack(alignment: .leading, spacing: 11) {
                         alarmWindowPicker
                         // The strap's firmware alarm is exact; production has no light-sleep window to offer yet.
-                        Text(rest != nil
-                            ? "Exact means exact — the strap wakes you at \(alarmSetText.noopClock) whatever stage you are in. An earlier window needs light-sleep timing the strap does not give yet."
-                            : "Fifteen minutes is enough to find light sleep on most nights. Exact means exact — it wakes you at \(alarmSetText.noopClock) whatever stage you are in.")
+                        Text("Exact means exact — the strap wakes you at \(alarmSetText.noopClock) whatever stage you are in. An earlier window needs light-sleep timing the strap does not give yet.")
                             .font(NoopHTMLFont.sans(NoopType.caption))
                             .foregroundStyle(Color(hex: 0x7F8A85))
                             .lineSpacing(NoopSpecType.lineSpacing(size: 11.5, cssLineHeight: 1.55, face: NoopSpecType.Face.sansRegular))
@@ -1629,15 +1472,12 @@ struct NoopAct1Screens: View {
             HStack(spacing: 6) {
                 ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
                     let dow = Self.alarmWeekdayOrder[index]
-                    let on = rest != nil
-                        ? SmartAlarmView.alarmWeekdayIsSelected(dow, in: behavior.smartAlarmWeekdays)
-                        : mask[index] == "1"
+                    let on = SmartAlarmView.alarmWeekdayIsSelected(dow, in: behavior.smartAlarmWeekdays)
                     Button {
-                        if rest != nil {
-                            behavior.smartAlarmWeekdays = SmartAlarmView.alarmToggledWeekday(dow, in: behavior.smartAlarmWeekdays)
-                            model.applySmartAlarm()
-                            return
-                        }
+                        behavior.smartAlarmWeekdays = SmartAlarmView.alarmToggledWeekday(dow, in: behavior.smartAlarmWeekdays)
+                        model.applySmartAlarm()
+                        return
+                    
                         var next = mask
                         next[index] = on ? "0" : "1"
                         alarmDayMask = String(next)
@@ -1672,9 +1512,9 @@ struct NoopAct1Screens: View {
                 .padding(.horizontal, 2)
             HStack(spacing: 0) {
                 ForEach(Array(Self.alarmWindows.enumerated()), id: \.offset) { index, window in
-                    let unavailable = rest != nil && window > 0
-                    let on = rest != nil ? window == 0 : index == alarmWindowIndex
-                    Button { if rest == nil { alarmWindowIndex = index } } label: {
+                    let unavailable = window > 0
+                    let on = window == 0
+                    Button {  } label: {
                         VStack(spacing: 2) {
                             Text(window == 0 ? "Exact" : "\(window) min")
                                 .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
@@ -1716,7 +1556,7 @@ struct NoopAct1Screens: View {
                 .foregroundStyle(Color(hex: 0xC9CEE8))
                 .lineSpacing(NoopSpecType.lineSpacing(size: 12.5, cssLineHeight: 1.6, face: NoopSpecType.Face.sansRegular))
                 .fixedSize(horizontal: false, vertical: true)
-            if rest != nil && model.whoop5Detected {
+            if model.whoop5Detected {
                 Divider().overlay(NoopHTMLColor.night.opacity(0.22)).frame(height: 0.5).padding(.vertical, 3)
                 Toggle(isOn: Binding(
                     get: { strapAlarm5Allowed },
@@ -1746,13 +1586,10 @@ struct NoopAct1Screens: View {
 
     /// True when the wearer has armed a time that a 5.0/MG strap will not buzz for.
     private var strapAlarmHeld: Bool {
-        rest != nil && model.whoop5Detected && !strapAlarm5Allowed
+        model.whoop5Detected && !strapAlarm5Allowed
     }
 
     private var alarmStrapCopy: String {
-        guard rest != nil else {
-            return "Noop hands the window to the band before you sleep. It buzzes your wrist even if your phone is off, flat, silenced or in another room. Costs about 2 % of the band’s battery a night."
-        }
         guard model.whoop5Detected else {
             return "Noop hands the wake time to the band. It buzzes your wrist even if your phone is off, flat, silenced or in another room."
         }
@@ -1767,14 +1604,10 @@ struct NoopAct1Screens: View {
         // Production names its own failure modes: the strap holds one alarm at a time and Noop re-arms
         // it on open, on reconnect and after it fires. The prototype's bedtime hand-over and the morning
         // battery line are not built.
-        let failures = rest != nil ? [
+        let failures = [
             "The band is not on your wrist when you fall asleep. It cannot buzz an empty strap; only the phone’s backup sounds, and only if Noop may send notifications.",
             "The band runs flat overnight. A strap with no charge cannot buzz; only the phone’s backup sounds.",
             "Noop has not run since the last alarm. The strap holds one alarm at a time, and Noop sets the next one when it opens or the strap reconnects."
-        ] : [
-            "The band is not on your wrist when you fall asleep. It cannot buzz an empty strap; only the phone’s backup sounds, and only if Noop may send notifications.",
-            "The band is below 5 %. It keeps the window armed but drops the buzz — you get one line about it on tomorrow morning’s read.",
-            "You never opened Noop before bed. The window is handed over at your bedtime anchor, so an alarm set three days ago and never re-armed does not fire."
         ]
         return VStack(alignment: .leading, spacing: 10) {
             Text("When it will not fire")
@@ -1811,12 +1644,9 @@ struct NoopAct1Screens: View {
     /// strap. The committed state lives on `tonight`, not in a toast.
     private var alarmArmButton: some View {
         Button {
-            if rest != nil {
-                behavior.smartAlarmEnabled = true
-                model.applySmartAlarm()
-            } else {
-                smartWake = true
-            }
+            behavior.smartAlarmEnabled = true
+            model.applySmartAlarm()
+        
             navigation.back(or: .tonight)
         } label: {
             Text(alarmArmed ? "Armed · back to tonight" : "Arm it for tonight")
@@ -1835,9 +1665,9 @@ struct NoopAct1Screens: View {
     }
     /// Armed means the strap alarm is on, in production; the prototype keeps its own flag.
     /// A measured record with no night in it yet: there is no balance to read, not a balance of zero.
-    private var debtUnmeasured: Bool { rest.map { $0.debt.isEmpty } ?? false }
+    private var debtUnmeasured: Bool { rest.debt.isEmpty }
 
-    private var alarmArmed: Bool { rest != nil ? behavior.smartAlarmEnabled && strapPaired : smartWake }
+    private var alarmArmed: Bool { behavior.smartAlarmEnabled && strapPaired}
     /// The alarm lives on the strap, so with none paired it cannot be armed, whatever was saved.
     private var strapPaired: Bool {
         !NoopStraps.paired(model.deviceRegistry?.devices ?? []).isEmpty
@@ -1942,24 +1772,6 @@ private struct Act1LinkRow: View {
             .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
         }
         .buttonStyle(NoopHTMLPressStyle())
-    }
-}
-
-private struct Act1CheckDisc: View {
-    let size: CGFloat
-
-    var body: some View {
-        ZStack {
-            Circle().fill(NoopHTMLColor.blue)
-            Canvas { context, canvas in
-                var path = Path()
-                path.move(to: CGPoint(x: canvas.width * 0.31, y: canvas.height * 0.52))
-                path.addLine(to: CGPoint(x: canvas.width * 0.45, y: canvas.height * 0.67))
-                path.addLine(to: CGPoint(x: canvas.width * 0.72, y: canvas.height * 0.36))
-                context.stroke(path, with: .color(NoopHTMLColor.blueInk), style: StrokeStyle(lineWidth: 1.5, lineCap: .square, lineJoin: .miter))
-            }
-        }
-        .frame(width: size, height: size)
     }
 }
 
@@ -2508,22 +2320,6 @@ private extension NoopAct1Screens {
         Act1Night(day: "S", date: "Saturday 22 August", shortDate: "last night", value: 7.2, hours: "7h 12m", window: "23:14 – 06:41", verdict: "Full night, and deep sleep came early.", delta: "7m over", reason: "You were in bed 26 minutes early — that's most of it. The room ran warm after 3am.", whyHeadline: "You slept well, and you nearly slept better.", whyParagraphOne: "Getting into bed at 23:14 did most of the work — that's 26 minutes earlier than your usual, and your deep sleep arrived in the first ninety minutes instead of after two hours.", whyParagraphTwo: "One thing cost you: after 3am your skin ran 0.4°C warmer than a normal night and you surfaced twice, briefly. On past nights that pattern has been the room, not you.", axis: ["23:14", "01:30", "04:00", "06:41"], warmestLabel: "03:20 — warmest", causes: defaultCauses)
     ]
 
-    static let bedtimes = [
-        Act1Bedtime(time: "22:30", length: "7h 55m", note: "An hour of debt gone by morning. Ambitious for a Saturday, but it works."),
-        Act1Bedtime(time: "22:50", length: "7h 35m", note: "Clears half an hour of debt. A stretch, and worth it if the evening allows."),
-        Act1Bedtime(time: "23:10", length: "7h 15m", note: "Clears twenty minutes of debt and still leaves you an evening. This is the one."),
-        Act1Bedtime(time: "23:30", length: "6h 55m", note: "Holds you exactly level — nothing paid back, nothing added."),
-        Act1Bedtime(time: "23:50", length: "6h 35m", note: "Adds half an hour to what you already owe. Fine once, not twice.")
-    ]
-
-    static let nightShiftBedtimes = [
-        Act1Bedtime(time: "07:30", length: "7h 55m", note: "An hour of debt gone before the street wakes up. Ambitious straight off a shift, but it works."),
-        Act1Bedtime(time: "07:50", length: "7h 35m", note: "Clears half an hour of debt. Worth it on the days you get home clean."),
-        Act1Bedtime(time: "08:10", length: "7h 15m", note: "Clears twenty minutes of debt and still leaves you a wind-down. This is the one."),
-        Act1Bedtime(time: "08:30", length: "6h 55m", note: "Holds you exactly level — nothing paid back, nothing added."),
-        Act1Bedtime(time: "08:50", length: "6h 35m", note: "Adds half an hour to what you already owe. Fine once, not twice.")
-    ]
-
     static let correlates: [(String, String, String, Bool)] = [
         ("Nights you drink", "9 nights logged", "−52 min", true),
         ("Screens in bed", "17 nights logged", "−21 min", true),
@@ -2531,29 +2327,6 @@ private extension NoopAct1Screens {
         ("Weekends", "8 nights", "+34 min", false)
     ]
 
-    static let debtModels: [String: Act1DebtModel] = [
-        "14 nights": Act1DebtModel(
-            values: [35, 23, 68, 48, 54, 109, 91, 69, 81, 72, 107, 78, 83, 80],
-            labels: ["3 Aug", "4 Aug", "5 Aug", "6 Aug", "7 Aug", "8 Aug", "9 Aug", "10 Aug", "11 Aug", "12 Aug", "13 Aug", "14 Aug", "15 Aug", "Last night"],
-            axis: ["3 Aug", "7 Aug", "11 Aug", "Last night"],
-            stats: [("Your need", "7h 05m"), ("Clear nights", "4 of 14"), ("Paid back", "51m"), ("Worst night", "1h 35m")],
-            read: "You have been between one and two hours behind all fortnight, and never worse than that. Two ordinary nights clears it — there is no catching up to do."
-        ),
-        "30 nights": Act1DebtModel(
-            values: [95, 120, 86, 64, 40, 72, 108, 131, 96, 70, 55, 88, 120, 74, 49, 66, 102, 84, 60, 95, 80],
-            labels: ["18 Jul", "19 Jul", "21 Jul", "22 Jul", "23 Jul", "25 Jul", "26 Jul", "27 Jul", "29 Jul", "30 Jul", "31 Jul", "1 Aug", "2 Aug", "4 Aug", "5 Aug", "7 Aug", "8 Aug", "10 Aug", "12 Aug", "14 Aug", "Last night"],
-            axis: ["18 Jul", "26 Jul", "4 Aug", "Last night"],
-            stats: [("Your need", "7h 05m"), ("Clear nights", "11 of 30"), ("Paid back", "3h 12m"), ("Worst night", "2h 10m")],
-            read: "The spike mid-month was one week of late nights, and you paid it back without doing anything special. This is a balance, not a wound."
-        ),
-        "3 months": Act1DebtModel(
-            values: [180, 150, 120, 96, 140, 168, 120, 88, 60, 95, 130, 102, 74, 110, 140, 96, 70, 105, 88, 80],
-            labels: ["19 May", "26 May", "2 Jun", "9 Jun", "13 Jun", "18 Jun", "23 Jun", "28 Jun", "3 Jul", "8 Jul", "13 Jul", "18 Jul", "22 Jul", "26 Jul", "30 Jul", "3 Aug", "6 Aug", "9 Aug", "13 Aug", "Last night"],
-            axis: ["19 May", "18 Jun", "18 Jul", "Last night"],
-            stats: [("Your need", "7h 02m"), ("Clear nights", "38 of 90"), ("Paid back", "9h 40m"), ("Worst night", "3h 05m")],
-            read: "Three months ago you were routinely three hours behind. You are not any more, and that happened without a single early alarm."
-        )
-    ]
 }
 
 extension String {
