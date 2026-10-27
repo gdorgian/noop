@@ -3,20 +3,6 @@ import UIKit
 import WhoopStore
 import StrandDesign
 
-/// The canonical HTML contains a complete, deterministic example person so every state can be
-/// reviewed in Simulator. Those values are permitted only in an explicitly seeded Debug process.
-/// A Release build cannot enter the prototype branch, even if a launch argument is injected.
-enum NoopContentPolicy {
-    static var allowsPrototypeContent: Bool {
-        #if DEBUG
-        // Test the production presentation against the seeded SQLite store without authored cards.
-        CommandLine.arguments.contains("--demo-seed") && !CommandLine.arguments.contains("--noop-live-data")
-        #else
-        false
-        #endif
-    }
-}
-
 /// Change 2 · the live bar. Left the workout, centre the ticking clock, right the pulse — or
 /// `Paused` where the pulse was. Tapping it returns to the session's own screen.
 private struct NoopCardioLiveBar: View {
@@ -1918,11 +1904,10 @@ private struct NoopNightJournalSheet: View {
 
                         Button {
                             if navigation.nightJournalSaved {
-                                let fixture = NoopContentPolicy.allowsPrototypeContent
                                 navigation.nightJournalSaved = false
-                                navigation.nightJournalMood = fixture ? 3 : -1
-                                navigation.nightJournalDrinks = fixture ? 0 : -1
-                                navigation.nightJournalNotes = fixture ? ["Screens in bed"] : []
+                                navigation.nightJournalMood = -1
+                                navigation.nightJournalDrinks = -1
+                                navigation.nightJournalNotes = []
                                 navigation.nightJournalSavedAt = nil
                                 navigation.nightJournalRevision += 1
                             }
@@ -2010,14 +1995,6 @@ private struct NoopDayLogSheet: View {
                         }
                     }
 
-                    if NoopContentPolicy.allowsPrototypeContent {
-                        Text("Everything logged here turns up in tonight's read — that is the only reason the app asks.")
-                            .font(NoopHTMLFont.sans(11.5))
-                            .foregroundStyle(NoopHTMLColor.faint)
-                            .lineSpacing(4.6)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(minHeight: 37, alignment: .top)
-                    }
 
                     VStack(spacing: 8) {
                         Button("Done", action: navigation.dismissOverlay)
@@ -2166,7 +2143,7 @@ private struct NoopLoggedItemsSheet: View {
     }
 
     private var filteredDays: [NoopLoggedDay] {
-        (NoopContentPolicy.allowsPrototypeContent ? NoopLoggedDay.canonical : liveDays).compactMap { day in
+        (liveDays).compactMap { day in
             let items = day.items.filter { filter.includes($0.kind) }
             return items.isEmpty ? nil : NoopLoggedDay(label: day.label, items: items)
         }
@@ -2273,7 +2250,6 @@ private struct NoopLoggedItemsSheet: View {
         .ignoresSafeArea()
         .transition(.move(edge: .bottom).combined(with: .opacity))
         .task {
-            guard !NoopContentPolicy.allowsPrototypeContent else { return }
             liveDays = await NoopLoggedDay.recorded(from: repo)
         }
     }

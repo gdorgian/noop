@@ -482,7 +482,7 @@ final class NoopNavigation: ObservableObject {
     /// The canonical fixture opens part-way into a steady ride, so its clock starts at 14:32. The
     /// live bar and the live screen read the same number rather than disagreeing by that offset.
     private var sessionDisplayOffset: Int {
-        guard NoopContentPolicy.allowsPrototypeContent else { return 0 }
+        guard false else { return 0 }
         return selectedWorkout.act3.isIntervals ? 0 : 872
     }
 
@@ -564,9 +564,9 @@ final class NoopNavigation: ObservableObject {
     // navigation owner so Edit restores what was saved and Cancel discards only the draft.
     // Release starts empty (-1 = not chosen); the example choices are the Debug design fixture only.
     // The production shell loads the day's saved answers from the journal and mood stores.
-    @Published var nightJournalMood = NoopContentPolicy.allowsPrototypeContent ? 3 : -1
-    @Published var nightJournalDrinks = NoopContentPolicy.allowsPrototypeContent ? 0 : -1
-    @Published var nightJournalNotes: Set<String> = NoopContentPolicy.allowsPrototypeContent ? ["Screens in bed"] : []
+    @Published var nightJournalMood = -1
+    @Published var nightJournalDrinks = -1
+    @Published var nightJournalNotes: Set<String> = []
     /// When the night journal was saved; nil when the entry came from the store without a time.
     @Published var nightJournalSavedAt: Date?
     /// Bumped by the sheet's Save and Delete so the production shell writes the entry once.
@@ -679,28 +679,28 @@ final class NoopNavigation: ObservableObject {
            let requestedGoal = NoopGoalKind(rawValue: arguments[flag + 1]) {
             selectedGoal = requestedGoal
         }
-        if NoopContentPolicy.allowsPrototypeContent,
+        if false,
            let flag = arguments.firstIndex(of: "--noop-instrument-metric"),
            arguments.indices.contains(flag + 1) {
             instrumentMetricKey = arguments[flag + 1]
         }
-        if NoopContentPolicy.allowsPrototypeContent,
+        if false,
            let flag = arguments.firstIndex(of: "--noop-instrument-a"),
            arguments.indices.contains(flag + 1) {
             instrumentCompareAKey = arguments[flag + 1]
         }
-        if NoopContentPolicy.allowsPrototypeContent,
+        if false,
            let flag = arguments.firstIndex(of: "--noop-instrument-b"),
            arguments.indices.contains(flag + 1) {
             instrumentCompareBKey = arguments[flag + 1]
         }
-        if NoopContentPolicy.allowsPrototypeContent,
+        if false,
            let flag = arguments.firstIndex(of: "--noop-instrument-shift"),
            arguments.indices.contains(flag + 1),
            let requestedShift = Int(arguments[flag + 1]) {
             instrumentCompareShift = min(2, max(0, requestedShift))
         }
-        if NoopContentPolicy.allowsPrototypeContent,
+        if false,
            let flag = arguments.firstIndex(of: "--noop-overlay"),
            arguments.indices.contains(flag + 1) {
             switch arguments[flag + 1] {
@@ -716,11 +716,11 @@ final class NoopNavigation: ObservableObject {
             default: break
             }
         }
-        if NoopContentPolicy.allowsPrototypeContent,
+        if false,
            arguments.contains("--noop-night-journal") {
             overlay = .nightJournal
         }
-        if NoopContentPolicy.allowsPrototypeContent,
+        if false,
            arguments.contains("--noop-finished-session") {
             selectedWorkout = .steadyRide
             finishedSession = NoopFinishedSessionRecord(
@@ -736,7 +736,7 @@ final class NoopNavigation: ObservableObject {
         // Deterministic Simulator QA for the context-sensitive centre action. This is compiled
         // only into Debug and still requires the explicit demo seed, so Release cannot expose a
         // prototype sheet or synthetic route state.
-        if NoopContentPolicy.allowsPrototypeContent,
+        if false,
            arguments.contains("--noop-plus") {
             plus()
         }

@@ -689,9 +689,8 @@ private struct NoopInstrumentRawScreen: View {
     @State private var errorMessage: String?
     @State private var exporting = false
 
-    private var isDemo: Bool { NoopContentPolicy.allowsPrototypeContent }
     private var sessions: [RawDataSessionStore.Session] {
-        guard isDemo else { return store.sessions }
+        guard false else { return store.sessions }
         let fixtures: [(String, TimeInterval)] = [
             ("0f3a91", 0), ("0e77c4", -86_400),
             ("0d1b58", -7 * 86_400), ("0c9042", -9 * 86_400)
@@ -715,7 +714,7 @@ private struct NoopInstrumentRawScreen: View {
     }
 
     private var active: RawDataSessionStore.Session? {
-        isDemo ? sessions.first(where: \.active) : store.active
+        store.active
     }
 
     private var selected: RawDataSessionStore.Session? {
@@ -746,10 +745,7 @@ private struct NoopInstrumentRawScreen: View {
             Button("Delete capture", role: .destructive) {
                 guard let candidate = deleteCandidate else { return }
                 deleteCandidate = nil
-                if isDemo {
-                    navigation.instrumentDemoRawDeletedIDs.insert(candidate.id)
-                    navigation.back(or: .instrumentRaw)
-                } else if store.removeMetadata(candidate.id) { navigation.back(or: .instrumentRaw) }
+                if store.removeMetadata(candidate.id) { navigation.back(or: .instrumentRaw) }
                 else { errorMessage = "The capture could not be deleted. Its record was kept so you can try again." }
             }
             Button("Cancel", role: .cancel) { deleteCandidate = nil }
@@ -816,12 +812,12 @@ private struct NoopInstrumentRawScreen: View {
                                         Text("cap_\(session.id.suffix(6))")
                                             .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
                                             .foregroundStyle(NoopHTMLColor.ink)
-                                        Text(isDemo ? Self.demoDate(session.id) : Self.date(session.startedAtMs))
+                                        Text(Self.date(session.startedAtMs))
                                             .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
                                     }
                                     Spacer()
                                     VStack(alignment: .trailing, spacing: 3) {
-                                        Text(isDemo ? Self.demoDuration(session.id) : Self.duration(session, now: now))
+                                        Text(Self.duration(session, now: now))
                                             .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
                                             .foregroundStyle(NoopHTMLColor.ink)
                                         Text(Self.size(stats(for: session).bytes))
@@ -855,7 +851,7 @@ private struct NoopInstrumentRawScreen: View {
             HStack(spacing: 9) {
                 Circle().fill(active == nil ? Color.white.opacity(0.2) : Color(hex: 0xE3574E))
                     .frame(width: 9, height: 9)
-                Text(active == nil ? "Not recording" : live.bonded || isDemo ? "Recording" : "Armed · disconnected")
+                Text(active == nil ? "Not recording" : live.bonded ? "Recording" : "Armed · disconnected")
                     .font(NoopHTMLFont.sans(10, weight: .semibold)).tracking(1.4)
                     .textCase(.uppercase)
                     .foregroundStyle(active == nil ? NoopHTMLColor.copy : Color(hex: 0xF2B3AE))
@@ -875,7 +871,7 @@ private struct NoopInstrumentRawScreen: View {
             }
             Text(active == nil
                  ? "Arming records until you stop it. It does not stop when you leave this screen. A connected WHOOP 5/MG is required."
-                 : live.bonded || isDemo
+                 : live.bonded
                     ? "The strap is sending 100 Hz motion data. This uses noticeable battery and continues after you leave this screen until you stop it."
                     : "The strap is disconnected, so no new samples can arrive. The capture remains armed and can resume when the strap reconnects.")
                 .font(NoopHTMLFont.sans(11.5)).foregroundStyle(Color(hex: 0xB7C3C9))
@@ -913,12 +909,12 @@ private struct NoopInstrumentRawScreen: View {
                     Text("cap_\(selected.id.suffix(6))")
                         .font(.system(size: 19, weight: .semibold, design: .monospaced))
                         .foregroundStyle(NoopHTMLColor.ink)
-                    Text(isDemo ? "Today 14:02:09 → 14:06:21 · Europe/Stockholm" : Self.date(selected.startedAtMs))
+                    Text(Self.date(selected.startedAtMs))
                         .font(NoopHTMLFont.sans(12.5)).foregroundStyle(NoopHTMLColor.copy)
                         .padding(.top, 5)
                     let stats = stats(for: selected)
                     VStack(spacing: 0) {
-                        captureRow("Duration", isDemo ? "4:12.4" : Self.duration(selected, now: now))
+                        captureRow("Duration", Self.duration(selected, now: now))
                         captureRow("Channels", "2")
                         captureRow("Rate", "100 Hz")
                         captureRow("Samples / channel", "\(stats.coveredSeconds * 100)")
@@ -938,9 +934,7 @@ private struct NoopInstrumentRawScreen: View {
                         }
                         coverageRow("accel", stats.coveredSeconds * 100)
                         coverageRow("gyro", stats.coveredSeconds * 100)
-                        Text(isDemo
-                             ? "Debug example: the gyro gap is drawn as a flat stretch. No actual sensor file is represented here."
-                             : "Only complete recorded seconds are counted. An exact gap-by-gap waveform is not available here, so none is invented.")
+                        Text("Only complete recorded seconds are counted. An exact gap-by-gap waveform is not available here, so none is invented.")
                             .font(NoopHTMLFont.sans(11)).foregroundStyle(NoopHTMLColor.copy)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -997,21 +991,9 @@ private struct NoopInstrumentRawScreen: View {
         HStack(spacing: 11) {
             Text(name).font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                 .frame(width: 52, alignment: .leading)
-            if isDemo {
-                HStack(alignment: .bottom, spacing: 1.5) {
-                    ForEach(0..<40, id: \.self) { index in
-                        let gap = name == "gyro" && (22..<25).contains(index)
-                        RoundedRectangle(cornerRadius: 1)
-                            .fill(gap ? Color.white.opacity(0.08) : NoopHTMLColor.blue.opacity(0.55))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: gap ? 3 : 8 + CGFloat((index * 7) % 5) * 2.4)
-                    }
-                }
-                .frame(height: 20)
-            } else {
-                Rectangle().fill(NoopHTMLColor.blue.opacity(count == 0 ? 0.15 : 0.55))
-                    .frame(height: 12).clipShape(RoundedRectangle(cornerRadius: 3))
-            }
+            Rectangle().fill(NoopHTMLColor.blue.opacity(count == 0 ? 0.15 : 0.55))
+                .frame(height: 12).clipShape(RoundedRectangle(cornerRadius: 3))
+        
             Text(count.formatted(.number.grouping(.automatic)))
                 .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
         }
@@ -1019,24 +1001,12 @@ private struct NoopInstrumentRawScreen: View {
     }
 
     private func stats(for session: RawDataSessionStore.Session) -> ImuSessionFileStore.Stats {
-        if isDemo {
-            let bytes: Int64 = switch session.id {
-            case "0f3a91": 3_100_000
-            case "0e77c4": 8_700_000
-            case "0d1b58": 800_000
-            case "0c9042": 16_400_000
-            default: 0
-            }
-            return .init(bytes: bytes, coveredSeconds: session.id == "0f3a91" ? 252 : 0,
-                         firstTs: nil)
-        }
         let from = Int(session.startedAtMs / 1_000)
         let endMs = session.endedAtMs ?? Int64(now.timeIntervalSince1970 * 1_000)
         return ImuSessionFileStore.shared.stats(session.id, from: from, to: Int(endMs / 1_000))
     }
 
     private func start() {
-        if isDemo { navigation.instrumentDemoRawArmedAt = now; return }
         guard live.bonded, model.ble.isWhoop5 else {
             errorMessage = "Connect a WHOOP 5/MG before arming a capture."
             return
@@ -1051,21 +1021,16 @@ private struct NoopInstrumentRawScreen: View {
     }
 
     private func restoreActiveCaptureIfPossible() {
-        guard !isDemo, let session = store.active, live.bonded, model.ble.isWhoop5 else { return }
+        guard let session = store.active, live.bonded, model.ble.isWhoop5 else { return }
         _ = model.ble.startGroundTruthRawCapture(sessionId: session.id)
     }
 
     private func stop() async {
-        if isDemo { navigation.instrumentDemoRawArmedAt = nil; return }
         await model.ble.stopGroundTruthRawCapture()
         store.stop()
     }
 
     private func export(_ session: RawDataSessionStore.Session) async {
-        if isDemo {
-            errorMessage = "This is a Debug design example, not a captured sensor file. Connect a WHOOP 5/MG outside demo mode to export real data."
-            return
-        }
         guard let endMs = session.endedAtMs else { return }
         exporting = true
         defer { exporting = false }
@@ -1089,26 +1054,6 @@ private struct NoopInstrumentRawScreen: View {
     private static func date(_ milliseconds: Int64) -> String {
         Date(timeIntervalSince1970: Double(milliseconds) / 1_000)
             .formatted(date: .abbreviated, time: .shortened)
-    }
-
-    private static func demoDate(_ id: String) -> String {
-        switch id {
-        case "0f3a91": "Today 14:02"
-        case "0e77c4": "Yesterday 08:41"
-        case "0d1b58": "Tue 16 Sep 19:20"
-        case "0c9042": "Sun 14 Sep 07:55"
-        default: "Today"
-        }
-    }
-
-    private static func demoDuration(_ id: String) -> String {
-        switch id {
-        case "0f3a91": "4:12"
-        case "0e77c4": "11:50"
-        case "0d1b58": "1:04"
-        case "0c9042": "22:31"
-        default: "0:00"
-        }
     }
 
     private static func duration(_ session: RawDataSessionStore.Session, now: Date) -> String {
@@ -2742,7 +2687,6 @@ private struct NoopInstrumentRankedBehavior {
 
 struct NoopInstrumentData {
     static let prototype = NoopInstrumentData()
-    static let prototypeOverview = prototype.overviewRecord()
     static func title(for key: String) -> String? { prototype.signal(key: key)?.name }
     static let empty = NoopInstrumentData(dayKeys: [], values: [:], drinkDoses: [])
     private static let count = 258

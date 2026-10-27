@@ -1383,8 +1383,6 @@ private struct NoopSveaMemory: View {
     @ObservedObject private var memoryStore = CoachMemory.shared
     @State private var showDeleteAll = false
     @State private var rebuilt = false
-    @State private var demoForgotten: Set<UUID> = []
-    @State private var demoCleared = false
 
     var body: some View {
         ZStack {
@@ -1527,15 +1525,9 @@ private struct NoopSveaMemory: View {
         .buttonStyle(NoopHTMLPressStyle())
     }
 
-    private var usesDemoMemories: Bool {
-        false && memoryStore.facts.isEmpty && !demoCleared
-    }
 
     private var memories: [NoopSveaMemoryItem] {
-        if usesDemoMemories {
-            return Self.demoMemories.filter { !demoForgotten.contains($0.id) }
-        }
-        return memoryStore.facts.map { fact in
+        memoryStore.facts.map { fact in
             let source: String
             switch fact.source {
             case .user: source = "you told Svea"
@@ -1546,50 +1538,32 @@ private struct NoopSveaMemory: View {
             return .init(
                 id: fact.id,
                 text: fact.text,
-                source: "\(source) · \(fact.createdAt.formatted(date: .abbreviated, time: .omitted))",
-                isDemo: false
-            )
+                source: "\(source) · \(fact.createdAt.formatted(date: .abbreviated, time: .omitted))")
         }
     }
 
     private var introText: String {
-        if usesDemoMemories {
-            return "Eleven facts, each one traceable to the day you said it. Nothing here was inferred about you in the background — a memory only forms out of something you wrote or logged."
-        }
-        return "\(indexCount) \(indexCount == 1 ? "memory" : "memories") kept on this phone. Some may come from conversations or tool results; you can inspect and remove them here."
+        "\(indexCount) \(indexCount == 1 ? "memory" : "memories") kept on this phone. Some may come from conversations or tool results; you can inspect and remove them here."
     }
 
     private var indexCount: Int {
-        usesDemoMemories ? max(0, 11 - demoForgotten.count) : memories.count
+        memories.count
     }
 
     private var indexSize: String {
-        if usesDemoMemories { return "2.1 MB" }
-        return memories.isEmpty ? "0 KB" : "local index"
+        memories.isEmpty ? "0 KB" : "local index"
     }
 
     private func forget(_ item: NoopSveaMemoryItem) {
-        if item.isDemo {
-            demoForgotten.insert(item.id)
-        } else {
-            memoryStore.remove(item.id)
-        }
+        memoryStore.remove(item.id)
     }
 
     private func deleteAll() {
         memoryStore.clearAll()
-        demoCleared = true
-        demoForgotten = Set(Self.demoMemories.map(\.id))
         Task { await CoachSemanticMemory.shared.deleteIndex() }
         showDeleteAll = false
     }
 
-    private static let demoMemories: [NoopSveaMemoryItem] = [
-        .init(id: UUID(uuidString: "A7000000-0000-0000-0000-000000000001")!, text: "You lift Tuesdays and Thursdays, and would rather not move them.", source: "from your journal · 3 weeks ago", isDemo: true),
-        .init(id: UUID(uuidString: "A7000000-0000-0000-0000-000000000002")!, text: "A 7h night is enough for you; 6h is not.", source: "observed across 60 nights · 2 months ago", isDemo: true),
-        .init(id: UUID(uuidString: "A7000000-0000-0000-0000-000000000003")!, text: "You are training toward a half marathon in October.", source: "you told Svea · 5 weeks ago", isDemo: true),
-        .init(id: UUID(uuidString: "A7000000-0000-0000-0000-000000000004")!, text: "Coffee after 14:00 costs you deep sleep.", source: "from your own journal correlation · 6 weeks ago", isDemo: true)
-    ]
 }
 
 // MARK: - Exact Act 7 surfaces and controls
@@ -2111,7 +2085,6 @@ private struct NoopSveaMemoryItem: Identifiable {
     let id: UUID
     let text: String
     let source: String
-    let isDemo: Bool
 }
 
 private struct NoopSveaPrimaryButtonStyle: ButtonStyle {

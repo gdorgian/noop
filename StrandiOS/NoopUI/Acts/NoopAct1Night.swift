@@ -280,9 +280,7 @@ struct NoopAct1Screens: View {
                                 Text("Lights out by \(pick.time.noopClock)")
                                     .font(NoopHTMLFont.outfit(NoopType.title3, weight: .light))
                                     .foregroundStyle(NoopHTMLColor.ink)
-                                Text(false && selectedBedtime == 2
-                                     ? "Clears twenty minutes of debt before your \(alarmTime.noopClock) alarm."
-                                     : "\(pick.length) before your \(alarmTime.noopClock) alarm.")
+                                Text("\(pick.length) before your \(alarmTime.noopClock) alarm.")
                                     .font(NoopHTMLFont.sans(NoopType.caption))
                                     .foregroundStyle(Color(hex: 0xB7C3C9))
                                     .lineLimit(1)

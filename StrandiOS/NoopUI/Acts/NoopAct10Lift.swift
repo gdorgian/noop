@@ -169,115 +169,6 @@ struct NoopAct10Screens: View {
 
 // MARK: - Deterministic visual fixture (Debug + --demo-seed only)
 
-private enum NoopLiftDemo {
-    static let programID = "noop-demo-upper-a"
-
-    static var programs: [LiftProgramRow] {
-        let now = Int(Date().timeIntervalSince1970)
-        return [
-            LiftProgramRow(id: programID, deviceId: "demo", name: "Upper A", note: nil,
-                           createdAt: now - 90 * 86_400, updatedAt: now, archived: false),
-            LiftProgramRow(id: "noop-demo-lower-a", deviceId: "demo", name: "Lower A", note: nil,
-                           createdAt: now - 80 * 86_400, updatedAt: now - 7 * 86_400, archived: false),
-            LiftProgramRow(id: "noop-demo-deadlift", deviceId: "demo", name: "Deadlift only", note: nil,
-                           createdAt: now - 70 * 86_400, updatedAt: now - 50 * 86_400, archived: false),
-        ]
-    }
-
-    static var archivedPrograms: [LiftProgramRow] {
-        let now = Int(Date().timeIntervalSince1970)
-        return [
-            LiftProgramRow(id: "noop-demo-winter", deviceId: "demo", name: "Winter block", note: nil,
-                           createdAt: now - 300 * 86_400, updatedAt: now - 60 * 86_400, archived: true),
-            LiftProgramRow(id: "noop-demo-upper-old", deviceId: "demo", name: "Upper A, old", note: nil,
-                           createdAt: now - 400 * 86_400, updatedAt: now - 100 * 86_400, archived: true),
-        ]
-    }
-
-    static func item(_ id: String, _ ord: Int, _ exercise: String, sets: Int? = nil,
-                     reps: Int? = nil, kg: Double? = nil, rest: Int? = nil,
-                     rpe: Double? = nil, note: String? = nil) -> LiftProgramItemRow {
-        LiftProgramItemRow(
-            id: id, deviceId: "demo", programId: programID, ord: ord, exercise: exercise,
-            targetSets: sets, targetRepsLow: reps, targetRepsHigh: reps,
-            targetRpe: rpe, targetWeightKg: kg, restSec: rest, note: note
-        )
-    }
-
-    static let items: [LiftProgramItemRow] = [
-        item("demo-bench", 0, "Bench press", sets: 4, reps: 8, kg: 80, rest: 150,
-             rpe: 8, note: "The last two sessions held here. Keep the load and add the clean reps first."),
-        item("demo-incline", 1, "Incline dumbbell press"),
-        item("demo-pulldown", 2, "Lat pulldown", sets: 3, reps: 10, kg: 55, rest: 120),
-        item("demo-fly", 3, "Cable fly"),
-        item("demo-raise", 4, "Lateral raise", sets: 3, reps: 12, kg: 12, rest: 90),
-        item("demo-face", 5, "Face pull"),
-    ]
-
-    static let plan: [LiftPlanItem] = [
-        LiftPlanItem(exercise: "Bench press", primaryMuscle: .chest,
-                     secondaryMuscles: [.frontDelts, .triceps], targetSets: 4, restSec: 150,
-                     targetRepsLow: 8, targetRepsHigh: 8, targetRpe: 8, targetWeightKg: 80,
-                     note: "The last two sessions held here. Keep the load and add the clean reps first.",
-                     programItemId: "demo-bench"),
-        LiftPlanItem(exercise: "Incline dumbbell press", primaryMuscle: .chest,
-                     secondaryMuscles: [.frontDelts, .triceps], targetSets: 3, restSec: 120,
-                     programItemId: "demo-incline"),
-        LiftPlanItem(exercise: "Lat pulldown", primaryMuscle: .lats,
-                     secondaryMuscles: [.biceps, .upperBack], targetSets: 3, restSec: 120,
-                     targetRepsLow: 10, targetRepsHigh: 10, targetWeightKg: 55,
-                     programItemId: "demo-pulldown"),
-        LiftPlanItem(exercise: "Cable fly", primaryMuscle: .chest, targetSets: 3, restSec: 90,
-                     programItemId: "demo-fly"),
-        LiftPlanItem(exercise: "Lateral raise", primaryMuscle: .sideDelts, targetSets: 3,
-                     restSec: 90, targetRepsLow: 12, targetRepsHigh: 12, targetWeightKg: 12,
-                     programItemId: "demo-raise"),
-        LiftPlanItem(exercise: "Face pull", primaryMuscle: .rearDelts,
-                     secondaryMuscles: [.upperBack], targetSets: 3, restSec: 90,
-                     programItemId: "demo-face"),
-    ]
-
-    static var detailSession: LiftSessionRow {
-        let end = Int(Date().timeIntervalSince1970) - 2 * 86_400
-        return LiftSessionRow(id: "noop-demo-session", deviceId: "demo",
-                              startTs: end - 62 * 60, endTs: end,
-                              sport: LiftingImporter.sport, programId: programID,
-                              programName: "Upper A", sessionRpe: 7.5, note: nil)
-    }
-
-    static var detailSets: [LiftSetRow] {
-        let session = detailSession
-        let values: [(String, LiftMuscle, [LiftMuscle], Double, Int)] = [
-            ("Bench press", .chest, [.frontDelts, .triceps], 80, 8),
-            ("Bench press", .chest, [.frontDelts, .triceps], 80, 8),
-            ("Bench press", .chest, [.frontDelts, .triceps], 80, 7),
-            ("Bench press", .chest, [.frontDelts, .triceps], 80, 6),
-            ("Incline dumbbell press", .chest, [.frontDelts, .triceps], 22, 12),
-            ("Incline dumbbell press", .chest, [.frontDelts, .triceps], 22, 11),
-            ("Incline dumbbell press", .chest, [.frontDelts, .triceps], 22, 9),
-            ("Lat pulldown", .lats, [.biceps, .upperBack], 55, 10),
-            ("Lat pulldown", .lats, [.biceps, .upperBack], 55, 10),
-            ("Lat pulldown", .lats, [.biceps, .upperBack], 55, 8),
-            ("Lateral raise", .sideDelts, [], 12, 14),
-            ("Lateral raise", .sideDelts, [], 12, 12),
-            ("Lateral raise", .sideDelts, [], 12, 11),
-            ("Lateral raise", .sideDelts, [], 8, 9),
-            ("Lateral raise", .sideDelts, [], 6, 7),
-            ("Face pull", .rearDelts, [.upperBack], 20, 12),
-        ]
-        var perExercise: [String: Int] = [:]
-        return values.enumerated().map { ord, value in
-            perExercise[value.0, default: 0] += 1
-            return LiftSetRow(id: "noop-demo-set-\(ord)", deviceId: "demo", sessionId: session.id,
-                              ord: ord, exercise: value.0, primaryMuscle: value.1,
-                              secondaryMuscles: value.2, setIndex: perExercise[value.0] ?? 1,
-                              weightKg: value.3, reps: value.4, rpe: nil, isWarmup: false,
-                              startTs: session.startTs + ord * 180, endTs: session.startTs + ord * 180 + 35,
-                              restSec: 120, note: nil)
-        }
-    }
-}
-
 // MARK: - Shared Act 10 pieces
 
 /// Act 10's HTML header is 34 pt tall at y=56, with an 18 pt outer inset. The
@@ -1159,7 +1050,6 @@ private struct NoopLiftLiveScreen: View {
         .sensoryFeedback(.impact(weight: .heavy), trigger: allDone)
     }
 
-    @State private var prototypeOpenedAt = Date()
     /// Counts +30 taps, for their haptic.
     @State private var restBumps = 0
 
@@ -1185,7 +1075,6 @@ private struct NoopLiftLiveScreen: View {
     private func liveElapsed(_ presentation: LiftSessionController.Presentation, at date: Date) -> Int {
         // The prototype is the design's fixture: 23:14 into the session when the screen opens,
         // however long ago a demo session was started on this device.
-        if isPrototypeSession { return 1_394 + max(0, Self.second(date) - Self.second(prototypeOpenedAt)) }
         guard !live.isPaused else { return presentation.sessionElapsedSeconds }
         return presentation.sessionElapsedSeconds + max(0, Self.second(date) - live.now)
     }
@@ -1206,18 +1095,6 @@ private struct NoopLiftLiveScreen: View {
     }
 
     private func prepare() async {
-        if NoopContentPolicy.allowsPrototypeContent, !live.isActive {
-            live.start(plan: NoopLiftDemo.plan, programId: NoopLiftDemo.programID, programName: "Upper A")
-            live.advance()
-            if let first = live.engine?.currentSlot {
-                live.updateSet(first, weightKg: 80, reps: 8, rpe: nil, isWarmup: false)
-                live.advance(); live.advance()
-            }
-            if let second = live.engine?.currentSlot {
-                live.updateSet(second, weightKg: 80, reps: 8, rpe: nil, isWarmup: false)
-                live.advance(); live.advance()
-            }
-        }
         await loadLastSessionValues()
         if let store = await repo.storeHandle() {
             vocabulary = (try? await store.liftExercises(deviceId: repo.deviceId)) ?? []
@@ -1228,7 +1105,7 @@ private struct NoopLiftLiveScreen: View {
     /// Each exercise's sessions before this one. Loaded for a line added mid-session too, so its sets can
     /// break records as well.
     private func loadPriorHistory() async {
-        guard let engine = live.engine, !isPrototypeSession, let store = await repo.storeHandle() else { return }
+        guard let engine = live.engine, true, let store = await repo.storeHandle() else { return }
         for name in Set(engine.plan.map(\.exercise)) where priorHistory[name] == nil {
             let rows = (try? await store.liftExerciseHistory(deviceId: repo.deviceId, exercise: name)) ?? []
             priorHistory[name] = rows.filter { $0.sessionStartTs < engine.startTs }
@@ -1316,16 +1193,6 @@ private struct NoopLiftLiveScreen: View {
 
     private func finish(includeShownValues: Bool) async {
         guard !saving, live.engine != nil else { return }
-        if isPrototypeSession {
-            // The deterministic HTML person is a visual fixture, never a workout in the user's store.
-            live.discard()
-            navigation.selectedLiftSessionID = nil
-            flow.selectedSession = nil
-            flow.sessionSets = []
-            navigation.liftDetailReturnRoute = .fitness
-            navigation.replace(with: .liftDetail)
-            return
-        }
         saving = true
         defer { saving = false }
         if let slot { writeFields(slot: slot) }
@@ -1422,22 +1289,6 @@ private struct NoopLiftLiveScreen: View {
         }
     }
 
-    private func displayedRest(for slot: LiftSlot, engine: LiftSessionEngine) -> String? {
-        if isPrototypeSession,
-           slot.exerciseIndex == 0, engine.isCompleted(slot) {
-            return slot.setIndex == 1 ? "2:30" : "2:31"
-        }
-        return engine.recordedSet(for: slot)?.restSec.map { liftClock($0) }
-    }
-
-    private var isPrototypeSession: Bool {
-        NoopContentPolicy.allowsPrototypeContent && live.programId == NoopLiftDemo.programID
-    }
-
-    private func nextExercise(after index: Int, in engine: LiftSessionEngine) -> LiftPlanItem? {
-        guard engine.plan.indices.contains(index + 1) else { return nil }
-        return engine.plan[index + 1]
-    }
 
     private func targetSummary(_ item: LiftPlanItem) -> String {
         guard item.targetWeightKg != nil || item.targetRepsLow != nil else { return "no targets" }
@@ -1447,14 +1298,6 @@ private struct NoopLiftLiveScreen: View {
         return pieces.joined(separator: " · ")
     }
 
-    private func nextRestSentence(engine: LiftSessionEngine, item: LiftPlanItem, slot: LiftSlot) -> String {
-        let nextIndex = min(item.targetSets, slot.setIndex + 1)
-        let nextSlot = LiftSlot(exerciseIndex: slot.exerciseIndex, setIndex: nextIndex)
-        let values = live.values(of: nextSlot)
-        let detail = [liftWeight(values.weightKg, system: units), values.reps.map { "× \($0)" }]
-            .compactMap { $0 }.joined(separator: " ")
-        return "Next: set \(nextIndex) of \(item.targetSets)\(detail.isEmpty ? "" : ", \(detail)"). The strap will buzz once when the clock runs out."
-    }
 }
 
 /// A record a set just broke, as the live screen announces it.
@@ -1767,11 +1610,6 @@ private struct NoopLiftProgramScreen: View {
         if let selected = flow.selectedProgram, !flow.programItems.isEmpty {
             name = selected.name; items = flow.programItems; loaded = true; return
         }
-        if NoopContentPolicy.allowsPrototypeContent && navigation.selectedLiftProgramID == nil {
-            flow.selectedProgram = NoopLiftDemo.programs[0]
-            flow.programItems = NoopLiftDemo.items
-            name = "Upper A"; items = NoopLiftDemo.items; loaded = true; return
-        }
         await flow.loadProgram(id: navigation.selectedLiftProgramID, repo: repo)
         name = flow.selectedProgram?.name ?? ""
         items = flow.programItems
@@ -1790,7 +1628,7 @@ private struct NoopLiftProgramScreen: View {
 
     private func save() async {
         guard canSave, !saving else { return }
-        if NoopContentPolicy.allowsPrototypeContent,
+        if false,
            flow.selectedProgram?.id.hasPrefix("noop-demo") == true {
             // Editing the preview program must not write its invented lines to the real database.
             navigation.back(or: .liftLibrary)
@@ -1876,15 +1714,11 @@ struct NoopLiftDetailScreen: View {
     @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
 
     private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
-    private var isPrototypeRecord: Bool {
-        NoopContentPolicy.allowsPrototypeContent && flow.selectedSession == nil
-            && navigation.selectedLiftSessionID == nil
-    }
     private var record: LiftSessionRow? {
-        flow.selectedSession ?? (isPrototypeRecord ? NoopLiftDemo.detailSession : nil)
+        flow.selectedSession ?? (nil)
     }
     private var sets: [LiftSetRow] {
-        isPrototypeRecord ? NoopLiftDemo.detailSets : flow.sessionSets
+        flow.sessionSets
     }
     private var working: [LiftSetRow] { sets.filter { !$0.isWarmup } }
     private var volume: Double { working.compactMap(\.volumeKg).reduce(0, +) }
@@ -1940,7 +1774,7 @@ struct NoopLiftDetailScreen: View {
 
     /// The lift, its sets and the workout row it saved, so Fitness and Effort stop counting it.
     private func deleteSession() async {
-        guard let record, !isPrototypeRecord, let store = await repo.storeHandle() else { return }
+        guard let record, true, let store = await repo.storeHandle() else { return }
         _ = try? await store.deleteLiftSession(id: record.id)
         if let matched {
             if WorkoutSource.classify(matched.source) == .lifting {
@@ -2247,30 +2081,7 @@ struct NoopLiftDetailScreen: View {
         records = NoopLiftRecord.find(now: working, past: past, units: units)
     }
 
-    private var musclesDoor: some View {
-        Button {
-            navigation.push(.liftMuscles)
-        } label: {
-            HStack(spacing: 13) {
-                NoopCanonicalGlyph(name: .person, size: 21, color: NoopHTMLColor.blush)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Which muscles this credited").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(isPrototypeRecord
-                         ? "7 regions · 22.5 credited sets · mapping stated"
-                         : "credited sets · mapping stated")
-                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                }
-                Spacer(); NoopChevron()
-            }
-            .padding(16)
-            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-        }
-        .buttonStyle(NoopHTMLPressStyle())
-    }
-
     private func load() async {
-        if isPrototypeRecord { return }
         if let startTs = navigation.liftDetailStartTs {
             navigation.liftDetailStartTs = nil
             await flow.refresh(repo: repo)
@@ -2292,7 +2103,6 @@ struct NoopLiftDetailScreen: View {
     }
 
     private func detailSubtitle(_ row: LiftSessionRow) -> String {
-        if isPrototypeRecord { return "Tuesday, 18:12 – 19:14" }
         let start = Date(timeIntervalSince1970: TimeInterval(row.startTs))
         let minutes = row.endTs.map { max(1, ($0 - row.startTs) / 60) }
         let end = row.endTs.map { Date(timeIntervalSince1970: TimeInterval($0)).noopLiftTime }
@@ -2306,35 +2116,10 @@ struct NoopLiftDetailScreen: View {
         return display.formatted(.number.precision(.fractionLength(display < 100 ? 0...1 : 0...0)).grouping(.automatic))
     }
 
-    private func setPill(_ row: LiftSetRow) -> String {
-        switch (liftWeight(row.weightKg, system: units), row.reps) {
-        case let (weight?, reps?): return "\(weight) × \(reps)"
-        case let (weight?, nil): return weight
-        case let (nil, reps?): return "× \(reps)"
-        default: return "recorded"
-        }
-    }
-
-    private func warmupNote(_ count: Int) -> String {
-        count == 0 ? "no warm-ups logged" : "\(count) warm-up\(count == 1 ? "" : "s") folded"
-    }
-
     private func exerciseMeta(_ exercise: String, rows: [LiftSetRow]) -> String {
-        if isPrototypeRecord && exercise == "Lateral raise" {
-            return "3 working sets, one dropped"
-        }
         return "\(rows.count) working \(rows.count == 1 ? "set" : "sets")"
     }
 
-    private func exerciseNote(_ exercise: String) -> String? {
-        guard isPrototypeRecord else { return nil }
-        switch exercise {
-        case "Bench press": return "2 warm-ups folded away"
-        case "Incline dumbbell press": return "No targets on this line — this is what you did."
-        case "Lateral raise": return "The third set expanded into three rows when you dropped the weight."
-        default: return nil
-        }
-    }
 }
 
 // MARK: - lift-edit
@@ -2351,10 +2136,6 @@ private struct NoopLiftEditScreen: View {
     @State private var saveError: String?
 
     private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
-    private var isPrototypeRecord: Bool {
-        NoopContentPolicy.allowsPrototypeContent && flow.selectedSession == nil
-            && navigation.selectedLiftSessionID == nil
-    }
     private var kept: [LiftSetRow] { rows.filter { !deleted.contains($0.id) } }
     private var working: [LiftSetRow] { kept.filter { !$0.isWarmup } }
     private var volume: Double { working.compactMap(\.volumeKg).reduce(0, +) }
@@ -2499,9 +2280,6 @@ private struct NoopLiftEditScreen: View {
 
     /// One exercise's working sets and what they moved, so a card counts only its own rows.
     private func totalText(_ exercise: String) -> String {
-        if isPrototypeRecord {
-            return deleted.isEmpty ? "14 working sets · 5,020 kg" : "14 → 13 working sets · 4,540 kg"
-        }
         let all = rows.filter { !$0.isWarmup && $0.exercise == exercise }
         let mine = working.filter { $0.exercise == exercise }
         let moved = mine.compactMap(\.volumeKg).reduce(0, +)
@@ -2511,7 +2289,6 @@ private struct NoopLiftEditScreen: View {
     }
 
     private var editTitle: String {
-        if isPrototypeRecord { return "Upper A, Tuesday" }
         let record = flow.selectedSession
         let name = record?.programName ?? "A lift"
         let day = record.map { Date(timeIntervalSince1970: TimeInterval($0.startTs)).formatted(.dateTime.weekday(.wide)) }
@@ -2523,9 +2300,8 @@ private struct NoopLiftEditScreen: View {
             await flow.loadSession(id: navigation.selectedLiftSessionID, repo: repo)
         }
         rows = flow.sessionSets
-        if rows.isEmpty && isPrototypeRecord { rows = NoopLiftDemo.detailSets }
         deleted = flow.deletedSetIDs
-        if isPrototypeRecord, deleted.isEmpty,
+        if false, deleted.isEmpty,
            let fourth = rows.filter({ $0.exercise == selectedExercise && !$0.isWarmup }).dropFirst(3).first {
             deleted.insert(fourth.id)
         }
@@ -2544,18 +2320,11 @@ private struct NoopLiftEditScreen: View {
     }
 
     private var recordFallback: LiftSessionRow? {
-        isPrototypeRecord ? NoopLiftDemo.detailSession : nil
+        nil
     }
 
     private func save() async {
         guard !saving else { return }
-        if isPrototypeRecord {
-            // The demo session is not a stored record; never persist its fabricated sets.
-            withAnimation(NoopMotion.swap) { saved = true }
-            try? await Task.sleep(nanoseconds: 600_000_000)
-            navigation.back(or: .liftDetail)
-            return
-        }
         guard let store = await repo.storeHandle(),
               let sessionID = flow.selectedSession?.id ?? navigation.selectedLiftSessionID else {
             saveError = "The session could not be opened. Nothing was changed."
@@ -2779,13 +2548,9 @@ private struct NoopLiftReviewScreen: View {
     @State private var committing = false
     @State private var prototypeCommitted = false
 
-    private var isPrototypeImport: Bool {
-        NoopContentPolicy.allowsPrototypeContent && flow.importResult == nil
-    }
 
     private var result: LiftingImportResult? {
         if let result = flow.importResult { return result }
-        if isPrototypeImport { return demoImportResult }
         return nil
     }
 
@@ -2806,12 +2571,8 @@ private struct NoopLiftReviewScreen: View {
                                              disabled: committing) {
                             Task {
                                 committing = true
-                                if isPrototypeImport {
-                                    // Screenshot fixtures simulate the transition without importing fake rows.
-                                    prototypeCommitted = true
-                                } else {
-                                    _ = await flow.commitImport(repo: repo)
-                                }
+                                _ = await flow.commitImport(repo: repo)
+                            
                                 committing = false
                             }
                         }
@@ -2833,14 +2594,14 @@ private struct NoopLiftReviewScreen: View {
         VStack(spacing: 0) {
             summaryRow("Sessions read", sub: dateSpan(result), value: "\(result.sessionCount)", first: true)
             summaryRow("Exercises matched to the catalogue",
-                       sub: isPrototypeImport ? "by name, where the name matched" : "the current importer does not expose a defensible count",
-                       value: isPrototypeImport ? "206" : "—")
+                       sub: "the current importer does not expose a defensible count",
+                       value: "—")
             summaryRow("Names kept as the file wrote them",
-                       sub: isPrototypeImport ? "no match, so nothing was renamed" : "no match count is available from this export summary",
-                       value: isPrototypeImport ? "14" : "—")
+                       sub: "no match count is available from this export summary",
+                       value: "—")
             summaryRow("Warm-up sets folded away",
-                       sub: isPrototypeImport ? "out of every figure a session states" : "excluded by the parser; source count is not exposed",
-                       value: isPrototypeImport ? "96" : "—")
+                       sub: "excluded by the parser; source count is not exposed",
+                       value: "—")
         }
         .padding(.horizontal, 16).padding(.vertical, 6)
         .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
@@ -2937,37 +2698,11 @@ private struct NoopLiftReviewScreen: View {
     }
 
     private func dateSpan(_ result: LiftingImportResult) -> String {
-        if isPrototypeImport { return "12 March to 14 September" }
         guard let first = result.earliest, let last = result.latest else { return "dates unavailable" }
         if Calendar.current.isDate(first, inSameDayAs: last) { return first.formatted(date: .abbreviated, time: .omitted) }
         return "\(first.formatted(date: .abbreviated, time: .omitted)) to \(last.formatted(date: .abbreviated, time: .omitted))"
     }
 
-    private var demoImportResult: LiftingImportResult {
-        let calendar = Calendar(identifier: .gregorian)
-        func day(_ month: Int, _ value: Int) -> Date {
-            calendar.date(from: DateComponents(year: 2026, month: month, day: value, hour: 18))!
-        }
-        func session(_ date: Date, _ title: String, _ exercises: Int, _ sets: Int, _ minutes: Int) -> LiftingSession {
-            LiftingSession(start: date, end: date.addingTimeInterval(Double(minutes * 60)),
-                           volumeLoadKg: 0, setCount: sets, exerciseCount: exercises,
-                           totalReps: 0, topSetKg: nil, title: title)
-        }
-        let first = day(3, 12)
-        var sessions = (0..<33).map { index in
-            session(first.addingTimeInterval(Double(index * 4 * 86_400)),
-                    index.isMultiple(of: 2) ? "Upper A" : "Lower A", 5, 14, 58)
-        }
-        sessions += [
-            session(day(9, 4), "Lower A", 4, 12, 49),
-            session(day(9, 7), "Untitled", 3, 9, 38),
-            session(day(9, 9), "Upper B", 6, 18, 71),
-            session(day(9, 12), "Lower A", 4, 13, 54),
-            session(day(9, 14), "Upper A", 5, 16, 62),
-        ]
-        return LiftingImportResult(sessions: sessions, skipped: 0,
-                                   earliest: first, latest: day(9, 14))
-    }
 }
 
 // MARK: - lift-muscles
@@ -2993,27 +2728,17 @@ private struct NoopLiftMusclesScreen: View {
         "upper_traps", "lower_traps", "upper_abs", "lower_abs",
         "inner_quadriceps", "outer_quadriceps",
     ]
-    private static let demoCredits: [String: Double] = [
-        "chest": 7, "upper_chest": 4.5, "lower_chest": 2.5,
-        "front_delts": 5.5, "side_delts": 4, "rear_delts": 2,
-        "triceps": 5, "biceps": 1.5, "forearms": 0.5,
-        "lats": 3, "upper_back": 1.5, "rhomboids": 1.5, "traps": 1,
-        "upper_traps": 0.5, "lower_traps": 0.5,
-        "abdominals": 0.5, "serratus": 0.5,
-    ]
 
     private var workingSets: [LiftSetRow] { weekSets.filter { !$0.isWarmup } }
     private var uniqueExercises: [String] { Array(Set(workingSets.map(\.exercise))).sorted() }
     private var unresolvedExercises: [String] {
         uniqueExercises.filter { ExerciseAnatomyCatalog.resolve(title: $0) == nil }
     }
-    private var isDemo: Bool { NoopContentPolicy.allowsPrototypeContent && flow.sessions.isEmpty }
     private var isAbsent: Bool { loaded && workingSets.isEmpty }
     private var isCalibrating: Bool {
         loaded && !workingSets.isEmpty && (weekSessionCount < 5 || !unresolvedExercises.isEmpty)
     }
     private var credits: [String: Double] {
-        if isDemo { return Self.demoCredits }
         var result: [String: Double] = [:]
         for set in workingSets {
             guard let anatomy = ExerciseAnatomyCatalog.resolve(title: set.exercise) else { continue }
@@ -3029,7 +2754,7 @@ private struct NoopLiftMusclesScreen: View {
                 value + (Self.indentedMuscles.contains(muscle.id) ? 0 : credits[muscle.id, default: 0])
             }
             return NoopLiftMuscleRegion(region: region, muscles: muscles, total: total,
-                                        recoveryRead: isDemo ? demoRecovery(for: region) : nil)
+                                        recoveryRead: nil)
         }
     }
     private var maxCredit: Double { max(1, credits.values.max() ?? 1) }
@@ -3145,14 +2870,12 @@ private struct NoopLiftMusclesScreen: View {
         let mapped = uniqueExercises.count - unresolvedExercises.count
         return VStack(alignment: .leading, spacing: 9) {
             NoopSectionLabel("Where the mapping comes from")
-            Text(isDemo
-                 ? "Nineteen of this week’s twenty-four exercises carry a muscle mapping someone checked by hand. Five fall back to the catalogue’s own, which is usually right and occasionally generous about what a movement uses. They are named so a number you doubt can be traced."
-                 : "Each credited exercise is resolved through Noop’s reviewed local anatomy catalogue. An exercise without an unambiguous mapping is withheld rather than guessed.")
+            Text("Each credited exercise is resolved through Noop’s reviewed local anatomy catalogue. An exercise without an unambiguous mapping is withheld rather than guessed.")
                 .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
                 .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 6) {
-                provenanceChip(isDemo ? "19 checked" : "\(mapped) checked", highlighted: true)
-                provenanceChip(isDemo ? "5 from the catalogue" : "0 fallbacks")
+                provenanceChip("\(mapped) checked", highlighted: true)
+                provenanceChip("0 fallbacks")
                 provenanceChip("0 you confirmed")
             }
         }
@@ -3180,12 +2903,6 @@ private struct NoopLiftMusclesScreen: View {
 
     private func loadWeek() async {
         await flow.refresh(repo: repo)
-        if NoopContentPolicy.allowsPrototypeContent && flow.sessions.isEmpty {
-            weekSets = NoopLiftDemo.detailSets
-            weekSessionCount = 6
-            loaded = true
-            return
-        }
         guard let store = await repo.storeHandle() else { loaded = true; return }
         let cutoff = Int(Date().timeIntervalSince1970) - 7 * 86_400
         let sessions = flow.sessions.filter { $0.startTs >= cutoff }
@@ -3206,15 +2923,6 @@ private struct NoopLiftMusclesScreen: View {
         value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 
-    private func demoRecovery(for region: TrainingBodyRegion) -> String? {
-        switch region {
-        case .chest: return "Worked hard. Recovered by Thursday morning."
-        case .shoulders: return "Worked. Nothing owed by tomorrow."
-        case .back: return "Light this week — one pulling line in six."
-        case .legs: return "Nothing this week. Monday’s ride is the only thing your legs have had."
-        default: return nil
-        }
-    }
 }
 
 

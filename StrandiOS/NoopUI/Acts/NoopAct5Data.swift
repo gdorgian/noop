@@ -466,7 +466,7 @@ struct NoopDataScreen: View {
     /// capture on the production binding, so the live states can be flipped at the same position.
     private var demo: Bool {
         #if DEBUG
-        NoopContentPolicy.allowsPrototypeContent && !CommandLine.arguments.contains("--act5-live")
+        false
         #else
         false
         #endif

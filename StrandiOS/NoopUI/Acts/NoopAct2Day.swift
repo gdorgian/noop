@@ -382,13 +382,6 @@ struct NoopAct2Screens: View {
 
                 // The date now always opens the calendar; the seeded shell's rail stays for the
                 // design's example week. It spans the screen inside the page's own inset.
-                if dayRailOpen && false {
-                    dayRail
-                        .padding(.horizontal, -20)
-                        .padding(.top, 12)
-                        .padding(.bottom, 2)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
 
                 if isHistorical {
                     Button {
@@ -960,40 +953,6 @@ struct NoopAct2Screens: View {
             .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
         }
         .buttonStyle(NoopHTMLPressStyle())
-    }
-
-    private var dayRail: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 6) {
-                ForEach(Array(Self.days.enumerated()), id: \.offset) { index, day in
-                    let offset = Self.days.count - 1 - index
-                    let selected = offset == selectedTodayOffset
-                    Button {
-                        navigation.selectedTodayDay = offset
-                        dayRailOpen = false
-                    } label: {
-                        VStack(spacing: 3) {
-                            Text(day.weekday.uppercased())
-                                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
-                                .tracking(0.6)
-                                .foregroundStyle(selected ? NoopHTMLColor.blueLight : Color(hex: 0x7F8A85))
-                            Text("\(day.number)")
-                                .font(NoopHTMLFont.outfit(NoopType.body))
-                                .foregroundStyle(selected ? NoopHTMLColor.ink : NoopHTMLColor.inkSoft)
-                                .frame(minHeight: 17)
-                        }
-                        .padding(.top, 9)
-                        .padding(.bottom, 10)
-                        .frame(width: 46)
-                        .background(selected ? NoopHTMLColor.blue.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
-                        .overlay(RoundedRectangle(cornerRadius: 15).stroke(selected ? NoopHTMLColor.blue.opacity(0.42) : NoopHTMLColor.border, lineWidth: 0.5))
-                    }
-                    .buttonStyle(NoopPlainHitStyle())
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-        .scrollIndicators(.hidden)
     }
 
     // MARK: - Updates
@@ -3922,7 +3881,6 @@ final class NoopBreatheSession: ObservableObject {
         }
     }
 
-    var isDemo: Bool { NoopContentPolicy.allowsPrototypeContent }
 
     func attach(model: AppModel, live: LiveState) {
         guard controller == nil else { return }
@@ -3938,7 +3896,6 @@ final class NoopBreatheSession: ObservableObject {
 
     /// The pace every resonance session uses: the locked one if a sweep found it.
     var lockedPace: Double? {
-        if isDemo { return demoFound ? 5.5 : nil }
         return BiofeedbackPrefs.lockedPace
     }
 
@@ -3949,7 +3906,7 @@ final class NoopBreatheSession: ObservableObject {
         samples = []
         paceSamples = []
         sessionStart = Date()
-        if !isDemo, let controller {
+        if let controller {
             if let proto = item.source {
                 controller.startProtocolSession(proto, sessionMs: item.sessionSeconds * 1000)
             } else if item.id == "noop.resonance", let bpm = lockedPace {
@@ -3974,13 +3931,8 @@ final class NoopBreatheSession: ObservableObject {
         let t = Date().timeIntervalSince(start)
         let cycle = max(item.cycleSeconds, 1)
         let heart: Double?
-        if isDemo {
-            // The prototype's synthetic heart: a 7.5 bpm swing that trails the breath by a sixth of a cycle.
-            let jitter = sin(t * 12.9898) * 0.45
-            heart = 64 + 7.5 * sin(2 * .pi * (t - cycle * 0.16) / cycle) + jitter
-        } else {
-            heart = model?.bpm.map(Double.init)
-        }
+        heart = model?.bpm.map(Double.init)
+    
         guard let heart else { return }
         samples = Array((samples + [heart]).suffix(96))
         paceSamples = Array((paceSamples + [NoopBreathePacer.breath(item: item, at: t)]).suffix(96))
@@ -4001,20 +3953,15 @@ final class NoopBreatheSession: ObservableObject {
         sweepPaceStart = Date()
         sweepSwings = [:]
         lastSweepIndex = -1
-        if !isDemo {
-            controller?.startSweep(quick: false, secondsPerPace: Self.sweepSecondsPerPace, paces: Self.sweepPaces)
-            ticker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-                Task { @MainActor in self?.sampleSweep() }
-            }
+        controller?.startSweep(quick: false, secondsPerPace: Self.sweepSecondsPerPace, paces: Self.sweepPaces)
+        ticker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.sampleSweep() }
         }
+    
     }
 
     /// The step the sweep is on, 0-based, and how far through it (0…1).
     func sweepStep(at date: Date) -> (index: Int, progress: Double) {
-        if isDemo {
-            let t = date.timeIntervalSince(sweepStart ?? date)
-            return (min(4, Int(t / 6)), (t.truncatingRemainder(dividingBy: 6)) / 6)
-        }
         guard case let .resonanceSweep(_, index, _) = controller?.session else { return (0, 0) }
         let t = date.timeIntervalSince(sweepPaceStart ?? date)
         return (index, min(1, t / Double(Self.sweepSecondsPerPace)))
@@ -4270,11 +4217,10 @@ struct NoopBreatheScreens: View {
     private static let body = Color(hex: 0xB7C3C9)
     private static let sub = Color(hex: 0x7F8A85)
 
-    private var demo: Bool { session.isDemo }
-    private var groups: [NoopBreatheGroup] { NoopBreatheCatalog.groups(lockedPace: session.lockedPace, demo: demo) }
+    private var groups: [NoopBreatheGroup] { NoopBreatheCatalog.groups(lockedPace: session.lockedPace, demo: false) }
     private var current: NoopBreatheItem {
-        NoopBreatheCatalog.item(id: demo && !protocolID.hasPrefix("demo.") ? "demo.coherent" : protocolID,
-                                lockedPace: session.lockedPace, demo: demo)
+        NoopBreatheCatalog.item(id: protocolID,
+                                lockedPace: session.lockedPace, demo: false)
     }
 
     var body: some View {
@@ -4518,17 +4464,13 @@ struct NoopBreatheScreens: View {
     }
 
     private var sweepDate: String? {
-        if demo { return "12 August" }
         return BiofeedbackPrefs.lockedPaceDate?.formatted(.dateTime.day().month(.wide))
     }
 
     private var homeLine: String {
         guard foundPace != nil else {
-            return demo
-                ? "Breathe works today at six a minute, which suits most people. Ten minutes of measuring finds the one that suits you."
-                : "Breathe starts at six a minute, inside the commonly tested 4.5–7 range. A ten-minute sweep compares five paces against your recorded heart response."
+            return "Breathe starts at six a minute, inside the commonly tested 4.5–7 range. A ten-minute sweep compares five paces against your recorded heart response."
         }
-        if demo { return "Locked from your sweep on 12 August. Every protocol that can run at your pace now does." }
         if let sweepDate { return "Locked from your sweep on \(sweepDate). Resonance sessions now run at it." }
         return "Locked from your latest saved sweep. Resonance sessions now run at it."
     }
@@ -4540,19 +4482,12 @@ struct NoopBreatheScreens: View {
 
     private var sweepLine: String {
         guard foundPace != nil else {
-            return demo
-                ? "There is one pace where your heart swings hardest with each breath. The strap can find it in about ten minutes."
-                : "The sweep compares how strongly your recorded heart rate changes at five paced breathing rates."
+            return "The sweep compares how strongly your recorded heart rate changes at five paced breathing rates."
         }
-        return demo
-            ? "Your resting pulse has moved 3 bpm since. Worth re-testing, not urgent."
-            : "The saved pace is dated. Re-test whenever you want a newer measurement."
+        return "The saved pace is dated. Re-test whenever you want a newer measurement."
     }
 
     private var homeFootnote: String {
-        if demo {
-            return "A pace that suits your physiology. Nothing here treats anything, and the strap does the counting so you can shut your eyes."
-        }
         if foundPace != nil {
             return "A pace selected from your recorded sweep. Nothing here treats anything, and a connected strap can carry the cue while your eyes are shut."
         }
@@ -4578,13 +4513,6 @@ struct NoopBreatheScreens: View {
 
     private func afterRowsData(_ pace: Double?) -> [AfterRow] {
         guard let pace else { return [] }
-        if demo {
-            return [
-                AfterRow(k: "Breathe", sub: "Every paced protocol runs at 5.5 unless you pick otherwise", v: "5.5"),
-                AfterRow(k: "The orb on today", sub: "Paces at your rate instead of a generic six", v: "follows"),
-                AfterRow(k: "Wind-down buzz", sub: "The bedtime nudge uses your pace for its two minutes", v: "follows")
-            ]
-        }
         // Only what the build actually does with the pace.
         return [AfterRow(k: "Resonance", sub: "A protocol in the catalog that paces at your rate", v: NoopBreatheWords.rate(pace))]
     }
@@ -4746,7 +4674,7 @@ struct NoopBreatheScreens: View {
 
     private func buzzChip(_ item: NoopBreatheItem) -> some View {
         // A promise about hardware: say so when there is no strap to keep it.
-        let buzzing = demo || (session.strapCanBuzz && item.kind == .paced)
+        let buzzing = false || (session.strapCanBuzz && item.kind == .paced)
         return NoopAnimatedTimeline(minimumInterval: 1 / 20) { timeline in
             let t = session.sessionStart.map { timeline.date.timeIntervalSince($0) } ?? 0
             let b = NoopBreathePacer.breath(item: item, at: t)
@@ -4811,7 +4739,7 @@ struct NoopBreatheScreens: View {
     private var heartTrace: some View {
         let samples = session.samples
         let swing: String = {
-            guard samples.count > 8 else { return demo ? "0.0" : "\u{2014}" }
+            guard samples.count > 8 else { return "\u{2014}"}
             let recent = samples.suffix(40)
             return String(format: "%.1f", (recent.max() ?? 0) - (recent.min() ?? 0))
         }()
@@ -4835,7 +4763,7 @@ struct NoopBreatheScreens: View {
                 .frame(height: 96)
                 .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-            copy(samples.isEmpty && !demo
+            copy(samples.isEmpty
                  ? "No heart rate is coming in, so there is nothing to draw against the pace. The pacer still runs."
                  : "The dashed line is the pace you are following. The bright one is your heart answering it \u{2014} the bigger the swing, the better this pace fits you.",
                  11.5, 1.55, Self.sub)
@@ -4877,12 +4805,10 @@ struct NoopBreatheScreens: View {
 
             VStack(spacing: 9) {
                 secondary("Stop \u{2014} keep what it has") {
-                    if demo { session.demoFound = true } else { session.keepSweep() }
+                    session.keepSweep()
                     navigation.replace(with: .bfound)
                 }
-                Text(demo
-                     ? "Ten minutes, five paces, ninety seconds each. Stopping early keeps every pace it finished."
-                     : "Ten minutes, five paces, two minutes each. Stopping early keeps every pace it finished.")
+                Text("Ten minutes, five paces, two minutes each. Stopping early keeps every pace it finished.")
                     .font(NoopHTMLFont.sans(NoopType.eyebrow))
                     .foregroundStyle(NoopHTMLColor.faint)
                     .multilineTextAlignment(.center)
@@ -4894,7 +4820,7 @@ struct NoopBreatheScreens: View {
         }
         .sessionFrame()
         .onAppear {
-            if session.sweepStart == nil || (!demo && !session.sweepRunning) { session.startSweep() }
+            if session.sweepStart == nil || (!session.sweepRunning) { session.startSweep() }
         }
         .onChange(of: session.sweep) { _, _ in
             if navigation.route == .bsweep { navigation.replace(with: .bfound) }
@@ -4902,24 +4828,16 @@ struct NoopBreatheScreens: View {
     }
 
     private func sweepStepLabel(_ step: (index: Int, progress: Double)) -> String {
-        if !demo && model.bpm == nil {
+        if model.bpm == nil {
             return "Pace \(step.index + 1) of 5 \u{00B7} no heart rate to measure"
         }
-        let secondsPerPace = demo ? 90 : NoopBreatheSession.sweepSecondsPerPace
+        let secondsPerPace = NoopBreatheSession.sweepSecondsPerPace
         let left = max(1, Int(ceil((1 - step.progress) * Double(secondsPerPace))))
         return "Pace \(step.index + 1) of 5 \u{00B7} \(left)s left"
     }
 
     private func sweepBody(at date: Date) -> some View {
         let step = session.sweepStep(at: date)
-        if demo, date.timeIntervalSince(session.sweepStart ?? date) > 30, navigation.route == .bsweep {
-            DispatchQueue.main.async {
-                guard navigation.route == .bsweep else { return }
-                session.demoFound = true
-                session.cancelSweep()
-                navigation.replace(with: .bfound)
-            }
-        }
         let rate = NoopBreatheSession.sweepPaces[step.index]
         let t = date.timeIntervalSince(session.sweepStart ?? date)
         let wave = NoopBreathePacer.sine(rate: rate, at: t)
@@ -4961,28 +4879,20 @@ struct NoopBreatheScreens: View {
         }
     }
 
-    private static let demoSwings: [Double] = [0.52, 0.74, 1.0, 0.68, 0.44]
-
     private func sweepBar(_ i: Int, step: (index: Int, progress: Double)) -> some View {
         let done = i < step.index
         let isLive = i == step.index
         let h: Double
         let figure: String
         let best: Bool
-        if demo {
-            let swing = Self.demoSwings[i]
-            h = done ? swing : isLive ? swing * min(1, step.progress * 1.15) : 0
-            figure = done || (isLive && step.progress > 0.25) ? String(format: "%.1f", h * 9.4) : ""
-            best = done && swing == 1
-        } else {
-            let swings = (0..<5).map { session.measuredSwing($0) }
-            let top = swings.compactMap { $0 }.max() ?? 0
-            let mine = swings[i]
-            h = top > 0 && (done || isLive) ? (mine ?? 0) / top : 0
-            figure = (done || isLive) ? mine.map { String(format: "%.1f", $0) } ?? "" : ""
-            let doneSwings = (0..<step.index).compactMap { swings[$0] }
-            best = done && doneSwings.count >= 2 && mine == doneSwings.max()
-        }
+        let swings = (0..<5).map { session.measuredSwing($0) }
+        let top = swings.compactMap { $0 }.max() ?? 0
+        let mine = swings[i]
+        h = top > 0 && (done || isLive) ? (mine ?? 0) / top : 0
+        figure = (done || isLive) ? mine.map { String(format: "%.1f", $0) } ?? "" : ""
+        let doneSwings = (0..<step.index).compactMap { swings[$0] }
+        best = done && doneSwings.count >= 2 && mine == doneSwings.max()
+    
         let fill: AnyShapeStyle = best
             ? AnyShapeStyle(LinearGradient(colors: [Self.auraPale, Color(hex: 0x2FB2F0)], startPoint: .top, endPoint: .bottom))
             : AnyShapeStyle(isLive ? Self.auraPale.opacity(0.55) : done ? Self.auraPale.opacity(0.28) : Color.white.opacity(0.07))
@@ -5005,12 +4915,6 @@ struct NoopBreatheScreens: View {
     // MARK: 2.12 bfound
 
     private var result: NoopBreatheSweep? {
-        if demo {
-            return NoopBreatheSweep(points: [
-                .init(bpm: 6.5, amplitude: 0.52), .init(bpm: 6.0, amplitude: 0.74), .init(bpm: 5.5, amplitude: 1.0),
-                .init(bpm: 5.0, amplitude: 0.68), .init(bpm: 4.5, amplitude: 0.44)
-            ], lockedBpm: 5.5, date: Date())
-        }
         return session.sweep
     }
 
@@ -5055,7 +4959,7 @@ struct NoopBreatheScreens: View {
                     if let result, !result.points.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             NoopSectionLabel("The curve it found")
-                            NoopBreatheCurve(sweep: result, htmlPoints: demo)
+                            NoopBreatheCurve(sweep: result, htmlPoints: false)
                                 .frame(height: 128)
                         }
                         .padding(.horizontal, 16)
@@ -5070,7 +4974,7 @@ struct NoopBreatheScreens: View {
 
                     if let peak {
                         primary("Breathe at \(NoopBreatheWords.rate(peak.bpm))") {
-                            protocolID = demo ? "demo.resonance" : "noop.resonance"
+                            protocolID = "noop.resonance"
                             navigation.replace(with: .bplayer)
                         }
                     } else {
@@ -5089,9 +4993,7 @@ struct NoopBreatheScreens: View {
 
     private func foundSentence(_ result: NoopBreatheSweep?) -> String {
         guard let result else {
-            return demo
-                ? "No sweep yet. Ten minutes with the strap on finds the pace your heart answers most."
-                : "No sweep has been saved yet. With heart-rate data, the ten-minute sweep compares five paced rates."
+            return "No sweep has been saved yet. With heart-rate data, the ten-minute sweep compares five paced rates."
         }
         guard let peak = result.peak else {
             return "None of the paces it tried cleared the others, so it has not picked one. Nothing changes until a sweep finds one."
@@ -5099,14 +5001,11 @@ struct NoopBreatheScreens: View {
         let half = NoopBreatheWords.half(30 / peak.bpm)
         let lead = "\(half) seconds in, \(half.lowercased()) out."
         // The prototype's sentence is verbatim; its bars are not its curve, so its margin is not derived.
-        guard let margin = demo ? 31 : result.margin else { return lead }
+        guard let margin = result.margin else { return lead }
         return lead + " Your heart swung \(margin) % harder here than at any other pace it tried."
     }
 
     private func resultFootnote(_ result: NoopBreatheSweep?) -> String {
-        if demo {
-            return "Worth testing again after a few months, or if your resting pulse moves. It is a pace that suits your physiology, not a treatment for anything."
-        }
         guard result?.peak != nil else {
             return "No pace was selected from this sweep. It is an estimate from wrist heart-rate timing, not a treatment or clinical measurement."
         }

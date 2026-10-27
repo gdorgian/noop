@@ -34,7 +34,7 @@ struct NoopActivityOffer: View {
 
     private var preview: Bool {
         #if DEBUG
-        NoopContentPolicy.allowsPrototypeContent && CommandLine.arguments.contains("--noop-activity-offer-preview")
+        false
         #else
         false
         #endif
