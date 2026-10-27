@@ -60,7 +60,7 @@ final class NoopPageLayout: ObservableObject {
         if let saved = defaults.string(forKey: "noop.layout.\(page)") {
             let allIDs = catalog.map(\.id)
             let known = Set((defaults.string(forKey: "noop.layout.\(page).known") ?? saved).split(separator: ",").map(String.init))
-            var result = saved.split(separator: ",").map(String.init).filter(allIDs.contains)
+            var result = saved.split(separator: ",").map(String.init).filter { allIDs.contains($0) || Self.isSpacer($0) }
             // Sections that cannot be removed are always present.
             for (index, section) in catalog.enumerated() where !section.removable && !result.contains(section.id) {
                 result.insert(section.id, at: min(index, result.count))
@@ -79,7 +79,28 @@ final class NoopPageLayout: ObservableObject {
         if let resetObserver { NotificationCenter.default.removeObserver(resetObserver) }
     }
 
-    func section(_ id: String) -> NoopPageSection? { catalog.first { $0.id == id } }
+    func section(_ id: String) -> NoopPageSection? { catalog.first { $0.id == id } ?? Self.spacerSection(id) }
+
+    // MARK: Space and dividers
+    //
+    // A page can hold any number of blank spaces and thin dividers (testers, 27 Oct 2026). Each one is its own
+    // entry, `noop.space.<n>` or `noop.divider.<n>`, so several can sit in one page; the page never draws them
+    // itself, the editable list does.
+
+    static let spacePrefix = "noop.space."
+    static let dividerPrefix = "noop.divider."
+
+    static func isSpacer(_ id: String) -> Bool { id.hasPrefix(spacePrefix) || id.hasPrefix(dividerPrefix) }
+
+    static func newSpacerID(divider: Bool) -> String {
+        (divider ? dividerPrefix : spacePrefix) + String(UUID().uuidString.prefix(8)).lowercased()
+    }
+
+    static func spacerSection(_ id: String) -> NoopPageSection? {
+        if id.hasPrefix(spacePrefix) { return NoopPageSection(id: id, title: "Space", detail: "A blank gap between sections") }
+        if id.hasPrefix(dividerPrefix) { return NoopPageSection(id: id, title: "Divider", detail: "A thin line between sections") }
+        return nil
+    }
 
     func save(_ newOrder: [String]) {
         order = newOrder
@@ -127,7 +148,7 @@ final class NoopPageLayout: ObservableObject {
         guard defaults.integer(forKey: "noop.layout.\(page).version") >= version,
               let saved = defaults.string(forKey: orderKey(page)) else { return false }
         let allIDs = Set(catalog.map(\.id))
-        let order = saved.split(separator: ",").map(String.init).filter(allIDs.contains)
+        let order = saved.split(separator: ",").map(String.init).filter { allIDs.contains($0) || isSpacer($0) }
         return order != catalog.filter(\.onByDefault).map(\.id)
     }
 
@@ -236,7 +257,7 @@ struct NoopEditableSections<Section: View>: View {
                     } else if editing.active {
                         editable(id)
                     } else {
-                        section(id)
+                        draw(id)
                     }
                 }
                 .layoutValue(key: NoopHalfWidth.self, value: isHalf(id))
@@ -300,7 +321,8 @@ struct NoopEditableSections<Section: View>: View {
             }
             incomingDrag.landed = nil
         }) {
-            NoopAddSectionSheet(layout: layout, editing: $editing, drag: incomingDrag, isEmpty: isEmpty, section: section)
+            NoopAddSectionSheet(layout: layout, editing: $editing, drag: incomingDrag, isEmpty: isEmpty,
+                                section: { id in AnyView(draw(id)) })
         }
     }
 
@@ -346,6 +368,16 @@ struct NoopEditableSections<Section: View>: View {
         .accessibilityElement(children: .contain)
     }
 
+    /// A page section, or a space or divider the wearer put in.
+    @ViewBuilder
+    private func draw(_ id: String) -> some View {
+        if NoopPageLayout.isSpacer(id) {
+            NoopLayoutSpacer(divider: id.hasPrefix(NoopPageLayout.dividerPrefix), editing: editing.active)
+        } else {
+            section(id)
+        }
+    }
+
     @ViewBuilder
     private func editable(_ id: String) -> some View {
         let info = layout.section(id)
@@ -353,7 +385,7 @@ struct NoopEditableSections<Section: View>: View {
             if isEmpty(id) {
                 NoopSectionPlaceholder(title: info?.title ?? id, detail: info?.detail ?? "")
             } else {
-                section(id).allowsHitTesting(info?.liveWhileEditing ?? false)
+                draw(id).allowsHitTesting(info?.liveWhileEditing ?? false)
             }
         }
         .frame(maxWidth: .infinity)
@@ -522,7 +554,8 @@ struct NoopEditableSections<Section: View>: View {
     private var foot: some View {
         if editing.active {
             VStack(spacing: 12) {
-                if layout.catalog.contains(where: { !editing.draft.contains($0.id) }) {
+                // Always offered: a space or a divider can be added however many sections are on the page.
+                do {
                     Button { editing.addBeside = nil; NoopEditableSections.presentGallery($editing) } label: {
                         VStack(spacing: 6) {
                             Image(systemName: "plus").font(.system(size: 17, weight: .semibold))
@@ -906,6 +939,11 @@ private struct NoopAddSectionSheet<Section: View>: View {
     private var missing: [NoopPageSection] { layout.catalog.filter { !editing.draft.contains($0.id) } }
     private var tiles: [NoopPageSection] { missing.filter(\.half) }
     private var sections: [NoopPageSection] { missing.filter { !$0.half } }
+    /// A fresh space and divider each time the sheet opens, so each one added is its own entry.
+    @State private var spacers: [NoopPageSection] = [
+        NoopPageLayout.spacerSection(NoopPageLayout.newSpacerID(divider: false))!,
+        NoopPageLayout.spacerSection(NoopPageLayout.newSpacerID(divider: true))!,
+    ]
 
     private func add(_ info: NoopPageSection) {
         NoopHaptics.play(.add)
@@ -1014,6 +1052,24 @@ private struct NoopAddSectionSheet<Section: View>: View {
                                 }
                                 .contentShape(Rectangle())
                                 .modifier(NoopGalleryItem(info: info, add: add, fallback: carryOut(info)) { carry(info, $0) })
+                        }
+                    }
+                    if editing.addBeside == nil {
+                        NoopSectionLabel("Space and lines").padding(.top, 6)
+                        ForEach(spacers) { info in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(info.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                                        .foregroundStyle(NoopHTMLColor.ink)
+                                    Text(info.detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
+                                }
+                                Spacer()
+                                Image(systemName: "plus.circle.fill").font(.system(size: 20))
+                                    .foregroundStyle(NoopHTMLColor.inkSoft)
+                            }
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                            .modifier(NoopGalleryItem(info: info, add: add, fallback: carryOut(info)) { carry(info, $0) })
                         }
                     }
                 }
@@ -1191,5 +1247,32 @@ extension View {
     func noopEditBar(_ editing: Binding<NoopPageEditing>, layout: NoopPageLayout,
                      settings: (() -> Void)? = nil) -> some View {
         modifier(NoopEditBar(editing: editing, layout: layout, settings: settings))
+    }
+}
+
+/// A blank gap or a thin line the wearer placed between sections. While editing, a faint outline shows
+/// where an empty space is, so it can be held and moved.
+struct NoopLayoutSpacer: View {
+    let divider: Bool
+    var editing = false
+
+    var body: some View {
+        Group {
+            if divider {
+                Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+                    .padding(.horizontal, 6)
+                    .frame(height: 18)
+            } else {
+                Color.clear.frame(height: 28)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .overlay {
+            if editing {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.14), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+            }
+        }
+        .accessibilityHidden(!editing)
     }
 }
