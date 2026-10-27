@@ -123,11 +123,17 @@ struct NoopActivityConfirmSheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(detected ? "What was it?" : "Change activity")
                     .font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                Text(suggestions.isEmpty
+                Text(detected
+                     ? "Tap what you did to confirm it. Each answer teaches Noop how your sessions look."
+                     : suggestions.isEmpty
                      ? "Pick what you did. Each answer teaches Noop how your sessions look."
                      : "Ranked by how much this looks like your past sessions.")
                     .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
                     .fixedSize(horizontal: false, vertical: true)
+                // The best guess as one tap: confirming it is the usual answer.
+                if detected, let top = suggestions.first?.sport {
+                    NoopActionButton(title: "Confirm \(top)", systemImage: "checkmark") { pick(top) }
+                }
                 NoopFlowLayout(spacing: 8) {
                     ForEach(choices, id: \.self) { item in chip(item) }
                 }
