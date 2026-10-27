@@ -799,14 +799,9 @@ struct NoopMetricChart: View {
     }
 
     private var yDomain: ClosedRange<Double> {
+        // Fitted to your readings and your normal, not the population scale: a resting HR of 45 on a
+        // 50–90 norm scale was squashed into a sliver under the dates. The scale stays on the bar below.
         let values = points.map(\.value)
-        if let s = metric.scale {
-            // The norm's scale is a floor, not a cage: a reading outside it widens the axis rather than
-            // being drawn over the header.
-            guard let lo = values.min(), let hi = values.max(), lo < s.lowerBound || hi > s.upperBound else { return s }
-            let pad = max((max(hi, s.upperBound) - min(lo, s.lowerBound)) * 0.06, 1)
-            return min(lo - pad, s.lowerBound)...max(hi + pad, s.upperBound)
-        }
         let vs = values + [normal?.low, normal?.high].compactMap { $0 }
         guard let lo = vs.min(), let hi = vs.max() else { return 0...1 }
         let pad = max((hi - lo) * 0.25, abs(hi) * 0.05, 1)
