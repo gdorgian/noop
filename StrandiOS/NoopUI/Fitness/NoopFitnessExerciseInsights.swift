@@ -171,7 +171,7 @@ struct NoopTrendChartCard: View {
     private var chart: some View {
         let low = points.map(\.value).min() ?? 0, high = points.map(\.value).max() ?? 1
         let pad = max(1, (high - low) * 0.25)
-        return Chart {
+        return NoopChartZoomReader { zoom in Chart {
             NoopGapAwareLine(points: points.map { (date: $0.date, value: $0.value) }, tint: tint,
                              floor: low - pad, lineWidth: 2.2)
             ForEach(points, id: \.id) { p in
@@ -182,7 +182,7 @@ struct NoopTrendChartCard: View {
         }
         .chartYScale(domain: (low - pad)...(high + pad))
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+            AxisMarks(values: .automatic(desiredCount: NoopChartAxis.ticks(4, zoom))) { _ in
                 AxisValueLabel(format: .dateTime.month(.abbreviated).day(), centered: false)
                     .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
             }
@@ -207,6 +207,7 @@ struct NoopTrendChartCard: View {
             }
         }
         .sensoryFeedback(.selection, trigger: selected?.id)
+        }
         .noopChartZoom()
         .frame(height: 170)
     }

@@ -394,7 +394,7 @@ struct NoopStressSheet: View {
     }
 
     private var chart: some View {
-        Chart {
+        NoopChartZoomReader { zoom in Chart {
             if let sleep, sleep.end > chartStart {
                 bandMarks(from: max(sleep.start, chartStart), to: min(sleep.end, Date()), tint: NoopHTMLColor.night, symbol: "moon.fill")
             }
@@ -450,7 +450,7 @@ struct NoopStressSheet: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+            AxisMarks(values: .automatic(desiredCount: NoopChartAxis.ticks(4, zoom))) { _ in
                 AxisValueLabel(format: .dateTime.hour()).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
             }
         }
@@ -466,6 +466,7 @@ struct NoopStressSheet: View {
             }
         }
         .sensoryFeedback(.selection, trigger: selectedPoint?.time)
+        }
         .noopChartZoom()
     }
 

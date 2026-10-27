@@ -449,7 +449,7 @@ struct NoopFitnessMeasureChart: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Chart {
+                NoopChartZoomReader { zoom in Chart {
                     if style == .running {
                         ForEach(prev) { p in
                             LineMark(x: .value("Bucket", p.i), y: .value("Value", p.v), series: .value("Series", p.series))
@@ -505,7 +505,7 @@ struct NoopFitnessMeasureChart: View {
                 }
                 .chartXScale(domain: -0.5...Double(n) - 0.5)
                 .chartXAxis {
-                    AxisMarks(values: Array(stride(from: 0, to: n, by: tickEvery))) { v in
+                    AxisMarks(values: Array(stride(from: 0, to: n, by: max(1, Int(CGFloat(tickEvery) / zoom))))) { v in
                         AxisValueLabel {
                             if let i = v.as(Int.self) {
                                 Text(window.tick(i)).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
@@ -523,6 +523,7 @@ struct NoopFitnessMeasureChart: View {
                         }
                     }
                 }
+        }
                 .stickyChartSelection($selection)
             }
         }

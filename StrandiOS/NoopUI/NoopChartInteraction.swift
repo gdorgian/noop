@@ -45,6 +45,23 @@ extension View {
     }
 }
 
+/// Reads the zoom of the chart it is drawn in, so the x axis can add labels as the chart widens:
+/// Swift Charts keeps the same number of labels at any width, so a zoomed chart lost its dates.
+/// Wrap the chart from `Chart {` to the modifier that zooms it.
+struct NoopChartZoomReader<Content: View>: View {
+    @ViewBuilder var content: (CGFloat) -> Content
+    @Environment(\.noopChartZoomLevel) private var zoom
+
+    var body: some View { content(zoom) }
+}
+
+enum NoopChartAxis {
+    /// The label count for an axis that shows `base` labels unzoomed.
+    static func ticks(_ base: Int, _ zoom: CGFloat) -> Int {
+        max(base, Int((CGFloat(base) * zoom).rounded()))
+    }
+}
+
 // MARK: Shared state between scrub and zoom
 
 private struct NoopChartWindowKey: EnvironmentKey {
@@ -56,7 +73,13 @@ private struct NoopChartScrubbingKey: EnvironmentKey {
     static let defaultValue: Binding<Bool>? = nil
 }
 
+private struct NoopChartZoomLevelKey: EnvironmentKey { static let defaultValue: CGFloat = 1 }
+
 private extension EnvironmentValues {
+    var noopChartZoomLevel: CGFloat {
+        get { self[NoopChartZoomLevelKey.self] }
+        set { self[NoopChartZoomLevelKey.self] = newValue }
+    }
     var noopChartWindow: ClosedRange<CGFloat>? {
         get { self[NoopChartWindowKey.self] }
         set { self[NoopChartWindowKey.self] = newValue }
@@ -236,6 +259,7 @@ private struct NoopChartZoom: ViewModifier {
             let base = NoopZoomLayout(zoom: zoom, offset: offset) {
                 content
                     .environment(\.noopChartWindow, zoomed ? offset...(offset + width) : nil)
+                    .environment(\.noopChartZoomLevel, zoom)
                     .environment(\.noopChartScrubbing, $scrubbing)
             }
             // Clip the sides only: a scrub's value may sit above the chart.

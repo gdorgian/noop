@@ -495,7 +495,7 @@ struct NoopFitnessLoadPage: View {
     private func chart(_ points: [Point]) -> some View {
         let n = max(points.last.map { $0.i + 1 } ?? 1, 1)
         let window = NoopFitnessWindow.make(range, offset: offset, now: history.now)
-        return Chart {
+        return NoopChartZoomReader { zoom in Chart {
             ForEach(points.filter { $0.reading.status != .calibrating || $0.reading.chronic > 0 }) { p in
                 AreaMark(x: .value("Day", p.i), yStart: .value("Low", p.reading.optimal.lowerBound),
                          yEnd: .value("High", p.reading.optimal.upperBound))
@@ -516,7 +516,7 @@ struct NoopFitnessLoadPage: View {
         }
         .chartXScale(domain: -0.5...Double(max(n, window.buckets.count)) - 0.5)
         .chartXAxis {
-            AxisMarks(values: Array(stride(from: 0, to: window.buckets.count, by: max(1, window.buckets.count / 4)))) { v in
+            AxisMarks(values: Array(stride(from: 0, to: window.buckets.count, by: max(1, Int(CGFloat(window.buckets.count) / (4 * zoom)))))) { v in
                 AxisValueLabel {
                     if let i = v.as(Int.self) {
                         Text(window.tick(i)).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
@@ -533,6 +533,7 @@ struct NoopFitnessLoadPage: View {
                     }
                 }
             }
+        }
         }
         .stickyChartSelection($selection)
     }
@@ -694,7 +695,7 @@ struct NoopFitnessFocusPage: View {
                     status: lead.map { ("\(Int(((shown[CardioFocus.Band.allCases.firstIndex(of: $0)!] / total) * 100).rounded()))%", NoopFitnessDetailScreen.focusColor($0)) },
                     trailing: total > 0 ? NoopFitnessFormat.duration(total * 60) : nil)
                 VStack(spacing: 10) {
-                    Chart(bars) { b in
+                    NoopChartZoomReader { zoom in Chart(bars) { b in
                         BarMark(x: .value("Bucket", b.i), y: .value("Minutes", b.minutes), width: .fixed(NoopFitnessMeasureChart.barWidth(window.buckets.count)))
                             // Coloured per mark: the by-value style scale drew no bars at all.
                             .foregroundStyle(NoopFitnessDetailScreen.focusColor(b.band))
@@ -702,7 +703,7 @@ struct NoopFitnessFocusPage: View {
                     }
                     .chartXScale(domain: -0.5...Double(window.buckets.count) - 0.5)
                     .chartXAxis {
-                        AxisMarks(values: Array(stride(from: 0, to: window.buckets.count, by: max(1, window.buckets.count / 4)))) { v in
+                        AxisMarks(values: Array(stride(from: 0, to: window.buckets.count, by: max(1, Int(CGFloat(window.buckets.count) / (4 * zoom)))))) { v in
                             AxisValueLabel {
                                 if let i = v.as(Int.self) {
                                     Text(window.tick(i)).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
@@ -720,6 +721,7 @@ struct NoopFitnessFocusPage: View {
                             }
                         }
                     }
+        }
                     .stickyChartSelection($selection)
                     .frame(height: 200)
                     .overlay {

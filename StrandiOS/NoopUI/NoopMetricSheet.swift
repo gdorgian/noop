@@ -933,7 +933,7 @@ struct NoopMetricChart: View {
 
     private var chart: some View {
         let sparse = points.count <= 45
-        return Chart {
+        return NoopChartZoomReader { zoom in Chart {
             if let normal {
                 RectangleMark(xStart: .value("Start", window.lowerBound), xEnd: .value("End", window.upperBound),
                               yStart: .value("Low", normal.low), yEnd: .value("High", normal.high))
@@ -977,7 +977,7 @@ struct NoopMetricChart: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+            AxisMarks(values: .automatic(desiredCount: NoopChartAxis.ticks(4, zoom))) { _ in
                 AxisValueLabel(format: .dateTime.day().month(.abbreviated))
                     .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
             }
@@ -997,6 +997,7 @@ struct NoopMetricChart: View {
             }
         }
         .sensoryFeedback(.selection, trigger: picked)
+        }
         .noopChartZoom()
     }
 }

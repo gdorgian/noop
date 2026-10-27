@@ -220,7 +220,7 @@ struct NoopTodayDayRibbon: View {
         let peak = self.peak
         let selectedPoint = self.selectedPoint
         let now = self.now
-        return Chart {
+        return NoopChartZoomReader { zoom in Chart {
             // Sleep and sessions as bands: a soft fill, a bright top edge, and the icon centred
             // above it, so either reads at a glance across the whole line.
             if let sleep {
@@ -286,7 +286,7 @@ struct NoopTodayDayRibbon: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 5)) { _ in
+            AxisMarks(values: .automatic(desiredCount: NoopChartAxis.ticks(5, zoom))) { _ in
                 AxisValueLabel(format: .dateTime.hour()).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
             }
         }
@@ -303,6 +303,7 @@ struct NoopTodayDayRibbon: View {
             }
         }
         .sensoryFeedback(.selection, trigger: selectedPoint?.time)
+        }
         .noopChartZoom()
         .accessibilityLabel("Heart rate from \(AppClock.hourMinuteFormatter().string(from: start)) to now")
     }
