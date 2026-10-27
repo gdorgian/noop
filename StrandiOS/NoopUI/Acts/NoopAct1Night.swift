@@ -66,9 +66,10 @@ struct NoopAct1Screens: View {
                     // ring under a date is the night that date opens.
                     let key = Repository.localDayKey(date)
                     guard let rest, rest.needMin > 0,
-                          let m = rest.slots.lazy.compactMap({ $0 }).first(where: { $0.dayKey == key })?.asleepMin
+                          let n = rest.slots.lazy.compactMap({ $0 }).first(where: { $0.dayKey == key })
                     else { return nil }
-                    return (min(1, m / rest.needMin), NoopHeroFamily.current.dayColor(.sleep, m))
+                    let fill = n.score.map { $0 / 100 } ?? n.asleepMin / rest.needMin
+                    return (min(1, fill), NoopHeroFamily.current.dayColor(.sleep, n.asleepMin))
                 }
 
                 NoopEditableSections(layout: restLayout, editing: $restEditing) { id in restSection(id) }
@@ -136,7 +137,9 @@ struct NoopAct1Screens: View {
                             // Rest's own ring first; the aurora and the glass are the other two heroes.
                             // The header follows the ring style on Today; Rest's own ring is Noop's.
                             let performance = min(1, night.asleepMin / max(1, rest.needMin))
-                            let score = NoopHeroScore(kind: .sleep, fill: performance, text: "\(Int((performance * 100).rounded()))")
+                            // The number is the engine's sleep score; Noop's own ring below still closes at the need.
+                            let rated = min(1, night.score.map { $0 / 100 } ?? performance)
+                            let score = NoopHeroScore(kind: .sleep, fill: rated, text: "\(Int((rated * 100).rounded()))")
                             switch NoopHeroFamily.current {
                             case .whoop:
                                 NoopWhoopStyleHero(score: score).frame(maxWidth: .infinity).padding(.vertical, 8)

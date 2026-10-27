@@ -53,6 +53,9 @@ struct NoopRestRecord: Equatable {
         /// The in-bed span and, inside it, when sleep began and when the final waking came. The edges are
         /// only known from a real timeline; without one they are nil and only the totals are shown.
         var bed: Bed? = nil
+        /// The engine's 0–100 sleep score (`sleep_performance`: duration, efficiency, deep and REM,
+        /// consistency) for the day this night ended on. Nil until the engine has scored it.
+        var score: Double? = nil
 
         /// "23:25 – 06:30": first sleep to final waking when the timeline shows them, else the in-bed window.
         var asleepWindow: String {
@@ -153,6 +156,7 @@ struct NoopRestRecord: Equatable {
                       sessions: [CachedSleepSession],
                       habitualMidsleepSec: Int?,
                       importedDebtMin: [String: Double] = [:],
+                      sleepScores: [String: Double] = [:],
                       now: Date = Date(),
                       calendar: Calendar = .current) -> NoopRestRecord {
         let dayGroups = SleepModel.navDays(navSessions: sessions)
@@ -174,7 +178,7 @@ struct NoopRestRecord: Equatable {
             guard stages.asleep > 0 else { continue }
             let key = Repository.localDayKey(end)
             let real = (night.realSegments?.count ?? 0) >= 2 ? night.realSegments : nil
-            let built = Night(
+            var built = Night(
                 dayKey: key,
                 weekdayLetter: weekdayLetter(end, calendar: calendar),
                 longDate: longDateFormatter.string(from: end),
@@ -189,6 +193,7 @@ struct NoopRestRecord: Equatable {
                 span: real.flatMap { span(of: $0, onset: night.onsetDate) },
                 bed: real.flatMap { Bed(segments: $0, start: night.onsetDate, end: end) }
             )
+            built.score = sleepScores[key]
             if latest == nil { latest = built }
             if endDay < windowStart && latest != built { continue }
             if endDay >= windowStart { byDay[key] = built }
@@ -281,6 +286,12 @@ struct NoopRestRecord: Equatable {
         let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("d MMM"); return f
     }()
 
+    /// The engine's sleep score by day key, for `build(sleepScores:)`.
+    static func sleepScores(_ repo: Repository) async -> [String: Double] {
+        let series = await repo.exploreSeries(key: "sleep_performance", source: "my-whoop", days: 120)
+        return Dictionary(series.map { ($0.day, $0.value) }, uniquingKeysWith: { _, last in last })
+    }
+
     // MARK: - Formatting, computed once and shared by every place a number is printed
 
     /// "7h 12m", "6h 06m", "48m".
@@ -311,7 +322,8 @@ final class NoopRestStore: ObservableObject {
         record = NoopRestRecord.build(days: repo.days,
                                       sessions: sessions.isEmpty ? repo.sleeps : sessions,
                                       habitualMidsleepSec: habitual,
-                                      importedDebtMin: repo.importedSleep.compactMapValues(\.debtMin))
+                                      importedDebtMin: repo.importedSleep.compactMapValues(\.debtMin),
+                                      sleepScores: await NoopRestRecord.sleepScores(repo))
     }
 }
 #endif

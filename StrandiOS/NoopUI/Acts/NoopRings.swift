@@ -14,7 +14,7 @@ struct NoopRingValues: Equatable {
     var recovery: Double?
     /// 0–100 (the app's strain scale, StrainScorer).
     var strain: Double?
-    /// Asleep against need, 0–1 (capped; over the need reads full).
+    /// The sleep score, 0–1; asleep against need (capped) until the engine has scored the night.
     var sleep: Double?
     var sleepMinutes: Double?
     /// The night's stage runs, for the segmented sleep ring.

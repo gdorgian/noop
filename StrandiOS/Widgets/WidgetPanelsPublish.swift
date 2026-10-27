@@ -53,6 +53,7 @@ enum WidgetPanelsPublisher {
                                           sessions: sessions.isEmpty ? repo.sleeps : sessions,
                                           habitualMidsleepSec: habitual,
                                           importedDebtMin: repo.importedSleep.compactMapValues(\.debtMin),
+                                          sleepScores: await NoopRestRecord.sleepScores(repo),
                                           now: now, calendar: calendar)
         guard let night = record.latest else { return nil }
         let today = calendar.startOfDay(for: now)

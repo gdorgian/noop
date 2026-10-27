@@ -139,7 +139,10 @@ struct NoopSleepPerformanceSection: View {
 
     private static let tint = Color(hex: 0x7FA6C4)
 
-    private var performance: Double { needMin > 0 ? min(1, night.asleepMin / needMin) : 0 }
+    private var performance: Double {
+        if let score = night.score { return min(1, max(0, score / 100)) }
+        return needMin > 0 ? min(1, night.asleepMin / needMin) : 0
+    }
 
     var body: some View {
         Button(action: action) {

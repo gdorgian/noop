@@ -71,7 +71,9 @@ final class NoopDayStore: ObservableObject {
         let sessions = await repo.allSleepSessions()
         let habitual = await repo.habitualMidsleepSec()
         next.rest = NoopRestRecord.build(days: repo.days, sessions: sessions.isEmpty ? repo.sleeps : sessions,
-                                         habitualMidsleepSec: habitual, now: now, calendar: calendar)
+                                         habitualMidsleepSec: habitual,
+                                         sleepScores: await NoopRestRecord.sleepScores(repo),
+                                         now: now, calendar: calendar)
 
         let midnight = calendar.startOfDay(for: now)
         let start: Date = {
@@ -178,7 +180,7 @@ final class NoopDayStore: ObservableObject {
         next.rings.recovery = day?.recovery ?? repo.days.last { $0.recovery != nil && $0.day >= Repository.localDayKey(midnight.addingTimeInterval(-86_400)) }?.recovery
         next.rings.strain = day?.strain
         if let night = next.rest.latest, next.rest.needMin > 0 {
-            next.rings.sleep = night.asleepMin / next.rest.needMin
+            next.rings.sleep = night.score.map { $0 / 100 } ?? night.asleepMin / next.rest.needMin
             next.rings.sleepMinutes = night.asleepMin
             next.rings.sleepRuns = night.runs
         }
