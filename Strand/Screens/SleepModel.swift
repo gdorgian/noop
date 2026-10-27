@@ -389,6 +389,34 @@ extension SleepModel {
             age: nil) * 60.0)
     }
 
+    /// TONIGHT'S sleep need (`SleepNeed.tonight`) — WHOOP's STRUCTURE on top of the #242 baseline:
+    /// the normative `debtNeedMin` + a one-night add-on for YESTERDAY'S stored Effort + the debt
+    /// ledger's still-owed balance − today's not-yet-ledgered naps. Derived and DISPLAY-ONLY: it is
+    /// computed downstream of the ledger and never passed into `SleepDebt`,
+    /// `personalizedNeedHours` or Rest scoring — the ledger measures only the baseline, so it can
+    /// never measure itself (the one-way rule; see `SleepNeed.swift`). Weights are trial-tunable.
+    ///
+    /// `ledgerDebtBalanceMin` is the ledger's SIGNED balance (negative = debt, its own convention);
+    /// `napMinutesNotInLedger` covers only naps banked today BEFORE tonight's scoring pass — naps
+    /// the pass sees are already sleep-obtained inside `SleepDebt.creditedSleepMin`, and a second
+    /// credit would count them twice.
+    static func tonightNeed(days: [DailyMetric],
+                            ledgerDebtBalanceMin: Double?,
+                            napMinutesNotInLedger: Double = 0,
+                            now: Date = Date()) -> SleepNeed.Tonight? {
+        let base = debtNeedMin(days: days)
+        guard base.isFinite, base > 0 else { return nil }
+        // Yesterday's stored Effort (0–100 axis): the freshest COMPLETED day's `strain`, with the
+        // same 04:00 logical-day boundary the debt tiles use. Today's partial-day read is excluded —
+        // an evening workout would otherwise move tonight's need twice (its day is not over yet).
+        let todayKey = BodyVitalSigns.logicalDayKey(now)
+        let yesterdayStrain = days.last(where: { $0.day != todayKey })?.strain
+        return SleepNeed.tonight(baseMinutes: base,
+                                 strain: yesterdayStrain,
+                                 ledgerDebtBalanceMin: ledgerDebtBalanceMin,
+                                 napMinutesNotInLedger: napMinutesNotInLedger)
+    }
+
     // MARK: Per-tile series (latest, typical mean, sparkline history)
 
     /// Build a metric from a per-day transform, keeping only finite values.
