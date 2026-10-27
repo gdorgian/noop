@@ -71,6 +71,8 @@ final class IntelligenceEngine: ObservableObject {
     /// UserDefaults key holding the persisted `stepsMotionCache` payload. Versioned in the key as well as
     /// in the payload header so a format change cannot even be read, let alone half-parsed.
     private static let stepsMotionCacheDefaultsKey = "analyzeRecent.stepsMotionCache.v1"
+    /// The highest gravity rowid the steps fold has seen, so the next pass probes only days new rows touched.
+    private static let stepsGravityMarkKey = "analyzeRecent.stepsGravityMark.v1"
     /// Whether this process has already seeded `stepsMotionCache` from `stepsMotionCacheDefaultsKey`. The
     /// read happens once per process, not once per pass: after the first pass the in-memory cache is at
     /// least as fresh as the payload, so re-reading it could only ever put back what we just pruned.
@@ -2793,6 +2795,20 @@ final class IntelligenceEngine: ObservableObject {
             }
         }
         let inStepsMotionCache = stepsMotionCache
+        // One cheap read decides which days can have changed: none when no gravity was written since the last
+        // pass, else only those on or after the earliest new row. Probing all sixty days' COUNT/MAX cost
+        // 3.7-5.6 s of every pass, and once 223 s (tester log, 27 Oct 2026), even with 59 of 60 days reused.
+        let gravityMark = UserDefaults.standard.object(forKey: Self.stepsGravityMarkKey) as? Int
+        let gravityNow = try? await store.gravityMaxRowid()
+        // Int.max: nothing new, every cached day stands. Int.min: unknown, probe every day as before.
+        var gravityDirtyFrom = Int.min
+        if let gravityMark, let gravityNow {
+            if gravityNow == gravityMark {
+                gravityDirtyFrom = Int.max
+            } else if let earliest = try? await store.gravityEarliestTs(afterRowid: gravityMark) {
+                gravityDirtyFrom = earliest
+            }
+        }
         let (refStepsByDay, motionByDay, updatedStepsMotionCache, stepsMotionLogLine):
             ([String: Double], [String: Double], [String: (key: String, motion: Double)], String) =
             await Task.detached(priority: .utility) {
@@ -2829,6 +2845,14 @@ final class IntelligenceEngine: ObservableObject {
                 // from a genuinely empty day, so a failed aggregate could serve a stale zero for a day that
                 // has since gained gravity. On a nil fingerprint the cache is bypassed in both directions:
                 // fold fresh, and store nothing under a key that does not describe anything.
+                // A cached day that ends before the earliest new gravity row cannot have changed: keep it
+                // without asking the store, as long as it was folded for the same owner.
+                if dayEnd < gravityDirtyFrom, let cached = motionCacheLocal[dayKey],
+                   cached.key.hasPrefix(owner + "|") {
+                    motionReused += 1
+                    if cached.motion > 0 { motion[dayKey] = cached.motion }
+                    continue
+                }
                 let fp = try? await store.gravityFingerprint(deviceId: owner, from: dayMid, to: dayEnd)
                 let key = fp.map { StepsMotionCache.cacheKey(owner: owner, gravityCount: $0.count,
                                                              gravityMaxTs: $0.maxTs) }
@@ -2862,6 +2886,7 @@ final class IntelligenceEngine: ObservableObject {
             return (refSteps, motion, motionCacheLocal, motionLog)
         }.value
         stepsMotionCache = updatedStepsMotionCache
+        if let gravityNow { UserDefaults.standard.set(gravityNow, forKey: Self.stepsGravityMarkKey) }
         // Write the pruned cache back, only when it moved. `serialize` renders sorted, so a pass that reused
         // every day produces the string already stored and skips the write entirely.
         let stepsMotionPayload = StepsMotionCache.serialize(stepsMotionCache)

@@ -171,6 +171,23 @@ extension WhoopStore {
         }
     }
 
+    /// The highest `gravitySample` rowid, across devices. One B-tree seek. Every write lands as a new row (an
+    /// upsert replaces, which also takes a new rowid), so an unchanged value means no gravity was written
+    /// since it was last read — the cheap gate in front of the per-day `gravityFingerprint` probes.
+    public func gravityMaxRowid() async throws -> Int {
+        try syncRead { db in
+            try Int.fetchOne(db, sql: "SELECT COALESCE(MAX(rowid), 0) FROM gravitySample") ?? 0
+        }
+    }
+
+    /// The earliest `ts` among gravity rows written after `rowid`, or nil when none were. Walks only the new
+    /// rows, by rowid, so it stays cheap however much history the table holds.
+    public func gravityEarliestTs(afterRowid rowid: Int) async throws -> Int? {
+        try syncRead { db in
+            try Int.fetchOne(db, sql: "SELECT MIN(ts) FROM gravitySample WHERE rowid > ?", arguments: [rowid])
+        }
+    }
+
     /// Cross-device raw-HR fingerprint: `(count, maxTs)` over EVERY `hrSample` row, no `deviceId` filter.
     /// The `analyzeRecent` re-score gate (#1392) only needs to answer "did the raw stream change AT ALL",
     /// so it must see HR that lands under ANY id — an Oura ring, an Apple Watch, or a WHOOP re-added under a

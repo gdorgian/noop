@@ -86,6 +86,32 @@ final class GravityWitnessTests: XCTestCase {
         XCTAssertEqual(fp.count, 0)
         XCTAssertEqual(fp.maxTs, 0)
     }
+    // MARK: The store-wide gate in front of the per-day witnesses
+
+    /// No write, no movement: the steps fold keeps every cached day without probing one.
+    func testMaxRowidHoldsWhenNothingIsWritten() async throws {
+        let s = try await store()
+        _ = try await s.insert(Streams(gravity: [grav(100, 1), grav(200, 2)]), deviceId: "dev1")
+        let mark = try await s.gravityMaxRowid()
+        _ = try await s.insert(Streams(gravity: [grav(100, 9)]), deviceId: "dev1")   // already banked: ignored
+        let now = try await s.gravityMaxRowid()
+        XCTAssertEqual(mark, now)
+        let earliest = try await s.gravityEarliestTs(afterRowid: mark)
+        XCTAssertNil(earliest)
+    }
+
+    /// A backfilled OLDER second still moves the mark, and the earliest new timestamp names the day it
+    /// landed in, so that day is re-probed even though it is not the newest.
+    func testBackfilledOlderSecondIsFoundByTheEarliestNewTimestamp() async throws {
+        let s = try await store()
+        _ = try await s.insert(Streams(gravity: [grav(5_000, 1), grav(6_000, 2)]), deviceId: "dev1")
+        let mark = try await s.gravityMaxRowid()
+        _ = try await s.insert(Streams(gravity: [grav(1_000, 3), grav(7_000, 4)]), deviceId: "other")
+        let moved = try await s.gravityMaxRowid()
+        XCTAssertGreaterThan(moved, mark)
+        let earliest = try await s.gravityEarliestTs(afterRowid: mark)
+        XCTAssertEqual(earliest, 1_000)
+    }
 }
 
 /// `hasHrInWindow` is the day-owner resolver's presence probe. It replaced a `LIMIT 1` fetch from
@@ -143,4 +169,5 @@ final class HasHrInWindowTests: XCTestCase {
             XCTAssertEqual(viaExists, viaUnion, "window \(from)...\(to)")
         }
     }
+
 }
