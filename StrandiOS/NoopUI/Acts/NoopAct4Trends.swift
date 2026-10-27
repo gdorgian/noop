@@ -136,6 +136,16 @@ private struct NoopTrendsScreen: View {
     var battery: Int? = nil
     var ages: NoopAgesRecord? = nil
 
+    /// Your ages, open as a sheet over Trends, with its own navigation for its inner pages.
+    @State private var agesNavigation: NoopNavigation?
+
+    private func openAges() {
+        NoopHaptics.play(.tick)
+        let nav = NoopNavigation()
+        nav.reset(to: .ages)
+        agesNavigation = nav
+    }
+
     var body: some View {
         NoopScreen(topInset: 58) {
             VStack(alignment: .leading, spacing: 0) {
@@ -150,6 +160,12 @@ private struct NoopTrendsScreen: View {
             }
         }
         .noopEditBar($trendsEditing, layout: trendsLayout) { navigation.push(.settingsScores) }
+        .sheet(isPresented: Binding(get: { agesNavigation != nil }, set: { if !$0 { agesNavigation = nil } })) {
+            if let agesNavigation {
+                NoopAgesSheet(navigation: agesNavigation, measured: ages) { self.agesNavigation = nil }
+                    .noopSheet()
+            }
+        }
         .task(id: repo.deviceId) {
             guard live != nil else { return }
             await labBook.load(store: await repo.storeHandle(), deviceId: repo.deviceId)
@@ -182,7 +198,7 @@ private struct NoopTrendsScreen: View {
                 pace: ages?.pace,
                 paceWeeks: ages?.paceWeeks ?? 0,
                 waitingReason: ages?.buildReason ?? "Checking recorded signals"
-            ) { navigation.push(.ages) }
+            ) { openAges() }
         case "markers":
             NoopTrendsMarkersSection(navigation: navigation)
                 .padding(.top, 32)

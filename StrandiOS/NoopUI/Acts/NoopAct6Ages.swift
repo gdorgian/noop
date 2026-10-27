@@ -583,11 +583,17 @@ private struct NoopAgeBackHeader: View {
     let label: String
     let action: () -> Void
 
+    @Environment(\.noopAgesInSheet) private var inSheet
+
     var body: some View {
         HStack(spacing: 12) {
-            NoopBackButton(action: action)
-
-            NoopBackTitle(label)
+            // Opened from Trends as a sheet: its first page closes rather than going back.
+            if inSheet && label == "Trends" {
+                NoopCloseButton(action: action)
+            } else {
+                NoopBackButton(action: action)
+                NoopBackTitle(label)
+            }
             Spacer(minLength: 0)
         }
         .frame(minHeight: NoopCloseButton.side)
@@ -1721,5 +1727,35 @@ private extension NoopAct6Screens {
                 NoopAgeDisclaimer("Estimates from a wrist sensor, not a diagnosis. No part of this screen is a medical device.", topPadding: 0)
             }
         }
+    }
+}
+
+// MARK: - As a sheet
+
+private struct NoopAgesInSheetKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    /// Your ages is showing in its sheet over Trends.
+    var noopAgesInSheet: Bool {
+        get { self[NoopAgesInSheetKey.self] }
+        set { self[NoopAgesInSheetKey.self] = newValue }
+    }
+}
+
+/// Your ages over Trends (27 Oct 2026), with its own small navigation for its drivers and method
+/// pages. Backing out of its first page closes it.
+struct NoopAgesSheet: View {
+    @ObservedObject var navigation: NoopNavigation
+    let measured: NoopAgesRecord?
+    let close: () -> Void
+
+    private static let own: Set<NoopRoute> = [.ages, .building, .driver, .method, .health]
+
+    var body: some View {
+        NoopAct6Screens(navigation: navigation, measured: measured)
+            .environment(\.noopAgesInSheet, true)
+            .onChange(of: navigation.route) { _, route in
+                if !Self.own.contains(route) { close() }
+            }
     }
 }
