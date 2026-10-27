@@ -99,17 +99,29 @@ struct NoopSlotPill: View {
     var glow = false
     let action: () -> Void
 
+    /// False for the first frame on screen: figures roll up from zero and rings fill from empty,
+    /// so every pill arrives together with the rings above them.
+    @State private var entered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The title with each digit at zero, which the numeric transition rolls up from.
+    private var shownTitle: String {
+        entered ? title : String(title.map { $0.isNumber ? "0" : $0 })
+    }
+
+    private var fill: Double { entered ? 1 : 0 }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
                 NoopGlossTile(symbol: symbol, tint: tint, side: 36, beat: beat, dimmed: dimmed)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
+                    Text(shownTitle)
                         .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                         .foregroundStyle(dimmed ? NoopHTMLColor.faint : NoopHTMLColor.ink)
                         .monospacedDigit()
                         .contentTransition(.numericText())
-                        .animation(.smooth(duration: 0.45), value: title)
+                        .animation(.smooth(duration: 0.45), value: shownTitle)
                     Text(subtitle)
                         .font(NoopHTMLFont.sans(NoopType.caption))
                         .foregroundStyle(NoopHTMLColor.copy)
@@ -138,6 +150,11 @@ struct NoopSlotPill: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibility ?? "\(subtitle), \(title)")
         .accessibilityAddTraits(.isButton)
+        .onAppear {
+            guard !entered else { return }
+            if reduceMotion { entered = true; return }
+            withAnimation(.spring(response: 0.9, dampingFraction: 0.85).delay(0.12)) { entered = true }
+        }
     }
 
     @ViewBuilder
@@ -154,7 +171,7 @@ struct NoopSlotPill: View {
         case .progress(let value):
             ZStack {
                 Circle().stroke(Color.white.opacity(0.1), lineWidth: 3)
-                Circle().trim(from: 0, to: max(0.001, min(1, value)))
+                Circle().trim(from: 0, to: max(0.001, min(1, value * fill)))
                     .stroke(tint.0, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
@@ -166,7 +183,7 @@ struct NoopSlotPill: View {
                 Circle().trim(from: band.lowerBound, to: band.upperBound)
                     .stroke(Color.white.opacity(0.22), lineWidth: 3)
                     .rotationEffect(.degrees(-90))
-                Circle().trim(from: 0, to: max(0.001, min(1, value)))
+                Circle().trim(from: 0, to: max(0.001, min(1, value * fill)))
                     .stroke(tint.0, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 Capsule().fill(.white).frame(width: 1.6, height: 6)
