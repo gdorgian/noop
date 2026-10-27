@@ -1803,6 +1803,12 @@ public enum SleepStager {
                     detail: "daytime=true restingHR=\(resting ?? -1) baseline=\(baseline.map { Int($0) } ?? -1) nightTail=false"))
                 continue
             }
+            // The strap watched the whole stretch and never called it asleep: awake and still in bed.
+            if InBedWake.strapNeverAsleep(bandSleepState, start: p.start, end: p.end) {
+                traceSink?(GateTrace.runLine(index: runIndex, startTs: p.start, endTs: p.end,
+                    verdict: .dropped, gate: "strapNeverAsleep", detail: "spanMin=\(spanMin)"))
+                continue
+            }
             let rawStages = useSleepStagerV2
                 ? SleepStagerV2.stageSession(start: p.start, end: p.end, grav: grav,
                                              hr: hrS, rr: rrS, resp: respS)

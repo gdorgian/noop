@@ -176,6 +176,23 @@ public enum InBedWake {
         return (0..<onset).last(where: { band[$0] == bandWake || band[$0] == bandUp }).map { $0 + 1 }
     }
 
+    /// True when the strap recorded the window (`strapCoverage` of its minutes) and never once called
+    /// `strapSustainedAsleepMin` minutes of "asleep" in a row. Lying still and awake in bed reads as sleep to
+    /// pulse and movement; the strap says wake and "still" throughout. 26 Oct 2026: 22:23–00:05 was kept as
+    /// sleep at a pulse near 77 while the strap's first asleep minute came at 02:47.
+    public static func strapNeverAsleep(_ band: [(ts: Int, state: Int)], start: Int, end: Int) -> Bool {
+        let n = (end - start) / 60
+        guard n > 0, !band.isEmpty else { return false }
+        let minutes = perMinuteBand(band, start: start, n: n)
+        guard Double(minutes.compactMap { $0 }.count) >= Double(n) * strapCoverage else { return false }
+        var run = 0
+        for b in minutes {
+            run = b == bandAsleep ? run + 1 : 0
+            if run >= strapSustainedAsleepMin { return false }
+        }
+        return true
+    }
+
     static func dominated(_ e: ArraySlice<Evidence>, share: Double) -> Bool {
         let awake = e.filter { $0 == .awake }.count, asleep = e.filter { $0 == .asleep }.count
         return awake + asleep > 0 && Double(awake) / Double(awake + asleep) >= share

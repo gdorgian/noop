@@ -106,6 +106,18 @@ final class InBedWakeTests: XCTestCase {
         XCTAssertEqual(edges(night()).latencyMin, 0)   // pulse and movement alone call it sleep
     }
 
+    func testStrapNeverAsleepRejectsAStillEvening() {
+        // 100 minutes in bed awake: the strap reads wake and "still" by turns and never asleep.
+        let awake = (0..<100).map { m in (ts: t0 + m * 60 + 30, state: m % 8 == 0 ? 0 : 1) }
+        XCTAssertTrue(InBedWake.strapNeverAsleep(awake, start: t0, end: t0 + 6000))
+        // Ten minutes of asleep in a row is enough to keep it.
+        let dozed = (0..<100).map { m in (ts: t0 + m * 60 + 30, state: (40..<50).contains(m) ? 2 : 1) }
+        XCTAssertFalse(InBedWake.strapNeverAsleep(dozed, start: t0, end: t0 + 6000))
+        // No strap state, or too little of it, decides nothing.
+        XCTAssertFalse(InBedWake.strapNeverAsleep([], start: t0, end: t0 + 6000))
+        XCTAssertFalse(InBedWake.strapNeverAsleep(Array(awake.prefix(50)), start: t0, end: t0 + 6000))
+    }
+
     func testStrapStillBeforeAsleepIsNotLatency() {
         // Straight into "still" and then asleep with no "wake": nothing to bound.
         let band = (0..<510).map { m in (ts: t0 + m * 60 + 30, state: m >= 15 ? 2 : 1) }

@@ -3010,6 +3010,17 @@ final class IntelligenceEngine: ObservableObject {
             let segs = json.components(separatedBy: "\"stage\"").count - 1
             return "[\(s.startTs) -> \(s.endTs)] min=\((s.endTs - s.effectiveStartTs) / 60) segs=\(segs) json=\(json.utf8.count)"
         }
+        // A computed session this pass no longer finds is removed once the same wake day was re-detected
+        // from real data. 27 Oct 2026: a pass at 00:05 banked 22:23–00:05 (lying awake in bed) from the
+        // evening alone; every later pass rejected it, but nothing ever deleted it, so the night showed
+        // as two sleeps.
+        let storedComputed = (try? await store.sleepSessions(deviceId: computedId, from: windowStart,
+                                                             to: now, limit: 4000)) ?? []
+        for stale in Self.supersededSleep(stored: storedComputed, fresh: cachedSleepKept,
+                                          skipWindows: skipWindows, tzOffset: tzOffset) {
+            _ = try? await store.deleteSleepSession(deviceId: computedId, startTs: stale.startTs)
+            diagnosticSink?("Sleep: removed [\(stale.startTs) -> \(stale.endTs)], no longer detected", nil)
+        }
         var healDropped: [CachedSleepSession] = []
         for healId in healDeviceIds {
             let storedSessions = (try? await store.sleepSessions(deviceId: healId, from: windowStart,
@@ -3660,5 +3671,22 @@ extension DailyMetric {
                     skinTempDevC: skinTempDevC, respRateBpm: respRateBpm, steps: steps,
                     activeKcalEst: activeKcalEst, spo2Red: spo2Red, spo2Ir: spo2Ir, avgSdnn: avgSdnn,
                     skinTempC: skinTempC, sleepHrOnly: sleepHrOnly)
+    }
+}
+
+extension IntelligenceEngine {
+    /// Stored computed sessions this pass's detection has superseded: unedited, not re-detected, not
+    /// overlapping a fresh session (the overlap heal owns those) or an edited/deleted window, and waking on
+    /// a day this pass re-detected a session for, so a day whose raw streams are gone keeps its history.
+    nonisolated static func supersededSleep(stored: [CachedSleepSession], fresh: [CachedSleepSession],
+                                skipWindows: [(start: Int, end: Int)], tzOffset: Int) -> [CachedSleepSession] {
+        let freshStarts = Set(fresh.map { $0.startTs })
+        let freshDays = Set(fresh.map { AnalyticsEngine.dayString($0.endTs, offsetSec: tzOffset) })
+        return stored.filter { s in
+            !s.userEdited && !freshStarts.contains(s.startTs)
+                && freshDays.contains(AnalyticsEngine.dayString(s.endTs, offsetSec: tzOffset))
+                && !fresh.contains { $0.startTs < s.endTs && s.startTs < $0.endTs }
+                && !skipWindows.contains { $0.start < s.endTs && s.startTs < $0.end }
+        }
     }
 }
