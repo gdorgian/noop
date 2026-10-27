@@ -33,6 +33,9 @@ struct NoopAct5Screens: View {
     @AppStorage(UnitPrefs.effortScaleKey) private var effortScaleRaw = ""
     @AppStorage(QuietMotionPrefs.enabledKey) private var quietMotionOn = false
     @AppStorage(UnitPrefs.liveActivityKey) private var liveActivityOn = true
+    @AppStorage(UnitPrefs.syncLiveActivityKey) private var syncActivityOn = true
+    @AppStorage(PuffinExperiment.lowRefreshKey) private var hourlySyncOn = false
+    @AppStorage(UnitPrefs.hrvWindowKey) private var hrvWindowRaw = HrvWindow.whole.rawValue
     @AppStorage(PuffinExperiment.powerSavingKey) private var powerSavingOn = false
     @AppStorage(PuffinExperiment.powerSavingBatteryPctKey) private var powerSavingPct = 20
     @AppStorage(PuffinExperiment.pauseHrvDisabledKey) private var pauseHrvDisabled = false
@@ -267,6 +270,10 @@ private extension NoopAct5Screens {
         switch key {
         case "Reduce motion in Noop": $quietMotionOn
         case "Live heart rate in the Dynamic Island": $liveActivityOn
+        case "Sync on the Lock Screen": $syncActivityOn
+        case "Hourly sync at any charge": $hourlySyncOn
+        case "Recharge tonight": $behavior.batteryPredictiveAlerts
+        case "Effort target reached": $behavior.strainTargetNudge
         case "Battery alerts": $behavior.batteryAlerts
         case "Off-wrist reminder": $behavior.wearAlerts
         case "Sync reminder": $behavior.syncReminder
@@ -314,6 +321,13 @@ private extension NoopAct5Screens {
         case "Overnight only": model.ble.setKeepRealtimeForData(PuffinExperiment.keepRealtimeForDataEnabled)
         case "SpO₂ strap estimate", "Exponential effort": Task { await model.intelligence.analyzeRecent(); await model.repo.refresh() }
         case "Illness early warning": if behavior.illnessWatch { IllnessNotifier.requestAuthorization() }
+        case "Power saving", "Hourly sync at any charge": model.applyPowerSaving()
+        case "Recharge tonight": if behavior.batteryPredictiveAlerts { BatteryNotifier.requestAuthorization() }
+        case "Effort target reached":
+            if behavior.strainTargetNudge {
+                StrainTargetNotifier.requestAuthorization()
+                model.evaluateStrainTarget()
+            }
         case "Sync reminder":
             if behavior.syncReminder { SyncReminder.requestAuthorization() }
             model.rearmSyncReminder()
@@ -348,7 +362,15 @@ private extension NoopAct5Screens {
                     set: { effortScaleRaw = ($0 == "0–21" ? EffortScale.whoop : .hundred).rawValue })
         case "Power saving at":
             Binding(get: { "\(powerSavingPct)%" },
-                    set: { powerSavingPct = Int($0.dropLast()) ?? powerSavingPct })
+                    set: { powerSavingPct = Int($0.dropLast()) ?? powerSavingPct; model.applyPowerSaving() })
+        case "HRV window":
+            Binding(get: { hrvWindowRaw == HrvWindow.deep.rawValue ? "Deep sleep" : "Whole night" },
+                    set: { new in
+                        let raw = (new == "Deep sleep" ? HrvWindow.deep : .whole).rawValue
+                        guard raw != hrvWindowRaw else { return }
+                        hrvWindowRaw = raw
+                        Task { await model.intelligence.analyzeRecent(); await model.repo.refresh() }
+                    })
         case "Double tap":
             Binding(get: {
                 switch behavior.doubleTapAction {
@@ -3623,8 +3645,8 @@ private extension NoopAct5Screens {
     }
 
     static let settingsAlertTitles = [
-        "Battery alerts", "Off-wrist reminder", "Sync reminder", "Your night is in",
-        "Bedtime nudge", "A new best", "Weekly read", "Backup reminder"
+        "Battery alerts", "Recharge tonight", "Off-wrist reminder", "Sync reminder", "Your night is in",
+        "Bedtime nudge", "Effort target reached", "A new best", "Weekly read", "Backup reminder"
     ]
 
     /// A segmented choice's current value, measured or prototype, without its Binding.
@@ -3913,7 +3935,8 @@ private extension NoopAct5Screens {
         "Journal reminder": true,
         "Sleep staging V2": true, "Motion-aware wake": false,
         "Keep the screen on in a workout": false, "Offer a workout it spotted": false, "Lift on the Lock Screen": true,
-        "Live heart rate in the Dynamic Island": true,
+        "Live heart rate in the Dynamic Island": true, "Sync on the Lock Screen": true,
+        "Hourly sync at any charge": false, "Recharge tonight": true, "Effort target reached": false,
         "Power saving": false, "Pause the HRV stream when low": true,
         "Continuous HRV capture": false, "Overnight only": true, "Broadcast heart rate": false,
         "Quiet hours": false, "Battery alerts": true, "Off-wrist reminder": false, "Sync reminder": true, "Exponential effort": false,
@@ -3934,6 +3957,7 @@ private extension NoopAct5Screens {
         case "Effort": return settingsChoice("Effort") == "0–21"
         case "Clock": return ClockFormatPreference.from(stored: clockRaw) != .system
         case "Power saving at": return powerSavingPct != 20
+        case "HRV window": return hrvWindowRaw == HrvWindow.deep.rawValue
         default: return false
         }
     }
@@ -3952,7 +3976,12 @@ private extension NoopAct5Screens {
         case "Temperature": temperatureRaw = ""
         case "Effort": effortScaleRaw = ""
         case "Clock": clockRaw = ClockFormatPreference.system.rawValue
-        case "Power saving at": powerSavingPct = 20
+        case "Power saving at": powerSavingPct = 20; model.applyPowerSaving()
+        case "HRV window":
+            if hrvWindowRaw != HrvWindow.whole.rawValue {
+                hrvWindowRaw = HrvWindow.whole.rawValue
+                Task { await model.intelligence.analyzeRecent(); await model.repo.refresh() }
+            }
         default: break
         }
     }
@@ -4024,6 +4053,8 @@ private extension NoopAct5Screens {
         case .sleep:
             return [
                 NoopSettingsSection(title: "Reading the night", items: [
+                    segmentItem(tint, "sleep-hrv-window", "HRV window", "the stretch of the night your HRV is read over", choices: ["Whole night", "Deep sleep"],
+                                keywords: "hrv variability deep sleep window recovery"),
                     labItem(tint, "sleep-staging", "Sleep staging V2", "A cardiorespiratory recipe that recovers deep and REM better on nights the old stager flattened to light. On by default after a 44-person benchmark.",
                             badge: "default on", keywords: "stages deep rem light hypnogram v1 recipe"),
                     labItem(tint, "sleep-wake", "Motion-aware wake", "Re-reads scored wake as light sleep when your posture was stable and there were no steps. A no-op on a sparse night.",
@@ -4067,7 +4098,7 @@ private extension NoopAct5Screens {
                 }
             ]),
             NoopSettingsSection(title: "Alerts", items: [
-                alertsLinkItem(tint, "scores-alerts", "Progress alerts", titles: ["A new best", "Weekly read"], focus: "alerts-best")
+                alertsLinkItem(tint, "scores-alerts", "Progress alerts", titles: ["Effort target reached", "A new best", "Weekly read"], focus: "alerts-effort-target")
             ])]
 
         case .you:
@@ -4090,16 +4121,21 @@ private extension NoopAct5Screens {
                     linkItem(tint, "strap-automations", "Automations", "what the strap does on its own, and what a tap on it does", symbol: "sparkles",
                              keywords: "double tap move reminder stress check-ins illness zone buzz") { navigation.push(.automations) },
                     toggleItem(tint, "strap-island", "Live heart rate in the Dynamic Island", "Also puts it on the Lock Screen while a session runs.",
-                               keywords: "live activity lock screen bpm")
+                               keywords: "live activity lock screen bpm"),
+                    toggleItem(tint, "strap-sync-activity", "Sync on the Lock Screen", "A long sync shows its progress on the Lock Screen and in the Dynamic Island, then goes.",
+                               keywords: "live activity sync progress history")
                 ]),
                 NoopSettingsSection(title: "Alerts", items: [
-                    alertsLinkItem(tint, "strap-alerts", "Strap alerts", titles: ["Battery alerts", "Off-wrist reminder", "Sync reminder"], focus: "alerts-battery")
+                    alertsLinkItem(tint, "strap-alerts", "Strap alerts", titles: ["Battery alerts", "Recharge tonight", "Off-wrist reminder", "Sync reminder"], focus: "alerts-battery")
                 ]),
                 NoopSettingsSection(title: "Battery", items: [
                     toggleItem(tint, "strap-power-saving", "Power saving", "Syncs every 45 minutes instead of 15 once the strap is low and discharging. Never while charging.",
                                keywords: "battery low sync 45 minutes"),
                     segmentItem(tint, "strap-power-at", "Power saving at", "the strap battery that starts it", choices: ["10%", "20%", "30%"],
                                 keywords: "battery threshold percent"),
+                    labItem(tint, "strap-hourly", "Hourly sync at any charge", "Syncs once an hour whatever the battery, not only when low. Nothing is lost: the strap keeps its history until it is read.",
+                            gate: "Follows Power saving — with it off, this does nothing.",
+                            keywords: "battery sync hourly cadence low refresh"),
                     toggleItem(tint, "strap-pause-hrv", "Pause the HRV stream when low", "Releases the always-on stream too. Costs overnight variability detail on that night only.",
                                keywords: "battery hrv stream")
                 ]),
@@ -4128,6 +4164,8 @@ private extension NoopAct5Screens {
                 NoopSettingsSection(title: "Strap", items: [
                     toggleItem(tint, "alerts-battery", "Battery alerts", "One notice at 15% and one when it finishes charging. Never twice for the same crossing.",
                                keywords: "charging low battery"),
+                    toggleItem(tint, "alerts-recharge", "Recharge tonight", "An early notice when the strap has about a day of runtime left, at most once per charge. Follows Battery alerts.",
+                               keywords: "battery estimate runtime predictive charge"),
                     toggleItem(tint, "alerts-off-wrist", "Off-wrist reminder", "One notice when the strap has been off your wrist for ten minutes. Not while it charges.",
                                keywords: "wear wrist"),
                     toggleItem(tint, "alerts-sync", "Sync reminder", "A silent notice when the strap hasn’t synced for three hours, usually because Noop was swiped away. Every sync pushes it back.",
@@ -4140,6 +4178,8 @@ private extension NoopAct5Screens {
                                keywords: "wind down bedtime reminder")
                 ]),
                 NoopSettingsSection(title: "Progress", items: [
+                    toggleItem(tint, "alerts-effort-target", "Effort target reached", "Once a day, when today's Effort reaches the low end of the target band on your Today ring.",
+                               keywords: "strain target optimal effort goal"),
                     toggleItem(tint, "alerts-best", "A new best", "When last night beat three months on HRV, resting pulse or recovery. Never more than one a day.",
                                keywords: "record hrv resting personal best"),
                     toggleItem(tint, "alerts-weekly", "Weekly read", "Sunday at seven: sleep, recovery and sessions against the week before. Off by default.",
@@ -6078,9 +6118,6 @@ struct NoopPendingOption: Identifiable {
         .init(id: "pending-day-starts", page: .sleep, status: .later, title: "When the day starts", symbol: "sunrise",
               does: "Start each day at your main sleep instead of at midnight, so a late night counts toward the day it belongs to.",
               why: "Every Aura page that counts a day has to follow the same choice. It comes once they all can."),
-        .init(id: "pending-hrv-window", page: .sleep, status: .later, title: "HRV window", symbol: "waveform.path.ecg",
-              does: "Read your nightly HRV over the whole night, or over deep sleep only.",
-              why: "The classic setting changes one number; in Aura, Recovery, Trends and the night all read HRV and need to agree."),
         .init(id: "pending-sleep-chart", page: .sleep, status: .later, title: "Sleep chart", symbol: "chart.bar.xaxis",
               does: "The hypnogram drawn as rows or as a ribbon instead.",
               why: "Designed, not built yet."),
@@ -6105,25 +6142,13 @@ struct NoopPendingOption: Identifiable {
         .init(id: "pending-wrist-shortcuts", page: .strap, status: .later, title: "Shortcuts on and off the wrist", symbol: "arrow.triangle.branch",
               does: "Run a Shortcut when the strap comes off (set a Focus, pause media) and another when it goes back on.",
               why: "It works in the classic app. Aura still needs a way to pick the Shortcut."),
-        .init(id: "pending-hourly-sync", page: .strap, status: .later, title: "Hourly sync at any charge", symbol: "clock.arrow.circlepath",
-              does: "Stretches the strap’s history sync to once an hour whatever its battery, not only when low. Nothing is lost: the strap keeps it until it is read.",
-              why: "A part of Power saving that needs testing against Aura’s background sync."),
         .init(id: "pending-sync-awake", page: .strap, status: .later, title: "Keep the screen on while syncing", symbol: "iphone",
               does: "Holds the iPhone awake while the strap sends a long history, so the sync is not cut off.",
               why: "Needs testing against Aura’s background sync first."),
-        .init(id: "pending-sync-activity", page: .strap, status: .later, title: "Sync on the Lock Screen", symbol: "rectangle.badge.checkmark",
-              does: "A long sync’s progress as a Live Activity.",
-              why: "Comes with the Lock Screen pass."),
         .init(id: "pending-oura-hr", page: .strap, status: .later, title: "Oura ring all-day heart rate", symbol: "circle.circle",
               does: "Oura ring only. Keeps the ring measuring heart rate through the day, standing it down only for your night.",
               why: "Oura works in the classic app. Aura’s strap pages are WHOOP-first for now."),
         // Notifications
-        .init(id: "pending-predictive-battery", page: .alerts, status: .later, title: "Recharge tonight", symbol: "battery.25",
-              does: "An early heads-up when the strap has about a day of estimated runtime left, at most once per discharge.",
-              why: "The estimate already runs. The notice needs testing on a real discharge first."),
-        .init(id: "pending-effort-target", page: .alerts, status: .later, title: "Effort target reached", symbol: "flame",
-              does: "Once a day, when today’s Effort reaches the low end of what your recovery allows.",
-              why: "Aura names that range differently. The wording and the number need to agree first."),
         .init(id: "pending-session-offer", page: .alerts, status: .later, title: "Session offer", symbol: "figure.run",
               does: "One notification a day, in the morning, with today’s recommendation.",
               why: "Aura does not recommend a session yet. The notice comes with the recommendation."),

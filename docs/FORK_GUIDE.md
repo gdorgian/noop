@@ -78,6 +78,41 @@ The tree itself was removed on 2026-08-14: `android/` (899 files), `.github/work
 and the Android jobs in both release workflows. Nobody here develops it, and a tree nobody builds
 only rots — it was still absorbing upstream churn on every sync while never being compiled.
 
+### The WHOOP table accuracy build is LOCAL ONLY (2026-10-27)
+
+The local DAY Effort path uses WHOOP's lookup tables and the arithmetic reported from the
+WHOOP iOS 5.65.1 assembly. The raw sum is weight × duration ÷ 691,200, without an extra reserve
+multiplier; its scale lookup selects the nearest row at each midpoint, with a tie selecting the
+upper row. Minute HR uses the 25th percentile (`25.0` for the shared percentage-based helper).
+Duration/smoothing and low-reading behavior still need confirmation, so this is not an
+end-to-end equivalence claim. See `WhoopStrain.swift` and the 2026-10-27 decision rows.
+
+- **The two WHOOP lookup tables live only in git-ignored local files:**
+  `Config/strain_raw_scale_lookup.json` + `Config/recovery_to_strain.json`, copied verbatim from
+  the owner's WHOOP IPA. They sit beside `Config/BundleIdSecrets.xcconfig` under the same
+  **personal data / never publish** rule.
+- **Both app targets bundle present tables and remove absent ones.** The `preBuildScripts`
+  phases in `project.yml` create the destination, stop on copy errors, and remove a stale
+  destination JSON when its source disappears. An incremental build cannot silently keep a
+  removed table.
+- **Every daily scoring path uses `DayStrainScorer`.** Calendar-day analysis, sleep-onset-day
+  analysis and live Today calculations select the same WHOOP-or-independent fallback recipe.
+  Missing or wholly rejected HR remains unknown. Workout bouts and Training Load keep the
+  independent scorer. Diagnostics name the actual `whoop`, `edwards` or `banister` method and
+  give the fallback reason separately.
+- **The analysis identity includes the daily recipe version and both tables' semantic identity.**
+  Installing, removing or changing tables invalidates persisted analysis and per-day score
+  caches even when the raw streams are unchanged.
+- **Tests distinguish arithmetic from table plumbing.** Synthetic cases exercise a nontrivial
+  25th percentile, weight-only accumulation, and values below/at/above scale midpoints.
+  `testWHOOPScaleRowsLookupExactly` additionally checks local table nodes within 0.099 when the
+  files exist; node checks alone cannot distinguish interpolation from snapping. Public CI
+  has no proprietary tables and skips that fixture check.
+- **Unconfirmed behavior remains unchanged:** the handoff from minute smoothing to WHOOP's
+  per-reading duration calculation (reported 3 s cap), removal of leading readings below
+  30 bpm, and fractional-recovery target lookup. Target bands continue to interpolate; real
+  data, including the 26 Aug anchor, is still required for an end-to-end comparison.
+
 **What that changed elsewhere.** The release pipeline read the version from
 `android/app/build.gradle.kts`; it now reads `project.yml`'s `MARKETING_VERSION`.
 `publish-ios-release.yml` (named `publish-ios-beta.yml` at the time) had a hard gate asserting the

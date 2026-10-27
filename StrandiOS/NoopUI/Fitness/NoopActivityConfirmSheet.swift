@@ -34,6 +34,11 @@ struct NoopActivityConfirmSheet: View {
                          "Pilates", "Core training"]
 
     private var detected: Bool { WorkoutSource.classify(row.source) == .detected }
+    /// Imported from Apple Health, a file or another app: shown, never changed here.
+    private var imported: Bool {
+        let kind = WorkoutSource.classify(row.source)
+        return kind != .detected && kind != .manual
+    }
     private var unnamed: Bool { row.sport.isEmpty || row.sport.lowercased() == "detected" }
     private var title: String { unnamed ? "Activity" : row.sport }
 
@@ -51,17 +56,17 @@ struct NoopActivityConfirmSheet: View {
             VStack(alignment: .leading, spacing: 18) {
                 NoopSessionHero(symbol: NoopFitnessCardioLive.symbol(for: row.sport),
                                 kind: detected ? "Detected activity" : kindLine, title: title, when: when,
-                                source: detected ? "Noop Aura · detected from heart rate" : "Noop Aura",
+                                source: detected ? "Noop Aura · detected from heart rate" : imported ? importedSource : "Noop Aura",
                                 badge: detected ? "unconfirmed" : nil,
                                 tint: accent, ink: isStrength ? NoopHTMLColor.voltInk : NoopHTMLColor.blueInk,
                                 celebrate: justFinished, share: detected ? nil : shareContent)
-                if detected || changing { picker } else { changeRow }
+                if detected || changing { picker } else if !imported { changeRow }
                 NoopSessionHeading(title: "Workout details")
                 if let strain = row.strain, strain > 0 {
                     let e = NoopSessionEffort.describe(strain)
                     NoopSessionRingRow(value: e.value, fraction: e.fraction, title: "Effort", line: e.line)
                 }
-                if !detected { feelRow }
+                if !detected && !imported { feelRow }
                 NoopSessionFigures(items: figures)
                 if let compare, !compare.lines.isEmpty {
                     NoopCompareCard(sport: row.sport, count: compare.count, lines: compare.lines)
@@ -72,7 +77,13 @@ struct NoopActivityConfirmSheet: View {
                     if route.splits.count >= 2 { NoopSplitsCard(splits: route.splits).transition(.opacity) }
                 }
                 NoopSessionHeart(start: row.startTs, end: row.endTs, source: row.source)
-                actions
+                if imported {
+                    Text("Imported, so it is changed where it came from. The heart rate and zones are the strap's for the same window.")
+                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    actions
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
@@ -240,6 +251,16 @@ struct NoopActivityConfirmSheet: View {
             }
             .foregroundStyle(NoopHTMLColor.red)
             .buttonStyle(NoopPlainHitStyle())
+        }
+    }
+
+    private var importedSource: String {
+        switch WorkoutSource.classify(row.source) {
+        case .apple: "Apple Health"
+        case .activityFile: "Activity file"
+        case .lifting: "Imported lifting"
+        case .whoop: "WHOOP import"
+        default: "Imported"
         }
     }
 

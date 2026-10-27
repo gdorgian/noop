@@ -811,14 +811,16 @@ struct NoopFitnessSessionButton: View {
                 navigation.selectedLiftSessionID = lift
                 navigation.liftDetailReturnRoute = returnRoute
                 showingLift = true
-            } else if session.editable {
+            } else if session.row != nil {
+                // Imported sessions open too, read-only: their heart rate and zones are worth seeing even
+                // when the session belongs to Strava or Apple Health (tester, 27 Oct 2026).
                 confirming = session.row
             }
         } label: {
             NoopFitnessSessionRow(session: session, showsDate: showsDate)
         }
         .buttonStyle(NoopHTMLPressStyle())
-        .disabled(session.liftSessionID == nil && !session.editable)
+        .disabled(session.liftSessionID == nil && session.row == nil)
         .contextMenu {
             if session.editable {
                 Button("Edit details") { confirming = session.row }
@@ -911,7 +913,7 @@ struct NoopFitnessSessionRow: View {
                 }
             }
             Spacer(minLength: 4)
-            if session.liftSessionID != nil || session.editable {
+            if session.liftSessionID != nil || session.row != nil {
                 NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
             }
         }
