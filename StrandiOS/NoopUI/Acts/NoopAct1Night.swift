@@ -2599,7 +2599,7 @@ struct NoopSleepEditSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Edit sleep times").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
+                NoopSheetHeader(title: "Edit sleep times", closeLabel: "Cancel") { dismiss() }
                 VStack(alignment: .leading, spacing: 0) {
                     timeRow("Fell asleep", $bed)
                     Divider().overlay(NoopHTMLColor.border)

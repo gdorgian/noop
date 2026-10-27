@@ -306,15 +306,8 @@ struct NoopMarkersEditSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ZStack {
-                Text("Edit markers").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                HStack {
-                    Spacer()
-                    Button("Done") { pinnedRaw = NoopMarkers.encode(pinned); dismiss() }
-                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.ink)
-                        .noopHitTarget()
-                }
+            NoopSheetHeader(title: "Edit markers", closeLabel: "Cancel", close: { dismiss() }) {
+                NoopSheetAction(title: "Done") { pinnedRaw = NoopMarkers.encode(pinned); dismiss() }
             }
             .padding(.horizontal, NoopSpace.l)
             .padding(.vertical, NoopSpace.m)

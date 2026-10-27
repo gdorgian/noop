@@ -84,10 +84,7 @@ struct NoopCardioGoalSheet: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                HStack {
-                    Spacer()
-                    NoopCloseButton { dismiss() }
-                }
+                NoopSheetHeader(title: "Goal") { dismiss() }
                 hero.padding(.bottom, NoopSpace.xl)
 
                 NoopTabs(options: hasRoute || kind == .distance

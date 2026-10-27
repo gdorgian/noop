@@ -553,20 +553,13 @@ struct NoopMetricSheet: View {
 
 // MARK: - Pieces
 
-/// The sheet's top: a close button and the title centred over the sheet. Every metric sheet, Fitness's too.
+/// The sheet's header, padded for a full-width sheet. Every metric sheet, Fitness's too.
 struct NoopMetricTopBar: View {
     let title: String
     let close: () -> Void
 
     var body: some View {
-        ZStack {
-            Text(title).font(NoopHTMLFont.sheetHeader).tracking(-0.3).foregroundStyle(NoopHTMLColor.ink)
-                .lineLimit(1).minimumScaleFactor(0.8).padding(.horizontal, 60)
-            HStack {
-                NoopCloseButton(action: close)
-                Spacer()
-            }
-        }
+        NoopSheetHeader(title: title, close: close)
         .padding(.horizontal, NoopSpace.l)
         .padding(.top, NoopSpace.l)
         .padding(.bottom, NoopSpace.s)

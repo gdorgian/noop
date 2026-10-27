@@ -1023,22 +1023,7 @@ private struct NoopSleepNeededSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                HStack {
-                    Text("How sleep needed is worked out")
-                        .font(NoopHTMLFont.outfit(NoopType.title3, weight: .medium))
-                        .foregroundStyle(NoopHTMLColor.ink)
-                    Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(NoopHTMLColor.inkSoft)
-                            .frame(width: 30, height: 30)
-                            .background(Color.white.opacity(0.08), in: Circle())
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(NoopNightPress())
-                    .accessibilityLabel("Close")
-                }
+                NoopSheetHeader(title: "Sleep needed") { dismiss() }
 
                 VStack(spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.offset) { i, row in

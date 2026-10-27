@@ -265,12 +265,8 @@ struct NoopSportPickerSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Start a session").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
-                Spacer()
-                NoopCloseButton { dismiss() }
-            }
-            .padding(.horizontal, 20).padding(.top, 20)
+            NoopSheetHeader(title: "Start a session") { dismiss() }
+                .padding(.horizontal, 20).padding(.top, 20)
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").font(.system(size: 14, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy)
                 TextField("Search sports", text: $query)

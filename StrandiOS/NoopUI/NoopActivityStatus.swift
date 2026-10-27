@@ -164,15 +164,8 @@ struct NoopActivityStatusSheet: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            ZStack {
-                Text("Activity status").font(NoopHTMLFont.sans(NoopType.body, weight: .semibold))
-                    .foregroundStyle(NoopHTMLColor.ink)
-                HStack {
-                    NoopCloseButton { dismiss() }
-                    Spacer()
-                }
-            }
-            .padding(.top, 22).padding(.bottom, 8)
+            NoopSheetHeader(title: "Activity status") { dismiss() }
+                .padding(.top, 22).padding(.bottom, 8)
 
             ForEach(NoopActivityStatus.allCases) { s in row(s) }
 

@@ -589,7 +589,7 @@ private struct NoopAgeBackHeader: View {
         HStack(spacing: 12) {
             // Opened from Trends as a sheet: its first page closes rather than going back.
             if inSheet && label == "Trends" {
-                NoopCloseButton(action: action)
+                NoopSheetHeader(title: "Your ages", close: action)
             } else {
                 NoopBackButton(action: action)
                 NoopBackTitle(label)

@@ -138,16 +138,12 @@ struct NoopFitnessExercisePicker: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack {
-                Button("Cancel") { dismiss() }
-                Spacer()
-                Text("Exercise library").font(NoopHTMLFont.sheetTitle)
-                Spacer()
-                Button("Add (\(selected.count))") {
+            NoopSheetHeader(title: "Exercise library", closeLabel: "Cancel", close: { dismiss() }) {
+                NoopSheetAction(title: selected.isEmpty ? "Add" : "Add \(selected.count)", enabled: !selected.isEmpty) {
                     if let onPickMany { onPickMany(selected) }
                     else { selected.forEach { onPick?($0) } }
                     dismiss()
-                }.disabled(selected.isEmpty)
+                }
             }
             TextField("Search exercises", text: $query).autocorrectionDisabled()
                 .padding(12).background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 12))

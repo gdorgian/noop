@@ -272,11 +272,7 @@ private struct NoopBodyLogSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Text("Log measurements").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
-                    Spacer()
-                    Button("Cancel") { dismiss() }.foregroundStyle(NoopHTMLColor.inkSoft)
-                }
+                NoopSheetHeader(title: "Log measurements", closeLabel: "Cancel") { dismiss() }
                 DatePicker("Taken", selection: $date, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
                     .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
                 group("Body", [.weight, .bodyFat])
@@ -397,13 +393,10 @@ private struct NoopProgressPhotoViewer: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            HStack {
-                Text(Date(timeIntervalSince1970: Double(photo.ts)).formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
-                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                Spacer()
-                Button { confirm = true } label: { Image(systemName: "trash") }.foregroundStyle(NoopHTMLColor.red)
-                    .accessibilityLabel("Delete photo")
-                Button("Done") { dismiss() }.foregroundStyle(NoopHTMLColor.inkSoft).padding(.leading, 12)
+            NoopSheetHeader(title: "Progress photo",
+                            subtitle: Date(timeIntervalSince1970: Double(photo.ts)).formatted(.dateTime.weekday(.wide).day().month(.wide).year()),
+                            close: { dismiss() }) {
+                NoopGlassDisc(symbol: "trash", label: "Delete photo", tint: NoopHTMLColor.red) { confirm = true }
             }
             if let image = NoopProgressPhotoFiles.image(photo.fileName) {
                 Image(uiImage: image).resizable().scaledToFit()
@@ -433,11 +426,7 @@ private struct NoopProgressCompare: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Compare").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
-                Spacer()
-                Button("Done") { dismiss() }.foregroundStyle(NoopHTMLColor.inkSoft)
-            }
+            NoopSheetHeader(title: "Compare") { dismiss() }
             if let before, let after,
                let a = NoopProgressPhotoFiles.image(before.fileName), let b = NoopProgressPhotoFiles.image(after.fileName) {
                 GeometryReader { geo in

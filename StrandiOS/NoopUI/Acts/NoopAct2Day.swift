@@ -195,13 +195,7 @@ struct NoopEnergyProfileConfirmation: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 17) {
-                HStack {
-                    Text("Confirm your body profile")
-                        .font(NoopHTMLFont.outfit(NoopType.title2)).foregroundStyle(NoopHTMLColor.ink)
-                    Spacer()
-                    Button("Cancel") { dismiss() }
-                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
-                }
+                NoopSheetHeader(title: "Your body profile", closeLabel: "Cancel") { dismiss() }
                 Text("Enter your own values. The starting values in Noop are examples and will not be used for Energy until you save this form.")
                     .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                     .fixedSize(horizontal: false, vertical: true)

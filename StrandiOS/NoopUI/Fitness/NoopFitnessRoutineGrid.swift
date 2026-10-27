@@ -18,14 +18,10 @@ struct NoopFitnessRoutineGrid: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack {
-                Button("Done") { dismiss() }
-                Spacer()
-                Text("Routines").font(NoopHTMLFont.sheetTitle)
-                Spacer()
-                Button {
+            NoopSheetHeader(title: "Routines", close: { dismiss() }) {
+                NoopGlassDisc(symbol: "plus", label: "New routine") {
                     dismiss(); navigation.fitnessRoutineID = nil; navigation.push(.fitnessRoutineEdit)
-                } label: { Image(systemName: "plus").frame(width: 44, height: 44) }.accessibilityLabel("New routine")
+                }
             }
             TextField("Search routines", text: $query).padding(12)
                 .background(NoopHTMLColor.cardRaised, in: RoundedRectangle(cornerRadius: 12))

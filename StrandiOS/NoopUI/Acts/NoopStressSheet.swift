@@ -140,14 +140,8 @@ struct NoopStressSheet: View {
     // MARK: Pieces
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Stress").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
-                Text(Date().formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-            }
-            Spacer()
-            NoopCloseButton { dismiss() }
+        NoopSheetHeader(title: "Stress", subtitle: Date().formatted(.dateTime.weekday(.wide).day().month(.wide))) {
+            dismiss()
         }
         .padding(.top, 18)
     }
@@ -408,12 +402,23 @@ struct NoopStressSheet: View {
                 bandMarks(from: s.start, to: max(s.end, s.start.addingTimeInterval(600)), tint: NoopHTMLColor.warm,
                           symbol: NoopFitnessCardioLive.symbol(for: s.sport))
             }
-            ForEach(Array(segments.enumerated()), id: \.offset) { index, seg in
+            let runs = segments
+            ForEach(Array(runs.enumerated()), id: \.offset) { index, seg in
                 ForEach(Array(seg.enumerated()), id: \.offset) { _, p in
                     LineMark(x: .value("Time", p.time), y: .value("Stress", p.level), series: .value("Run", index))
                         .interpolationMethod(.monotone)
                         .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                         .foregroundStyle(Self.levelGradient(seg.map(\.level)))
+                }
+            }
+            // Where no reading was taken, the runs are joined by the dim dashed bridge every chart uses.
+            ForEach(Array(runs.indices.dropFirst()), id: \.self) { k in
+                if let a = runs[k - 1].last, let b = runs[k].first {
+                    ForEach([a, b], id: \.time) { p in
+                        LineMark(x: .value("Time", p.time), y: .value("Stress", p.level), series: .value("Run", "gap\(k)"))
+                            .foregroundStyle(NoopChartGaps.bridgeStyle)
+                            .lineStyle(NoopChartGaps.bridgeStroke)
+                    }
                 }
             }
             if let p = selectedPoint {

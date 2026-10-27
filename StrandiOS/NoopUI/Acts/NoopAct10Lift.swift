@@ -1904,7 +1904,11 @@ struct NoopLiftDetailScreen: View {
         Group {
             if asSheet {
                 ScrollView {
-                    content.padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 28)
+                    VStack(alignment: .leading, spacing: 14) {
+                        NoopSheetHeader(title: "Workout") { dismiss() }
+                        content
+                    }
+                    .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 28)
                 }
             } else {
                 NoopScreen(topInset: 56) {
@@ -3279,16 +3283,7 @@ private struct NoopLiftLastTimeSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("LAST TIME").font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.2)
-                        .foregroundStyle(NoopHTMLColor.muted)
-                    Text(exercise).font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink)
-                }
-                Spacer()
-                Button("Done") { dismiss() }
-                    .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.warm)
-            }
+            NoopSheetHeader(title: "Last time", subtitle: exercise) { dismiss() }
             if sets.isEmpty {
                 Text("No earlier session of this exercise. The numbers you log today become next time's guide.")
                     .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
@@ -3400,6 +3395,7 @@ struct NoopLiftEffortSheet: View {
     /// A cardio session reads in its own words and Aura blue; a lift keeps the warm save.
     var cardio = false
     let save: () -> Void
+    @Environment(\.dismiss) private var dismiss
 
     private static let cardioWords: [(String, String)] = [
         ("Barely anything", "Could have kept going all day."),
@@ -3439,8 +3435,8 @@ struct NoopLiftEffortSheet: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Text("How hard was that?").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
-                .padding(.top, 34)
+            NoopSheetHeader(title: "How hard was that?") { dismiss() }
+                .padding(.top, 18)
             Text(cardio
                  ? "Your own read of the whole session. It sits beside the heart rate, which cannot feel the legs or the heat."
                  : "Your own read of the whole session. It sits beside the heart-rate figures, which cannot see a heavy set.")

@@ -30,15 +30,8 @@ struct NoopTileSheetFrame<Picture: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ZStack {
-                Text(tile.section.title).font(NoopHTMLFont.sheetHeader).tracking(-0.3)
-                    .foregroundStyle(NoopHTMLColor.ink)
-                HStack {
-                    NoopCloseButton { dismiss() }
-                    Spacer()
-                }
-            }
-            .padding(.top, 22).padding(.bottom, 22)
+            NoopSheetHeader(title: tile.section.title) { dismiss() }
+                .padding(.top, 22).padding(.bottom, 22)
 
             HStack(alignment: .center, spacing: 14) {
                 NoopGlossTile(symbol: tile.symbol, tint: tint ?? tile.tint, side: 52, beat: beat)

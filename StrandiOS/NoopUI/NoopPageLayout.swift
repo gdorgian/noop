@@ -1020,13 +1020,7 @@ private struct NoopAddSectionSheet<Section: View>: View {
 
     private var panel: some View {
         VStack(spacing: 0) {
-            HStack {
-                NoopCloseButton { close() }
-                Spacer()
-                Text(editing.addBeside == nil ? "Add section" : "Add a tile").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                Spacer()
-                Color.clear.frame(width: NoopCloseButton.side, height: 1)
-            }
+            NoopSheetHeader(title: editing.addBeside == nil ? "Add section" : "Add a tile") { close() }
             .padding(.horizontal, 20)
             .padding(.top, 18)
             .padding(.bottom, 10)

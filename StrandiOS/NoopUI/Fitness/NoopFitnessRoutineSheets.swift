@@ -11,20 +11,16 @@ private struct NoopFitnessCompactSheet<Content: View, Actions: View>: View {
     var subtitle: String? = nil
     @ViewBuilder var content: Content
     @ViewBuilder var actions: Actions
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
-                if let subtitle {
-                    Text(subtitle).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
-                }
-            }
+            NoopSheetHeader(title: title, subtitle: subtitle) { dismiss() }
             content
             Spacer(minLength: 0)
             actions
         }
-        .padding(.horizontal, 20).padding(.top, 30).padding(.bottom, 16)
+        .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

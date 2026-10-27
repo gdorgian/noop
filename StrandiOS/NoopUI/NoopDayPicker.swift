@@ -155,24 +155,11 @@ struct NoopDayCalendarSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ZStack {
-                Text(title).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                HStack {
-                    NoopCloseButton { dismiss() }
-                    Spacer()
-                    Button {
-                        NoopHaptics.play(.tick)
-                        offset = 0
-                        dismiss()
-                    } label: {
-                        Text("Today").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                            .foregroundStyle(offset == 0 ? NoopHTMLColor.faint : NoopHTMLColor.blueLight)
-                            .padding(.horizontal, 14).frame(height: NoopControlSize.small.height)
-                            .background(Color.white.opacity(0.06), in: Capsule())
-                            .noopHitTarget()
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    .disabled(offset == 0)
+            NoopSheetHeader(title: title, close: { dismiss() }) {
+                NoopSheetAction(title: "Today", enabled: offset != 0) {
+                    NoopHaptics.play(.tick)
+                    offset = 0
+                    dismiss()
                 }
             }
             .padding(.top, 22)

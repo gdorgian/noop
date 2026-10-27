@@ -18,12 +18,8 @@ struct NoopDailyRhythmScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: NoopSpace.l) {
-                HStack { Spacer(); NoopCloseButton { dismiss() } }
+                NoopSheetHeader(title: "Daily rhythm") { dismiss() }
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Daily rhythm")
-                        .font(NoopHTMLFont.outfit(NoopType.title2))
-                        .tracking(-0.6)
-                        .foregroundStyle(NoopHTMLColor.ink)
                     Text("When you move across the day, read from your strap over the last week.")
                         .font(NoopHTMLFont.sans(NoopType.footnote))
                         .foregroundStyle(NoopHTMLColor.copy)

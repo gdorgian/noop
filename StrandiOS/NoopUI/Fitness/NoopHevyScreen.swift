@@ -22,10 +22,7 @@ struct NoopHevyScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: NoopSpace.l) {
-                HStack {
-                    Spacer()
-                    NoopCloseButton { dismiss() }
-                }
+                NoopSheetHeader(title: "Hevy") { dismiss() }
                 hero
                 if connected { connectedBody } else { connectBody }
             }

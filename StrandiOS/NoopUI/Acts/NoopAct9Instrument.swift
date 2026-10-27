@@ -1167,13 +1167,8 @@ private struct NoopInstrumentMetricScreen: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                HStack {
-                    NoopCloseButton(label: "Close metric details") { navigation.dismissMetricSheet() }
-                    Spacer()
-                    Text(model.signal.name).font(NoopHTMLFont.sans(17, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.ink).lineLimit(1)
-                    Spacer()
-                    Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+                NoopSheetHeader(title: model.signal.name, closeLabel: "Close metric details") {
+                    navigation.dismissMetricSheet()
                 }
                 .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 12)
                 ScrollViewReader { scroll in

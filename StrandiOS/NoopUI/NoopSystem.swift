@@ -221,6 +221,7 @@ struct NoopGlassDisc: View {
     let symbol: String
     let label: String
     var nudge: CGFloat = 0
+    var tint: Color = NoopHTMLColor.ink
     let action: () -> Void
 
     var body: some View {
@@ -246,7 +247,7 @@ struct NoopGlassDisc: View {
 
     private var glyph: some View {
         Image(systemName: symbol).font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(NoopHTMLColor.ink)
+            .foregroundStyle(tint)
             .offset(x: nudge)
             .frame(width: NoopCloseButton.side, height: NoopCloseButton.side)
             .contentShape(Circle())
@@ -261,6 +262,88 @@ struct NoopBackButton: View {
 
     var body: some View {
         NoopGlassDisc(symbol: "chevron.left", label: label, nudge: -1, action: action)
+    }
+}
+
+/// Every sheet's top (27 Oct 2026), the system's own sheet layout: the glass close disc leading, the
+/// title centred at sheet size, and an optional action trailing. The two sides take the same width, so
+/// the title stays centred whatever sits on the right. Change the sheet header here only.
+struct NoopSheetHeader<Trailing: View>: View {
+    let title: String
+    /// A short line under the title: the day, the exercise.
+    var subtitle: String? = nil
+    var closeLabel = "Close"
+    let close: () -> Void
+    @ViewBuilder var trailing: Trailing
+
+    @State private var side: CGFloat = NoopCloseButton.side
+
+    var body: some View {
+        HStack(spacing: NoopSpace.s) {
+            NoopCloseButton(label: closeLabel, action: close)
+                .frame(width: side, alignment: .leading)
+            VStack(spacing: 1) {
+                Text(title)
+                    .font(NoopHTMLFont.sheetTitle).tracking(-0.4)
+                    .foregroundStyle(NoopHTMLColor.ink)
+                    .lineLimit(1).minimumScaleFactor(0.75)
+                    .accessibilityAddTraits(.isHeader)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(NoopHTMLFont.sans(NoopType.caption))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                        .lineLimit(1).minimumScaleFactor(0.85)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            trailing
+                .fixedSize()
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
+                    side = max(NoopCloseButton.side, $0)
+                }
+                .frame(width: side, alignment: .trailing)
+        }
+        .frame(minHeight: NoopCloseButton.side)
+    }
+}
+
+extension NoopSheetHeader where Trailing == EmptyView {
+    init(title: String, subtitle: String? = nil, closeLabel: String = "Close", close: @escaping () -> Void) {
+        self.init(title: title, subtitle: subtitle, closeLabel: closeLabel, close: close) { EmptyView() }
+    }
+}
+
+/// A sheet header's trailing action: a word on the same glass as the close disc, the system's
+/// confirm placement.
+struct NoopSheetAction: View {
+    let title: String
+    var enabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                .foregroundStyle(enabled ? NoopHTMLColor.ink : NoopHTMLColor.faint)
+                .padding(.horizontal, 16)
+                .frame(height: NoopCloseButton.side)
+                .modifier(NoopGlassCapsule())
+                .noopHitTarget()
+        }
+        .buttonStyle(NoopPlainHitStyle())
+        .disabled(!enabled)
+    }
+}
+
+private struct NoopGlassCapsule: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.interactive(), in: .capsule)
+        } else {
+            content
+                .background(Color.white.opacity(0.13), in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+        }
     }
 }
 

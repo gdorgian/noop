@@ -56,6 +56,7 @@ struct NoopActivityConfirmSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                NoopSheetHeader(title: detected ? "Detected activity" : "Workout") { dismiss() }
                 NoopSessionHero(symbol: NoopFitnessCardioLive.symbol(for: row.sport),
                                 kind: detected ? "Detected activity" : kindLine, title: title, when: when,
                                 source: detected ? "Noop Aura · detected from heart rate" : imported ? importedSource : "Noop Aura",
@@ -378,7 +379,7 @@ struct NoopSessionEditSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Edit session").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
+                NoopSheetHeader(title: "Edit session", closeLabel: "Cancel") { dismiss() }
 
                 VStack(alignment: .leading, spacing: 10) {
                     NoopSectionLabel("Activity")

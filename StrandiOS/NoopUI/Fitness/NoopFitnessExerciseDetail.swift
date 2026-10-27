@@ -19,11 +19,7 @@ struct NoopFitnessExerciseDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top) {
-                    Text(choice.name).font(NoopHTMLFont.sheetTitle)
-                    Spacer()
-                    Button("Done") { dismiss() }
-                }
+                NoopSheetHeader(title: choice.name) { dismiss() }
                 Text(choice.equipment ?? "Equipment not specified").foregroundStyle(NoopHTMLColor.copy)
                 NoopTabs(options: [("Summary", NoopExerciseInsightsTab.summary), ("Records", .records),
                                    ("History", .history), ("How to", .howTo)], selection: $tab)
@@ -117,7 +113,7 @@ struct NoopFitnessChecklist: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Filter by \(title)").font(NoopHTMLFont.sheetTitle)
+            NoopSheetHeader(title: "Filter by \(title)") { dismiss() }
             List {
                 Button { draft.removeAll() } label: { row("All \(title)", on: draft.isEmpty) }
                 ForEach(options, id: \.0) { id, label in
