@@ -1229,6 +1229,7 @@ private struct NoopSveaSetup: View {
                 NoopSveaEyebrow("A model per job")
                     .frame(height: 20, alignment: .topLeading)
                 ForEach(Array(models.enumerated()), id: \.offset) { index, model in
+                    modelRowShell(index: index) {
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(model.title)
@@ -1252,6 +1253,8 @@ private struct NoopSveaSetup: View {
                     }
                     .frame(minHeight: 62)
                     .padding(.vertical, 13)
+                    .contentShape(Rectangle())
+                    }
                     if index < models.count - 1 {
                         Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
                     }
@@ -1453,7 +1456,7 @@ private struct NoopSveaSetup: View {
             let chartModel = coach.model(for: .cardAnalysis)
             return [
                 .init(title: "The daily brief", detail: "uses the conversation model", value: modelLabel(conversationModel)),
-                .init(title: "Conversation", detail: "your selected model", value: modelLabel(conversationModel)),
+                .init(title: "Conversation", detail: "tap to choose the model", value: modelLabel(conversationModel)),
                 .init(title: "Charts", detail: "card analysis, when available", value: modelLabel(chartModel))
             ]
         }
@@ -1470,6 +1473,33 @@ private struct NoopSveaSetup: View {
             .init(title: "Conversation", detail: "fast, interrupted often", value: values[1]),
             .init(title: "Charts", detail: "picks a window and a series", value: values[2])
         ]
+    }
+
+    /// The Conversation row (index 1) opens the provider's models; the others are read-only. The brief
+    /// follows the conversation model, so this one choice covers both.
+    @ViewBuilder
+    private func modelRowShell<Content: View>(index: Int, @ViewBuilder content: () -> Content) -> some View {
+        if index == 1 && !NoopSveaFixture.enabled {
+            Menu {
+                Button("Provider default (\(coach.provider.defaultModel.isEmpty ? "none" : coach.provider.defaultModel))") {
+                    coach.model = ""
+                }
+                ForEach(coach.availableModels, id: \.self) { id in
+                    Button {
+                        coach.model = id
+                    } label: {
+                        if id == coach.model { Label(id, systemImage: "checkmark") } else { Text(id) }
+                    }
+                }
+                Divider()
+                Button("Fetch the latest list from \(provider)") { Task { await coach.refreshModels() } }
+            } label: {
+                content()
+            }
+            .accessibilityHint("Choose the model Svea talks with")
+        } else {
+            content()
+        }
     }
 
     private func modelLabel(_ value: String) -> String {
