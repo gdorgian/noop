@@ -247,7 +247,7 @@ struct NoopSleepPeriodSection: View {
             VStack(spacing: 6) {
                 Image(systemName: read.glyph)
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(on ? NoopHTMLColor.inkSoft : NoopHTMLColor.faint)
+                    .foregroundStyle(on ? NoopHTMLColor.ink : NoopHTMLColor.faint)
                     .symbolEffect(.bounce, value: on)
                     .frame(height: 22)
                 Text(read.rating?.title ?? "—")
@@ -262,7 +262,6 @@ struct NoopSleepPeriodSection: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .background(on ? Color.white.opacity(0.035) : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(NoopHTMLPressStyle())
@@ -377,7 +376,7 @@ struct NoopSleepStagesSection: View {
                         draw(&context, canvasSize, reveal: reveal)
                     }
                 }
-                .padding(.top, 44)
+                .padding(.top, 10)
                 .contentShape(Rectangle())
                 .gesture(press(width: size.width))
                 if let index = scrubRun, runs.indices.contains(index) {
@@ -386,8 +385,8 @@ struct NoopSleepStagesSection: View {
                     Rectangle()
                         .fill(LinearGradient(colors: [.white.opacity(0), .white.opacity(0.5), .white.opacity(0.5), .white.opacity(0)],
                                              startPoint: .top, endPoint: .bottom))
-                        .frame(width: 1, height: size.height - 38)
-                        .position(x: x, y: 44 + (size.height - 44) / 2)
+                        .frame(width: 1, height: size.height - 4)
+                        .position(x: x, y: 10 + (size.height - 10) / 2)
                         .allowsHitTesting(false)
                     let from = span.lowerBound.addingTimeInterval(run.from * total)
                     let to = span.lowerBound.addingTimeInterval(run.to * total)
@@ -403,13 +402,14 @@ struct NoopSleepStagesSection: View {
                     .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
                     .fixedSize()
                     .alignmentGuide(.leading) { d in -min(max(0, x - d.width / 2), size.width - d.width) }
+                    .offset(y: -34)
                     .contentTransition(.numericText())
                     .allowsHitTesting(false)
                     .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .bottom)))
                 }
             }
         }
-        .frame(height: 214)
+        .frame(height: 180)
         .animation(reduceMotion ? nil : .interactiveSpring(response: 0.22, dampingFraction: 0.86), value: scrubRun)
         .accessibilityElement()
         .accessibilityLabel("Sleep stages from \(noopClock(span.lowerBound)) to \(noopClock(span.upperBound))")
@@ -556,7 +556,8 @@ struct NoopFallAsleepSection: View {
     @State private var shown = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var minutes: Double? { night.bed.map(\.latencyMin) }
+    /// Zero means the night starts asleep — no in-bed time was recorded, so there is nothing to time.
+    private var minutes: Double? { night.bed.map(\.latencyMin).flatMap { $0 >= 1 ? $0 : nil } }
 
     /// Fast under 10 minutes, normal 10–20, late beyond; each takes a third of the track.
     private var position: Double {
@@ -697,13 +698,17 @@ struct NoopSleepVitalsSection: View {
                     .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
                     .foregroundStyle(NoopHTMLColor.ink)
                     .contentTransition(.opacity)
-                headline
-                chart
+                if loaded && points.isEmpty {
+                    empty
+                } else {
+                    headline
+                    chart
+                }
                 if let span = night.span {
                     HStack {
                         edge("moon.fill", noopClock(span.lowerBound))
                         Spacer()
-                        edge("sun.max.fill", noopClock(span.upperBound))
+                        edge("sun.max.fill", noopClock(night.bed?.finalWake ?? span.upperBound))
                     }
                 }
                 tabs
@@ -711,6 +716,20 @@ struct NoopSleepVitalsSection: View {
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.86), value: vital)
         .task(id: night.dayKey) { await load() }
+    }
+
+    private var empty: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "waveform.slash")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(NoopHTMLColor.faint)
+            Text("No strap readings for this night")
+                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium))
+                .foregroundStyle(NoopHTMLColor.copy)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 120)
+        .background(Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var headline: some View {
