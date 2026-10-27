@@ -270,6 +270,13 @@ struct NoopMetricSheet: View {
     @State private var picked: Date?
     /// Readings of a catalogue-series metric, loaded when it is selected.
     @State private var seriesPoints: [NoopMetricPoint] = []
+    /// A day chosen on the calendar: the period ends there instead of today.
+    @State private var anchor: Date?
+    @State private var choosingDay = false
+    /// How far the figure has slid under the title, 0 to 1.
+    @State private var collapse: CGFloat = 0
+    /// The period bar is holding at the top.
+    @State private var pinned = false
 
     private var metric: NoopMetric { metrics.first { $0.id == selectedID } ?? metrics[0] }
 
@@ -284,7 +291,7 @@ struct NoopMetricSheet: View {
 
     private var window: ClosedRange<Date> {
         let cal = Calendar.current
-        let end = cal.date(byAdding: .day, value: -range.days * offset, to: cal.startOfDay(for: Date())) ?? Date()
+        let end = cal.date(byAdding: .day, value: -range.days * offset, to: cal.startOfDay(for: anchor ?? Date())) ?? Date()
         let start = cal.date(byAdding: .day, value: -(range.days - 1), to: end) ?? end
         return start...end.addingTimeInterval(86_399)
     }
@@ -306,29 +313,64 @@ struct NoopMetricSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            topBar
-            ScrollView {
-                VStack(alignment: .leading, spacing: NoopSpace.l) {
-                    hero
-                    if metrics.count > 1 { chips }
-                    chartCard
-                    NoopMetricRangeBar(range: $range, offset: $offset, canGoBack: canGoBack)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: NoopSpace.l, pinnedViews: [.sectionHeaders]) {
+                hero
+                    // The figure gives way as it slides under the title.
+                    .opacity(1 - collapse)
+                    .scaleEffect(1 - 0.05 * collapse, anchor: .topLeading)
+                    .blur(radius: 4 * collapse)
+                if metrics.count > 1 { chips }
+                chartCard
+                // The period stays to hand while the cards below are read (27 Oct 2026).
+                Section {
                     if !metric.zones.isEmpty { zonesCard }
                     trendsCard
                     aboutCard
+                } header: {
+                    NoopMetricRangeBar(range: $range, offset: $offset, canGoBack: canGoBack,
+                                       anchored: anchor != nil, calendar: { choosingDay = true })
+                        .padding(.vertical, NoopSpace.xs)
+                        .background {
+                            if pinned {
+                                NoopHTMLColor.canvas
+                                    .padding(.horizontal, -NoopSpace.l)
+                                    .mask(LinearGradient(stops: [.init(color: .black, location: 0.75), .init(color: .clear, location: 1)],
+                                                         startPoint: .top, endPoint: .bottom))
+                                    .padding(.top, -200)
+                            }
+                        }
+                        .onGeometryChange(for: Bool.self) { $0.frame(in: .scrollView).minY <= 1 } action: { pinned = $0 }
                 }
-                .padding(.horizontal, NoopSpace.l)
-                .padding(.top, NoopSpace.xs)
-                .padding(.bottom, NoopSpace.xxl)
             }
-            .scrollIndicators(.hidden)
+            .padding(.horizontal, NoopSpace.l)
+            .padding(.top, NoopSpace.xs)
+            .padding(.bottom, NoopSpace.xxl)
+        }
+        .scrollIndicators(.hidden)
+        .modifier(NoopScrollCollapse(collapse: $collapse))
+        .safeAreaInset(edge: .top, spacing: 0) {
+            topBar
+                .background(NoopHTMLColor.canvas.opacity(collapse > 0.02 ? 1 : 0))
+                // Content fades into the bar rather than meeting it at a line.
+                .overlay(alignment: .bottom) {
+                    LinearGradient(colors: [NoopHTMLColor.canvas, NoopHTMLColor.canvas.opacity(0)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 22)
+                        .offset(y: 22)
+                        .opacity(collapse)
+                        .allowsHitTesting(false)
+                }
         }
         .background(NoopHTMLColor.canvas.ignoresSafeArea())
+        .sheet(isPresented: $choosingDay) {
+            NoopMetricDayPicker(anchor: $anchor, range: range, earliest: all.first?.date)
+                .noopFloatingSheet(height: 520)
+        }
         .task(id: "\(repo.refreshSeq)|\(selectedID)") { await load() }
         .onChange(of: selectedID) { _, _ in picked = nil; openOnLatest() }
         .onChange(of: range) { _, _ in picked = nil; offset = 0 }
         .onChange(of: offset) { _, _ in picked = nil }
+        .onChange(of: anchor) { _, _ in picked = nil; offset = 0 }
     }
 
     private var canGoBack: Bool {
@@ -738,16 +780,82 @@ struct NoopMetricRangeBar: View {
     @Binding var range: NoopMetricRange
     @Binding var offset: Int
     var canGoBack: Bool
+    /// The period ends on a chosen day rather than today.
+    var anchored = false
+    /// Opens the calendar; nil leaves it out.
+    var calendar: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: NoopSpace.xs) {
             NoopIconButton(systemImage: "chevron.left", size: .small, label: "Earlier") { offset += 1 }
                 .disabled(!canGoBack).opacity(canGoBack ? 1 : 0.35)
             NoopTabs(options: NoopMetricRange.allCases.map { ($0.rawValue, $0) }, selection: $range)
+            if let calendar {
+                NoopIconButton(systemImage: anchored ? "calendar.badge.clock" : "calendar", size: .small,
+                               label: "Choose a day", action: calendar)
+            }
             NoopIconButton(systemImage: "chevron.right", size: .small, label: "Later") { offset -= 1 }
                 .disabled(offset == 0).opacity(offset == 0 ? 0.35 : 1)
         }
         .sensoryFeedback(.selection, trigger: offset)
+    }
+}
+
+/// The period bar's calendar: choose the day a period ends on, see the span it covers, Done or Reset.
+struct NoopMetricDayPicker: View {
+    @Binding var anchor: Date?
+    let range: NoopMetricRange
+    let earliest: Date?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var day = Date()
+
+    private var span: String {
+        let start = Calendar.current.date(byAdding: .day, value: -(range.days - 1), to: day) ?? day
+        let f = Date.FormatStyle().day().month(.abbreviated)
+        return "Last \(range.rawValue): \(start.formatted(f)) – \(day.formatted(f.year()))"
+    }
+
+    var body: some View {
+        VStack(spacing: NoopSpace.m) {
+            DatePicker("Period ends", selection: $day, in: (earliest ?? .distantPast)...Date(), displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .tint(NoopHTMLColor.blueLight)
+                .labelsHidden()
+            Text(span)
+                .font(NoopHTMLFont.sans(NoopType.caption)).monospacedDigit()
+                .foregroundStyle(NoopHTMLColor.copy)
+                .contentTransition(.numericText())
+                .animation(.smooth(duration: 0.25), value: span)
+            NoopActionButton(title: "Done", variant: .secondary) {
+                anchor = Calendar.current.isDateInToday(day) ? nil : day
+                dismiss()
+            }
+            NoopActionButton(title: "Reset", variant: .plain, size: .small) {
+                anchor = nil
+                dismiss()
+            }
+        }
+        .padding(.horizontal, NoopSpace.l)
+        .padding(.bottom, NoopSpace.l)
+        .onAppear { day = anchor ?? Date() }
+        .sensoryFeedback(.selection, trigger: day)
+    }
+}
+
+/// How far a sheet's figure has slid under its title, 0 to 1 over the first 70 points (iOS 18; still
+/// before that).
+struct NoopScrollCollapse: ViewModifier {
+    @Binding var collapse: CGFloat
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, y in
+                collapse = min(max(y / 70, 0), 1)
+            }
+        } else {
+            content
+        }
     }
 }
 
