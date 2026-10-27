@@ -1495,14 +1495,12 @@ private extension NoopAct5Screens {
             : item.kind == .sleep ? Self.lavender : NoopHTMLColor.blue
         Button {
             if item.kind == .sleep {
-                if let date = item.date, true {
-                    // Release has no "why" engine: open the night itself on Rest, which reads it in full.
+                if let date = item.date {
+                    // Open the night itself on Rest, which reads it in full.
                     let back = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: date),
                                                                to: Calendar.current.startOfDay(for: Date())).day ?? 0
                     navigation.selectedRestDay = max(0, back)
                     navigation.reset(to: .rest)
-                } else {
-                    navigation.push(.why)
                 }
             } else if let start = item.sessionStart {
                 navigation.openSession(startTs: start)

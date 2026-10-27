@@ -25,7 +25,6 @@ struct NoopAct1Screens: View {
     /// Which weekdays the window is armed for, Monday first, as a 7-character mask.
     @SceneStorage("noop.act1.alarm-days") private var alarmDayMask = "1111100"
     @SceneStorage("noop.act1.bedtime-committed") private var bedtimeCommitted = false
-    @State private var expandedCause = 1
     @State private var debtRange = "14 nights"
     @State private var debtPoint: Int?
 
@@ -35,8 +34,6 @@ struct NoopAct1Screens: View {
             restScreen
         case .tonight:
             tonightScreen
-        case .why:
-            whyScreen
         case .debt:
             debtScreen
         case .alarm:
@@ -78,6 +75,7 @@ struct NoopAct1Screens: View {
         NoopPageSection(id: "inbed", title: "In bed and asleep", detail: "Time in bed, asleep and awake, lights out to up"),
         NoopPageSection(id: "hero-aurora", title: "Header · Aurora", detail: "The night's lights in a dark disc", onByDefault: false),
         NoopPageSection(id: "hero-glass", title: "Header · Glass", detail: "The night's stages settled in a glass", onByDefault: false),
+        NoopPageSection(id: "hero-ring", title: "Header · Ring", detail: "The night's stages in a ring that closes at your need", onByDefault: false),
         NoopPageSection(id: "night-glass", title: "Sleep · Glass", detail: "The night as layered liquid, filled toward your need", onByDefault: false),
         NoopPageSection(id: "night-aurora", title: "Sleep · Aurora", detail: "The night as curtains of light, as tall as the sleep was deep", onByDefault: false),
         NoopPageSection(id: "night-dial", title: "Sleep · Dial", detail: "The night on a clock face, cut into its stages", onByDefault: false),
@@ -101,6 +99,23 @@ struct NoopAct1Screens: View {
         switch id {
         case "trends":
             NoopTrendsList(navigation: navigation, ids: noopSleepTrendIDs).padding(.top, 18)
+        case "hero-ring":
+            // Sleep's own ring on its own, whatever header style the page's "Your sleep" follows.
+            if let night = restNight {
+                let delta = NoopRestRecord.delta(asleepMin: night.asleepMin, needMin: rest.needMin)
+                Act1SleepRing(
+                    hours: NoopRestRecord.duration(night.asleepMin),
+                    delta: delta.text,
+                    progress: min(1, night.asleepMin / max(1, rest.needMin)),
+                    selectedStage: selectedStage,
+                    slices: night.slices,
+                    needCaption: "the ring closes at your need \u{00B7} \(NoopRestRecord.duration(rest.needMin))",
+                    closes: delta.closes,
+                    measured: true
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
         case "hero-aurora", "hero-glass":
             if let night = restNight {
                 Group {
@@ -116,11 +131,11 @@ struct NoopAct1Screens: View {
         case "night-aurora", "night-dial", "night-performance", "night-ledger", "night-glass":
             if let night = restNight {
                 switch id {
-                case "night-aurora": NoopSleepAuroraSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
-                case "night-glass": NoopSleepGlassSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
-                case "night-dial": NoopSleepDialSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
-                case "night-performance": NoopSleepPerformanceSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
-                default: NoopSleepLedgerSection(night: night, needMin: rest.needMin) { navigation.push(.why) }
+                case "night-aurora": NoopSleepAuroraSection(night: night, needMin: rest.needMin)
+                case "night-glass": NoopSleepGlassSection(night: night, needMin: rest.needMin)
+                case "night-dial": NoopSleepDialSection(night: night, needMin: rest.needMin)
+                case "night-performance": NoopSleepPerformanceSection(night: night, needMin: rest.needMin)
+                default: NoopSleepLedgerSection(night: night, needMin: rest.needMin)
                 }
             }
         case "night":
@@ -868,145 +883,6 @@ struct NoopAct1Screens: View {
 
     // MARK: - Why
 
-    private var whyScreen: some View {
-        NoopScreen(topInset: 56) {
-            VStack(spacing: 0) {
-                Act1BackHeader(label: selectedNightOffset == 0 ? (isNightWorker ? "Why that sleep" : "Why last night") : "Why \(selectedNight.shortDate)") { back(to: .rest) }
-
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 9) {
-                        Circle()
-                            .fill(RadialGradient(colors: [Color(hex: 0x9FE2FB), Color(hex: 0x2FB2F0), Color(hex: 0x0A5F92)], center: .topLeading, startRadius: 0, endRadius: 22))
-                            .frame(width: 22, height: 22)
-                            .shadow(color: NoopHTMLColor.blue.opacity(0.5), radius: 6)
-                        Text("SVEA")
-                            .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
-                            .tracking(1.43)
-                            .foregroundStyle(NoopHTMLColor.muted)
-                    }
-
-                    Text(selectedNight.whyHeadline)
-                        .font(NoopHTMLFont.serif(29))
-                        .foregroundStyle(NoopHTMLColor.ink)
-                        .tracking(-0.29)
-                        .noopAct1LineBox(fontSize: 29, ratio: 1.22)
-                    Text(whyParagraphOneDisplay)
-                        .font(NoopHTMLFont.sans(NoopType.subhead))
-                        .foregroundStyle(Color(hex: 0xB7C3C9))
-                        .tracking(-0.25)
-                        .noopAct1LineBox(fontSize: 14.5, ratio: 1.68)
-                        .padding(.top, -4)
-                        .padding(.bottom, -2)
-                    whyParagraphTwoText
-                        .foregroundStyle(Color(hex: 0xB7C3C9))
-                        .tracking(-0.25)
-                        .noopAct1LineBox(fontSize: 14.5, ratio: 1.68)
-                }
-                .padding(.top, 10)
-                .padding(.horizontal, 2)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("WHAT THE NIGHT WAS MADE OF")
-                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
-                        .tracking(1.3)
-                        .foregroundStyle(NoopHTMLColor.muted)
-                        .padding(.leading, 2)
-                    ForEach(Array(selectedNight.causes.enumerated()), id: \.offset) { index, cause in
-                        causeCard(cause, index: index)
-                    }
-                }
-                .padding(.top, 20)
-
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("The strap can't measure your bedroom. Room temperature here is inferred from skin temperature — treat it as a good guess, not a reading.")
-                        .noopAct1LineBox(fontSize: 11.5, ratio: 1.65)
-                    Text(rhythmLine)
-                        .noopAct1LineBox(fontSize: 11.5, ratio: 1.65)
-                    Button { navigation.push(.tonight) } label: {
-                        HStack(spacing: 9) {
-                            Text("Take this into tonight")
-                            NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.blue)
-                        }
-                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.blue)
-                        .padding(.horizontal, 17)
-                        .padding(.vertical, 12)
-                        .background(NoopHTMLColor.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(NoopHTMLColor.blue.opacity(0.3), lineWidth: 0.5))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                }
-                .font(NoopHTMLFont.sans(NoopType.caption))
-                .foregroundStyle(NoopHTMLColor.faint)
-                .padding(.top, 18)
-                .padding(.horizontal, 2)
-            }
-        }
-    }
-
-    private func causeCard(_ cause: Act1Cause, index: Int) -> some View {
-        let open = expandedCause == index
-        return Button {
-            withAnimation(.easeOut(duration: 0.2)) { expandedCause = open ? -1 : index }
-        } label: {
-            VStack(alignment: .leading, spacing: 11) {
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(cause.good ? NoopHTMLColor.blue : Color(hex: 0xF2B45C))
-                        .frame(width: 9, height: 9)
-                        .background(
-                            Circle()
-                                .fill((cause.good ? NoopHTMLColor.blue : Color(hex: 0xF2B45C)).opacity(0.14))
-                                .frame(width: 17, height: 17)
-                        )
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(cause.title).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                        Text(cause.meta).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
-                    }
-                    Spacer(minLength: 4)
-                    Text(cause.effect)
-                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                        .foregroundStyle(cause.good ? NoopHTMLColor.blueLight : Color(hex: 0xF3C888))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(
-                            (cause.good ? NoopHTMLColor.blue : Color(hex: 0xF2B45C)).opacity(0.12),
-                            in: RoundedRectangle(cornerRadius: 8)
-                        )
-                }
-                if open {
-                    VStack(alignment: .leading, spacing: 11) {
-                        Text(cause.detail)
-                            .font(NoopHTMLFont.sans(NoopType.footnote))
-                            .foregroundStyle(Color(hex: 0xB7C3C9))
-                            .noopAct1LineBox(fontSize: 13, ratio: 1.62)
-                        if cause.hasTemperatureChart {
-                            VStack(spacing: 6) {
-                                Act1TemperatureChart()
-                                    .frame(height: 46)
-                                HStack {
-                                    Text(selectedNight.axis[0]); Spacer()
-                                    Text(selectedNight.axis[1]); Spacer()
-                                    Text(selectedNight.warmestLabel); Spacer()
-                                    Text(selectedNight.axis[3])
-                                }
-                                .font(NoopHTMLFont.sans(NoopType.eyebrow))
-                                .foregroundStyle(NoopHTMLColor.faint)
-                            }
-                        }
-                    }
-                    .padding(.top, 1)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 15)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(open ? Color.white.opacity(0.055) : NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(open ? Color.white.opacity(0.13) : NoopHTMLColor.border, lineWidth: 0.5))
-        }
-        .buttonStyle(NoopPlainHitStyle())
-    }
-
     // MARK: - Debt
 
     private var debtScreen: some View {
@@ -1121,28 +997,6 @@ struct NoopAct1Screens: View {
     }
 
     // MARK: - Context and helpers
-
-    private var whyParagraphTwoText: Text {
-        let phrase = "0.4°C warmer"
-        guard let range = selectedNight.whyParagraphTwo.range(of: phrase) else {
-            return Text(selectedNight.whyParagraphTwo)
-                .font(NoopHTMLFont.sans(NoopType.subhead))
-        }
-        let prefix = String(selectedNight.whyParagraphTwo[..<range.lowerBound])
-        let suffix = String(selectedNight.whyParagraphTwo[range.upperBound...])
-        return Text(prefix).font(NoopHTMLFont.sans(NoopType.subhead))
-            + Text(phrase).font(NoopHTMLFont.serif(16, italic: true))
-            + Text(suffix).font(NoopHTMLFont.sans(NoopType.subhead))
-    }
-
-    /// Chromium's `text-wrap: pretty` keeps this final phrase together. SwiftUI uses a
-    /// greedy line breaker, so preserve the canonical break explicitly for the matching copy.
-    private var whyParagraphOneDisplay: String {
-        selectedNight.whyParagraphOne.replacingOccurrences(
-            of: " instead of after two hours.",
-            with: " instead of\nafter two hours."
-        )
-    }
 
     private var selectedNightOffset: Int {
         min(max(navigation.selectedRestDay, 0), Self.nights.count - 1)
@@ -1657,11 +1511,6 @@ struct NoopAct1Screens: View {
     }
 
     private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
-    private var rhythmLine: String {
-        isNightWorker
-            ? "You work nights, so none of this is anchored to darkness — it follows your own pattern."
-            : "Built from your own ninety-sleep pattern, not the clock."
-    }
 
     /// The debt screen over the measured series: the running balance for the chosen range, and the
     /// four figures the grid prints, each read off the same per-night deltas.
@@ -2049,34 +1898,6 @@ private struct Act1Hypnogram: View {
 
     private func color(_ stage: Int) -> Color {
         [Color.white.opacity(0.22), NoopHTMLColor.nightLight, Color(hex: 0x4FB8E8), Color(hex: 0x5D6BC4)][stage]
-    }
-}
-
-private struct Act1TemperatureChart: View {
-    private let values = [0.0, -1, -2, -1, 0, 1, 0, 2, 6, 10, 12, 9, 5, 2, 1]
-
-    var body: some View { chartBody.noopChartZoom() }
-
-    @ViewBuilder private var chartBody: some View {
-        Canvas { context, size in
-            let sx = size.width / 280
-            let sy = size.height / 46
-            var baseline = Path()
-            baseline.move(to: CGPoint(x: 0, y: 30 * sy))
-            baseline.addLine(to: CGPoint(x: size.width, y: 30 * sy))
-            context.stroke(baseline, with: .color(Color.white.opacity(0.08)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-
-            var line = Path()
-            for (index, value) in values.enumerated() {
-                let point = CGPoint(x: CGFloat(index) / CGFloat(values.count - 1) * size.width, y: CGFloat(30 - value * 1.75) * sy)
-                if index == 0 { line.move(to: point) } else { line.addLine(to: point) }
-            }
-            context.stroke(line, with: .color(Color(hex: 0xF2B45C)), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-            let dot = CGPoint(x: 176 * sx, y: 9 * sy)
-            let circle = Path(ellipseIn: CGRect(x: dot.x - 3.6, y: dot.y - 3.6, width: 7.2, height: 7.2))
-            context.fill(circle, with: .color(Color(hex: 0xF2B45C)))
-            context.stroke(circle, with: .color(NoopHTMLColor.card), lineWidth: 2.4)
-        }
     }
 }
 

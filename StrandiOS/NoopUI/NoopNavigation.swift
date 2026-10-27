@@ -97,7 +97,7 @@ enum NoopMotion {
 
 enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 1
-    case rest, tonight, why, debt, alarm
+    case rest, tonight, debt, alarm
     // Act 2
     case today, inbox, day, energy, vitals, stress, heart, recovery, strain
     case breathe, bcatalog, bplayer, bsweep, bfound
@@ -148,7 +148,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
 
     var act: NoopAct {
         switch self {
-        case .rest, .tonight, .why, .debt, .alarm: .night
+        case .rest, .tonight, .debt, .alarm: .night
         case .today, .inbox, .day, .energy, .vitals, .stress, .heart, .recovery, .strain,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound: .day
         case .session, .pick, .ready, .live, .intervals: .effort
@@ -174,7 +174,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     var tab: NoopTab {
         switch self {
         // Rest left the tab bar for Fitness (22 Oct 2026); last night is a row on Today.
-        case .rest, .tonight, .why, .debt, .alarm,
+        case .rest, .tonight, .debt, .alarm,
              .today, .inbox, .day, .energy, .vitals, .stress, .heart, .recovery, .strain,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound,
              .coach, .gate, .setup, .consent, .memory:
@@ -1129,7 +1129,6 @@ extension NoopRoute {
         switch self {
         case .rest: "Last night"
         case .tonight: "Tonight"
-        case .why: "Why"
         case .debt: "Sleep debt"
         case .alarm: "Smart alarm"
         case .today: "Today"

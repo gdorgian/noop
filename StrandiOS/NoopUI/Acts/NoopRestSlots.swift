@@ -36,15 +36,27 @@ private func noopNeedLine(_ asleep: Double, _ need: Double) -> String {
 
 // MARK: Dial
 
+/// A Button when there is somewhere to go, the bare label when there is not, so a card never presses
+/// into nothing.
+struct NoopOptionalButton<Label: View>: View {
+    let action: (() -> Void)?
+    @ViewBuilder let label: Label
+
+    var body: some View {
+        if let action { Button(action: action) { label } } else { label }
+    }
+}
+
 struct NoopSleepDialSection: View {
     let night: NoopRestRecord.Night
     let needMin: Double
-    let action: () -> Void
+    /// What a tap opens; nil leaves the card a plain card.
+    var action: (() -> Void)? = nil
 
     private static let accent = Color(hex: 0x9C8CFF)
 
     var body: some View {
-        Button(action: action) {
+        NoopOptionalButton(action: action) {
             NoopSlotCard(tint: Self.accent) {
                 VStack(spacing: 16) {
                     HStack {
@@ -135,7 +147,8 @@ struct NoopSleepDialSection: View {
 struct NoopSleepPerformanceSection: View {
     let night: NoopRestRecord.Night
     let needMin: Double
-    let action: () -> Void
+    /// What a tap opens; nil leaves the card a plain card.
+    var action: (() -> Void)? = nil
 
     private static let tint = Color(hex: 0x7FA6C4)
 
@@ -145,7 +158,7 @@ struct NoopSleepPerformanceSection: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        NoopOptionalButton(action: action) {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 22) {
                     NoopSlotClock(continuous: false) { _, reveal in
@@ -221,10 +234,11 @@ struct NoopSleepPerformanceSection: View {
 struct NoopSleepLedgerSection: View {
     let night: NoopRestRecord.Night
     let needMin: Double
-    let action: () -> Void
+    /// What a tap opens; nil leaves the card a plain card.
+    var action: (() -> Void)? = nil
 
     var body: some View {
-        Button(action: action) {
+        NoopOptionalButton(action: action) {
             NoopHTMLCard(radius: 22, padding: 18) {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(alignment: .firstTextBaseline) {
@@ -289,7 +303,8 @@ struct NoopSleepLedgerSection: View {
 struct NoopSleepAuroraSection: View {
     let night: NoopRestRecord.Night
     let needMin: Double
-    let action: () -> Void
+    /// What a tap opens; nil leaves the card a plain card.
+    var action: (() -> Void)? = nil
 
     /// How high each stage reaches: awake barely lifts off the horizon, deep reaches the top.
     private static let height: [Float] = [0.08, 0.42, 0.62, 0.95]
@@ -313,7 +328,7 @@ struct NoopSleepAuroraSection: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        NoopOptionalButton(action: action) {
             ZStack(alignment: .topLeading) {
                 NoopSlotClock { t, reveal in
                     GeometryReader { g in
@@ -353,10 +368,11 @@ struct NoopSleepAuroraSection: View {
 struct NoopSleepGlassSection: View {
     let night: NoopRestRecord.Night
     let needMin: Double
-    let action: () -> Void
+    /// What a tap opens; nil leaves the card a plain card.
+    var action: (() -> Void)? = nil
 
     var body: some View {
-        Button(action: action) {
+        NoopOptionalButton(action: action) {
             NoopSlotCard(tint: Color(hex: 0x5D6BC4)) {
                 HStack(alignment: .center, spacing: 22) {
                     NoopSleepGlass(night: night, needMin: needMin).frame(width: 110, height: 190)
@@ -459,7 +475,7 @@ struct NoopSleepAuroraHero: View {
     var side: CGFloat = 250
 
     var body: some View {
-        let section = NoopSleepAuroraSection(night: night, needMin: needMin, action: {})
+        let section = NoopSleepAuroraSection(night: night, needMin: needMin)
         NoopSlotClock { t, reveal in
             ZStack {
                 Circle().fill(RadialGradient(colors: [Color(hex: 0x141833), Color(hex: 0x05060C)], center: .center,
