@@ -546,7 +546,7 @@ struct NoopAct1Screens: View {
                 if restNight != nil {
                     if restHasTimeline {
                         VStack(spacing: 7) {
-                            NoopStageTimeline(slices: restNight?.slices ?? Act1Hypnogram.prototypeStages,
+                            NoopStageTimeline(slices: restNight?.slices ?? [],
                                               colors: NoopTodayNightCard.stageColors, selected: selectedStage)
                                 .frame(height: 96)
                             HStack {
@@ -1748,8 +1748,6 @@ private struct Act1RingCanvas: View {
     var stages: [Int]? = nil
     var singleTone = false
 
-    static let prototypeStages = [1, 1, 2, 3, 3, 3, 2, 2, 3, 3, 2, 1, 0, 1, 2, 3, 3, 2, 2, 1, 1, 2, 2, 3, 2, 1, 0, 1, 1, 2, 2, 1, 1, 0]
-
     var body: some View {
         Canvas { context, size in
             let scale = min(size.width / 232, size.height / 232)
@@ -1786,7 +1784,7 @@ private struct Act1RingCanvas: View {
             )
 
             // One tone (light) when the night has no measured timeline; the arc still closes at need.
-            let stages = singleTone ? [1] : (self.stages ?? Self.prototypeStages)
+            let stages = singleTone ? [1] : (self.stages ?? [1])
             let segmentSweep = usedSweep / Double(max(1, stages.count))
             context.drawLayer { glow in
                 glow.addFilter(.blur(radius: 9 * scale))
@@ -1876,28 +1874,6 @@ private struct Act1StageStrip: View {
         Rectangle()
             .fill(selectedStage == nil || selectedStage == stage ? color : Color.white.opacity(0.09))
             .frame(width: width)
-    }
-}
-
-private struct Act1Hypnogram: View {
-    let selectedStage: Int?
-    var stages: [Int]? = nil
-    static let prototypeStages = [1, 1, 2, 3, 3, 3, 2, 2, 3, 3, 2, 1, 0, 1, 2, 3, 3, 2, 2, 1, 1, 2, 2, 3, 2, 1, 0, 1, 1, 2, 2, 1, 1, 0]
-
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 2) {
-            ForEach(Array((stages ?? Self.prototypeStages).enumerated()), id: \.offset) { _, stage in
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(selectedStage == nil || selectedStage == stage ? color(stage) : Color.white.opacity(0.07))
-                    .frame(minWidth: 3, maxWidth: .infinity)
-                    .frame(height: [20, 40, 60, 82][stage])
-                    .shadow(color: selectedStage == stage ? color(stage) : .clear, radius: 5)
-            }
-        }
-    }
-
-    private func color(_ stage: Int) -> Color {
-        [Color.white.opacity(0.22), NoopHTMLColor.nightLight, Color(hex: 0x4FB8E8), Color(hex: 0x5D6BC4)][stage]
     }
 }
 
