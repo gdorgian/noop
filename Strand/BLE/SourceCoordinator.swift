@@ -241,14 +241,13 @@ final class SourceCoordinator: ObservableObject {
     }
 
     /// Apply the WHOOP targeting for the now-active WHOOP `id`. Always sets the preferred peripheral
-    /// (nil for the legacy "my-whoop" → connect to any WHOOP, unchanged). Re-points the sample deviceId
-    /// ONLY for a non-legacy WHOOP — the seeded "my-whoop" keeps the bootstrap-set id, so the single-
-    /// WHOOP path never calls `setActiveDeviceId`. Records `activeWhoopId` for future change detection.
+    /// (nil for the legacy "my-whoop" → connect to any WHOOP, unchanged). Always re-points the sample
+    /// deviceId: skipping it for "my-whoop" left samples stamped with the PREVIOUS strap's id after a
+    /// switch back to the seed (a re-pair folding into it, or "Switch to this"). On the single-WHOOP path
+    /// the id already equals "my-whoop", so the call changes nothing. Records `activeWhoopId`.
     private func pointWhoop(at id: String, peripheralId: String?) {
         setWhoopPreferredPeripheral(peripheralId)
-        if id != "my-whoop" {
-            setWhoopActiveDeviceId(id)
-        }
+        setWhoopActiveDeviceId(id)
         activeWhoopId = id
     }
 

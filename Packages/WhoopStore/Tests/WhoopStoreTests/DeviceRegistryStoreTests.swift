@@ -311,4 +311,40 @@ final class DeviceRegistryStoreTests: XCTestCase {
         XCTAssertFalse(try store.adoptSerialIdentity(from: "oura-X", to: "oura-X"))       // same id
         XCTAssertFalse(try store.adoptSerialIdentity(from: "oura-absent", to: "oura-Y"))  // no active row
     }
+
+    /// The legacy strap forgotten and paired again must fold back onto `my-whoop`, or the new row's
+    /// fresh minutes win the day and the night recorded under the seed stops scoring recovery.
+    func testReclaimLegacyWhoopFoldsARePairedStrapBack() throws {
+        let dbq = try makeDB(); let store = DeviceRegistryStore(dbQueue: dbq)
+        try store.setPeripheralId("my-whoop", peripheralId: "293AD54E")
+        try store.archive("my-whoop")
+        try store.add(PairedDevice(id: "whoop-5A00487289", brand: "WHOOP", model: "5.0 MG", peripheralId: "293AD54E",
+                                   sourceKind: .liveBLE, capabilities: [.hr, .hrv, .steps], status: .paired,
+                                   addedAt: 200, lastSeenAt: 200))
+        try store.setActive("whoop-5A00487289")
+        try dbq.write { db in
+            try db.execute(sql: "INSERT INTO hrSample (deviceId, ts, bpm) VALUES ('my-whoop', 10, 55)")
+            try db.execute(sql: "INSERT INTO hrSample (deviceId, ts, bpm) VALUES ('whoop-5A00487289', 20, 60)")
+        }
+
+        XCTAssertTrue(try store.reclaimLegacyWhoop())
+
+        XCTAssertEqual(try store.activeDeviceId(), "my-whoop")
+        XCTAssertEqual(Set(try store.all().map(\.id)), ["my-whoop"])
+        XCTAssertEqual(try hrCount(dbq, "my-whoop"), 2)
+        XCTAssertEqual(try store.all().first?.capabilities, [.hr, .hrv, .steps])
+        XCTAssertFalse(try store.reclaimLegacyWhoop())   // idempotent
+    }
+
+    /// A different strap (another peripheral) is a real second device and keeps its own row.
+    func testReclaimLegacyWhoopLeavesADifferentStrapAlone() throws {
+        let store = DeviceRegistryStore(dbQueue: try makeDB())
+        try store.setPeripheralId("my-whoop", peripheralId: "293AD54E")
+        try store.archive("my-whoop")
+        try store.add(PairedDevice(id: "whoop-OTHER", brand: "WHOOP", model: "5.0 MG", peripheralId: "AAAA1111",
+                                   sourceKind: .liveBLE, capabilities: [.hr], status: .paired, addedAt: 200, lastSeenAt: 200))
+        try store.setActive("whoop-OTHER")
+        XCTAssertFalse(try store.reclaimLegacyWhoop())
+        XCTAssertEqual(try store.activeDeviceId(), "whoop-OTHER")
+    }
 }

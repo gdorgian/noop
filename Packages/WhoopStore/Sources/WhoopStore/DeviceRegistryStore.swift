@@ -283,6 +283,32 @@ public struct DeviceRegistryStore: Sendable {
         }
     }
 
+    /// The legacy single-WHOOP seed id. Its history and ~47 literal readers stay on it (see `WhoopSerialIdentity.mayAdopt`).
+    public static let legacyWhoopId = "my-whoop"
+
+    /// Forgetting the strap that still lives on the legacy seed and pairing it again created a second row
+    /// (`whoop-<uuid>`, later `whoop-<serial>`) for the SAME strap. Its few minutes of fresh data then won
+    /// the day in `resolveDayOwner` (active outranks archived), so the night recorded under `my-whoop`
+    /// stopped counting: sleep survived through the stable computed id, recovery and HRV went blank.
+    ///
+    /// When the active WHOOP row and an inactive `my-whoop` row share a peripheral, fold the new row back
+    /// into the seed: its rows move onto `my-whoop`, the seed becomes active again with the new row's
+    /// capabilities, and the duplicate is dropped. Returns true when it folded.
+    public func reclaimLegacyWhoop() throws -> Bool {
+        let rows = try all()
+        guard let active = rows.first(where: { $0.status == .active }),
+              active.id != Self.legacyWhoopId, active.id.hasPrefix("whoop-"), active.sourceKind == .liveBLE,
+              let peripheral = active.peripheralId, !peripheral.isEmpty,
+              rows.contains(where: { $0.id == Self.legacyWhoopId && $0.status != .active && $0.peripheralId == peripheral })
+        else { return false }
+        let caps = active.capabilities.map(\.rawValue).sorted().joined(separator: ",")
+        guard try adoptSerialIdentity(from: active.id, to: Self.legacyWhoopId) else { return false }
+        try dbQueue.write { db in
+            try db.execute(sql: "UPDATE pairedDevice SET capabilities = ? WHERE id = ?", arguments: [caps, Self.legacyWhoopId])
+        }
+        return true
+    }
+
     // MARK: day ownership
     public struct DayOwner: Equatable { public let deviceId: String; public let locked: Bool }
 

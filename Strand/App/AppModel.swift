@@ -719,6 +719,10 @@ final class AppModel: ObservableObject {
         guard sourceCoordinator == nil, let store = await repo.storeHandle() else { return }
         let registry = DeviceRegistry(store: DeviceRegistryStore(dbQueue: store.registryWriter))
         registry.reload()
+        // Heals an install where the legacy strap was forgotten and paired again as a second row.
+        if registry.reclaimLegacyWhoop() {
+            live.append(log: "Re-paired strap folded back onto its original history (my-whoop).")
+        }
         let coordinator = SourceCoordinator(
             registry: registry,
             live: live,
@@ -1425,7 +1429,9 @@ final class AppModel: ObservableObject {
             // is kept as a belt-and-braces immediate re-point (idempotent, so it's a safe no-op once the
             // subscription has also fired). The just-activated id IS `device.id` (`setActive` made it active).
             registry.setActive(device.id)
-            Task { [weak self] in await self?.adoptActiveDevice(device.id) }
+            // The same strap paired again after "Forget": keep one history instead of starting a second.
+            let activeId = registry.reclaimLegacyWhoop() ? registry.activeDeviceId : device.id
+            Task { [weak self] in await self?.adoptActiveDevice(activeId) }
         }
     }
 

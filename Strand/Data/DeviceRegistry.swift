@@ -67,6 +67,15 @@ final class DeviceRegistry: ObservableObject {
         return moved
     }
 
+    /// Fold a re-paired strap back onto the legacy `my-whoop` row it duplicates (see
+    /// `DeviceRegistryStore.reclaimLegacyWhoop`). Returns true when it folded; the active id is then "my-whoop".
+    @discardableResult
+    func reclaimLegacyWhoop() -> Bool {
+        let folded = (try? store.reclaimLegacyWhoop()) ?? false
+        if folded { reload() }
+        return folded
+    }
+
     /// Archive (remove) a device: NOOP stops connecting to it, but its recorded data is kept. If the
     /// archived device was the active one, `activeDeviceId` is left as-is here — the caller decides the
     /// next active device (or leaves none active) and calls `setActive` explicitly.
