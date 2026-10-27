@@ -366,6 +366,8 @@ struct LiftSessionEngine: Equatable {
     mutating func start(_ slot: LiftSlot, now: Int) {
         guard planItem(for: slot) != nil else { return }
         pushHistory()
+        // Starting a set from its own row ends the rest that was running: keep what was rested.
+        closeRunningRest(now: now)
         sets.removeAll { $0.slot == slot }
         stage = .working(slot)
         stageStartedAt = now
@@ -560,15 +562,20 @@ struct LiftSessionEngine: Equatable {
         return true
     }
 
+    /// Record the rest running now against the set it follows, once. The stage is left as it is.
+    mutating func closeRunningRest(now: Int) {
+        if case .resting(let slot, _) = stage,
+           let i = sets.firstIndex(where: { $0.slot == slot }), sets[i].restSec == nil {
+            sets[i].restSec = max(0, now - stageStartedAt)
+        }
+    }
+
     /// End the session. The rest that was running is closed out first, so its measured duration is
     /// not silently lost.
     mutating func finish(now: Int) {
         guard stage != .finished else { return }
         pushHistory()
-        if case .resting(let slot, _) = stage,
-           let i = sets.firstIndex(where: { $0.slot == slot }), sets[i].restSec == nil {
-            sets[i].restSec = max(0, now - stageStartedAt)
-        }
+        closeRunningRest(now: now)
         stage = .finished
         stageStartedAt = now
     }

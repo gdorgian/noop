@@ -735,6 +735,13 @@ final class LiftSessionController: ObservableObject {
         persist()
     }
 
+    /// Close the running rest into the record before the sets are read for saving.
+    func closeRunningRest() {
+        guard !saveInProgress else { return }
+        engine?.closeRunningRest(now: Int(Date().timeIntervalSince1970))
+        persist()
+    }
+
     func finish() {
         guard !saveInProgress else { return }
         engine?.finish(now: Int(Date().timeIntervalSince1970))

@@ -1262,6 +1262,8 @@ private struct NoopLiftLiveScreen: View {
         saving = true
         defer { saving = false }
         if let slot { writeFields(slot: slot) }
+        // The last rest ends here; without this its measured duration never reached the record.
+        live.closeRunningRest()
         guard let engine = live.engine else { return }
         // A retry after a partial write must address the same natural session and replace the same
         // set list, not mint a second collection of sets under a new random session id.
@@ -2305,7 +2307,15 @@ private struct NoopLiftEditScreen: View {
     private var working: [LiftSetRow] { kept.filter { !$0.isWarmup } }
     private var volume: Double { working.compactMap(\.volumeKg).reduce(0, +) }
     private var selectedExercise: String { rows.first?.exercise ?? "Recorded sets" }
-    private var displayIndices: [Int] { rows.indices.filter { rows[$0].exercise == selectedExercise && !rows[$0].isWarmup } }
+    /// Every exercise in the session, in the order it was done, each corrected in its own card.
+    private var exercises: [String] {
+        var seen: [String] = []
+        for row in rows where !row.isWarmup && !seen.contains(row.exercise) { seen.append(row.exercise) }
+        return seen.isEmpty ? [selectedExercise] : seen
+    }
+    private func displayIndices(_ exercise: String) -> [Int] {
+        rows.indices.filter { rows[$0].exercise == exercise && !rows[$0].isWarmup }
+    }
 
     var body: some View {
         NoopScreen(bottomInset: 40, topInset: 58) {
@@ -2338,20 +2348,21 @@ private struct NoopLiftEditScreen: View {
                     .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color(hex: 0x6FBF7F).opacity(0.22), lineWidth: 0.5))
                 }
 
+                ForEach(exercises, id: \.self) { exercise in
                 VStack(alignment: .leading, spacing: 11) {
                     HStack {
-                        NoopSectionLabel(selectedExercise)
+                        NoopSectionLabel(exercise)
                         Spacer()
-                        Text(totalText)
+                        Text(totalText(exercise))
                             .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.blueLight)
                             .monospacedDigit()
                     }
                     VStack(spacing: 0) {
-                        ForEach(displayIndices, id: \.self) { index in
-                            editRow(index)
+                        ForEach(Array(displayIndices(exercise).enumerated()), id: \.element) { position, index in
+                            editRow(index, number: position + 1, first: position == 0)
                         }
                     }
-                    Button { addSet() } label: {
+                    Button { addSet(to: exercise) } label: {
                         HStack(spacing: 9) {
                             NoopCanonicalGlyph(name: .plus, size: 16, color: NoopHTMLColor.blueLight)
                             Text("Add a set you forgot")
@@ -2366,6 +2377,7 @@ private struct NoopLiftEditScreen: View {
                 .padding(.horizontal, 16).padding(.vertical, 14)
                 .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+                }
 
                 Text("A corrected session is the session. Noop keeps one record and this screen edits it — there is no second, truer copy kept somewhere you cannot see.")
                     .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
@@ -2383,10 +2395,11 @@ private struct NoopLiftEditScreen: View {
         }
     }
 
-    private func editRow(_ index: Int) -> some View {
+    /// `number` is the set's place in its exercise, as the session summary numbers it.
+    private func editRow(_ index: Int, number: Int, first: Bool) -> some View {
         let isDeleted = deleted.contains(rows[index].id)
         return HStack(spacing: 10) {
-            Text("\(rows[index].setIndex)")
+            Text("\(number)")
                 .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                 .frame(width: 20, alignment: .leading)
             HStack(spacing: 7) {
@@ -2428,16 +2441,21 @@ private struct NoopLiftEditScreen: View {
         }
         .frame(minHeight: 48).opacity(isDeleted ? 0.5 : 1)
         .overlay(alignment: .top) {
-            if index != displayIndices.first { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) }
+            if !first { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) }
         }
     }
 
-    private var totalText: String {
+    /// One exercise's working sets and what they moved, so a card counts only its own rows.
+    private func totalText(_ exercise: String) -> String {
         if isPrototypeRecord {
             return deleted.isEmpty ? "14 working sets · 5,020 kg" : "14 → 13 working sets · 4,540 kg"
         }
-        let suffix = "\(working.count) working sets · \(groupedWeight(volume))"
-        return deleted.isEmpty ? suffix : "\(rows.filter { !$0.isWarmup }.count) → \(suffix)"
+        let all = rows.filter { !$0.isWarmup && $0.exercise == exercise }
+        let mine = working.filter { $0.exercise == exercise }
+        let moved = mine.compactMap(\.volumeKg).reduce(0, +)
+        let noun = mine.count == 1 ? "working set" : "working sets"
+        let suffix = moved > 0 ? "\(mine.count) \(noun) · \(groupedWeight(moved))" : "\(mine.count) \(noun)"
+        return all.count == mine.count ? suffix : "\(all.count) → \(suffix)"
     }
 
     private var editTitle: String {
@@ -2461,9 +2479,9 @@ private struct NoopLiftEditScreen: View {
         }
     }
 
-    private func addSet() {
-        guard let source = kept.last(where: { $0.exercise == selectedExercise })
-                ?? rows.last(where: { $0.exercise == selectedExercise }),
+    private func addSet(to exercise: String) {
+        guard let source = kept.last(where: { $0.exercise == exercise })
+                ?? rows.last(where: { $0.exercise == exercise }),
               let session = flow.selectedSession ?? recordFallback else { return }
         let next = (rows.filter { $0.exercise == source.exercise }.map(\.setIndex).max() ?? 0) + 1
         rows.append(LiftSetRow(id: UUID().uuidString, deviceId: repo.deviceId, sessionId: session.id,

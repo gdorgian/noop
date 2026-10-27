@@ -321,7 +321,9 @@ targets:
         # hard-coded in Swift; stays in sync with the application-groups entitlement (both $(APP_GROUP_ID)).
         AppGroupIdentifier: "$(APP_GROUP_ID)"
         LSApplicationCategoryType: public.app-category.healthcare-fitness
-        UILaunchScreen: {}
+        # Aura's canvas, so a cold start opens dark instead of flashing white before the first frame.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         # ProMotion opt-in. WITHOUT this key iOS clamps every app-driven animation to 60Hz on a 120Hz
         # panel — CADisplayLink, Core Animation, and SwiftUI's TimelineView(.animation) alike. The app
         # never declared it, so the whole liquid layer has been running at half the panel's rate on
