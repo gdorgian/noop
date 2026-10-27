@@ -31,7 +31,7 @@ struct NoopTileSheetFrame<Picture: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack {
-                Text(tile.section.title).font(NoopHTMLFont.sans(NoopType.body, weight: .semibold))
+                Text(tile.section.title).font(NoopHTMLFont.sheetHeader).tracking(-0.3)
                     .foregroundStyle(NoopHTMLColor.ink)
                 HStack {
                     NoopCloseButton { dismiss() }

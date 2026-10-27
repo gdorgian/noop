@@ -518,8 +518,8 @@ struct NoopMetricTopBar: View {
 
     var body: some View {
         ZStack {
-            Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                .lineLimit(1).padding(.horizontal, 60)
+            Text(title).font(NoopHTMLFont.sheetHeader).tracking(-0.3).foregroundStyle(NoopHTMLColor.ink)
+                .lineLimit(1).minimumScaleFactor(0.8).padding(.horizontal, 60)
             HStack {
                 NoopCloseButton(action: close)
                 Spacer()

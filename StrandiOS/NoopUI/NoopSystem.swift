@@ -211,16 +211,45 @@ struct NoopCloseButton: View {
     static let side: CGFloat = 42
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(NoopHTMLColor.ink)
-                .frame(width: Self.side, height: Self.side)
-                .background(Color.white.opacity(0.13), in: Circle())
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
-                .noopHitTarget()
+        NoopGlassDisc(symbol: "xmark", label: label, action: action)
+    }
+}
+
+/// The close and back discs: Liquid Glass that swells and catches the light under the finger, the
+/// system's own press (27 Oct 2026), and the old frosted disc before iOS 26.
+struct NoopGlassDisc: View {
+    let symbol: String
+    let label: String
+    var nudge: CGFloat = 0
+    let action: () -> Void
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            Button(action: action) {
+                glyph
+                    .glassEffect(.regular.interactive(), in: .circle)
+                    .noopHitTarget()
+            }
+            .buttonStyle(NoopPlainHitStyle())
+            .accessibilityLabel(label)
+        } else {
+            Button(action: action) {
+                glyph
+                    .background(Color.white.opacity(0.13), in: Circle())
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+                    .noopHitTarget()
+            }
+            .buttonStyle(NoopHTMLPressStyle())
+            .accessibilityLabel(label)
         }
-        .buttonStyle(NoopHTMLPressStyle())
-        .accessibilityLabel(label)
+    }
+
+    private var glyph: some View {
+        Image(systemName: symbol).font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(NoopHTMLColor.ink)
+            .offset(x: nudge)
+            .frame(width: NoopCloseButton.side, height: NoopCloseButton.side)
+            .contentShape(Circle())
     }
 }
 
@@ -231,17 +260,7 @@ struct NoopBackButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: "chevron.left").font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(NoopHTMLColor.ink)
-                .offset(x: -1)
-                .frame(width: NoopCloseButton.side, height: NoopCloseButton.side)
-                .background(Color.white.opacity(0.13), in: Circle())
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
-                .noopHitTarget()
-        }
-        .buttonStyle(NoopHTMLPressStyle())
-        .accessibilityLabel(label)
+        NoopGlassDisc(symbol: "chevron.left", label: label, nudge: -1, action: action)
     }
 }
 

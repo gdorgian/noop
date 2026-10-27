@@ -116,6 +116,8 @@ enum NoopHTMLFont {
     /// SwiftUI's `.thin` is weight 200; `.ultraLight` would incorrectly select 100.
     /// Every sheet's title, native or overlay.
     static var sheetTitle: Font { outfit(24, weight: .semibold) }
+    /// A sheet's name, centred beside its close button.
+    static var sheetHeader: Font { outfit(20, weight: .semibold) }
 
     static func outfit200(_ size: CGFloat) -> Font {
         scaled("Outfit", size).weight(.thin)
