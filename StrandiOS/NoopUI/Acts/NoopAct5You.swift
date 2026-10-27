@@ -21,6 +21,7 @@ struct NoopAct5Screens: View {
     @EnvironmentObject private var coach: AICoachEngine
     @EnvironmentObject private var profile: ProfileStore
     @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
+    @AppStorage(ClockFormatPreference.defaultsKey) private var clockRaw = ClockFormatPreference.system.rawValue
     /// The same gate Energy uses: until the wearer confirms them, the profile's starting values are
     /// examples and are not printed as theirs.
     @AppStorage("noop.energy.profileConfirmed") private var profileConfirmed = false
@@ -99,7 +100,7 @@ struct NoopAct5Screens: View {
     @State private var deviceNotice: String?
 
     @State private var preferences: [String: String] = [
-        "Units": "Metric", "Temperature": "°C", "Effort": "0–100", "Appearance": "Dark",
+        "Units": "Metric", "Temperature": "°C", "Clock": "iPhone", "Effort": "0–100", "Appearance": "Dark",
         "Chart colours": "Titanium", "Sleep chart": "Hypnogram", "Card surface": "Frosted",
         "App icon": "Aura", "Power saving at": "20%", "Double tap": "Sleep mark",
         "Language": "English", "Svea’s manner": "Plain"
@@ -327,6 +328,17 @@ private extension NoopAct5Screens {
                 UnitPrefs.resolveTemperature(system: UnitSystem(rawValue: unitSystemRaw) ?? .metric,
                                              override: temperatureRaw) == .fahrenheit ? "°F" : "°C"
             }, set: { temperatureRaw = ($0 == "°F" ? TemperatureUnit.fahrenheit : .celsius).rawValue })
+        case "Clock":
+            Binding(get: {
+                switch ClockFormatPreference.from(stored: clockRaw) {
+                case .system: "iPhone"
+                case .twelveHour: "12-hour"
+                case .twentyFourHour: "24-hour"
+                }
+            }, set: {
+                clockRaw = ($0 == "12-hour" ? ClockFormatPreference.twelveHour
+                            : $0 == "24-hour" ? .twentyFourHour : .system).rawValue
+            })
         case "Effort":
             Binding(get: { UnitPrefs.resolveEffortScale(effortScaleRaw) == .whoop ? "0–21" : "0–100" },
                     set: { effortScaleRaw = ($0 == "0–21" ? EffortScale.whoop : .hundred).rawValue })
@@ -3916,6 +3928,7 @@ private extension NoopAct5Screens {
         case "Temperature":
             return settingsChoice("Temperature") != (settingsChoice("Units") == "Imperial" ? "°F" : "°C")
         case "Effort": return settingsChoice("Effort") == "0–21"
+        case "Clock": return ClockFormatPreference.from(stored: clockRaw) != .system
         case "Power saving at": return powerSavingPct != 20
         default: return false
         }
@@ -3934,6 +3947,7 @@ private extension NoopAct5Screens {
         case "Units": UserDefaults.standard.removeObject(forKey: UnitPrefs.systemKey)
         case "Temperature": temperatureRaw = ""
         case "Effort": effortScaleRaw = ""
+        case "Clock": clockRaw = ClockFormatPreference.system.rawValue
         case "Power saving at": powerSavingPct = 20
         default: break
         }
@@ -4179,6 +4193,8 @@ private extension NoopAct5Screens {
                             keywords: "metric imperial kilograms pounds miles kilometres"),
                 segmentItem(tint, "look-temperature", "Temperature", "independent of the rest", choices: ["°C", "°F"],
                             keywords: "celsius fahrenheit"),
+                segmentItem(tint, "look-clock", "Clock", "times inside Noop", choices: ["iPhone", "12-hour", "24-hour"],
+                            keywords: "time 12 24 hour am pm military"),
                 toggleItem(tint, "look-motion", "Reduce motion in Noop", "Poses every looping graphic still without needing the system switch.",
                            keywords: "animation accessibility still"),
                 linkItem(tint, "look-widgets", "Widgets", "\(widgetFamilyCountWord) families, and what each one answers", symbol: "square.grid.2x2",
@@ -6094,9 +6110,6 @@ struct NoopPendingOption: Identifiable {
         .init(id: "pending-skin-temp", page: .look, status: .later, title: "Skin temperature as a change", symbol: "thermometer.medium",
               does: "Show skin temperature as degrees, or as the change from your own normal.",
               why: "Every page that shows it needs to follow the same choice."),
-        .init(id: "pending-clock", page: .look, status: .later, title: "Clock", symbol: "clock",
-              does: "12- or 24-hour times inside Noop, whatever the iPhone itself uses.",
-              why: "Aura follows the iPhone for now."),
         .init(id: "pending-appearance", page: .look, status: .later, title: "Appearance", symbol: "circle.lefthalf.filled",
               does: "Light, dark, or follow the iPhone.",
               why: "Dark only in this build. Light is drawn but not coloured yet."),
