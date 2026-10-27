@@ -235,9 +235,13 @@ struct NoopSessionHeart: View {
         let lowest = curve.map(\.minBpm).filter { $0 > 0 }.min() ?? values.min() ?? 0
         let highest = curve.map(\.maxBpm).max() ?? values.max() ?? 0
         let average = values.reduce(0, +) / Double(max(1, values.count))
-        let floors = zoneSet.zones.map(\.lower)
-        let lo = max(40, min(lowest, floors.first ?? lowest) - 6)
-        let hi = max(highest, (floors.last ?? highest)) + 6
+        // The range follows the session's own pulse, reaching up to the next zone floor above its peak, so
+        // an easy session is not pressed flat under five empty floors.
+        let lo = max(40, lowest - 6)
+        let nextFloor = zoneSet.zones.map(\.lower).first { $0 > highest }
+        let hi = max(highest + 6, (nextFloor ?? highest) + 4)
+        let shown = zoneSet.zones.map(\.lower).enumerated().filter { $0.element >= lo && $0.element <= hi }
+        let floors = shown.map(\.element)
         return NoopSessionCard {
             VStack(alignment: .leading, spacing: 14) {
                 NoopSessionCardTitle(symbol: "heart.fill", title: "Heart rate")
@@ -247,7 +251,7 @@ struct NoopSessionHeart: View {
                     figure("Max", highest)
                 }
                 Chart {
-                    ForEach(Array(floors.enumerated()), id: \.offset) { i, low in
+                    ForEach(shown, id: \.offset) { i, low in
                         RuleMark(y: .value("Zone \(i + 1)", low))
                             .foregroundStyle(Self.zoneColors[min(i + 1, 5)].opacity(0.55))
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
