@@ -5531,6 +5531,9 @@ struct NoopLivePairScreen: View {
     @State private var picked: (uuid: String, name: String, rssi: Int)?
     @State private var registered = false
     @State private var found: [(uuid: String, name: String, rssi: Int)] = []
+    /// Why nothing can be found: Bluetooth off, not allowed, or missing. The scan would otherwise
+    /// read "Looking" forever with the reason only in the strap log.
+    @State private var radioBlocked: String?
 
     var body: some View {
         NoopScreen(bottomInset: 40, topInset: 56) {
@@ -5538,7 +5541,7 @@ struct NoopLivePairScreen: View {
                 HStack {
                     NoopBackButton { leave() }
                     Spacer()
-                    Text(registered ? "PAIRED" : "LOOKING")
+                    Text(registered ? "PAIRED" : radioBlocked != nil ? "BLUETOOTH" : "LOOKING")
                         .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.5)
                         .foregroundStyle(Color(hex: 0x7F8A85))
                     Spacer()
@@ -5568,13 +5571,13 @@ struct NoopLivePairScreen: View {
                 NoopA5PairPulse(paired: registered)
 
                 VStack(spacing: 9) {
-                    Text(registered ? "That is everything." : "Hold the button until it blinks.")
+                    Text(registered ? "That is everything." : radioBlocked != nil ? "Bluetooth is not available." : "Hold the button until it blinks.")
                         .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).tracking(-0.8).multilineTextAlignment(.center)
                     Text(registered
                          ? "Noop is connecting and will import what the strap has buffered. It watches for a week before it tells you anything."
-                         : found.isEmpty
+                         : radioBlocked ?? (found.isEmpty
                             ? "Looking for a \(family.displayName) nearby. Nothing is connected until you tap Connect, and pairing does not send anything anywhere."
-                            : "Noop found \(found.count == 1 ? "one strap" : "\(found.count) straps") nearby. Nothing is connected until you tap Connect, and pairing does not send anything anywhere.")
+                            : "Noop found \(found.count == 1 ? "one strap" : "\(found.count) straps") nearby. Nothing is connected until you tap Connect, and pairing does not send anything anywhere."))
                         .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         .multilineTextAlignment(.center).lineSpacing(4).frame(maxWidth: 300)
                 }
@@ -5618,7 +5621,9 @@ struct NoopLivePairScreen: View {
                     .disabled(!canConnect && !registered)
                     Text(registered
                          ? "You can wear it loosely. Noop would rather have an imperfect night than none."
-                         : "If nothing appears, the strap is asleep — put it on the charger for a moment.")
+                         : radioBlocked != nil
+                            ? "Noop starts looking again as soon as Bluetooth is back."
+                            : "If nothing appears, the strap is asleep — put it on the charger for a moment.")
                         .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                         .multilineTextAlignment(.center).lineSpacing(3)
                 }
@@ -5628,6 +5633,12 @@ struct NoopLivePairScreen: View {
         .onDisappear { if !registered { model.stopWhoopScan() } }
         // The scan publishes as straps advertise; the list follows it, strongest first.
         .onReceive(model.ble.$discoveredWhoops) { found = $0.sorted { $0.rssi > $1.rssi } }
+        .onReceive(model.ble.$radioStateErrorShown) { blocked in
+            let was = radioBlocked != nil
+            radioBlocked = blocked ? (model.ble.state.lastSyncError ?? "Turn Bluetooth on to look for your strap.") : nil
+            // The radio came back while this screen was up: the scan started earlier went nowhere.
+            if was && !blocked && !registered { model.presentWhoopScan(model: family) }
+        }
     }
 
     private var canConnect: Bool { picked != nil }

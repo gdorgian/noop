@@ -10,6 +10,8 @@ struct NoopOnboardingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var step = 0
     @State private var schedule: OnboardingSchedule?
+    /// Bluetooth off, not allowed or missing: said beside the button rather than a scan that finds nothing.
+    @State private var radioBlocked: String?
     @State private var scanning = false
     @State private var notificationsAsked = false
 
@@ -209,8 +211,19 @@ struct NoopOnboardingView: View {
             Button(live.bonded ? "Connected" : scanning ? "Looking…" : "Start looking") {
                 startScanning()
             }
-            .buttonStyle(NoopHTMLButtonStyle(kind: live.bonded ? .secondary : .primary, fullWidth: true))
-            .disabled(scanning && !live.bonded)
+            .buttonStyle(NoopHTMLButtonStyle(kind: live.bonded || radioBlocked != nil ? .secondary : .primary, fullWidth: true))
+            .disabled((scanning && !live.bonded) || radioBlocked != nil)
+            .onReceive(model.ble.$radioStateErrorShown) { blocked in
+                radioBlocked = blocked ? (live.lastSyncError ?? "Turn Bluetooth on to look for your strap.") : nil
+            }
+            if let radioBlocked, !live.bonded {
+                Text(radioBlocked)
+                    .font(NoopHTMLFont.sans(12.5))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .frame(maxWidth: .infinity)
+            }
         } footer: {
             // One primary action per page: until a strap answers, moving on is the quiet choice.
             if live.bonded {

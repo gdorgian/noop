@@ -192,7 +192,7 @@ struct BondRefusalGiveUp {
     /// #747: the honest user-facing hint shown when auto-reconnect pauses. Tells them WHY it stopped and how
     /// to get going again. Pure; no em-dash. Byte-identical to the Android twin.
     static func pausedHint() -> String {
-        "NOOP stopped retrying because your strap keeps refusing to pair. It is likely still held by the official WHOOP app, or your phone is holding an old pairing. Close the WHOOP app, put the strap in pairing mode (tap until the LEDs flash blue), and if it is listed in your Bluetooth settings choose Forget This Device. Then tap Connect to try again."
+        "Noop stopped retrying because your strap keeps refusing to pair. It is likely still held by the official WHOOP app, or your phone is holding an old pairing. Close the WHOOP app, put the strap in pairing mode (tap until the LEDs flash blue), and if it is listed in your Bluetooth settings choose Forget This Device. Then tap Connect to try again."
     }
 
     /// #1635: the log epitaph for the SUPPRESSION path.
@@ -220,7 +220,7 @@ struct BondRefusalGiveUp {
     ///
     /// Pure. Byte-identical to the Kotlin `BondRefusalGiveUp.helloSuppressedHint`.
     static func helloSuppressedHint() -> String {
-        "The secure handshake with your strap never completes, and the attempt itself is what drops the link. NOOP has switched it off for this strap so live heart rate keeps streaming. History sync stays unavailable until it pairs, and so do motion, skin temperature, SpO₂ and respiratory rate, so sleep is staged from heart rate alone. Some straps have paired again after being put in pairing mode. Tap until the LEDs flash blue, then tap Connect."
+        "The secure handshake with your strap never completes, and the attempt itself is what drops the link. Noop has switched it off for this strap so live heart rate keeps streaming. History sync stays unavailable until it pairs, and so do motion, skin temperature, SpO₂ and respiratory rate, so sleep is staged from heart rate alone. Some straps have paired again after being put in pairing mode. Tap until the LEDs flash blue, then tap Connect."
     }
 
     /// The paused hint for a bond that failed WITHOUT the strap ever answering (#1635).
@@ -234,7 +234,7 @@ struct BondRefusalGiveUp {
     ///
     /// Pure. Byte-identical to the Kotlin `BondRefusalGiveUp.pausedHintHandshakeUnanswered`.
     static func pausedHintHandshakeUnanswered() -> String {
-        "NOOP stopped retrying because the secure handshake with your strap never completes: the strap does not answer, and the link drops a few seconds later. Auto-reconnect is paused so it stops draining both batteries. Tap Connect to try again, and if it keeps happening please share your strap log."
+        "Noop stopped retrying because the secure handshake with your strap never completes: the strap does not answer, and the link drops a few seconds later. Auto-reconnect is paused so it stops draining both batteries. Tap Connect to try again, and if it keeps happening please share your strap log."
     }
 
     /// #750: a short OPAQUE token from a CoreBluetooth-local peripheral UUID for the epitaph. The CB UUID is
@@ -987,7 +987,7 @@ public final class BLEManager: NSObject, ObservableObject {
     /// #280: true while `lastSyncError` currently holds a radio-state message (off / unauthorized /
     /// unsupported) that `centralManagerDidUpdateState` set. Lets the poweredOn transition clear ONLY
     /// that message, never a genuine mid-sync error (e.g. "Sync interrupted").
-    private var radioStateErrorShown = false
+    @Published public private(set) var radioStateErrorShown = false
     /// #391: pending one-shot escalation armed when the central reports `.unauthorized` while the TCC
     /// grant reads as granted (the macOS cold-start settling window). Canceled by ANY later state
     /// callback (the settle resolved); if it fires instead, the state never settled — the wedged-grant
@@ -3247,7 +3247,7 @@ public final class BLEManager: NSObject, ObservableObject {
     nonisolated static func futureDatedStrapBanner(strapNewestTs: Int?, wallNowUnix: Int) -> String? {
         guard BackfillContinuation.isFutureDatedNewest(strapNewestTs, wallNowUnix: wallNowUnix) else { return nil }
         return "Synced, but your strap's clock is set in the future - its banked history is dated ahead of "
-            + "today, so NOOP can't trust those timestamps and didn't import them (importing them would "
+            + "today, so Noop can't trust those timestamps and didn't import them (importing them would "
             + "misfile your data days or years ahead). Fully charge the strap to 100% and power-cycle it so "
             + "its clock re-syncs, then reconnect."
     }
@@ -5712,7 +5712,7 @@ extension BLEManager: @preconcurrency CBCentralManagerDelegate {
         #if os(macOS)
         state.lastSyncError = "NOOP isn't allowed to use Bluetooth. Open System Settings → Privacy & Security → Bluetooth — if NOOP is already listed there, toggle it off and back on (a new NOOP build needs a fresh grant), then quit and reopen NOOP."
         #else
-        state.lastSyncError = "NOOP isn't allowed to use Bluetooth. Open iPhone Settings → NOOP → Bluetooth — if it's already on, toggle it off and back on, then quit and reopen NOOP."
+        state.lastSyncError = "Noop isn't allowed to use Bluetooth. Open iPhone Settings → Noop Aura → Bluetooth — if it's already on, toggle it off and back on, then quit and reopen Noop."
         #endif
         log("Bluetooth permission not granted (unauthorized) — cannot scan or connect")
         radioStateErrorShown = true
@@ -6763,7 +6763,7 @@ extension BLEManager: @preconcurrency CBPeripheralDelegate {
                     // counting silently; recordRefusal() below stays false (latched), so no epitaph spam.
                     log("WHOOP 5/MG: bond still refused during a paused-state probe (streak \(bondRefusalStreak)) - the give-up stays latched")
                 } else if bondRefusalStreak >= 2 {
-                    state.pairingHint = "NOOP can see your strap but it's refusing to pair - it's likely still bonded to the official WHOOP app, or your phone is holding an old pairing. To fix it: (1) fully close the WHOOP app, (2) on a 5.0/MG, tap the band repeatedly until the LEDs flash blue (pairing mode), (3) if your strap is listed under iPhone Settings → Bluetooth, tap it and choose Forget This Device, then reconnect in NOOP."
+                    state.pairingHint = "Noop can see your strap but it's refusing to pair - it's likely still bonded to the official WHOOP app, or your phone is holding an old pairing. To fix it: (1) fully close the WHOOP app, (2) on a 5.0/MG, tap the band repeatedly until the LEDs flash blue (pairing mode), (3) if your strap is listed under iPhone Settings → Bluetooth, tap it and choose Forget This Device, then reconnect in Noop."
                     log("WHOOP 5/MG: bond refused \(bondRefusalStreak)× with no successful bond — the strap is refusing the encrypted link (WHOOP app holds it, or a stale iOS pairing). Surfacing pairing-mode + forget-device guidance (#78).")
                 } else {
                     log("WHOOP 5/MG: bond write refused (insufficient) — retrying once; will surface pairing-mode guidance if it persists (#78).")
