@@ -42,17 +42,6 @@ final class NoopLiftFlowModel: ObservableObject {
         isLoaded = true
     }
 
-    func loadProgram(id: String?, repo: Repository) async {
-        guard let id, let store = await repo.storeHandle() else {
-            selectedProgram = nil
-            programItems = []
-            return
-        }
-        if !isLoaded { await refresh(repo: repo) }
-        selectedProgram = (programs + archivedPrograms).first { $0.id == id }
-        programItems = (try? await store.liftProgramItems(programId: id)) ?? []
-    }
-
     func loadSession(id: String?, repo: Repository) async {
         guard let id, let store = await repo.storeHandle() else {
             selectedSession = nil
@@ -155,7 +144,6 @@ struct NoopAct10Screens: View {
     var body: some View {
         switch navigation.route {
         case .liftLive: NoopLiftLiveScreen(navigation: navigation, flow: flow)
-        case .liftProgram: NoopLiftProgramScreen(navigation: navigation, flow: flow)
         case .liftDetail: NoopLiftDetailScreen(navigation: navigation, flow: flow)
         case .liftEdit: NoopLiftEditScreen(navigation: navigation, flow: flow)
         case .liftImport: NoopLiftImportScreen(navigation: navigation, flow: flow)
@@ -166,8 +154,6 @@ struct NoopAct10Screens: View {
         }
     }
 }
-
-// MARK: - Deterministic visual fixture (Debug + --demo-seed only)
 
 // MARK: - Shared Act 10 pieces
 
@@ -262,34 +248,6 @@ private struct NoopLiftActionButton: View {
     }
 }
 
-private struct NoopLiftDoor: View {
-    let icon: NoopCanonicalGlyphName
-    let title: String
-    let subtitle: String
-    let action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 13) {
-                NoopCanonicalGlyph(name: icon, size: 20, color: NoopHTMLColor.blue)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold)).foregroundStyle(NoopHTMLColor.ink)
-                    Text(subtitle)
-                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                NoopChevron()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 15)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-        }
-        .buttonStyle(NoopHTMLPressStyle())
-    }
-}
-
 private func liftClock(_ seconds: Int, long: Bool = false) -> String {
     let safe = max(0, seconds)
     if long { return String(format: "%d:%02d:%02d", safe / 3600, (safe / 60) % 60, safe % 60) }
@@ -300,18 +258,6 @@ private func liftWeight(_ kilograms: Double?, system: UnitSystem) -> String? {
     guard let kilograms else { return nil }
     let value = LiftFormat.trim(LiftFormat.display(fromKilograms: kilograms, system: system))
     return "\(value) \(LiftFormat.weightUnit(system))"
-}
-
-private func liftTargetSummary(_ row: LiftProgramItemRow, system: UnitSystem) -> String {
-    var pieces: [String] = []
-    if let sets = row.targetSets {
-        if let low = row.targetRepsLow { pieces.append("\(sets) × \(low)") }
-        else { pieces.append("\(sets) set\(sets == 1 ? "" : "s")") }
-    } else if let low = row.targetRepsLow { pieces.append("reps \(low)") }
-    if let weight = liftWeight(row.targetWeightKg, system: system) { pieces.append(weight) }
-    if let rest = row.restSec { pieces.append("rest \(liftClock(rest))") }
-    if let rpe = row.targetRpe { pieces.append("RPE \(LiftFormat.trim(rpe))") }
-    return pieces.isEmpty ? "just the exercise" : pieces.joined(separator: " · ")
 }
 
 private extension Date {
@@ -1073,8 +1019,6 @@ private struct NoopLiftLiveScreen: View {
     /// Elapsed session time at `date`: the controller's figure as of its last change, carried forward
     /// by the wall clock unless the session is paused.
     private func liveElapsed(_ presentation: LiftSessionController.Presentation, at date: Date) -> Int {
-        // The prototype is the design's fixture: 23:14 into the session when the screen opens,
-        // however long ago a demo session was started on this device.
         guard !live.isPaused else { return presentation.sessionElapsedSeconds }
         return presentation.sessionElapsedSeconds + max(0, Self.second(date) - live.now)
     }
@@ -1389,318 +1333,6 @@ private enum NoopLiftSetType: CaseIterable, Hashable {
 }
 
 // MARK: - lift-program
-
-private struct NoopLiftProgramScreen: View {
-    @ObservedObject var navigation: NoopNavigation
-    @ObservedObject var flow: NoopLiftFlowModel
-    @EnvironmentObject private var repo: Repository
-    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
-    @State private var name = ""
-    @State private var items: [LiftProgramItemRow] = []
-    @State private var selectedLine = 0
-    @State private var loaded = false
-    @State private var saving = false
-    @State private var saveError: String?
-    @FocusState private var focusedTarget: String?
-
-    private var units: UnitSystem { UnitSystem(rawValue: unitSystemRaw) ?? .metric }
-    private var readOnly: Bool { flow.selectedProgram?.archived == true }
-    private var canSave: Bool {
-        !readOnly && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        items.contains { !$0.exercise.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    }
-
-    var body: some View {
-        NoopScreen(bottomInset: 40, topInset: 58) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Button("Programs") { navigation.back(or: .liftLibrary) }
-                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.blueLight)
-                        .buttonStyle(NoopPlainHitStyle()).frame(minHeight: 36)
-                    Spacer()
-                    if !readOnly {
-                        Button(saving ? "Saving…" : "Done") { Task { await save() } }
-                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                            .foregroundStyle(canSave ? NoopHTMLColor.blueLight : NoopHTMLColor.muted)
-                            .buttonStyle(NoopPlainHitStyle()).disabled(!canSave || saving)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    if readOnly {
-                        Text(name).font(NoopHTMLFont.outfit(NoopType.title2, weight: .regular)).tracking(-0.625)
-                    } else {
-                        TextField("Name it", text: $name)
-                            .font(NoopHTMLFont.outfit(NoopType.title2, weight: .regular)).tracking(-0.625)
-                            .foregroundStyle(NoopHTMLColor.ink)
-                    }
-                    Text(readOnly
-                         ? "These lines are exactly as they were when the program was archived."
-                         : "A name and one exercise is a program. Add targets later, or never.")
-                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                        .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
-                }
-
-                if readOnly {
-                    HStack(alignment: .top, spacing: 10) {
-                        NoopCanonicalGlyph(name: .key, size: 17, color: NoopHTMLColor.copy)
-                        Text("Archived and read-only. Restore it from Programs and every line becomes editable again.")
-                            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
-                            .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(13)
-                    .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
-                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
-                }
-
-                lineList
-
-                if !readOnly {
-                    editor
-                    NoopLiftDoor(icon: .plus, title: "Add an exercise", subtitle: "targets remain optional") {
-                        addLine()
-                    }
-                }
-
-                modes
-            }
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .task { await load() }
-        .alert("Program not saved", isPresented: Binding(
-            get: { saveError != nil }, set: { if !$0 { saveError = nil } }
-        )) {
-            Button("OK", role: .cancel) { saveError = nil }
-        } message: {
-            Text(saveError ?? "Your changes are still here. Try saving again.")
-        }
-    }
-
-    private var lineList: some View {
-        VStack(spacing: 0) {
-            if items.isEmpty {
-                Text("Add the first exercise. Nothing else is required.")
-                    .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 18)
-            }
-            ForEach(items.indices, id: \.self) { index in
-                Button {
-                    guard !readOnly else { return }
-                    withAnimation(NoopMotion.swap) { selectedLine = index }
-                } label: {
-                    HStack(spacing: 11) {
-                        if !readOnly {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 13, weight: .medium)).foregroundStyle(NoopHTMLColor.faint)
-                                .frame(width: 17)
-                        }
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(items[index].exercise.isEmpty ? "Exercise name" : items[index].exercise)
-                                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(items[index].exercise.isEmpty ? NoopHTMLColor.muted : NoopHTMLColor.ink)
-                            Text(liftTargetSummary(items[index], system: units))
-                                .font(NoopHTMLFont.sans(NoopType.caption))
-                                .foregroundStyle(liftTargetSummary(items[index], system: units) == "just the exercise" ? NoopHTMLColor.muted : NoopHTMLColor.blueLight)
-                                .monospacedDigit()
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        if !readOnly { NoopChevron().rotationEffect(.degrees(selectedLine == index ? 90 : 0)) }
-                    }
-                    .frame(minHeight: 52)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(NoopPlainHitStyle())
-                .overlay(alignment: .top) {
-                    if index > 0 { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) }
-                }
-            }
-        }
-        .padding(.horizontal, 14).padding(.vertical, 4)
-        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-    }
-
-    @ViewBuilder
-    private var editor: some View {
-        if items.indices.contains(selectedLine) {
-            VStack(alignment: .leading, spacing: 11) {
-                HStack {
-                    Text(items[selectedLine].exercise.isEmpty ? "EXERCISE" : items[selectedLine].exercise.uppercased())
-                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.2).foregroundStyle(NoopHTMLColor.muted)
-                    Spacer()
-                    Text("weight × reps").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                }
-                targetRow("Exercise", text: binding(\.exercise), keyboard: .default)
-                targetRow("Sets", text: optionalIntBinding(\.targetSets))
-                targetRow("Reps", text: optionalIntBinding(\.targetRepsLow))
-                targetRow("Weight", text: weightBinding())
-                targetRow("Rest between sets", text: restBinding())
-                targetRow("Effort to aim for", text: optionalDoubleBinding(\.targetRpe))
-                targetRow("Time under the bar", text: .constant("not set"), disabled: true)
-                targetRow("Technique note", text: optionalStringBinding(\.note), keyboard: .default)
-                Button(role: .destructive) {
-                    items.remove(at: selectedLine)
-                    selectedLine = max(0, min(selectedLine, items.count - 1))
-                } label: {
-                    Text("Remove this line")
-                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                        .frame(maxWidth: .infinity, alignment: .leading).frame(minHeight: 44)
-                }
-                .buttonStyle(NoopPlainHitStyle())
-            }
-            .padding(.horizontal, 16).padding(.vertical, 15)
-            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-        }
-    }
-
-    private func targetRow(_ label: String, text: Binding<String>,
-                           keyboard: UIKeyboardType = .decimalPad, disabled: Bool = false) -> some View {
-        HStack(spacing: 8) {
-            Text(label).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
-            Spacer(minLength: 8)
-            TextField("not set", text: text)
-                .keyboardType(keyboard)
-                .multilineTextAlignment(.trailing)
-                .font(NoopHTMLFont.sans(NoopType.footnote, weight: text.wrappedValue == "not set" || text.wrappedValue.isEmpty ? .regular : .semibold))
-                .foregroundStyle(disabled || text.wrappedValue == "not set" ? NoopHTMLColor.muted : NoopHTMLColor.ink)
-                .disabled(disabled)
-                .focused($focusedTarget, equals: label)
-                .frame(maxWidth: 178)
-        }
-        .frame(minHeight: 46)
-        // The field is only the trailing 178 pt; a tap on the label went nowhere.
-        .contentShape(Rectangle())
-        .onTapGesture { if !disabled { focusedTarget = label } }
-        .overlay(alignment: .top) { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) }
-    }
-
-    private var modes: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            NoopSectionLabel("Six ways a line can be measured")
-            let values = [
-                ("Weight × reps", "881", "80 kg × 8"),
-                ("Bodyweight reps", "284", "× 12"),
-                ("Duration", "102", "0:45"),
-                ("Weighted bodyweight", "36", "+10 kg × 8"),
-                ("Assisted bodyweight", "15", "−20 kg × 8"),
-                ("Reps only", "6", "× 20"),
-            ]
-            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(value.0).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
-                        Text(value.2).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                    }
-                    Spacer()
-                    Text(value.1).font(NoopHTMLFont.outfit(NoopType.title3, weight: .regular)).foregroundStyle(NoopHTMLColor.blueLight)
-                }
-                .padding(.vertical, 8)
-                .overlay(alignment: .top) { if index > 0 { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) } }
-            }
-            Text("The catalogue carries the mode. A line only asks for the values that mode can honestly hold.")
-                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(16)
-        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-    }
-
-    private func load() async {
-        if let selected = flow.selectedProgram, !flow.programItems.isEmpty {
-            name = selected.name; items = flow.programItems; loaded = true; return
-        }
-        await flow.loadProgram(id: navigation.selectedLiftProgramID, repo: repo)
-        name = flow.selectedProgram?.name ?? ""
-        items = flow.programItems
-        loaded = true
-    }
-
-    private func addLine() {
-        let programID = flow.selectedProgram?.id ?? navigation.selectedLiftProgramID ?? "new"
-        items.append(LiftProgramItemRow(
-            id: UUID().uuidString, deviceId: repo.deviceId, programId: programID,
-            ord: items.count, exercise: "", targetSets: nil, targetRepsLow: nil,
-            targetRepsHigh: nil, targetRpe: nil, targetWeightKg: nil, restSec: nil, note: nil
-        ))
-        selectedLine = max(0, items.count - 1)
-    }
-
-    private func save() async {
-        guard canSave, !saving else { return }
-        if false,
-           flow.selectedProgram?.id.hasPrefix("noop-demo") == true {
-            // Editing the preview program must not write its invented lines to the real database.
-            navigation.back(or: .liftLibrary)
-            return
-        }
-        guard let store = await repo.storeHandle() else { return }
-        saving = true
-        defer { saving = false }
-        let now = Int(Date().timeIntervalSince1970)
-        let id = flow.selectedProgram?.id ?? UUID().uuidString
-        let created = flow.selectedProgram?.createdAt ?? now
-        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let row = LiftProgramRow(id: id, deviceId: repo.deviceId, name: cleanName, note: nil,
-                                 createdAt: created, updatedAt: now, archived: false)
-        let cleanItems = items.filter { !$0.exercise.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .enumerated().map { ord, source -> LiftProgramItemRow in
-                var item = source
-                item.deviceId = repo.deviceId; item.programId = id; item.ord = ord
-                item.exercise = source.exercise.trimmingCharacters(in: .whitespacesAndNewlines)
-                return item
-            }
-        do {
-            try await store.saveLiftProgram(row, items: cleanItems)
-            NoopFitnessModel.markChanged()
-        } catch {
-            saveError = "The program and its lines could not be written. Your changes are still here."
-            return
-        }
-        flow.selectedProgram = row; flow.programItems = cleanItems
-        navigation.selectedLiftProgramID = id
-        await flow.refresh(repo: repo)
-        navigation.back(or: .liftLibrary)
-    }
-
-    private func binding(_ keyPath: WritableKeyPath<LiftProgramItemRow, String>) -> Binding<String> {
-        Binding(get: { items.indices.contains(selectedLine) ? items[selectedLine][keyPath: keyPath] : "" },
-                set: { if items.indices.contains(selectedLine) { items[selectedLine][keyPath: keyPath] = $0 } })
-    }
-    private func optionalStringBinding(_ keyPath: WritableKeyPath<LiftProgramItemRow, String?>) -> Binding<String> {
-        Binding(get: { items.indices.contains(selectedLine) ? items[selectedLine][keyPath: keyPath] ?? "" : "" },
-                set: { if items.indices.contains(selectedLine) { items[selectedLine][keyPath: keyPath] = $0.isEmpty ? nil : $0 } })
-    }
-    private func optionalIntBinding(_ keyPath: WritableKeyPath<LiftProgramItemRow, Int?>) -> Binding<String> {
-        Binding(get: { items.indices.contains(selectedLine) ? items[selectedLine][keyPath: keyPath].map(String.init) ?? "" : "" },
-                set: { if items.indices.contains(selectedLine) { items[selectedLine][keyPath: keyPath] = Int($0) } })
-    }
-    private func optionalDoubleBinding(_ keyPath: WritableKeyPath<LiftProgramItemRow, Double?>) -> Binding<String> {
-        Binding(get: { items.indices.contains(selectedLine) ? items[selectedLine][keyPath: keyPath].map(LiftFormat.trim) ?? "" : "" },
-                set: { if items.indices.contains(selectedLine) { items[selectedLine][keyPath: keyPath] = Double($0.replacingOccurrences(of: ",", with: ".")) } })
-    }
-    private func weightBinding() -> Binding<String> {
-        Binding(get: {
-            guard items.indices.contains(selectedLine), let kg = items[selectedLine].targetWeightKg else { return "" }
-            return LiftFormat.trim(LiftFormat.display(fromKilograms: kg, system: units))
-        }, set: {
-            guard items.indices.contains(selectedLine) else { return }
-            let display = Double($0.replacingOccurrences(of: ",", with: "."))
-            items[selectedLine].targetWeightKg = display.map { LiftFormat.kilograms(fromDisplay: $0, system: units) }
-        })
-    }
-    private func restBinding() -> Binding<String> {
-        Binding(get: {
-            guard items.indices.contains(selectedLine), let seconds = items[selectedLine].restSec else { return "" }
-            return liftClock(seconds)
-        }, set: {
-            guard items.indices.contains(selectedLine) else { return }
-            let parts = $0.split(separator: ":").compactMap { Int($0) }
-            if parts.count == 2 { items[selectedLine].restSec = parts[0] * 60 + parts[1] }
-            else { items[selectedLine].restSec = Int($0) }
-        })
-    }
-}
 
 // MARK: - lift-detail
 
@@ -2546,7 +2178,6 @@ private struct NoopLiftReviewScreen: View {
     @ObservedObject var flow: NoopLiftFlowModel
     @EnvironmentObject private var repo: Repository
     @State private var committing = false
-    @State private var prototypeCommitted = false
 
 
     private var result: LiftingImportResult? {
@@ -2558,7 +2189,7 @@ private struct NoopLiftReviewScreen: View {
         NoopScreen(bottomInset: 40, topInset: 58) {
             VStack(alignment: .leading, spacing: 14) {
                 NoopLiftSheetHeader(label: "Import", trailing: nil) { navigation.back(or: .liftImport) }
-                if flow.importCommitted || prototypeCommitted {
+                if flow.importCommitted {
                     committed
                 } else if let result, result.sessionCount > 0 {
                     NoopLiftTitle(title: "What the file contains",

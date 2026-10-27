@@ -134,7 +134,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     // and the raw value is load-bearing beyond compilation — it is the view identity the shell
     // animates on and the `--noop-route` argument design launches with. The prefix also makes that
     // argument read the way the screen is named: `--noop-route lift-live`.
-    case liftLive = "lift-live", liftLibrary = "lift-library", liftProgram = "lift-program"
+    case liftLive = "lift-live", liftLibrary = "lift-library"
     case liftDetail = "lift-detail", liftEdit = "lift-edit", liftImport = "lift-import"
     case liftReview = "lift-review", liftMuscles = "lift-muscles"
     // Fitness (22 Oct 2026): the training home that replaces the Effort and Lift tab-level entry.
@@ -163,7 +163,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .goal, .setGoal, .labs, .picker, .review, .marker: .goals
         case .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects,
              .instrumentRaw, .instrumentCapture: .instrument
-        case .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
+        case .liftLive, .liftLibrary, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles: .lift
         case .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit, .fitnessRoutine, .fitnessCalendar,
              .fitnessRoutineEdit, .fitnessBody, .fitnessReport, .fitnessProgram: .fitness
@@ -194,7 +194,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         // Act 10 is deliberately not a sixth tab. A lift is an effort, so it lights the same key
         // Act 3 does. Act 3's sessions moved here from Today on 23 Oct 2026: training has one home.
         case .session, .pick, .ready, .live, .intervals,
-             .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
+             .liftLive, .liftLibrary, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles, .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit,
              .fitnessRoutine, .fitnessCalendar, .fitnessRoutineEdit, .fitnessBody, .fitnessReport, .fitnessProgram:
             .fitness
@@ -204,7 +204,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     var hidesBottomBar: Bool {
         switch self {
         case .ready, .live, .intervals, .pair, .bplayer, .bsweep,
-             .liftLive, .liftProgram, .liftEdit, .liftImport, .liftReview, .fitnessRoutineEdit: true
+             .liftLive, .liftEdit, .liftImport, .liftReview, .fitnessRoutineEdit: true
         default: false
         }
     }
@@ -1080,8 +1080,6 @@ final class NoopNavigation: ObservableObject {
             return
         case .liftLibrary:
             back(or: .fitness)
-        case .liftProgram:
-            back(or: .liftLibrary)
         case .liftDetail:
             back(or: liftDetailReturnRoute)
         case .liftEdit:
@@ -1217,7 +1215,6 @@ extension NoopRoute {
         // Act 10 · The Lift.
         case .liftLive: "Lift session"
         case .liftLibrary: "Lift Log"
-        case .liftProgram: "Program"
         case .liftDetail: "Lift detail"
         case .liftEdit: "Edit session"
         case .liftImport: "Import a program"

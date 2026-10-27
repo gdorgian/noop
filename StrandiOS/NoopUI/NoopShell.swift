@@ -404,7 +404,7 @@ struct NoopVerifiedAppShell: View {
     /// `--demo-seed`. The screens themselves are placeholders until design lands them; being
     /// canonical is what makes `--noop-route lift-live` reach one in an ordinary Debug build.
     private static let canonicalLiftRoutes: Set<NoopRoute> = [
-        .liftLive, .liftLibrary, .liftProgram, .liftDetail,
+        .liftLive, .liftLibrary, .liftDetail,
         .liftEdit, .liftImport, .liftReview, .liftMuscles
     ]
 

@@ -591,12 +591,6 @@ struct NoopFitnessHome: View {
         return f.string(from: d)
     }
 
-    static var weekTitle: String {
-        let f = DateFormatter()
-        f.setLocalizedDateFormatFromTemplate("EEEEdMMMM")
-        return f.string(from: Date())
-    }
-
     /// Every small card shares one height so a two-column row never looks ragged.
     static let cardHeight: CGFloat = 132
 

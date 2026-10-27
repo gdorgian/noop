@@ -100,14 +100,6 @@ struct NoopFitnessHistory {
             : AcuteChronicLoad.reading(dailyLoad: muscularDaily, sessionDates: muscularDates, asOf: day)
     }
 
-    /// One reading per day for the last `days` days, oldest first.
-    func loadHistory(_ kind: LoadKind, days: Int) -> [(date: Date, reading: AcuteChronicLoad.Reading)] {
-        let cal = Calendar.current, today = cal.startOfDay(for: now)
-        return (0..<days).reversed().compactMap { i in
-            cal.date(byAdding: .day, value: -i, to: today).map { ($0, load(kind, asOf: $0)) }
-        }
-    }
-
     /// The sessions that carried the most load in the seven days ending `day`, heaviest first.
     func contributors(_ kind: LoadKind, asOf day: Date) -> [(title: String, date: Date, load: Double)] {
         let start = Calendar.current.date(byAdding: .day, value: -6, to: Calendar.current.startOfDay(for: day)) ?? day
