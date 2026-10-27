@@ -107,7 +107,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case trends, rhythm
     // Act 5
     case diagnostics = "lab-diagnostics"
-    case you, record, zones, history, strap, notifs, devices, apple, data, settings, widgets, lab, automations, onboard, pair, position
+    case you, record, zones, history, strap, notifs, devices, apple, data, settings, widgets, lab, automations, pair, position
     case importHistory = "import", reading, imported, rejected, backup
     // Utilities that left "Later" (21 Oct 2026): each is an Aura page over an engine that already ships.
     case howItWorks = "how-noop-works", limitations = "strap-limitations", siri = "siri-shortcuts"
@@ -154,7 +154,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .session, .pick, .ready, .live, .intervals: .effort
         case .trends, .rhythm: .picture
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
-             .widgets, .lab, .diagnostics, .automations, .onboard, .pair, .position, .importHistory, .reading,
+             .widgets, .lab, .diagnostics, .automations, .pair, .position, .importHistory, .reading,
              .imported, .rejected, .backup,
              .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration,
              .settingsToday, .settingsSleep, .settingsFitness, .settingsScores, .settingsYou, .settingsStrap, .settingsAlerts, .settingsSvea, .settingsData, .settingsLook, .settingsLater, .settingsAbout: .plumbing
@@ -185,7 +185,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .instrumentRaw, .instrumentCapture:
             .trends
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
-             .widgets, .lab, .diagnostics, .automations, .onboard, .pair, .position, .importHistory, .reading,
+             .widgets, .lab, .diagnostics, .automations, .pair, .position, .importHistory, .reading,
              .imported, .rejected, .backup,
              .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration,
              .settingsToday, .settingsSleep, .settingsFitness, .settingsScores, .settingsYou, .settingsStrap, .settingsAlerts, .settingsSvea, .settingsData, .settingsLook, .settingsLater, .settingsAbout,
@@ -203,7 +203,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
 
     var hidesBottomBar: Bool {
         switch self {
-        case .ready, .live, .intervals, .onboard, .pair, .bplayer, .bsweep,
+        case .ready, .live, .intervals, .pair, .bplayer, .bsweep,
              .liftLive, .liftProgram, .liftEdit, .liftImport, .liftReview, .fitnessRoutineEdit: true
         default: false
         }
@@ -762,7 +762,7 @@ final class NoopNavigation: ObservableObject {
     var hasSwipeBack: Bool {
         if overlay != nil { return true }
         switch route {
-        case .you, .reading, .imported, .rejected, .onboard, .liftLive:
+        case .you, .reading, .imported, .rejected, .liftLive:
             return false   // handleBackSwipe returns without acting on these
         case .rest, .today, .session, .trends, .ages, .coach:
             return canGoBack
@@ -1051,7 +1051,7 @@ final class NoopNavigation: ObservableObject {
         // a direct launch, a cross-act entrance and a tapped chevron agree. The three import-result
         // states deliberately have no chevron and therefore no swipe exit.
         switch route {
-        case .you, .reading, .imported, .rejected, .onboard:
+        case .you, .reading, .imported, .rejected:
             return
         case .record, .history, .strap, .settings, .data, .position:
             back(or: .you)
@@ -1193,7 +1193,6 @@ extension NoopRoute {
         case .lab: "The Lab"
         case .diagnostics: "Diagnostics"
         case .automations: "Automations"
-        case .onboard: "Welcome"
         case .pair: "Pair a strap"
         case .ages: "Your ages"
         case .building: "Building your ages"

@@ -60,7 +60,6 @@ struct NoopAct5Screens: View {
     @State private var choosingSleepNeed = false
 
     @SceneStorage("noop.act5.history-filter") private var historyFilter = "All"
-    @State private var openZone: Int?
     @State private var photoItem: PhotosPickerItem?
     @State private var confirmingProfile = false
     @State private var dailyLogOn = ScheduledDebugExport.isEnabled
@@ -75,8 +74,6 @@ struct NoopAct5Screens: View {
     @State private var stepScale = 1.0
 
     @State private var connected = true
-    @State private var syncStage = 0
-    @State private var healthSyncStage = 0
     @State private var buzz = "Normal"
     @State private var enabled: Set<String> = [
         "Continuous pulse", "Temperature", "Blood oxygen", "Stay connected in the background",
@@ -95,7 +92,6 @@ struct NoopAct5Screens: View {
     @State private var ceilingZone = "Zone 4"
     @State private var ceilingBPM = 162
 
-    @State private var sparePresent = true
     @State private var activeDevice = "mg"
     @State private var spareName = "WHOOP 4.0"
     @State private var renameDraft = ""
@@ -129,7 +125,6 @@ struct NoopAct5Screens: View {
     @State private var showReleaseNotes = false
     @State private var selectedAppIcon = NoopAppIconChoice.current
 
-    @State private var selectedShift: String?
     @State private var paired = false
     @State private var labFlagToClear: String?
     @StateObject var youLayout = NoopPageLayout(page: "you", catalog: NoopAct5Screens.youSections)
@@ -155,8 +150,7 @@ struct NoopAct5Screens: View {
             case .lab: labScreen
             case .diagnostics: diagnosticsScreen
             case .automations: automationsScreen
-            case .onboard: onboardingScreen
-            case .pair: if true { NoopLivePairScreen(navigation: navigation) } else { pairingScreen }
+            case .pair: NoopLivePairScreen(navigation: navigation)
             case .position: positionScreen
             case .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration:
                 NoopUtilityScreens(navigation: navigation)
@@ -215,7 +209,6 @@ struct NoopAct5Screens: View {
 private extension NoopAct5Screens {
     static var blush: Color { Color(hex: 0xE08A9B) }
     static var blushLight: Color { Color(hex: 0xF6D3DA) }
-    static var blushDark: Color { Color(hex: 0x2A0E14) }
     static var blushLabel: Color { Color(hex: 0xC08E98) }
     static var green: Color { Color(hex: 0x2ECC80) }
     static var lavender: Color { Color(hex: 0x8B99D6) }
@@ -1209,49 +1202,6 @@ private extension NoopAct5Screens {
         .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
     }
 
-    var dateOfBirthRow: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Date of birth").font(NoopHTMLFont.sans(NoopType.footnote))
-                Spacer()
-                Text("\(birthDay) \(monthName) \(String(birthYear)) · 29 years")
-                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Self.blushLight)
-            }
-            HStack(spacing: 7) {
-                compactStepper(value: "\(birthDay)", label: "day", minus: { birthDay = birthDay == 1 ? 31 : birthDay - 1 }, plus: { birthDay = birthDay == 31 ? 1 : birthDay + 1 })
-                compactStepper(value: String(monthName.prefix(3)), label: "month", minus: { birthMonth = birthMonth == 1 ? 12 : birthMonth - 1 }, plus: { birthMonth = birthMonth == 12 ? 1 : birthMonth + 1 })
-                compactStepper(value: "\(birthYear)", label: "year", minus: { birthYear = max(1930, birthYear - 1) }, plus: { birthYear = min(2012, birthYear + 1) })
-            }
-            Text("Your age is derived from this, so it advances on its own. Nothing else in the app asks for it.")
-                .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(2)
-        }
-        .padding(.vertical, 11.5)
-    }
-
-    var compactSexControl: some View {
-        HStack(spacing: 3) {
-            ForEach(["Male", "Female", "Other"], id: \.self) { choice in
-                let selected = sex == choice
-                Button { sex = choice } label: {
-                    Text(choice)
-                        .font(NoopHTMLFont.sans(NoopType.caption, weight: selected ? .semibold : .regular))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .foregroundStyle(selected ? Self.blushLight : NoopHTMLColor.copy)
-                        .padding(.horizontal, 9)
-                        .frame(minHeight: 32)
-                        .background(selected ? Self.blush.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 11))
-                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? Self.blush.opacity(0.42) : .clear, lineWidth: 0.5))
-                }
-                .buttonStyle(NoopPlainHitStyle())
-            }
-        }
-        .padding(3)
-        .fixedSize()
-        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-    }
-
     func compactStepper(value: String, label: String, minus: @escaping () -> Void, plus: @escaping () -> Void) -> some View {
         HStack(spacing: 5) {
             Button(action: minus) { Image(systemName: "minus").font(.system(size: 9, weight: .semibold)).frame(width: 32, height: 32).noopHitTarget() }
@@ -1309,63 +1259,6 @@ private struct NoopA5StepButtonStyle: ButtonStyle {
 // MARK: Zones
 
 private extension NoopAct5Screens {
-    var zonesScreen: some View {
-        NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 14) {
-                act5BackHeader("Your record") { navigation.back(or: .record) }
-                pageTitle("Your zones", copy: "")
-                    .padding(.bottom, 3)
-
-                HStack(spacing: 9) {
-                    // No maximum is observed anywhere in the app, so "Measured maximum" cannot be
-                    // claimed. The maximum the zones are built on is shown, named for where it came
-                    // from; the resting anchor is measured.
-                    let source = NoopZoneSource.current(profile)
-                    anchorCard(value: source.trusted ? "\(profile.hrMax)" : "\u{2014}", title: source.maximumTitle,
-                               copy: source.tag ?? "")
-                    if let resting = liveRestingAnchor {
-                        anchorCard(value: "\(resting)", title: "Resting rate", copy: "Overnight average across the last fourteen nights, updated every morning.")
-                    }
-                
-                }
-
-                VStack(spacing: 9) {
-                    ForEach(Array((liveZones).enumerated()), id: \.offset) { index, zone in
-                        Button { withAnimation(.easeOut(duration: 0.18)) { openZone = openZone == index ? nil : index } } label: {
-                            VStack(alignment: .leading, spacing: 11) {
-                                HStack(spacing: 11) {
-                                    RoundedRectangle(cornerRadius: 4).fill(zone.color).frame(width: 10, height: 26)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(zone.name).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                                        Text(zone.percent).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
-                                    }
-                                    Spacer()
-                                    Text(zone.range).font(NoopHTMLFont.outfit(NoopType.body)).foregroundStyle(NoopHTMLColor.inkSoft).monospacedDigit()
-                                }
-                                if openZone == index {
-                                    if !zone.use.isEmpty {
-                                    Text(zone.use).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(3)
-                                    }
-                                    HStack(spacing: 10) {
-                                        Text("Lower edge").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.muted)
-                                        NoopProgressBar(progress: zone.progress, color: zone.color, height: 4)
-                                        Text(zone.lower).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.inkSoft)
-                                    }
-                                    Text("Nudging an edge only changes what the app calls it. Your history is not renumbered.")
-                                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
-                                }
-                            }
-                            .padding(16)
-                            .background(openZone == index ? NoopHTMLColor.blue.opacity(0.07) : NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(openZone == index ? NoopHTMLColor.blue.opacity(0.28) : NoopHTMLColor.border, lineWidth: 0.5))
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
-                    }
-                }
-
-            }
-        }
-    }
 
     func anchorCard(value: String, title: String, copy: String) -> some View {
         NoopHTMLCard(radius: 20, padding: 16) {
@@ -1900,217 +1793,6 @@ private extension NoopAct5Screens {
 
     var pairedStrapCount: Int { NoopStraps.paired(model.deviceRegistry?.devices ?? []).count }
 
-    var prototypeStrapScreen: some View {
-        NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 12) {
-                act5BackHeader("You") { navigation.back(or: .you) }
-                pageTitle("Your strap", copy: "\(activeStrapName) · left wrist")
-
-                NoopHTMLCard(radius: 24, padding: 18) {
-                    VStack(spacing: 16) {
-                        HStack(spacing: 18) {
-                            NoopStrapBatteryRing(percent: activeStrapBattery)
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(connected ? Self.green : NoopHTMLColor.faint)
-                                        .frame(width: 8, height: 8)
-                                        .shadow(color: connected ? Self.green.opacity(0.7) : .clear, radius: 5)
-                                    Text(connected ? "Connected and reading" : "Disconnected")
-                                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                                }
-                                strapFact("Secure link", connected ? "Encrypted" : "—")
-                                strapFact("On wrist", connected ? "Yes, worn since 06:38" : "No")
-                            }
-                        }
-                        Button {
-                            guard connected else { connected = true; return }
-                            syncStage = min(2, syncStage + 1)
-                        } label: {
-                            HStack(spacing: 9) {
-                                Image(systemName: syncStage == 2 ? "checkmark" : "arrow.triangle.2.circlepath")
-                                Text(syncStage == 0 ? "Sync now" : syncStage == 1 ? "Syncing — 3 nights buffered" : "Up to date, just now")
-                            }
-                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                            .foregroundStyle(syncStage == 0 ? NoopHTMLColor.blueInk : syncStage == 2 ? Color(hex: 0x8FE3B4) : NoopHTMLColor.blueLight)
-                            .frame(maxWidth: .infinity)
-                            .frame(minHeight: 52)
-                            .background(syncStage == 0 ? NoopHTMLColor.blue : syncStage == 2 ? Self.green.opacity(0.12) : NoopHTMLColor.blue.opacity(0.16), in: RoundedRectangle(cornerRadius: 17))
-                            .overlay(RoundedRectangle(cornerRadius: 17).stroke(syncStage == 0 ? .clear : syncStage == 2 ? Self.green.opacity(0.36) : NoopHTMLColor.blue.opacity(0.4), lineWidth: 0.5))
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
-                    }
-                }
-
-                NoopHTMLCard(radius: 22, padding: 16) {
-                    VStack(alignment: .leading, spacing: 13) {
-                        HStack(spacing: 11) {
-                            NoopCanonicalGlyph(name: .heart, size: 20, color: Self.green).frame(width: 21)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Apple Health").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                                Text(isEnabled("Apple Health") ? (healthSyncStage > 0 ? "wrote 6 kinds · just now" : "wrote 6 kinds · 2 hours ago") : "not connected")
-                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
-                            }
-                            Spacer()
-                            NoopHTMLToggle(isOn: isEnabled("Apple Health"), color: Self.green) { flip("Apple Health") }
-                        }
-                        NoopFlowLayout(spacing: 6) {
-                            ForEach(["Sleep", "Workouts", "Heart rate", "HRV", "Respiration", "Body temp"], id: \.self) { kind in
-                                Text(kind)
-                                    .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .medium))
-                                    .foregroundStyle(NoopHTMLColor.inkSoft)
-                                    .padding(.horizontal, 10)
-                                    .frame(minHeight: 27)
-                                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
-                                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
-                            }
-                        }
-                        Button {
-                            guard isEnabled("Apple Health") else { return }
-                            healthSyncStage = min(2, healthSyncStage + 1)
-                        } label: {
-                            Text(!isEnabled("Apple Health") ? "Turn on Apple Health to sync" : healthSyncStage == 0 ? "Sync Apple Health now" : "Written — 6 kinds, 221 nights")
-                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                                .foregroundStyle(isEnabled("Apple Health") ? Color(hex: 0x8FE3B4) : NoopHTMLColor.faint)
-                                .frame(maxWidth: .infinity).frame(minHeight: 46)
-                                .background(isEnabled("Apple Health") ? Self.green.opacity(healthSyncStage == 0 ? 0.13 : 0.2) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 15))
-                                .overlay(RoundedRectangle(cornerRadius: 15).stroke(isEnabled("Apple Health") ? Self.green.opacity(0.36) : Color.white.opacity(0.08), lineWidth: 0.5))
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
-                        .disabled(!isEnabled("Apple Health"))
-                        Text("Noop writes to Health and never reads your Health history back in — the only exception is your phone's step count, which fills days the strap could not estimate.")
-                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
-                        Button { navigation.push(.apple) } label: {
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("What crossed, and what did not")
-                                        .font(NoopHTMLFont.sans(NoopType.footnote))
-                                        .foregroundStyle(NoopHTMLColor.ink)
-                                    Text(healthAccessFixed
-                                         ? "Six kinds out, steps in. Everything is crossing."
-                                         : "One kind is being refused — variability has never reached Health")
-                                        .font(NoopHTMLFont.sans(NoopType.caption))
-                                        .foregroundStyle(healthAccessFixed ? Color(hex: 0x7F8A85) : Color(hex: 0xC8934B))
-                                        .lineSpacing(3)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                Spacer(minLength: 8)
-                                NoopChevron()
-                            }
-                            .padding(.top, 13)
-                            .overlay(alignment: .top) {
-                                Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
-                            }
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
-                    }
-                }
-
-                dividedCard {
-                    VStack(spacing: 0) {
-                        toggleRow("Continuous pulse", detail: "Off means pulse only during sessions and sleep. Saves about a day and a half.")
-                        Divider().overlay(NoopHTMLColor.border)
-                        toggleRow("Temperature", detail: "Off costs you the skin-temperature vital and the early warning it gives. Saves about six hours.")
-                        Divider().overlay(NoopHTMLColor.border)
-                        toggleRow("Blood oxygen", detail: "Overnight only. Costs about four hours a week.")
-                        Divider().overlay(NoopHTMLColor.border)
-                        toggleRow("Stay connected in the background", detail: "Off and Noop only reads when you open it — you lose live heart rate and the nightly backfill runs late.")
-                    }
-                }
-
-                NoopHTMLCard(radius: 22, padding: 16) {
-                    VStack(alignment: .leading, spacing: 11) {
-                        HStack {
-                            Text("Buzz strength").font(NoopHTMLFont.sans(NoopType.footnote))
-                            Spacer()
-                            Text(buzz == "Light" ? "easy to miss on a cold wrist" : buzz == "Normal" ? "enough to notice, not to startle" : "you will not miss it")
-                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
-                        }
-                        NoopSegmentedControl(items: ["Light", "Normal", "Firm"], selection: buzz) { buzz = $0 }
-                        Button {
-                            pinged = true
-                        } label: {
-                            Text(pinged ? "Buzzing now — follow the sound" : "Buzz the strap to find it")
-                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                                .foregroundStyle(pinged ? NoopHTMLColor.blueLight : NoopHTMLColor.inkSoft)
-                                .frame(maxWidth: .infinity).frame(minHeight: 46)
-                                .background(pinged ? NoopHTMLColor.blue.opacity(0.18) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
-                                .overlay(RoundedRectangle(cornerRadius: 15).stroke(pinged ? NoopHTMLColor.blue.opacity(0.45) : Color.white.opacity(0.12), lineWidth: 0.5))
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
-                    }
-                }
-
-                Button { navigation.push(.notifs) } label: {
-                    HStack(spacing: 13) {
-                        NoopCanonicalGlyph(name: .bell, size: 19, color: Self.blush)
-                            .frame(width: 20)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Buzz for phone notifications")
-                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                                .foregroundStyle(NoopHTMLColor.ink)
-                            Text("designed · not built yet")
-                                .font(NoopHTMLFont.sans(NoopType.caption))
-                                .foregroundStyle(Color(hex: 0x7F8A85))
-                        }
-                        Spacer(minLength: 8)
-                        NoopChevron()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 15)
-                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-
-                NoopHTMLCard(radius: 22, padding: 16) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        NoopSectionLabel("Strap log")
-                        HStack(spacing: 8) {
-                            logButton("Copy", symbol: "doc.on.doc", done: lastLogAction == "Copied") { lastLogAction = "Copied" }
-                            logButton("Save…", symbol: "square.and.arrow.up", done: lastLogAction == "Saved") { lastLogAction = "Saved" }
-                        }
-                        Divider().overlay(NoopHTMLColor.border)
-                        HStack(spacing: 13) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Save one copy a day").font(NoopHTMLFont.sans(NoopType.footnote))
-                                Text("A timestamped file at 22:00, on this phone. Off by default.")
-                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(2)
-                            }
-                            Spacer()
-                            NoopHTMLToggle(isOn: isEnabled("Save one copy a day")) { flip("Save one copy a day") }
-                        }
-                        Text("Send this log when a sync or a reading looks wrong. It is the one thing that makes a bug report answerable.")
-                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
-                    }
-                }
-
-                NoopHTMLRow(title: "Manage straps", detail: sparePresent ? "two bands paired · one connected" : "one band paired", symbol: "link", value: nil) {
-                    navigation.push(.devices)
-                }
-
-                Button {
-                    connected.toggle()
-                    if connected { activeDevice = "mg" }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: connected ? "xmark.circle" : "arrow.triangle.2.circlepath")
-                        Text(connected ? "Disconnect this strap" : "Reconnect")
-                    }
-                    .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                    .foregroundStyle(connected ? Color(hex: 0xF3A472) : NoopHTMLColor.blueLight)
-                    .frame(maxWidth: .infinity).frame(minHeight: 50)
-                    .background((connected ? NoopHTMLColor.amber : NoopHTMLColor.blue).opacity(0.09), in: RoundedRectangle(cornerRadius: 16))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke((connected ? NoopHTMLColor.amber : NoopHTMLColor.blue).opacity(0.26), lineWidth: 0.5))
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-
-                Text("Every switch here says what it costs you in battery, because that is the only reason anyone turns one off.")
-                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
-            }
-        }
-    }
-
     func strapFact(_ title: String, _ value: String) -> some View {
         HStack {
             Text(title).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
@@ -2390,142 +2072,6 @@ private extension NoopAct5Screens {
         }
     }
 
-    var prototypeAppleHealthScreen: some View {
-        NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 14) {
-                act5BackHeader("Your strap") { navigation.back(or: .strap) }
-                pageTitle(
-                    "Apple Health",
-                    copy: "A two-way bridge — six kinds out, one in — and the only place to look when a kind stops crossing."
-                )
-
-                HStack(spacing: 10) {
-                    appleSummaryTile(
-                        eyebrow: "Noop writes",
-                        value: healthAccessFixed ? "Six kinds" : "Five of six",
-                        copy: healthAccessFixed
-                            ? "sleep, workouts, pulse, resting pulse, variability and respiration"
-                            : "one is being refused, and it is the one the night is built on"
-                    )
-                    appleSummaryTile(
-                        eyebrow: "Noop takes",
-                        value: "One",
-                        copy: "steps, and only on days the strap could not estimate them"
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("An imported score never becomes your score")
-                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.blueLight)
-                    Text("Another app’s readiness or sleep score is kept under its own name and is never shown as Recovery, Effort or Rest. Noop recomputes its own from the raw pulse, variability and sleep it can see.")
-                        .font(NoopHTMLFont.sans(NoopType.caption))
-                        .foregroundStyle(Color(hex: 0xB7C3C9))
-                        .lineSpacing(3)
-                }
-                .padding(.horizontal, 15)
-                .padding(.vertical, 14)
-                .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 20))
-                .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.blue.opacity(0.20), lineWidth: 0.5))
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .firstTextBaseline) {
-                        NoopSectionLabel("Every kind, and what happened to it")
-                        Spacer()
-                        Text(healthAccessFixed ? "all crossing" : "1 needs you")
-                            .font(NoopHTMLFont.sans(NoopType.eyebrow))
-                            .foregroundStyle(NoopHTMLColor.faint)
-                    }
-                    .padding(.horizontal, 2)
-
-                    dividedCard {
-                        ForEach(Array(appleKinds.enumerated()), id: \.offset) { index, item in
-                            appleKindRow(item)
-                            if index < appleKinds.count - 1 {
-                                Divider().overlay(NoopHTMLColor.border)
-                            }
-                        }
-                    }
-
-                    Text("iOS never tells an app that a read was refused — a denied kind and a kind with no data look identical from in here. That is why this page counts what was written rather than claiming everything worked.")
-                        .font(NoopHTMLFont.sans(NoopType.caption))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .lineSpacing(4)
-                        .padding(.horizontal, 2)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    NoopSectionLabel("Where your steps came from")
-                        .padding(.horizontal, 2)
-                    NoopHTMLCard(radius: 22, padding: 16) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .bottom, spacing: 3) {
-                                ForEach(Array(appleStepBars.enumerated()), id: \.offset) { index, value in
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill([2, 7, 11].contains(index) ? Color(hex: 0x5B7C8D) : NoopHTMLColor.blue)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: value / 13.1 * 60)
-                                }
-                            }
-                            .frame(height: 60, alignment: .bottom)
-                            HStack(spacing: 14) {
-                                appleLegend("the strap", color: NoopHTMLColor.blue)
-                                appleLegend("your phone, through Health", color: Color(hex: 0x5B7C8D))
-                            }
-                            Text("Three of the last fourteen days came from the phone — days the strap was off your wrist or charging. Nothing else on this page fills a gap that way.")
-                                .font(NoopHTMLFont.sans(NoopType.caption))
-                                .foregroundStyle(Color(hex: 0x8B958F))
-                                .lineSpacing(3)
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    NoopSectionLabel("Health holds these, Noop does not use them")
-                        .padding(.horizontal, 2)
-                    dividedCard {
-                        ForEach(Array(appleUnused.enumerated()), id: \.offset) { index, item in
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.0).font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.inkSoft)
-                                    Text(item.2).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
-                                }
-                                Spacer(minLength: 8)
-                                Text(item.1).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x8B958F)).monospacedDigit()
-                            }
-                            .padding(.vertical, 13)
-                            if index < appleUnused.count - 1 { Divider().overlay(NoopHTMLColor.border) }
-                        }
-                    }
-                    Text("To bring any of this in as history rather than as a live feed, hand the Health export to Bring history in — it reads the same file and tells you what it wrote.")
-                        .font(NoopHTMLFont.sans(NoopType.caption))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .lineSpacing(4)
-                        .padding(.horizontal, 2)
-                }
-
-                Button { navigation.enter(.importHistory, from: .data) } label: {
-                    HStack(spacing: 13) {
-                        NoopCanonicalGlyph(name: .upload, size: 19, color: NoopHTMLColor.blue)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Bring history in").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.ink)
-                            Text("the one-time import — a Health export, or any of the other eleven formats")
-                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85)).lineSpacing(3)
-                        }
-                        Spacer(minLength: 8)
-                        NoopChevron()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 15)
-                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-                .padding(.bottom, 22)
-            }
-        }
-    }
-
     struct AppleKind {
         let title: String
         let value: String
@@ -2556,27 +2102,6 @@ private extension NoopAct5Screens {
             ("Body fat", "17.4%", "nothing in Noop reads this yet"),
             ("Lean mass", "61.3 kg", "nothing in Noop reads this yet")
         ]
-    }
-
-    func appleSummaryTile(eyebrow: String, value: String, copy: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            NoopSectionLabel(eyebrow)
-            Text(value)
-                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
-                .tracking(-0.78)
-                .foregroundStyle(NoopHTMLColor.ink)
-            Text(copy)
-                .font(NoopHTMLFont.sans(NoopType.caption))
-                .foregroundStyle(Color(hex: 0x7F8A85))
-                .lineSpacing(3)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.top, 15)
-        .padding(.horizontal, 15)
-        .padding(.bottom, 13)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
     }
 
     func appleKindRow(_ item: AppleKind, openHealth: Bool = false) -> some View {
@@ -2624,12 +2149,6 @@ private extension NoopAct5Screens {
         .padding(.vertical, 13)
     }
 
-    func appleLegend(_ title: String, color: Color) -> some View {
-        HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 8, height: 8)
-            Text(title).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(Color(hex: 0x7F8A85))
-        }
-    }
 }
 
 // MARK: Automations
@@ -3002,155 +2521,6 @@ private extension NoopAct5Screens {
         }
     }
 
-    var prototypeDevicesScreen: some View {
-        NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 13) {
-                act5BackHeader("Your strap") { navigation.back(or: .strap) }
-                pageTitle("Manage straps", copy: "Noop can hold several bands and remembers each one's nights. Only one is connected at a time.")
-                    .padding(.bottom, 5)
-
-                VStack(spacing: 10) {
-                    deviceCard(
-                        id: "mg",
-                        name: "WHOOP 5.0 / MG",
-                        meta: activeDevice == "mg" && connected ? "52% · encrypted" : "last seen 2 minutes ago",
-                        renamable: false
-                    )
-
-                    if sparePresent {
-                        deviceCard(
-                            id: "w4",
-                            name: spareName,
-                            meta: "spare · last seen 11 June · 221 nights on record",
-                            renamable: true
-                        )
-                    }
-                }
-
-                if let deviceNotice {
-                    Text(deviceNotice)
-                        .font(NoopHTMLFont.sans(NoopType.caption))
-                        .foregroundStyle(Color(hex: 0x8FE3B4))
-                        .padding(14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Self.green.opacity(0.09), in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Self.green.opacity(0.25), lineWidth: 0.5))
-                }
-
-                Button { paired = false; navigation.push(.pair) } label: {
-                    Label("Pair a new strap", systemImage: "plus")
-                        .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.blueInk)
-                        .frame(maxWidth: .infinity).frame(minHeight: 54)
-                        .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 18))
-                        .shadow(color: NoopHTMLColor.blue.opacity(0.26), radius: 12, y: 8)
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-
-                Button {
-                    deviceNotice = "Search complete · \(sparePresent ? "two straps found" : "one strap found")"
-                } label: {
-                    Label("Re-scan for straps", systemImage: "arrow.triangle.2.circlepath")
-                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.inkSoft)
-                        .frame(maxWidth: .infinity).frame(minHeight: 50)
-                        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.11), lineWidth: 0.5))
-                }
-                .buttonStyle(NoopHTMLPressStyle())
-
-                Text("Forgetting a strap removes the pairing, not the nights. Its history stays in your record and stays in your export.")
-                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(4).padding(.horizontal, 2)
-            }
-        }
-    }
-
-    func deviceCard(id: String, name: String, meta: String, renamable: Bool) -> some View {
-        let active = activeDevice == id && connected
-        return NoopHTMLCard(radius: 22, padding: 16, tint: active ? NoopHTMLColor.blue : nil) {
-            VStack(alignment: .leading, spacing: renamable ? 10.3 : 15) {
-                HStack(spacing: 12) {
-                    NoopCanonicalGlyph(
-                        name: .watch,
-                        size: 22,
-                        color: active ? NoopHTMLColor.blue : Color(hex: 0x7F8A85)
-                    )
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(name).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                        Text(meta).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
-                    }
-                    Spacer()
-                    NoopPill(text: active ? "Connected" : "Paired", color: active ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
-                }
-
-                HStack(spacing: 7) {
-                    Button {
-                        if active {
-                            connected = false
-                            deviceNotice = "\(name) is disconnected. Its pairing and history remain."
-                        } else {
-                            activeDevice = id
-                            connected = true
-                            deviceNotice = "\(name) is now the connected strap."
-                        }
-                    } label: {
-                        Text(active ? "Disconnect" : "Switch to this")
-                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                            .foregroundStyle(active ? NoopHTMLColor.inkSoft : NoopHTMLColor.blueLight)
-                            .frame(maxWidth: .infinity).frame(minHeight: 44)
-                            .background(active ? Color.white.opacity(0.05) : NoopHTMLColor.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(active ? Color.white.opacity(0.11) : NoopHTMLColor.blue.opacity(0.34), lineWidth: 0.5))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-
-                    Button {
-                        if id == "w4" {
-                            if activeDevice == "w4" { activeDevice = "mg"; connected = true }
-                            sparePresent = false
-                            deviceNotice = "Pairing forgotten. Its 221 nights remain in your record and export."
-                        } else if activeDevice == "mg", sparePresent {
-                            deviceNotice = "Switch to the spare strap before forgetting this one. Its history will remain."
-                        } else {
-                            deviceNotice = "Pairing forgotten. Its history remains in your record and export."
-                        }
-                    } label: {
-                        Text("Forget")
-                            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                            .foregroundStyle(Color(hex: 0xF3A472))
-                            .padding(.horizontal, 18).frame(minHeight: 44)
-                            .background(NoopHTMLColor.amber.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(NoopHTMLColor.amber.opacity(0.26), lineWidth: 0.5))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                }
-
-                if renamable {
-                    HStack(spacing: 9) {
-                        TextField("a name for this band", text: $renameDraft)
-                            .font(.system(size: 12.5, design: .monospaced))
-                            .foregroundStyle(NoopHTMLColor.inkSoft)
-                            .padding(.horizontal, 13).frame(height: 40)
-                            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 13))
-                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
-                        Button("Rename") {
-                            let value = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !value.isEmpty else { return }
-                            spareName = value
-                            renameDraft = ""
-                            deviceNotice = "Renamed to \(value). The strap is rebooting to apply it."
-                        }
-                        .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.blueLight)
-                        .padding(.horizontal, 15).frame(height: 40)
-                        .background(NoopHTMLColor.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 13))
-                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(NoopHTMLColor.blue.opacity(0.34), lineWidth: 0.5))
-                    }
-                    Text("A 4.0 can be renamed over Bluetooth — useful for a second-hand band still carrying its old owner's name. The strap reboots to apply it.")
-                        .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).lineSpacing(3)
-                }
-            }
-        }
-    }
 }
 
 // MARK: Data and permissions
@@ -3578,12 +2948,6 @@ private extension NoopAct5Screens {
                      disabled: Set<String> = [], keywords: String = "") -> NoopSettingsItem {
         NoopSettingsItem(id: id, title: title, detail: detail, keywords: keywords) {
             AnyView(segmentRow(title, detail: detail, choices: choices, tint: tint, disabledChoices: disabled))
-        }
-    }
-
-    func soonItem(_ id: String, _ title: String, _ detail: String, glyph: NoopCanonicalGlyphName, keywords: String = "") -> NoopSettingsItem {
-        NoopSettingsItem(id: id, title: title, detail: detail, keywords: keywords) {
-            AnyView(soonRow(title, detail: detail, glyph: glyph))
         }
     }
 
@@ -4578,21 +3942,6 @@ private extension NoopAct5Screens {
             .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
     }
 
-    var widgetChargeTrack: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                HStack(spacing: 0) {
-                    Color(hex: 0x9FE2FB, alpha: 0.24).frame(width: proxy.size.width * 0.92)
-                    Color.white.opacity(0.08)
-                }
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(NoopHTMLColor.blueLight)
-                    .frame(width: proxy.size.width * 0.56)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 3))
-        }
-        .frame(height: 6)
-    }
 }
 
 // MARK: The Lab
@@ -4938,192 +4287,11 @@ struct NoopA5TintToggle: View {
 // MARK: Onboarding schedule
 
 private extension NoopAct5Screens {
-    var onboardingScreen: some View {
-        GeometryReader { proxy in
-            let canvasWidth = min(proxy.size.width, UIScreen.main.bounds.width)
-            let canvasHeight = min(proxy.size.height, UIScreen.main.bounds.height)
-            ScrollView {
-                VStack(spacing: 0) {
-                    HStack {
-                        HStack(spacing: 5) {
-                            Capsule().fill(Self.blush).frame(width: 7, height: 7)
-                            Capsule().fill(Self.blush).frame(width: 22, height: 7)
-                            Capsule().fill(Color.white.opacity(0.14)).frame(width: 7, height: 7)
-                            Capsule().fill(Color.white.opacity(0.14)).frame(width: 7, height: 7)
-                        }
-                        Spacer()
-                        Text("Step 2 of 4").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
-                    }
-
-                    Spacer(minLength: 24)
-
-                    VStack(alignment: .leading, spacing: 25) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("When do you usually sleep?")
-                                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).tracking(-0.9).lineSpacing(1)
-                            Text("This is the only question that changes the whole app. Everything else Noop works out by watching for a week.")
-                                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
-                        }
-
-                        VStack(spacing: 9) {
-                            shiftOption("At night, mostly", detail: "A normal bedtime that lands in the evening. Today means midnight to midnight.")
-                            shiftOption("Rotating shifts", detail: "It changes week to week. Noop will anchor your day to your sleep instead of the clock.")
-                            shiftOption("Permanent nights", detail: "You sleep in daylight. Every screen in the app will be written for that, not translated into it.")
-                        }
-
-                        VStack(alignment: .leading, spacing: 9) {
-                            Text("What Noop will not ask you").font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                            Text(NoopPositionCopy.inlineSentence)
-                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x939C97)).lineSpacing(4.5)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 17)
-                        .background(Self.lavender.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Self.lavender.opacity(0.2), lineWidth: 0.5))
-                    }
-
-                    Spacer(minLength: 24)
-
-                    VStack(spacing: 8) {
-                        Button {
-                            guard selectedShift != nil else { return }
-                            navigation.push(.pair)
-                        } label: {
-                            Text(selectedShift == nil ? "Pick one to continue" : "Continue")
-                                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                                .foregroundStyle(selectedShift == nil ? NoopHTMLColor.muted : Self.blushDark)
-                                .frame(maxWidth: .infinity).frame(minHeight: 56)
-                                .background(selectedShift == nil ? Color.white.opacity(0.07) : Self.blush, in: RoundedRectangle(cornerRadius: 18))
-                                .overlay(RoundedRectangle(cornerRadius: 18).stroke(selectedShift == nil ? Color.white.opacity(0.1) : .clear, lineWidth: 0.5))
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
-                        .disabled(selectedShift == nil)
-
-                        Button("I would rather not say") {
-                            selectedShift = nil
-                            navigation.push(.pair)
-                        }
-                        .font(NoopHTMLFont.sans(NoopType.footnote))
-                        .foregroundStyle(Color(hex: 0x7F8A85))
-                        .frame(minHeight: 42)
-                    }
-                }
-                .frame(width: max(0, canvasWidth - 44))
-                .frame(minHeight: max(0, canvasHeight - 84))
-                .padding(.horizontal, 22)
-                .padding(.top, 56)
-                .padding(.bottom, 28)
-            }
-            .scrollIndicators(.hidden)
-        }
-        .frame(width: UIScreen.main.bounds.width)
-        .background(Color.clear)
-    }
-
-    func shiftOption(_ title: String, detail: String) -> some View {
-        let selected = selectedShift == title
-        return Button { selectedShift = title } label: {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(selected ? Self.blush : .clear)
-                    .frame(width: 20, height: 20)
-                    .overlay(Circle().stroke(selected ? Self.blush : Color.white.opacity(0.22), lineWidth: 1.5))
-                    .overlay(Circle().stroke(NoopHTMLColor.canvas, lineWidth: selected ? 4 : 0))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                    Text(detail).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy).lineSpacing(4)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 17)
-            .background(selected ? Self.blush.opacity(0.1) : NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(selected ? Self.blush.opacity(0.4) : NoopHTMLColor.border, lineWidth: 0.5))
-        }
-        .buttonStyle(NoopHTMLPressStyle())
-    }
 }
 
 // MARK: Pairing
 
 private extension NoopAct5Screens {
-    var pairingScreen: some View {
-        GeometryReader { proxy in
-            let canvasWidth = min(proxy.size.width, UIScreen.main.bounds.width)
-            let canvasHeight = min(proxy.size.height, UIScreen.main.bounds.height)
-            ScrollView {
-                VStack(spacing: 0) {
-                    HStack {
-                        NoopBackButton(action: navigation.back)
-                        Spacer()
-                        NoopSectionLabel(paired ? "Paired" : "Looking")
-                        Spacer()
-                        Color.clear.frame(width: NoopCloseButton.side, height: NoopCloseButton.side)
-                    }
-
-                    Spacer(minLength: 24)
-
-                    VStack(spacing: 24) {
-                        NoopA5PairPulse(paired: paired)
-
-                        VStack(spacing: 9) {
-                            Text(paired ? "That is everything." : "Hold the button until it blinks.")
-                                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).tracking(-0.8).multilineTextAlignment(.center)
-                            Text(paired
-                                 ? "Three nights were buffered on the strap and they are importing now. Noop will watch for a week before it tells you anything — the first read arrives next Sunday."
-                                 : "Noop found one strap nearby. Nothing is connected until you tap Connect, and pairing does not send anything anywhere.")
-                                .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy).multilineTextAlignment(.center).lineSpacing(4).frame(maxWidth: 290)
-                        }
-
-                        HStack(spacing: 13) {
-                            NoopCanonicalGlyph(name: .watch, size: 20, color: NoopHTMLColor.blue)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("WHOOP 5.0 / MG").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                                Text(paired ? "connected · 52% · importing 3 nights" : "signal strong · 52% battery")
-                                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
-                            }
-                            Spacer()
-                            NoopPill(text: paired ? "Connected" : "Found", color: paired ? NoopHTMLColor.blueLight : NoopHTMLColor.copy)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 15)
-                        .frame(width: max(0, canvasWidth - 10))
-                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-                    }
-
-                    Spacer(minLength: 24)
-
-                    VStack(spacing: 8) {
-                        Button {
-                            if paired { navigation.back() } else { paired = true; activeDevice = "mg"; connected = true }
-                        } label: {
-                            Text(paired ? "Back to your straps" : "Connect")
-                                .font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
-                                .foregroundStyle(NoopHTMLColor.blueInk)
-                                .frame(maxWidth: .infinity).frame(minHeight: 58)
-                                .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 19))
-                                .shadow(color: NoopHTMLColor.blue.opacity(0.28), radius: 13, y: 8)
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
-                        Text(paired
-                             ? "You can wear it loosely. Noop would rather have an imperfect night than none."
-                             : "If nothing appears, the strap is asleep — put it on the charger for a moment.")
-                            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint).multilineTextAlignment(.center).lineSpacing(3)
-                    }
-                }
-                .frame(width: max(0, canvasWidth - 44))
-                .frame(minHeight: max(0, canvasHeight - 84))
-                .padding(.horizontal, 22)
-                .padding(.top, 56)
-                .padding(.bottom, 28)
-            }
-            .scrollIndicators(.hidden)
-        }
-        .frame(width: UIScreen.main.bounds.width)
-        .background(Color.clear)
-    }
 }
 
 private struct NoopA5PairPulse: View {
