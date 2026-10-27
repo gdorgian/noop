@@ -80,54 +80,6 @@ final class NoopLabReviewDraft: ObservableObject {
         state = .empty
     }
 
-    #if DEBUG
-    func seedDemoReviewIfNeeded() {
-        guard origin == nil, false else { return }
-        let size = CGSize(width: 1000, height: 720)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        let rendered = renderer.image { context in
-            UIColor(red: 0.86, green: 0.83, blue: 0.76, alpha: 1).setFill()
-            context.cgContext.fill(CGRect(origin: .zero, size: size))
-            UIColor(red: 0.12, green: 0.10, blue: 0.08, alpha: 0.72).setFill()
-            "HAEMATOLOGY · SERUM                         14 AUGUST 2026".draw(
-                at: CGPoint(x: 72, y: 66),
-                withAttributes: [.font: UIFont.monospacedSystemFont(ofSize: 25, weight: .semibold), .foregroundColor: UIColor.black.withAlphaComponent(0.66)]
-            )
-            context.cgContext.fill(CGRect(x: 72, y: 112, width: 856, height: 2))
-            let rows = [
-                "Haemoglobin                         138      g/L",
-                "Ferritin                             28      µg/L",
-                "Vitamin D, 25-OH                     52      nmol/L",
-                "ApoB                               0.78      g/L",
-                "hs-CRP                              0.6      mg/L"
-            ]
-            for (index, row) in rows.enumerated() {
-                row.draw(
-                    at: CGPoint(x: 78, y: 165 + CGFloat(index) * 86),
-                    withAttributes: [.font: UIFont.monospacedSystemFont(ofSize: 27, weight: index == 1 ? .semibold : .regular), .foregroundColor: UIColor.black.withAlphaComponent(0.78)]
-                )
-            }
-        }
-        image = rendered
-        origin = .photo
-        filename = "IMG_4471"
-        reportDay = "2026-08-14"
-        let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("--noop-labs-reading") {
-            state = .reading
-            candidates = []
-            return
-        }
-        if arguments.contains("--noop-labs-nothing-legible") {
-            state = .nothingLegible
-            candidates = []
-            return
-        }
-        state = .read
-        candidates = NoopOCRCandidate.samplesWithRects
-    }
-    #endif
-
     fileprivate var captionDate: String? {
         guard let reportDay, let date = Self.dayFormatter.date(from: reportDay) else { return nil }
         return Self.captionFormatter.string(from: date)
@@ -1301,7 +1253,7 @@ private struct NoopLabsHome: View {
     private var heroCaption: String {
         "of \(markers.count) recorded"
     }
-    private var outsideCount: Int { markers.filter(\.isOutside).count }
+    private var outsideCount: Int { 0 }
     private var recordedCount: Int { markers.filter(\.isRecorded).count }
     private var outOfBandLine: String {
         guard book.hasLoaded else {
@@ -1313,19 +1265,12 @@ private struct NoopLabsHome: View {
         guard recordedCount > 0 else {
             return "nothing recorded yet"
         }
-        guard false else {
-            // No shipped reference ranges, so nothing here may be described as inside or outside
-            // one. The line names the sources instead, which is a recorded fact.
-            let sources = book.sources
-            if sources == ["manual"] { return "entered by hand" }
-            if sources.isEmpty { return "recorded on this phone" }
-            return "from \(sources.count) source\(sources.count == 1 ? "" : "s"), kept on this phone"
-        }
-        switch outsideCount {
-        case 0: return "every recorded marker inside the lab\u{2019}s band"
-        case 1: return "one marker outside the lab\u{2019}s band"
-        case let count: return "\(count) markers outside the lab\u{2019}s band"
-        }
+        // No shipped reference ranges, so nothing here may be described as inside or outside
+        // one. The line names the sources instead, which is a recorded fact.
+        let sources = book.sources
+        if sources == ["manual"] { return "entered by hand" }
+        if sources.isEmpty { return "recorded on this phone" }
+        return "from \(sources.count) source\(sources.count == 1 ? "" : "s"), kept on this phone"
     }
     private var latestDrawLabel: String? {
         // The most recent day a reading is dated to. No clinic: the store records a source, not a
@@ -1356,7 +1301,7 @@ private struct NoopLabsHome: View {
                     }
                 }
                 .padding(.top, 8)
-                NoopHelixHero(markers: markers.map { NoopHelixMarker(id: $0.id, outOfBand: $0.isOutside) })
+                NoopHelixHero(markers: markers.map { NoopHelixMarker(id: $0.id, outOfBand: false) })
                     .padding(.top, 6)
 
                 // The helix has no centre to hold the count, so the reading sits under it: the
@@ -1408,7 +1353,7 @@ private struct NoopLabsHome: View {
                                     }
                                     Text(marker.bandTag)
                                         .font(NoopHTMLFont.sans(10.5, weight: .semibold))
-                                        .foregroundStyle(marker.isOutside ? Color(hex: 0xF6DCB4) : NoopHTMLColor.copy)
+                                        .foregroundStyle(NoopHTMLColor.copy)
                                 }
                                 NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
                             }
@@ -2004,15 +1949,6 @@ private struct NoopLabReview: View {
     }
 
     private func ensureValidArrival() {
-        #if DEBUG
-        if false,
-           ProcessInfo.processInfo.arguments.contains("--noop-labs-manual"),
-           draft.origin == nil {
-            draft.beginManual()
-        } else {
-            draft.seedDemoReviewIfNeeded()
-        }
-        #endif
         if draft.origin == nil || (!draft.isManual && draft.image == nil) {
             navigation.reset(to: .labs)
         }
@@ -2611,26 +2547,13 @@ private struct NoopLabMarker: Identifiable {
         return nil
     }
     var isRecorded: Bool { value != nil }
-    /// Absent is not "outside": a marker with nothing recorded is neither in nor out of its band.
-    var isOutside: Bool {
-        guard false, let value else { return false }
-        return value < low || value > high
-    }
-    var isInBand: Bool {
-        guard false, let value else { return false }
-        return value >= low && value <= high
-    }
     var color: Color {
         guard isRecorded else { return NoopHTMLColor.faint }
-        return isOutside ? Color(hex: 0xF2B45C) : NoopHTMLColor.green
+        return NoopHTMLColor.green
     }
     var valueText: String { value?.formatted(.number.precision(.fractionLength(0...2))) ?? "—" }
     /// The stored reading's unit, falling back to the design's only for an empty row.
     var shownUnit: String { live?.unit ?? unit }
-    var rangeText: String { "\(number(low))–\(number(high)) \(unit)" }
-    /// The band the chart may shade, or `nil` when there is none to shade. Outside the false
-    /// fixture NOOP ships no reference range, so nothing is drawn and nothing is described.
-    var chartBand: (low: Double, high: Double)? { nil}
     var recordedDateText: String? {
         if let live { return live.dayLabel }
         return nil
@@ -2647,13 +2570,11 @@ private struct NoopLabMarker: Identifiable {
     }
     var bandTag: String {
         guard value != nil else { return "not recorded" }
-        guard false, let value else { return "recorded" }
-        return value < low ? "below band" : value > high ? "above band" : "in band"
+        return "recorded"
     }
     var detailBandTag: String {
         guard value != nil else { return "not recorded" }
-        guard false, let value else { return "recorded" }
-        return value < low ? "below the band" : value > high ? "above the band" : "in the band"
+        return "recorded"
     }
     /// The dated series behind the trend chart. Empty when the marker holds nothing — there is no
     /// history to draw for a value that was never recorded, and an invented one is the failure
@@ -2680,72 +2601,10 @@ private struct NoopLabMarker: Identifiable {
         return "the latest equals the first of \(count) dated results"
     }
     var readCopy: String {
-        guard false else {
-            return dynamicContextCopy
-        }
-        let note = htmlNote
-        return "Four draws in fourteen months. \(note.prefix(1).uppercased())\(note.dropFirst())."
-    }
-    var htmlNote: String {
-        guard false else { return bandTag }
-        switch id {
-        case "ferritin": return isOutside ? "under the band, and the one worth asking about" : "inside, at the low end of a very wide band"
-        case "vitamin-d": return isOutside ? "under the band, which for August is early" : "inside, in August — it falls by February"
-        case "apob": return isOutside ? "over the band, and the first thing a clinician would look at" : "comfortably inside"
-        case "hs-crp": return isOutside ? "over the band — worth repeating before reading anything into it" : "low, which is where you want it"
-        case "hba1c": return isOutside ? "over the band" : "inside, and stable across four draws"
-        case "tsh": return isOutside ? "over the band" : "inside"
-        case "alt": return isOutside ? "over the band, in a hard training block" : "inside, and it moves with hard training weeks"
-        default: return bandTag
-        }
-    }
-    var chartMinimum: Double {
-        let values = series + (chartBand.map { [$0.low] } ?? [])
-        guard let minimum = values.min(), let maximum = values.max() else { return 0 }
-        let padding = minimum == maximum
-            ? max(abs(minimum) * 0.14, 1)
-            : max((maximum - minimum) * 0.14, 0.001)
-        return minimum - padding
-    }
-    var chartMaximum: Double {
-        let values = series + (chartBand.map { [$0.low] } ?? [])
-        guard let minimum = values.min(), let maximum = values.max() else { return 1 }
-        let padding = minimum == maximum
-            ? max(abs(maximum) * 0.14, 1)
-            : max((maximum - minimum) * 0.14, 0.001)
-        return maximum + padding
-    }
-    var bandNote: String {
-        guard false else {
-            // Shown back verbatim because it is the user's own text, not a range NOOP supplies.
-            guard let reference = live?.referenceText else {
-                return "No reference range was recorded with this result, so none is drawn."
-            }
-            return "The range recorded with this result: \(reference)."
-        }
-        let topVisible = high <= chartMaximum
-        let bottomVisible = low >= chartMinimum
-        if topVisible && bottomVisible {
-            return "The shaded area is the band the laboratory gave: \(number(low)) to \(number(high)) \(unit)."
-        }
-        if topVisible {
-            return "The shaded area is the laboratory’s band. Its lower limit, \(number(low)) \(unit), sits below this scale."
-        }
-        return "The shaded area is the laboratory’s band from \(number(low)) \(unit) upward. Its upper limit, \(number(high)) \(unit), is far off this scale and is not drawn."
+        return dynamicContextCopy
     }
     var retestCopy: String {
-        guard false else {
-            return isOutside
-                ? "A single out-of-band result is not conclusive. Ask a clinician whether and when a repeat draw would be useful."
-                : "Noop does not infer a retest schedule from one recorded result."
-        }
-        if id == "ferritin" && isOutside {
-            return "A single low ferritin inside a training block is common and not conclusive. The usual advice is a repeat draw in eight to twelve weeks — 9 November is the earliest that would tell you anything new."
-        }
-        if !isOutside {
-            return "Nothing here asks for a retest before your next routine draw. Noop will keep this dated result beside the next one."
-        }
-        return "A single out-of-band result is not conclusive. Ask a clinician whether and when a repeat draw would be useful."
+        return "Noop does not infer a retest schedule from one recorded result."
     }
     var provenanceCopy: String {
         guard let live else {
@@ -2775,28 +2634,14 @@ private struct NoopLabMarker: Identifiable {
         guard let value else {
             return "Nothing has been recorded for \(name) yet. Add a result from a report or type one in, and Noop will store and date what you confirm."
         }
-        guard false else {
-            let dated = live.map { ", dated \($0.dayLabel)" } ?? ""
-            let history = series.count == 1
-                ? "This is one recorded result, not yet a trend."
-                : "Across the recorded history, \(trendDirection)."
-            let comparison = live?.referenceText == nil
-                ? "Noop does not compare it to a reference range it was not given."
-                : "Noop shows the recorded reference text verbatim and does not interpret or compare the value to it."
-            return "\(name) is \(valueText) \(shownUnit)\(dated). \(history) \(comparison) A recorded result is not a diagnosis; discuss it with a clinician if you want it interpreted."
-        }
-        let position = value < low ? "below" : value > high ? "above" : "inside"
-        let markerFact: String
-        switch id {
-        case "vitamin-d": markerFact = "Noop does not assume a seasonal cause."
-        case "hs-crp": markerFact = "Noop does not attach an inflammatory cause to a single value."
-        case "hba1c": markerFact = "Noop records the dated series without turning it into a metabolic conclusion."
-        case "tsh": markerFact = "Interpretation depends on clinical context Noop does not have."
-        case "alt": markerFact = "Noop does not attribute the change to training or anything else."
-        case "apob": markerFact = "Noop records the laboratory comparison and makes no treatment claim."
-        default: markerFact = "Noop records the dated value and does not infer a cause."
-        }
-        return "\(name) is \(position) the laboratory’s band and is \(trendDirection). \(markerFact) One result is not a diagnosis; discuss it with a clinician if you want it interpreted."
+        let dated = live.map { ", dated \($0.dayLabel)" } ?? ""
+        let history = series.count == 1
+            ? "This is one recorded result, not yet a trend."
+            : "Across the recorded history, \(trendDirection)."
+        let comparison = live?.referenceText == nil
+            ? "Noop does not compare it to a reference range it was not given."
+            : "Noop shows the recorded reference text verbatim and does not interpret or compare the value to it."
+        return "\(name) is \(valueText) \(shownUnit)\(dated). \(history) \(comparison) A recorded result is not a diagnosis; discuss it with a clinician if you want it interpreted."
     }
     private func number(_ value: Double) -> String { value.formatted(.number.precision(.fractionLength(0...2))) }
 
@@ -2929,12 +2774,6 @@ private struct NoopOCRCandidate: Identifiable {
         NoopOCRCandidate(id: "hs-crp", markerKey: "crp", category: .bloodPanel, name: "hs-CRP", value: "0.6", unit: "mg/L", raw: "hsCRP  <0,6", confidence: "check this", lowConfidence: true, sourceRect: nil, readToken: "<0,6")
     ]
 
-    static let samplesWithRects: [NoopOCRCandidate] = [
-        NoopOCRCandidate(id: "ferritin", markerKey: "ferritin", category: .bloodPanel, name: "Ferritin", value: "28", unit: "µg/L", raw: "Ferritin  28 µg/L", confidence: "clear read", lowConfidence: false, sourceRect: CGRect(x: 0.07, y: 0.32, width: 0.86, height: 0.075), readToken: "28"),
-        NoopOCRCandidate(id: "vitamin-d", markerKey: "vitamin_d", category: .bloodPanel, name: "Vitamin D", value: "52", unit: "nmol/L", raw: "Vitamin D, 25-OH  52 nmol/L", confidence: "clear read", lowConfidence: false, sourceRect: CGRect(x: 0.07, y: 0.44, width: 0.86, height: 0.075), readToken: "52"),
-        NoopOCRCandidate(id: "apob", markerKey: "custom_apob", category: .other, name: "ApoB", value: "0.78", unit: "g/L", raw: "ApoB  O.78 g/L", confidence: "check this", lowConfidence: true, sourceRect: CGRect(x: 0.07, y: 0.56, width: 0.86, height: 0.075), readToken: "O.78"),
-        NoopOCRCandidate(id: "hs-crp", markerKey: "crp", category: .bloodPanel, name: "hs-CRP", value: "0.6", unit: "mg/L", raw: "hsCRP  <0,6", confidence: "check this", lowConfidence: true, sourceRect: CGRect(x: 0.07, y: 0.68, width: 0.86, height: 0.075), readToken: "<0,6")
-    ]
 }
 
 private struct NoopMarkerTrend: View {
@@ -3100,15 +2939,12 @@ struct NoopLabMarkerState: Equatable, Identifiable {
 
     /// A range only exists when the user recorded one on the latest reading.
     var referenceText: String? { latest?.referenceText }
-    var hasRange: Bool { referenceText != nil }
 
     var valueText: String {
         guard let latest else { return "—" }
         return latest.value.formatted(.number.precision(.fractionLength(0...max(0, decimals))))
     }
 
-    /// Only a series of two or more dated points is a history worth drawing. One point is a point.
-    var drawableHistory: [NoopLabReading] { history.count >= 2 ? history : [] }
 }
 
 /// Loads the Act 8 lab family from the real Lab Book.
@@ -3142,8 +2978,6 @@ final class NoopLabBook: ObservableObject {
     @Published private(set) var unavailable = false
 
     var recordedCount: Int { markers.filter(\.isRecorded).count }
-    /// Only markers whose latest reading carries a user-recorded range can be judged against one.
-    var rangedMarkers: [NoopLabMarkerState] { markers.filter(\.hasRange) }
 
     /// The most recently dated reading across all markers. Absent when nothing is recorded — the
     /// header then says nothing rather than naming a date.
