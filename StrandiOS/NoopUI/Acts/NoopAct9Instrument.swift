@@ -690,27 +690,7 @@ private struct NoopInstrumentRawScreen: View {
     @State private var exporting = false
 
     private var sessions: [RawDataSessionStore.Session] {
-        guard false else { return store.sessions }
-        let fixtures: [(String, TimeInterval)] = [
-            ("0f3a91", 0), ("0e77c4", -86_400),
-            ("0d1b58", -7 * 86_400), ("0c9042", -9 * 86_400)
-        ]
-        var result = fixtures.filter { !navigation.instrumentDemoRawDeletedIDs.contains($0.0) }.map { id, offset in
-            let start = Int64((now.addingTimeInterval(offset).timeIntervalSince1970) * 1_000)
-            return RawDataSessionStore.Session(
-                id: id, deviceId: "debug-fixture", startedAtMs: start,
-                endedAtMs: start + (id == "0f3a91" ? 252_000 : 710_000),
-                capturedStartedAtMs: start, capturedEndedAtMs: start + 252_000,
-                comment: "", exported: false, lastExportedAtMs: nil, events: []
-            )
-        }
-        if let demoArmedAt = navigation.instrumentDemoRawArmedAt {
-            result.insert(.init(id: "demo-live", deviceId: "debug-fixture",
-                                startedAtMs: Int64(demoArmedAt.timeIntervalSince1970 * 1_000),
-                                endedAtMs: nil, capturedStartedAtMs: nil, capturedEndedAtMs: nil,
-                                comment: "", exported: false, lastExportedAtMs: nil, events: []), at: 0)
-        }
-        return result
+        return store.sessions
     }
 
     private var active: RawDataSessionStore.Session? {
@@ -2856,27 +2836,6 @@ struct NoopInstrumentData {
         )
     }
 
-    /// Preserve all aligned inputs up to the chosen end day, so existing range/correlation gates
-    /// operate on the same historical period on index, detail, comparison and effects screens.
-    func overviewRecord() -> NoopTrendsRecord {
-        var daily: [String: [String: Double]] = [:]
-        let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
-        for key in ["rhr", "hrv", "sleep"] {
-            var rows: [String: Double] = [:]
-            for (index, value) in (values[key] ?? []).enumerated() {
-                guard let value, historyDates.indices.contains(index), let date = historyDates[index] else { continue }
-                rows[f.string(from: date)] = key == "sleep" ? value * 60 : value
-            }
-            daily[key == "sleep" ? "sleep_total_min" : key] = rows
-        }
-        let capacity = (values["cap"] ?? []).enumerated().compactMap { index, value -> (day: String, value: Double)? in
-            guard let value, historyDates.indices.contains(index), let date = historyDates[index] else { return nil }
-            return (f.string(from: date), value)
-        }
-        return NoopTrendsRecord.build(days: [], capacityDays: capacity, resolvedDaily: daily)
-    }
-
     fileprivate func between(start: Date, end: Date) -> NoopInstrumentData {
         let calendar = Calendar.current
         guard let window = HistoryDateWindow(endingOn: end, dayCount: nil, firstDay: start, calendar: calendar) else { return .empty }
@@ -3935,15 +3894,6 @@ private extension NoopInstrumentData {
                      width: width, height: height, padding: padding)
     }
 
-    func rollingRange(_ values: [Double], radius: Int) -> [ClosedRange<Double>] {
-        values.indices.map { index in
-            let lower = max(0, index - radius)
-            let upper = min(values.count - 1, index + radius)
-            let window = values[lower...upper]
-            return (window.min() ?? 0)...(window.max() ?? 0)
-        }
-    }
-
     func regression(values: [Double], scale: ChartScale) -> (start: CGPoint, end: CGPoint)? {
         guard !values.isEmpty else { return nil }
         var sumX = 0.0, sumY = 0.0, sumXX = 0.0, sumXY = 0.0
@@ -3962,24 +3912,6 @@ private extension NoopInstrumentData {
             scale.point(value: intercept, index: 0),
             scale.point(value: intercept + slope * Double(values.count - 1), index: values.count - 1)
         )
-    }
-
-    func regressionMeasured(values: [Double?], scale: ChartScale) -> (start: CGPoint, end: CGPoint)? {
-        let measured = values.enumerated().compactMap { index, value -> (Double, Double)? in
-            value.map { (Double(index), $0) }
-        }
-        guard measured.count >= 2 else { return nil }
-        let count = Double(measured.count)
-        let sumX = measured.map(\.0).reduce(0, +)
-        let sumY = measured.map(\.1).reduce(0, +)
-        let sumXX = measured.map { $0.0 * $0.0 }.reduce(0, +)
-        let sumXY = measured.map { $0.0 * $0.1 }.reduce(0, +)
-        let denominator = count * sumXX - sumX * sumX
-        guard denominator != 0 else { return nil }
-        let slope = (count * sumXY - sumX * sumY) / denominator
-        let intercept = (sumY - slope * sumX) / count
-        return (scale.point(value: intercept, index: 0),
-                scale.point(value: intercept + slope * Double(max(0, values.count - 1)), index: max(0, values.count - 1)))
     }
 
     func correlation(first: [Double?], second: [Double?], lag: Int) -> NoopInstrumentCorrelation {

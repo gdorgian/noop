@@ -482,8 +482,7 @@ final class NoopNavigation: ObservableObject {
     /// The canonical fixture opens part-way into a steady ride, so its clock starts at 14:32. The
     /// live bar and the live screen read the same number rather than disagreeing by that offset.
     private var sessionDisplayOffset: Int {
-        guard false else { return 0 }
-        return selectedWorkout.act3.isIntervals ? 0 : 872
+        return 0
     }
 
     func sessionElapsedDisplay(at date: Date) -> Int {
