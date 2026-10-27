@@ -14,6 +14,8 @@ final class NoopLiveGlance: ObservableObject {
     @Published private(set) var heartRate: Int?
     /// Whole percent, so a millivolt wobble that rounds to the same figure redraws nothing.
     @Published private(set) var batteryPercent: Int?
+    /// A history offload is running: the battery pill draws its sync line.
+    @Published private(set) var syncing = false
 
     private var bound: ObjectIdentifier?
     private var subscriptions: Set<AnyCancellable> = []
@@ -29,6 +31,7 @@ final class NoopLiveGlance: ObservableObject {
         bonded = live.bonded
         heartRate = live.heartRate
         batteryPercent = live.batteryPct.map { Int($0.rounded()) }
+        syncing = live.backfilling
 
         live.$connected.removeDuplicates().receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.connected = $0 }.store(in: &subscriptions)
@@ -38,5 +41,7 @@ final class NoopLiveGlance: ObservableObject {
             .sink { [weak self] in self?.heartRate = $0 }.store(in: &subscriptions)
         live.$batteryPct.map { $0.map { Int($0.rounded()) } }.removeDuplicates().receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.batteryPercent = $0 }.store(in: &subscriptions)
+        live.$backfilling.removeDuplicates().receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.syncing = $0 }.store(in: &subscriptions)
     }
 }

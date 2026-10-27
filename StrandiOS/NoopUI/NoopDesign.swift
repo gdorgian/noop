@@ -451,6 +451,8 @@ struct NoopBatteryChip: View {
     var percent: Int?
     /// Inside another capsule: no capsule of its own unless the charge is low.
     var bare = false
+    /// The strap is syncing history: a short green line runs around the pill.
+    var syncing = false
     var action: (() -> Void)?
 
     private var isLow: Bool { percent.map { $0 <= 20 } ?? false }
@@ -511,8 +513,39 @@ struct NoopBatteryChip: View {
                     lineWidth: 0.5
                 )
             )
+            .overlay { if syncing { NoopSyncTrace() } }
+            .animation(.easeInOut(duration: 0.3), value: syncing)
         }
         .buttonStyle(NoopPlainHitStyle())
+        .accessibilityValue(syncing ? "syncing" : "")
+    }
+}
+
+/// A short green line circling a capsule, for as long as it is on screen. Still under Reduce Motion.
+struct NoopSyncTrace: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = max(geo.size.width, 1), h = max(geo.size.height, 1)
+            let perimeter = 2 * (w - h) + .pi * h
+            let length = perimeter * 0.22
+            if reduceMotion {
+                Capsule().stroke(NoopHTMLColor.green.opacity(0.7), lineWidth: 1.4)
+            } else {
+                TimelineView(.animation) { context in
+                    let t = context.date.timeIntervalSinceReferenceDate
+                    let phase = CGFloat(t.truncatingRemainder(dividingBy: 1.6) / 1.6) * perimeter
+                    Capsule()
+                        .stroke(NoopHTMLColor.green,
+                                style: StrokeStyle(lineWidth: 1.6, lineCap: .round,
+                                                   dash: [length, perimeter - length], dashPhase: -phase))
+                        .shadow(color: NoopHTMLColor.green.opacity(0.6), radius: 3)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        .transition(.opacity)
     }
 }
 

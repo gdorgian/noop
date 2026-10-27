@@ -305,6 +305,7 @@ struct NoopAct2Screens: View {
     @State private var showingStress = false
     @EnvironmentObject private var profile: ProfileStore
     @EnvironmentObject private var repo: Repository
+    @EnvironmentObject private var glance: NoopLiveGlance
     @ObservedObject private var planStore = CoachPlanStore.shared
 
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
@@ -1037,7 +1038,7 @@ struct NoopAct2Screens: View {
                 // The band and the updates as two separate controls, each at the height of the date
                 // beside them (25 Oct 2026).
                 HStack(spacing: 9) {
-                    NoopBatteryChip(percent: day == nil ? 52 : battery) { navigation.push(.strap) }
+                    NoopBatteryChip(percent: day == nil ? 52 : battery, syncing: day != nil && glance.syncing) { navigation.push(.strap) }
                     Button { navigation.push(.inbox) } label: {
                         ZStack(alignment: .topTrailing) {
                             NoopCanonicalGlyph(name: .bell, size: NoopControlSize.small.icon, color: NoopHTMLColor.inkSoft)
