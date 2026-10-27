@@ -1262,7 +1262,7 @@ private extension NoopAct3Screens {
 /// The five session templates as plans: a name, a length and a zone the wearer's own bands resolve to
 /// beats per minute. What each would "cost today", whether it fits, and why — the prescription the
 /// design writes — needs an engine the app does not have and is left out.
-private extension NoopWorkout {
+extension NoopWorkout {
     static func matchingRecordedSport(_ sport: String) -> NoopWorkout? {
         allCases.first { $0.catalogSport.caseInsensitiveCompare(sport) == .orderedSame }
     }
@@ -1275,6 +1275,16 @@ private extension NoopWorkout {
         case .intervals: 5
         case .strength: nil
         }
+    }
+
+    /// The template's band in beats per minute from the wearer's zones; nil without a single zone or
+    /// before the zones are the wearer's own.
+    @MainActor func band(profile: ProfileStore) -> (low: Int, high: Int)? {
+        guard NoopZoneSource.current(profile).trusted, let number = targetZone else { return nil }
+        let zones = profile.hrZoneSet.zones
+        guard zones.indices.contains(number - 1) else { return nil }
+        let z = zones[number - 1]
+        return (Int(z.lower.rounded()), Int(z.upper.rounded()))
     }
 
     /// The catalogue sport the recorder saves the session under.
@@ -1295,8 +1305,7 @@ private extension NoopAct3Screens {
         switch navigation.route {
         case .pick: livePicker
         case .ready: liveReady
-        case .live, .intervals: liveSession
-        default: liveSessionHome(effort)
+        default: liveSession
         }
     }
 
@@ -1305,13 +1314,7 @@ private extension NoopAct3Screens {
 
     /// The template's band in beats per minute from the wearer's zones; nil without a single zone or
     /// before the zones are the wearer's own.
-    func band(_ workout: NoopWorkout) -> (low: Int, high: Int)? {
-        guard zonesTrusted, let number = workout.targetZone else { return nil }
-        let zones = profile.hrZoneSet.zones
-        guard zones.indices.contains(number - 1) else { return nil }
-        let z = zones[number - 1]
-        return (Int(z.lower.rounded()), Int(z.upper.rounded()))
-    }
+    func band(_ workout: NoopWorkout) -> (low: Int, high: Int)? { workout.band(profile: profile) }
 
     func bandText(_ workout: NoopWorkout) -> String {
         band(workout).map { "\($0.low)\u{2013}\($0.high)" } ?? "\u{2014}"
@@ -1322,124 +1325,12 @@ private extension NoopAct3Screens {
 
     // MARK: Session home
 
-    func liveSessionHome(_ effort: NoopEffortRecord) -> some View {
-        let workout = navigation.selectedWorkout
-        let chosen = navigation.workoutChosenByUser
-        return NoopScreen(topInset: 58) {
-            VStack(spacing: 0) {
-                Act3HomeHeader(title: isNightWorker ? "This shift's session" : "Today's session",
-                               eyebrow: "\(Self.weekdayFormatter.string(from: Date())), \(AppClock.hourMinuteFormatter().string(from: Date()))") {
-                    NoopBatteryChip(percent: battery) { navigation.push(.strap) }
-                }
-
-                VStack(spacing: 9) {
-                    VStack(alignment: .leading, spacing: 13) {
-                        if chosen {
-                            NoopSectionLabel("Your choice", color: NoopHTMLColor.blue)
-                        }
-                        Text(workout.act3.name)
-                            .font(NoopHTMLFont.outfit(29, weight: .light))
-                            .tracking(-0.85)
-                        HStack(spacing: 14) {
-                            heroMetric("\(workout.act3.duration)", label: "minutes")
-                            Rectangle().fill(Color.white.opacity(0.12)).frame(width: 0.5, height: 30)
-                            heroMetric(bandText(workout), label: "bpm to hold")
-                        }
-                        .padding(.top, 4)
-                        .padding(.bottom, 2)
-                        VStack(spacing: 8) {
-                            Act3ActionButton("Get ready", height: 54, radius: 18, fontSize: 15, primary: true) {
-                                if model.activeWorkout != nil { navigation.push(.live) }
-                                else if !refuseIfRunning() {
-                                    navigation.push(workout == .strength ? .liftLibrary : .ready)
-                                }
-                            }
-                            Act3ActionButton("Choose something else", height: 46, radius: 16) { navigation.push(.pick) }
-                        }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 18)
-                    .padding(.bottom, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background {
-                        NoopCSSLinearGradient(colors: [NoopHTMLColor.blue.opacity(0.16), NoopHTMLColor.blue.opacity(0.03)],
-                                              degrees: 158)
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                    }
-                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(NoopHTMLColor.blue.opacity(0.3), lineWidth: 0.5))
-
-                    liveWeekCard(effort)
-
-                    if let last = effort.workouts.first {
-                        Button { openStored(last) } label: {
-                            HStack(spacing: 13) {
-                                NoopCanonicalGlyph(name: Self.glyph(for: last.sport), size: 21, color: NoopHTMLColor.blue)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("\(Self.dayWord(last.startTs)) \u{00B7} \(last.sport)")
-                                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
-                                    Text(Self.meta(last))
-                                        .font(NoopHTMLFont.sans(11.5))
-                                        .foregroundStyle(Color(hex: 0x7F8A85))
-                                        .monospacedDigit()
-                                }
-                                Spacer()
-                                NoopChevron()
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 15)
-                            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-                        }
-                        .buttonStyle(NoopHTMLPressStyle())
-                    }
-
-                }
-                .padding(.top, 14)
-            }
-        }
-    }
-
-    func liveWeekCard(_ effort: NoopEffortRecord) -> some View {
-        let total = effort.week.compactMap(\.value).reduce(0, +)
-        return NoopHTMLCard(radius: 20, padding: 16) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    NoopSectionLabel("Load, last seven days")
-                    Spacer()
-                    Text("\(Int(total.rounded())) total")
-                        .font(NoopHTMLFont.sans(11))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .monospacedDigit()
-                }
-                HStack(alignment: .bottom, spacing: 6) {
-                    ForEach(effort.week.indices, id: \.self) { index in
-                        let value = effort.week[index].value ?? 0
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(value > 78 ? Color(hex: 0xF2B45C) : value <= 0 ? Color.white.opacity(0.07) : NoopHTMLColor.blue.opacity(0.5))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: max(3, CGFloat(min(100, value)) / 100 * 62))
-                    }
-                }
-                .frame(height: 62, alignment: .bottom)
-                HStack(spacing: 6) {
-                    ForEach(effort.week.indices, id: \.self) { index in
-                        let today = index == effort.week.count - 1
-                        Text(effort.week[index].label)
-                            .font(NoopHTMLFont.sans(9.5, weight: today ? .semibold : .regular))
-                            .foregroundStyle(today ? NoopHTMLColor.blueLight : NoopHTMLColor.faint)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-            }
-        }
-    }
-
     // MARK: Picker
 
     var livePicker: some View {
         NoopScreen(topInset: 56) {
             VStack(spacing: 0) {
-                Act3BackHeader(label: "Today's session") { back(to: .session) }
+                Act3BackHeader(label: "Fitness") { back(to: .fitness) }
                     .padding(.horizontal, -2)
                 VStack(spacing: 14) {
                     Text("Choose something else")
@@ -1452,10 +1343,10 @@ private extension NoopAct3Screens {
                             Button {
                                 navigation.selectedWorkout = workout
                                 navigation.workoutChosenByUser = true
-                                // Strength is a lift: it continues into Act 10's library, whose back
-                                // returns to the session.
+                                // Strength is a lift: it continues into Act 10's library. Anything
+                                // else returns to Fitness, where the suggested session now reads it.
                                 if workout == .strength { navigation.push(.liftLibrary) }
-                                else { navigation.reset(to: .session) }
+                                else { navigation.back(or: .fitness) }
                             } label: {
                                 HStack(spacing: 13) {
                                     Act3WorkoutGlyph(workout: workout, size: 21, color: NoopHTMLColor.blue)
@@ -1493,7 +1384,7 @@ private extension NoopAct3Screens {
         let zone = workout.targetZone
         return VStack(spacing: 0) {
             HStack {
-                NoopBackButton { navigation.back(or: .session) }
+                NoopBackButton { navigation.back(or: .fitness) }
                 Spacer()
                 NoopSectionLabel("Ready")
                 Spacer()
@@ -1569,7 +1460,7 @@ private extension NoopAct3Screens {
                     navigation.push(.live)
                 }
                 .shadow(color: NoopHTMLColor.blue.opacity(0.3), radius: 13, y: 8)
-                Button("Not now") { navigation.reset(to: .session) }
+                Button("Not now") { navigation.reset(to: .fitness) }
                     .font(NoopHTMLFont.sans(13))
                     .foregroundStyle(Color(hex: 0x7F8A85))
                     .frame(height: 44)
@@ -1589,19 +1480,6 @@ private extension NoopAct3Screens {
         }
         withAnimation(NoopMotion.swap) { refusal = running }
         return true
-    }
-
-    /// Opens a stored session: a lift recorded in Act 10 opens its lift detail, anything else its
-    /// session page.
-    func openStored(_ row: WorkoutRow) {
-        if row.sport == LiftingImporter.sport && row.source == "manual" {
-            navigation.selectedLiftSessionID = nil
-            navigation.liftDetailStartTs = row.startTs
-            navigation.liftDetailReturnRoute = navigation.route
-            navigation.push(.liftDetail)
-            return
-        }
-        navigation.openSession(startTs: row.startTs)
     }
 
     func liveReadyCheck(_ glyph: NoopCanonicalGlyphName, _ text: String) -> some View {
@@ -1707,7 +1585,7 @@ private extension NoopAct3Screens {
         } else {
             NoopScreen(topInset: 58) {
                 VStack(alignment: .leading, spacing: 16) {
-                    Act3BackHeader(label: "Session") { navigation.back(or: .session) }
+                    Act3BackHeader(label: "Fitness") { navigation.back(or: .fitness) }
                     Text("No session is running")
                         .font(NoopHTMLFont.outfit(27, weight: .light))
                     Text("Choose a session when you are ready. Nothing has been recorded here.")
@@ -1716,41 +1594,6 @@ private extension NoopAct3Screens {
                 }
             }
         }
-    }
-
-    // MARK: Detail
-
-    // MARK: Session helpers
-
-    static func glyph(for sport: String) -> NoopCanonicalGlyphName {
-        let s = sport.lowercased()
-        if s.contains("cycl") || s.contains("ride") || s.contains("bike") || s.contains("spin") { return .bike }
-        if s.contains("walk") || s.contains("hik") { return .walk }
-        if s.contains("swim") || s.contains("row") || s.contains("water") { return .wave }
-        if s.contains("strength") || s.contains("weight") || s.contains("lift") || s.contains("body") { return .weight }
-        if s.contains("hiit") || s.contains("interval") { return .bolt }
-        return .spark
-    }
-
-    static let weekdayFormatter: DateFormatter = {
-        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("EEEE"); return f
-    }()
-
-    static func dayWord(_ ts: Int) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(ts))
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) { return "Today" }
-        if calendar.isDateInYesterday(date) { return "Yesterday" }
-        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("d MMM")
-        return f.string(from: date)
-    }
-
-    /// "42 min · load 48 · 14.8 km".
-    static func meta(_ row: WorkoutRow) -> String {
-        var parts = [row.noopMinutesLabel]
-        if let strain = row.strain { parts.append("load \(Int(strain.rounded()))") }
-        if let d = row.distanceM, d > 0 { parts.append(String(format: "%.1f km", d / 1000)) }
-        return parts.joined(separator: " \u{00B7} ")
     }
 
 }

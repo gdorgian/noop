@@ -1103,7 +1103,7 @@ struct NoopVerifiedAppShell: View {
 
         switch navigation.route.act {
         case .effort:
-            navigation.reset(to: .session)
+            navigation.reset(to: .fitness)
         case .plumbing:
             navigation.reset(to: .you)
         default:

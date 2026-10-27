@@ -11,10 +11,10 @@ import StrandTraining
 @MainActor
 final class NoopFitnessSettings: ObservableObject {
     enum Section: String, CaseIterable, Codable, Identifiable {
-        case week, activity, routines, sports, load, cardio, strength, totals
+        case week, activity, routines, sports, load, cardio, strength, totals, suggested, effortWeek
         var id: String { rawValue }
-        /// On the page before the wearer arranges it. Totals waits in Add.
-        var onByDefault: Bool { self != .totals }
+        /// On the page before the wearer arranges it. The optional sections wait in Add.
+        var onByDefault: Bool { ![.totals, .suggested, .effortWeek].contains(self) }
         static var standard: [Section] { allCases.filter(\.onByDefault) }
         var title: String {
             switch self {
@@ -26,6 +26,8 @@ final class NoopFitnessSettings: ObservableObject {
             case .cardio: "Cardio"
             case .strength: "Strength"
             case .totals: "Totals"
+            case .suggested: "Suggested session"
+            case .effortWeek: "Effort, last seven days"
             }
         }
         var cards: [Card] {

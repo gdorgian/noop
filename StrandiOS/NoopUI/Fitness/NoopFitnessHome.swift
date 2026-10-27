@@ -240,6 +240,8 @@ struct NoopFitnessHome: View {
         case .cardio: "Active time, energy, VO₂ max, recovery, focus and zones"
         case .strength: "Sets, volume and how fresh each muscle is"
         case .totals: "Sessions, time and distance over a period you choose, and where the time went"
+        case .suggested: "One session with its length and heart-rate band, to start or swap"
+        case .effortWeek: "Each day's Effort for the past week"
         }
     }
 
@@ -315,6 +317,12 @@ struct NoopFitnessHome: View {
             if Calendar.current.isDateInToday(selectedDay) { NoopActivityOffer().padding(.bottom, 10) }
             activity(s)
                 .padding(.bottom, 20)
+        case .suggested:
+            sectionTitle("Suggested session")
+            NoopFitnessSuggestedSession(navigation: navigation).padding(.bottom, 22)
+        case .effortWeek:
+            sectionTitle("Effort, last seven days")
+            NoopFitnessEffortWeek().padding(.bottom, 22)
         case .totals:
             sectionTitle("Totals")
             NoopFitnessTotalsCard(sessions: s.history.sessions, workouts: s.history.workouts, now: s.history.now)
@@ -1466,6 +1474,93 @@ struct NoopFitnessTotalsCard: View {
             Text(value).font(NoopHTMLFont.outfit(NoopType.title2, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
                 .monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
             Text(label).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+        }
+        .fitnessCard()
+    }
+}
+
+// MARK: - Suggested session
+
+/// One of the session templates with its length and the heart-rate band to hold, to start or swap.
+/// Taken from the old Effort "Today's session" page; Get ready and Choose something else open the same
+/// ready and picker screens it did.
+struct NoopFitnessSuggestedSession: View {
+    @ObservedObject var navigation: NoopNavigation
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var liftSession: LiftSessionController
+    @EnvironmentObject private var profile: ProfileStore
+
+    var body: some View {
+        let workout = navigation.selectedWorkout
+        let band = workout.band(profile: profile)
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                if navigation.workoutChosenByUser {
+                    Text("Your choice").font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
+                        .foregroundStyle(NoopHTMLColor.blueLight)
+                }
+                Text(workout.act3.name).font(NoopHTMLFont.outfit(NoopType.title2, weight: .medium))
+                    .foregroundStyle(NoopHTMLColor.ink)
+                Text("\(workout.act3.duration) min" + (band.map { " · \($0.low)–\($0.high) bpm to hold" } ?? ""))
+                    .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy).monospacedDigit()
+            }
+            HStack(spacing: 10) {
+                NoopActionButton(title: "Get ready", size: .medium) {
+                    if let running = NoopRunningSession.current(app: model, lift: liftSession, navigation: navigation) {
+                        running.go(navigation: navigation, lift: liftSession)
+                    } else {
+                        navigation.push(workout == .strength ? .liftLibrary : .ready)
+                    }
+                }
+                NoopActionButton(title: "Choose another", variant: .secondary, size: .medium) { navigation.push(.pick) }
+            }
+        }
+        .fitnessCard()
+    }
+}
+
+// MARK: - Effort, last seven days
+
+/// Each of the past seven days' Effort as a bar, today last. Taken from the old Effort "Today's
+/// session" page.
+struct NoopFitnessEffortWeek: View {
+    @EnvironmentObject private var repo: Repository
+
+    var body: some View {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let byDay = Dictionary(repo.days.map { ($0.day, $0.strain) }, uniquingKeysWith: { a, _ in a })
+        let weekday = Date.FormatStyle().weekday(.abbreviated)
+        let days: [(label: String, value: Double)] = (0..<7).reversed().compactMap { back in
+            cal.date(byAdding: .day, value: -back, to: today).map {
+                ($0.formatted(weekday), (byDay[Repository.localDayKey($0)] ?? nil) ?? 0)
+            }
+        }
+        let total = days.map(\.value).reduce(0, +)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(noopStrainText(total)) in total").font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium))
+                    .foregroundStyle(NoopHTMLColor.copy).monospacedDigit()
+                Spacer()
+            }
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach(days.indices, id: \.self) { i in
+                    let v = days[i].value
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(v > 78 ? NoopHTMLColor.warm : v <= 0 ? Color.white.opacity(0.07) : NoopHTMLColor.blueLight.opacity(0.6))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: max(3, CGFloat(min(100, v)) / 100 * 62))
+                }
+            }
+            .frame(height: 62, alignment: .bottom)
+            HStack(spacing: 6) {
+                ForEach(days.indices, id: \.self) { i in
+                    Text(days[i].label)
+                        .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: i == days.count - 1 ? .semibold : .regular))
+                        .foregroundStyle(i == days.count - 1 ? NoopHTMLColor.blueLight : NoopHTMLColor.faint)
+                        .frame(maxWidth: .infinity)
+                }
+            }
         }
         .fitnessCard()
     }

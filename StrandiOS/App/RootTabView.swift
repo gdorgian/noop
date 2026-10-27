@@ -129,7 +129,7 @@ struct RootTabView: View {
         case .activeWorkout:
             navigation.push(navigation.selectedWorkout == .intervals ? .intervals : .live)
         case .liveSession:
-            navigation.push(.session)
+            navigation.reset(to: .fitness)
         case .breathe:
             navigation.push(.breathe)
         case .journal:
