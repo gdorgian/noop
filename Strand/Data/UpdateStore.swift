@@ -310,12 +310,28 @@ final class UpdateStore: ObservableObject {
         }) {
             items[index].title = title
         }
-        guard d.string(forKey: K.lastSeededVersion) != version else { return }
+        #if os(iOS)
+        // Aura ships many builds on one version: each new build gets its own note.
+        let build = (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? ""
+        let seededKey = build.isEmpty ? version : "\(version) (\(build))"
+        #else
+        let seededKey = version
+        #endif
+        guard d.string(forKey: K.lastSeededVersion) != seededKey else { return }
         // Mark seeded first so a re-entrant call (or a crash mid-post) can't double-post this version.
-        d.set(version, forKey: K.lastSeededVersion)
+        d.set(seededKey, forKey: K.lastSeededVersion)
 
         // The iOS fork ships as Noop Aura; the macOS app keeps the upstream name.
         #if os(iOS)
+        // A new build of a version already noted gets one short row of its own, replacing the last
+        // build's, so the bell says something changed without repeating the version's note.
+        if !build.isEmpty, items.contains(where: { $0.kind == .whatsNew && $0.message.contains(" \(version) is here") }) {
+            items.removeAll { $0.kind == .whatsNew && $0.message.hasPrefix("Build ") }
+            post(UpdateItem(kind: .whatsNew,
+                            title: "Noop Aura \(version) (\(build)) installed",
+                            message: "Build \(build) is on this phone. Tap to read what's new."))
+            return
+        }
         let message = summary ?? "Noop \(version) is here. Tap to read what's new."
         let fallbackTitle = "What's new in Noop \(version)"
         #else

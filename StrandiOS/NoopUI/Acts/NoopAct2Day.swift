@@ -1357,6 +1357,17 @@ struct NoopAct2Screens: View {
                     Spacer()
                 }
                 .padding(.top, 6)
+            case .download(let url):
+                HStack {
+                    inboxActionButton("Open release", tint: NoopHTMLColor.blue, ink: NoopHTMLColor.blueLight) {
+                        if let sourceItemID = item.sourceItemID {
+                            updateStore.markRead(sourceItemID)
+                        }
+                        UIApplication.shared.open(url)
+                    }
+                    Spacer()
+                }
+                .padding(.top, 6)
             case .none:
                 EmptyView()
             }
@@ -1512,6 +1523,9 @@ struct NoopAct2Screens: View {
             let action: Act2InboxAction
             if item.kind == .whatsNew {
                 action = .release
+            } else if item.kind == .newVersion, let link = item.deepLink, let url = URL(string: link),
+                      url.scheme == "https" {
+                action = .download(url)
             } else if item.category == .actionable, decision == nil {
                 action = .proposal(planProposalID: item.planProposalId)
             } else if item.category == .statusReminder, item.kind == .dismissedCard {
@@ -2816,6 +2830,8 @@ private enum Act2InboxAction {
     case proposal(planProposalID: UUID?)
     case restore
     case release
+    /// A newer Aura build on GitHub: opens its release page.
+    case download(URL)
 }
 
 private struct Act2InboxItem: Identifiable {
@@ -2833,7 +2849,7 @@ private struct Act2InboxItem: Identifiable {
     var usesActionSpacing: Bool {
         switch action {
         case .none: false
-        case .proposal, .restore, .release: true
+        case .proposal, .restore, .release, .download: true
         }
     }
 }

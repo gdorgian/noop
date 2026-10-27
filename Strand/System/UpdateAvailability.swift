@@ -139,6 +139,10 @@ enum UpdateWatch {
     /// path: it reports "couldn't check", because there a human is waiting on an answer.
     @MainActor
     static func runIfDue(currentVersion: String, sideloadHint: Bool, now: Date = Date()) {
+        #if os(iOS)
+        runAuraIfDue(now: now)
+        return
+        #endif
         let d = UserDefaults.standard
         // Runs before every guard below, including the toggle: a stale announcement must not outlive the
         // feature that posted it (see `shouldPruneAnnouncement`).
@@ -181,3 +185,83 @@ enum UpdateWatch {
         }
     }
 }
+
+#if os(iOS)
+// MARK: - Noop Aura
+
+extension UpdateWatch {
+
+    /// The installed build (CFBundleVersion). Aura releases share an upstream version, so this is what
+    /// tells one from the next.
+    static var installedBuild: Int {
+        Int((Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "") ?? 0
+    }
+
+    private static let lastPostedBuildKey = "updates.aura.lastPostedBuild"
+    private static let postedBuildsKey = "updates.aura.postedBuilds"
+
+    /// Aura's check, every six hours: a beta can follow a release within a day, and one read of a
+    /// public list is all it costs. Posts one row per channel (beta, release), never the same build
+    /// twice, and clears rows for builds now installed.
+    @MainActor
+    static func runAuraIfDue(now: Date) {
+        let d = UserDefaults.standard
+        let installed = installedBuild
+        // Caught up: a row telling you to get a build you already have is false.
+        var posted = d.dictionary(forKey: postedBuildsKey) as? [String: Int] ?? [:]
+        for item in UpdateStore.shared.items where item.kind == .newVersion {
+            if let build = posted[item.id.uuidString], build > installed { continue }
+            UpdateStore.shared.remove(item.id)
+            posted[item.id.uuidString] = nil
+        }
+        d.set(posted, forKey: postedBuildsKey)
+        guard !inFlight else { return }
+        guard UpdateAvailability.shouldCheckNow(enabled: isEnabled,
+                                                lastCheckedAt: d.double(forKey: Keys.lastCheckedAt),
+                                                now: now.timeIntervalSince1970,
+                                                interval: 6 * 60 * 60) else { return }
+        inFlight = true
+        Task {
+            defer { inFlight = false }
+            d.set(now.timeIntervalSince1970, forKey: Keys.lastCheckedAt)
+            let releases = await UpdateChecker.fetchAuraReleases()
+            let lastPosted = d.integer(forKey: lastPostedBuildKey)
+            var posted = d.dictionary(forKey: postedBuildsKey) as? [String: Int] ?? [:]
+            for release in AuraRelease.announcements(releases, installedBuild: installed).reversed()
+            where release.build > lastPosted {
+                // A newer row on the same channel replaces the older one.
+                for item in UpdateStore.shared.items where item.kind == .newVersion {
+                    let isBeta = item.title.contains("Beta")
+                    if isBeta == release.prerelease { UpdateStore.shared.remove(item.id); posted[item.id.uuidString] = nil }
+                }
+                let item = UpdateItem(kind: .newVersion, title: title(release),
+                                      message: message(release), deepLink: release.url.absoluteString,
+                                      priority: release.prerelease ? .normal : .high)
+                UpdateStore.shared.post(item)
+                posted[item.id.uuidString] = release.build
+                d.set(max(d.integer(forKey: lastPostedBuildKey), release.build), forKey: lastPostedBuildKey)
+            }
+            d.set(posted, forKey: postedBuildsKey)
+        }
+    }
+
+    static func title(_ r: AuraRelease) -> String {
+        switch r.kind(installedVersion: installedVersion) {
+        case .beta: "Noop Aura \(r.version) Beta (\(r.build)) is out"
+        case .major: "Noop Aura \(r.version) is out, a major release"
+        case .release: "Noop Aura \(r.version) (\(r.build)) is out"
+        }
+    }
+
+    /// The release's opening paragraph, without its own heading: enough to know whether to open it.
+    static func message(_ r: AuraRelease) -> String {
+        let lines = r.notes.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && $0 != r.name && !$0.hasPrefix("Noop Aura \(r.version)") }
+        var summary = lines.prefix(3).joined(separator: " ")
+        if summary.count > 240 { summary = String(summary.prefix(240)).trimmingCharacters(in: .whitespaces) + "…" }
+        let channel = r.prerelease ? "A beta to try. " : ""
+        return channel + (summary.isEmpty ? "Tap to read what changed." : summary)
+    }
+}
+#endif

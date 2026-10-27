@@ -64,6 +64,33 @@ final class UpdateChecker: ObservableObject {
         }
     }
 
+    #if os(iOS)
+    /// Every recent Aura release, betas included. `releases/latest` skips pre-releases, and Aura's
+    /// betas are exactly the builds a wearer most needs to hear about.
+    static func fetchAuraReleases() async -> [AuraRelease] {
+        guard let url = URL(string: "https://api.github.com/repos/gdorgian/noop/releases?per_page=15") else { return [] }
+        do {
+            var req = URLRequest(url: url, timeoutInterval: 12)
+            req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard (resp as? HTTPURLResponse)?.statusCode == 200,
+                  let list = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+            return list.compactMap { json in
+                guard json["draft"] as? Bool != true,
+                      let tag = json["tag_name"] as? String,
+                      let parsed = AuraRelease.parseTag(tag),
+                      let page = (json["html_url"] as? String).flatMap(URL.init(string:)) else { return nil }
+                return AuraRelease(version: parsed.version, build: parsed.build,
+                                   prerelease: json["prerelease"] as? Bool ?? false,
+                                   name: json["name"] as? String ?? "",
+                                   url: page, notes: cleanNotes(json["body"] as? String ?? ""))
+            }
+        } catch {
+            return []
+        }
+    }
+    #endif
+
     func check(currentVersion: String) {
         guard state != .checking else { return }
         state = .checking
