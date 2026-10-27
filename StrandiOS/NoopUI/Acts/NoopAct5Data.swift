@@ -726,11 +726,11 @@ struct NoopDataScreen: View {
             section("Take one now", noteView: AnyView(approximateNote)) {
                 rowsCard([
                     RowModel(id: "noopbak", title: "Everything, exactly · .noopbak",
-                             note: "The whole database, your settings, and which build wrote it. The phone-to-phone path.",
+                             note: flow.backupBusy ? Self.workingNote : "The whole database, your settings, and which build wrote it. The phone-to-phone path.",
                              noteColor: Self.dim, noteSize: 11.5,
                              trailing: .glyph(.upload, Self.blush.opacity(0.8), 17), padding: 14),
                     RowModel(id: "csv", title: "A readable copy · WHOOP CSV",
-                             note: "Four CSVs in a zip. Reads back into Noop, and into NOOP on Android.",
+                             note: flow.backupBusy ? Self.workingNote : "Four CSVs in a zip. Reads back into Noop, and into NOOP on Android.",
                              noteColor: Self.dim, noteSize: 11.5,
                              trailing: .glyph(.upload, Self.blush.opacity(0.8), 17), padding: 14)
                 ], onTap: demo ? nil : { id in
@@ -750,7 +750,7 @@ struct NoopDataScreen: View {
                 } label: {
                     rowsCard([
                         RowModel(title: "Restore from a .noopbak",
-                                 note: "Replaces everything on this phone. It will tell you which build wrote the file first.",
+                                 note: flow.backupBusy ? Self.workingNote : "Replaces everything on this phone. It will tell you which build wrote the file first.",
                                  noteColor: Self.dim, noteSize: 11.5,
                                  trailing: .chevron, padding: 14)
                     ])
@@ -760,6 +760,9 @@ struct NoopDataScreen: View {
 
         }
     }
+
+    /// Shown on every backup row while one runs, so a tap is visibly doing something.
+    private static let workingNote = "Working… this can take a minute on a long record."
 
     private var backupScreen: some View {
         NoopScreen(topInset: 56, horizontalInset: 18) {
