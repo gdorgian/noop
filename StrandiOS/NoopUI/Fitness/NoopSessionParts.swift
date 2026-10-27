@@ -435,18 +435,21 @@ struct NoopSessionHeart: View {
                         .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                VStack(spacing: 6) {
-                    HStack(spacing: 3) {
-                        ForEach(Array(bands.enumerated()), id: \.offset) { i, b in
-                            let next = i + 1 < bands.count ? bands[i + 1].1 : Int.max
-                            let here = drop1.map { $0 >= b.1 && $0 < next } ?? false
-                            Capsule().fill(here ? Self.zoneColors[min(i + 1, 5)] : Color.white.opacity(0.07)).frame(height: 7)
+                // The scale only means something beside a reading; without one it was an empty bar.
+                if drop1 != nil {
+                    VStack(spacing: 6) {
+                        HStack(spacing: 3) {
+                            ForEach(Array(bands.enumerated()), id: \.offset) { i, b in
+                                let next = i + 1 < bands.count ? bands[i + 1].1 : Int.max
+                                let here = drop1.map { $0 >= b.1 && $0 < next } ?? false
+                                Capsule().fill(here ? Self.zoneColors[min(i + 1, 5)] : Color.white.opacity(0.07)).frame(height: 7)
+                            }
                         }
-                    }
-                    HStack(spacing: 3) {
-                        ForEach(bands, id: \.0) { b in
-                            Text(b.0).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(spacing: 3) {
+                            ForEach(bands, id: \.0) { b in
+                                Text(b.0).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                     }
                 }
