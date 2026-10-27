@@ -21,6 +21,7 @@ struct NoopAct1Screens: View {
     @State private var showHypnogram = NoopContentPolicy.allowsPrototypeContent
         && CommandLine.arguments.contains("--noop-hypnogram")
     @State private var selectedStage: Int?
+    @State private var editingNight: NoopRestRecord.EditTarget?
     @StateObject private var restLayout = NoopPageLayout(page: "rest", catalog: NoopAct1Screens.restSections)
     @State private var restEditing = NoopPageEditing()
     @SceneStorage("noop.act1.selected-bedtime") private var selectedBedtime = 2
@@ -76,6 +77,9 @@ struct NoopAct1Screens: View {
             }
         }
         .noopEditBar($restEditing, layout: restLayout) { navigation.push(.settingsSleep) }
+        .sheet(item: $editingNight) { edit in
+            NoopSleepEditSheet(edit: edit).noopSheet()
+        }
     }
 
     /// Rest's sections in their default order.
@@ -191,6 +195,12 @@ struct NoopAct1Screens: View {
                 }
                 .buttonStyle(NoopHTMLPressStyle())
                 .modifier(NoopDaySwipe(offset: restDayStep, maxBack: 6))
+                if rest != nil, let edit = restNight?.edit {
+                    NoopActionButton(title: edit.userEdited ? "Edit sleep times (edited)" : "Edit sleep times",
+                                     systemImage: "pencil", variant: .secondary, size: .medium) {
+                        editingNight = edit
+                    }
+                }
                 }
             }
         case "inbed":
@@ -2542,5 +2552,99 @@ extension String {
               (0..<24).contains(h), (0..<60).contains(m),
               let date = Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date()) else { return self }
         return AppClock.hourMinute(date)
+    }
+}
+
+extension NoopRestRecord.EditTarget: Identifiable {
+    var id: Int { detectedStartTs }
+}
+
+/// Correct a night's fell-asleep and woke-up times, or delete a night the strap misread. Stages are
+/// re-derived from the strap's raw data for the saved window, and the day is re-scored.
+struct NoopSleepEditSheet: View {
+    let edit: NoopRestRecord.EditTarget
+
+    @EnvironmentObject private var repo: Repository
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var bed: Date
+    @State private var wake: Date
+    @State private var working = false
+    @State private var confirmDelete = false
+
+    init(edit: NoopRestRecord.EditTarget) {
+        self.edit = edit
+        _bed = State(initialValue: Date(timeIntervalSince1970: TimeInterval(edit.bedTs)))
+        _wake = State(initialValue: Date(timeIntervalSince1970: TimeInterval(edit.wakeTs)))
+    }
+
+    private var valid: Bool {
+        let span = wake.timeIntervalSince(bed)
+        return span >= 20 * 60 && span <= 20 * 3600 && wake <= Date()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Edit sleep times").font(NoopHTMLFont.sheetTitle).foregroundStyle(NoopHTMLColor.ink)
+                VStack(alignment: .leading, spacing: 0) {
+                    timeRow("Fell asleep", $bed)
+                    Divider().overlay(NoopHTMLColor.border)
+                    timeRow("Woke up", $wake)
+                }
+                .padding(.horizontal, 14)
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                HStack {
+                    Text("Time in bed").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+                    Spacer()
+                    Text(wake > bed ? NoopRestRecord.duration(wake.timeIntervalSince(bed) / 60) : "—")
+                        .font(NoopHTMLFont.outfit(NoopType.title3)).foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+                }
+                Text("Stages are worked out again from the strap for the window you save, and the day is re-scored.")
+                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
+                    .fixedSize(horizontal: false, vertical: true)
+                NoopActionButton(title: working ? "Saving…" : "Save", enabled: valid && !working) {
+                    Task { await save() }
+                }
+                NoopActionButton(title: "Delete this night", variant: .destructive, enabled: !working) {
+                    confirmDelete = true
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+        }
+        .confirmationDialog("Delete this night?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await delete() } }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("It will not be detected again, and the day is re-scored without it.") }
+    }
+
+    private func timeRow(_ label: String, _ date: Binding<Date>) -> some View {
+        HStack {
+            Text(label).font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(NoopHTMLColor.ink)
+            Spacer()
+            DatePicker("", selection: date, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
+                .labelsHidden()
+        }
+        .frame(minHeight: 52)
+    }
+
+    private func save() async {
+        working = true
+        await repo.editSleepTimes(detectedStartTs: edit.detectedStartTs, oldEndTs: edit.wakeTs,
+                                  storedStagesJSON: edit.stagesJSON,
+                                  newStartTs: Int(bed.timeIntervalSince1970), newEndTs: Int(wake.timeIntervalSince1970))
+        await model.intelligence.analyzeRecent()
+        await repo.refresh()
+        dismiss()
+    }
+
+    private func delete() async {
+        working = true
+        await repo.deleteSleepSession(detectedStartTs: edit.detectedStartTs, endTs: edit.wakeTs)
+        await model.intelligence.analyzeRecent()
+        await repo.refresh()
+        dismiss()
     }
 }

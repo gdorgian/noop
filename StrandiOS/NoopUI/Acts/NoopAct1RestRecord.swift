@@ -56,6 +56,8 @@ struct NoopRestRecord: Equatable {
         /// The engine's 0–100 sleep score (`sleep_performance`: duration, efficiency, deep and REM,
         /// consistency) for the day this night ended on. Nil until the engine has scored it.
         var score: Double? = nil
+        /// The stored block behind this night, for editing its times or deleting it.
+        var edit: EditTarget? = nil
 
         /// "23:25 – 06:30": first sleep to final waking when the timeline shows them, else the in-bed window.
         var asleepWindow: String {
@@ -63,6 +65,16 @@ struct NoopRestRecord: Equatable {
             let f = AppClock.hourMinuteFormatter()
             return "\(f.string(from: bed.fellAsleep)) \u{2013} \(f.string(from: bed.finalWake))"
         }
+    }
+
+    /// The real stored block a night is drawn from: its immutable detected key, the onset and wake the
+    /// editor starts from, and the stages to reshape when the strap has no raw data for a new window.
+    struct EditTarget: Equatable {
+        let detectedStartTs: Int
+        let bedTs: Int
+        let wakeTs: Int
+        let stagesJSON: String?
+        let userEdited: Bool
     }
 
     struct StageRun: Equatable {
@@ -194,6 +206,10 @@ struct NoopRestRecord: Equatable {
                 bed: real.flatMap { Bed(segments: $0, start: night.onsetDate, end: end) }
             )
             built.score = sleepScores[key]
+            built.edit = night.editTarget.map {
+                EditTarget(detectedStartTs: $0.startTs, bedTs: $0.effectiveStartTs, wakeTs: $0.endTs,
+                           stagesJSON: $0.stagesJSON, userEdited: $0.userEdited)
+            }
             if latest == nil { latest = built }
             if endDay < windowStart && latest != built { continue }
             if endDay >= windowStart { byDay[key] = built }
