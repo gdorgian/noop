@@ -554,3 +554,62 @@ extension LiftingImporter {
         return f
     }()
 }
+
+// MARK: - Hevy CSV, set by set
+
+/// One set as a Hevy CSV export wrote it, in file order. The summary parser above folds these into a
+/// session's totals; this keeps each line so an import can store the sets themselves.
+public struct HevyCSVSet: Sendable, Equatable {
+    public var exercise: String
+    public var weightKg: Double?
+    public var reps: Int?
+    public var rpe: Double?
+    public var isWarmup: Bool
+    /// Hevy's own type token ("normal", "warmup", "dropset", "failure"), lowercased.
+    public var setType: String
+    public var note: String?
+}
+
+/// One Hevy CSV workout with its sets, grouped exactly as `parseHevy` groups its sessions.
+public struct HevyCSVWorkout: Sendable, Equatable {
+    public var title: String?
+    public var start: Date
+    public var end: Date
+    public var sets: [HevyCSVSet]
+}
+
+extension LiftingImporter {
+    /// Every workout in a Hevy CSV export with every set it holds, oldest first. Rows without a
+    /// readable start are skipped, as the summary parser skips them.
+    public static func hevyWorkouts(data: Data, zone: TimeZone = .current) -> [HevyCSVWorkout] {
+        let table = CSVTable(data: data)
+        var order: [String] = []
+        var byKey: [String: HevyCSVWorkout] = [:]
+        for row in table.rows {
+            guard let startRaw = row.cell("start_time", "start", "date"),
+                  let start = parseDate(startRaw, zone: zone) else { continue }
+            let title = row.cell("title", "workout_name", "name")
+            let key = "\(title ?? "")|\(startRaw)"
+            if byKey[key] == nil {
+                byKey[key] = HevyCSVWorkout(title: title, start: start, end: start, sets: [])
+                order.append(key)
+            }
+            if let endRaw = row.cell("end_time", "end"), let end = parseDate(endRaw, zone: zone), end > start {
+                byKey[key]?.end = end
+            }
+            let exercise = (row.cell("exercise_title", "exercise_name", "exercise") ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !exercise.isEmpty else { continue }
+            let setType = (row.cell("set_type", "type") ?? "").lowercased()
+            let weightKg: Double? = (row.double("weight_kg", "weight", "weight_kgs")
+                ?? row.double("weight_lb", "weight_lbs", "weight_lbf").map { $0 * lbToKg })
+                .flatMap { $0.isFinite ? $0 : nil }
+            let rpe = row.double("rpe").flatMap { $0.isFinite && $0 > 0 && $0 <= 10 ? $0 : nil }
+            let note = row.cell("exercise_notes").flatMap { $0.isEmpty ? nil : $0 }
+            byKey[key]?.sets.append(HevyCSVSet(exercise: exercise, weightKg: weightKg,
+                                               reps: boundedReps(row.double("reps", "rep_count")), rpe: rpe,
+                                               isWarmup: setType == "warmup", setType: setType, note: note))
+        }
+        return order.compactMap { byKey[$0] }.filter { !$0.sets.isEmpty }.sorted { $0.start < $1.start }
+    }
+}

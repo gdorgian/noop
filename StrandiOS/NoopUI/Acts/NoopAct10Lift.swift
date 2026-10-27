@@ -23,6 +23,8 @@ final class NoopLiftFlowModel: ObservableObject {
     @Published var sessionSets: [LiftSetRow] = []
     @Published var importResult: LiftingImportResult?
     @Published var importFileName: String?
+    /// The same Hevy file read set by set, so a commit can store the sets as well as the session totals.
+    private var importWorkouts: [HevyCSVWorkout] = []
     @Published var importError: String?
     @Published var importCommitted = false
     @Published var isReadingImport = false
@@ -81,11 +83,41 @@ final class NoopLiftFlowModel: ObservableObject {
                 return
             }
             importResult = parsed
+            importWorkouts = LiftingImporter.detectFormat(data: data) == .hevyCsv ? LiftingImporter.hevyWorkouts(data: data) : []
             importFileName = url.lastPathComponent
         } catch {
             importResult = nil
             importFileName = url.lastPathComponent
             importError = "The file could not be read. Nothing was added."
+        }
+    }
+
+    /// Each Hevy workout as a lift session with its sets, so it opens exercise by exercise like one
+    /// recorded here. The id comes from the start time, so importing the same file again replaces the
+    /// same sets rather than adding a second copy; a session Noop recorded itself at that time stands.
+    private func storeImportedSets(store: WhoopStore, deviceId: String) async throws {
+        for w in importWorkouts {
+            let start = Int(w.start.timeIntervalSince1970), end = Int(w.end.timeIntervalSince1970)
+            let nearby = (try? await store.liftSessions(deviceId: deviceId, fromTs: start - 30 * 60, toTs: max(end, start))) ?? []
+            if nearby.contains(where: { !$0.id.hasPrefix("hevy") && abs($0.startTs - start) < 30 * 60 }) { continue }
+            let sessionId = "hevycsv-\(start)"
+            var perExercise: [String: Int] = [:]
+            let rows = w.sets.enumerated().map { ord, set -> LiftSetRow in
+                let name = HevySync.noopName(set.exercise)
+                let choice = NoopFitnessExerciseChoice.lookup(name)
+                let index = perExercise[name, default: 0]
+                perExercise[name] = index + 1
+                return LiftSetRow(id: "\(sessionId)-\(ord)", deviceId: deviceId, sessionId: sessionId, ord: ord,
+                                  exercise: name, primaryMuscle: choice?.primary, secondaryMuscles: choice?.secondaries ?? [],
+                                  setIndex: index, weightKg: set.weightKg, reps: set.reps, rpe: set.rpe,
+                                  isWarmup: set.isWarmup, startTs: nil, endTs: nil, restSec: nil,
+                                  note: index == 0 ? set.note : nil,
+                                  setKind: set.setType == "dropset" ? .drop : set.setType == "failure" ? .failure : nil)
+            }
+            _ = try await store.upsertLiftSessions([LiftSessionRow(
+                id: sessionId, deviceId: deviceId, startTs: start, endTs: end, sport: LiftingImporter.sport,
+                programId: nil, programName: w.title, sessionRpe: nil, note: "From a Hevy export")])
+            _ = try await store.replaceLiftSessionSets(sessionId: sessionId, rows: rows)
         }
     }
 
@@ -103,6 +135,7 @@ final class NoopLiftFlowModel: ObservableObject {
         }
         do {
             try await store.upsertWorkouts(rows, deviceId: LiftingImporter.sourceId)
+            try await storeImportedSets(store: store, deviceId: repo.deviceId)
             NoopFitnessModel.markChanged()
             importCommitted = true
             await repo.refresh()
@@ -726,8 +759,12 @@ private struct NoopLiftLiveScreen: View {
             if let coach { coachLine(coach) }
             HStack(spacing: 8) {
                 Text("SET").lineLimit(1).frame(width: 34, alignment: .leading)
-                Text(LiftFormat.weightUnit(units).uppercased()).frame(maxWidth: .infinity)
-                Text("REPS").frame(maxWidth: .infinity)
+                if isTimed(line) {
+                    Text("TIME").frame(maxWidth: .infinity)
+                } else {
+                    Text(LiftFormat.weightUnit(units).uppercased()).frame(maxWidth: .infinity)
+                    Text("REPS").frame(maxWidth: .infinity)
+                }
                 Color.clear.frame(width: 38, height: 1)
             }
             .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(0.8).foregroundStyle(NoopHTMLColor.muted)
@@ -825,7 +862,21 @@ private struct NoopLiftLiveScreen: View {
             }
             .frame(width: 34, alignment: .leading)
             .accessibilityLabel("\(type.title) set \(row.setIndex). Change the set type or see last time.")
-            if active {
+            if let line = engine.planItem(for: row), isTimed(line) {
+                // A timed exercise is measured by the set itself: the clock runs while it is the set
+                // in progress and stops on the tick. There is no weight or count to type.
+                if active {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        cell(Self.clock(max(0, Self.second(context.date) - engine.stageStartedAt)),
+                             done: false, typed: true)
+                    }
+                } else if done, let set = engine.sets.first(where: { $0.slot == row }) {
+                    cell(Self.clock(max(0, set.endTs - set.startTs)), done: true, typed: true)
+                } else {
+                    cell(line.routinePlan?.sets[safe: row.setIndex - 1]?.targetDurationS.map { Self.clock($0) } ?? "—",
+                         done: false, typed: false)
+                }
+            } else if active {
                 field($loadText, placeholder: values.weightKg.map { LiftFormat.trim(LiftFormat.display(fromKilograms: $0, system: units)) } ?? "—",
                       focus: .weight, slot: row)
                 field($repsText, placeholder: values.reps.map(String.init) ?? "—", focus: .reps, slot: row)
@@ -1113,6 +1164,21 @@ private struct NoopLiftLiveScreen: View {
     @State private var restBumps = 0
 
     private static func second(_ date: Date) -> Int { Int(date.timeIntervalSince1970) }
+
+    /// "0:45", "1:30": a set's own duration.
+    private static func clock(_ seconds: Int) -> String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
+
+    /// A plank or a hang: timed by its routine, by the catalogue, or by the lifter's own exercise.
+    private func isTimed(_ line: LiftPlanItem) -> Bool {
+        if line.routinePlan?.sets.contains(where: { ($0.targetDurationS ?? 0) > 0 }) == true { return true }
+        let timedModes: Set<TrainingMeasurementMode> = [.duration, .distanceDuration]
+        if let mode = NoopFitnessExerciseChoice.lookup(line.exercise)?.definition?.mode { return timedModes.contains(mode) }
+        let key = NoopFitnessExercisePicker.fold(line.exercise)
+        guard let own = vocabulary.first(where: { NoopFitnessExercisePicker.fold($0.name) == key }),
+              let json = own.definitionJSON?.data(using: .utf8),
+              let definition = try? JSONDecoder().decode(TrainingExercise.self, from: json) else { return false }
+        return timedModes.contains(definition.mode)
+    }
 
     /// Elapsed session time at `date`: the controller's figure as of its last change, carried forward
     /// by the wall clock unless the session is paused.
@@ -2571,7 +2637,7 @@ private struct NoopLiftImportScreen: View {
 
                 VStack(spacing: 9) {
                     importDoor(icon: .file, title: "Choose a file", meta: "the CSV Hevy exports",
-                               note: "Each session with its time, sets, reps and volume. Set-by-set detail comes with Connect Hevy.") {
+                               note: "Everything in the export: sessions, exercises and the sets it contains.") {
                         choosingFile = true
                     }
                     importDoor(icon: .link, title: HevySync.shared.hasKey ? "Hevy · connected" : "Connect Hevy",
@@ -2833,7 +2899,7 @@ private struct NoopLiftReviewScreen: View {
                 .padding(.vertical, 10)
                 .overlay(alignment: .top) { if index > 0 { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) } }
             }
-            Text("There is nothing to tick here. The importer produces whole sessions with no reference back to each source row, so Noop cannot honestly claim a reconstructed line is the exact line it read.")
+            Text("There is nothing to tick here. Each session comes in whole, with every set the file lists, warm-ups marked as warm-ups.")
                 .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
                 .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
         }
