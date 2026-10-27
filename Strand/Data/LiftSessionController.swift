@@ -163,7 +163,6 @@ final class LiftSessionController: ObservableObject {
                 .map { LiftSlot(exerciseIndex: index, setIndex: $0.offset + 1) }
         })
         setKinds = [:]
-        Self.askForRestAlertsIfUndecided()
         self.programId = programId
         self.programName = programName
         warnedFor = nil
@@ -990,8 +989,9 @@ final class LiftSessionController: ObservableObject {
         UserDefaults.standard.object(forKey: restAlertsKey) as? Bool ?? true
     }
 
-    /// Ask once, at the start of a session — the moment the lifter can see why a phone would ask.
-    private static func askForRestAlertsIfUndecided() {
+    /// Asked only when the lifter turns rest alerts on themself. Noop asks for notifications once, at the
+    /// end of setup; a system prompt popping up as the first set starts was the one place it broke that.
+    static func askForRestAlertsIfUndecided() {
         #if os(iOS)
         guard restAlertsEnabled else { return }
         let center = UNUserNotificationCenter.current()

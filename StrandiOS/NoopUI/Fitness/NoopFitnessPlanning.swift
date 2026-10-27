@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import UserNotifications
 import WhoopStore
 import StrandTraining
 
@@ -116,6 +117,12 @@ struct NoopFitnessEditScreen: View {
     @AppStorage(Repository.autoLogActivitiesKey) private var autoLog = true
     @AppStorage(ActivityNotifier.enabledKey) private var activityNotices = true
     @AppStorage(LiftSessionController.restAlertsKey) private var restAlerts = true
+    @State private var notificationsAllowed = true
+
+    private static func notificationsAllowed() async -> Bool {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        return status == .authorized || status == .provisional || status == .ephemeral
+    }
     @AppStorage(LiftSessionController.autoScrollKey) private var autoScroll = true
     @AppStorage(LiftPlanItem.defaultRestKey) private var defaultRest = 120
     @AppStorage(LiftSessionController.warmupRestKey) private var warmupRest = 60
@@ -172,8 +179,19 @@ struct NoopFitnessEditScreen: View {
                     }
                     .frame(minHeight: 44)
                     NoopToggleRow(title: "Alert when rest ends",
-                                  subtitle: "A notification at the end of each rest, for a phone in a pocket. With Noop open it only sounds.",
+                                  subtitle: restAlerts && !notificationsAllowed
+                                      ? "Notifications are off for Noop, so only the sound plays, with Noop open."
+                                      : "A notification at the end of each rest, for a phone in a pocket. With Noop open it only sounds.",
                                   isOn: $restAlerts)
+                        .task { notificationsAllowed = await Self.notificationsAllowed() }
+                        .onChange(of: restAlerts) { _, on in
+                            guard on else { return }
+                            LiftSessionController.askForRestAlertsIfUndecided()
+                            Task {
+                                try? await Task.sleep(for: .seconds(1))
+                                notificationsAllowed = await Self.notificationsAllowed()
+                            }
+                        }
                     NoopToggleRow(title: "Follow the session",
                                   subtitle: "When the next set is on another exercise, such as the other half of a superset, scroll it into view.",
                                   isOn: $autoScroll)

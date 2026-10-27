@@ -633,6 +633,7 @@ private struct NoopLiftLiveScreen: View {
                     .disabled(!(live.engine?.canUndo ?? false))
                 Toggle(isOn: Binding(get: { restAlerts }, set: { on in
                     restAlerts = on
+                    if on { LiftSessionController.askForRestAlertsIfUndecided() }
                     live.refreshRestAlert()
                 })) {
                     Label("Alert when rest ends", systemImage: "bell")
@@ -2570,7 +2571,7 @@ private struct NoopLiftImportScreen: View {
 
                 VStack(spacing: 9) {
                     importDoor(icon: .file, title: "Choose a file", meta: "the CSV Hevy exports",
-                               note: "Everything in the export: sessions, exercises and the sets it contains.") {
+                               note: "Each session with its time, sets, reps and volume. Set-by-set detail comes with Connect Hevy.") {
                         choosingFile = true
                     }
                     importDoor(icon: .link, title: HevySync.shared.hasKey ? "Hevy · connected" : "Connect Hevy",
