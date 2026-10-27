@@ -664,7 +664,7 @@ struct NoopVerifiedAppShell: View {
 
     /// Act 3 on the stored sessions and the real recorder. The prescription (what today can take,
     /// what a session would cost) has no engine and stays out.
-    private static let canonicalEffortRoutes: Set<NoopRoute> = [.session, .pick, .ready, .live, .intervals, .detail, .across]
+    private static let canonicalEffortRoutes: Set<NoopRoute> = [.session, .pick, .ready, .live, .intervals, .detail]
 
     /// Act 7 runs on the real coach engine, grants and memory; its prototype conversation is gated on
     /// `--demo-seed` inside the act.

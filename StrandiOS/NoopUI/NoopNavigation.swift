@@ -102,7 +102,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case today, inbox, charge, day, energy, vitals, stress, heart, recovery, strain
     case breathe, bcatalog, bplayer, bsweep, bfound
     // Act 3
-    case session, pick, ready, live, intervals, detail, across
+    case session, pick, ready, live, intervals, detail
     // Act 4
     case trends, capacity, rhythm, year
     // Act 5
@@ -151,7 +151,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .rest, .tonight, .why, .debt, .alarm: .night
         case .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart, .recovery, .strain,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound: .day
-        case .session, .pick, .ready, .live, .intervals, .detail, .across: .effort
+        case .session, .pick, .ready, .live, .intervals, .detail: .effort
         case .trends, .capacity, .rhythm, .year: .picture
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
              .widgets, .lab, .diagnostics, .automations, .onboard, .pair, .position, .importHistory, .reading,
@@ -193,7 +193,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
             .you
         // Act 10 is deliberately not a sixth tab. A lift is an effort, so it lights the same key
         // Act 3 does. Act 3's sessions moved here from Today on 23 Oct 2026: training has one home.
-        case .session, .pick, .ready, .live, .intervals, .detail, .across,
+        case .session, .pick, .ready, .live, .intervals, .detail,
              .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles, .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit,
              .fitnessRoutine, .fitnessCalendar, .fitnessRoutineEdit, .fitnessBody, .fitnessReport, .fitnessProgram:
@@ -1245,7 +1245,6 @@ extension NoopRoute {
         case .live: "Live session"
         case .intervals: "Intervals"
         case .detail: "Session detail"
-        case .across: "Every session"
         case .trends: "Trends"
         case .capacity: "Capacity"
         case .rhythm: "Rhythm"

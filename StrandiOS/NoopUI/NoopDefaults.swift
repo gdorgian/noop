@@ -34,7 +34,7 @@ enum NoopDefaults {
             ("today", NoopAct2Screens.todaySections),
             ("rest", NoopAct1Screens.restSections),
             ("trends", NoopTrendsCatalog.sections),
-            ("fitness", NoopFitnessSettings.Section.allCases.map { NoopPageSection(id: $0.rawValue, title: $0.title, detail: "") }),
+            ("fitness", NoopFitnessSettings.Section.allCases.map { NoopPageSection(id: $0.rawValue, title: $0.title, detail: "", onByDefault: $0.onByDefault) }),
             ("you", NoopAct5Screens.youCatalog),
             ("recovery", NoopRecoveryPage.sections),
             ("strain", NoopStrainPage.sections)

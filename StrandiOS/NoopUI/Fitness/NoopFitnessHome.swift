@@ -18,7 +18,7 @@ struct NoopFitnessHome: View {
     /// their cards can be hidden or shown in place.
     @StateObject private var pageLayout = NoopPageLayout(page: "fitness", catalog: NoopFitnessSettings.Section.allCases.map {
         NoopPageSection(id: $0.rawValue, title: $0.title, detail: Self.sectionDetail($0),
-                        liveWhileEditing: !$0.cards.isEmpty)
+                        onByDefault: $0.onByDefault, liveWhileEditing: !$0.cards.isEmpty)
     })
     @State private var pageEditing = NoopPageEditing()
     /// Cards hidden when editing began, put back if the edit is cancelled.
@@ -239,6 +239,7 @@ struct NoopFitnessHome: View {
         case .load: "Cardio and muscular load against your normal"
         case .cardio: "Active time, energy, VO₂ max, recovery, focus and zones"
         case .strength: "Sets, volume and how fresh each muscle is"
+        case .totals: "Sessions, time and distance over a period you choose, and where the time went"
         }
     }
 
@@ -313,20 +314,11 @@ struct NoopFitnessHome: View {
             }
             if Calendar.current.isDateInToday(selectedDay) { NoopActivityOffer().padding(.bottom, 10) }
             activity(s)
-            Button { navigation.push(.across) } label: {
-                HStack(spacing: 6) {
-                    Text("Every session").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                    Text("· all of them, in aggregate").font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                    Spacer()
-                    NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
-                }
-                .foregroundStyle(NoopHTMLColor.ink)
-                .padding(.horizontal, 4)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(NoopHTMLPressStyle())
-            .padding(.bottom, 20)
+                .padding(.bottom, 20)
+        case .totals:
+            sectionTitle("Totals")
+            NoopFitnessTotalsCard(sessions: s.history.sessions, workouts: s.history.workouts, now: s.history.now)
+                .padding(.bottom, 22)
         case .sports:
             sectionTitle("Cardio and sports")
             NoopFitnessSportsSection(navigation: navigation, workouts: s.history.workouts)
@@ -1403,4 +1395,80 @@ struct NoopFitnessDotMeter: View {
         }
     }
 }
+// MARK: - Totals
+
+/// Every session over a period the wearer picks, added up: how many, how long, how far, how many days
+/// went untrained, and which activities the time went to. Taken from the old Effort "Every session"
+/// page; the per-session list is the calendar's job, so it is not repeated here.
+struct NoopFitnessTotalsCard: View {
+    let sessions: [NoopFitnessSession]
+    let workouts: [NoopFitnessHistory.Workout]
+    let now: Date
+
+    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
+    @AppStorage(UnitPrefs.distanceSystemKey) private var distanceSystemRaw = ""
+    @State private var days = 30
+
+    private var units: UnitSystem {
+        UnitPrefs.resolveDistance(system: UnitSystem(rawValue: unitSystemRaw) ?? .metric, override: distanceSystemRaw)
+    }
+
+    var body: some View {
+        let cal = Calendar.current
+        let from = cal.date(byAdding: .day, value: -(days - 1), to: cal.startOfDay(for: now)) ?? now
+        let shown = sessions.filter { $0.start >= from && $0.start <= now }
+        let seconds = shown.reduce(0) { $0 + $1.durationS }
+        let meters = workouts.filter { $0.start >= from && $0.start <= now }.compactMap(\.distanceM).reduce(0, +)
+        let trained = Set(shown.map { cal.startOfDay(for: $0.start) }).count
+        let byTitle = Dictionary(grouping: shown, by: \.title)
+            .map { (title: $0.key, count: $0.value.count, seconds: $0.value.reduce(0) { $0 + $1.durationS }) }
+            .sorted { $0.seconds > $1.seconds }
+        let top = max(1, byTitle.first?.seconds ?? 1)
+        return VStack(alignment: .leading, spacing: 14) {
+            NoopTabs(options: [("7 days", 7), ("30 days", 30), ("90 days", 90), ("Year", 365)], selection: $days)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())], spacing: 10) {
+                tile("\(shown.count)", shown.count == 1 ? "session" : "sessions")
+                tile(NoopFitnessHome.duration(seconds), "active")
+                tile(meters > 0 ? UnitFormatter.distanceFromMeters(meters, system: units) : "—", "covered")
+                tile("\(max(0, days - trained))", "of \(days) days without training")
+            }
+            if !byTitle.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Where the time went").font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                    ForEach(byTitle.prefix(6), id: \.title) { row in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(row.title).font(NoopHTMLFont.sans(NoopType.subhead, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                                Spacer()
+                                Text(NoopFitnessHome.duration(row.seconds)).font(NoopHTMLFont.sans(NoopType.subhead))
+                                    .foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
+                            }
+                            GeometryReader { g in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Color.white.opacity(0.06))
+                                    Capsule().fill(NoopHTMLColor.blueLight).frame(width: max(8, g.size.width * row.seconds / top))
+                                }
+                            }
+                            .frame(height: 6)
+                            Text("\(row.count) \(row.count == 1 ? "session" : "sessions") · \(NoopFitnessHome.duration(row.seconds / Double(row.count))) each")
+                                .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+                        }
+                    }
+                }
+                .fitnessCard()
+            }
+        }
+    }
+
+    private func tile(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value).font(NoopHTMLFont.outfit(NoopType.title2, weight: .medium)).foregroundStyle(NoopHTMLColor.ink)
+                .monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
+            Text(label).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
+        }
+        .fitnessCard()
+    }
+}
+
 #endif

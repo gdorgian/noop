@@ -11,8 +11,11 @@ import StrandTraining
 @MainActor
 final class NoopFitnessSettings: ObservableObject {
     enum Section: String, CaseIterable, Codable, Identifiable {
-        case week, activity, routines, sports, load, cardio, strength
+        case week, activity, routines, sports, load, cardio, strength, totals
         var id: String { rawValue }
+        /// On the page before the wearer arranges it. Totals waits in Add.
+        var onByDefault: Bool { self != .totals }
+        static var standard: [Section] { allCases.filter(\.onByDefault) }
         var title: String {
             switch self {
             case .week: "This week"
@@ -22,6 +25,7 @@ final class NoopFitnessSettings: ObservableObject {
             case .load: "Training load"
             case .cardio: "Cardio"
             case .strength: "Strength"
+            case .totals: "Totals"
             }
         }
         var cards: [Card] {
@@ -197,7 +201,7 @@ struct NoopFitnessEditScreen: View {
                                   isOn: $autoScroll)
                 }
                 Button {
-                    layout.sections = NoopFitnessSettings.Section.allCases
+                    layout.sections = NoopFitnessSettings.Section.standard
                     layout.hidden = []
                 } label: {
                     Text("Reset to the standard layout")

@@ -1607,32 +1607,6 @@ private extension NoopAct5Screens {
                     }
                 }
 
-                Button {
-                    navigation.push(.across)
-                } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Every session, in aggregate")
-                                .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                                .foregroundStyle(NoopHTMLColor.ink)
-                            Text("A window rather than a list — how much you rode, walked and lifted in it.")
-                                .font(NoopHTMLFont.sans(NoopType.caption))
-                                .foregroundStyle(Color(hex: 0x7F8A85))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        NoopFixedChevron(direction: .right, color: NoopHTMLColor.chevronDim)
-                    }
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(NoopHTMLColor.border, lineWidth: 0.5)
-                    )
-                }
-                .buttonStyle(NoopPlainHitStyle())
 
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(filteredHistory) { day in
