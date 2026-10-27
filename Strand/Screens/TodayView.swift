@@ -5025,8 +5025,8 @@ struct TodayView: View {
         // above shows (logical-day midnight → now) so the gauge tracks the day live instead of lagging
         // on the last persisted daily row. Uses the identical params the daily pass uses, Tanaka HRmax
         // from age, today's resting HR (else the default), sex, so the live number matches what the
-        // engine will eventually persist. Below StrainScorer.minReadings the scorer returns nil and the
-        // gauge falls back to the stored row (never a fabricated value); a navigated past day clears it.
+        // engine will eventually persist. The daily resolver owns recipe selection and its no-data
+        // behavior; a nil live score falls back to the stored row. A navigated past day clears it.
         let liveStrainLocal: Double?
         if selectedDayOffset == 0 {
             let mode = DayCycleMode.persisted(UserDefaults.standard.string(forKey: DayCycleMode.storageKey))
@@ -5049,11 +5049,12 @@ struct TodayView: View {
             let restHR = displayDay?.restingHr.map(Double.init) ?? StrainScorer.defaultRestingHR
             let method = PuffinExperiment.effortMethod
             let sex = profile.sex
+            let strainTables = WhoopStrain.tables
             // The full-day fingerprint and score are pure; do not occupy the main actor
             // while the Today cards are scrolling or responding to touch.
             liveStrainLocal = await Task.detached(priority: .utility) {
-                StrainScorer.strain(todayHr, maxHR: maxHR, restingHR: restHR,
-                                    method: method, sex: sex)
+                DayStrainScorer.score(todayHr, maxHR: maxHR, restingHR: restHR,
+                                      method: method, sex: sex, tables: strainTables)
             }.value
         } else {
             liveStrainLocal = nil

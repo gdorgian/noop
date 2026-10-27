@@ -139,6 +139,29 @@ targets:
       # sentence false and left `plumbing/terms` with nothing to render. Read by `TermsDocument`.
       - path: TERMS.md
         buildPhase: resources
+    # WHOOP-exact accuracy tables — LOCAL ONLY, git-ignored (personal-data section of .gitignore).
+    # Copy your two files verbatim out of your own WHOOP IPA (Whoop.app) to Config/; this script
+    # copies them into the app bundle when present and removes stale bundled copies when not. This is
+    # a script phase rather than optional resources deliberately: xcodegen's `optional: true` still
+    # emits the build-file reference into the project, which FAILS the build when the file is
+    # absent — the exact opposite of what public builds (and CI) need. Inside Config/ the files are
+    # WHOOP's data by construction and never enter the repo; the runtime reads the bundle and the
+    # diagnostics name which method produced a day's score (WhoopStrain.swift).
+    preBuildScripts:
+      - name: Bundle WHOOP exact tables (local Config/, git-ignored)
+        basedOnDependencyAnalysis: false
+        script: |
+          set -eu
+          DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          mkdir -p "$DEST"
+          for f in "${SRCROOT}/Config/strain_raw_scale_lookup.json" "${SRCROOT}/Config/recovery_to_strain.json"; do
+            if [ -f "$f" ]; then
+              cp "$f" "$DEST/"
+            else
+              rm -f "$DEST/$(basename "$f")"
+              echo "note: $(basename "$f") absent — removed any stale bundled copy"
+            fi
+          done
     # Oura BYO-app OAuth credentials. OuraConfig.xcconfig is a tracked wrapper that optionally
     # includes the untracked, gitignored Strand/Oura/OuraSecrets.xcconfig (template at
     # OuraSecrets.example.xcconfig) — absent secrets leave the $(OURA_*) references in the
@@ -304,6 +327,24 @@ targets:
       - path: TERMS.md
         buildPhase: resources
     # Same tracked wrapper as the macOS target (Strand/Oura/ is shared, not per-platform).
+    # WHOOP-exact accuracy tables — identical script to the macOS target's (see its comment): the
+    # git-ignored Config/ JSONs are copied into the bundle when present and removed when absent;
+    # the build never depends on their existence.
+    preBuildScripts:
+      - name: Bundle WHOOP exact tables (local Config/, git-ignored)
+        basedOnDependencyAnalysis: false
+        script: |
+          set -eu
+          DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          mkdir -p "$DEST"
+          for f in "${SRCROOT}/Config/strain_raw_scale_lookup.json" "${SRCROOT}/Config/recovery_to_strain.json"; do
+            if [ -f "$f" ]; then
+              cp "$f" "$DEST/"
+            else
+              rm -f "$DEST/$(basename "$f")"
+              echo "note: $(basename "$f") absent — removed any stale bundled copy"
+            fi
+          done
     configFiles:
       Debug: Strand/Oura/OuraConfig.xcconfig
       Release: Strand/Oura/OuraConfig.xcconfig

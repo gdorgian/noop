@@ -1,4 +1,5 @@
 import XCTest
+import StrandAnalytics
 @testable import Strand
 
 /// Swift twin of the Kotlin `DayCacheConfigFieldTest`: which config field dropped the day cache.
@@ -55,6 +56,17 @@ final class DayCacheConfigFieldTests: XCTestCase {
         XCTAssertEqual(IntelligenceEngine.changedConfigField(previous: "", current: fullSig()), "first")
     }
 
+    func testDailyStrainRecipeChangeNamesTheInvalidation() throws {
+        let index = try XCTUnwrap(IntelligenceEngine.dayCacheConfigFields.firstIndex(of: "dailyStrainRecipe"))
+        let independent = DayStrainScorer.cacheIdentity(method: .edwards, tables: nil)
+        let exact = DayStrainScorer.cacheIdentity(method: .edwards,
+            tables: WhoopStrain.Tables(scale: [.init(raw: 0, strain: 0), .init(raw: 1, strain: 21)], targets: nil))
+        XCTAssertEqual(
+            IntelligenceEngine.changedConfigField(previous: fullSig { $0[index] = independent },
+                                                   current: fullSig { $0[index] = exact }),
+            "dailyStrainRecipe")
+    }
+
     /// The names and the construction can fall out of step, because they live apart. When they do, this
     /// refuses to name anything rather than resolve an index against a list that no longer describes it.
     /// A wrong field name is worse than none: a diagnostic asserting what it cannot attribute.
@@ -75,7 +87,7 @@ final class DayCacheConfigFieldTests: XCTestCase {
             "hrvBaseline", "rhrBaseline", "age", "sex", "stepTicksPerStep", "maxHROverride",
             "tzOffset", "sleepNeedHours", "sleepConsistency", "habitualMidsleep",
             "experimentalSleepV2", "motionAwareWake", "deepHrvWindow", "spo2CandidateDisplay",
-            "effortMethod", "dayCycleMode",
+            "effortMethod", "dayCycleMode", "dailyStrainRecipe",
         ])
     }
 }

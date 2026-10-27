@@ -1,4 +1,5 @@
 import Foundation
+import StrandAnalytics
 import UserNotifications
 
 // MARK: - Target-strain notification (#593)
@@ -41,6 +42,46 @@ enum StrainTargetNotifier {
         static func copy(target: Int) -> (title: String, body: String) {
             (String(localized: "Optimal strain reached"),
              String(localized: "You've hit today's optimal strain target of \(target). Nice work — your recovery earned it."))
+        }
+    }
+
+    /// Noop Aura's own target band on the stored 0–100 Effort axis: easier after a low recovery, harder after
+    /// a high one. The Today ring's hatched band and the Aura notice both read it, so the number the
+    /// notice names is the band the ring draws. Nil until recovery is scored.
+    ///
+    /// WHOOP-exact build: with the bundled recovery table this is WHOOP's own target row for the recovery
+    /// (lower…upper, interpolated at the recovery percent) mapped 0–21 → 0–100 by the shipped
+    /// `effortValue(fromWhoopStrain:)`, so the ring band, the notice and the coupled target all name the
+    /// same curve. Without tables: the existing Bevel-port band below.
+    static func auraTarget(recovery: Double?) -> ClosedRange<Double>? {
+        guard let r = recovery else { return nil }
+        if let band = WhoopStrain.targetStrain21(recovery: r)?.band {
+            let lower = StrainScorer.effortValue(fromWhoopStrain: band.lowerBound)
+            let upper = StrainScorer.effortValue(fromWhoopStrain: band.upperBound)
+            return lower...upper
+        }
+        let mid = 25 + 45 * min(1, max(0, r / 100))
+        return (mid - 9)...(mid + 9)
+    }
+
+    /// The Aura notice: today's Effort reached the low end of `auraTarget`. Same once-a-day gate and
+    /// authorisation idiom as `onDayUpdate`; the copy names Effort on the wearer's chosen scale.
+    static func onAuraDayUpdate(day: String, effort: Double?, recovery: Double?, enabled: Bool, scale: EffortScale) {
+        let d = UserDefaults.standard
+        let low = auraTarget(recovery: recovery)?.lowerBound
+        guard StrainTargetPolicy.shouldNotify(enabled: enabled, dayStrain: effort, target: low,
+                                              lastNotifiedDay: d.string(forKey: lastDayKey), today: day),
+              let low else { return }
+        let shown = UnitFormatter.effortDisplay(low, scale: scale)
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            let content = UNMutableNotificationContent()
+            content.title = String(localized: "Effort target reached")
+            content.body = String(localized: "Today's Effort has reached \(shown), the low end of what your recovery allows.")
+            content.sound = .default
+            center.add(UNNotificationRequest(identifier: "strain-target", content: content, trigger: nil))
+            UserDefaults.standard.set(day, forKey: lastDayKey)
         }
     }
 

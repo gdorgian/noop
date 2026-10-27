@@ -296,6 +296,11 @@ final class AppModel: ObservableObject {
     init() {
         let live = LiveState()
         self.live = live
+        // Local WHOOP tables: resolved once at launch from this build's bundle. project.yml copies
+        // the git-ignored files when present; public builds use the independent scorer. Daily-score
+        // cache identity includes the recipe and tables. Remaining reconstruction limits are
+        // documented in WhoopStrain.swift rather than presented as end-to-end equivalence.
+        WhoopStrain.tables = WhoopStrain.Tables.load(from: .main)
         // SEED every subsystem with the same id (`deviceId`, "my-whoop" at launch). The store/registry
         // aren't open yet here, so the registry's active id can't be read synchronously; `bootstrapStore`
         // (write side) and `wireSourceCoordinator → adoptActiveDevice` (read spine, #814) re-point them to
@@ -1874,6 +1879,7 @@ final class AppModel: ObservableObject {
         let overrides = WindDownNudge.perDayWakeOverrides
         guard behavior.smartAlarmEnabled else {
             ble.disableStrapAlarm()
+            self.cancelWakeWindowSweep()
             Self.cancelSmartAlarmBackupNotification()
             return
         }
@@ -1883,6 +1889,7 @@ final class AppModel: ObservableObject {
             // No enabled weekday in the next week (only possible from a corrupted set) , disarm rather
             // than arm a misleading time the user never asked for.
             ble.disableStrapAlarm()
+            self.cancelWakeWindowSweep()
             Self.cancelSmartAlarmBackupNotification()
             return
         }
@@ -1896,6 +1903,86 @@ final class AppModel: ObservableObject {
                                                   log: { [weak self] line in
                                                       Task { @MainActor in self?.live.append(log: line) }
                                                   })
+        // Wake window (smart wake): re-point the in-app early-fire sweep at THIS wake every time the
+        // alarm (re-)arms, whether it was re-armed on connect, on foreground, at midnight, or by a
+        // settings change. The strap's firmware alarm stays at `next` — the sweep only hunts for a
+        // wakeable window INSIDE the last `wakeWindowMinutes` before it, and the policy never fires
+        // within the final minute (`WakeWindow.firmwareHandoverSeconds`), so the last-minutes
+        // firmware buzz is never doubled. Self-gates on wakeWindowEnabled inside the scheduler.
+        scheduleWakeWindowSweep(wake: next)
+    }
+
+    // MARK: Wake window (smart wake) sweep
+
+    private var wakeWindowSweepTimer: Timer?
+    /// Which wake instant the sweep has already fired for — one gentle buzz per alarm, decided by
+    /// comparing the wake's own epoch, so a 21:00 alarm tonight and a 07:00 alarm tomorrow are both
+    /// fireable while the one that fired never fires again. (The same idiom as the strain-target
+    /// nudge's persisted-day dedupe, keyed on the instant rather than the day.)
+    private static let wakeWindowFiredWakeKey = "wakeWindow.lastFiredWakeEpoch"
+
+    /// A 60 s sweep tick over the wake window. In-app by necessity — the strap only accepts fixed
+    /// alarm times, not stage-triggered wake; macOS keeps running so this is reliable, iOS checks
+    /// while the sweep timer is alive (foreground/relaunch re-arms through `applySmartAlarm`).
+    /// Best-effort, documented as such on the Settings toggle.
+    private func scheduleWakeWindowSweep(wake: Date) {
+        cancelWakeWindowSweep()
+        guard behavior.wakeWindowEnabled else { return }
+        guard wake.timeIntervalSinceNow > 0 else { return }
+        let timer = Timer(fire: Date().addingTimeInterval(5), interval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.wakeWindowTick(wake: wake) }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        wakeWindowSweepTimer = timer
+        live.append(log: Self.stamped("Wake window: \(behavior.wakeWindowMinutes) min early-fire zone before \(AppClock.hourMinute(wake)); strap alarm stays at the wake time"))
+    }
+
+    private func cancelWakeWindowSweep() {
+        wakeWindowSweepTimer?.invalidate()
+        wakeWindowSweepTimer = nil
+    }
+
+    /// One sweep tick: bounded, deduped, and handed to the pure `WakeWindow.evaluate` policy.
+    @discardableResult
+    func wakeWindowTick(wake: Date) -> WakeWindow.Decision {
+        let now = Date()
+        defer { if now >= wake { cancelWakeWindowSweep() } }
+        guard behavior.smartAlarmEnabled, behavior.wakeWindowEnabled else {
+            cancelWakeWindowSweep()
+            return WakeWindow.Decision(fire: false, buzzLoops: 0, reason: "sweep disabled")
+        }
+        guard now < wake else {
+            return WakeWindow.Decision(fire: false, buzzLoops: 0, reason: "wake passed")
+        }
+        // One gentle buzz per alarm: compare the wake's own epoch, not the day — two alarms in one
+        // day (an evening override then tomorrow's) each get their own chance.
+        let wakeEpoch = Int(wake.timeIntervalSince1970)
+        guard UserDefaults.standard.object(forKey: Self.wakeWindowFiredWakeKey) as? Int != wakeEpoch else {
+            return WakeWindow.Decision(fire: false, buzzLoops: 0, reason: "already fired for this alarm")
+        }
+        // Before the window starts: quietly keep the timer running until the window opens.
+        if wake.timeIntervalSince(now) > TimeInterval(min(max(behavior.wakeWindowMinutes, WakeWindow.minWindowMinutes), WakeWindow.maxWindowMinutes) * 60) {
+            return WakeWindow.Decision(fire: false, buzzLoops: 0, reason: "before window")
+        }
+        // Read the last hour of banked HR — the OLD portion gives the overnight floor, the NEW gives
+        // the slice being judged. `repo` is the same device-deduped read the analytics funnel uses.
+        Task { @MainActor in
+            let nowS = Int(Date().timeIntervalSince1970)
+            let hr = await self.repo.hrSamples(from: nowS - Int(WakeWindow.lookbackSeconds), to: nowS, limit: 4_000)
+            let decision = WakeWindow.evaluate(now: Date(), wake: wake,
+                                               windowMinutes: self.behavior.wakeWindowMinutes,
+                                               recent: hr)
+            guard decision.fire else {
+                // Idle ticks stay silent in the strap log; the reason is decided every minute anyway.
+                return
+            }
+            // Dedupe BEFORE buzzing — a crash between haptic and persist would be a one-time double
+            // buzz; buzz-then-persist ordering makes the re-fire correct rather than repeated.
+            UserDefaults.standard.set(wakeEpoch, forKey: Self.wakeWindowFiredWakeKey)
+            self.ble.buzzStrapEarly(loops: decision.buzzLoops, reason: decision.reason)
+            self.cancelWakeWindowSweep()
+        }
+        return WakeWindow.Decision(fire: false, buzzLoops: 0, reason: "evaluating (async)")
     }
 
     /// Compute the next fire date for the smart alarm, honouring the weekday selection.
@@ -2420,11 +2507,18 @@ final class AppModel: ObservableObject {
     /// nil band → no target → no notification. Android twin: AppViewModel's days-collector call.
     func evaluateStrainTarget() {
         guard let row = repo.today else { return }
+        #if os(iOS)
+        // Aura draws its own target band on the Today ring; the notice names that band, not the classic one.
+        StrainTargetNotifier.onAuraDayUpdate(
+            day: row.day, effort: row.strain, recovery: row.recovery, enabled: behavior.strainTargetNudge,
+            scale: UnitPrefs.resolveEffortScale(UserDefaults.standard.string(forKey: UnitPrefs.effortScaleKey) ?? ""))
+        #else
         StrainTargetNotifier.onDayUpdate(
             day: row.day,
             dayStrain21: row.strain.map { UnitFormatter.effortValue($0, scale: .whoop) },
             target21: CoupledView.optimalStrainRange(recovery: row.recovery)?.lowerBound,
             enabled: behavior.strainTargetNudge)
+        #endif
     }
 
     /// Re-run the illness watch over the cached history. Called when the Automations toggle

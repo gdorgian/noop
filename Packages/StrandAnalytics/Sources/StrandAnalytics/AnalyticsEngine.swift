@@ -922,9 +922,12 @@ public enum AnalyticsEngine {
         // The Effort ring's own funnel. A nil sink builds nothing at all, so a caller that does not want
         // diagnostics pays nothing; IntelligenceEngine passes its per-day recorder, the same one the
         // `workout detect` and `sleep-detect` lines beside it already use.
-        let strain = StrainScorer.strain(dayHr ?? hr, maxHR: effMaxHR, restingHR: restForStrain,
-                                         method: effortMethod, sex: profile.sex,
-                                         diag: strainDiag, day: day)
+        //
+        // Calendar-day, physiological-day and live readouts share this method selection,
+        // calibration and no-data behavior. Workout bouts retain their independent scorer.
+        let strain = DayStrainScorer.score(dayHr ?? hr, maxHR: effMaxHR, restingHR: restForStrain,
+                                           method: effortMethod, sex: profile.sex,
+                                           diag: strainDiag, day: day)
         // #2438 step 0 asks two things of a contributed log: whether the day was scored against the
         // user's own setting or against the age formula, and how far the day's own heart rate ran above
         // that. The `effort score` line above answers neither — it collapses override and Tanaka into

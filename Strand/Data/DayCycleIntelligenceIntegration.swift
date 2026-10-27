@@ -95,6 +95,7 @@ import WhoopStore
                         now: Int, offsetSec: Int, habitualMidsleepSec: Int?, ticksPerStep: Double,
                         mode: DayCycleMode, cache: Cache,
                         profile: UserProfile, maxHROverride: Double?, effortMethod: StrainScorer.Method,
+                        strainTables: WhoopStrain.Tables? = WhoopStrain.tables,
                         recoveryReader: BoundaryRecoveryReader? = nil,
                         trace: ((String) -> Void)? = nil) async -> Result {
         guard mode == .sleepOnset else {
@@ -103,6 +104,7 @@ import WhoopStore
                           markerUpdate: .replace(points: [], sourceIds: Array(Set(
                             candidates.map { computedId($0.owner) })).sorted()))
         }
+        let strainRecipe = DayStrainScorer.cacheIdentity(method: effortMethod, tables: strainTables)
         let editsByDay = Dictionary(grouping: editedRows) {
             AnalyticsEngine.dayString($0.endTs, offsetSec: offsetSec)
         }
@@ -215,6 +217,7 @@ import WhoopStore
             }
             let loadKey = "\(window.onset)-\(window.endExclusive)|\(hrWitness.joined(separator: ","))"
                 + "|rhr=\(restingHR)|max=\(effectiveMaxHR.map { "\($0)" } ?? "nil")|\(effortMethod)|\(profile.cacheKey)"
+                + "|\(strainRecipe)"
             let load: CachedLoad
             if let hit = cache.loads[window.sleepId], hit.key == loadKey, !hrWitness.contains(where: { $0.hasSuffix("=unread") }) {
                 load = hit
@@ -230,8 +233,9 @@ import WhoopStore
                 let cycleHR = hrByTimestamp.values.sorted { $0.ts < $1.ts }
                 load = CachedLoad(
                     key: loadKey,
-                    strain: StrainScorer.strain(cycleHR, maxHR: effectiveMaxHR, restingHR: restingHR,
-                                                method: effortMethod, sex: profile.sex),
+                    strain: DayStrainScorer.score(cycleHR, maxHR: effectiveMaxHR, restingHR: restingHR,
+                                                  method: effortMethod, sex: profile.sex,
+                                                  tables: strainTables),
                     calories: cycleHR.isEmpty ? nil : Calories.estimateDayCalories(
                         cycleHR, profile: profile, hrmax: effectiveMaxHR, restingHR: restingHR))
                 cache.loads[window.sleepId] = load

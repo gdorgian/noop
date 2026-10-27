@@ -105,7 +105,7 @@ final class IntelligenceEngine: ObservableObject {
         "hrvBaseline", "rhrBaseline", "age", "sex", "stepTicksPerStep", "maxHROverride",
         "tzOffset", "sleepNeedHours", "sleepConsistency", "habitualMidsleep",
         "experimentalSleepV2", "motionAwareWake", "deepHrvWindow", "spo2CandidateDisplay",
-        "effortMethod", "dayCycleMode",
+        "effortMethod", "dayCycleMode", "dailyStrainRecipe",
     ]
 
     /// Which config field(s) moved between two signatures, for the `configDropped` tally.
@@ -897,11 +897,17 @@ final class IntelligenceEngine: ObservableObject {
         // Oura / Apple Watch / re-added-WHOOP install the per-device read returned 0, so this gate never
         // fired and a night finishing after launch stayed unscored until relaunch. Scoring below still reads
         // the registry's ACTIVE device (`owner`); only this change-detector needed to be cross-device.
-        let wmKey = (try? await store.analysisFingerprint()) ?? ""
+        let rawAnalysisFingerprint = (try? await store.analysisFingerprint()) ?? ""
+        // Recipe changes can change every scored day even when no new sensor rows arrive.
+        // Resolve the method once for the watermark, day cache and scoring calls in this pass.
+        let effortMethodGlobal = PuffinExperiment.effortMethod
+        let dailyStrainIdentity = DayStrainScorer.cacheIdentity(method: effortMethodGlobal)
+        let wmKey = Self.analysisWatermark(rawFingerprint: rawAnalysisFingerprint,
+                                          dailyStrainIdentity: dailyStrainIdentity)
         // #1538: read the stored watermark ONCE for both gates and the attribution line below. There is no
         // suspension point between them, so the three reads this replaces could not disagree — but the log
-        // line asserting `newData` and the gate deciding whether to run must be the SAME comparison by
-        // construction, not by the reader checking for an `await`. Twin of the Android AppViewModel hoist.
+        // raw-data attribution and scoring-recipe attribution below therefore share the same saved
+        // state as the gate deciding whether to run. Twin of the Android AppViewModel hoist.
         let storedWatermark = UserDefaults.standard.string(forKey: Self.analyzeWatermarkKey)
         if !force, !wmKey.isEmpty, storedWatermark == wmKey {
             return
@@ -935,18 +941,21 @@ final class IntelligenceEngine: ObservableObject {
         //
         // A completed offload / edit / recalibrate always re-scores past the gate above, so an empty or
         // duplicate offload still pays for a full maxDays pass over the whole raw store (#1146).
-        // `newData=no` means the fingerprint already equals the watermark the last run advanced: a re-score
-        // driven by the trigger, not by data (#1005 background battery). Diagnostic only; the pass runs
-        // either way. Twin of the Android WhoopBleClient / AppViewModel attribution.
+        // `newData=no` means the raw sensor fingerprint has not moved. A recipe-only change is named
+        // separately as `scoringChanged=yes`; otherwise a forced pass is driven by its trigger, not data
+        // (#1005 background battery). Diagnostic only; the pass runs either way.
         // #2238: a caller that knows its own name says so. The derivation below reads
         // `skipIfUnchanged` as "post-offload", which was an exact witness while that was the only
         // caller opting in; the #1538 resume now opts in too when its debt came from a completed
         // pass, and labelling it post-offload would put the investigation on the wrong caller for
         // the second time in this area.
         let trigger = triggerLabel ?? (!force ? "idle" : (skipIfUnchanged ? "post-offload" : "forced"))
-        let hadNew = wmKey.isEmpty || storedWatermark != wmKey
+        let hadNew = Self.rawAnalysisInputsChanged(rawFingerprint: rawAnalysisFingerprint,
+                                                   storedWatermark: storedWatermark)
+        let scoringChanged = !wmKey.isEmpty && storedWatermark != wmKey && !hadNew
         diagnosticSink?("re-score: trigger=\(trigger) "
-                        + "newData=\(hadNew ? "yes" : "no (nothing changed since last run)")", nil)
+                        + "newData=\(hadNew ? "yes" : "no")"
+                        + (scoringChanged ? " scoringChanged=yes" : (hadNew ? "" : " (nothing changed since last run)")), nil)
 
         // #1005: time the whole pass — the trigger line above records WHY; this records how many nights
         // and how long (the CPU cost per run), so a re-score STORM is visible in the strap log.
@@ -1126,9 +1135,6 @@ final class IntelligenceEngine: ObservableObject {
         // surface it as a "strap estimate (unverified)" fallback. Default OFF per the derived-biosignal
         // rule (CLAUDE.md) — neither candidate is a validated calibration.
         let spo2CandidateDisplayOn = PuffinExperiment.spo2CandidateDisplayEnabled
-        // #1545: the Effort TRIMP recipe, read ONCE per pass. Global (same for every day), so it folds
-        // into the config signature below rather than the per-day key.
-        let effortMethodGlobal = PuffinExperiment.effortMethod
         let dayCycleMode = DayCycleMode.persisted(UserDefaults.standard.string(forKey: DayCycleMode.storageKey))
 
         // Zero the per-day probe counters so the line emitted after the steps phase describes THIS pass
@@ -1193,6 +1199,7 @@ final class IntelligenceEngine: ObservableObject {
             // window of days scored by a recipe the user just turned off, with nothing to explain it.
             "\(effortMethodGlobal)",
             dayCycleMode.rawValue,
+            dailyStrainIdentity,
         ].joined(separator: "|")
         // Drop the whole cache on a config change, then snapshot it into a Sendable `let` for the detached
         // loop (the engine is @MainActor; the loop can't touch `self`). The loop returns the updated cache
@@ -3144,7 +3151,7 @@ final class IntelligenceEngine: ObservableObject {
         if !dailies.isEmpty || !healDropped.isEmpty { await repo.refresh() }
 
         markPostLoopPhase("workouts")
-        // #836/#sleep-sync: record the complete raw-analysis fingerprint this run scored against, so a later
+        // #836/#sleep-sync: record the raw inputs and daily recipe this run scored against, so a later
         // NON-forced tick can short-circuit while it's unchanged. Written ONLY at the end of a completed run (never on an
         // early guard-return), so an interrupted/failed run can't advance the watermark past unscored data.
         if !wmKey.isEmpty { UserDefaults.standard.set(wmKey, forKey: Self.analyzeWatermarkKey) }
@@ -3174,9 +3181,29 @@ final class IntelligenceEngine: ObservableObject {
         if !Task.isCancelled { onPersisted?() }
     }
 
-    /// UserDefaults key for the #836 idle-tick gate: the complete raw-analysis fingerprint the last completed
-    /// `analyzeRecent` scored against. A non-forced tick whose current fingerprint equals this skips the
-    /// 21-day rescore; cleared implicitly by any scoring-stream insert (the fingerprint moves), so it self-heals.
+    /// Stable watermark for both unchanged-input gates. An unreadable raw fingerprint stays empty,
+    /// preserving the fail-open behavior; recipe identity alone must never skip an unobserved store.
+    nonisolated static func analysisWatermark(rawFingerprint: String, dailyStrainIdentity: String) -> String {
+        guard !rawFingerprint.isEmpty,
+              let data = try? JSONSerialization.data(withJSONObject: [
+                "raw": rawFingerprint, "dailyStrain": dailyStrainIdentity,
+              ], options: [.sortedKeys]) else { return "" }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    /// Keep the trigger's `newData` attribution about raw sensor inputs. A recipe-only invalidation
+    /// runs the pass too, but is reported separately rather than claiming new sensor rows arrived.
+    /// Legacy raw-only watermarks deliberately miss the new gate once, while retaining this attribution.
+    nonisolated static func rawAnalysisInputsChanged(rawFingerprint: String, storedWatermark: String?) -> Bool {
+        guard !rawFingerprint.isEmpty, let storedWatermark else { return true }
+        if storedWatermark == rawFingerprint { return false }
+        guard let data = storedWatermark.data(using: .utf8),
+              let values = (try? JSONSerialization.jsonObject(with: data)) as? [String: String] else { return true }
+        return values["raw"] != rawFingerprint
+    }
+
+    /// UserDefaults key for the #836 idle-tick gate: raw inputs plus daily recipe from the last completed
+    /// `analyzeRecent`. Sensor inserts, recipe versions, method changes and table changes all invalidate it.
     private static let analyzeWatermarkKey = "noop.analyzeWatermark"
 
     /// CAPTURE-B (#814/#799): build the universal `dayOwner …` self-diagnostic line VERBATIM (the Test

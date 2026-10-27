@@ -4,8 +4,9 @@ import WhoopProtocol
 
 /// The Keytel 2005 FITNESS-ADJUSTED calorie path: when a resting HR is known, a Uth VO2max
 /// (15.3·HRmax/HRrest) is threaded into the more accurate Keytel equation that reads fitness; with
-/// no resting HR the estimator falls back to the base (fitness-blind) model, byte-identical to
-/// before. Expected values hand-computed from the published coefficients — the Kotlin twin
+/// no resting HR the estimator falls back to the base (fitness-blind) model, whose coefficients are
+/// WHOOP's own active row (OwnerDecision: the calories-against-WHOOP check; see `Calories.Coeffs`).
+/// Expected values hand-computed from those constants — the Kotlin twin
 /// `Vo2maxCaloriesTest` asserts the SAME literals, which is the cross-platform parity contract.
 final class Vo2maxCaloriesTests: XCTestCase {
 
@@ -23,7 +24,9 @@ final class Vo2maxCaloriesTests: XCTestCase {
 
     func testActiveRateFallsBackToBaseWhenNoVo2max() {
         let base = Calories.activeKcalPerS(Calories.male, hr: 150.0, hrmax: 190.0, weightKg: 80.0, age: 30.0, vo2max: nil)
-        XCTAssertEqual(base, 0.24495339388145318, accuracy: 1e-12)
+        // Base rate = WHOOP's active row (the owner's calories-against-WHOOP check): male
+        // 0.6·HR + 0.19·W + 0.2·A − 50 = 61.2 kJ/min over the 251.04 bridge.
+        XCTAssertEqual(base, 0.24378585086042068, accuracy: 1e-12)
         // The whole point: the fitness anchor MOVES the number (here it is higher).
         let fit = Calories.activeKcalPerS(Calories.male, hr: 150.0, hrmax: 190.0, weightKg: 80.0, age: 30.0, vo2max: 58.14)
         XCTAssertNotEqual(fit, base)

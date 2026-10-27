@@ -1,6 +1,7 @@
 import XCTest
 import StrandAnalytics
 import WhoopStore
+import WhoopProtocol
 @testable import Strand
 
 @MainActor
@@ -27,6 +28,48 @@ final class DayCycleRecoveryTests: XCTestCase {
         XCTAssertEqual(updated.exerciseCount, 2)
         XCTAssertEqual(updated.skinTempC, 34.2)
         XCTAssertEqual(updated.sleepHrOnly, true)
+    }
+
+    func testDefaultCycleUsesSharedDailyRecipeAndInvalidatesRecipeCache() async throws {
+        let store = try await WhoopStore.inMemory()
+        let onset = 1_788_472_800 // 2026-09-03 22:00 UTC, followed by an eight-hour main sleep.
+        let end = onset + 8 * 3_600
+        let now = onset + 10 * 3_600
+        let samples = (0..<600).map { HRSample(ts: end + $0, bpm: 150) }
+        _ = try await store.insert(Streams(hr: samples), deviceId: "strap")
+        let daily = DailyMetric(
+            day: "2026-09-04", totalSleepMin: 480, efficiency: 95, deepMin: nil, remMin: nil,
+            lightMin: nil, disturbances: nil, restingHr: 50, avgHrv: nil, recovery: nil,
+            strain: 83, exerciseCount: nil, spo2Pct: nil, skinTempDevC: nil, respRateBpm: nil,
+            steps: nil, activeKcalEst: nil)
+        let night = DayCycleIntelligenceIntegration.Night(daily: daily,
+            sleeps: [.init(startTs: onset, endTs: end, efficiency: 95, restingHr: 50,
+                           avgHrv: nil, stagesJSON: nil)], workouts: [], owner: "strap")
+        let tables = WhoopStrain.Tables(scale: [.init(raw: 0, strain: 0), .init(raw: 0.001, strain: 10),
+                                                .init(raw: 1, strain: 21)], targets: nil)
+        let cache = DayCycleIntelligenceIntegration.Cache()
+        let mode = DayCycleMode.persisted(nil)
+        XCTAssertEqual(mode, .sleepOnset)
+        func compute(_ tables: WhoopStrain.Tables?) async -> DayCycleIntelligenceIntegration.Result {
+            await DayCycleIntelligenceIntegration.compute(
+                nights: [night], editedRows: [], store: store,
+                candidates: [(owner: "strap", priority: 0)], physiologyOwners: ["strap"], workouts: [],
+                windowStart: onset, now: now, offsetSec: 0, habitualMidsleepSec: nil, ticksPerStep: 1,
+                mode: mode, cache: cache, profile: UserProfile(), maxHROverride: 185,
+                effortMethod: .edwards, strainTables: tables)
+        }
+        let exact = await compute(tables)
+        let expected = try XCTUnwrap(DayStrainScorer.score(samples, maxHR: 185, restingHR: 50, tables: tables))
+        XCTAssertEqual(expected, 10 * 100 / 21, accuracy: 1e-12)
+        XCTAssertEqual(exact.strainByWakeDay[daily.day], expected)
+        XCTAssertEqual(DayCycleIntelligenceIntegration.applying(exact, to: daily).strain, expected)
+
+        // Reuse the same raw rows, cycle and cache with the tables removed. The old method must
+        // replace the cached WHOOP value even though the raw-data witness has not changed.
+        let independent = await compute(nil)
+        let fallback = StrainScorer.strain(samples, maxHR: 185, restingHR: 50)
+        XCTAssertNotEqual(fallback, expected)
+        XCTAssertEqual(independent.strainByWakeDay[daily.day], fallback)
     }
 
     func testBoundaryRecoveryPropagatesSessionReadFailure() async {

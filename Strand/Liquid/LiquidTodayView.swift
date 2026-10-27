@@ -1730,11 +1730,12 @@ struct LiquidTodayView: View {
             let restHR = day?.restingHr.map(Double.init) ?? StrainScorer.defaultRestingHR
             let method = PuffinExperiment.effortMethod
             let sex = profile.sex
+            let strainTables = WhoopStrain.tables
             // Fingerprinting and scoring a full day's HR samples is pure work. Keep it off the
             // main actor so a Repository refresh cannot block an in-progress scroll.
             liveStrainLocal = await Task.detached(priority: .utility) {
-                StrainScorer.strain(todayHr, maxHR: maxHR, restingHR: restHR,
-                                    method: method, sex: sex)
+                DayStrainScorer.score(todayHr, maxHR: maxHR, restingHR: restHR,
+                                      method: method, sex: sex, tables: strainTables)
             }.value
         } else {
             liveStrainLocal = nil

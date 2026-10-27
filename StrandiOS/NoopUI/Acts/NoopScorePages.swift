@@ -121,8 +121,15 @@ struct NoopStrainPage: View {
     private var strain: Double? { offset == 0 ? (day?.rings.strain ?? metric?.strain) : metric?.strain }
     private var recoveryForTarget: Double? { offset == 0 ? (day?.rings.recovery ?? metric?.recovery) : metric?.recovery }
     /// The day's target, on the strain scale: easier after a low recovery, harder after a high one.
+    /// WHOOP-exact build: WHOOP's own recovery row for the day (lower…upper) as ring fractions —
+    /// whoop value × 100/21 / 100. Without tables: the existing Bevel-port band.
     private var target: ClosedRange<Double>? {
         guard let r = recoveryForTarget else { return nil }
+        if let band = WhoopStrain.targetStrain21(recovery: r)?.band {
+            let lower = StrainScorer.effortValue(fromWhoopStrain: band.lowerBound) / 100
+            let upper = StrainScorer.effortValue(fromWhoopStrain: band.upperBound) / 100
+            return lower...upper
+        }
         let mid = 0.2 + 0.4 * min(1, max(0, r / 100))
         return (mid - 0.08)...(mid + 0.08)
     }

@@ -603,6 +603,12 @@ public enum Calories {
         let restingHeight: Double  // applied to height in METRES
         let restingAge: Double
         // Keytel 2005 base (fitness-blind) active model: EE(kJ/min) = alpha + hr·HR + wt·W + age·A.
+        // Owner decision (the calories-against-WHOOP check): the base row is WHOOP's OWN constants,
+        // read from the WHOOP iOS 5.65.1 binary (kJ/min over the 251.04 bridge, sex 0/1, unknown sex
+        // = the exact mean) — male: 0.6·HR + 0.19·W + 0.2·A − 50; female: 0.4·HR − 0.13·W + 0.07·A
+        // − 15. WHOOP ships a tighter-rounded variant of the same Keytel-family paper coefficients;
+        // the published values (male 0.6309/0.1988/0.2017/−55.0969, female 0.4472/−0.1263/0.0740/
+        // −20.4022) are kept here as provenance, not as active constants.
         let workoutHR: Double
         let workoutWeight: Double
         let workoutAge: Double
@@ -619,19 +625,21 @@ public enum Calories {
     }
 
     static let male = Coeffs(restingAlpha: 88.362, restingWeight: 13.397, restingHeight: 479.9,
-                             restingAge: 5.677, workoutHR: 0.6309, workoutWeight: 0.1988,
-                             workoutAge: 0.2017, workoutAlpha: -55.0969,
+                             restingAge: 5.677, workoutHR: 0.6, workoutWeight: 0.19,
+                             workoutAge: 0.2, workoutAlpha: -50.0,
                              fitHR: 0.634, fitVO2: 0.404, fitWeight: 0.394, fitAge: 0.271,
                              fitAlpha: -95.7735)
     static let female = Coeffs(restingAlpha: 447.593, restingWeight: 9.247, restingHeight: 309.8,
-                               restingAge: 4.33, workoutHR: 0.4472, workoutWeight: -0.1263,
-                               workoutAge: 0.0740, workoutAlpha: -20.4022,
+                               restingAge: 4.33, workoutHR: 0.4, workoutWeight: -0.13,
+                               workoutAge: 0.07, workoutAlpha: -15.0,
                                fitHR: 0.450, fitVO2: 0.380, fitWeight: 0.103, fitAge: 0.274,
                                fitAlpha: -59.3954)
-    // Nonbinary = the male/female midpoint, the same convention the base workout* coeffs use.
+    // Nonbinary = the male/female EXACT midpoint. The base workout* row is WHOOP's own active
+    // equation (below), so the midpoint is the arithmetic mean of WHOOP's two rows,
+    // coefficient by coefficient — which is exactly what WHOOP does for an unknown sex.
     static let nonbinary = Coeffs(restingAlpha: 267.9775, restingWeight: 11.322, restingHeight: 394.85,
-                                  restingAge: 5.0035, workoutHR: 0.53905, workoutWeight: 0.03625,
-                                  workoutAge: 0.13785, workoutAlpha: -37.74955,
+                                  restingAge: 5.0035, workoutHR: 0.5, workoutWeight: 0.03,
+                                  workoutAge: 0.135, workoutAlpha: -32.5,
                                   fitHR: 0.542, fitVO2: 0.392, fitWeight: 0.2485, fitAge: 0.2725,
                                   fitAlpha: -77.58445)
 
@@ -711,7 +719,16 @@ public enum Calories {
 
     /// Active energy rate (kcal/s). With `vo2max` present, uses the Keytel 2005 fitness-ADJUSTED
     /// equation (personalizes beyond age/weight/sex); with nil, the base fitness-blind Keytel model,
-    /// byte-identical to before. HR is capped at HRmax in both, as the base model always did.
+    /// byte-identical to before. HR is capped at HRmax in both, as the base model always did — WHOOP
+    /// caps at its max-HR argument the same way (`if (param_2 <= hr) hr = param_2` in its binary).
+    ///
+    /// Owner decision (calories-against-WHOOP check, 2026-10-27): the BASE row is WHOOP's own active
+    /// equation — male `0.6·HR + 0.19·W + 0.2·A − 50`, female `0.4·HR − 0.13·W + 0.07·A − 15`,
+    /// unknown sex the exact coefficient mean, all in kJ/min over the 251.04 bridge — replacing the
+    /// published Keytel paper coefficients Noop carried before. The fitness-ADJUSTED row stays
+    /// Noop's own published-Keytel volunteer (never WHOOP-exact: WHOOP's binary has no VO2max path),
+    /// so exact-against-WHOOP calorie trials compare with resting HR absent, or attribute the anchor's
+    /// share separately.
     static func activeKcalPerS(_ c: Coeffs, hr: Double, hrmax: Double, weightKg: Double, age: Double,
                                vo2max: Double? = nil) -> Double {
         let eeKjMin: Double

@@ -250,9 +250,8 @@ extension NoopRingValues {
     /// Today's strain target, as fractions of the ring: easier after a low recovery, harder after a
     /// high one. Nil until recovery is scored.
     var strainTarget: ClosedRange<Double>? {
-        guard let r = recovery else { return nil }
-        let mid = 0.25 + 0.45 * min(1, max(0, r / 100))
-        return (mid - 0.09)...(mid + 0.09)
+        guard let band = StrainTargetNotifier.auraTarget(recovery: recovery) else { return nil }
+        return (band.lowerBound / 100)...(band.upperBound / 100)
     }
 }
 

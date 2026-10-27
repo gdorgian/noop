@@ -91,6 +91,13 @@ android/noop-release.jks
 
 # ── Personal data — NEVER publish (real WHOOP/Apple Health exports) ──
 Fixtures/
+# WHOOP's own lookup tables for the accuracy port (WhoopStrain.swift): copied verbatim out of your
+# WHOOP IPA (Whoop.app) so the day strain and the strain target run WHOOP's exact values. They are
+# WHOOP's data by construction, so they live in this section too — local build bundles them when
+# present (copy scripts in project.yml remove stale bundled copies when absent); public builds fall
+# back and diagnostics name the selected method.
+Config/strain_raw_scale_lookup.json
+Config/recovery_to_strain.json
 # One narrow exception, and the reason it is safe: MemoryBench's golden fixture holds no export at all —
 # fifteen hand-written strings (a German sentence, a Chinese clause, an ISO date) whose only purpose is to
 # pin the tokeniser and chunker. It has to be committed, because it is the ONLY thing tying the app's
