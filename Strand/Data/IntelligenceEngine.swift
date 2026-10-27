@@ -823,6 +823,15 @@ final class IntelligenceEngine: ObservableObject {
     /// Compute on-device scores for each of the last `maxDays` that actually has raw HR data.
     /// Personal baselines (HRV / resting HR) are folded from the imported history, so even the first
     /// live night can be scored against your norm.
+    /// Wall time after which a pass's inputs are too old to write when a newer forced re-score is queued.
+    nonisolated static let staleSuspendedPassSeconds: TimeInterval = 10 * 60
+
+    /// True when a pass should discard its results: it began long enough ago that the phone must have
+    /// suspended it, and a forced re-score queued behind it means newer data exists.
+    nonisolated static func staleSuspendedPass(startedAt: Date, now: Date, forcedPending: Bool) -> Bool {
+        forcedPending && now.timeIntervalSince(startedAt) > staleSuspendedPassSeconds
+    }
+
     func analyzeRecent(maxDays: Int = 21, force: Bool = true, skipIfUnchanged: Bool = false,
                        triggerLabel: String? = nil, preserveUnscoredHistory: Bool = false,
                        onPersisted: (() -> Void)? = nil) async {
@@ -943,6 +952,9 @@ final class IntelligenceEngine: ObservableObject {
         // also counts every minute the process spent suspended mid-pass. One overnight pass suspended by a
         // sleeping phone banked 19 003 s, which then deferred every background re-score after it.
         let reScoreStart = DispatchTime.now().uptimeNanoseconds
+        // Wall clock, unlike the cost clock above: how old this pass's inputs are when it comes to write.
+        let reScoreWallStart = Date()
+        let reScoreStartedBackgrounded = RescoreBackgroundScheduler.isBackgrounded
         let reScoreCPUStart = RescoreBackgroundScheduler.processCPUSeconds()
         let reScoreExpiriesAtStart = RescoreBackgroundScheduler.assertionExpiries
         // #1538: the pass is now past every gate and will do real work. Mark it started durably, so that a
@@ -1957,6 +1969,17 @@ final class IntelligenceEngine: ObservableObject {
         // #1005: write the loop's updated reuse cache back to the (main-actor) stored property. The pass ran
         // to completion above (`.value` awaited), so there is no concurrent access.
         dayScanCache = updatedDayScanCache
+        // A pass the phone suspended (overnight, in the background) can wake hours later holding inputs read
+        // before the night was synced. One read at 01:43 woke at 09:05 and wrote 56 min of sleep for a
+        // 495-min night, which the queued pass corrected 40 s later (tester log, 27 Oct 2026). When a forced
+        // re-score is already waiting, newer data has landed since these inputs were read: write nothing and
+        // let the queued pass, which the `defer` starts, score it. The watermark is left behind on purpose.
+        if !preserveUnscoredHistory, maxDays <= 21, reScoreStartedBackgrounded,
+           Self.staleSuspendedPass(startedAt: reScoreWallStart, now: Date(), forcedPending: pendingForcedRescore) {
+            diagnosticSink?("re-score: discarded — inputs read \(Int(Date().timeIntervalSince(reScoreWallStart) / 60)) min ago "
+                            + "and newer data is queued; the queued pass scores it", nil)
+            return
+        }
         // #1538: the pass after the day loop was never measured. The cost line above brackets the loop and
         // is emitted the moment it returns, so a pass whose time went somewhere later reported a small
         // prep/score and no account of the rest — which is where the steps calibration was re-folding sixty
