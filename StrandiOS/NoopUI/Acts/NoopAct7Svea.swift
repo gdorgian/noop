@@ -43,6 +43,7 @@ private enum NoopSveaFixture {
 private struct NoopSveaCoach: View {
     @ObservedObject var navigation: NoopNavigation
     @EnvironmentObject private var coach: AICoachEngine
+    @Environment(\.noopLiveBarInset) private var liveBarInset
     @ObservedObject private var memoryStore = CoachMemory.shared
     @AppStorage("noop.html.svea-grant-count") private var grantCount = 5
     // Onboarding step 2's answer. Svea's framing follows it: for a night worker "last night" is
@@ -134,7 +135,8 @@ private struct NoopSveaCoach: View {
         .overlay(alignment: .bottom) {
             composer
                 .padding(.horizontal, 14)
-                .padding(.bottom, 88)
+                // Above the tab bar, and above a running session's bar when there is one.
+                .padding(.bottom, 88 + liveBarInset)
         }
         .onChange(of: navigation.askFocusRequest) { _, _ in askFocused = true }
         .task {
@@ -1144,8 +1146,36 @@ private struct NoopSveaSetup: View {
                     }
                 }
 
+                if provider == "Custom" {
+                    // A local or self-hosted model is reached at its own address; without one, Custom had
+                    // nowhere to send a message and every test failed on an empty URL.
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Server address")
+                            .font(NoopHTMLFont.sans(11.5))
+                            .foregroundStyle(Color(hex: 0x8B958F))
+                        TextField("", text: $coach.customBaseURL,
+                                  prompt: Text("http://192.168.1.10:11434/v1").font(NoopHTMLFont.sans(13)).foregroundColor(NoopHTMLColor.faint))
+                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(NoopHTMLColor.inkSoft)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .submitLabel(.done)
+                            .onSubmit { coach.connectCustom() }
+                            .padding(.horizontal, 14)
+                            .frame(height: 48)
+                            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 15))
+                            .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.white.opacity(0.11), lineWidth: 0.5))
+                        Text("Plain http only reaches this network (a Mac, a NAS, localhost). Anything farther needs https.")
+                            .font(NoopHTMLFont.sans(11))
+                            .foregroundStyle(Color(hex: 0x7F8A85))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.top, 4)
+                }
+
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("API key")
+                    Text(provider == "Custom" ? "API key, if your server asks for one" : "API key")
                         .font(NoopHTMLFont.sans(11.5))
                         .foregroundStyle(Color(hex: 0x8B958F))
                     HStack(spacing: 10) {
@@ -1183,11 +1213,12 @@ private struct NoopSveaSetup: View {
 
                 Button(connectionTestLabel) {
                     if !keyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { saveKeyDraft() }
+                    if provider == "Custom" { coach.connectCustom() }
                     Task { await coach.testConnection() }
                 }
                 .buttonStyle(NoopSveaTintButtonStyle())
-                .disabled(coach.connectionTest == .testing || missingKey)
-                .opacity(missingKey ? 0.5 : 1)
+                .disabled(coach.connectionTest == .testing || missingKey || missingServer)
+                .opacity(missingKey || missingServer ? 0.5 : 1)
             }
         }
     }
@@ -1338,6 +1369,11 @@ private struct NoopSveaSetup: View {
         if !keyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Save" }
         if coach.hasKey || NoopSveaFixture.enabled { return keyEndingVisible ? "Hide" : "Reveal" }
         return "Enter"
+    }
+
+    /// Custom answers from the address the wearer gives it, so there is nothing to test without one.
+    private var missingServer: Bool {
+        provider == "Custom" && coach.customBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// A hosted provider cannot answer without a key; a custom endpoint may be local and keyless.
