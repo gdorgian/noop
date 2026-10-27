@@ -533,9 +533,11 @@ struct NoopAct2Screens: View {
                 // the orb is Breathe's door either way.
                 Button { navigation.push(.breathe) } label: {
                     Act2BreathingOrb(
-                        wakeCharge: dayContext.wakeCharge,
-                        charge: dayContext.charge,
-                        recordedBPM: dayContext.recordedPulse,
+                        // Nothing computes charge yet, so the measured orb draws no gauge; these
+                        // fixed inputs only hold its breathing shape as designed.
+                        wakeCharge: 92,
+                        charge: 56,
+                        recordedBPM: 72,
                         isHistorical: false,
                         measured: true,
                         liveBPM: liveBPM
@@ -1536,7 +1538,6 @@ struct NoopAct2Screens: View {
         let series = heartWindow == nil ? todayHeartSeries : (zoomedHeart.count > 1 ? zoomedHeart : todayHeartSeries)
         let values = (series?.map(\.bpm) ?? [])
         let point = min(max(selectedHeartPoint, 0), max(0, values.count - 1))
-        let nearest = nearestMark(to: point)
         return NoopScreen(topInset: 58) {
             VStack(spacing: 0) {
                 Act2BackBar(label: "The day so far", action: { back(to: .today) })
@@ -2053,70 +2054,9 @@ struct NoopAct2Screens: View {
 
     // MARK: - Shared context
 
-    private var selectedTodayOffset: Int {
-        min(max(navigation.selectedTodayDay, 0), Self.days.count - 1)
-    }
-
     
-    private var dayContext: Act2DayContext {
-        let selected = Self.days[Self.days.count - 1 - selectedTodayOffset]
-        let canonical = Self.days[Self.days.count - 1]
-        let eyebrow = (isNightWorker ? "Evening, Gabriel" : "Hi, Gabriel")
-        let header = "Take four breaths first"
-
-        guard isNightWorker else {
-            return Act2DayContext(
-                weekday: selected.weekday,
-                number: selected.number,
-                date: selected.date,
-                shortLabel: selected.shortLabel,
-                eyebrow: eyebrow,
-                header: header,
-                span: canonical.span,
-                axis: canonical.axis,
-                endTime: canonical.endTime,
-                dayRead: canonical.dayRead,
-                recordedPulse: canonical.recordedPulse,
-                wakeCharge: canonical.wakeCharge,
-                charge: canonical.charge,
-                chargeLabel: canonical.chargeLabel,
-                chargeLine: canonical.chargeLine,
-                spend: canonical.spend,
-                marks: canonical.marks
-            )
-        }
-        return Act2DayContext(
-            weekday: selected.weekday,
-            number: selected.number,
-            date: selected.date,
-            shortLabel: selected.shortLabel,
-            eyebrow: eyebrow,
-            header: header,
-            span: "15:22 → 22:40",
-            axis: ["15:22", "17:30", "20:00", "22:40"],
-            endTime: "22:40",
-            dayRead: "Quiet since the walk before your shift. You are eight beats above your resting line, which is normal for this point of a night.",
-            recordedPulse: canonical.recordedPulse,
-            wakeCharge: canonical.wakeCharge,
-            charge: canonical.charge,
-            chargeLabel: canonical.chargeLabel,
-            // The HTML selects this sentence from the same charge thresholds in either
-            // schedule. Night-shift wording is used only by the >= 70 stateCoach branch.
-            chargeLine: canonical.chargeLine,
-            spend: canonical.spend,
-            marks: Self.nightShiftMarks
-        )
-    }
 
     private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
-
-    private var chargeColor: Color {
-        Act2ChargePalette.color(forCharge: dayContext.charge)
-    }
-
-    private func nearestMark(to point: Int) -> Act2Mark {
-        dayContext.marks.min(by: { abs($0.index - point) < abs($1.index - point) }) ?? dayContext.marks[0]
-    }
 
     private func back(to fallback: NoopRoute) {
         navigation.canGoBack ? navigation.back() : navigation.reset(to: fallback)
@@ -3355,39 +3295,6 @@ private struct Act2VitalCard: View {
 
 // MARK: - Act 2 models
 
-private struct Act2Spend {
-    let title: String
-    let detail: String
-    let cost: Int
-}
-
-private struct Act2Mark {
-    let time: String
-    let label: String
-    let pulse: Int
-    let index: Int
-}
-
-private struct Act2DayContext {
-    let weekday: String
-    let number: Int
-    let date: String
-    let shortLabel: String
-    let eyebrow: String
-    let header: String
-    let span: String
-    let axis: [String]
-    let endTime: String
-    let dayRead: String
-    let recordedPulse: Int
-    let wakeCharge: Int
-    let charge: Int
-    let chargeLabel: String
-    let chargeLine: String
-    let spend: [Act2Spend]
-    let marks: [Act2Mark]
-}
-
 private struct Act2HeartZone {
     let name: String
     let range: String
@@ -3453,42 +3360,6 @@ private extension NoopAct2Screens {
         Act2Vital(name: "Skin temperature", value: "−0.2", unit: "°C", window: "deviation from your normal", delta: "−0.2 °C vs baseline", plain: "Slightly cool, which is what a proper sleep looks like.", lowLabel: "−0.4", baselineLabel: "your normal 0.0", highLabel: "0.4", bandStart: 0.8 / 2.4, bandWidth: 0.8 / 2.4, baseline: 0.50, position: 1.0 / 2.4)
     ]
 
-    static let commonSpend = [
-        Act2Spend(title: "Just being awake", detail: "baseline burn across 8h 56m", cost: 10),
-        Act2Spend(title: "The intervals", detail: "6 × 3 min hard at 07:40", cost: 14),
-        Act2Spend(title: "Two hard meetings", detail: "38 stressed minutes before lunch", cost: 7),
-        Act2Spend(title: "On your feet", detail: "11.4k steps, 3k over your normal", cost: 5)
-    ]
-
-    static func marks(_ day: Int) -> [Act2Mark] {
-        [
-            Act2Mark(time: "06:41", label: "Woke", pulse: 58, index: 0),
-            Act2Mark(time: "07:20", label: "Coffee", pulse: 62, index: 2),
-            Act2Mark(time: "08:10", label: "Walk, 32 min", pulse: 96, index: 5),
-            Act2Mark(time: "09:30", label: day == 22 ? "Standup" : "Morning", pulse: 78, index: 7),
-            Act2Mark(time: "12:05", label: "Lunch", pulse: 80, index: 11),
-            Act2Mark(time: "14:20", label: day == 22 ? "Now" : "Final reading", pulse: 72, index: 23)
-        ]
-    }
-
-    static let nightShiftMarks = [
-        Act2Mark(time: "15:22", label: "Woke", pulse: 58, index: 0),
-        Act2Mark(time: "16:10", label: "Coffee", pulse: 62, index: 2),
-        Act2Mark(time: "17:00", label: "Walk, 32 min", pulse: 96, index: 5),
-        Act2Mark(time: "18:00", label: "Shift started", pulse: 78, index: 7),
-        Act2Mark(time: "20:30", label: "Ward round", pulse: 80, index: 11),
-        Act2Mark(time: "22:40", label: "Now", pulse: 72, index: 23)
-    ]
-
-    static let days: [Act2DayContext] = [
-        Act2DayContext(weekday: "Sun", number: 16, date: "Sunday 16 August", shortLabel: "Sun 16", eyebrow: "Sunday 16 August", header: "Two sessions, then nothing", span: "06:38 → 22:10", axis: ["06:38", "11:30", "17:00", "22:10"], endTime: "22:10", dayRead: "The second session was the whole cost. After it, the day came back down normally.", recordedPulse: 68, wakeCharge: 86, charge: 34, chargeLabel: "Running low", chargeLine: "You woke with 86 and finished with 34. Two sessions spent most of the room you had.", spend: commonSpend, marks: marks(16)),
-        Act2DayContext(weekday: "Mon", number: 17, date: "Monday 17 August", shortLabel: "Mon 17", eyebrow: "Monday 17 August", header: "The intervals cost you", span: "06:50 → 21:42", axis: ["06:50", "11:00", "16:00", "21:42"], endTime: "21:42", dayRead: "The intervals are the one clear climb. Everything after them stayed a little higher than usual.", recordedPulse: 74, wakeCharge: 80, charge: 31, chargeLabel: "Running low", chargeLine: "You woke with 80 and finished with 31. The intervals were the largest single cost.", spend: commonSpend, marks: marks(17)),
-        Act2DayContext(weekday: "Tue", number: 18, date: "Tuesday 18 August", shortLabel: "Tue 18", eyebrow: "Tuesday 18 August", header: "Short night, easy day", span: "05:18 → 20:50", axis: ["05:18", "10:00", "15:00", "20:50"], endTime: "20:50", dayRead: "You started with less after the short night, then kept the day easy enough not to spend it twice.", recordedPulse: 66, wakeCharge: 62, charge: 38, chargeLabel: "Running low", chargeLine: "You woke with 62 and finished with 38. The short night, not the day, set the limit.", spend: Array(commonSpend.prefix(2)), marks: marks(18)),
-        Act2DayContext(weekday: "Wed", number: 19, date: "Wednesday 19 August", shortLabel: "Wed 19", eyebrow: "Wednesday 19 August", header: "Back to your own normal", span: "05:42 → 21:10", axis: ["05:42", "10:30", "15:30", "21:10"], endTime: "21:10", dayRead: "A normal curve from wake to evening, with no hour sitting outside your own range.", recordedPulse: 64, wakeCharge: 78, charge: 49, chargeLabel: "Running low", chargeLine: "You woke with 78 and finished with 49. An ordinary day used an ordinary amount.", spend: Array(commonSpend.prefix(3)), marks: marks(19)),
-        Act2DayContext(weekday: "Thu", number: 20, date: "Thursday 20 August", shortLabel: "Thu 20", eyebrow: "Thursday 20 August", header: "A quiet day, mostly", span: "06:20 → 21:30", axis: ["06:20", "10:30", "16:00", "21:30"], endTime: "21:30", dayRead: "Quiet except for the walk and one pushed hour after lunch. Both came down cleanly.", recordedPulse: 65, wakeCharge: 84, charge: 53, chargeLabel: "Enough for the evening", chargeLine: "You woke with 84 and finished with 53. Most of the day stayed cheap.", spend: Array(commonSpend.prefix(3)), marks: marks(20)),
-        Act2DayContext(weekday: "Fri", number: 21, date: "Friday 21 August", shortLabel: "Fri 21", eyebrow: "Friday 21 August", header: "You went to bed on time", span: "06:40 → 22:05", axis: ["06:40", "11:00", "16:30", "22:05"], endTime: "22:05", dayRead: "The day held steady and the evening came down early enough to leave sleep alone.", recordedPulse: 63, wakeCharge: 88, charge: 57, chargeLabel: "Enough for the evening", chargeLine: "You woke with 88 and finished with 57. Nothing borrowed from the next morning.", spend: Array(commonSpend.prefix(3)), marks: marks(21)),
-        Act2DayContext(weekday: "Sat", number: 22, date: "Saturday 22 August", shortLabel: "Sat 22", eyebrow: "Hi, Gabriel", header: "Take four breaths first", span: "06:41 → 14:20", axis: ["06:41", "09:00", "11:30", "14:20"], endTime: "14:20", dayRead: "Quiet since the walk. You are sitting eight beats above your resting line, which is normal for the early afternoon.", recordedPulse: 72, wakeCharge: 92, charge: 56, chargeLabel: "Enough for the evening", chargeLine: "You woke with 92 and you have 56 left. Normal for this hour. Enough for the evening you had planned.", spend: commonSpend, marks: marks(22))
-    ]
 }
 
 // MARK: - Breathe (Act 2 §2.8–2.12)

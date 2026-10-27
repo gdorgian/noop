@@ -553,7 +553,6 @@ final class NoopNavigation: ObservableObject {
     /// The live workout's own screen — intervals get theirs.
     var liveRoute: NoopRoute { selectedWorkout.act3.isIntervals ? .intervals : .live }
     @Published var selectedRestDay = 0
-    @Published var selectedTodayDay = 0
     /// Updates is recreated when its route changes, so transient decisions must live above the
     /// screen just like an in-progress session. Release proposals still write their real stores;
     /// these values only preserve the current navigation session and Debug design fixture.
