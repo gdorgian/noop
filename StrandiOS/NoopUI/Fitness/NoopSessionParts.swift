@@ -297,8 +297,12 @@ struct NoopSessionHeart: View {
                 .chartXAxis {
                     // Clock times for a long session; for a short one they would all read the same minute,
                     // so the axis counts time into the session instead.
+                    // The first and last labels hang inward from the plot's edges; centred on the edge, the
+                    // last one ran past the card and Charts dropped it.
                     AxisMarks(values: [date(start), date((start + end) / 2), date(end)]) { value in
-                        AxisValueLabel {
+                        AxisValueLabel(anchor: value.index == 0 ? .topLeading
+                                       : value.index == value.count - 1 ? .topTrailing : .top,
+                                       collisionResolution: .disabled) {
                             if let d = value.as(Date.self) {
                                 Text(end - start < 20 * 60
                                      ? Self.elapsed(Int(d.timeIntervalSince1970) - start)
