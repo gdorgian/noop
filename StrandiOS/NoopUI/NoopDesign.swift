@@ -231,11 +231,21 @@ struct NoopScreen<Content: View>: View {
 }
 
 /// Content scrolling up under the status bar softens into it, as it does under the system's own bars,
-/// instead of running through the clock.
+/// instead of running through the clock. Only once the page has moved: at rest the effect's band reached
+/// the page title and blurred it (tester, 27 Oct 2026).
 private struct NoopTopScrollEdge: ViewModifier {
+    @State private var scrolled = false
+
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.scrollEdgeEffectStyle(.soft, for: .top)
+            content
+                .scrollEdgeEffectStyle(.soft, for: .top)
+                .scrollEdgeEffectHidden(!scrolled, for: .top)
+                .onScrollGeometryChange(for: Bool.self) { geo in
+                    geo.contentOffset.y + geo.contentInsets.top > 6
+                } action: { _, now in
+                    scrolled = now
+                }
         } else {
             content
         }
