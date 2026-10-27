@@ -370,7 +370,11 @@ struct NoopSleepStagesSection: View {
                 }
                 HStack(spacing: 8) {
                     if typical != nil {
-                        Capsule().fill(Color.white.opacity(0.34)).frame(width: 14, height: 2.5)
+                        HStack(spacing: 0) {
+                            Rectangle().fill(Color.white.opacity(0.55)).frame(width: 2, height: 10)
+                            Rectangle().fill(Color.white.opacity(0.22)).frame(width: 14, height: 6)
+                            Rectangle().fill(Color.white.opacity(0.55)).frame(width: 2, height: 10)
+                        }
                         Text("Your usual range")
                     }
                     Spacer()
@@ -575,9 +579,9 @@ struct NoopSleepStagesSection: View {
                 ZStack {
                     Circle().stroke(Color.white.opacity(0.06), lineWidth: 5)
                     if let range {
-                        // The usual share: a thin arc just outside the ring, so in-range reads at a glance.
-                        Circle().inset(by: -6).trim(from: range.lowerBound, to: range.upperBound)
-                            .stroke(Color.white.opacity(0.34), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                        // The usual share lies on the ring itself, in the stage's colour turned down.
+                        Circle().trim(from: range.lowerBound, to: range.upperBound)
+                            .stroke(color.opacity(0.32), style: StrokeStyle(lineWidth: 5))
                             .rotationEffect(.degrees(-90))
                             .opacity(shown ? 1 : 0)
                     }
@@ -586,6 +590,15 @@ struct NoopSleepStagesSection: View {
                                 style: StrokeStyle(lineWidth: 5, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                         .shadow(color: color.opacity(on ? 0.6 : 0), radius: 6)
+                    if let range {
+                        // A white tick across the ring at each end of the usual share, over the fill.
+                        ForEach([range.lowerBound, range.upperBound], id: \.self) { edge in
+                            Capsule().fill(Color.white.opacity(0.92)).frame(width: 2, height: 8)
+                                .offset(y: -22)
+                                .rotationEffect(.degrees(edge * 360))
+                        }
+                        .opacity(shown ? 1 : 0)
+                    }
                 }
                 .frame(width: 44, height: 44)
                 .animation(reduceMotion ? nil : NoopNightMotion.reveal(0.9, delay: 0.15 + Double(NoopNightStage.lane[stage]) * 0.05), value: shown)
