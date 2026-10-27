@@ -67,14 +67,6 @@ extension WorkoutRow {
         noopMinutes == 0 ? "Under 1 min" : "\(noopMinutes) min"
     }
 
-    /// Where the row came from, in the design's three words.
-    var noopSourceLabel: String {
-        let s = source.lowercased()
-        if s.contains("apple") || s.contains("health") { return "Health" }
-        if s.contains("import") || s.contains("csv") || s.contains("whoop") || s.contains("strava")
-            || s.contains("fit") || s.contains("gpx") { return "imported" }
-        return "strap"
-    }
 }
 
 @MainActor

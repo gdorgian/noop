@@ -13,7 +13,6 @@ struct NoopAct7Screens: View {
             } else {
                 NoopSveaGate(navigation: navigation)
             }
-        case .gate: NoopSveaGate(navigation: navigation)
         case .setup: NoopSveaSetup(navigation: navigation)
         case .consent: NoopSveaConsent(navigation: navigation)
         case .memory: NoopSveaMemory(navigation: navigation)

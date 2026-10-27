@@ -250,14 +250,6 @@ enum NoopZoneSource: Equatable {
         }
     }
 
-    /// The maximum card's title.
-    var maximumTitle: String {
-        switch self {
-        case .manualMax, .custom(maximumIsManual: true): "Maximum you set"
-        case .custom(maximumIsManual: false), .estimated, .unconfirmed: "Estimated maximum"
-        }
-    }
-
     /// "Zone 3" — the app's own zone vocabulary (the design uses it on Automations). The design's
     /// Resting/Easy/Steady/Hard/All out bands do not line up with the app's zones.
     static func name(_ number: Int) -> String { "Zone \(number)" }

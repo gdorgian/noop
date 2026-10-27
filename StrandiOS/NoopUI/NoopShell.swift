@@ -421,7 +421,7 @@ struct NoopVerifiedAppShell: View {
 
     /// Act 6 on one engine (`VitalityEngine`): hero, band, drivers and history from the same call.
     /// Driver detail, the method page and the health hub have no production source and stay out.
-    private static let canonicalAgesRoutes: Set<NoopRoute> = [.ages, .building, .driver]
+    private static let canonicalAgesRoutes: Set<NoopRoute> = [.ages, .driver]
 
     /// Act 3 on the stored sessions and the real recorder. The prescription (what today can take,
     /// what a session would cost) has no engine and stays out.
@@ -429,7 +429,7 @@ struct NoopVerifiedAppShell: View {
 
     /// Act 7 runs on the real coach engine, grants and memory; its prototype conversation is gated on
     /// `--demo-seed` inside the act.
-    private static let canonicalSveaRoutes: Set<NoopRoute> = [.coach, .gate, .setup, .consent, .memory]
+    private static let canonicalSveaRoutes: Set<NoopRoute> = [.coach, .setup, .consent, .memory]
 
     /// Act 5's hub: the wearer's own name, photo, usual sleep window and need. The rest of Act 5 is
     /// wired separately, screen by screen.

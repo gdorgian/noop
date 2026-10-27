@@ -120,9 +120,9 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case settingsAlerts = "settings-notifications", settingsSvea = "settings-svea", settingsData = "settings-data"
     case settingsLook = "settings-look", settingsLater = "settings-later", settingsAbout = "settings-about"
     // Act 6
-    case ages, building, driver, method, health
+    case ages, driver, method, health
     // Act 7
-    case coach, gate, setup, consent, memory
+    case coach, setup, consent, memory
     // Act 8
     case goal, setGoal = "set", labs, picker, review, marker
     // Act 9
@@ -158,8 +158,8 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .imported, .rejected, .backup,
              .howItWorks, .limitations, .siri, .shortcutExport, .storage, .digest, .report, .fused, .hydration,
              .settingsToday, .settingsSleep, .settingsFitness, .settingsScores, .settingsYou, .settingsStrap, .settingsAlerts, .settingsSvea, .settingsData, .settingsLook, .settingsLater, .settingsAbout: .plumbing
-        case .ages, .building, .driver, .method, .health: .ages
-        case .coach, .gate, .setup, .consent, .memory: .svea
+        case .ages, .driver, .method, .health: .ages
+        case .coach, .setup, .consent, .memory: .svea
         case .goal, .setGoal, .labs, .picker, .review, .marker: .goals
         case .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects,
              .instrumentRaw, .instrumentCapture: .instrument
@@ -177,10 +177,10 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .rest, .tonight, .debt, .alarm,
              .today, .inbox, .day, .energy, .vitals, .stress, .heart, .recovery, .strain,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound,
-             .coach, .gate, .setup, .consent, .memory:
+             .coach, .setup, .consent, .memory:
             .today
         case .trends, .rhythm,
-             .ages, .building, .driver, .method, .health,
+             .ages, .driver, .method, .health,
              .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects,
              .instrumentRaw, .instrumentCapture:
             .trends
@@ -267,11 +267,6 @@ struct NoopFinishedSessionRecord: Codable, Equatable {
 
     var minutes: Int {
         max(0, Int((Double(durationSeconds) / 60).rounded()))
-    }
-
-    func whenLabel(relativeTo now: Date = Date()) -> String {
-        if now.timeIntervalSince(endedAt) < 5 * 60 { return "Just now" }
-        return endedAt.formatted(date: .omitted, time: .shortened)
     }
 
     var distanceLabel: String? {
@@ -452,15 +447,6 @@ final class NoopNavigation: ObservableObject {
     }
 
     var sessionRunning: Bool { sessionStartedAt != nil }
-
-    /// A completed session is meaningful only on the same app-day that produced it.
-    var finishedSessionToday: NoopFinishedSessionRecord? {
-        guard let finishedSession,
-              finishedSession.day == Self.dayFormatter.string(from: Date()) else { return nil }
-        return finishedSession
-    }
-
-    var finishedWorkout: NoopWorkout? { finishedSessionToday?.workout }
 
     func beginSession(at date: Date) {
         // The bar rises and the bottom inset grows 52 in the same frames. If the inset lags,
@@ -677,67 +663,9 @@ final class NoopNavigation: ObservableObject {
            let requestedGoal = NoopGoalKind(rawValue: arguments[flag + 1]) {
             selectedGoal = requestedGoal
         }
-        if false,
-           let flag = arguments.firstIndex(of: "--noop-instrument-metric"),
-           arguments.indices.contains(flag + 1) {
-            instrumentMetricKey = arguments[flag + 1]
-        }
-        if false,
-           let flag = arguments.firstIndex(of: "--noop-instrument-a"),
-           arguments.indices.contains(flag + 1) {
-            instrumentCompareAKey = arguments[flag + 1]
-        }
-        if false,
-           let flag = arguments.firstIndex(of: "--noop-instrument-b"),
-           arguments.indices.contains(flag + 1) {
-            instrumentCompareBKey = arguments[flag + 1]
-        }
-        if false,
-           let flag = arguments.firstIndex(of: "--noop-instrument-shift"),
-           arguments.indices.contains(flag + 1),
-           let requestedShift = Int(arguments[flag + 1]) {
-            instrumentCompareShift = min(2, max(0, requestedShift))
-        }
-        if false,
-           let flag = arguments.firstIndex(of: "--noop-overlay"),
-           arguments.indices.contains(flag + 1) {
-            switch arguments[flag + 1] {
-            case "night-journal": overlay = .nightJournal
-            case "day-log": overlay = .dayLog
-            case "logged-items": overlay = .loggedItems
-            case "add-record": overlay = .addRecord
-            case "goal-editor": overlay = .goalEditor
-            case "deep-insights": overlay = .deepInsightsConfirmation
-            case "destructive": overlay = .destructiveConfirmation("your account and data")
-            case "instrument-signal-a": overlay = .instrumentSignalPickerA
-            case "instrument-signal-b": overlay = .instrumentSignalPickerB
-            default: break
-            }
-        }
-        if false,
-           arguments.contains("--noop-night-journal") {
-            overlay = .nightJournal
-        }
-        if false,
-           arguments.contains("--noop-finished-session") {
-            selectedWorkout = .steadyRide
-            finishedSession = NoopFinishedSessionRecord(
-                day: today,
-                workout: .steadyRide,
-                endedAt: Date(),
-                durationSeconds: 42 * 60,
-                distanceKilometres: 14.8,
-                chargeCost: 18,
-                sleepNeedMinutes: 12
-            )
-        }
         // Deterministic Simulator QA for the context-sensitive centre action. This is compiled
         // only into Debug and still requires the explicit demo seed, so Release cannot expose a
         // prototype sheet or synthetic route state.
-        if false,
-           arguments.contains("--noop-plus") {
-            plus()
-        }
         #endif
     }
 
@@ -822,12 +750,6 @@ final class NoopNavigation: ObservableObject {
         withAnimation(NoopMotion.arrive) {
             path = [route]
         }
-    }
-
-    /// The + door: the sheet goes down on `cover`, then 60 ms of nothing, then the arrival.
-    /// Overlapping them shows a push behind a dismissing sheet.
-    func dismissSheetThenArrive(at route: NoopRoute) {
-        dismissSheet(then: route, pushed: false)
     }
 
     /// A sheet choice preserves the page it came from, after the sheet finishes closing.
@@ -1019,16 +941,6 @@ final class NoopNavigation: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: action)
     }
 
-    func consumeLabPhotoRequest() {
-        labPhotoRequestID = 0
-    }
-
-    func selectWorkout(_ workout: NoopWorkout) {
-        selectedWorkout = workout
-        workoutChosenByUser = true
-        push(.ready)
-    }
-
     /// Called by the root swipe recognizer. Sheets always close before navigation, matching the
     /// resolved Night Journal and Day Log behavior.
     func handleBackSwipe(startX: CGFloat, translation: CGSize) {
@@ -1191,12 +1103,10 @@ extension NoopRoute {
         case .automations: "Automations"
         case .pair: "Pair a strap"
         case .ages: "Your ages"
-        case .building: "Building your ages"
         case .driver: "Driver"
         case .method: "How it is figured"
         case .health: "Health"
         case .coach: "Svea"
-        case .gate: "Connect a provider"
         case .setup: "Provider setup"
         case .consent: "Data access"
         case .memory: "Memory"

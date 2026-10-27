@@ -25,7 +25,6 @@ enum NoopHTMLColor {
     static let chevronDim = Color(hex: 0x57605C)
     static let blue = Color(hex: 0x17A2E6)
     static let blueLight = Color(hex: 0x8FD3F5)
-    static let blueDeep = Color(hex: 0x0E6E9C)
     static let blueInk = Color(hex: 0x04121A)
     static let night = Color(hex: 0x8B99D6)
     static let nightLight = Color(hex: 0x9AA7E0)

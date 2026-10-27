@@ -1726,7 +1726,7 @@ struct NoopAgesSheet: View {
     let measured: NoopAgesRecord
     let close: () -> Void
 
-    private static let own: Set<NoopRoute> = [.ages, .building, .driver, .method, .health]
+    private static let own: Set<NoopRoute> = [.ages, .driver, .method, .health]
 
     var body: some View {
         NoopAct6Screens(navigation: navigation, measured: measured)

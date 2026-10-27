@@ -1933,10 +1933,6 @@ private struct NoopLiftEditScreen: View {
         }
         rows = flow.sessionSets
         deleted = flow.deletedSetIDs
-        if false, deleted.isEmpty,
-           let fourth = rows.filter({ $0.exercise == selectedExercise && !$0.isWarmup }).dropFirst(3).first {
-            deleted.insert(fourth.id)
-        }
     }
 
     private func addSet(to exercise: String) {

@@ -88,12 +88,8 @@ struct NoopAct5Screens: View {
     @State private var pinged = false
     @State private var notificationBuzz = "Two short"
     @State private var healthAccessFixed = false
-    @State private var ceilingMode = "Profile zone"
-    @State private var ceilingZone = "Zone 4"
     @State private var ceilingBPM = 162
 
-    @State private var activeDevice = "mg"
-    @State private var spareName = "WHOOP 4.0"
     @State private var renameDraft = ""
     @State private var deviceNotice: String?
 
@@ -215,20 +211,6 @@ private extension NoopAct5Screens {
     static var warm: Color { Color(hex: 0xF2B45C) }
 
     var imperial: Bool { preferences["Units"] == "Imperial" }
-    var heightDisplay: String {
-        guard imperial else { return "\(height) cm" }
-        let totalInches = Int((Double(height) / 2.54).rounded())
-        return "\(totalInches / 12)′ \(totalInches % 12)″"
-    }
-    var weightDisplay: String {
-        imperial ? "\(Int((weight * 2.20462).rounded())) lb" : String(format: "%.1f kg", weight)
-    }
-    var waistDisplay: String {
-        guard waist > 0 else { return "Not set" }
-        return imperial ? "\(Int((Double(waist) / 2.54).rounded()))″" : "\(waist) cm"
-    }
-    var activeStrapName: String { activeDevice == "w4" ? spareName : "WHOOP 5.0 / MG" }
-    var activeStrapBattery: Int { activeDevice == "w4" ? 61 : 52 }
 
     var monthName: String {
         let names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
@@ -1275,31 +1257,6 @@ private extension NoopAct5Screens {
         }
     }
 
-    /// The profile's own five zones, named by number. The design's "use" lines describe its own
-    /// bands, which do not line up with these, so none is printed.
-    var liveZones: [NoopA5Zone] {
-        let set = profile.hrZoneSet
-        return Self.zones.enumerated().compactMap { index, template in
-            guard set.zones.indices.contains(index) else { return nil }
-            let z = set.zones[index]
-            let lo = Int(z.lower.rounded()), hi = Int(z.upper.rounded())
-            // An age formula over an unconfirmed example age is not the wearer's zone.
-            let trusted = NoopZoneSource.current(profile).trusted
-            return NoopA5Zone(name: NoopZoneSource.name(index + 1), range: trusted ? "\(lo)\u{2013}\(hi)" : "\u{2014}",
-                              percent: "\(Int((z.lowerPct * 100).rounded()))\u{2013}\(Int((z.upper / set.maxHR * 100).rounded()))% of your maximum",
-                              lower: trusted ? "\(lo) bpm" : "\u{2014}", progress: z.lowerPct, color: template.color,
-                              // The "use" lines describe the design's bands, not the app's zones.
-                              use: "")
-        }
-    }
-
-    /// Mean resting heart rate over the last fourteen recorded nights.
-    var liveRestingAnchor: Int? {
-        let values = model.repo.days.suffix(14).compactMap(\.restingHr)
-        guard !values.isEmpty else { return nil }
-        return Int((Double(values.reduce(0, +)) / Double(values.count)).rounded())
-    }
-
     static let zones: [NoopA5Zone] = [
         .init(name: "Resting", range: "40–62", percent: "22–33% of your maximum", lower: "40 bpm", progress: 0.22, color: Color(hex: 0x3E6C86), use: "Sitting, sleeping, standing in a queue. Nothing to train here — it is the floor the other four are measured from."),
         .init(name: "Easy", range: "62–96", percent: "33–52% of your maximum", lower: "62 bpm", progress: 0.33, color: Color(hex: 0x4FB8E8), use: "Walking, gentle riding, most of a long day. The zone that built almost all of your capacity this year."),
@@ -2079,31 +2036,6 @@ private extension NoopAct5Screens {
         let state: Int
     }
 
-    var appleKinds: [AppleKind] {
-        [
-            AppleKind(title: "Sleep", value: "221 nights", copy: "Written after each night is sorted. Last at 07:14 today.", state: 1),
-            AppleKind(title: "Workouts", value: "148 sessions", copy: "Written when a session ends. Last yesterday, 18:22.", state: 1),
-            AppleKind(title: "Heart rate", value: "62,410 samples", copy: "Every sample the strap took, at the strap’s own rate.", state: 1),
-            AppleKind(title: "Resting heart rate", value: "221 days", copy: "One figure a day, from the night rather than from the morning.", state: 1),
-            healthAccessFixed
-                ? AppleKind(title: "Heart rate variability", value: "221 nights", copy: "Allowed. Written with the night it belongs to.", state: 1)
-                : AppleKind(title: "Heart rate variability", value: "refused", copy: "iOS is refusing this one, so 221 nights of variability have never reached Health. Nothing is lost in Noop — it is only missing on the other side.", state: -1),
-            AppleKind(title: "Respiratory rate", value: "219 nights", copy: "Two nights had too little clean signal to write anything.", state: 1),
-            AppleKind(title: "Body temperature", value: "not asked", copy: "Noop asks for a kind the first time it has something to write. It has not needed this one yet.", state: 0)
-        ]
-    }
-
-    var appleStepBars: [CGFloat] { [8.4, 11.2, 6.1, 9.8, 12.4, 7.2, 10.1, 5.4, 11.9, 9.2, 13.1, 8.8, 10.6, 11.4] }
-
-    var appleUnused: [(String, String, String)] {
-        [
-            ("VO₂ max", "48.2", "from your watch — Noop works its own out from your sessions and shows that one instead"),
-            ("Weight", "74.2 kg", "from a scale app. Your record holds 74.0, and Your record is what Noop uses."),
-            ("Body fat", "17.4%", "nothing in Noop reads this yet"),
-            ("Lean mass", "61.3 kg", "nothing in Noop reads this yet")
-        ]
-    }
-
     func appleKindRow(_ item: AppleKind, openHealth: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 11) {
             Circle()
@@ -2266,15 +2198,6 @@ private extension NoopAct5Screens {
         let zones = profile.hrZoneSet.zones
         let index = min(max(behavior.hrCeilingAllowedZone, 1), 4)
         return zones.indices.contains(index) ? Int(zones[index].lower.rounded()) : nil
-    }
-
-    var resolvedCeilingBPM: Int {
-        guard ceilingMode == "Profile zone" else { return ceilingBPM }
-        switch ceilingZone {
-        case "Zone 3": return 148
-        case "Zone 5": return 176
-        default: return 162
-        }
     }
 
     func automationGroup<Content: View>(_ title: String, note: String, @ViewBuilder content: () -> Content) -> some View {
