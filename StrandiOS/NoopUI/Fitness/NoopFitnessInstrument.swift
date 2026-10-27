@@ -543,6 +543,7 @@ struct NoopStickyChartSelection: ViewModifier {
             .chartXSelection(value: $live)
             .onChange(of: live) { if let live { selection = live } }
             .sensoryFeedback(.selection, trigger: selection)
+            .noopChartZoom()
     }
 }
 

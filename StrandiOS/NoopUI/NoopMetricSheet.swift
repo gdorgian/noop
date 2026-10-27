@@ -897,6 +897,7 @@ struct NoopMetricChart: View {
             }
         }
         .sensoryFeedback(.selection, trigger: picked)
+        .noopChartZoom()
     }
 }
 #endif

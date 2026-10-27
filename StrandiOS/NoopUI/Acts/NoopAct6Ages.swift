@@ -913,7 +913,9 @@ private struct NoopBodyAgeHistoryChart: View {
     let values: [Double]
     var recorded: DatedChartSeries? = nil
     var bandYears: Double = 5
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         let series = recorded ?? .fixture(NoopContentPolicy.allowsPrototypeContent ? values : [])
         NoopHistoryPlot(presentation: .init(series: series, showVariability: false, estimateHalfWidth: bandYears), tint: NoopHTMLColor.green)
             .frame(height: 104)
@@ -1176,7 +1178,9 @@ private struct NoopDriverScale: View {
 private struct NoopAgeDriverTrendChart: View {
     let item: NoopAgeDriver
     var recorded: DatedChartSeries? = nil
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         let series = recorded ?? .fixture(NoopContentPolicy.allowsPrototypeContent ? item.trend : [])
         NoopHistoryPlot(presentation: .init(series: series, showVariability: false), tint: item.color)
             .frame(height: 84)

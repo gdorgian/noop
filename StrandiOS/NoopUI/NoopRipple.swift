@@ -44,7 +44,7 @@ struct NoopSurfaceWave: Equatable {
 /// ripples spreading and thinning, a removal is a small pop, an addition settles in.
 @MainActor
 enum NoopHaptics {
-    enum Kind { case enterEdit, lift, pass, land, save, remove, add, cancel, edge, tick }
+    enum Kind { case enterEdit, lift, pass, land, save, remove, add, cancel, edge, tick, grab, settle }
 
     private static var engine: CHHapticEngine?
     private static var players: [Kind: CHHapticPatternPlayer] = [:]
@@ -117,6 +117,13 @@ enum NoopHaptics {
             return try CHHapticPattern(events: [tap(0, 0.5, 0.9)], parameters: [])
         case .tick:
             return try CHHapticPattern(events: [tap(0, 0.38, 0.8)], parameters: [])
+        case .grab:
+            // A chart taking hold under the finger: a soft swell that firms into a catch.
+            return try CHHapticPattern(events: [hum(0, 0.06, 0.35, 0.3), tap(0.06, 0.55, 0.6)],
+                                       parameterCurves: [curve(.hapticIntensityControl, at: 0, [(0, 0.3), (0.06, 1)])])
+        case .settle:
+            // A zoomed chart easing home: one low, rounded knock.
+            return try CHHapticPattern(events: [tap(0, 0.5, 0.25), tap(0.07, 0.18, 0.3)], parameters: [])
         case .edge:
             // The page starting to carry along: a soft, low push.
             return try CHHapticPattern(events: [hum(0, 0.14, 0.45, 0.1)],

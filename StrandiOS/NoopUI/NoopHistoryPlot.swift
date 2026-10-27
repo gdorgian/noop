@@ -40,7 +40,9 @@ struct NoopHistoryPlot: View {
         guard let date else { return }
         if let onSelect { onSelect(date) } else { localSelection = date }
     }
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         GeometryReader { geometry in
             Canvas { context, size in
                 let plot = plotRect(size)

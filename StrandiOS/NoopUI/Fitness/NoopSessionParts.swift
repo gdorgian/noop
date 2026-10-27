@@ -305,6 +305,7 @@ struct NoopSessionHeart: View {
                     }
                 }
                 .frame(height: 190)
+                .noopChartZoom()
             }
         }
     }

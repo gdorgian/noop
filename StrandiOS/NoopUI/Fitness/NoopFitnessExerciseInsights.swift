@@ -212,6 +212,7 @@ struct NoopTrendChartCard: View {
             }
         }
         .sensoryFeedback(.selection, trigger: selected?.id)
+        .noopChartZoom()
         .frame(height: 170)
     }
 }

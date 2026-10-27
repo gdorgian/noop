@@ -229,7 +229,9 @@ struct NoopFitnessBarRow: View {
 struct NoopFitnessLoadHistoryChart: View {
     let series: [(date: Date, reading: AcuteChronicLoad.Reading)]
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         GeometryReader { geo in
             let top = max(series.map { max($0.reading.acute, $0.reading.optimal.upperBound) }.max() ?? 1, 0.0001) * 1.1
             let n = max(1, series.count - 1)
@@ -269,7 +271,9 @@ struct NoopFitnessWeeklySetBars: View {
     let weeks: [Double]
     let range: ClosedRange<Double>
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         let ceiling = max(range.upperBound + 4, weeks.max() ?? 0)
         let h: CGFloat = 32
         ZStack(alignment: .bottom) {

@@ -2245,7 +2245,9 @@ private struct Act1Hypnogram: View {
 private struct Act1TemperatureChart: View {
     private let values = [0.0, -1, -2, -1, 0, 1, 0, 2, 6, 10, 12, 9, 5, 2, 1]
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         Canvas { context, size in
             let sx = size.width / 280
             let sy = size.height / 46
@@ -2275,7 +2277,9 @@ private struct Act1DebtChart: View {
     let value: String
     let onSelect: (Int) -> Void
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         GeometryReader { proxy in
             let size = proxy.size
             let maxValue = Double(max(1, values.max() ?? 1)) * 1.18

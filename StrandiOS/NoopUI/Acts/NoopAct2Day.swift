@@ -3537,7 +3537,9 @@ private struct Act2FixedHeartChart: View {
     /// The point under the finger while the chart is dragged; nil draws no cursor.
     var selected: Int? = nil
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         Canvas { context, size in
             guard values.count > 1 else { return }
             // The design's 50–104 bpm frame, widened only when the day leaves it, so a workout's peak or a
@@ -3614,7 +3616,9 @@ private struct Act2ScrubbableDayChart: View {
     var pan: ((CGFloat, Bool) -> Void)? = nil
     @GestureState private var holding = false
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         GeometryReader { proxy in
             if let pan {
                 Act2FixedHeartChart(values: values, kind: .scrub(selected), resting: resting)

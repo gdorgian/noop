@@ -1888,7 +1888,9 @@ private struct Act3PulseChart: View {
     let low: Int
     let high: Int
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         Canvas { context, size in
             guard values.count > 1 else { return }
             let scale = min(size.width / 300, size.height / 104)

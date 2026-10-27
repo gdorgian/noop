@@ -1566,7 +1566,9 @@ private struct NoopA4Axis: View {
 
 private struct NoopA4CapacityChart: View {
     let chart: DatedChartSeries
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         NoopHistoryPlot(presentation: .init(series: chart, showVariability: false), tint: NoopA4.greenLight,
                         valueLabel: { $0.formatted(.number.precision(.fractionLength(1))) })
     }
@@ -1575,7 +1577,9 @@ private struct NoopA4CapacityChart: View {
 private struct NoopA4SleepChart: View {
     let chart: DatedChartSeries
     let need: Double
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         NoopHistoryPlot(presentation: .init(series: chart, showVariability: false, references: [need]), tint: NoopA4.lavender,
                         referenceValue: need, valueLabel: { $0.formatted(.number.precision(.fractionLength(1))) })
     }

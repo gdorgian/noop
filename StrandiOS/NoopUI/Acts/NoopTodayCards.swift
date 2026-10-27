@@ -308,6 +308,7 @@ struct NoopTodayDayRibbon: View {
             }
         }
         .sensoryFeedback(.selection, trigger: selectedPoint?.time)
+        .noopChartZoom()
         .accessibilityLabel("Heart rate from \(AppClock.hourMinuteFormatter().string(from: start)) to now")
     }
 

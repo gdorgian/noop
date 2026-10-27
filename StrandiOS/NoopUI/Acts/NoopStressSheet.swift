@@ -318,6 +318,13 @@ struct NoopStressSheet: View {
                             }
                             .chartYScale(domain: 0...3)
                             .chartXAxis(.hidden).chartYAxis(.hidden)
+                            .noopChart(x: Int.self, snap: Array(m.sparkValues.indices)) { i in
+                                m.sparkValues.indices.contains(i)
+                                    ? NoopChartReadout(value: NoopStressPalette.name(m.sparkValues[i]),
+                                                       detail: i == m.sparkValues.count - 1 ? "Last night"
+                                                           : "\(m.sparkValues.count - 1 - i) nights ago")
+                                    : nil
+                            }
                             .frame(height: 46)
                             Text("Last \(m.sparkValues.count) nights").font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                         }
@@ -454,6 +461,7 @@ struct NoopStressSheet: View {
             }
         }
         .sensoryFeedback(.selection, trigger: selectedPoint?.time)
+        .noopChartZoom()
     }
 
     /// A gradient pinned to the 0–3 scale rather than to the segment's own height. Swift Charts

@@ -1891,7 +1891,9 @@ private struct NoopInstrumentCompareSlotButton: View {
 private struct NoopInstrumentComparisonChart: View {
     let model: NoopInstrumentComparisonModel
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         Canvas { context, size in
             let xOffset = max(0, (size.width - 300) / 2)
             func point(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x + xOffset, y: p.y) }

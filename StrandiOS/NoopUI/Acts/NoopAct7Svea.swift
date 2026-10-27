@@ -2325,7 +2325,9 @@ private struct NoopSveaFlowRow: View {
 private struct NoopSveaHRVChart: View {
     private let values = [59, 61, 58, 63, 65, 66, 68]
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         HStack(alignment: .bottom, spacing: 5) {
             ForEach(Array(values.enumerated()), id: \.offset) { index, value in
                 let last = index == values.count - 1

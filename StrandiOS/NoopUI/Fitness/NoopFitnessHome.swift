@@ -1124,7 +1124,9 @@ struct NoopFitnessCumulativeChart: View {
     let series: PeriodTotals.Series
     let tint: Color
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         GeometryReader { geo in
             let top = max(series.total, series.previousTotal, 0.0001)
             ZStack {
@@ -1156,7 +1158,9 @@ struct NoopFitnessLineChart: View {
     let values: [Double]
     let tint: Color
 
-    var body: some View {
+    var body: some View { chartBody.noopChartZoom() }
+
+    @ViewBuilder private var chartBody: some View {
         GeometryReader { geo in
             let lo = values.min() ?? 0, hi = values.max() ?? 1
             let span = max(hi - lo, 0.0001)

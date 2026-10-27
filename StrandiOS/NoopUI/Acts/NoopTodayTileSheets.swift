@@ -239,6 +239,13 @@ struct NoopTodayTileSheet: View {
                 }
                 .chartXAxis(.hidden)
                 .chartYAxis(.hidden)
+                // Bars sit at midday, so the rule snaps to their middles.
+                .noopChart(x: Date.self, snap: days.map { $0.day.addingTimeInterval(43_200) }) { x in
+                    days.first { Calendar.current.isDate($0.day, inSameDayAs: x) }.map {
+                        NoopChartReadout(value: "\($0.steps.formatted()) steps",
+                                         detail: $0.day.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
+                    }
+                }
                 .frame(height: 110)
                 Self.axisLabels("\(days.count) days ago", "Today").padding(.top, 6)
             } else {
@@ -838,6 +845,12 @@ private struct NoopChartScrub: ViewModifier {
     @Binding var picked: Date?
 
     func body(content: Content) -> some View {
-        if enabled { content.chartXSelection(value: $picked) } else { content }
+        if enabled {
+            content.chartXSelection(value: $picked)
+                .sensoryFeedback(.selection, trigger: picked)
+                .noopChartZoom()
+        } else {
+            content
+        }
     }
 }
