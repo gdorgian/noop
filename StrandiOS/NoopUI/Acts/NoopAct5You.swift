@@ -587,17 +587,8 @@ private extension NoopAct5Screens {
                 // You is the person (23 Oct 2026); everything about the app sits in Settings, a plain
                 // section at the foot of the page (27 Oct 2026), outside the editable layout so it can
                 // never be hidden.
-                NoopEditableSections(layout: youLayout, editing: $youEditing, spacing: 0) { id in youSection(id) }
-                VStack(alignment: .leading, spacing: 9) {
-                    youSectionLabel("Noop Aura")
-                    dividedCard {
-                        copyRow("Settings", detail: "your strap, notifications, Health and more", symbol: "gearshape", tint: Self.blush) {
-                            navigation.settingsQuery = ""
-                            navigation.push(.settings)
-                        }
-                    }
-                }
-                .padding(.top, 17)
+                NoopEditableSections(layout: youLayout, editing: $youEditing, spacing: 0,
+                                     trailing: AnyView(settingsSection)) { id in youSection(id) }
             }
             .background(alignment: .top) {
                 NoopPageBackdrop(theme: .you)
@@ -606,6 +597,19 @@ private extension NoopAct5Screens {
             }
         }
         .noopEditBar($youEditing, layout: youLayout) { navigation.push(.settingsYou) }
+    }
+
+    var settingsSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            youSectionLabel("Noop Aura")
+            dividedCard {
+                copyRow("Settings", detail: "your strap, notifications, Health and more", symbol: "gearshape", tint: Self.blush) {
+                    navigation.settingsQuery = ""
+                    navigation.push(.settings)
+                }
+            }
+        }
+        .padding(.top, 17)
     }
 
     /// You's sections in their default order; each carries the space above it.

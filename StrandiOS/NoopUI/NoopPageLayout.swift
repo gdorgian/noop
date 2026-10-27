@@ -206,6 +206,9 @@ struct NoopEditableSections<Section: View>: View {
     /// Whether a section has nothing to show right now; it is skipped, or drawn as a placeholder
     /// while editing so it can still be moved or removed.
     var isEmpty: (String) -> Bool = { _ in false }
+    /// Fixed content after the last section and before Edit page: part of the page, never part of
+    /// its arrangement (You's Settings, 27 Oct 2026). Hidden while editing.
+    var trailing: AnyView? = nil
     @ViewBuilder let section: (String) -> Section
 
     /// The section being carried, where its middle was when it was picked up, and how far the
@@ -306,6 +309,7 @@ struct NoopEditableSections<Section: View>: View {
                 .zIndex(dragging == id ? 1 : 0)
                 .transition(.scale(scale: 0.92).combined(with: .opacity))
             }
+            if let trailing, !editing.active { trailing }
             foot.padding(.top, 14)
         }
         // Room for Cancel and Save, so the first section's remove disc never sits under them.
