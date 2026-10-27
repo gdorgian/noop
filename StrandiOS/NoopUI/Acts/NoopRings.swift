@@ -47,6 +47,12 @@ enum NoopRingStyle { case living, segmented, donuts, dials, gyro }
 /// Strain as the wearer chose to read it: the stored 0–100 value on the app's 0–100 or WHOOP's 0–21
 /// scale (You › Units), one decimal.
 func noopStrainText(_ v: Double) -> String { UnitFormatter.effortDisplay(v, scale: noopEffortScale) }
+/// A stored 0–100 effort on the chosen scale for a compact read-out: whole numbers out of 100, one
+/// decimal out of 21 (where a whole step is too coarse).
+func noopStrainShort(_ v: Double) -> String {
+    let shown = UnitFormatter.effortValue(v, scale: noopEffortScale)
+    return noopEffortScale == .whoop ? String(format: "%.1f", shown) : "\(Int(shown.rounded()))"
+}
 
 var noopEffortScale: EffortScale {
     EffortScale(rawValue: UserDefaults.standard.string(forKey: UnitPrefs.effortScaleKey) ?? "") ?? .hundred

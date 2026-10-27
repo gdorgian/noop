@@ -170,13 +170,13 @@ struct NoopTodayTileSheet: View {
             guard let strain else { return "Effort builds from your heart rate as the day goes." }
             guard let target else { return "Today's effort so far." }
             let s = strain / 100
-            if s < target.lowerBound { return "Below today's target. \(Int(((target.lowerBound - s) * 100).rounded())) to go." }
+            if s < target.lowerBound { return "Below today's target. \(noopStrainShort((target.lowerBound - s) * 100)) to go." }
             if s > target.upperBound { return "Past today's target. Recovery will ask for more tonight." }
             return "Inside today's target. A good place to stop or to hold."
         }()
         return NoopTileSheetFrame(
-            tile: tile, figure: strain.map { "\(Int($0.rounded()))" } ?? "—", caption: caption,
-            facts: [("Target", target.map { "\(Int(($0.lowerBound * 100).rounded()))–\(Int(($0.upperBound * 100).rounded()))" } ?? "—"),
+            tile: tile, figure: strain.map { noopStrainShort($0) } ?? "—", caption: caption,
+            facts: [("Target", target.map { "\(noopStrainShort($0.lowerBound * 100))–\(noopStrainShort($0.upperBound * 100))" } ?? "—"),
                     ("Recovery", rings.recovery.map { "\(Int($0.rounded()))%" } ?? "—"),
                     ("Sessions", "\(sessions)")],
             openTitle: "Open effort", open: { navigation.push(.strain) }

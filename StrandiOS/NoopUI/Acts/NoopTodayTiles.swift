@@ -152,12 +152,12 @@ struct NoopTodayTileView: View {
         let rings = seeded ? NoopAct2Screens.demoRings : (day?.rings ?? NoopRingValues())
         guard let strain = rings.strain else { return Face(title: "—", subtitle: "Effort today") }
         guard let target = rings.strainTarget else {
-            return Face(title: "\(Int(strain.rounded()))", subtitle: "Effort today", accessory: .progress(strain / 100))
+            return Face(title: noopStrainShort(strain), subtitle: "Effort today", accessory: .progress(strain / 100))
         }
-        let low = Int((target.lowerBound * 100).rounded()), high = Int((target.upperBound * 100).rounded())
+        let low = noopStrainShort(target.lowerBound * 100), high = noopStrainShort(target.upperBound * 100)
         let line = strain >= target.lowerBound * 100 && strain <= target.upperBound * 100 ? "On target"
             : strain < target.lowerBound * 100 ? "Target \(low)–\(high)" : "Past target"
-        return Face(title: "\(Int(strain.rounded()))", subtitle: line, accessory: .target(strain / 100, target))
+        return Face(title: noopStrainShort(strain), subtitle: line, accessory: .target(strain / 100, target))
     }
 
     private var stepsFace: Face {
