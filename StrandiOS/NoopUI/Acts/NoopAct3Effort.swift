@@ -133,21 +133,6 @@ private extension View {
     }
 }
 
-private func heartbeatValue(_ phase: Double, points: [(Double, CGFloat)]) -> CGFloat {
-    guard let first = points.first else { return 1 }
-    if phase <= first.0 { return first.1 }
-    for index in 1..<points.count {
-        let previous = points[index - 1]
-        let next = points[index]
-        if phase <= next.0 {
-            let span = max(0.0001, next.0 - previous.0)
-            let amount = CGFloat((phase - previous.0) / span)
-            return previous.1 + (next.1 - previous.1) * amount
-        }
-    }
-    return points.last?.1 ?? first.1
-}
-
 // MARK: - Live faces
 
 // MARK: - Act 3 models
@@ -267,10 +252,6 @@ private extension NoopAct3Screens {
     /// The template's band in beats per minute from the wearer's zones; nil without a single zone or
     /// before the zones are the wearer's own.
     func band(_ workout: NoopWorkout) -> (low: Int, high: Int)? { workout.band(profile: profile) }
-
-    func bandText(_ workout: NoopWorkout) -> String {
-        band(workout).map { "\($0.low)\u{2013}\($0.high)" } ?? "\u{2014}"
-    }
 
     /// The app's own five zones, by number: the design's band names do not line up with them.
     static let zoneNames = (1...5).map(NoopZoneSource.name)
