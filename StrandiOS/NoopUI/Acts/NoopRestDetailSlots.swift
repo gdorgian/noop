@@ -22,6 +22,42 @@ private enum NoopNightStage {
 
 private func noopClock(_ date: Date) -> String { AppClock.hourMinuteFormatter().string(from: date) }
 
+/// The sections' one motion vocabulary. A finger moves things on springs with no bounce, since nothing here is
+/// flicked; what the page shows by itself arrives on a strong ease-out, and leaves faster than it came.
+private enum NoopNightMotion {
+    /// Something the finger chose: a tab, a tile, a stage.
+    static let snap = Animation.spring(response: 0.32, dampingFraction: 1)
+    /// Something the finger is dragging along: the scrub moving between stages.
+    static let follow = Animation.interactiveSpring(response: 0.2, dampingFraction: 1)
+    /// A reveal the page plays on its own.
+    static func reveal(_ duration: Double = 0.55, delay: Double = 0) -> Animation {
+        .timingCurve(0.23, 1, 0.32, 1, duration: duration).delay(delay)
+    }
+    static let exit = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.16)
+}
+
+/// Press feedback on touch-down: the card gives a little under the finger, and comes back on a spring.
+private struct NoopNightPress: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(Rectangle())
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(configuration.isPressed ? .timingCurve(0.23, 1, 0.32, 1, duration: 0.12) : NoopNightMotion.snap,
+                       value: configuration.isPressed)
+    }
+}
+
+/// Press feedback for a full-width row: a highlight, not a squeeze.
+private struct NoopNightRowPress: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(Rectangle())
+            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.white.opacity(configuration.isPressed ? 0.05 : 0)))
+            .animation(configuration.isPressed ? nil : .easeOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
 /// The night's edges: lying down to getting up when the bed is known, else the recorded span.
 private func noopNightEdges(_ night: NoopRestRecord.Night) -> (start: Date, end: Date)? {
     if let bed = night.bed { return (bed.inBed, bed.outOfBed) }
@@ -210,17 +246,19 @@ struct NoopSleepPeriodSection: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(14)
-                        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .padding([.horizontal, .bottom], 12)
                         .id(read.id)
-                        .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: -6)), removal: .opacity))
+                        .transition(reduceMotion ? .opacity : .asymmetric(
+                            insertion: .opacity.combined(with: .offset(y: -6)).animation(NoopNightMotion.reveal(0.28)),
+                            removal: .opacity.animation(NoopNightMotion.exit)))
                     }
                 }
             }
         }
         .onAppear {
             guard !shown else { return }
-            if reduceMotion { shown = true } else { withAnimation(.spring(response: 0.9, dampingFraction: 0.85).delay(0.1)) { shown = true } }
+            if reduceMotion { shown = true } else { withAnimation(NoopNightMotion.reveal(0.6, delay: 0.08)) { shown = true } }
         }
         .task(id: night.dayKey) { await loadDip() }
     }
@@ -232,6 +270,7 @@ struct NoopSleepPeriodSection: View {
                 .foregroundStyle(NoopHTMLColor.faint)
             NoopCountUp(value: minutes, format: { NoopRestRecord.duration($0) },
                         font: NoopHTMLFont.outfit(NoopType.title2, weight: .medium))
+                .tracking(-0.6)
                 .foregroundStyle(NoopHTMLColor.ink)
         }
         .frame(maxWidth: .infinity)
@@ -242,7 +281,7 @@ struct NoopSleepPeriodSection: View {
         let on = picked == read.id
         return Button {
             NoopHaptics.play(.tick)
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) { picked = on ? nil : read.id }
+            withAnimation(reduceMotion ? nil : NoopNightMotion.snap) { picked = on ? nil : read.id }
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: read.glyph)
@@ -264,7 +303,7 @@ struct NoopSleepPeriodSection: View {
             .padding(.vertical, 18)
             .contentShape(Rectangle())
         }
-        .buttonStyle(NoopHTMLPressStyle())
+        .buttonStyle(NoopNightPress())
         .accessibilityElement(children: .combine)
         .accessibilityValue(read.figure)
     }
@@ -276,7 +315,7 @@ struct NoopSleepPeriodSection: View {
                 if let rating = read.rating {
                     Capsule().fill(rating.fill)
                         .frame(width: proxy.size.width * (shown ? min(1, max(0.06, read.fill)) : 0))
-                        .animation(reduceMotion ? nil : .spring(response: 0.9, dampingFraction: 0.82).delay(0.12 + Double(index) * 0.06), value: shown)
+                        .animation(reduceMotion ? nil : NoopNightMotion.reveal(0.7, delay: 0.1 + Double(index) * 0.04), value: shown)
                 }
             }
         }
@@ -331,7 +370,7 @@ struct NoopSleepStagesSection: View {
                 }
                 HStack(spacing: 8) {
                     if typical != nil {
-                        Image(systemName: "line.diagonal").rotationEffect(.degrees(45)).font(.system(size: 11, weight: .bold))
+                        Capsule().fill(Color.white.opacity(0.34)).frame(width: 14, height: 2.5)
                         Text("Your usual range")
                     }
                     Spacer()
@@ -348,7 +387,7 @@ struct NoopSleepStagesSection: View {
         }
         .onAppear {
             guard !shown else { return }
-            if reduceMotion { shown = true } else { withAnimation(.spring(response: 1.1, dampingFraction: 0.88).delay(0.15)) { shown = true } }
+            if reduceMotion { shown = true } else { withAnimation(NoopNightMotion.reveal(0.8, delay: 0.1)) { shown = true } }
         }
         .onChange(of: night.dayKey) { _, _ in focus = nil; scrubRun = nil }
     }
@@ -361,7 +400,7 @@ struct NoopSleepStagesSection: View {
         .font(NoopHTMLFont.sans(NoopType.caption, weight: .medium))
         .foregroundStyle(NoopHTMLColor.inkSoft)
         .padding(.horizontal, 9).padding(.vertical, 5)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     // MARK: Hypnogram
@@ -405,12 +444,13 @@ struct NoopSleepStagesSection: View {
                     .offset(y: -34)
                     .contentTransition(.numericText())
                     .allowsHitTesting(false)
-                    .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .bottom)))
+                    .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.94, anchor: .bottom)),
+                                            removal: .opacity.animation(NoopNightMotion.exit)))
                 }
             }
         }
         .frame(height: 180)
-        .animation(reduceMotion ? nil : .interactiveSpring(response: 0.22, dampingFraction: 0.86), value: scrubRun)
+        .animation(reduceMotion ? nil : NoopNightMotion.follow, value: scrubRun)
         .accessibilityElement()
         .accessibilityLabel("Sleep stages from \(noopClock(span.lowerBound)) to \(noopClock(span.upperBound))")
     }
@@ -447,10 +487,25 @@ struct NoopSleepStagesSection: View {
             let x0 = size.width * run.from, x1 = max(x0 + 1.5, size.width * run.to)
             let rect = CGRect(x: x0, y: mid(run.stage) - thick / 2, width: x1 - x0, height: thick)
             let color = NoopNightStage.color[run.stage]
+            let bar = Path(roundedRect: rect, cornerRadius: min(4, (x1 - x0) / 2), style: .continuous)
             context.opacity = alpha(i, run.stage)
-            context.fill(Path(roundedRect: rect, cornerRadius: min(4, (x1 - x0) / 2)), with: .linearGradient(
+            if scrubRun == i {
+                // The stage under the finger glows, so the eye finds it before the label.
+                context.drawLayer { layer in
+                    layer.addFilter(.shadow(color: color.opacity(0.75), radius: 9))
+                    layer.fill(bar, with: .color(color))
+                }
+            }
+            context.fill(bar, with: .linearGradient(
                 Gradient(colors: [color, color.opacity(0.72)]),
                 startPoint: CGPoint(x: x0, y: rect.minY), endPoint: CGPoint(x: x0, y: rect.maxY)))
+            // A hairline of light along the top edge: lit objects, not flat fills.
+            if rect.width > 8 {
+                var edge = Path()
+                edge.move(to: CGPoint(x: rect.minX + 3, y: rect.minY + 0.75))
+                edge.addLine(to: CGPoint(x: rect.maxX - 3, y: rect.minY + 0.75))
+                context.stroke(edge, with: .color(.white.opacity(0.24)), lineWidth: 1)
+            }
             context.opacity = 1
         }
     }
@@ -471,7 +526,7 @@ struct NoopSleepStagesSection: View {
             }
             .onEnded { _ in
                 scrubbing = false
-                withAnimation(.easeOut(duration: 0.22)) { scrubRun = nil }
+                withAnimation(NoopNightMotion.exit) { scrubRun = nil }
             }
     }
 
@@ -500,7 +555,7 @@ struct NoopSleepStagesSection: View {
         let range = typical?[stage]
         return Button {
             NoopHaptics.play(.tick)
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { focus = on ? nil : stage }
+            withAnimation(reduceMotion ? nil : NoopNightMotion.snap) { focus = on ? nil : stage }
         } label: {
             HStack(alignment: .center, spacing: 6) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -518,16 +573,13 @@ struct NoopSleepStagesSection: View {
                 }
                 Spacer(minLength: 0)
                 ZStack {
-                    Circle().stroke(Color.white.opacity(0.07), lineWidth: 5)
+                    Circle().stroke(Color.white.opacity(0.06), lineWidth: 5)
                     if let range {
-                        Circle().trim(from: range.lowerBound, to: range.upperBound)
-                            .stroke(Color.white.opacity(0.16), style: StrokeStyle(lineWidth: 5))
+                        // The usual share: a thin arc just outside the ring, so in-range reads at a glance.
+                        Circle().inset(by: -6).trim(from: range.lowerBound, to: range.upperBound)
+                            .stroke(Color.white.opacity(0.34), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                             .rotationEffect(.degrees(-90))
-                        ForEach([range.lowerBound, range.upperBound], id: \.self) { edge in
-                            Capsule().fill(Color.white.opacity(0.85)).frame(width: 2, height: 9)
-                                .offset(y: -22)
-                                .rotationEffect(.degrees(edge * 360))
-                        }
+                            .opacity(shown ? 1 : 0)
                     }
                     Circle().trim(from: 0, to: shown ? max(0.008, share) : 0)
                         .stroke(LinearGradient(colors: [color.opacity(0.7), color], startPoint: .top, endPoint: .bottom),
@@ -536,14 +588,15 @@ struct NoopSleepStagesSection: View {
                         .shadow(color: color.opacity(on ? 0.6 : 0), radius: 6)
                 }
                 .frame(width: 44, height: 44)
+                .animation(reduceMotion ? nil : NoopNightMotion.reveal(0.9, delay: 0.15 + Double(NoopNightStage.lane[stage]) * 0.05), value: shown)
             }
             .padding(12)
             .background(on ? color.opacity(0.1) : Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(on ? color.opacity(0.45) : Color.white.opacity(0.05), lineWidth: on ? 1 : 0.5))
-            .opacity(focus == nil || on ? 1 : 0.55)
+            .opacity(focus == nil || on ? 1 : 0.5)
         }
-        .buttonStyle(NoopHTMLPressStyle())
+        .buttonStyle(NoopNightPress())
         .accessibilityLabel("\(NoopNightStage.name[stage]), \(NoopRestRecord.duration(minutes)), \(Int((share * 100).rounded())) percent")
     }
 }
@@ -582,6 +635,7 @@ struct NoopFallAsleepSection: View {
                     NoopCountUp(value: m.rounded(), format: { v in
                         let n = Int(v.rounded()); return n == 1 ? "1 minute" : "\(n) minutes"
                     }, font: NoopHTMLFont.outfit(NoopType.title3, weight: .medium))
+                    .tracking(-0.4)
                     .foregroundStyle(NoopHTMLColor.ink)
                 } else {
                     Text("No reading for this night")
@@ -604,7 +658,7 @@ struct NoopFallAsleepSection: View {
         }
         .onAppear {
             guard !shown else { return }
-            if reduceMotion { shown = true } else { withAnimation(.spring(response: 1.0, dampingFraction: 0.72).delay(0.2)) { shown = true } }
+            if reduceMotion { shown = true } else { withAnimation(NoopNightMotion.reveal(0.9, delay: 0.15)) { shown = true } }
         }
     }
 
@@ -640,7 +694,8 @@ struct NoopFallAsleepSection: View {
     private func label(_ text: String, _ index: Int, _ alignment: Alignment) -> some View {
         Text(text)
             .font(NoopHTMLFont.sans(NoopType.footnote, weight: zone == index ? .semibold : .medium))
-            .foregroundStyle(zone == index ? NoopHTMLColor.ink : NoopHTMLColor.faint)
+            .foregroundStyle(zone == index && shown ? NoopHTMLColor.ink : NoopHTMLColor.faint)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.3).delay(0.5), value: shown)
     }
 
     private var caption: String {
@@ -676,6 +731,7 @@ struct NoopSleepVitalsSection: View {
     @State private var series: [Vital: [(time: Date, value: Double)]] = [:]
     @State private var loaded = false
     @Namespace private var pill
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var points: [(time: Date, value: Double)] { series[vital] ?? [] }
 
@@ -714,7 +770,7 @@ struct NoopSleepVitalsSection: View {
                 tabs
             }
         }
-        .animation(.spring(response: 0.45, dampingFraction: 0.86), value: vital)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : NoopNightMotion.snap, value: vital)
         .task(id: night.dayKey) { await load() }
     }
 
@@ -729,7 +785,7 @@ struct NoopSleepVitalsSection: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 120)
-        .background(Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var headline: some View {
@@ -740,6 +796,7 @@ struct NoopSleepVitalsSection: View {
                 if let avg {
                     NoopCountUp(value: avg, format: { String(format: "%.1f", $0) },
                                 font: NoopHTMLFont.outfit(NoopType.title1, weight: .medium))
+                        .tracking(-0.8)
                         .foregroundStyle(NoopHTMLColor.ink)
                     Text(vital.unit)
                         .font(NoopHTMLFont.outfit(NoopType.title3, weight: .medium))
@@ -754,7 +811,25 @@ struct NoopSleepVitalsSection: View {
                 .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold))
                 .tracking(0.6)
                 .foregroundStyle(NoopHTMLColor.faint)
+            if let line = conclusion {
+                Text(line)
+                    .font(NoopHTMLFont.sans(NoopType.caption, weight: .medium))
+                    .foregroundStyle(NoopHTMLColor.inkSoft)
+                    .monospacedDigit()
+                    .padding(.top, 4)
+                    .contentTransition(.opacity)
+            }
         }
+    }
+
+    /// The night's telling moment, said rather than left to find: the lowest pulse, breathing or oxygen and
+    /// when it came, or the highest HRV.
+    private var conclusion: String? {
+        guard points.count >= 10 else { return nil }
+        let wantsHigh = vital == .hrv
+        guard let p = wantsHigh ? points.max(by: { $0.value < $1.value }) : points.min(by: { $0.value < $1.value }) else { return nil }
+        let value = vital == .spo2 || vital == .resp ? String(format: "%.1f", p.value) : "\(Int(p.value.rounded()))"
+        return "\(wantsHigh ? "Highest" : "Lowest") \(value) \(vital.unit) at \(noopClock(p.time))"
     }
 
     private var chart: some View {
@@ -795,7 +870,8 @@ struct NoopSleepVitalsSection: View {
         .padding(.top, 36)
         .frame(height: 236)
         .id(vital)
-        .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .bottom)))
+        // One measure becomes the next: a blurred cross-fade reads as one change, not two charts overlapping.
+        .transition(reduceMotion ? AnyTransition.opacity : AnyTransition(.blurReplace))
         .opacity(points.isEmpty ? 0.3 : 1)
     }
 
@@ -807,7 +883,7 @@ struct NoopSleepVitalsSection: View {
         .font(NoopHTMLFont.sans(NoopType.caption, weight: .medium))
         .foregroundStyle(NoopHTMLColor.inkSoft)
         .padding(.horizontal, 9).padding(.vertical, 5)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var tabs: some View {
@@ -832,18 +908,18 @@ struct NoopSleepVitalsSection: View {
                     .padding(.vertical, 11)
                     .background {
                         if on {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .fill(v.tint.opacity(0.14))
-                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(v.tint, lineWidth: 1.5))
+                                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(v.tint, lineWidth: 1.5))
                                 .matchedGeometryEffect(id: "pill", in: pill)
                         } else {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .strokeBorder(v.tint.opacity(0.28), lineWidth: 1)
                         }
                     }
                     .opacity(empty ? 0.4 : 1)
                 }
-                .buttonStyle(NoopHTMLPressStyle())
+                .buttonStyle(NoopNightPress())
                 .disabled(empty)
                 .accessibilityLabel(v.title)
                 .accessibilityAddTraits(on ? .isSelected : [])
@@ -905,7 +981,7 @@ struct NoopSleepNeededSection: View {
             .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
         }
-        .buttonStyle(NoopHTMLPressStyle())
+        .buttonStyle(NoopNightRowPress())
         .disabled(rest.needMin <= 0)
         .sheet(isPresented: $showing) {
             NoopSleepNeededSheet(need: need, asleepMin: night.asleepMin).noopSheet([.medium, .large])
@@ -918,6 +994,7 @@ private struct NoopSleepNeededSheet: View {
     let asleepMin: Double
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = false
 
     private var rows: [(String, Double, String)] {
@@ -943,7 +1020,10 @@ private struct NoopSleepNeededSheet: View {
                             .foregroundStyle(NoopHTMLColor.inkSoft)
                             .frame(width: 30, height: 30)
                             .background(Color.white.opacity(0.08), in: Circle())
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(NoopNightPress())
                     .accessibilityLabel("Close")
                 }
 
@@ -958,7 +1038,7 @@ private struct NoopSleepNeededSheet: View {
                         .padding(.vertical, 11)
                         .opacity(shown ? 1 : 0)
                         .offset(y: shown ? 0 : 8)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.85).delay(0.05 + Double(i) * 0.07), value: shown)
+                        .animation(reduceMotion ? nil : NoopNightMotion.reveal(0.4, delay: 0.12 + Double(i) * 0.05), value: shown)
                     }
                     Rectangle().fill(NoopHTMLColor.border).frame(height: 1).padding(.vertical, 6)
                     HStack {
@@ -972,8 +1052,8 @@ private struct NoopSleepNeededSheet: View {
                     .padding(.vertical, 8)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
+                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
 
                 Text(verdict)
                     .font(NoopHTMLFont.sans(NoopType.footnote, weight: .medium))
