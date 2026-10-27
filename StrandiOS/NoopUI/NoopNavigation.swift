@@ -102,7 +102,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     case today, inbox, charge, day, energy, vitals, stress, heart, recovery, strain
     case breathe, bcatalog, bplayer, bsweep, bfound
     // Act 3
-    case session, pick, ready, live, intervals, detail
+    case session, pick, ready, live, intervals
     // Act 4
     case trends, capacity, rhythm, year
     // Act 5
@@ -151,7 +151,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .rest, .tonight, .why, .debt, .alarm: .night
         case .today, .inbox, .charge, .day, .energy, .vitals, .stress, .heart, .recovery, .strain,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound: .day
-        case .session, .pick, .ready, .live, .intervals, .detail: .effort
+        case .session, .pick, .ready, .live, .intervals: .effort
         case .trends, .capacity, .rhythm, .year: .picture
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
              .widgets, .lab, .diagnostics, .automations, .onboard, .pair, .position, .importHistory, .reading,
@@ -193,7 +193,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
             .you
         // Act 10 is deliberately not a sixth tab. A lift is an effort, so it lights the same key
         // Act 3 does. Act 3's sessions moved here from Today on 23 Oct 2026: training has one home.
-        case .session, .pick, .ready, .live, .intervals, .detail,
+        case .session, .pick, .ready, .live, .intervals,
              .liftLive, .liftLibrary, .liftProgram, .liftDetail, .liftEdit, .liftImport,
              .liftReview, .liftMuscles, .fitness, .fitnessDetail, .fitnessMuscles, .fitnessEdit,
              .fitnessRoutine, .fitnessCalendar, .fitnessRoutineEdit, .fitnessBody, .fitnessReport, .fitnessProgram:
@@ -357,25 +357,6 @@ enum NoopOverlay: Identifiable, Equatable {
     }
 }
 
-struct NoopSessionDetailSelection {
-    let workout: NoopWorkout
-    let headerLine: String?
-    let durationLabel: String?
-    let load: Int?
-
-    init(
-        workout: NoopWorkout,
-        headerLine: String? = nil,
-        durationLabel: String? = nil,
-        load: Int? = nil
-    ) {
-        self.workout = workout
-        self.headerLine = headerLine
-        self.durationLabel = durationLabel
-        self.load = load
-    }
-}
-
 @MainActor
 final class NoopNavigation: ObservableObject {
     private static let coachVoiceKey = "noop.html.svea-voice"
@@ -451,13 +432,10 @@ final class NoopNavigation: ObservableObject {
     @Published var sessionPaused = false
     @Published var sessionPausedElapsed = 0
     @Published private(set) var finishedSession: NoopFinishedSessionRecord?
-    /// The exact record selected from Act 3's session/across screens. It must outlive the source
-    /// screen because the shell intentionally recreates child screens on every route change.
-    @Published var detailSession: NoopSessionDetailSelection?
-    /// Change 4. The session a `history` row opened, so `detail` renders that one.
-    @Published var historyWorkout: NoopWorkout?
-    /// Production: the stored session `detail` shows (a row tapped, or the one just saved).
-    @Published var liveDetailRow: WorkoutRow?
+    /// A stored session to open on its own page, by when it started. The shell finds the row and shows it.
+    @Published var openSessionStart: Int?
+
+    func openSession(startTs: Int) { openSessionStart = startTs }
     /// A cardio session just saved: Fitness shows "How hard was that?" and then the session.
     @Published var cardioFinish: WorkoutRow?
     /// The lift just saved, so its page opens with the finish ring once.
@@ -527,7 +505,7 @@ final class NoopNavigation: ObservableObject {
         }
     }
 
-    /// The session ends, the bar goes, and `detail` opens on what was just done.
+    /// The session ends, the bar goes, and Fitness opens, where the session now sits in Today.
     func endSession(_ workout: NoopWorkout, at endedAt: Date = Date()) {
         let measuredSeconds = sessionElapsed(at: endedAt)
         let isDemo = NoopContentPolicy.allowsPrototypeContent
@@ -558,7 +536,6 @@ final class NoopNavigation: ObservableObject {
     /// started from the native workout catalogue with a sport absent from the five HTML templates.
     /// Never write the picker default as that session's name or substitute its example duration.
     func endRecordedSession(workout: NoopWorkout?, row: WorkoutRow?, at endedAt: Date = Date()) {
-        liveDetailRow = row
         if let workout, let row {
             let record = NoopFinishedSessionRecord(
                 day: Self.dayFormatter.string(from: endedAt), workout: workout, endedAt: endedAt,
@@ -586,29 +563,12 @@ final class NoopNavigation: ObservableObject {
     }
 
     private func finishSessionArrival() {
-        detailSession = nil
-        historyWorkout = nil
-        overlay = nil
-        arrival = .coverIn
-        withAnimation(NoopMotion.coverIn) {
-            path = [.detail]
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { [weak self] in
-            guard let self, self.route == .detail else { return }
-            self.arrival = .arrived
-        }
-        // The bar is never animated out. It is removed once `detail` is already over it, so the
-        // user never sees it go and the inset shrinks in covered frames.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            guard let self else { return }
-            self.sessionStartedAt = nil
-            self.sessionPaused = false
-            self.sessionPausedElapsed = 0
-        }
+        sessionStartedAt = nil
+        sessionPaused = false
+        sessionPausedElapsed = 0
+        reset(to: .fitness)
     }
 
-    /// A session-end landing is a cover, not a push. Its back action therefore reveals Today by
-    /// dismissing the landing down the same edge it arrived from.
     /// A lift saved from the Lift Log is today's session too, so Today's card reads it rather than
     /// an earlier ride.
     func recordFinishedLift(sessionID: String, title: String?, durationSeconds: Int, at endedAt: Date = Date()) {
@@ -621,24 +581,6 @@ final class NoopNavigation: ObservableObject {
         finishedSession = record
         if let data = try? JSONEncoder().encode(record) {
             defaults.set(data, forKey: Self.finishedSessionKey)
-        }
-    }
-
-    func dismissFinishedSessionDetail() {
-        if canGoBack {
-            back()
-            return
-        }
-        guard route == .detail, finishedSessionToday != nil else {
-            reset(to: .today)
-            return
-        }
-        arrival = .coverOut
-        withAnimation(NoopMotion.coverOut) {
-            path = [.today]
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.arrival = .arrived
         }
     }
 
@@ -1244,7 +1186,6 @@ extension NoopRoute {
         case .ready: "Ready"
         case .live: "Live session"
         case .intervals: "Intervals"
-        case .detail: "Session detail"
         case .trends: "Trends"
         case .capacity: "Capacity"
         case .rhythm: "Rhythm"

@@ -1654,15 +1654,8 @@ private extension NoopAct5Screens {
                 } else {
                     navigation.push(.why)
                 }
-            } else if let workout = item.workout {
-                navigation.detailSession = NoopSessionDetailSelection(
-                    workout: workout,
-                    headerLine: item.sessionHeaderLine,
-                    durationLabel: item.sessionDurationLabel,
-                    load: item.sessionLoad
-                )
-                navigation.historyWorkout = workout
-                navigation.push(.detail)
+            } else if let start = item.sessionStart {
+                navigation.openSession(startTs: start)
             }
         } label: {
             HStack(spacing: 12) {
@@ -1691,15 +1684,15 @@ private extension NoopAct5Screens {
         .disabled(!item.opensSomething)
     }
 
-    /// The measured list in the prototype's row shapes. Session rows keep no workout identity yet, so
-    /// they carry no chevron until the session record screen is wired.
+    /// The measured list in the prototype's row shapes. A session row opens that session's page.
     var liveHistoryDays: [NoopA5HistoryDay] {
         (history?.days ?? []).map { day in
             NoopA5HistoryDay(day: day.label, summary: "", items: day.entries.map { e in
                 switch e.kind {
                 case .session:
                     NoopA5HistoryItem(kind: .session, name: e.name, detail: e.detail, value: e.value,
-                                      symbol: Self.glyph(forSport: e.sport))
+                                      symbol: Self.glyph(forSport: e.sport),
+                                      sessionStart: Int(e.date.timeIntervalSince1970))
                 case .sleep:
                     NoopA5HistoryItem(kind: .sleep, name: e.name, detail: e.detail, value: e.value, symbol: .bed,
                                       date: e.date)
@@ -1763,11 +1756,7 @@ private extension NoopAct5Screens {
                 name: "Steady ride",
                 detail: "17:04 · 42 min · avg 126 bpm",
                 value: "load 48",
-                symbol: .bike,
-                workout: .steadyRide,
-                sessionHeaderLine: "Today, 17:04 · 42 min · 14.8 km",
-                sessionDurationLabel: "42:10",
-                sessionLoad: 48
+                symbol: .bike
             ),
             .init(kind: .log, name: "Coffee", detail: "07:20", value: "", symbol: .cup),
             .init(kind: .log, name: "Water", detail: "09:40 · 11:15", value: "×2", symbol: .drop),
@@ -1784,11 +1773,7 @@ private extension NoopAct5Screens {
                 name: "6 × 1 min hard",
                 detail: "18:10 · 22 min · max 174 bpm",
                 value: "load 86",
-                symbol: .bolt,
-                workout: .intervals,
-                sessionHeaderLine: "Monday 18 August, 18:10 · 22 min · 7.1 km",
-                sessionDurationLabel: "22:08",
-                sessionLoad: 86
+                symbol: .bolt
             ),
             .init(kind: .sleep, name: "Slept 6h 48m", detail: "23:52 → 06:40 · 24 min under", value: "", symbol: .bed),
             .init(kind: .log, name: "Nap", detail: "15:10 · 26 min", value: "", symbol: .bed)
@@ -1799,11 +1784,7 @@ private extension NoopAct5Screens {
                 name: "Long walk",
                 detail: "10:20 · 68 min",
                 value: "load 22",
-                symbol: .walk,
-                workout: .longWalk,
-                sessionHeaderLine: "Sunday 17 August, 10:20 · 68 min",
-                sessionDurationLabel: "68:00",
-                sessionLoad: 22
+                symbol: .walk
             ),
             .init(kind: .session, name: "Strength, lower body", detail: "17:40 · 35 min", value: "load 62", symbol: .weight),
             .init(kind: .sleep, name: "Slept 7h 26m", detail: "23:05 → 06:31", value: "", symbol: .bed)
@@ -1822,14 +1803,12 @@ private struct NoopA5HistoryItem {
     /// Change 4. Written when the session is logged. A row without one has no record to open, keeps
     /// no chevron, and does nothing — the honest state for anything logged before this existed.
     /// Sleep rows carry no workout and open the night instead.
-    var workout: NoopWorkout? = nil
-    var sessionHeaderLine: String? = nil
-    var sessionDurationLabel: String? = nil
-    var sessionLoad: Int? = nil
+    /// When the session started, so its row opens the session's own page.
+    var sessionStart: Int? = nil
     /// When the night ended, so a sleep row can open that night on Rest.
     var date: Date? = nil
 
-    var opensSomething: Bool { kind == .sleep || workout != nil }
+    var opensSomething: Bool { kind == .sleep || sessionStart != nil }
 }
 
 private struct NoopA5HistoryDay: Identifiable {

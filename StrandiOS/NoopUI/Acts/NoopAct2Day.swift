@@ -396,11 +396,6 @@ struct NoopAct2Screens: View {
             : navigation.selectedWorkout.act3.note
     }
 
-    private var sessionCardRoute: NoopRoute {
-        guard let finished = navigation.finishedSessionToday else { return .session }
-        return finished.liftSessionID != nil ? .liftDetail : .detail
-    }
-
     private var todayInitialScrollID: String? {
         #if DEBUG
         CommandLine.arguments.contains("--noop-scroll-session-card") ? "noop-today-session" : nil

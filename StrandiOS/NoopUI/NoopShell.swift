@@ -664,7 +664,7 @@ struct NoopVerifiedAppShell: View {
 
     /// Act 3 on the stored sessions and the real recorder. The prescription (what today can take,
     /// what a session would cost) has no engine and stays out.
-    private static let canonicalEffortRoutes: Set<NoopRoute> = [.session, .pick, .ready, .live, .intervals, .detail]
+    private static let canonicalEffortRoutes: Set<NoopRoute> = [.session, .pick, .ready, .live, .intervals]
 
     /// Act 7 runs on the real coach engine, grants and memory; its prototype conversation is gated on
     /// `--demo-seed` inside the act.
@@ -695,6 +695,17 @@ struct NoopVerifiedAppShell: View {
 
     /// The strap is on its charger and taking charge, for Today's battery.
     private var strapCharging: Bool { live.connected && live.charging == true }
+
+    /// Opens the stored session nearest `start` on its page. The row may be renamed or moved by a minute
+    /// since it was listed, so the closest one within twenty minutes is taken.
+    private func openActivity(near start: Int) {
+        Task { @MainActor in
+            let days = max(3, (Int(Date().timeIntervalSince1970) - start) / 86_400 + 2)
+            tappedActivity = (await repo.workoutRows(days: days))
+                .filter { abs($0.startTs - start) <= 20 * 60 }
+                .min { abs($0.startTs - start) < abs($1.startTs - start) }
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -820,12 +831,12 @@ struct NoopVerifiedAppShell: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationPresenter.activityTapped)) { note in
             guard let start = note.object as? Int else { return }
-            Task { @MainActor in
-                // The row may be renamed or moved by a minute since the notice; take the closest one.
-                tappedActivity = (await repo.workoutRows(days: 3))
-                    .filter { abs($0.startTs - start) <= 20 * 60 }
-                    .min { abs($0.startTs - start) < abs($1.startTs - start) }
-            }
+            openActivity(near: start)
+        }
+        .onChange(of: navigation.openSessionStart) { _, start in
+            guard let start else { return }
+            navigation.openSessionStart = nil
+            openActivity(near: start)
         }
         .sheet(item: $navigation.metricSheet) { request in
             NoopMetricSheet(metrics: request.metrics, selectedID: request.metricID)
