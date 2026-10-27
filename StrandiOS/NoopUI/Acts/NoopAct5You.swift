@@ -47,6 +47,7 @@ struct NoopAct5Screens: View {
     @AppStorage(PuffinExperiment.keepRealtimeForDataKey) private var continuousHrvOn = false
     @AppStorage(PuffinExperiment.continuousHrvOvernightOnlyKey) private var hrvOvernightOnly = true
     @AppStorage(PuffinExperiment.spo2CandidateDisplayKey) private var spo2EstimateOn = false
+    @AppStorage(PuffinExperiment.banisterEffortKey) private var exponentialEffortOn = false
     @AppStorage(PuffinFrameRecorder.enabledKey) private var frameRecorderOn = false
 
     @AppStorage(PuffinExperiment.deepDataKey) private var deepDataEnabled = false
@@ -291,6 +292,7 @@ private extension NoopAct5Screens {
         case "Continuous HRV capture": $continuousHrvOn
         case "Overnight only": $hrvOvernightOnly
         case "SpO₂ strap estimate": $spo2EstimateOn
+        case "Exponential effort": $exponentialEffortOn
         case "Record protocol frames": $frameRecorderOn
         default: nil
         }
@@ -310,7 +312,7 @@ private extension NoopAct5Screens {
         switch key {
         case "Continuous HRV capture": model.ble.setKeepRealtimeForData(continuousHrvOn)
         case "Overnight only": model.ble.setKeepRealtimeForData(PuffinExperiment.keepRealtimeForDataEnabled)
-        case "SpO₂ strap estimate": Task { await model.intelligence.analyzeRecent(); await model.repo.refresh() }
+        case "SpO₂ strap estimate", "Exponential effort": Task { await model.intelligence.analyzeRecent(); await model.repo.refresh() }
         case "Illness early warning": if behavior.illnessWatch { IllnessNotifier.requestAuthorization() }
         case "Sync reminder":
             if behavior.syncReminder { SyncReminder.requestAuthorization() }
@@ -3914,7 +3916,7 @@ private extension NoopAct5Screens {
         "Live heart rate in the Dynamic Island": true,
         "Power saving": false, "Pause the HRV stream when low": true,
         "Continuous HRV capture": false, "Overnight only": true, "Broadcast heart rate": false,
-        "Quiet hours": false, "Battery alerts": true, "Off-wrist reminder": false, "Sync reminder": true,
+        "Quiet hours": false, "Battery alerts": true, "Off-wrist reminder": false, "Sync reminder": true, "Exponential effort": false,
         "Your night is in": true, "Bedtime nudge": false, "A new best": false, "Weekly read": false,
         "Backup reminder": true,
         "Reduce motion in Noop": false
@@ -4055,6 +4057,9 @@ private extension NoopAct5Screens {
             return [NoopSettingsSection(items: [
                 segmentItem(tint, "scores-effort", "Effort", "display only — Effort is stored 0–100", choices: ["0–100", "0–21"],
                             keywords: "strain scale 21 effort scale"),
+                toggleItem(tint, "scores-exponential", "Exponential effort",
+                           "Scores Effort on an exponential curve (Banister) instead of heart-rate zones, so hard minutes count far more and a lifting hour no longer reads near zero. Re-scores your history; both reach the same maximum.",
+                           keywords: "banister trimp strain curve lifting intensity"),
                 NoopSettingsItem(id: "scores-recalibrate", title: "Recalibrate your baselines",
                                  detail: "Restart the four-night build-up if a bad week — being ill, a flight — set it wrong.",
                                  keywords: "baselines recovery charge hrv resting pulse respiration skin temperature restart reset") {
@@ -6093,9 +6098,6 @@ struct NoopPendingOption: Identifiable {
         .init(id: "pending-trend-style", page: .scores, status: .later, title: "Trend chart style", symbol: "chart.bar",
               does: "Draw trend charts as lines or as bars.",
               why: "Aura’s trend charts are drawn one way for now. The second style comes with the chart pass."),
-        .init(id: "pending-exponential-effort", page: .scores, status: .deciding, title: "Exponential effort", symbol: "function",
-              does: "Weights hard minutes more heavily, the way a training-load model does, instead of a straight line.",
-              why: "It changes every Effort score you have, so it needs a benchmark before it can be offered."),
         // Strap
         .init(id: "pending-phone-buzz", page: .strap, status: .later, title: "Buzz for phone notifications", symbol: "bell",
               does: "Choose which iPhone apps buzz your strap, and how.",
