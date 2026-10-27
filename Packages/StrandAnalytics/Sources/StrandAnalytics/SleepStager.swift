@@ -1315,6 +1315,106 @@ public enum SleepStager {
         return cut
     }
 
+    // MARK: - Band "up" inside the night is a waking
+
+    /// The strap calls "up" some minutes AFTER the wearer gets out of bed: one 5.0 night the wrist was
+    /// walking from 07:12 and the strap's "up" began at 07:22. The pulse and motion before the call are
+    /// part of the getting up, so the interior confirm reads this far back.
+    static let bandUpLeadInS: Int = 600
+    /// Wrist still this long ends a waking's motion chain (settled back in bed).
+    static let bandUpSettleS: Int = 300
+
+    /// A sustained "up" FLANKED by sleep (a bathroom trip) used to vanish: `bandUpCut` only ends the night,
+    /// and the stager staged the walk as light/REM. That night showed 2.5 awake minutes for a half-hour up.
+    ///
+    /// Each "up" run of at least `bandUpMinRunS`, with sustained "asleep" after it inside the night, and
+    /// confirmed by a pulse rise or wrist movement read from `bandUpLeadInS` before the call, becomes wake.
+    /// The wake spans the movement chain around the call (out of bed until settled again); with no movement
+    /// it spans the "up" run. Only interior epochs change and only sleep turns into wake. A flat pulse on a
+    /// still wrist (the strap's false "up" lying in bed) is left asleep.
+    static func applyBandUpWake(_ stages: [StageSegment], start: Int, end: Int,
+                                bandSleepState: [(ts: Int, state: Int)],
+                                hr: [HRSample], grav: [GravitySample]) -> [StageSegment] {
+        guard !bandSleepState.isEmpty, !stages.isEmpty, end > start else { return stages }
+        let band = bandSleepState.filter { $0.ts > start && $0.ts < end }.sorted { $0.ts < $1.ts }
+        // Sustained "up" runs.
+        var runs: [(from: Int, to: Int)] = []
+        var runStart: Int? = nil, prev = 0
+        for s in band {
+            if s.state == bandStateUp {
+                if let r = runStart, s.ts - prev > bandUpMaxGapS { runs.append((r, prev)); runStart = nil }
+                if runStart == nil { runStart = s.ts }
+                prev = s.ts
+            } else if let r = runStart {
+                runs.append((r, prev)); runStart = nil
+            }
+        }
+        if let r = runStart { runs.append((r, prev)) }
+        runs = runs.filter { $0.to - $0.from >= bandUpMinRunS }
+        guard !runs.isEmpty else { return stages }
+
+        let moves = grav.filter { ($0.dynAccel ?? 0) > bandUpMoveG }.map(\.ts).sorted()
+        var spans: [(from: Int, to: Int)] = []
+        for run in runs {
+            // Interior only: the strap must call sustained "asleep" after it, before the night ends.
+            var asleep = 0, last: Int? = nil
+            for s in band where s.ts > run.to {
+                if s.state == bandStateAsleep {
+                    if let l = last, s.ts - l <= bandUpMaxGapS { asleep += s.ts - l }
+                    last = s.ts
+                    if asleep >= bandUpReturnAsleepS { break }
+                } else { last = nil }
+            }
+            guard asleep >= bandUpReturnAsleepS else { continue }
+            let u = run.from
+            let rise: Bool = {
+                guard let before = medianBPM(hr, u - bandUpLeadInS - bandUpHRBeforeS, u - bandUpLeadInS),
+                      let after = medianBPM(hr, u, u + bandUpHRAfterS) else { return false }
+                return after - before >= bandUpHRRiseBpm
+            }()
+            let window = grav.filter { $0.ts >= u - bandUpLeadInS && $0.ts < u + bandUpMoveWindowS }.compactMap(\.dynAccel)
+            let moving = window.count >= bandUpMoveWindowS / 3
+                && Double(window.filter { $0 > bandUpMoveG }.count) / Double(window.count) >= bandUpMoveShare
+            guard rise || moving else { continue }
+            // Out of bed: the movement chain around the call, unbroken by `bandUpSettleS` of stillness.
+            var from = u, to = run.to
+            if let first = moves.firstIndex(where: { $0 >= u - bandUpSettleS }), moves[first] <= run.to {
+                var i = first
+                from = min(u, moves[i])
+                while i > 0, moves[i - 1] >= u - bandUpLeadInS - bandUpSettleS, from - moves[i - 1] <= bandUpSettleS {
+                    i -= 1; from = moves[i]
+                }
+                var j = first
+                while j + 1 < moves.count, moves[j + 1] <= run.to, moves[j + 1] - moves[j] <= bandUpSettleS { j += 1 }
+                to = max(moves[j], u + bandUpMinRunS)
+            }
+            spans.append((max(from, start), min(to, end)))
+        }
+        guard !spans.isEmpty else { return stages }
+
+        let n = Int((Double(end - start) / epochS).rounded(.up))
+        func epochStart(_ i: Int) -> Int { start + Int(Double(i) * epochS) }
+        var labels = (0..<n).map { i -> String in
+            let t = epochStart(i)
+            return (stages.first(where: { $0.start <= t && t < $0.end }) ?? stages.last!).stage
+        }
+        guard let onset = labels.firstIndex(where: { $0 != "wake" }),
+              let final = labels.lastIndex(where: { $0 != "wake" }), onset < final else { return stages }
+        var changed = false
+        for i in onset...final where labels[i] != "wake" {
+            let t = epochStart(i)
+            if spans.contains(where: { t + Int(epochS) > $0.from && t < $0.to }) { labels[i] = "wake"; changed = true }
+        }
+        guard changed else { return stages }
+        var out: [StageSegment] = []
+        for i in 0..<n {
+            let segEnd = i == n - 1 ? end : epochStart(i + 1)
+            if let l = out.last, l.stage == labels[i] { out[out.count - 1].end = segEnd }
+            else { out.append(StageSegment(start: epochStart(i), end: segEnd, stage: labels[i])) }
+        }
+        return out
+    }
+
     // MARK: - Band sleep_state WAKE-veto (recover strap-disputed false wakes)
 
     // NOOP's cardiorespiratory stager is known to OVER-CALL wake: an EEG-free stager reads a still, low-HR
@@ -1822,7 +1922,10 @@ public enum SleepStager {
                                                 bandSleepState: bandSleepState)
             // Awake in bed at the night's edges (lying awake before sleep, staying in bed after the final
             // waking) is wake, not light sleep. Interior stages are untouched. See `InBedWake`.
-            let stages = InBedWake.refine(vetoed, start: p.start, end: p.end, hr: hrS, grav: grav,
+            // A confirmed "up" between two stretches of sleep (a bathroom trip) is awake, not light sleep.
+            let woken = applyBandUpWake(vetoed, start: p.start, end: p.end, bandSleepState: bandSleepState,
+                                        hr: hrS, grav: grav)
+            let stages = InBedWake.refine(woken, start: p.start, end: p.end, hr: hrS, grav: grav,
                                           bandSleepState: bandSleepState)
             let eff = efficiency(start: p.start, end: p.end, stages: stages)
             let avgHrv = sessionAvgHRV(start: p.start, end: p.end, rr: rrS)

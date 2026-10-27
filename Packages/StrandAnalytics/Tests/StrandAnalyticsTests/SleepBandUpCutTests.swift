@@ -79,4 +79,40 @@ final class SleepBandUpCutTests: XCTestCase {
         let state = band([(0, 10_000, 2), (10_000, 11_000, 3), (11_000, 11_030, 2), (11_030, 12_000, 3)])
         XCTAssertEqual(SleepStager.bandUpCut(start: 0, end: 12_000, bandSleepState: state), 10_000)
     }
+
+    // MARK: - "up" inside the night
+
+    private func wakeSeconds(_ stages: [StageSegment], _ from: Int, _ to: Int) -> Int {
+        stages.filter { $0.stage == "wake" }.reduce(0) { $0 + max(0, min($1.end, to) - max($1.start, from)) }
+    }
+
+    /// A real 5.0 night: walking from 07:12 (t=4_200), the strap's "up" from 07:22 (t=4_800) for 30 minutes,
+    /// the wrist settled at 07:44 (t=6_100), asleep again. The stager had staged it all as sleep.
+    func testBathroomTripInsideTheNightIsAwake() {
+        let state = band([(0, 4_800, 2), (4_800, 6_600, 3), (6_600, 12_000, 2)])
+        let hr = pulse([(0, 4_200, 64), (4_200, 5_100, 70), (5_100, 12_000, 66)])
+        let grav = motion(0, 4_200, share: 0) + motion(4_200, 6_100, share: 0.2) + motion(6_100, 12_000, share: 0)
+        let asleep = [StageSegment(start: 0, end: 12_000, stage: "light")]
+        let out = SleepStager.applyBandUpWake(asleep, start: 0, end: 12_000, bandSleepState: state, hr: hr, grav: grav)
+        XCTAssertGreaterThanOrEqual(wakeSeconds(out, 4_200, 6_100), 1_800)   // out of bed until settled
+        XCTAssertEqual(wakeSeconds(out, 0, 4_100), 0)
+        XCTAssertEqual(wakeSeconds(out, 6_500, 12_000), 0)
+    }
+
+    /// The strap's false "up" lying still in bed, pulse flat: stays asleep.
+    func testStillFalseUpInsideTheNightStaysAsleep() {
+        let state = band([(0, 4_800, 2), (4_800, 5_700, 3), (5_700, 12_000, 2)])
+        let hr = pulse([(0, 12_000, 66)])
+        let grav = motion(0, 12_000, share: 0)
+        let asleep = [StageSegment(start: 0, end: 12_000, stage: "light")]
+        XCTAssertEqual(SleepStager.applyBandUpWake(asleep, start: 0, end: 12_000, bandSleepState: state, hr: hr, grav: grav), asleep)
+    }
+
+    /// The final "up" is the night's end, handled by `bandUpCut`; this pass leaves it alone.
+    func testFinalUpIsNotAnInteriorWake() {
+        let state = band([(0, 4_800, 2), (4_800, 6_000, 3)])
+        let hr = pulse([(0, 4_800, 64), (4_800, 6_000, 75)])
+        let asleep = [StageSegment(start: 0, end: 6_000, stage: "light")]
+        XCTAssertEqual(SleepStager.applyBandUpWake(asleep, start: 0, end: 6_000, bandSleepState: state, hr: hr, grav: []), asleep)
+    }
 }
