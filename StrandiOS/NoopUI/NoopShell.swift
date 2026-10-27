@@ -693,6 +693,9 @@ struct NoopVerifiedAppShell: View {
             || navigation.route.act == .fitness
     }
 
+    /// The strap is on its charger and taking charge, for Today's battery.
+    private var strapCharging: Bool { live.connected && live.charging == true }
+
     var body: some View {
         ZStack {
             NoopHTMLColor.canvas.ignoresSafeArea()
@@ -723,6 +726,7 @@ struct NoopVerifiedAppShell: View {
                 } else if Self.canonicalDayRoutes.contains(navigation.route) {
                     NoopAct2Screens(navigation: navigation, day: dayStore.record,
                                     battery: WidgetSnapshot.activeBatteryPct(from: model),
+                                    charging: strapCharging,
                                     liveBPM: live.connected ? live.heartRate : nil,
                                     displayName: profile.displayName)
                         // Today's Next workout tile reads the plans.

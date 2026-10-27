@@ -463,13 +463,18 @@ struct NoopBatteryChip: View {
     var bare = false
     /// The strap is syncing history: a short green line runs around the pill.
     var syncing = false
+    /// On the charger: the cell fills green, a bolt sits in it and light sweeps along the charge.
+    var charging = false
     var action: (() -> Void)?
 
-    private var isLow: Bool { percent.map { $0 <= 20 } ?? false }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var isLow: Bool { !charging && (percent.map { $0 <= 20 } ?? false) }
     private var fillFraction: CGFloat {
         CGFloat(max(0, min(100, percent ?? 0))) / 100
     }
     private var tint: Color {
+        if charging { return NoopHTMLColor.green }
         guard let percent else { return NoopHTMLColor.blueLight }
         if percent <= 10 { return NoopHTMLColor.amber }
         if percent <= 20 { return NoopHTMLColor.warm }
@@ -494,8 +499,20 @@ struct NoopBatteryChip: View {
                         RoundedRectangle(cornerRadius: 2.2 * k)
                             .fill(tint)
                             .frame(width: 18.6 * k * fillFraction, height: 8.6 * k)
+                            .overlay { if charging && !reduceMotion { NoopChargeSweep() } }
+                            .clipShape(RoundedRectangle(cornerRadius: 2.2 * k))
                             .offset(x: 1.2 * k)
+                        if charging {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 7.5 * k, weight: .black))
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.35), radius: 0.6)
+                                .frame(width: 21 * k, height: 11 * k)
+                                .transition(.scale(scale: 0.3).combined(with: .opacity))
+                        }
                     }
+                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: charging)
+                    .animation(.smooth(duration: 0.8), value: fillFraction)
                     UnevenRoundedRectangle(
                         topLeadingRadius: 0,
                         bottomLeadingRadius: 0,
@@ -509,6 +526,8 @@ struct NoopBatteryChip: View {
                     .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
                     .tracking(-0.12)
                     .monospacedDigit()
+                    .contentTransition(.numericText(value: Double(percent ?? 0)))
+                    .animation(.smooth(duration: 0.5), value: percent)
                     .foregroundStyle(isLow ? tint : NoopHTMLColor.inkSoft)
             }
             .padding(.horizontal, 11)
@@ -527,7 +546,27 @@ struct NoopBatteryChip: View {
             .animation(.easeInOut(duration: 0.3), value: syncing)
         }
         .buttonStyle(NoopPlainHitStyle())
-        .accessibilityValue(syncing ? "syncing" : "")
+        .accessibilityValue(charging ? "charging" : syncing ? "syncing" : "")
+    }
+}
+
+/// A soft band of light running along a charging cell, left to right, every two seconds.
+struct NoopChargeSweep: View {
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2) / 2
+            // Ease in and out so the light gathers, crosses and leaves rather than ticking past.
+            let x = t < 0.5 ? 2 * t * t : 1 - pow(-2 * t + 2, 2) / 2
+            GeometryReader { geo in
+                let band = max(8, geo.size.width * 0.7)
+                LinearGradient(colors: [.white.opacity(0), .white.opacity(0.75), .white.opacity(0)],
+                               startPoint: .leading, endPoint: .trailing)
+                    .frame(width: band)
+                    .offset(x: -band + (geo.size.width + band) * x)
+                    .blendMode(.plusLighter)
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 

@@ -16,6 +16,8 @@ final class NoopLiveGlance: ObservableObject {
     @Published private(set) var batteryPercent: Int?
     /// A history offload is running: the battery pill draws its sync line.
     @Published private(set) var syncing = false
+    /// On the charger and taking charge.
+    @Published private(set) var charging = false
 
     private var bound: ObjectIdentifier?
     private var subscriptions: Set<AnyCancellable> = []
@@ -32,6 +34,7 @@ final class NoopLiveGlance: ObservableObject {
         heartRate = live.heartRate
         batteryPercent = live.batteryPct.map { Int($0.rounded()) }
         syncing = live.backfilling
+        charging = live.charging == true
 
         live.$connected.removeDuplicates().receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.connected = $0 }.store(in: &subscriptions)
@@ -43,5 +46,7 @@ final class NoopLiveGlance: ObservableObject {
             .sink { [weak self] in self?.batteryPercent = $0 }.store(in: &subscriptions)
         live.$backfilling.removeDuplicates().receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.syncing = $0 }.store(in: &subscriptions)
+        live.$charging.map { $0 == true }.removeDuplicates().receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.charging = $0 }.store(in: &subscriptions)
     }
 }

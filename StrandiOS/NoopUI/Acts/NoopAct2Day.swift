@@ -295,6 +295,8 @@ struct NoopAct2Screens: View {
     var day: NoopDayRecord? = nil
     /// The active device's charge and the live pulse; read only when `day` is set.
     var battery: Int? = nil
+    /// The strap is on its charger and taking charge.
+    var charging = false
     var liveBPM: Int? = nil
     /// The wearer's own name from Your record, for the greeting.
     var displayName: String? = nil
@@ -1038,7 +1040,8 @@ struct NoopAct2Screens: View {
                 // The band and the updates as two separate controls, each at the height of the date
                 // beside them (25 Oct 2026).
                 HStack(spacing: 9) {
-                    NoopBatteryChip(percent: day == nil ? 52 : battery, syncing: day != nil && glance.syncing) { navigation.push(.strap) }
+                    NoopBatteryChip(percent: day == nil ? 52 : battery, syncing: day != nil && glance.syncing,
+                                    charging: day != nil && charging) { navigation.push(.strap) }
                     Button { navigation.push(.inbox) } label: {
                         ZStack(alignment: .topTrailing) {
                             NoopCanonicalGlyph(name: .bell, size: NoopControlSize.small.icon, color: NoopHTMLColor.inkSoft)
