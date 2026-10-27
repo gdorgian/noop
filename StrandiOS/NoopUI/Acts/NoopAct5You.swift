@@ -584,21 +584,20 @@ private extension NoopAct5Screens {
     var youScreen: some View {
         NoopScreen(topInset: 52) {
             VStack(alignment: .leading, spacing: 0) {
-                // You is the person (23 Oct 2026); everything about the app is one tap away in Settings.
-                HStack(spacing: 8) {
-                    Spacer()
-                    NoopBatteryChip(percent: you == nil ? 52 : battery) { navigation.push(.strap) }
-                    Button { navigation.settingsQuery = ""; navigation.push(.settings) } label: {
-                        NoopIconDiscShape(size: .small) {
-                            Image(systemName: "gearshape").font(.system(size: NoopControlSize.small.icon, weight: .medium))
+                // You is the person (23 Oct 2026); everything about the app sits in Settings, a plain
+                // section at the foot of the page (27 Oct 2026), outside the editable layout so it can
+                // never be hidden.
+                NoopEditableSections(layout: youLayout, editing: $youEditing, spacing: 0) { id in youSection(id) }
+                VStack(alignment: .leading, spacing: 9) {
+                    youSectionLabel("Noop Aura")
+                    dividedCard {
+                        copyRow("Settings", detail: "your strap, notifications, Health and more", symbol: "gearshape", tint: Self.blush) {
+                            navigation.settingsQuery = ""
+                            navigation.push(.settings)
                         }
                     }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    .accessibilityLabel("Settings")
                 }
-                .padding(.bottom, -30)
-                .zIndex(1)
-                NoopEditableSections(layout: youLayout, editing: $youEditing, spacing: 0) { id in youSection(id) }
+                .padding(.top, 17)
             }
             .background(alignment: .top) {
                 NoopPageBackdrop(theme: .you)
