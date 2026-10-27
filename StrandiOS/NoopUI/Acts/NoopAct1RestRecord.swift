@@ -133,6 +133,8 @@ struct NoopRestRecord: Equatable {
     var debt: [(day: String, minutes: Double)] = []
     /// Each usable night's sleep against the need, in minutes (negative = short).
     var nightDeltas: [(day: String, minutes: Double)] = []
+    /// Each day's stored Effort (0–100), for the need a night was measured against.
+    var strainByDay: [String: Double] = [:]
     /// Time from getting into bed to first sleep. The current store has a detected sleep-session
     /// onset and sleep stages, but no verified in-bed start, so this stays nil. An awake segment at
     /// the start of a detected timeline is not evidence of when the wearer lay down.
@@ -233,6 +235,8 @@ struct NoopRestRecord: Equatable {
             .suffix(90).map { (day: $0.day, minutes: max(0, $0.value)) }
         record.nightDeltas = series.compactMap { row in row.totalSleepMin.map { (day: row.day, minutes: $0 - needMin) } }
             .suffix(90).map { $0 }
+        record.strainByDay = Dictionary(days.compactMap { d in d.strain.map { (d.day, $0) } }.suffix(14),
+                                        uniquingKeysWith: { _, new in new })
         return record
     }
 

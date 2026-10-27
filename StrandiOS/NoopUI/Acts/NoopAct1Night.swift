@@ -96,6 +96,11 @@ struct NoopAct1Screens: View {
         NoopPageSection(id: "seven", title: "Your last seven", detail: "Seven nights against your need"),
         NoopPageSection(id: "shape", title: "The shape of it", detail: "The night's stages on one timeline", onByDefault: false),
         NoopPageSection(id: "shape-lanes", title: "Stages in lanes", detail: "Heart rate over one lane per stage"),
+        NoopPageSection(id: "sleep-period", title: "Sleep period", detail: "In bed and asleep, with six reads of the night rated", onByDefault: false),
+        NoopPageSection(id: "sleep-stages", title: "Sleep stages", detail: "The night's stages to scrub, against your usual range", onByDefault: false),
+        NoopPageSection(id: "fall-asleep", title: "Time to fall asleep", detail: "Lying down to asleep, fast to late", onByDefault: false),
+        NoopPageSection(id: "sleep-vitals", title: "Sleeping vitals", detail: "Heart rate, HRV, breathing and oxygen through the night", onByDefault: false),
+        NoopPageSection(id: "sleep-needed", title: "Sleep needed", detail: "What the night asked of you, and why", onByDefault: false),
         NoopPageSection(id: "overtime", title: "Over time", detail: "Sleep debt, consistency and history"),
         NoopPageSection(id: "next", title: "Your next sleep", detail: "Evening journal and tonight"),
         NoopPageSection(id: "trends", title: "Trends", detail: "Consistency, sleep score and each measure as a chart", onByDefault: false)
@@ -203,6 +208,16 @@ struct NoopAct1Screens: View {
                 }
                 }
             }
+        case "sleep-period":
+            if let rest, let night = restNight { NoopSleepPeriodSection(night: night, needMin: rest.needMin) }
+        case "sleep-stages":
+            if let rest, let night = restNight { NoopSleepStagesSection(night: night, history: rest.slots.compactMap { $0 }) }
+        case "fall-asleep":
+            if let night = restNight { NoopFallAsleepSection(night: night) }
+        case "sleep-vitals":
+            if let night = restNight, night.span != nil { NoopSleepVitalsSection(night: night) }
+        case "sleep-needed":
+            if let rest, let night = restNight { NoopSleepNeededSection(night: night, rest: rest, isLatest: restIsLatest) }
         case "inbed":
             if let bed = restNight?.bed {
                 inBedCard(bed)
