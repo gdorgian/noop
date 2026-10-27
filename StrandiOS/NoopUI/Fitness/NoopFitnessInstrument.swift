@@ -479,11 +479,8 @@ struct NoopFitnessMeasureChart: View {
                                 .opacity(selection == nil || selection == p.i ? 1 : 0.35)
                         }
                     } else {
+                        NoopGapAwareIndexLine(points: cur.map { ($0.i, $0.v) }, tint: tint, lineWidth: 2.2)
                         ForEach(cur) { p in
-                            LineMark(x: .value("Bucket", p.i), y: .value("Value", p.v))
-                                .foregroundStyle(tint)
-                                .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-                                .interpolationMethod(.monotone)
                             PointMark(x: .value("Bucket", p.i), y: .value("Value", p.v))
                                 .foregroundStyle(tint).symbolSize(cur.count > 40 ? 0 : 28)
                         }

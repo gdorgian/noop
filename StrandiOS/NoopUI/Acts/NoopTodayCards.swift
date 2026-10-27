@@ -239,15 +239,10 @@ struct NoopTodayDayRibbon: View {
                             .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
                     }
             }
-            ForEach(Array(points.enumerated()), id: \.offset) { _, p in
-                AreaMark(x: .value("Time", p.time), yStart: .value("Floor", floor), yEnd: .value("bpm", p.bpm))
-                    .interpolationMethod(.monotone)
-                    .foregroundStyle(Self.areaFill)
-                LineMark(x: .value("Time", p.time), y: .value("bpm", p.bpm))
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(Self.lineFill)
-            }
+            // A strap off for a quarter hour or more reads as a gap, not a straight line across it.
+            NoopGapAwareLine(points: points.map { ($0.time, $0.bpm) }, tint: Color(hex: 0x6FCFB4), floor: floor,
+                             lineWidth: 1.8, minimumGap: 15 * 60,
+                             lineStyle: AnyShapeStyle(Self.lineFill), areaStyle: AnyShapeStyle(Self.areaFill))
             if let last = points.last, selected == nil {
                 PointMark(x: .value("Time", last.time), y: .value("bpm", last.bpm))
                     .symbolSize(38)

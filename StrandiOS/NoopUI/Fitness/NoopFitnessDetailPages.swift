@@ -502,11 +502,8 @@ struct NoopFitnessLoadPage: View {
                     .foregroundStyle(NoopHTMLColor.green.opacity(0.14))
                     .interpolationMethod(.monotone)
             }
+            NoopGapAwareIndexLine(points: points.map { ($0.i, $0.reading.acute) }, tint: NoopHTMLColor.inkSoft, lineWidth: 1.8)
             ForEach(points) { p in
-                LineMark(x: .value("Day", p.i), y: .value("Load", p.reading.acute))
-                    .foregroundStyle(NoopHTMLColor.inkSoft)
-                    .lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
-                    .interpolationMethod(.monotone)
                 PointMark(x: .value("Day", p.i), y: .value("Load", p.reading.acute))
                     .foregroundStyle(p.reading.status.color)
                     .symbolSize(points.count > 40 ? 10 : 26)

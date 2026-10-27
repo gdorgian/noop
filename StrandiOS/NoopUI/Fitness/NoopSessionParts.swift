@@ -262,16 +262,12 @@ struct NoopSessionHeart: View {
                         PointMark(x: .value("Time", date(p.ts)), y: .value("bpm", p.bpm))
                             .symbolSize(60).foregroundStyle(NoopHTMLColor.ink)
                     }
-                    ForEach(Array(curve.enumerated()), id: \.offset) { _, b in
-                        AreaMark(x: .value("Time", date(b.ts)), yStart: .value("Floor", lo), yEnd: .value("bpm", b.bpm))
-                            .interpolationMethod(.monotone)
-                            .foregroundStyle(LinearGradient(colors: [Color(hex: 0x6FCFB4).opacity(0.16), .clear],
-                                                            startPoint: .top, endPoint: .bottom))
-                        LineMark(x: .value("Time", date(b.ts)), y: .value("bpm", b.bpm))
-                            .interpolationMethod(.monotone)
-                            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                            .foregroundStyle(gradient(lo: lo, hi: hi))
-                    }
+                    // A dropout of two minutes or more mid-session reads as a gap, not a line across it.
+                    NoopGapAwareLine(points: curve.map { (date($0.ts), $0.bpm) }, tint: Color(hex: 0x6FCFB4), floor: lo,
+                                     minimumGap: 120,
+                                     lineStyle: AnyShapeStyle(gradient(lo: lo, hi: hi)),
+                                     areaStyle: AnyShapeStyle(LinearGradient(colors: [Color(hex: 0x6FCFB4).opacity(0.16), .clear],
+                                                                             startPoint: .top, endPoint: .bottom)))
                 }
                 .chartYScale(domain: lo...hi)
                 .chartXScale(domain: date(start)...date(end))

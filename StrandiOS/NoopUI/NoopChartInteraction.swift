@@ -492,22 +492,36 @@ private struct NoopTwoFingerPan: UIGestureRecognizerRepresentable {
 /// readings reads as a month of steady values; the gap is drawn dim and dashed instead, with no fill
 /// beneath it (27 Oct 2026).
 enum NoopChartGaps {
-    /// A silence counts as a gap past four times the usual spacing, and never under an hour.
-    static func threshold(_ dates: [Date]) -> TimeInterval {
+    /// A silence counts as a gap past four times the usual spacing, and never under `minimum`
+    /// (an hour by default; a day's trace passes a shorter one so a strap left off shows).
+    static func threshold(_ dates: [Date], minimum: TimeInterval = 3600) -> TimeInterval {
         guard dates.count > 2 else { return .infinity }
         let steps = zip(dates.dropFirst(), dates).map { $0.timeIntervalSince($1) }.sorted()
-        return max(steps[steps.count / 2] * 4, 3600)
+        return max(steps[steps.count / 2] * 4, minimum)
     }
 
     /// Each reading's run: a new run starts after every gap.
-    static func runs(_ dates: [Date]) -> [Int] {
-        let limit = threshold(dates)
+    static func runs(_ dates: [Date], minimum: TimeInterval = 3600) -> [Int] {
+        let limit = threshold(dates, minimum: minimum)
         var run = 0
         return dates.indices.map { i in
             if i > 0, dates[i].timeIntervalSince(dates[i - 1]) > limit { run += 1 }
             return run
         }
     }
+
+    /// Runs over bucket indices: any skipped bucket is a gap.
+    static func runs(indices: [Int]) -> [Int] {
+        var run = 0
+        return indices.indices.map { i in
+            if i > 0, indices[i] - indices[i - 1] > 1 { run += 1 }
+            return run
+        }
+    }
+
+    /// How a gap is drawn on every chart: a dim dashed bridge, no fill under it.
+    static let bridgeStyle = Color.white.opacity(0.22)
+    static let bridgeStroke = StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: [2, 4])
 }
 
 /// A line (and its fill) drawn run by run, with each gap bridged by a dim dashed line.
@@ -518,20 +532,26 @@ struct NoopGapAwareLine: ChartContent {
     var floor: Double? = nil
     var lineWidth: CGFloat = 2
     var interpolation: InterpolationMethod = .monotone
+    /// Shortest silence drawn as a gap.
+    var minimumGap: TimeInterval = 3600
+    /// Styles in place of the tint, for a gradient line or fill.
+    var lineStyle: AnyShapeStyle? = nil
+    var areaStyle: AnyShapeStyle? = nil
 
     var body: some ChartContent {
-        let runs = NoopChartGaps.runs(points.map(\.date))
+        let runs = NoopChartGaps.runs(points.map(\.date), minimum: minimumGap)
         let bridges = runs.indices.dropFirst().filter { runs[$0] != runs[$0 - 1] }
         ForEach(points.indices, id: \.self) { i in
             if let floor {
                 AreaMark(x: .value("Date", points[i].date), yStart: .value("Floor", floor),
                          yEnd: .value("Value", points[i].value), series: .value("Run", "r\(runs[i])"))
-                    .foregroundStyle(LinearGradient(colors: [tint.opacity(0.26), tint.opacity(0)], startPoint: .top, endPoint: .bottom))
+                    .foregroundStyle(areaStyle ?? AnyShapeStyle(LinearGradient(colors: [tint.opacity(0.26), tint.opacity(0)],
+                                                                                startPoint: .top, endPoint: .bottom)))
                     .interpolationMethod(interpolation)
             }
             LineMark(x: .value("Date", points[i].date), y: .value("Value", points[i].value),
                      series: .value("Run", "r\(runs[i])"))
-                .foregroundStyle(tint)
+                .foregroundStyle(lineStyle ?? AnyShapeStyle(tint))
                 .lineStyle(StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
                 .interpolationMethod(interpolation)
         }
@@ -539,8 +559,43 @@ struct NoopGapAwareLine: ChartContent {
             ForEach([i - 1, i], id: \.self) { j in
                 LineMark(x: .value("Date", points[j].date), y: .value("Value", points[j].value),
                          series: .value("Run", "gap\(i)"))
-                    .foregroundStyle(Color.white.opacity(0.22))
-                    .lineStyle(StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: [2, 4]))
+                    .foregroundStyle(NoopChartGaps.bridgeStyle)
+                    .lineStyle(NoopChartGaps.bridgeStroke)
+            }
+        }
+    }
+}
+
+/// The same over bucket indices (a day per bucket, a week per bucket): a skipped bucket is a gap.
+struct NoopGapAwareIndexLine: ChartContent {
+    let points: [(i: Int, value: Double)]
+    let tint: Color
+    var floor: Double? = nil
+    var lineWidth: CGFloat = 2
+    var interpolation: InterpolationMethod = .monotone
+
+    var body: some ChartContent {
+        let runs = NoopChartGaps.runs(indices: points.map(\.i))
+        let bridges = runs.indices.dropFirst().filter { runs[$0] != runs[$0 - 1] }
+        ForEach(points.indices, id: \.self) { k in
+            if let floor {
+                AreaMark(x: .value("Bucket", points[k].i), yStart: .value("Floor", floor),
+                         yEnd: .value("Value", points[k].value), series: .value("Run", "r\(runs[k])"))
+                    .foregroundStyle(LinearGradient(colors: [tint.opacity(0.26), tint.opacity(0)], startPoint: .top, endPoint: .bottom))
+                    .interpolationMethod(interpolation)
+            }
+            LineMark(x: .value("Bucket", points[k].i), y: .value("Value", points[k].value),
+                     series: .value("Run", "r\(runs[k])"))
+                .foregroundStyle(tint)
+                .lineStyle(StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+                .interpolationMethod(interpolation)
+        }
+        ForEach(bridges, id: \.self) { k in
+            ForEach([k - 1, k], id: \.self) { j in
+                LineMark(x: .value("Bucket", points[j].i), y: .value("Value", points[j].value),
+                         series: .value("Run", "gap\(k)"))
+                    .foregroundStyle(NoopChartGaps.bridgeStyle)
+                    .lineStyle(NoopChartGaps.bridgeStroke)
             }
         }
     }
