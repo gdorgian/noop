@@ -505,33 +505,6 @@ final class NoopNavigation: ObservableObject {
         }
     }
 
-    /// The session ends, the bar goes, and Fitness opens, where the session now sits in Today.
-    func endSession(_ workout: NoopWorkout, at endedAt: Date = Date()) {
-        let measuredSeconds = sessionElapsed(at: endedAt)
-        let isDemo = NoopContentPolicy.allowsPrototypeContent
-        // The prototype deliberately holds a tap-through session at its canonical measured record;
-        // synthetic values remain unreachable outside an explicit Debug `--demo-seed` process.
-        let durationSeconds = isDemo && measuredSeconds < 120
-            ? workout.minutes * 60
-            : max(60, measuredSeconds)
-        let minutes = max(1, Int((Double(durationSeconds) / 60).rounded()))
-        let detailDistance = Double(workout.act3.detail.distance)
-        let record = NoopFinishedSessionRecord(
-            day: Self.dayFormatter.string(from: endedAt),
-            workout: workout,
-            endedAt: endedAt,
-            durationSeconds: durationSeconds,
-            distanceKilometres: isDemo ? detailDistance : nil,
-            chargeCost: isDemo ? Int((Double(minutes) * 0.43).rounded()) : nil,
-            sleepNeedMinutes: isDemo ? Int((Double(minutes) * 0.29).rounded()) : nil
-        )
-        finishedSession = record
-        if let data = try? JSONEncoder().encode(record) {
-            defaults.set(data, forKey: Self.finishedSessionKey)
-        }
-        finishSessionArrival()
-    }
-
     /// A real recorder may have resumed from disk after the picker state was reset, or may have
     /// started from the native workout catalogue with a sport absent from the five HTML templates.
     /// Never write the picker default as that session's name or substitute its example duration.
@@ -560,13 +533,6 @@ final class NoopNavigation: ObservableObject {
         sessionPausedElapsed = 0
         reset(to: .fitness)
         cardioFinish = row
-    }
-
-    private func finishSessionArrival() {
-        sessionStartedAt = nil
-        sessionPaused = false
-        sessionPausedElapsed = 0
-        reset(to: .fitness)
     }
 
     /// A lift saved from the Lift Log is today's session too, so Today's card reads it rather than

@@ -17,13 +17,7 @@ struct RootTabView: View {
     @State private var resetError: String?
 
     var body: some View {
-        Group {
-            if NoopContentPolicy.allowsPrototypeContent {
-                NoopAppShell(navigation: navigation)
-            } else {
-                NoopVerifiedAppShell(navigation: navigation)
-            }
-        }
+        NoopVerifiedAppShell(navigation: navigation)
             .environmentObject(liveGlance)
             .onAppear {
                 liveGlance.bind(to: model.live)
