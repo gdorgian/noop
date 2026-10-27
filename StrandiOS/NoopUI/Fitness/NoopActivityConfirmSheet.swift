@@ -17,6 +17,8 @@ struct NoopActivityConfirmSheet: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var profile: ProfileStore
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
+    @AppStorage(UnitPrefs.distanceSystemKey) private var distanceSystemRaw = ""
     @State private var suggestions: [PersonalActivityModel.Suggestion] = []
     @State private var changing = false
     @State private var editing = false
@@ -232,8 +234,22 @@ struct NoopActivityConfirmSheet: View {
         if let hr = row.avgHr { items.append(.init(label: "Avg HR", value: "\(hr)", unit: "bpm")) }
         if let hr = row.maxHr { items.append(.init(label: "Peak HR", value: "\(hr)", unit: "bpm")) }
         if let kcal = row.energyKcal, kcal > 0 { items.append(.init(label: "Energy", value: "\(Int(kcal.rounded()))", unit: "kcal")) }
-        if let d = row.distanceM, d > 0 { items.append(.init(label: "Distance", value: String(format: "%.2f", d / 1000), unit: "km")) }
+        if let d = row.distanceM, d > 0 {
+            let units = UnitPrefs.resolveDistance(system: UnitSystem(rawValue: unitSystemRaw) ?? .metric, override: distanceSystemRaw)
+            items.append(Self.split("Distance", UnitFormatter.distanceFromMeters(d, system: units)))
+            let seconds = row.durationS ?? Double(row.endTs - row.startTs)
+            if seconds > 0 {
+                items.append(Self.split("Avg pace", UnitFormatter.paceFromSecPerKm(seconds / (d / 1000), system: units)))
+            }
+        }
+        if let steps = row.steps, steps > 0 { items.append(.init(label: "Steps", value: steps.formatted())) }
         return items
+    }
+
+    /// "1.7 km" → value "1.7", unit "km", so the number takes the figure's large type.
+    private static func split(_ label: String, _ text: String) -> NoopSessionFigures.Item {
+        let parts = text.split(separator: " ", maxSplits: 1).map(String.init)
+        return .init(label: label, value: parts.first ?? text, unit: parts.count > 1 ? parts[1] : nil)
     }
 
     private var actions: some View {
