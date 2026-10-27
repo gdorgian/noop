@@ -3,10 +3,9 @@ import SwiftUI
 
 struct NoopAct6Screens: View {
     @ObservedObject var navigation: NoopNavigation
-    /// The production shell's measured ages (one engine). Nil only in the seeded Debug shell.
-    var measured: NoopAgesRecord? = nil
+    /// The measured ages (one engine).
+    let measured: NoopAgesRecord
     @AppStorage("noop.html.selected-age-driver") private var selectedDriver = 0
-    @AppStorage("noop.html.nights-recorded") private var nightsRecorded = 221
     // Onboarding step 2's answer. `ages` says "night" in two places that mean the time of day
     // rather than a count of sleeps, and both have to follow a rotating or permanent-nights answer.
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
@@ -14,32 +13,10 @@ struct NoopAct6Screens: View {
     private var isNightWorker: Bool { NoopScheduleInference.isNightWorker(kind: scheduleKind) }
 
     var body: some View {
-        if let measured {
-            if measured.bodyAge == nil { liveBuilding }
-            else if navigation.route == .driver, !measured.drivers.isEmpty { liveDriver(measured) }
-            else { liveAges(measured) }
-        } else {
-            demoBody
-        }
-    }
-
-    @ViewBuilder private var demoBody: some View {
-        switch navigation.route {
-        case .ages:
-            // Change 8.1. Under seven recorded nights `ages` shows this INSTEAD of itself — it is a
-            // state, not a destination, and is never reachable again after the seventh night.
-            if nightsRecorded < 7 { building } else { ages }
-        case .building:
-            building
-        case .driver:
-            driver
-        case .method:
-            method
-        case .health:
-            health
-        default:
-            ages
-        }
+        if measured.bodyAge == nil { liveBuilding }
+        else if navigation.route == .driver, !measured.drivers.isEmpty { liveDriver(measured) }
+        else { liveAges(measured) }
+    
     }
 
     // MARK: Your ages
@@ -922,7 +899,7 @@ private struct NoopBodyAgeHistoryChart: View {
     var body: some View { chartBody.noopChartZoom() }
 
     @ViewBuilder private var chartBody: some View {
-        let series = recorded ?? .fixture(NoopContentPolicy.allowsPrototypeContent ? values : [])
+        let series = recorded ?? .fixture([])
         NoopHistoryPlot(presentation: .init(series: series, showVariability: false, estimateHalfWidth: bandYears), tint: NoopHTMLColor.green)
             .frame(height: 104)
     }
@@ -1187,7 +1164,7 @@ private struct NoopAgeDriverTrendChart: View {
     var body: some View { chartBody.noopChartZoom() }
 
     @ViewBuilder private var chartBody: some View {
-        let series = recorded ?? .fixture(NoopContentPolicy.allowsPrototypeContent ? item.trend : [])
+        let series = recorded ?? .fixture([])
         NoopHistoryPlot(presentation: .init(series: series, showVariability: false), tint: item.color)
             .frame(height: 84)
             .accessibilityLabel("Recorded weekly inputs for \(item.name)")
@@ -1675,7 +1652,7 @@ private extension NoopAct6Screens {
     /// Amber is reserved for a validated Body Age older than the wearer's confirmed age, never for
     /// missing data or a profile still awaiting confirmation.
     var liveBuilding: some View {
-        let needsProfile = (measured?.chronoAge ?? 0) <= 0
+        let needsProfile = (measured.chronoAge ?? 0) <= 0
         return NoopScreen(topInset: 56) {
             VStack(alignment: .leading, spacing: 12) {
                 NoopAgeBackHeader(label: "Trends") { navigation.back(or: .trends) }
@@ -1684,7 +1661,7 @@ private extension NoopAct6Screens {
                         Text("Body age")
                             .font(NoopHTMLFont.sans(13, weight: .semibold))
                             .foregroundStyle(NoopHTMLColor.green)
-                        Text(measured?.buildReason ?? "Checking recorded signals")
+                        Text(measured.buildReason ?? "Checking recorded signals")
                             .font(NoopHTMLFont.sans(11.5))
                             .foregroundStyle(NoopHTMLColor.copy)
                     }
@@ -1746,7 +1723,7 @@ extension EnvironmentValues {
 /// pages. Backing out of its first page closes it.
 struct NoopAgesSheet: View {
     @ObservedObject var navigation: NoopNavigation
-    let measured: NoopAgesRecord?
+    let measured: NoopAgesRecord
     let close: () -> Void
 
     private static let own: Set<NoopRoute> = [.ages, .building, .driver, .method, .health]
