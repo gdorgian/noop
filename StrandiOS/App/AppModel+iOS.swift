@@ -17,6 +17,13 @@ enum StrapSyncShortcutOutcome {
     case notStarted
 }
 
+/// What the "Buzz Strap" shortcut observed. A buzz is only worth anything at the moment it was asked for,
+/// so an unready link is reported, never parked for later.
+enum StrapBuzzShortcutOutcome {
+    case buzzed
+    case strapNotReady
+}
+
 extension AppModel {
     /// Execute any actions queued by App Intents while the app was suspended (mark moment, buzz,
     /// ask coach, Shortcuts health export). Call when the app becomes active. The optional `router`
@@ -111,6 +118,28 @@ extension AppModel {
         if model.live.backfilling { return .started }
         SyncLiveActivityController.shared.shortcutDidNotStart()
         return .notStarted
+    }
+
+    /// Background entry point for the "Buzz Strap" shortcut, so a Shortcuts automation (a message from someone,
+    /// a VIP email, a meeting) can buzz the wrist without opening NOOP. Waits briefly for the link, then fires
+    /// `pulses` single notification buzzes `gapMs` apart, or the full alarm-style one-shot when `alarm` is set.
+    /// Each 5/MG notification buzz is a fixed-length motor pulse (see `buzzTimeNow`), so a pattern is a count of
+    /// buzzes, not a length. Returns only after the last write so the background process stays alive for it.
+    static func buzzFromShortcut(pulses: Int, alarm: Bool, gapMs: Int = 900, waitSeconds: Int = 6) async -> StrapBuzzShortcutOutcome {
+        for _ in 0..<waitSeconds {
+            if let model = shared, model.live.historyReady || model.live.backfilling { break }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        guard let model = shared, model.live.historyReady || model.live.backfilling else { return .strapNotReady }
+        if alarm {
+            model.buzzStrapOnce()
+            return .buzzed
+        }
+        for i in 0..<max(1, pulses) {
+            if i > 0 { try? await Task.sleep(nanoseconds: UInt64(gapMs) * 1_000_000) }
+            model.ble.send(.runHapticsPattern, payload: [2, 1, 0, 0, 0], writeType: .withResponse)
+        }
+        return .buzzed
     }
 
     /// Once the intent has replied, nothing keeps the background-launched process running, and iOS may suspend

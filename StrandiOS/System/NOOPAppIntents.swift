@@ -70,15 +70,50 @@ struct MarkMomentIntent: AppIntent {
     }
 }
 
-/// Send a confirming haptic buzz to the strap. Opens the app so the live BLE link can deliver it.
+/// How the strap buzzes for a "Buzz Strap" run. Distinct counts let a screenless wrist tell automations apart
+/// (one for a message, three for a VIP); Alarm is the long graduated buzz the Live "Buzz strap" button uses.
+enum StrapBuzzPattern: String, AppEnum {
+    case once, twice, three, alarm
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Buzz pattern"
+    static var caseDisplayRepresentations: [StrapBuzzPattern: DisplayRepresentation] = [
+        .once: "Once",
+        .twice: "Twice",
+        .three: "Three times",
+        .alarm: "Alarm",
+    ]
+
+    var pulses: Int {
+        switch self {
+        case .once, .alarm: return 1
+        case .twice: return 2
+        case .three: return 3
+        }
+    }
+}
+
+/// Buzz the strap without opening NOOP, so a Shortcuts automation ("When I get a message from…", "When an
+/// email arrives from…") can tap the wrist. iOS gives no app other apps' notifications, so this is how a
+/// screenless strap gets a notification buzz. Runs in NOOP's own process under the bluetooth-central
+/// background mode, the same way Sync Strap does. Silent on success; says so when the strap isn't connected.
 struct BuzzStrapIntent: AppIntent {
     static var title: LocalizedStringResource = "Buzz Strap"
-    static var description = IntentDescription("Send a haptic buzz to your WHOOP strap.")
-    static var openAppWhenRun = true
+    static var description = IntentDescription("Buzz your WHOOP strap. Use it in an automation to feel a message or email arrive.")
+    static var openAppWhenRun = false
 
-    func perform() async throws -> some IntentResult {
-        PendingIntents.append(.buzz)
-        return .result()
+    @Parameter(title: "Pattern", default: .once)
+    var pattern: StrapBuzzPattern
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Buzz strap \(\.$pattern)")
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        switch await AppModel.buzzFromShortcut(pulses: pattern.pulses, alarm: pattern == .alarm) {
+        case .buzzed:        return .result(dialog: "Buzzed.")
+        case .strapNotReady: return .result(dialog: "Your strap isn't connected to Noop Aura, so it didn't buzz.")
+        }
     }
 }
 
