@@ -1898,6 +1898,7 @@ struct NoopLiftDetailScreen: View {
     @State private var insightsFor: NoopFitnessExerciseChoice?
 
     @State private var matched: WorkoutRow?
+    @State private var confirmDelete = false
 
     var body: some View {
         Group {
@@ -1927,6 +1928,29 @@ struct NoopLiftDetailScreen: View {
             }
             .noopSheet()
         }
+        .confirmationDialog("Delete this session?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await deleteSession() } }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("This removes it and every set in it from your record.") }
+    }
+
+    /// The lift, its sets and the workout row it saved, so Fitness and Effort stop counting it.
+    private func deleteSession() async {
+        guard let record, !isPrototypeRecord, let store = await repo.storeHandle() else { return }
+        _ = try? await store.deleteLiftSession(id: record.id)
+        if let matched {
+            if WorkoutSource.classify(matched.source) == .lifting {
+                // An imported lift's summary row lives in the import namespace, which deleteWorkout leaves alone.
+                _ = try? await store.deleteWorkouts(deviceId: LiftingImporter.sourceId, sport: matched.sport,
+                                                    from: matched.startTs, to: matched.startTs)
+            } else {
+                await repo.deleteWorkout(matched)
+            }
+        }
+        flow.selectedSession = nil
+        NoopFitnessModel.markChanged()
+        await repo.refresh()
+        if asSheet { dismiss() } else { navigation.back(or: navigation.liftDetailReturnRoute) }
     }
 
     /// Leaves the sheet first when there is one, so the next screen opens on the page underneath.
@@ -2236,6 +2260,12 @@ struct NoopLiftDetailScreen: View {
             }
             .buttonStyle(NoopHTMLPressStyle())
             .padding(.top, 4)
+            Button(role: .destructive) { confirmDelete = true } label: {
+                Text("Delete session").font(NoopHTMLFont.sans(NoopType.subhead, weight: .semibold))
+                    .frame(maxWidth: .infinity, minHeight: 46)
+            }
+            .foregroundStyle(NoopHTMLColor.red)
+            .buttonStyle(NoopPlainHitStyle())
         }
     }
 
