@@ -417,7 +417,7 @@ struct NoopVerifiedAppShell: View {
 
     /// Act 4's home: four weekly lines and the attendance grid from the stored daily rows. Body age
     /// stays out until its engine is chosen.
-    private static let canonicalPictureRoutes: Set<NoopRoute> = [.trends, .capacity, .rhythm]
+    private static let canonicalPictureRoutes: Set<NoopRoute> = [.trends, .rhythm]
 
     /// Act 6 on one engine (`VitalityEngine`): hero, band, drivers and history from the same call.
     /// Driver detail, the method page and the health hub have no production source and stay out.

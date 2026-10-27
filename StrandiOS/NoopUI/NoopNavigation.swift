@@ -104,7 +104,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
     // Act 3
     case session, pick, ready, live, intervals
     // Act 4
-    case trends, capacity, rhythm, year
+    case trends, rhythm
     // Act 5
     case diagnostics = "lab-diagnostics"
     case you, record, zones, history, strap, notifs, devices, apple, data, settings, widgets, lab, automations, onboard, pair, position
@@ -152,7 +152,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
         case .today, .inbox, .day, .energy, .vitals, .stress, .heart, .recovery, .strain,
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound: .day
         case .session, .pick, .ready, .live, .intervals: .effort
-        case .trends, .capacity, .rhythm, .year: .picture
+        case .trends, .rhythm: .picture
         case .you, .record, .zones, .history, .strap, .notifs, .devices, .apple, .data, .settings,
              .widgets, .lab, .diagnostics, .automations, .onboard, .pair, .position, .importHistory, .reading,
              .imported, .rejected, .backup,
@@ -179,7 +179,7 @@ enum NoopRoute: String, CaseIterable, Identifiable {
              .breathe, .bcatalog, .bplayer, .bsweep, .bfound,
              .coach, .gate, .setup, .consent, .memory:
             .today
-        case .trends, .capacity, .rhythm, .year,
+        case .trends, .rhythm,
              .ages, .building, .driver, .method, .health,
              .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects,
              .instrumentRaw, .instrumentCapture:
@@ -747,7 +747,7 @@ final class NoopNavigation: ObservableObject {
     /// Shared reports and sleep consistency retain the tab from which they were opened.
     var selectedTab: NoopTab {
         switch route {
-        case .digest, .report, .rhythm, .capacity: path.first?.tab ?? route.tab
+        case .digest, .report, .rhythm: path.first?.tab ?? route.tab
         case .labs, .picker, .review, .marker, .instrumentIndex, .instrumentMetric, .instrumentCompare, .instrumentEffects:
             path.first?.tab ?? route.tab
         default: route.tab
@@ -1151,9 +1151,7 @@ extension NoopRoute {
         case .live: "Live session"
         case .intervals: "Intervals"
         case .trends: "Trends"
-        case .capacity: "Capacity"
         case .rhythm: "Rhythm"
-        case .year: "The year"
         case .you: "You"
         case .record: "Your record"
         case .zones: "Your zones"

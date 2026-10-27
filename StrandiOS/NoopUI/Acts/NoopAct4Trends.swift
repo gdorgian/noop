@@ -28,12 +28,8 @@ struct NoopAct4Screens: View {
 
     var body: some View {
         switch navigation.route {
-        case .capacity:
-            NoopCapacityScreen(navigation: navigation, window: window, live: trends)
         case .rhythm:
             NoopRhythmScreen(navigation: navigation, window: window, live: trends)
-        case .year:
-            NoopYearScreen(navigation: navigation)
         default:
             NoopTrendsScreen(navigation: navigation, window: windowBinding, live: trends, battery: battery, ages: ages)
         }
@@ -180,6 +176,7 @@ private struct NoopTrendsScreen: View {
         NoopPageSection(id: "markers", title: "Markers", detail: "The measures you pinned"),
         NoopPageSection(id: "markers-tiles", title: "Markers · Tiles", detail: "Your pinned measures as a grid of tiles", onByDefault: false),
         NoopPageSection(id: "changes", title: "What changed", detail: "The window's verdict, six weeks to a year"),
+        NoopPageSection(id: "capacity", title: "Capacity", detail: "Estimated capacity week by week, and how far it moved", onByDefault: false),
         NoopPageSection(id: "bloodwork", title: "Bloodwork", detail: "Your lab results"),
         NoopPageSection(id: "explore", title: "Explore", detail: "Compare signals and relationships"),
         NoopPageSection(id: "summaries", title: "Your summaries", detail: "Weekly digest and the trends report"),
@@ -189,6 +186,12 @@ private struct NoopTrendsScreen: View {
     @ViewBuilder
     private func trendsSection(_ id: String) -> some View {
         switch id {
+        case "capacity":
+            VStack(alignment: .leading, spacing: 10) {
+                NoopSectionHeader("Capacity")
+                NoopCapacityCard(window: window, live: live)
+            }
+            .padding(.top, 18)
         case "hero", "hero-rings", "hero-field":
             NoopTrendsHero(
                 style: id == "hero-rings" ? 1 : id == "hero-field" ? 2 : 0,
@@ -852,8 +855,9 @@ private struct NoopAttendanceCard: View {
     }
 }
 
-private struct NoopCapacityScreen: View {
-    @ObservedObject var navigation: NoopNavigation
+/// Estimated capacity (ml/kg/min) week by week over the chosen window, with the change across it. Was
+/// its own Capacity page, which nothing opened; now an optional Trends section.
+private struct NoopCapacityCard: View {
     let window: NoopTrendWindow
     let live: NoopTrendsRecord
 
@@ -879,53 +883,43 @@ private struct NoopCapacityScreen: View {
     private var change: Double { (values.last ?? 0) - (values.first ?? 0) }
 
     var body: some View {
-        NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 0) {
-                NoopA4BackHeader(label: "Trends", action: navigation.back)
-                VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Capacity").font(NoopHTMLFont.outfit(NoopType.title2)).tracking(-0.6)
-                    HStack(alignment: .firstTextBaseline, spacing: 9) {
-                        Text(values.last.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? ("\u{2014}"))
-                            .font(NoopHTMLFont.outfit200(54)).tracking(-2.43)
-                            .frame(minHeight: 54)
-                        Text("ml/kg/min, estimated").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
-                    }
-                    if let read {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 9) {
+                    Text(values.last.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? ("\u{2014}"))
+                        .font(NoopHTMLFont.outfit200(54)).tracking(-2.43)
+                        .frame(minHeight: 54)
+                    Text("ml/kg/min, estimated").font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+                }
+                if let read {
                     Text(read)
                         .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
                         .noopA4LineBox(fontSize: 13.5, ratio: 1.6)
-                    }
                 }
-
-                VStack(alignment: .leading, spacing: 11) {
-                    HStack {
-                        NoopSectionLabel(window.span)
-                        Spacer()
-                        if values.count >= 2 {
+            }
+            VStack(alignment: .leading, spacing: 11) {
+                HStack {
+                    NoopSectionLabel(window.span)
+                    Spacer()
+                    if values.count >= 2 {
                         NoopA4Chip(
                             text: "\(change >= 0 ? "+" : "−")\(abs(change).formatted(.number.precision(.fractionLength(1)))) over the window",
                             color: change >= 0 ? NoopA4.goodLight : Color(hex: 0xF3C888),
                             background: change >= 0 ? NoopA4.good : NoopA4.warm
                         )
-                        }
                     }
-                    NoopA4CapacityChart(chart: chart)
-                        .frame(height: 118)
-                    NoopA4Axis(labels: window.axis(weekStarts: live.weekStarts))
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 13)
-                .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-                .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-
-                }
-                .padding(.top, 8)
+                NoopA4CapacityChart(chart: chart)
+                    .frame(height: 118)
+                NoopA4Axis(labels: window.axis(weekStarts: live.weekStarts))
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 13)
+            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+            .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
         }
     }
-
 }
 
 private struct NoopRhythmScreen: View {
@@ -1067,104 +1061,6 @@ private struct NoopRhythmScreen: View {
                 .monospacedDigit()
         }
         .frame(minHeight: 56)
-    }
-}
-
-private struct NoopYearScreen: View {
-    @ObservedObject var navigation: NoopNavigation
-
-    private let chapters: [(String, String, String, String, Color)] = [
-        ("January – February", "drift 52 min", "The flat start", "Six or seven hours a night at whatever hour the evening ended. Resting pulse 62, variability in the low forties, and nothing moving in either direction.", NoopHTMLColor.faint),
-        ("March – April", "drift 34 min", "The walking months", "You started going to bed inside the same hour and walking most days. Nothing else changed, and by the end of April resting pulse was down two beats.", NoopA4.lavender),
-        ("May – June", "drift 21 min", "It took", "The first stretch where sleep was over your need more weeks than under it. Variability climbed eight milliseconds and the rides stopped feeling like efforts.", NoopA4.green),
-        ("July – August", "drift 18 min", "The heat, and holding", "Two hot weeks pushed breathing rate up and sleep down, and it recovered on its own within ten days. That recovery is what the last eight months bought you.", NoopA4.green)
-    ]
-
-    private let firsts: [(String, String, String, String)] = [
-        ("Resting pulse under 60 for a full month", "it had never been under 60 for a week", "May", "heart"),
-        ("Eleven weeks inside your own bedtime hour", "previous best was three", "Jun", "clock"),
-        ("A hard session your body actually wanted", "readiness said yes and it was right", "Jul", "bolt"),
-        ("A hot fortnight you recovered from unaided", "no debt carried into August", "Aug", "checkmark")
-    ]
-
-    var body: some View {
-        NoopScreen(topInset: 56) {
-            VStack(alignment: .leading, spacing: 0) {
-                NoopA4BackHeader(label: "Trends", action: navigation.back)
-                VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("The year so far").font(NoopHTMLFont.outfit(NoopType.title2)).tracking(-0.6)
-                    Text("Eight months in four chapters, written the way you would tell it to someone — not as a chart you have to interpret.")
-                        .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
-                        .noopA4LineBox(fontSize: 13.5, ratio: 1.6)
-                }
-
-                VStack(alignment: .leading, spacing: 9) {
-                    ForEach(Array(chapters.enumerated()), id: \.offset) { _, chapter in
-                        VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text(chapter.0.uppercased()).font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).tracking(1.3).foregroundStyle(chapter.4)
-                                    Spacer()
-                                    Text(chapter.1).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.faint)
-                                }
-                                Text(chapter.2).font(NoopHTMLFont.outfit(NoopType.title3)).tracking(-0.38)
-                                    .frame(minHeight: 22.8, alignment: .top)
-                                Text(chapter.3).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy)
-                                    .noopA4LineBox(fontSize: 12.5, ratio: 1.6)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
-                        .padding(.bottom, 15)
-                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-                    }
-                }
-
-                NoopHTMLCard(radius: 22, padding: 16) {
-                    VStack(alignment: .leading, spacing: 13) {
-                        NoopSectionLabel("Firsts")
-                        VStack(alignment: .leading, spacing: 11) {
-                            ForEach(Array(firsts.enumerated()), id: \.offset) { _, item in
-                                HStack(alignment: .top, spacing: 11) {
-                                    NoopCanonicalGlyph(name: firstGlyph(item.3), size: 17, color: NoopA4.green).frame(width: 18)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(item.0).font(NoopHTMLFont.sans(NoopType.footnote))
-                                        Text(item.1).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0x7F8A85))
-                                    }
-                                    Spacer()
-                                    Text(item.2).font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 9) {
-                    NoopSectionLabel("Svea", color: Color(hex: 0xC9D0EE))
-                    Text("Nothing here happened because of a hard week. It happened because you went to bed at roughly the same hour for four months and walked most days. The interesting part is that your body is now good enough at recovering that it can take the harder sessions you have been avoiding.")
-                        .font(NoopHTMLFont.sans(NoopType.subhead)).foregroundStyle(Color(hex: 0xDCE3E0))
-                        .noopA4LineBox(fontSize: 14, ratio: 1.68)
-                }
-                .padding(16)
-                .background(NoopA4.lavender.opacity(0.08), in: RoundedRectangle(cornerRadius: 22))
-                .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopA4.lavender.opacity(0.2), lineWidth: 0.5))
-
-                Text("No year-in-review confetti, no personal bests you did not try for. A chapter only appears once there is enough of it to be true.")
-                    .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.faint)
-                    .noopA4LineBox(fontSize: 11.5, ratio: 1.6).padding(.horizontal, 2)
-                }
-                .padding(.top, 8)
-            }
-        }
-    }
-
-    private func firstGlyph(_ name: String) -> NoopCanonicalGlyphName {
-        switch name {
-        case "heart": .heart
-        case "clock": .clock
-        case "bolt": .bolt
-        default: .check
-        }
     }
 }
 
