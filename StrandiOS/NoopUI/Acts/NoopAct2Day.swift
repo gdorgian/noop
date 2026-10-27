@@ -1759,6 +1759,23 @@ struct NoopAct2Screens: View {
                     )
                     }
 
+                    if day != nil, let series = heartWindow == nil ? todayHeartSeries : (zoomedHeart.count > 1 ? zoomedHeart : todayHeartSeries),
+                       series.count > 1 {
+                        // The zoomable chart Your day has (tester, 27 Oct): opened from the heart tile, this page
+                        // only offered a fixed strip to drag along.
+                        let point = min(max(selectedHeartPoint, 0), series.count - 1)
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text("\(Int(series[point].bpm.rounded()))")
+                                    .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light)).monospacedDigit()
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Text("bpm at \(AppClock.hourMinuteFormatter().string(from: series[point].time))")
+                                    .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
+                            }
+                            .padding(.horizontal, 2)
+                            zoomableHeartCard(values: series.map(\.bpm), series: series, point: point)
+                        }
+                    } else
                     if todayHeartValues != nil {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -2160,50 +2177,7 @@ struct NoopAct2Screens: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     if !values.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            if heartBounds != nil {
-                                // Zoom you can see, as Apple Health picks its span with tabs; pinch and drag
-                                // still work on the chart itself.
-                                NoopTabs(options: Self.heartSpans, selection: Binding(
-                                    get: { heartSpanSelection },
-                                    set: { setHeartSpan($0, series: series, point: point) }))
-                            }
-                            NoopSectionLabel(day == nil ? "Drag along the day"
-                                             : heartWindow == nil ? "Drag to read \u{00B7} pinch to zoom"
-                                             : "Drag to move \u{00B7} hold to read")
-                            Act2ScrubbableDayChart(values: values, selected: $selectedHeartPoint, resting: todayRestingLine,
-                                                   pan: heartWindow == nil ? nil : { panHeart(by: $0, ended: $1, series: series, point: point) })
-                                .frame(height: 150)
-                                .simultaneousGesture(
-                                    MagnifyGesture()
-                                        .onChanged { zoomHeart(by: $0.magnification, series: series, point: point) }
-                                        .onEnded { _ in heartGestureAnchor = nil },
-                                    including: day == nil ? .subviews : .all)
-                                .onTapGesture(count: 2) { if heartWindow != nil { resetHeartZoom(series: series, point: point) } }
-                                .task(id: heartWindowKey) { await loadZoomedHeart() }
-                            HStack {
-                                let axis = heartWindow.map { Self.zoomAxisLabels($0) }
-                                    ?? dayAxis ?? (day == nil ? dayContext.axis : ["", "", "", ""])
-                                Text(axis[0]); Spacer()
-                                Text(axis[1]); Spacer()
-                                Text(axis[2]); Spacer()
-                                Text(axis[3])
-                            }
-                            .font(NoopHTMLFont.sans(NoopType.eyebrow))
-                            .foregroundStyle(NoopHTMLColor.faint)
-                            if let caption = todayRestingCaption {
-                            Text(caption)
-                                .font(NoopHTMLFont.sans(NoopType.eyebrow))
-                                .foregroundStyle(NoopHTMLColor.faint)
-                                .padding(.top, 2)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
-                        .padding(.bottom, 12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
+                        zoomableHeartCard(values: values, series: series, point: point)
                     }
 
                     if day == nil {
@@ -2263,6 +2237,55 @@ struct NoopAct2Screens: View {
                 }
             }
         }
+    }
+
+    /// The day's heart rate as a chart you drag to read, pinch to zoom and drag to pan once zoomed, with
+    /// the span tabs above. Your day and the Heart page both draw it, so either door reaches the zoom.
+    private func zoomableHeartCard(values: [Double], series: [(time: Date, bpm: Double)]?, point: Int) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if heartBounds != nil {
+                // Zoom you can see, as Apple Health picks its span with tabs; pinch and drag
+                // still work on the chart itself.
+                NoopTabs(options: Self.heartSpans, selection: Binding(
+                    get: { heartSpanSelection },
+                    set: { setHeartSpan($0, series: series, point: point) }))
+            }
+            NoopSectionLabel(day == nil ? "Drag along the day"
+                             : heartWindow == nil ? "Drag to read \u{00B7} pinch to zoom"
+                             : "Drag to move \u{00B7} hold to read")
+            Act2ScrubbableDayChart(values: values, selected: $selectedHeartPoint, resting: todayRestingLine,
+                                   pan: heartWindow == nil ? nil : { panHeart(by: $0, ended: $1, series: series, point: point) })
+                .frame(height: 150)
+                .simultaneousGesture(
+                    MagnifyGesture()
+                        .onChanged { zoomHeart(by: $0.magnification, series: series, point: point) }
+                        .onEnded { _ in heartGestureAnchor = nil },
+                    including: day == nil ? .subviews : .all)
+                .onTapGesture(count: 2) { if heartWindow != nil { resetHeartZoom(series: series, point: point) } }
+                .task(id: heartWindowKey) { await loadZoomedHeart() }
+            HStack {
+                let axis = heartWindow.map { Self.zoomAxisLabels($0) }
+                    ?? dayAxis ?? (day == nil ? dayContext.axis : ["", "", "", ""])
+                Text(axis[0]); Spacer()
+                Text(axis[1]); Spacer()
+                Text(axis[2]); Spacer()
+                Text(axis[3])
+            }
+            .font(NoopHTMLFont.sans(NoopType.eyebrow))
+            .foregroundStyle(NoopHTMLColor.faint)
+            if let caption = todayRestingCaption {
+            Text(caption)
+                .font(NoopHTMLFont.sans(NoopType.eyebrow))
+                .foregroundStyle(NoopHTMLColor.faint)
+                .padding(.top, 2)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
     }
 
     // MARK: Heart chart zoom
