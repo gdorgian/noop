@@ -838,11 +838,10 @@ struct NoopMetricChart: View {
                               yStart: .value("Low", normal.low), yEnd: .value("High", normal.high))
                     .foregroundStyle(accent.fill.opacity(0.10))
             }
+            // Day marks sit at midday; the line is placed to meet them.
+            NoopGapAwareLine(points: points.map { (date: Calendar.current.startOfDay(for: $0.date).addingTimeInterval(43_200), value: $0.value) },
+                             tint: accent.fill.opacity(0.55))
             ForEach(points) { p in
-                LineMark(x: .value("Day", p.date, unit: .day), y: .value(metric.short, p.value))
-                    .foregroundStyle(accent.fill.opacity(0.55))
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    .interpolationMethod(.monotone)
                 if sparse || p.date == picked {
                     PointMark(x: .value("Day", p.date, unit: .day), y: .value(metric.short, p.value))
                         .foregroundStyle(color(p.value))

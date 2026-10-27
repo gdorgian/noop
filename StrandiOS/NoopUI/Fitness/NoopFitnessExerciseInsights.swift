@@ -172,14 +172,9 @@ struct NoopTrendChartCard: View {
         let low = points.map(\.value).min() ?? 0, high = points.map(\.value).max() ?? 1
         let pad = max(1, (high - low) * 0.25)
         return Chart {
+            NoopGapAwareLine(points: points.map { (date: $0.date, value: $0.value) }, tint: tint,
+                             floor: low - pad, lineWidth: 2.2)
             ForEach(points, id: \.id) { p in
-                AreaMark(x: .value("Date", p.date), yStart: .value("Floor", low - pad), yEnd: .value("Value", p.value))
-                    .foregroundStyle(LinearGradient(colors: [tint.opacity(0.22), tint.opacity(0)], startPoint: .top, endPoint: .bottom))
-                    .interpolationMethod(.monotone)
-                LineMark(x: .value("Date", p.date), y: .value("Value", p.value))
-                    .foregroundStyle(tint)
-                    .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-                    .interpolationMethod(.monotone)
                 PointMark(x: .value("Date", p.date), y: .value("Value", p.value))
                     .foregroundStyle(selected?.id == p.id ? NoopHTMLColor.ink : tint)
                     .symbolSize(selected?.id == p.id ? 70 : (points.count > 30 ? 0 : 26))

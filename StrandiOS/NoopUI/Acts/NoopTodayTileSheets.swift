@@ -779,7 +779,8 @@ private struct NoopBreathePreview: View {
     }
 }
 
-/// A tile sheet's line. With `scrub`, a touch along it reads the value and time under the finger.
+/// A tile sheet's line. Every one reads under the finger through the shared chart touch; `scrub` is
+/// kept for callers and no longer changes that (27 Oct 2026: the weight sheet's line could not be read).
 struct NoopTileLineChart: View {
     let points: [(Date, Double)]
     let tint: (Color, Color)
@@ -788,42 +789,15 @@ struct NoopTileLineChart: View {
     var scrub = false
     var unit = ""
 
-    @State private var picked: Date?
-
-    private var pickedPoint: (Date, Double)? {
-        guard let picked else { return nil }
-        return points.min { abs($0.0.timeIntervalSince(picked)) < abs($1.0.timeIntervalSince(picked)) }
-    }
-
     var body: some View {
         let values = points.map(\.1)
         let low = (values.min() ?? 0), high = (values.max() ?? 1)
         let pad = max(1, (high - low) * 0.15)
+        let span = (points.last?.0).flatMap { last in points.first.map { last.timeIntervalSince($0.0) } } ?? 0
         VStack(spacing: 6) {
             Chart {
-                ForEach(Array(points.enumerated()), id: \.offset) { _, p in
-                    AreaMark(x: .value("Time", p.0), yStart: .value("Floor", low - pad), yEnd: .value("Value", p.1))
-                        .foregroundStyle(LinearGradient(colors: [tint.0.opacity(0.32), tint.0.opacity(0)], startPoint: .top, endPoint: .bottom))
-                        .interpolationMethod(.monotone)
-                    LineMark(x: .value("Time", p.0), y: .value("Value", p.1))
-                        .foregroundStyle(tint.0)
-                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                        .interpolationMethod(.monotone)
-                }
-                if let p = pickedPoint {
-                    RuleMark(x: .value("Picked", p.0))
-                        .foregroundStyle(NoopHTMLColor.inkSoft.opacity(0.45))
-                        .lineStyle(StrokeStyle(lineWidth: 1))
-                        .annotation(position: .top, spacing: 2, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                            Text("\(Int(p.1.rounded()))\(unit.isEmpty ? "" : " " + unit) · \(AppClock.hourMinuteFormatter().string(from: p.0))")
-                                .font(NoopHTMLFont.sans(NoopType.eyebrow, weight: .semibold)).monospacedDigit()
-                                .foregroundStyle(NoopHTMLColor.canvas)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(NoopHTMLColor.inkSoft, in: Capsule())
-                        }
-                    PointMark(x: .value("Time", p.0), y: .value("Value", p.1))
-                        .symbol { Circle().fill(.white).frame(width: 8, height: 8).shadow(color: tint.1, radius: 5) }
-                } else if let last = points.last {
+                NoopGapAwareLine(points: points.map { (date: $0.0, value: $0.1) }, tint: tint.0, floor: low - pad)
+                if let last = points.last {
                     PointMark(x: .value("Time", last.0), y: .value("Value", last.1))
                         .symbol { Circle().fill(.white).frame(width: 8, height: 8).shadow(color: tint.1, radius: 5) }
                 }
@@ -831,26 +805,22 @@ struct NoopTileLineChart: View {
             .chartYScale(domain: (low - pad)...(high + pad))
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)
-            .modifier(NoopChartScrub(enabled: scrub, picked: $picked))
+            .noopChart(x: Date.self, snap: points.map(\.0)) { x in
+                points.first { $0.0 == x }.map { p in
+                    NoopChartReadout(value: Self.value(p.1) + (unit.isEmpty ? "" : " " + unit),
+                                     detail: span < 36 * 3600 ? AppClock.hourMinuteFormatter().string(from: p.0)
+                                         : p.0.formatted(.dateTime.day().month(.abbreviated).year(.twoDigits)),
+                                     y: p.1, tint: tint.1)
+                }
+            }
             .frame(height: height)
-            .padding(.top, scrub ? 18 : 0)
+            .padding(.top, 18)
             if let labels { NoopTodayTileSheet.axisLabels(labels.0, labels.1) }
         }
     }
-}
 
-/// Touch-to-read on a chart, attached only where asked so other charts keep the sheet's drag.
-private struct NoopChartScrub: ViewModifier {
-    let enabled: Bool
-    @Binding var picked: Date?
-
-    func body(content: Content) -> some View {
-        if enabled {
-            content.chartXSelection(value: $picked)
-                .sensoryFeedback(.selection, trigger: picked)
-                .noopChartZoom()
-        } else {
-            content
-        }
+    /// Whole numbers stay whole; a weight keeps its tenth.
+    private static func value(_ v: Double) -> String {
+        abs(v - v.rounded()) < 0.05 || abs(v) >= 200 ? "\(Int(v.rounded()))" : String(format: "%.1f", v)
     }
 }
