@@ -305,7 +305,6 @@ struct NoopAct2Screens: View {
     @ObservedObject private var planStore = CoachPlanStore.shared
 
     @AppStorage("noop.schedule.kind") private var scheduleKind = "mostly-nights"
-    @SceneStorage("noop.act2.day-rail-open") private var dayRailOpen = false
     @SceneStorage("noop.act2.heart-point") private var selectedHeartPoint = 23
     /// The heart chart's zoomed window; nil shows the whole day as 24 means. Pinch sets it, a drag pans
     /// it, double-tap or "Whole day" clears it. Zoomed points are re-read at the window's resolution,
@@ -335,12 +334,8 @@ struct NoopAct2Screens: View {
                 todayScreen
             case .inbox:
                 inboxScreen
-            case .charge:
-                chargeScreen
             case .day:
                 dayScreen
-            case .energy:
-                energyScreen
             case .vitals:
                 vitalsScreen
             case .stress:
@@ -383,36 +378,10 @@ struct NoopAct2Screens: View {
                 // The date now always opens the calendar; the seeded shell's rail stays for the
                 // design's example week. It spans the screen inside the page's own inset.
 
-                if isHistorical {
-                    Button {
-                        navigation.selectedTodayDay = 0
-                        dayRailOpen = false
-                    } label: {
-                        HStack(spacing: 10) {
-                            Act2Glyph(.clock, size: 17, color: NoopHTMLColor.night)
-                            Text("Looking back at \(dayContext.date). Nothing here is live.")
-                                .font(NoopHTMLFont.sans(NoopType.caption))
-                                .foregroundStyle(Color(hex: 0xC9D0EE))
-                                .multilineTextAlignment(.leading)
-                                .lineSpacing(2)
-                            Spacer(minLength: 4)
-                            Text("Today")
-                                .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-                                .foregroundStyle(NoopHTMLColor.night)
-                        }
-                        .padding(.horizontal, 15)
-                        .padding(.vertical, 12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(NoopHTMLColor.night.opacity(0.09), in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(NoopHTMLColor.night.opacity(0.24), lineWidth: 0.5))
-                    }
-                    .buttonStyle(NoopHTMLPressStyle())
-                    .padding(.top, 12)
-                }
 
                 // One question at a time, above the page and only on live data: the new look first,
                 // then the bedtime nudge once Noop has learned the nights it needs.
-                if !isHistorical, !todayEditing.active {
+                if !todayEditing.active {
                     if askingLook {
                         NoopNewLookCard { withAnimation(.smooth(duration: 0.3)) { askingLook = false } }
                             .padding(.top, 12)
@@ -669,7 +638,7 @@ struct NoopAct2Screens: View {
                             .noopSheet()
                     }
                 // A session the strap caught but nobody logged sits right under the line it shows on.
-                if !isHistorical { NoopActivityOffer() }
+                NoopActivityOffer()
             
             }
         case "energy":
@@ -815,14 +784,6 @@ struct NoopAct2Screens: View {
         return day.stressLevel.map { NoopDayRecord.stressNames[NoopDayRecord.stressStep($0)].lowercased() }
     }
 
-    private func energyLegend(_ text: String, color: Color) -> some View {
-        HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 7, height: 7)
-            Text(text).font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy)
-                .monospacedDigit()
-        }
-    }
-
     private var todayHeader: some View {
         // One row: the date opens the calendar, and across from it the band and the updates. The wearer's status is a tile on the page itself (25 Oct 2026).
         VStack(alignment: .leading, spacing: 14) {
@@ -879,13 +840,6 @@ struct NoopAct2Screens: View {
             }
 
             // The breathing prompt belongs to the orb and moves with it; a past day keeps its header.
-            if isHistorical {
-                Text(dayContext.header)
-                    .font(NoopHTMLFont.outfit(NoopType.title2))
-                    .tracking(-0.5)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
         }
         .padding(.bottom, 4)
         // A status kept for a set time runs out on its own; read it again whenever Today comes back.
@@ -1319,112 +1273,6 @@ struct NoopAct2Screens: View {
 
     // MARK: - Charge
 
-    private var chargeScreen: some View {
-        NoopScreen(topInset: 58) {
-            VStack(spacing: 0) {
-                Act2BackBar(label: "Today", action: { back(to: .today) })
-                    .padding(.bottom, 16)
-
-                VStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 13) {
-                        HStack(alignment: .bottom, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                NoopSectionLabel("Charge left", color: Color(hex: 0x8B958F))
-                                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                    Text("\(dayContext.charge)")
-                                        .font(NoopHTMLFont.outfit200(52))
-                                        .tracking(-1.56)
-                                        .foregroundStyle(chargeColor)
-                                        .monospacedDigit()
-                                        .frame(minHeight: 52)
-                                    Text("of \(dayContext.wakeCharge)")
-                                        .font(NoopHTMLFont.sans(NoopType.footnote))
-                                        .foregroundStyle(Color(hex: 0x7F8A85))
-                                        .monospacedDigit()
-                                }
-                            }
-                            Spacer()
-                            Act2ChargeStateChip(text: dayContext.chargeLabel, color: chargeColor)
-                        }
-                        GeometryReader { proxy in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Color.white.opacity(0.06))
-                                Capsule()
-                                    .fill(NoopHTMLColor.blueLight.opacity(0.16))
-                                    .frame(width: proxy.size.width * min(1, CGFloat(dayContext.wakeCharge) / 100))
-                                Capsule()
-                                    .fill(chargeColor)
-                                    .frame(width: proxy.size.width * min(1, CGFloat(dayContext.charge) / 100))
-                                    .animation(.easeInOut(duration: 0.5), value: dayContext.charge)
-                            }
-                        }
-                        .frame(height: 12)
-                        Text(dayContext.chargeLine)
-                            .font(NoopHTMLFont.sans(NoopType.footnote))
-                            .foregroundStyle(NoopHTMLColor.copy)
-                            .lineSpacing(3)
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        NoopSectionLabel("Where it went")
-                            .padding(.horizontal, 4)
-                        VStack(spacing: 0) {
-                            ForEach(Array(dayContext.spend.enumerated()), id: \.offset) { index, row in
-                                HStack(spacing: 12) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(row.title).font(NoopHTMLFont.sans(NoopType.footnote))
-                                        Text(row.detail)
-                                            .font(NoopHTMLFont.sans(NoopType.caption))
-                                            .foregroundStyle(Color(hex: 0x7F8A85))
-                                            .lineSpacing(2)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                    }
-                                    Spacer(minLength: 6)
-                                    Text("−\(row.cost)")
-                                        .font(NoopHTMLFont.outfit(NoopType.body))
-                                        .tracking(-0.34)
-                                        .foregroundStyle(chargeColor)
-                                        .monospacedDigit()
-                                }
-                                .padding(.vertical, 11)
-                                if index < dayContext.spend.count - 1 { Divider().overlay(NoopHTMLColor.border) }
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-                    }
-
-                    HStack(spacing: 13) {
-                        Act2Glyph(.moon, size: 19, color: NoopHTMLColor.night)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Tonight puts it back").font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                            Text("7h 05m in bed gets you back to about \(min(100, dayContext.charge + 26)) by morning. Sleep is the only thing that does it.")
-                                .font(NoopHTMLFont.sans(NoopType.caption))
-                                .foregroundStyle(Color(hex: 0xC9D0EE))
-                                .lineSpacing(2)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer()
-                    }
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(NoopHTMLColor.night.opacity(0.09), in: RoundedRectangle(cornerRadius: 22))
-                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(NoopHTMLColor.night.opacity(0.24), lineWidth: 0.5))
-
-                    Text("Charge is spent, not scored. It starts where your night left it and everything you do takes a piece — so a low evening is not a failure, it is the day showing up in the number.")
-                        .font(NoopHTMLFont.sans(NoopType.caption))
-                        .foregroundStyle(NoopHTMLColor.faint)
-                        .lineSpacing(4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 2)
-                }
-            }
-        }
-    }
-
     // MARK: - Heart
 
     private var heartScreen: some View {
@@ -1683,139 +1531,6 @@ struct NoopAct2Screens: View {
     }
 
     // MARK: - The day so far
-
-    private static let energyDemoActiveHours: [CGFloat] = [
-        0, 0, 0, 0, 0, 0, 10, 45, 30, 20, 25, 18,
-        30, 22, 18, 120, 60, 25, 30, 22, 15, 10, 5, 0,
-    ]
-
-    private var energyScreen: some View {
-        NoopScreen(topInset: 58) {
-            VStack(alignment: .leading, spacing: 0) {
-                Act2BackBar(label: "What today has cost", action: { back(to: .today) })
-                    .padding(.bottom, 18)
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack(alignment: .lastTextBaseline, spacing: 9) {
-                            Text("1,280")
-                                .font(NoopHTMLFont.outfit200(50)).tracking(-2)
-                                .foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
-                            Text("kcal").font(NoopHTMLFont.sans(NoopType.footnote))
-                                .foregroundStyle(NoopHTMLColor.copy)
-                        }
-                        .frame(minHeight: 50, alignment: .bottom)
-                        Text("Measured from the strap, which you have worn for all but one hour of the day so far.")
-                            .font(NoopHTMLFont.sans(NoopType.footnote)).foregroundStyle(NoopHTMLColor.copy)
-                            .lineSpacing(4.5).fixedSize(horizontal: false, vertical: true)
-                    }
-                    energyHourCard
-                    energyReadCard
-                    VStack(alignment: .leading, spacing: 9) {
-                        Text("Spend only")
-                            .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                            .foregroundStyle(NoopHTMLColor.ink)
-                        Text("Noop estimates what the day cost because that changes a training decision. It will never set a number for you to eat against — there is no target here, no deficit, and nothing remaining.")
-                            .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(Color(hex: 0xB7C3C9))
-                            .lineSpacing(4.5).fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 15)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(NoopHTMLColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
-                    .overlay(RoundedRectangle(cornerRadius: 22)
-                        .strokeBorder(NoopHTMLColor.blue.opacity(0.18), lineWidth: 0.5))
-                    Text("A figure Noop stands behind for the hours it saw, and silence for the ones it did not. No score on this screen, and nothing on it is a thing to hit.")
-                        .font(NoopHTMLFont.sans(NoopType.caption)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                        .lineSpacing(4.5).fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 2)
-                }
-            }
-        }
-    }
-
-    private var energyHourCard: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(alignment: .firstTextBaseline) {
-                NoopSectionLabel("Hour by hour")
-                Spacer()
-                Text("230 kcal an hour")
-                    .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                    .monospacedDigit()
-            }
-            HStack(alignment: .bottom, spacing: 2) {
-                ForEach(0..<24, id: \.self) { hour in
-                    let part: CGFloat = hour < 15 ? 1 : hour == 15 ? 0.6 : 0
-                    let seen = hour != 11
-                    VStack(spacing: 1) {
-                        if part > 0, seen, Self.energyDemoActiveHours[hour] > 0 {
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color(hex: 0x9FE2FB))
-                                .frame(height: Self.energyDemoActiveHours[hour] * part * 132 / 230)
-                        }
-                        if part > 0 {
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(seen ? NoopHTMLColor.blue : Color.white.opacity(0.08))
-                                .frame(height: max(2, 69 * part * 132 / 230))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .bottom)
-                }
-            }
-            .frame(height: 132, alignment: .bottom)
-            HStack {
-                Text("00"); Spacer(); Text("06"); Spacer(); Text("12"); Spacer(); Text("18"); Spacer(); Text("24")
-            }
-            .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-            .monospacedDigit()
-            HStack(spacing: 12) {
-                energyLegend("basal 1,010", color: NoopHTMLColor.blue)
-                energyLegend("active 270", color: Color(hex: 0x9FE2FB))
-            }
-            .padding(.top, 2)
-            Text("Solid columns were measured. The hour with no strap is a hairline at its modelled basal — the size of the hole, not a contribution to the figure. A gap is not a zero, and it is not a number either.")
-                .font(NoopHTMLFont.sans(NoopType.eyebrow)).foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-    }
-
-    private var energyReadCard: some View {
-        let rows: [(String, String, String)] = [
-            ("Read from", "The strap", "by worn time, with Apple Health as the fallback"),
-            ("How much of the day it saw", "94%", "stated in hours on the card; the percentage lives here"),
-            ("Unattributed heart rate", "1 h 10 m", "elevated and not matched to a session, so it is counted as active and named here"),
-            ("The forecast’s width", "±11%", "widens as coverage falls"),
-        ]
-        return VStack(alignment: .leading, spacing: 0) {
-            NoopSectionLabel("What it read")
-                .padding(.top, 13).padding(.bottom, 6)
-            ForEach(rows.indices, id: \.self) { index in
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(rows[index].0).font(NoopHTMLFont.sans(NoopType.footnote))
-                            .foregroundStyle(NoopHTMLColor.ink)
-                        Text(rows[index].2).font(NoopHTMLFont.sans(NoopType.eyebrow))
-                            .foregroundStyle(NoopHTMLColor.copy.opacity(0.82))
-                            .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 0)
-                    Text(rows[index].1).font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.ink).monospacedDigit()
-                        .fixedSize()
-                }
-                .padding(.vertical, 12)
-                .overlay(alignment: .top) {
-                    if index > 0 { Rectangle().fill(Color.white.opacity(0.055)).frame(height: 0.5) }
-                }
-            }
-        }
-        .padding(.horizontal, 16).padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: 22))
-        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(NoopHTMLColor.border, lineWidth: 0.5))
-    }
 
     private var dayScreen: some View {
         let series = heartWindow == nil ? todayHeartSeries : (zoomedHeart.count > 1 ? zoomedHeart : todayHeartSeries)
@@ -2342,13 +2057,12 @@ struct NoopAct2Screens: View {
         min(max(navigation.selectedTodayDay, 0), Self.days.count - 1)
     }
 
-    private var isHistorical: Bool { selectedTodayOffset > 0 }
-
+    
     private var dayContext: Act2DayContext {
         let selected = Self.days[Self.days.count - 1 - selectedTodayOffset]
         let canonical = Self.days[Self.days.count - 1]
-        let eyebrow = isHistorical ? selected.date : (isNightWorker ? "Evening, Gabriel" : "Hi, Gabriel")
-        let header = isHistorical ? selected.header : "Take four breaths first"
+        let eyebrow = (isNightWorker ? "Evening, Gabriel" : "Hi, Gabriel")
+        let header = "Take four breaths first"
 
         guard isNightWorker else {
             return Act2DayContext(
@@ -2564,20 +2278,6 @@ private struct Act2BackBar: View {
         }
         .padding(.horizontal, -2)
         .padding(.top, -2)
-    }
-}
-
-private struct Act2ChargeStateChip: View {
-    let text: String
-    let color: Color
-    var body: some View {
-        Text(text)
-            .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
-            .foregroundStyle(color)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 6)
-            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(color.opacity(0.3), lineWidth: 0.5))
     }
 }
 
