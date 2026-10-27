@@ -118,6 +118,8 @@ struct NoopAct5Screens: View {
     @State private var notificationAuth: UNAuthorizationStatus?
     @State private var actionNotice: String?
     @State private var labExportBusy = false
+    /// The export waiting for its range ("Last night", "Last 24 hours", "Last 7 days").
+    @State private var exportRangeFor: String?
     @State private var showPhasePicker = false
     @State private var showTestCentre = false
     /// One request to the Aura release page, only when the wearer taps Check for updates.
@@ -5005,9 +5007,9 @@ private extension NoopAct5Screens {
                 labGroup("Exports", blurb: "Send the zip with a note of what went wrong and roughly when.") {
                     labAction("Copy the strap log", detail: "the connection and protocol trace, as text", symbol: "doc.on.doc")
                     Divider().overlay(NoopHTMLColor.border)
-                    labAction("Export raw sensor data", detail: "the decoded per-sample streams for the last 24 hours, as CSV", symbol: "arrow.down.to.line")
+                    labAction("Export raw sensor data", detail: labExportBusy ? "Preparing the export…" : "the decoded per-sample streams, last night or longer, zipped", symbol: "arrow.down.to.line")
                     Divider().overlay(NoopHTMLColor.border)
-                    labAction("Export raw and log together", detail: "one zip, for when the two need reading side by side", symbol: "archivebox")
+                    labAction("Export raw and log together", detail: labExportBusy ? "Preparing the export…" : "one zip, for when the two need reading side by side", symbol: "archivebox")
                     Divider().overlay(NoopHTMLColor.border)
                     labAction("Mark an experiment phase", detail: "timestamps the local capture file — sends nothing to the strap", symbol: "clock")
                     Divider().overlay(NoopHTMLColor.border)
@@ -5018,6 +5020,17 @@ private extension NoopAct5Screens {
 
             }
         }
+        .confirmationDialog("How much to export?", isPresented: Binding(get: { exportRangeFor != nil },
+                                                                       set: { if !$0 { exportRangeFor = nil } }),
+                            titleVisibility: .visible) {
+            ForEach(["Last night", "Last 24 hours", "Last 7 days"], id: \.self) { range in
+                Button(range) {
+                    if let title = exportRangeFor { runRawExport(title, range: range) }
+                    exportRangeFor = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { exportRangeFor = nil }
+        } message: { Text("Last night is usually enough, and the smallest to send.") }
     }
 
     var labScreen: some View {
@@ -5121,29 +5134,7 @@ private extension NoopAct5Screens {
             actionNotice = "Strap log copied. Paste it into a message or a note."
         case "Export raw sensor data", "Export raw and log together":
             guard !labExportBusy else { return }
-            labExportBusy = true
-            let withLog = title == "Export raw and log together"
-            Task { @MainActor in
-                defer { labExportBusy = false }
-                guard let store = await model.repo.storeHandle() else {
-                    actionNotice = "Export failed: the local store could not be opened."
-                    return
-                }
-                do {
-                    let url = try await store.exportRawCSV(deviceId: model.repo.deviceId,
-                                                           since: Date().timeIntervalSince1970 - 24 * 60 * 60)
-                    if withLog {
-                        let extra = await DebugDataDiagnostics.dynamicLines(repo: model.repo)
-                        await FileExport.exportPair(file: url, fileSuggestedName: url.lastPathComponent,
-                                                    text: live.exportableLogText(extraHeaderLines: extra),
-                                                    textSuggestedName: FileExport.timestampedName("noop-strap-log", ext: "txt"))
-                    } else {
-                        FileExport.exportFile(at: url)
-                    }
-                } catch {
-                    actionNotice = "Export failed: \(error.localizedDescription)"
-                }
-            }
+            exportRangeFor = title
         case "Mark an experiment phase":
             showPhasePicker = true
         case "This phone’s environment":
@@ -5153,6 +5144,45 @@ private extension NoopAct5Screens {
             showTestCentre = true
         default:
             break
+        }
+    }
+
+    /// The raw export for one range, zipped. "Last night" starts an hour before the latest night's onset.
+    func runRawExport(_ title: String, range: String) {
+        guard !labExportBusy else { return }
+        labExportBusy = true
+        let withLog = title == "Export raw and log together"
+        Task { @MainActor in
+            defer { labExportBusy = false }
+            guard let store = await model.repo.storeHandle() else {
+                actionNotice = "Export failed: the local store could not be opened."
+                return
+            }
+            let now = Date().timeIntervalSince1970
+            var since = now - 24 * 3600
+            switch range {
+            case "Last 7 days": since = now - 7 * 86_400
+            case "Last night":
+                if let night = await model.repo.allSleepSessions(days: 3).max(by: { $0.endTs < $1.endTs }) {
+                    since = TimeInterval(night.effectiveStartTs - 3600)
+                }
+            default: break
+            }
+            do {
+                let url = try await store.exportRawCSV(deviceId: model.repo.deviceId, since: since)
+                if withLog {
+                    let extra = await DebugDataDiagnostics.dynamicLines(repo: model.repo)
+                    await FileExport.exportPair(file: url, fileSuggestedName: url.lastPathComponent,
+                                                text: live.exportableLogText(extraHeaderLines: extra),
+                                                textSuggestedName: FileExport.timestampedName("noop-strap-log", ext: "txt"))
+                } else {
+                    let data = (try? Data(contentsOf: url)) ?? Data()
+                    await FileExport.exportBundle(entries: [.init(name: url.lastPathComponent, data: data)],
+                                                  suggestedName: FileExport.timestampedName("noop-raw", ext: "zip"))
+                }
+            } catch {
+                actionNotice = "Export failed: \(error.localizedDescription)"
+            }
         }
     }
 

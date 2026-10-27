@@ -171,7 +171,10 @@ enum FileExport {
         try? FileManager.default.removeItem(at: url)
         guard let archive = try? Archive(url: url, accessMode: .create) else { return nil }
         for entry in entries {
-            try? archive.addEntry(with: entry.name, type: .file, uncompressedSize: Int64(entry.data.count)) { position, size in
+            // Deflated: ZIPFoundation stores entries uncompressed by default, and a raw CSV export
+            // shrinks several times over, the difference between attachable and not.
+            try? archive.addEntry(with: entry.name, type: .file, uncompressedSize: Int64(entry.data.count),
+                                  compressionMethod: .deflate) { position, size in
                 let start = Int(position)
                 let end = min(start + size, entry.data.count)
                 return entry.data.subdata(in: start..<end)
