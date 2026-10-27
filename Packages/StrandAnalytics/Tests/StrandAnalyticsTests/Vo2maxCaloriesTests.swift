@@ -49,4 +49,15 @@ final class Vo2maxCaloriesTests: XCTestCase {
         let kcal = Calories.estimateBoutCalories(hr, profile: profile, hrmax: 190.0, restingHR: 50.0).0
         XCTAssertEqual(kcal, 0.248825127469726 * 60, accuracy: 1e-9)
     }
+
+    /// Unknown sex: each sex's rate is clamped at zero before averaging. At a low pulse the male row
+    /// goes negative while the female row stays positive, so the average is half the female rate.
+    func testUnknownSexAveragesClampedRates() {
+        let male = Calories.activeKcalPerS(Calories.male, hr: 50, hrmax: 190, weightKg: 40, age: 18)
+        let female = Calories.activeKcalPerS(Calories.female, hr: 50, hrmax: 190, weightKg: 40, age: 18)
+        XCTAssertEqual(male, 0)
+        XCTAssertGreaterThan(female, 0)
+        XCTAssertEqual(Calories.activeKcalPerS(Calories.nonbinary, hr: 50, hrmax: 190, weightKg: 40, age: 18),
+                       female / 2, accuracy: 1e-12)
+    }
 }

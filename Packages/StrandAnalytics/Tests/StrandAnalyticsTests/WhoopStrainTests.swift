@@ -256,4 +256,11 @@ final class WhoopStrainTests: XCTestCase {
         // Effort on its own scale; the WHOOP number passes through un-truncated.
         XCTAssertEqual(StrainScorer.effortValue(fromWhoopStrain: 20.5), 97.61904761904762, accuracy: 1e-12)
     }
+
+    /// A minute at exactly 30 % of reserve counts nothing; just above it counts.
+    func testReserveAtExactlyThirtyPercentIsZero() {
+        // resting 60, max 187 → reserve span 130 (max + 3); 99 bpm is exactly 30 %.
+        XCTAssertEqual(WhoopStrain.reserve(99, restingHR: 60, hrMax: 187), 0)
+        XCTAssertGreaterThan(WhoopStrain.reserve(99.5, restingHR: 60, hrMax: 187), 0)
+    }
 }

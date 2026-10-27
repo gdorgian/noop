@@ -183,8 +183,8 @@ public enum WhoopStrain {
     /// One minute's reserve share (clamped [0,1]) and zero below WHOOP's floor.
     static func reserve(_ hr: Double, restingHR: Double, hrMax: Double) -> Double {
         let share = (hr - restingHR) / ((hrMax + hrMaxBump) - restingHR)
-        if share < reserveFloor { return 0 }
-        return min(max(share, 0), 1)
+        let clamped = min(max(share, 0), 1)
+        return clamped <= reserveFloor ? 0 : clamped   // at or under 30 % counts nothing
     }
 
     /// WHOOP's S-curve weight at `reserve` share: 16 / (1 + exp((1 − share) / 0.15)).

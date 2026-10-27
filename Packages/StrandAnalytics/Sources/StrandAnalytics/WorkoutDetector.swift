@@ -597,7 +597,7 @@ public enum Calories {
         public var totalKcal: Double { restingKcal + activeKcal }
     }
 
-    struct Coeffs {
+    struct Coeffs: Equatable {
         let restingAlpha: Double
         let restingWeight: Double
         let restingHeight: Double  // applied to height in METRES
@@ -731,6 +731,12 @@ public enum Calories {
     /// share separately.
     static func activeKcalPerS(_ c: Coeffs, hr: Double, hrmax: Double, weightKg: Double, age: Double,
                                vo2max: Double? = nil) -> Double {
+        // Unknown sex on the base model: each sex's rate is clamped at zero first, then the two are
+        // averaged — averaging the coefficients instead disagrees whenever one sex's row is negative.
+        if vo2max == nil, c == nonbinary {
+            return (activeKcalPerS(male, hr: hr, hrmax: hrmax, weightKg: weightKg, age: age)
+                    + activeKcalPerS(female, hr: hr, hrmax: hrmax, weightKg: weightKg, age: age)) / 2
+        }
         let eeKjMin: Double
         if let vo2 = vo2max {
             eeKjMin = c.fitHR * min(hr, hrmax) + c.fitVO2 * vo2 + c.fitWeight * weightKg
