@@ -82,6 +82,9 @@ final class HevySync: ObservableObject {
             }
             account = user.name ?? "your Hevy account"
             d.set(account, forKey: K.account)
+            // The key check is done: leave its working phase, or `sync` sees a sync already running and
+            // returns at once, and a first connect brought nothing across while the sheet said Syncing.
+            phase = .idle
             await sync(repo: repo)
             return true
         } catch {
@@ -503,13 +506,23 @@ final class HevySync: ObservableObject {
 
     private enum Failure: Error { case status(Int), offline }
 
+    /// Hevy's API. A Debug build may point it at a local stand-in with `--hevy-base-url <url>`, so the
+    /// whole sync can be exercised without a real account; Release always talks to Hevy.
+    private static let baseURL: String = {
+        #if DEBUG
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--hevy-base-url"), args.indices.contains(i + 1) { return args[i + 1] }
+        #endif
+        return "https://api.hevyapp.com"
+    }()
+
     private func get(_ path: String, key: String, query: [String: String] = [:]) async throws -> Data {
         try await send("GET", path, key: key, query: query)
     }
 
     private func send(_ method: String, _ path: String, key: String, query: [String: String] = [:],
                       body: Data? = nil) async throws -> Data {
-        var components = URLComponents(string: "https://api.hevyapp.com" + path)
+        var components = URLComponents(string: Self.baseURL + path)
         if !query.isEmpty { components?.queryItems = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) } }
         guard let url = components?.url else { throw Failure.offline }
         var request = URLRequest(url: url, timeoutInterval: 30)
