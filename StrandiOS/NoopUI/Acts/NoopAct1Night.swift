@@ -1381,17 +1381,10 @@ struct NoopAct1Screens: View {
     private var restRingRead: String {
         guard let rest, let night = restNight else { return ringRead }
         let short = (rest.needMin - night.asleepMin) / 60
-        if short > 0.12 {
-            // The template's tail names "last night" / "that sleep". For an older night that is false,
-            // and design has written no variant, so only the template's own first clause is kept.
-            guard restHeaderLabel != night.longDate else {
-                return "The ring stops short by \(Int((short * 60).rounded())) minutes"
-            }
-            return isNightWorker
-                ? "The ring stops short by \(Int((short * 60).rounded())) minutes \u{2014} see why that sleep went that way"
-                : "The ring stops short by \(Int((short * 60).rounded())) minutes \u{2014} see why last night went that way"
-        }
-        return "A closed ring. See what the night was made of"
+        // The template's tail ("see why…", "See what…") points at the Why page, which has no engine
+        // behind measured nights yet and does not open from here; only the measured clause is kept.
+        if short > 0.12 { return "The ring stops short by \(Int((short * 60).rounded())) minutes" }
+        return "A closed ring: the night met your need"
     }
 
     /// The hero slot when there is no night to draw. Empty carries the spec's one static sentence;

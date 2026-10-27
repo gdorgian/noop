@@ -754,7 +754,15 @@ struct NoopFitnessRoutineEditor: View {
         defer { saving = false }
         let now = Int(Date().timeIntervalSince1970)
         let id = program?.id ?? navigation.fitnessRoutineID ?? "routine-\(UUID().uuidString)"
-        let title = typedName.isEmpty ? suggestedName : typedName
+        var title = typedName.isEmpty ? suggestedName : typedName
+        if typedName.isEmpty {
+            // A suggested name never repeats one already in the list: "Abs", then "Abs 2".
+            let taken = Set(((try? await store.liftPrograms(deviceId: repo.deviceId)) ?? [])
+                .filter { $0.id != id }.map { $0.name.lowercased() })
+            var n = 2
+            let base = title
+            while taken.contains(title.lowercased()) { title = "\(base) \(n)"; n += 1 }
+        }
         let row = LiftProgramRow(id: id, deviceId: repo.deviceId, name: title, note: program?.note,
                                  createdAt: program?.createdAt ?? now, updatedAt: now, archived: false)
         do {
