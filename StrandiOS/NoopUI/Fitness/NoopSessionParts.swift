@@ -471,6 +471,9 @@ struct NoopSessionHeart: View {
         if let zones = await repo.workoutZoneMinutes(from: start, to: end, zoneSet: zoneSet, source: source) {
             let counted = zones.reduce(0, +)
             minutes = [max(0, Double(end - start) / 60 - counted)] + zones
+        } else if !curve.isEmpty {
+            // Heart rate was recorded but never reached Zone 1: the whole session is Zone 0, not "no zones".
+            minutes = [Double(end - start) / 60] + Array(repeating: 0, count: zoneSet.zones.count)
         } else {
             minutes = []
         }
