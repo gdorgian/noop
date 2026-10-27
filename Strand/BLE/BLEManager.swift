@@ -5544,6 +5544,20 @@ public final class BLEManager: NSObject, ObservableObject {
         log("Buzz: one-shot fired (patternId=2 loops=3 + runAlarm, acked)")
     }
 
+    /// Wake-window early fire (`AppModel.wakeWindowTick`): a GENTLE 1–2-loop haptic during the
+    /// early-wake sweep, layered strap-side on the standard notification buzz (5/MG: `send` remaps
+    /// cmd 79 to the maverick notify buzz, same as the inactivity nudge and Haptic Clock use).
+    ///
+    /// DELIBERATELY NOT `buzzStrapOnce()`: that also fires RUN_ALARM, which books an
+    /// APP_DRIVEN_ALARM_EXECUTED event for what is not the alarm — a decoy event in any future
+    /// "didn't buzz" report. This is haptic-only, exactly like the sedentary nudge's path.
+    ///
+    /// Not sender-verifiable in the simulator (no motor). Test on-device.
+    func buzzStrapEarly(loops: Int, reason: String) {
+        send(.runHapticsPattern, payload: [2, UInt8(clamping: max(1, loops)), 0, 0, 0], writeType: .withResponse)
+        log("Wake window: early buzz fired — \(reason)")
+    }
+
     /// Haptic Clock (#460): buzz the current wall-clock time out on the strap so the user can read it
     /// off their wrist without a screen. The pure, unit-tested `HapticClock` encoder turns now into an
     /// ordered pulse list (long = a "ten", short = a "unit", in HH-tens / HH-units / MM-tens / MM-units

@@ -70,6 +70,18 @@ final class BehaviorStore: ObservableObject {
     /// "every day" — the backward-compatible default for anyone upgrading from before per-day scheduling.
     @Published var smartAlarmWeekdays: Set<Int> { didSet { d.set(Array(smartAlarmWeekdays).sorted(), forKey: K.alarmWeekdays) } }
 
+    // MARK: Wake window (smart wake; opt-in, experimental)
+    //
+    // The light-sleep early-wake sweep (`WakeWindow`, `AppModel.wakeWindowTick`): in the last
+    // `wakeWindowMinutes` before the wake time the app watches the HR pattern and fires a gentle
+    // strap buzz EARLY when it looks wakeable. The firmware alarm itself stays at the full wake
+    // time (the window end) — the window can only move waking earlier, never later. The decision
+    // heuristic is NOOP's own and TRIAL-TUNABLE (see WakeWindow.swift); default OFF like every
+    // other automation. (The retired "behavior.smartAlarmWindow" key above predates this real one.)
+    @Published var wakeWindowEnabled: Bool { didSet { d.set(wakeWindowEnabled, forKey: K.wakeWindowOn) } }
+    /// Length of the early-wake window in minutes, clamped [5, 90] on read and write.
+    @Published var wakeWindowMinutes: Int { didSet { d.set(wakeWindowMinutes, forKey: K.wakeWindowMinutes) } }
+
     // MARK: Illness early-warning
     @Published var illnessWatch: Bool { didSet { d.set(illnessWatch, forKey: K.illness) } }
 
@@ -117,7 +129,10 @@ final class BehaviorStore: ObservableObject {
         static let alarmWeekdays = "behavior.smartAlarmWeekdays"
         // "behavior.smartAlarmWindow" retired: it was stored but never read (no wake-window
         // watcher ever shipped). The defaults key is left orphaned on purpose — harmless, and
-        // preserved should a real light-sleep watcher ever land.
+        // preserved should a real light-sleep watcher ever land. It has now: the ACTIVE keys are
+        // wakeWindowEnabled / wakeWindowMinutes below, not this retired one.
+        static let wakeWindowOn = "behavior.wakeWindowEnabled"
+        static let wakeWindowMinutes = "behavior.wakeWindowMinutes"
         static let illness = "behavior.illnessWatch"
         static let batteryAlerts = "behavior.batteryAlerts"
         static let wearAlerts = "behavior.wearAlerts"
@@ -150,6 +165,9 @@ final class BehaviorStore: ObservableObject {
         // Stored as a plain [Int]; only valid weekday numbers (1…7) are kept so a corrupted defaults
         // entry can never schedule against a bogus day. Empty (or all 7) = every day.
         smartAlarmWeekdays = Set((d.array(forKey: K.alarmWeekdays) as? [Int] ?? []).filter { (1...7).contains($0) })
+        wakeWindowEnabled = d.object(forKey: K.wakeWindowOn) as? Bool ?? false
+        wakeWindowMinutes = min(max(d.object(forKey: K.wakeWindowMinutes) as? Int ?? 30,
+                                    WakeWindow.minWindowMinutes), WakeWindow.maxWindowMinutes)
         illnessWatch = d.object(forKey: K.illness) as? Bool ?? false
         batteryAlerts = d.object(forKey: K.batteryAlerts) as? Bool ?? true
         // Noop Aura starts calm (26 Oct 2026): the off-wrist notice is one a wearer asks for. macOS keeps its default.

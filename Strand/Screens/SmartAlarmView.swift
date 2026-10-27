@@ -270,6 +270,7 @@ struct SmartAlarmView: View {
                     }
                     Divider().overlay(StrandPalette.hairline)
                     alarmWeekdayPicker
+                    wakeWindowRows
                     // #864: a WHOOP 5/MG only arms its firmware alarm when Protocol probes is on (see
                     // BLEManager.armStrapAlarm, which logs "not armed" and returns otherwise). Without this
                     // branch the card claimed "Armed on the strap itself" to a 5/MG owner whose strap was
@@ -323,6 +324,58 @@ struct SmartAlarmView: View {
             .onChangeCompat(of: behavior.smartAlarmEnabled) { _ in model.applySmartAlarm() }
             .onChangeCompat(of: behavior.smartAlarmMinutes) { _ in model.applySmartAlarm() }
             .onChangeCompat(of: behavior.smartAlarmWeekdays) { _ in model.applySmartAlarm() }
+            // The wake window's sweep re-points at each (re-)arm; a window toggle or length change
+            // takes effect the same way every other dim change to this alarm does.
+            .onChangeCompat(of: behavior.wakeWindowEnabled) { _ in model.applySmartAlarm() }
+            .onChangeCompat(of: behavior.wakeWindowMinutes) { _ in model.applySmartAlarm() }
+        }
+    }
+
+    /// The smart wake window (opt-in, experimental): an early gentle buzz inside the last minutes
+    /// before the wake buzz, when the HR pattern looks wakeable. Independent, app-side heuristic
+    /// (`WakeWindow` / `AppModel.wakeWindowTick`) — NOT a decompiled WHOOP sleep-stage reader.
+    /// The firmware alarm stays at the full wake time; the window can only move waking earlier.
+    ///
+    /// Honest limits stated in the copy because they are real: the sweep lives in the app, so iOS
+    /// checks while the app is open/alive (macOS keeps running and is reliable), and it judges HR
+    /// patterns, not measured sleep stages.
+    private var wakeWindowRows: some View {
+        Group {
+            Divider().overlay(StrandPalette.hairline)
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Smart wake window")
+                        .font(StrandFont.body)
+                        .foregroundStyle(StrandPalette.textPrimary)
+                    Text("Best-effort smart wake: during the last minutes before the alarm buzz, Noop watches your heart rate and buzzes GENTLY early when it looks wakeable. The strap alarm still fires at your wake time either way. Judged from HR patterns, not sleep stages, and iOS checks only while the app is open/running.")
+                        .font(StrandFont.footnote)
+                        .foregroundStyle(StrandPalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Toggle("", isOn: $behavior.wakeWindowEnabled)
+                    .labelsHidden().toggleStyle(.switch).appleInspiredTint("alarms")
+                    .accessibilityLabel("Smart wake window")
+            }
+            .frame(minHeight: 42)
+            if behavior.wakeWindowEnabled {
+                Divider().overlay(StrandPalette.hairline)
+                HStack {
+                    Text("Window before wake").font(StrandFont.body).foregroundStyle(StrandPalette.textPrimary)
+                    Spacer()
+                    Picker("", selection: $behavior.wakeWindowMinutes) {
+                        ForEach(Array(stride(from: WakeWindow.minWindowMinutes,
+                                              through: WakeWindow.maxWindowMinutes, by: 5)),
+                                id: \.self) { minutes in
+                            Text("\(minutes) min").tag(minutes)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .accessibilityLabel("Smart wake window length")
+                }
+                .frame(minHeight: 42)
+            }
         }
     }
 
