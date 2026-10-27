@@ -280,55 +280,49 @@ struct NoopAct1Screens: View {
                     }
                 }
 
+                // One compact row (tester, 27 Oct): the card is often moved to the top of the page, where
+                // the old two-paragraph card with its own button took half the screen.
                 Button { navigation.push(.tonight) } label: {
-                    VStack(alignment: .leading, spacing: 11) {
-                        NoopSectionLabel(isNightWorker ? "Before you sleep" : "Tonight", color: NoopHTMLColor.blue)
-                        // Production needs an armed alarm and a verified in-bed-to-sleep interval;
-                        // the current sleep record has no in-bed start, so this is only a door.
-                        if !activeBedtimes.isEmpty {
-                        Text("Lights out by \(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].time.noopClock)")
-                            .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
-                            .tracking(-0.675)
-                            .frame(minHeight: 29.7, alignment: .top)
-                        Text(rest == nil && selectedBedtime == 2
-                             ? "Clears twenty minutes of debt before your \(alarmTime.noopClock) alarm."
-                             : "\(activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)].length) before your \(alarmTime.noopClock) alarm.")
-                            .font(NoopHTMLFont.sans(NoopType.footnote))
-                            .foregroundStyle(Color(hex: 0xB7C3C9))
-                            .noopAct1LineBox(fontSize: 13, ratio: 1.5)
-                        } else if rest != nil && behavior.smartAlarmEnabled {
-                            // No bedtime to show, but an armed alarm is a decision already made.
-                            Text("Wake by \(alarmSetText.noopClock)")
-                                .font(NoopHTMLFont.outfit(NoopType.title2, weight: .light))
-                                .tracking(-0.675)
-                                .frame(minHeight: 29.7, alignment: .top)
-                            Text("Armed on the strap.")
-                                .font(NoopHTMLFont.sans(NoopType.footnote))
-                                .foregroundStyle(Color(hex: 0xB7C3C9))
-                                .noopAct1LineBox(fontSize: 13, ratio: 1.5)
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            NoopSectionLabel(isNightWorker ? "Before you sleep" : "Tonight", color: NoopHTMLColor.blue)
+                            if !activeBedtimes.isEmpty {
+                                let pick = activeBedtimes[min(selectedBedtime, activeBedtimes.count - 1)]
+                                Text("Lights out by \(pick.time.noopClock)")
+                                    .font(NoopHTMLFont.outfit(NoopType.title3, weight: .light))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Text(rest == nil && selectedBedtime == 2
+                                     ? "Clears twenty minutes of debt before your \(alarmTime.noopClock) alarm."
+                                     : "\(pick.length) before your \(alarmTime.noopClock) alarm.")
+                                    .font(NoopHTMLFont.sans(NoopType.caption))
+                                    .foregroundStyle(Color(hex: 0xB7C3C9))
+                                    .lineLimit(1)
+                            } else if rest != nil && behavior.smartAlarmEnabled {
+                                Text("Wake by \(alarmSetText.noopClock)")
+                                    .font(NoopHTMLFont.outfit(NoopType.title3, weight: .light))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                                Text("Armed on the strap.")
+                                    .font(NoopHTMLFont.sans(NoopType.caption))
+                                    .foregroundStyle(Color(hex: 0xB7C3C9))
+                            } else {
+                                Text("Decide tonight")
+                                    .font(NoopHTMLFont.outfit(NoopType.title3, weight: .light))
+                                    .foregroundStyle(NoopHTMLColor.ink)
+                            }
                         }
-                        HStack(spacing: 7) {
-                            Text("Decide it")
-                            NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.blueInk)
-                        }
-                        .font(NoopHTMLFont.sans(NoopType.footnote, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.blueInk)
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 38)
-                        .background(NoopHTMLColor.blue, in: RoundedRectangle(cornerRadius: 14))
-                        .padding(.top, 2)
+                        Spacer(minLength: 4)
+                        NoopA4CSSChevron(direction: .right, color: NoopHTMLColor.blue)
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 19)
-                    .padding(.bottom, 17)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 13)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background {
                         NoopCSSLinearGradient(
                             colors: [NoopHTMLColor.blue.opacity(0.17), NoopHTMLColor.blue.opacity(0.03)]
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
                     }
-                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(NoopHTMLColor.blue.opacity(0.3), lineWidth: 0.5))
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(NoopHTMLColor.blue.opacity(0.3), lineWidth: 0.5))
                 }
                 .buttonStyle(NoopHTMLPressStyle())
                 .padding(.top, 4)
