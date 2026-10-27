@@ -410,8 +410,7 @@ private struct NoopTrendsScreen: View {
     }
 
     private var trendRows: [NoopTrendSignal] {
- return liveRows(live) 
-        return liveRows(NoopInstrumentData.prototypeOverview)
+        liveRows(live)
     }
 
     // MARK: Measured rows
@@ -1053,9 +1052,6 @@ private struct NoopRhythmScreen: View {
         let nights = live.nights.filter { $0.day >= from }
         guard !nights.isEmpty else { return nil }
         return Int((Double(nights.filter { $0.minutes >= live.needMin }.count) / Double(nights.count) * 100).rounded())
-    
-        guard !sleep.isEmpty else { return nil }
-        return Int((Double(sleep.filter { $0 >= 7.2 }.count) / Double(sleep.count) * 100).rounded())
     }
 
     private func rhythmRow(_ title: String, detail: String, value: String, warm: Bool = false) -> some View {

@@ -680,7 +680,7 @@ struct NoopAct2Screens: View {
             
             }
         case "energy":
- NoopTodayEnergyCard(record: day) { navigation.push(.energy) } 
+            NoopTodayEnergyCard(record: day) { navigation.push(.energy) }
         case "vitals":
             act2DestinationRow(
                 title: "Vitals",

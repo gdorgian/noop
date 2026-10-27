@@ -22,9 +22,6 @@ struct NoopAct1Screens: View {
     @StateObject private var restLayout = NoopPageLayout(page: "rest", catalog: NoopAct1Screens.restSections)
     @State private var restEditing = NoopPageEditing()
     @SceneStorage("noop.act1.selected-bedtime") private var selectedBedtime = 2
-    /// Minutes past midnight for the wake time, stepped in fives. Nil until the user moves it, so
-    /// the screen shows the schedule's own anchor rather than a number nobody chose.
-    @SceneStorage("noop.act1.alarm-minutes") private var alarmMinutes = -1
     /// Which weekdays the window is armed for, Monday first, as a 7-character mask.
     @SceneStorage("noop.act1.alarm-days") private var alarmDayMask = "1111100"
     @SceneStorage("noop.act1.bedtime-committed") private var bedtimeCommitted = false
@@ -1321,16 +1318,9 @@ struct NoopAct1Screens: View {
 
     // MARK: - 1.5 `alarm` — the smart alarm
 
-    /// The schedule's own wake anchor, in minutes past midnight.
-    private var alarmAnchorMinutes: Int {
-        let parts = alarmTime.split(separator: ":").compactMap { Int($0) }
-        guard parts.count == 2 else { return 6 * 60 + 25 }
-        return parts[0] * 60 + parts[1]
-    }
     /// The set time. Until the user steps it, this is the anchor — not a number nobody chose.
     private var alarmSetMinutes: Int {
- return behavior.smartAlarmMinutes 
-        return alarmMinutes < 0 ? alarmAnchorMinutes : alarmMinutes
+        behavior.smartAlarmMinutes
     }
 
     /// Production writes the strap alarm itself; the prototype only moves its own state.
@@ -1476,11 +1466,6 @@ struct NoopAct1Screens: View {
                     Button {
                         behavior.smartAlarmWeekdays = SmartAlarmView.alarmToggledWeekday(dow, in: behavior.smartAlarmWeekdays)
                         model.applySmartAlarm()
-                        return
-                    
-                        var next = mask
-                        next[index] = on ? "0" : "1"
-                        alarmDayMask = String(next)
                     } label: {
                         Text(label)
                             .font(NoopHTMLFont.sans(NoopType.caption, weight: .semibold))
