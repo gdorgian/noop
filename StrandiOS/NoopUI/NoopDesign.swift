@@ -185,6 +185,16 @@ extension EnvironmentValues {
     }
 }
 
+private struct NoopScreenTopCapKey: EnvironmentKey { static let defaultValue: CGFloat? = nil }
+
+extension EnvironmentValues {
+    /// A page shown inside a sheet has no status bar to clear: its screens cap their top inset here.
+    var noopScreenTopCap: CGFloat? {
+        get { self[NoopScreenTopCapKey.self] }
+        set { self[NoopScreenTopCapKey.self] = newValue }
+    }
+}
+
 struct NoopScreen<Content: View>: View {
     var bottomInset: CGFloat = 116
     var topInset: CGFloat = 10
@@ -195,6 +205,7 @@ struct NoopScreen<Content: View>: View {
     @ViewBuilder var content: Content
 
     @Environment(\.noopLiveBarInset) private var liveBarInset
+    @Environment(\.noopScreenTopCap) private var topCap
     @StateObject private var overscroll = NoopOverscroll()
 
     var body: some View {
@@ -205,7 +216,7 @@ struct NoopScreen<Content: View>: View {
                     content
                         .frame(width: max(0, viewportWidth - horizontalInset * 2), alignment: .topLeading)
                         .padding(.horizontal, horizontalInset)
-                        .padding(.top, topInset)
+                        .padding(.top, min(topInset, topCap ?? topInset))
                         .padding(.bottom, bottomInset + liveBarInset)
                         .id("noop-screen-top")
                 }

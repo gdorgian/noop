@@ -1754,6 +1754,7 @@ struct NoopAgesSheet: View {
     var body: some View {
         NoopAct6Screens(navigation: navigation, measured: measured)
             .environment(\.noopAgesInSheet, true)
+            .environment(\.noopScreenTopCap, 18)
             .onChange(of: navigation.route) { _, route in
                 if !Self.own.contains(route) { close() }
             }
