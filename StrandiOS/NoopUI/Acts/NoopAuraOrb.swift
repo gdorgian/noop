@@ -254,7 +254,7 @@ struct NoopAmoebaShape: Shape {
 /// unless a finger is down, then thrown outward in a slow spiral, slowing as they go, growing on the
 /// way and fading out near the rim, the whole field turning once every thirty seconds. Each lives two
 /// and a half to four seconds. `emitter` gives the birthplace for a birth time.
-private enum NoopAuraEmbers {
+enum NoopAuraEmbers {
     static func draw(in context: inout GraphicsContext, size: CGSize, t: Double, spin: Double, scale: CGFloat,
                      tint: Color = .white, pushes: [(t: Double, p: CGPoint)] = [], emitter: (Double) -> CGPoint) {
         let centre = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -305,7 +305,7 @@ private enum NoopAuraEmbers {
 
 /// Embers that leave the orb: born on the rim, they drift slowly outward over six to eleven seconds,
 /// turning with the field at half its pace, and fade as they get farther away.
-private enum NoopAuraDrift {
+enum NoopAuraDrift {
     static func draw(in context: inout GraphicsContext, size: CGSize, t: Double, spin: Double, scale: CGFloat,
                      rim: CGFloat, reach: CGFloat, tint: Color) {
         let c = CGPoint(x: size.width / 2, y: size.height / 2)

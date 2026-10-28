@@ -3,13 +3,30 @@ import StrandDesign
 import Foundation
 
 /// The full-screen Noop Aura clickwrap. It sits above onboarding, pairing and Bluetooth until the
-/// current terms version is accepted. The visual source of truth is `plumbing/terms` in the final
-/// Act 5 HTML; the agreement text itself is always read from the bundled `TERMS.md`.
+/// current terms version is accepted; the agreement text itself is always read from the bundled
+/// `TERMS.md`.
+///
+/// Paged since 28 Oct 2026, so nothing has to be scrolled to be agreed to: the plain summary first,
+/// then each of the four statements on a page of its own with its binding wording beneath it and its
+/// own "I agree" always in reach. Each agreement is a separate, deliberate act, as the four ticks
+/// were; the last one accepts. The full agreement is one tap away on every page.
 struct TermsGateView: View {
     let onAccept: () -> Void
 
     @AppStorage("noop.acceptedTermsVersion") private var previouslyAcceptedVersion = ""
     @State private var checks = Array(repeating: false, count: 4)
+    /// 0 is the summary; 1…4 are the statements.
+    @State private var page = 0
+    @State private var forward = true
+    @State private var readingAgreement = false
+
+    /// The four statements in plain words, each over its binding wording from `Terms.attestations`.
+    private static let statements = [
+        "I am not WHOOP staff, and I will not ask anyone at WHOOP to support Noop Aura.",
+        "This is my device, my data and my risk.",
+        "Noop Aura is unofficial, given as-is, and not a medical device.",
+        "I will not hold its author liable for anything that follows from using it.",
+    ]
 
     private let changedSectionNumbers: Set<Int> = [7, 8]
 
@@ -17,57 +34,217 @@ struct TermsGateView: View {
     private var isUpdate: Bool {
         !previouslyAcceptedVersion.isEmpty && previouslyAcceptedVersion != Terms.currentVersion
     }
-    private var allChecked: Bool { checks.allSatisfy { $0 } }
 
     var body: some View {
         ZStack {
             NoopPalette.canvas.ignoresSafeArea()
-
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    introduction
-
-                    if isUpdate {
-                        changedNotice
-                            .padding(.horizontal, 22)
-                            .padding(.top, 18)
-                    }
-
-                    summaryCard
-                        .padding(.horizontal, 22)
-                        .padding(.top, 18)
-
-                    Text("That is the summary, and the summary is not the agreement. The nine sections below are, and they are what you are accepting.")
-                        .noopText(NoopSpecType.Role.bodySmall)
-                        .foregroundStyle(NoopPalette.textQuiet)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 15)
-
-                    agreement
-                        .padding(.horizontal, 22)
-                        .padding(.top, 22)
-
-                    attestations
-                        .padding(.horizontal, 22)
-                        .padding(.top, 26)
-
-                    gateLine
-                        .padding(.horizontal, 24)
-                        .padding(.top, 13)
-                        .padding(.bottom, 18)
+            VStack(spacing: 0) {
+                progress
+                    .padding(.horizontal, 22)
+                    .padding(.top, 14)
+                Group {
+                    if page == 0 { summaryPage } else { statementPage(page - 1) }
                 }
-                .frame(maxWidth: 560)
-                .frame(maxWidth: .infinity)
+                .id(page)
+                .transition(.asymmetric(
+                    insertion: .offset(x: forward ? 28 : -28).combined(with: .opacity),
+                    removal: .offset(x: forward ? -28 : 28).combined(with: .opacity)
+                ))
             }
-            .scrollIndicators(.hidden)
-            #if os(iOS)
-            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-            #endif
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                actionBar
+            .frame(maxWidth: 560)
+        }
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $readingAgreement) { agreementSheet }
+    }
+
+    // MARK: Pages
+
+    /// Four marks, one per statement, filling as each is agreed to. Back steps to the page before.
+    private var progress: some View {
+        HStack(spacing: 6) {
+            Button {
+                go(to: page - 1)
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(NoopPalette.textQuiet)
+                    .frame(width: 44, height: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .opacity(page == 0 ? 0 : 1)
+            .disabled(page == 0)
+            .accessibilityLabel("Back")
+            Spacer()
+            ForEach(0..<4, id: \.self) { i in
+                Capsule()
+                    .fill(checks[i] ? NoopPalette.accent : Color.white.opacity(0.14))
+                    .frame(width: page == i + 1 ? 22 : 7, height: 7)
+            }
+            .accessibilityElement()
+            .accessibilityLabel("\(checks.filter { $0 }.count) of 4 agreed")
+            Spacer()
+            Color.clear.frame(width: 44, height: 44)
+        }
+        .animation(.spring(duration: 0.4, bounce: 0.15), value: page)
+        .animation(.spring(duration: 0.4, bounce: 0.15), value: checks)
+    }
+
+    private var summaryPage: some View {
+        pageLayout {
+            introduction
+            if isUpdate { changedNotice }
+            summaryCard
+            fullAgreementLink
+        } footer: {
+            primaryButton(isUpdate ? "Review the changes" : "Continue") { go(to: 1) }
+            Text(isUpdate
+                ? "Not now keeps you on the version you accepted and leaves Noop Aura closed. Nothing already recorded is touched, and nothing is deleted."
+                : "Declining leaves Noop Aura closed and nothing has been collected yet. There is no account to cancel and no data to remove.")
+                .noopText(NoopSpecType.Role.finePrint)
+                .foregroundStyle(NoopPalette.textQuiet)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    /// One statement: the plain sentence large, its binding wording beneath, and its own agreement.
+    private func statementPage(_ index: Int) -> some View {
+        pageLayout {
+            VStack(alignment: .leading, spacing: 18) {
+                TermsAgreeMark(agreed: checks[index])
+                    .frame(width: 52, height: 52)
+                Text("Statement \(index + 1) of 4")
+                    .noopText(NoopSpecType.Role.subline)
+                    .foregroundStyle(NoopPalette.textQuiet)
+                Text(Self.statements[index])
+                    .font(Font.custom(NoopSpecType.Face.outfitLight, size: 28))
+                    .tracking(-0.8)
+                    .lineSpacing(4)
+                    .foregroundStyle(NoopPalette.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("IN FULL")
+                        .noopText(NoopSpecType.Role.caption)
+                        .foregroundStyle(NoopPalette.textFaint)
+                    Text(Terms.attestations[index])
+                        .noopText(NoopSpecType.Role.bodySmall)
+                        .foregroundStyle(NoopSpecTokens.textBody)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(NoopPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(NoopPalette.cardBorder, lineWidth: 0.5)
+                }
+                fullAgreementLink
+            }
+            .padding(.top, 24)
+        } footer: {
+            primaryButton(index == 3 ? (isUpdate ? "I agree, and accept the changes" : "I agree, and accept") : "I agree",
+                          enabled: !checks[index] && document != nil) {
+                agree(index)
+            }
+            Text(index == 3
+                ? "Accepting writes which version you accepted, and when, to this phone."
+                : "Each statement is agreed to on its own. Noop Aura will not agree for you.")
+                .noopText(NoopSpecType.Role.finePrint)
+                .foregroundStyle(NoopPalette.textQuiet)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private var fullAgreementLink: some View {
+        Button {
+            readingAgreement = true
+        } label: {
+            Label("Read the full agreement", systemImage: "doc.text")
+                .noopText(NoopSpecType.Role.bodySmall)
+                .foregroundStyle(NoopSpecTokens.auraLight)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var agreementSheet: some View {
+        NavigationStack {
+            ScrollView {
+                agreement
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: 560)
+                    .frame(maxWidth: .infinity)
+            }
+            .background(NoopPalette.canvas)
+            .navigationTitle("The agreement")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { readingAgreement = false }
+                }
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    /// A page whose content scrolls only if a small screen needs it, over a footer that never moves.
+    private func pageLayout<Content: View, Footer: View>(
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder footer: () -> Footer
+    ) -> some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) { content() }
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollIndicators(.hidden)
+            #if os(iOS)
+            .scrollBounceBehavior(.basedOnSize)
+            #endif
+            VStack(spacing: 10) { footer() }
+                .padding(.horizontal, 22)
+                .padding(.bottom, 12)
+        }
+    }
+
+    private func primaryButton(_ title: String, enabled: Bool = true, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(NoopSpecType.Role.buttonLabel.font)
+                .foregroundStyle(NoopSpecTokens.onAura)
+                .frame(maxWidth: .infinity)
+                .frame(height: 58)
+                .background(NoopPalette.accent, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+                .shadow(color: NoopPalette.accent.opacity(0.28), radius: 13, x: 0, y: 8)
+        }
+        .buttonStyle(.plain)
+        .opacity(enabled ? 1 : 0.4)
+        .disabled(!enabled)
+    }
+
+    private func go(to target: Int) {
+        guard (0...4).contains(target) else { return }
+        forward = target > page
+        withAnimation(.snappy(duration: 0.28)) { page = target }
+    }
+
+    /// The statement is ticked where it stands, then the next one comes; the last accepts.
+    private func agree(_ index: Int) {
+        withAnimation(.spring(duration: 0.4, bounce: 0.4)) { checks[index] = true }
+        #if os(iOS)
+        NoopHaptics.play(.add)
+        #endif
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))
+            if index == 3 {
+                if checks.allSatisfy({ $0 }) { onAccept() }
+            } else {
+                go(to: index + 2)
+            }
+        }
     }
 
     private var introduction: some View {
@@ -99,13 +276,12 @@ struct TermsGateView: View {
 
                 Text(isUpdate
                     ? "You accepted version \(previouslyAcceptedVersion) before. Noop Aura will not carry your acceptance over on its own, so here is version \(Terms.currentVersion) with the changes marked."
-                    : "Noop Aura asks for this once, and it would rather you read it than scroll past it. So the plain version is first, and it is accurate.")
+                    : "Noop Aura asks for this once. The plain version is first, and it is accurate; then four short statements, each agreed to on its own.")
                     .noopText(NoopSpecType.Role.body)
                     .foregroundStyle(NoopPalette.textSecondary)
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 56)
+        .padding(.top, 24)
     }
 
     private var changedNotice: some View {
@@ -256,121 +432,6 @@ struct TermsGateView: View {
         return blocks
     }
 
-    private var attestations: some View {
-        VStack(spacing: 0) {
-            attestationRow(0, "I am not WHOOP staff, and I will not ask anyone at WHOOP to support Noop Aura.", first: true)
-            attestationRow(1, "This is my device, my data and my risk.")
-            attestationRow(2, "Noop Aura is unofficial, given as-is, and not a medical device.")
-            attestationRow(3, "I will not hold its author liable for anything that follows from using it.")
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 2)
-        .background(NoopPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(NoopPalette.cardBorder, lineWidth: 0.5)
-        }
-    }
-
-    private func attestationRow(_ index: Int, _ text: String, first: Bool = false) -> some View {
-        Button {
-            checks[index].toggle()
-        } label: {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(checks[index] ? NoopPalette.accent : Color.clear)
-                    .frame(width: 22, height: 22)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .strokeBorder(checks[index] ? NoopPalette.accent : Color.white.opacity(0.24), lineWidth: 0.5)
-                    }
-                    .overlay {
-                        if checks[index] {
-                            TermsCheckmark()
-                                .stroke(NoopSpecTokens.onAura, style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round))
-                                .frame(width: 13, height: 13)
-                        }
-                    }
-
-                Text(text)
-                    .noopText(NoopSpecType.Role.buttonLabel)
-                    .foregroundStyle(checks[index] ? NoopPalette.textPrimary : NoopSpecTokens.textBody)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(minHeight: 48)
-            .padding(.vertical, 13)
-            .contentShape(Rectangle())
-            .overlay(alignment: .top) {
-                if !first {
-                    Rectangle().fill(NoopSpecTokens.hairline).frame(height: 0.5)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityValue(checks[index] ? "Checked" : "Unchecked")
-    }
-
-    private var gateLine: some View {
-        Text(allChecked
-            ? "All four ticked. Accept is live, and accepting writes which version you accepted and when to this phone."
-            : "Accept turns on when all four are ticked. Noop Aura will not tick them for you, and it does not ask how far you scrolled.")
-            .noopText(NoopSpecType.Role.subline)
-            .foregroundStyle(allChecked ? NoopSpecTokens.auraLight : NoopPalette.textQuiet)
-    }
-
-    private var actionBar: some View {
-        VStack(spacing: 6) {
-            Button(action: onAccept) {
-                Text(isUpdate ? "Accept the changes" : "Accept and continue")
-                    .font(NoopSpecType.Role.buttonLabel.font)
-                    .foregroundStyle(allChecked ? NoopSpecTokens.onAura : NoopPalette.textQuiet)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 58)
-                    .background(
-                        allChecked ? NoopPalette.accent : Color.white.opacity(0.05),
-                        in: RoundedRectangle(cornerRadius: 19, style: .continuous)
-                    )
-                    .overlay {
-                        if !allChecked {
-                            RoundedRectangle(cornerRadius: 19, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
-                        }
-                    }
-                    .shadow(color: allChecked ? NoopPalette.accent.opacity(0.28) : .clear, radius: 13, x: 0, y: 8)
-            }
-            .buttonStyle(.plain)
-            .disabled(!allChecked || document == nil)
-
-            Text(isUpdate ? "Not now" : "I would rather not")
-                .noopText(NoopSpecType.Role.bodySmall)
-                .foregroundStyle(NoopPalette.textQuiet)
-                .frame(height: 42)
-
-            Text(isUpdate
-                ? "Not now keeps you on the version you accepted and leaves Noop Aura closed. Nothing already recorded is touched, and nothing is deleted."
-                : "Declining leaves Noop Aura closed and nothing has been collected yet. There is no account to cancel and no data to remove.")
-                .noopText(NoopSpecType.Role.finePrint)
-                .foregroundStyle(NoopPalette.textQuiet)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.horizontal, 22)
-        .padding(.top, 20)
-        .padding(.bottom, 10)
-        .background {
-            LinearGradient(
-                // Fade only across the bar's 20 pt top padding, so the agreement never shows through
-                // the button (it did while the fade ran to 30% of the bar).
-                stops: [
-                    .init(color: NoopPalette.canvas.opacity(0), location: 0),
-                    .init(color: NoopPalette.canvas, location: 0.11),
-                    .init(color: NoopPalette.canvas, location: 1),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        }
-    }
 }
 
 private enum TermsSummarySymbol {
@@ -411,6 +472,28 @@ private struct TermsSummaryGlyph: View {
         }
     }
     #endif
+}
+
+/// A statement's mark: an empty ring, filling with the accent and drawing its tick when agreed to.
+private struct TermsAgreeMark: View {
+    let agreed: Bool
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .strokeBorder(agreed ? NoopPalette.accent : Color.white.opacity(0.24), lineWidth: 1.5)
+            Circle()
+                .fill(NoopPalette.accent)
+                .scaleEffect(agreed ? 1 : 0.3)
+                .opacity(agreed ? 1 : 0)
+            TermsCheckmark()
+                .trim(from: 0, to: agreed ? 1 : 0)
+                .stroke(NoopSpecTokens.onAura, style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
+                .padding(14)
+        }
+        .animation(.spring(duration: 0.45, bounce: 0.35), value: agreed)
+        .accessibilityHidden(true)
+    }
 }
 
 private struct TermsCheckmark: Shape {

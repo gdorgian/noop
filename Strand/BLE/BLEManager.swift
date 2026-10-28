@@ -959,7 +959,37 @@ public final class BLEManager: NSObject, ObservableObject {
     }
 
     // MARK: CoreBluetooth
-    private var central: CBCentralManager!
+    /// Creating a CBCentralManager is what makes iOS ask for Bluetooth. On an install iOS has never
+    /// asked, it waits for onboarding's Bluetooth page (`startBluetooth`), so the question comes after
+    /// its explanation rather than over the launch screen. Any earlier use starts it on the spot, so
+    /// nothing can find it missing; the store bootstraps on poweredOn either way, as it always has.
+    private var centralStorage: CBCentralManager?
+    private var central: CBCentralManager! {
+        if centralStorage == nil { makeCentral() }
+        return centralStorage
+    }
+
+    /// Whether iOS has been asked about Bluetooth and what was answered, kept current from the
+    /// central's own state callbacks.
+    @Published public private(set) var bluetoothAuthorization = CBCentralManager.authorization
+
+    /// Start Bluetooth now, asking iOS for permission if it never has. Idempotent.
+    public func startBluetooth() {
+        _ = central
+    }
+
+    private func makeCentral() {
+        #if os(iOS)
+        // iOS background state preservation/restoration: the restore identifier is what makes
+        // CoreBluetooth relaunch the app into the background and deliver willRestoreState after
+        // a suspend-then-jettison. Without it, willRestoreState is never called.
+        centralStorage = CBCentralManager(delegate: self, queue: .main,
+                                          options: [CBCentralManagerOptionRestoreIdentifierKey: BLEManager.restoreID])
+        #else
+        // Strand (macOS desktop): no state-restoration identifier (iOS background feature).
+        centralStorage = CBCentralManager(delegate: self, queue: .main)
+        #endif
+    }
     private var peripheral: CBPeripheral?
     /// Multi-WHOOP: when non-nil, the scan/discover path connects ONLY to the peripheral whose
     /// `identifier == preferredPeripheralUUID` and ignores every other discovered WHOOP. When nil
@@ -1358,15 +1388,11 @@ public final class BLEManager: NSObject, ObservableObject {
         // whole change removes. `seedLastSyncFromActiveStrap` fills it from the ACTIVE strap once the
         // registry exists (bootstrapStore); a blank moment is honest, another strap's timestamp is not.
         // Restore identifier + background-capable central (foundation for M3 state restoration).
+        // iOS: held back only while Bluetooth has never been asked about (see `central`).
         #if os(iOS)
-        // iOS background state preservation/restoration: the restore identifier is what makes
-        // CoreBluetooth relaunch the app into the background and deliver willRestoreState after
-        // a suspend-then-jettison. Without it, willRestoreState is never called.
-        central = CBCentralManager(delegate: self, queue: .main,
-                                   options: [CBCentralManagerOptionRestoreIdentifierKey: BLEManager.restoreID])
+        if CBCentralManager.authorization != .notDetermined { makeCentral() }
         #else
-        // Strand (macOS desktop): no state-restoration identifier (iOS background feature).
-        central = CBCentralManager(delegate: self, queue: .main)
+        makeCentral()
         #endif
         // Strap-as-clock: an incoming EVENT packet kicks a rate-limited catch-up sync.
         router.onSyncTrigger = { [weak self] in self?.requestSync(.strap) }
@@ -1573,13 +1599,7 @@ public final class BLEManager: NSObject, ObservableObject {
         // registry exists (bootstrapStore); a blank moment is honest, another strap's timestamp is not.
         // Restore identifier + background-capable central (mirrors the production initializer
         // so a restored manager matches by identifier; only exercised by tests/previews).
-        #if os(iOS)
-        central = CBCentralManager(delegate: self, queue: .main,
-                                   options: [CBCentralManagerOptionRestoreIdentifierKey: BLEManager.restoreID])
-        #else
-        // Strand (macOS desktop): no state-restoration identifier (iOS background feature).
-        central = CBCentralManager(delegate: self, queue: .main)
-        #endif
+        makeCentral()
         // Strap-as-clock: an incoming EVENT packet kicks a rate-limited catch-up sync.
         router.onSyncTrigger = { [weak self] in self?.requestSync(.strap) }
         router.onStrapSerial = { [weak self] serial in self?.noteHarvardSerial(serial) }   // #1193
@@ -5752,6 +5772,7 @@ extension BLEManager: @preconcurrency CBCentralManagerDelegate {
 
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         log("Central state: \(central.state.rawValue) (5 = poweredOn)")
+        bluetoothAuthorization = CBCentralManager.authorization
         // #391: ANY state update means the cold-start settling window moved on — a pending
         // unauthorized-settle escalation is obsolete whether the new state is good news (poweredOn)
         // or its own banner-worthy case (poweredOff handles itself below).

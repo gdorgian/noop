@@ -1,38 +1,30 @@
 import SwiftUI
+import CoreBluetooth
 import UserNotifications
 import StrandAnalytics
 
 // MARK: - First run
 //
-// Rebuilt 28 Oct 2026. One Aura orb carries through every page: large on the welcome, small above each
-// question, calm and green once the strap answers, and large again on the summary. Five questions sit
-// between the two, each with one primary action and a quiet way past it, and each can be stepped back
-// to. The summary shows what was set rather than thanking the wearer for setting it.
+// One question a page, each answered with one gesture. The Aura orb carries the pages about the wearer
+// (it blooms in on the welcome, beats on every move, warms from teal toward green as the setup fills in,
+// and grows back for the summary); the pages about the world outside it get a scene of their own: a sky
+// that turns to the wearer's hours, the phone and strap finding each other, the record flowing into
+// Apple Health, a history arriving from another app, notices as they will look.
 //
-// Permissions (Bluetooth, Apple Health, notifications) are each asked on their own page with the reason
-// beside them, and no button says "Allow": the system sheet is where that word belongs (HIG, privacy).
-
-private enum OnboardingMotion {
-    /// Page to page: a short slide and a fade, not a full-width push. Quick, because there are nine.
-    static let page = Animation.snappy(duration: 0.28)
-    /// The orb changing size between pages, the progress bar filling.
-    static let morph = Animation.spring(duration: 0.42, bounce: 0.12)
-    /// Each block of a page arriving.
-    static let reveal = Animation.smooth(duration: 0.28)
-    /// A big figure ticking to its new value.
-    static let figure = Animation.snappy(duration: 0.2)
-    static let stagger = 0.03
-    static let staggerCap = 0.2
-    static let pageShift: CGFloat = 28
-    /// The beat between tapping an answer and the page moving on, so the choice is seen to land.
-    static let answerBeat: Duration = .milliseconds(240)
-}
+// Every permission (Bluetooth, Apple Health, notifications) has its own page saying what it is for and
+// what it is never used for, with the question iOS will ask previewed in iOS's own words. Their single
+// button is "Continue", never "Allow": that word belongs to the system's question (HIG, pre-alert
+// screens). Location and the microphone are asked only when a feature needs them; the summary says
+// which and why. Moving pictures fall still under Reduce Motion (NoopOnboardingScenes.swift).
 
 private enum OnboardingStep: Int, CaseIterable {
-    case welcome, born, sex, weight, height, sleep, strap, health, notices, done
+    case welcome, born, sex, weight, height, sleep, bluetooth, strap, health, history, notices, done
 
     /// The pages the progress bar counts: the questions, not the welcome or the summary.
-    static let counted: [OnboardingStep] = [.born, .sex, .weight, .height, .sleep, .strap, .health, .notices]
+    static let counted: [OnboardingStep] = [.born, .sex, .weight, .height, .sleep, .bluetooth, .strap, .health, .history, .notices]
+
+    /// Pages about the wearer, which the orb sits above. The rest carry their own scene.
+    var showsOrb: Bool { [.welcome, .born, .sex, .weight, .height, .done].contains(self) }
 
     #if DEBUG
     /// `--noop-onboarding-step <name>` opens straight onto one page, for screenshots and checks.
@@ -51,7 +43,10 @@ struct NoopOnboardingView: View {
     @EnvironmentObject private var live: LiveState
     @EnvironmentObject private var profile: ProfileStore
     @EnvironmentObject private var health: HealthKitBridge
+    @EnvironmentObject private var behavior: BehaviorStore
+    @ObservedObject private var imports = NoopDataFlow.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openURL) private var openURL
     @AppStorage(UnitPrefs.systemKey) private var unitSystemRaw = UnitSystem.metric.rawValue
     @Namespace private var unitPill
 
@@ -60,28 +55,50 @@ struct NoopOnboardingView: View {
     @State private var forward = true
     @State private var schedule: OnboardingSchedule?
     @State private var learnsSchedule = false
-    /// Bluetooth off, not allowed or missing: said beside the button rather than a scan that finds nothing.
+    @State private var bluetoothAsked = false
+    @State private var bluetoothAuth = CBCentralManager.authorization
+    /// Bluetooth off or missing: said beside the button rather than a scan that finds nothing.
     @State private var radioBlocked: String?
     @State private var scanning = false
+    @State private var healthAsking = false
+    @State private var importSource: String?
     @State private var notificationsAsked = false
     @State private var notificationsOn = false
-    @State private var healthAsking = false
-    // About you, held here until Continue so "Skip for now" leaves the profile exactly as it was.
+    // The four notices, chosen here and written when the page is continued, so flipping one never sets
+    // off the system's question before the page has explained it.
+    @State private var noticeNight = true
+    @State private var noticeBattery = true
+    @State private var noticeSync = true
+    @State private var noticeBackup = true
+    // About you, written per page on Continue, so "Skip" leaves that one value exactly as it was.
     @State private var birth = Date()
     @State private var sex = "female"
     @State private var weightKg = 70.0
     @State private var heightCm = 170.0
     @State private var profileSaved = false
-    /// Bumped on every page move, for the one light tap that goes with it.
+    /// Bumped on every page move, for the light tap and the orb's beat that go with it.
     @State private var moves = 0
-    /// Bumped when something lands: the strap answering, the summary arriving. Fires the ring.
-    @State private var bursts = 0
     @State private var bloomed = false
+    /// How many of the summary's marks have dropped in.
+    @State private var landed = 0
+    /// The summary has been drawn in and the way in holds the screen.
+    @State private var gathered = false
+    /// When ENTER was pressed; starts the burst.
+    @State private var burstAt: Date?
+    /// The orb's place on screen, which the way in sets off from.
+    @State private var orbFrame = CGRect.zero
+    /// The screen thinning away into the app as the burst spreads.
+    @State private var dissolving = false
     @State private var loaded = false
 
     private var imperial: Bool { unitSystemRaw == UnitSystem.imperial.rawValue }
 
     var body: some View {
+        screen
+            .allowsHitTesting(burstAt == nil)
+    }
+
+    private var screen: some View {
         ZStack {
             NoopHTMLColor.canvas.ignoresSafeArea()
             topGlow
@@ -98,8 +115,10 @@ struct NoopOnboardingView: View {
                     case .weight: weightStep
                     case .height: heightStep
                     case .sleep: sleepStep
+                    case .bluetooth: bluetoothStep
                     case .strap: strapStep
                     case .health: healthStep
+                    case .history: historyStep
                     case .notices: noticesStep
                     case .done: doneStep
                     }
@@ -107,19 +126,24 @@ struct NoopOnboardingView: View {
                 .id(step)
                 .transition(pageTransition)
             }
+            // Gathered: the page is drawn in toward the centre and blurs away, and the way in takes over.
+            .scaleEffect(gathered ? 0.82 : 1)
+            .blur(radius: gathered ? 14 : 0)
+            .opacity(gathered ? 0 : 1)
+            if gathered {
+                OnboardingFinaleScene(colour: NoopAuraOrbModel.palette(Self.noopBlue).top, from: orbFrame, burstAt: burstAt, onEnter: enter)
+                    .transition(.opacity)
+            }
         }
+        .opacity(dissolving ? 0 : 1)
         .preferredColorScheme(.dark)
         .foregroundStyle(NoopHTMLColor.ink)
         .font(NoopHTMLFont.sans(14))
-        .sensoryFeedback(.success, trigger: live.bonded) { _, bonded in bonded && step == .strap }
-        .sensoryFeedback(.selection, trigger: schedule)
         .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: moves)
         .onChange(of: live.bonded) { _, bonded in
-            if bonded {
-                scanning = false
-                if step == .strap { bursts += 1 }
-            }
+            if bonded { scanning = false }
         }
+        .onReceive(model.ble.$bluetoothAuthorization) { bluetoothAuth = $0 }
         .onAppear(perform: load)
     }
 
@@ -128,11 +152,11 @@ struct NoopOnboardingView: View {
     private var topGlow: some View {
         VStack {
             Ellipse()
-                .fill(RadialGradient(colors: [glowColor.opacity(0.15), .clear], center: .center, startRadius: 0, endRadius: 215))
+                .fill(RadialGradient(colors: [glowColor.opacity(0.16), .clear], center: .center, startRadius: 0, endRadius: 215))
                 .frame(width: 470, height: 410)
                 .blur(radius: 18)
                 .offset(y: -235)
-                .animation(OnboardingMotion.page, value: glowColor)
+                .animation(OnboardingMotion.sky, value: glowColor)
             Spacer()
         }
         // Wider than the phone: let it draw past the edges without widening the onboarding stack,
@@ -142,7 +166,9 @@ struct NoopOnboardingView: View {
         .allowsHitTesting(false)
     }
 
-    private var glowColor: Color { NoopAuraOrbModel.palette(orbColour).top }
+    private var glowColor: Color {
+        step == .sleep ? sky.glow : NoopAuraOrbModel.palette(orbColour).top
+    }
 
     private var header: some View {
         let index = OnboardingStep.counted.firstIndex(of: step)
@@ -157,8 +183,8 @@ struct NoopOnboardingView: View {
                         .frame(width: 132 * fraction, height: 5)
                 }
                 .animation(OnboardingMotion.morph, value: step)
-            .accessibilityElement()
-            .accessibilityLabel("Step \((index ?? 0) + 1) of \(OnboardingStep.counted.count)")
+                .accessibilityElement()
+                .accessibilityLabel("Step \((index ?? 0) + 1) of \(OnboardingStep.counted.count)")
             HStack {
                 Button { go(back: true) } label: {
                     Image(systemName: "chevron.left")
@@ -186,21 +212,19 @@ struct NoopOnboardingView: View {
 
     // MARK: Orb
 
-    /// The orb is the one thing on screen that never leaves. It blooms in on the welcome, shrinks to sit
-    /// above each question, gives a small beat on every move, warms from teal toward green as the setup
-    /// fills in, settles when the strap answers, and grows back for the summary.
+    private static let orbSide: CGFloat = 248
+
     private var orb: some View {
         let side: CGFloat = switch step {
         case .welcome: 248
         case .done: 208
-        default: 78
+        case _ where step.showsOrb: 78
+        default: 0
         }
         // Drawn at full size and scaled: laid out small, the orb's halo blur shrinks below a pixel and
         // leaves a hard second outline, and a scale animates on the GPU where a frame change re-lays out.
         return ZStack {
-            OnboardingRingBurst(trigger: bursts, colour: glowColor)
-                .frame(width: Self.orbSide * 0.8, height: Self.orbSide * 0.8)
-            NoopAuraOrb(shapeScore: orbShape, colorScore: orbColour)
+            NoopAuraOrb(shapeScore: live.bonded || step == .done ? 0.08 : 0.22, colorScore: orbColour, paused: !step.showsOrb)
                 .frame(width: Self.orbSide, height: Self.orbSide)
                 .keyframeAnimator(initialValue: 1.0, trigger: moves) { content, beat in
                     content.scaleEffect(reduceMotion ? 1 : beat)
@@ -209,34 +233,30 @@ struct NoopOnboardingView: View {
                     SpringKeyframe(1.0, duration: 0.5, spring: .bouncy(duration: 0.5, extraBounce: 0.1))
                 }
         }
-        .scaleEffect(side / Self.orbSide)
+        .scaleEffect(max(side, 1) / Self.orbSide)
         .frame(width: side, height: side)
+        // Where it sits on screen, so the way in can carry it from here to the centre.
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { orbFrame = $0 }
+        .opacity(step.showsOrb && bloomed && !gathered ? 1 : 0)
         // First appearance: out of a soft blur rather than popping in.
         .scaleEffect(bloomed || reduceMotion ? 1 : 0.86)
         .blur(radius: bloomed || reduceMotion ? 0 : 14)
-        .opacity(bloomed ? 1 : 0)
         .frame(maxWidth: .infinity)
-        .padding(.top, step == .welcome ? 18 : 4)
+        .padding(.top, step == .welcome ? 18 : step.showsOrb ? 4 : 0)
         .animation(OnboardingMotion.morph, value: step)
-        .animation(OnboardingMotion.morph, value: live.bonded)
         .accessibilityHidden(true)
         .onAppear {
             withAnimation(.smooth(duration: 0.9)) { bloomed = true }
         }
     }
 
-    private static let orbSide: CGFloat = 248
+    /// Where the orb's palette is bluest, matching Noop blue.
+    private static let noopBlue = 2.0 / 3.0
 
-    private var orbShape: Double {
-        if step == .strap && scanning && !live.bonded { return 0.55 }
-        return live.bonded || step == .done ? 0.08 : 0.22
-    }
-
-    /// Teal (0.5) at the start, toward green (0.2) as each question is answered; greener still with a
-    /// strap that answers.
+    /// Teal (0.5) at the start, toward green (0.2) as each question is answered; Noop blue at the end.
     private var orbColour: Double {
-        if live.bonded && (step == .strap || step == .done) { return 0.12 }
-        if step == .done { return 0.18 }
+        // The way in wears Noop's own blue.
+        if step == .done { return Self.noopBlue }
         guard let i = OnboardingStep.counted.firstIndex(of: step) else { return 0.5 }
         return 0.5 - 0.3 * Double(i) / Double(OnboardingStep.counted.count)
     }
@@ -249,22 +269,22 @@ struct NoopOnboardingView: View {
                 Text("Noop Aura")
                     .font(NoopHTMLFont.outfit(38, weight: .light))
                     .tracking(-1.2)
-                    .entrance(0)
+                    .onboardingEntrance(0)
                 Text("Your strap, read on this iPhone.\nNo account, no subscription, no server in the middle.")
                     .font(NoopHTMLFont.sans(14))
                     .foregroundStyle(NoopHTMLColor.copy)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
-                    .entrance(1)
+                    .onboardingEntrance(1)
             }
             .frame(maxWidth: .infinity)
             VStack(alignment: .leading, spacing: 16) {
-                welcomeLine("circle.dashed.inset.filled", NoopHTMLColor.blue, "Recovery every morning", "Scored against your own baselines. Missing inputs stay missing.")
-                    .entrance(2)
-                welcomeLine("waveform.path.ecg", NoopHTMLColor.blush, "Your heart, live", "Each beat, variability and zones as they happen.")
-                    .entrance(3)
-                welcomeLine("lock.shield", NoopHTMLColor.green, "Yours, locally", "Data stays on this iPhone unless you send it somewhere.")
-                    .entrance(4)
+                iconLine("circle.dashed.inset.filled", NoopHTMLColor.blue, "Recovery every morning", "Scored against your own baselines. Missing inputs stay missing.")
+                    .onboardingEntrance(2)
+                iconLine("waveform.path.ecg", NoopHTMLColor.blush, "Your heart, live", "Each beat, variability and zones as they happen.")
+                    .onboardingEntrance(3)
+                iconLine("lock.shield", NoopHTMLColor.green, "Yours, locally", "Data stays on this iPhone unless you send it somewhere.")
+                    .onboardingEntrance(4)
             }
             .padding(.top, 8)
         } footer: {
@@ -272,69 +292,115 @@ struct NoopOnboardingView: View {
         }
     }
 
-    private func welcomeLine(_ symbol: String, _ tint: Color, _ title: String, _ detail: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            NoopIconDisc(symbol: symbol, color: tint, size: 36)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(NoopHTMLFont.sans(14.5, weight: .semibold))
-                Text(detail)
-                    .font(NoopHTMLFont.sans(12.5))
-                    .foregroundStyle(NoopHTMLColor.copy)
-                    .lineSpacing(2.5)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
     // MARK: About you
-    //
-    // One question a page, each answered with one gesture: a wheel, a tap, a ruler. Each value is written
-    // when its page is continued, so "Skip" leaves that one value as it was.
 
     private var bornStep: some View {
         page {
             heading("When were you born?", "Your age sets your maximum heart rate, and with it every zone.")
-            bigFigure("\(ageFromBirth)", value: ageFromBirth, unit: "years old")
-                .entrance(2)
-            DatePicker("Born", selection: $birth, in: ProfileStore.dateOfBirthRange, displayedComponents: .date)
-                .datePickerStyle(.wheel)
-                .labelsHidden()
+            bigFigure("\(ageFromBirth)", value: ageFromBirth, unit: ageFromBirth == 1 ? "year old" : "years old")
+                .onboardingEntrance(2)
+            OnboardingRuler(range: birthYears, value: birthYearBinding, major: 10) { "\($0)" }
+                .onboardingEntrance(3)
+            Text("Born in \(String(birthYearBinding.wrappedValue))")
+                .font(NoopHTMLFont.sans(13))
+                .foregroundStyle(NoopHTMLColor.copy)
+                .monospacedDigit()
+                .contentTransition(.numericText(value: Double(birthYearBinding.wrappedValue)))
+                .animation(OnboardingMotion.figure, value: birthYearBinding.wrappedValue)
                 .frame(maxWidth: .infinity)
-                .entrance(3)
+                .onboardingEntrance(4)
         } footer: {
             answerFooter { profile.dateOfBirth = birth }
         }
-        .sensoryFeedback(.selection, trigger: ageFromBirth)
     }
 
     private var ageFromBirth: Int { ProfileStore.years(from: birth, to: Date()) }
 
-    private var divider: some View {
-        Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
+    private var birthYears: ClosedRange<Int> {
+        let range = ProfileStore.dateOfBirthRange
+        let calendar = Calendar.current
+        return calendar.component(.year, from: range.lowerBound)...calendar.component(.year, from: range.upperBound)
     }
+
+    /// The year on the ruler; the day and month already on the profile are kept.
+    private var birthYearBinding: Binding<Int> {
+        Binding(
+            get: { Calendar.current.component(.year, from: birth) },
+            set: { year in
+                let calendar = Calendar.current
+                var parts = calendar.dateComponents([.year, .month, .day], from: birth)
+                parts.year = year
+                guard let moved = calendar.date(from: parts) else { return }
+                let range = ProfileStore.dateOfBirthRange
+                birth = min(max(moved, range.lowerBound), range.upperBound)
+            }
+        )
+    }
+
+    private struct SexOption {
+        let tag: String
+        let title: String
+        let symbol: String
+        let detail: String
+    }
+
+    private static let sexOptions = [
+        SexOption(tag: "female", title: "Female", symbol: "figure.stand.dress", detail: "Calories use the female formula."),
+        SexOption(tag: "male", title: "Male", symbol: "figure.stand", detail: "Calories use the male formula."),
+        SexOption(tag: "nonbinary", title: "Other", symbol: "circle.lefthalf.filled", detail: "Calories use the average of both formulas."),
+    ]
 
     private var sexStep: some View {
         page {
-            heading("What's your sex?", "Only the calorie estimate uses it. Nothing else changes.")
-            VStack(spacing: 9) {
+            heading("What's your sex?", "Only the calorie estimate uses it. Nothing else in Noop changes.")
+            HStack(spacing: 10) {
                 ForEach(Array(Self.sexOptions.enumerated()), id: \.offset) { i, option in
-                    choiceCard(option.title, option.detail, selected: sex == option.tag) { answerSex(option.tag) }
-                        .entrance(2 + i)
+                    sexTile(option)
+                        .onboardingEntrance(2 + i)
                 }
             }
+            Text(Self.sexOptions.first { $0.tag == sex }?.detail ?? "")
+                .font(NoopHTMLFont.sans(13))
+                .foregroundStyle(NoopHTMLColor.copy)
+                .frame(maxWidth: .infinity)
+                .id(sex)
+                .transition(.opacity.combined(with: .offset(y: 4)))
+                .animation(OnboardingMotion.reveal, value: sex)
+                .onboardingEntrance(5)
         } footer: {
             answerFooter { profile.sex = sex }
         }
         .sensoryFeedback(.selection, trigger: sex)
     }
 
-    private static let sexOptions: [(tag: String, title: String, detail: String)] = [
-        ("female", "Female", "Calories use the female formula."),
-        ("male", "Male", "Calories use the male formula."),
-        ("nonbinary", "Other", "Calories use the average of both."),
-    ]
+    private func sexTile(_ option: SexOption) -> some View {
+        let on = sex == option.tag
+        return Button { answerSex(option.tag) } label: {
+            VStack(spacing: 14) {
+                Image(systemName: option.symbol)
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundStyle(on ? NoopHTMLColor.blush : NoopHTMLColor.inkSoft)
+                    .symbolEffect(.bounce, value: on)
+                    .frame(height: 52)
+                Text(option.title)
+                    .font(NoopHTMLFont.sans(15, weight: .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 156)
+            .background {
+                RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous)
+                    .fill(on
+                          ? AnyShapeStyle(LinearGradient(colors: [NoopHTMLColor.blush.opacity(0.24), NoopHTMLColor.blush.opacity(0.06)], startPoint: .top, endPoint: .bottom))
+                          : AnyShapeStyle(NoopHTMLColor.card))
+            }
+            .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).stroke(on ? NoopHTMLColor.blush.opacity(0.55) : NoopHTMLColor.border, lineWidth: on ? 1 : 0.5))
+            .shadow(color: on ? NoopHTMLColor.blush.opacity(0.25) : .clear, radius: 16, y: 6)
+            .opacity(on ? 1 : 0.62)
+            .animation(OnboardingMotion.morph, value: on)
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
 
     /// A tap is the answer: it is saved, seen to land, and the page moves on by itself.
     private func answerSex(_ tag: String) {
@@ -342,7 +408,7 @@ struct NoopOnboardingView: View {
         profile.sex = tag
         profileSaved = true
         Task { @MainActor in
-            try? await Task.sleep(for: OnboardingMotion.answerBeat)
+            try? await Task.sleep(for: OnboardingMotion.answerBeat * 2)
             if step == .sex { go() }
         }
     }
@@ -351,12 +417,12 @@ struct NoopOnboardingView: View {
         page {
             heading("Your weight", "For the calorie estimate only, never a goal. Apple Health weigh-ins keep it current.")
             bigFigure("\(weightBinding.wrappedValue)", value: weightBinding.wrappedValue, unit: imperial ? "lb" : "kg")
-                .entrance(2)
+                .onboardingEntrance(2)
             OnboardingRuler(range: imperial ? 77...440 : 35...200, value: weightBinding, major: 10) { "\($0)" }
                 .id(imperial)
-                .entrance(3)
+                .onboardingEntrance(3)
             unitSwitch(metric: "kg", imperial: "lb")
-                .entrance(4)
+                .onboardingEntrance(4)
         } footer: {
             answerFooter { profile.weightKg = weightKg }
         }
@@ -366,14 +432,14 @@ struct NoopOnboardingView: View {
         page {
             heading("Your height", "With your weight, it sets how much energy your body spends at rest.")
             bigFigure(imperial ? heightText : "\(heightBinding.wrappedValue)", value: heightBinding.wrappedValue, unit: imperial ? "" : "cm")
-                .entrance(2)
+                .onboardingEntrance(2)
             OnboardingRuler(range: imperial ? 48...86 : 120...220, value: heightBinding, major: imperial ? 12 : 10) { value in
                 imperial ? "\(value / 12)′" : "\(value)"
             }
             .id(imperial)
-            .entrance(3)
+            .onboardingEntrance(3)
             unitSwitch(metric: "cm", imperial: "ft")
-                .entrance(4)
+                .onboardingEntrance(4)
         } footer: {
             answerFooter { profile.heightCm = heightCm }
         }
@@ -451,20 +517,37 @@ struct NoopOnboardingView: View {
     }
 
     private var weightText: String { "\(weightBinding.wrappedValue) \(imperial ? "lb" : "kg")" }
-    private var heightText: String { imperial ? "\(heightBinding.wrappedValue / 12)′ \(heightBinding.wrappedValue % 12)″" : "\(heightBinding.wrappedValue) cm" }
+    private var heightText: String { "\(heightBinding.wrappedValue / 12)′ \(heightBinding.wrappedValue % 12)″" }
 
     // MARK: Sleep
 
+    private var sky: OnboardingSky {
+        if let schedule { return schedule.sky }
+        return learnsSchedule ? .rotating : .undecided
+    }
+
     private var sleepStep: some View {
         page {
-            heading("When do you usually sleep?", "The one answer that changes the whole app. Everything else Noop works out by watching for a week.")
+            OnboardingSkyScene(sky: sky)
+                .frame(height: 196)
+                .overlay(alignment: .bottomLeading) {
+                    Text(schedule?.caption ?? "Your hours, drawn")
+                        .font(NoopHTMLFont.sans(12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.28), in: Capsule())
+                        .padding(12)
+                        .id(schedule)
+                        .transition(.opacity)
+                        .animation(OnboardingMotion.reveal, value: schedule)
+                }
+                .onboardingEntrance(0)
+            heading("When do you sleep?", "The one answer that changes the whole app. Everything else Noop works out by watching for a week.")
             VStack(spacing: 9) {
                 ForEach(Array(OnboardingSchedule.allCases.enumerated()), id: \.element) { i, option in
-                    choiceCard(option.title, option.detail, selected: schedule == option) {
-                        schedule = option
-                        learnsSchedule = false
-                    }
-                    .entrance(2 + i)
+                    scheduleCard(option)
+                        .onboardingEntrance(2 + i)
                 }
             }
             NoopHTMLCard(radius: 20, padding: 16, tint: NoopHTMLColor.night) {
@@ -478,38 +561,49 @@ struct NoopOnboardingView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .entrance(5)
+            .onboardingEntrance(5)
         } footer: {
             VStack(spacing: 4) {
                 primaryButton("Continue", enabled: schedule != nil) {
                     guard let schedule else { return }
                     save(schedule)
-                    learnsSchedule = false
                     go()
                 }
                 secondaryButton("Let Noop learn it") {
                     enableScheduleInference()
-                    schedule = nil
-                    learnsSchedule = true
-                    go()
+                    withAnimation(OnboardingMotion.sky) {
+                        schedule = nil
+                        learnsSchedule = true
+                    }
+                    Task { @MainActor in
+                        try? await Task.sleep(for: OnboardingMotion.answerBeat * 3)
+                        if step == .sleep { go() }
+                    }
                 }
             }
         }
+        .sensoryFeedback(.selection, trigger: schedule)
     }
 
-    private func choiceCard(_ title: String, _ detail: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle().stroke(selected ? NoopHTMLColor.blush : Color.white.opacity(0.22), lineWidth: 1.5)
-                    Circle().fill(NoopHTMLColor.blush).padding(5).scaleEffect(selected ? 1 : 0.4).opacity(selected ? 1 : 0)
-                }
-                .frame(width: 20, height: 20)
+    private func scheduleCard(_ option: OnboardingSchedule) -> some View {
+        let on = schedule == option
+        return Button {
+            withAnimation(OnboardingMotion.sky) {
+                schedule = option
+                learnsSchedule = false
+            }
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: option.symbol)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(on ? option.tint : NoopHTMLColor.copy)
+                    .symbolEffect(.bounce, value: on)
+                    .frame(width: 40, height: 40)
+                    .background((on ? option.tint : Color.white).opacity(on ? 0.16 : 0.06), in: RoundedRectangle(cornerRadius: NoopRadius.control, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
+                    Text(option.title)
                         .font(NoopHTMLFont.sans(14.5, weight: .semibold))
-                        .foregroundStyle(NoopHTMLColor.ink)
-                    Text(detail)
+                    Text(option.detail)
                         .font(NoopHTMLFont.sans(12))
                         .foregroundStyle(NoopHTMLColor.copy)
                         .lineSpacing(2)
@@ -518,79 +612,129 @@ struct NoopOnboardingView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 15)
+            .padding(13)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected ? NoopHTMLColor.blush.opacity(0.1) : NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).stroke(selected ? NoopHTMLColor.blush.opacity(0.4) : NoopHTMLColor.border, lineWidth: 0.5))
-            .animation(OnboardingMotion.morph, value: selected)
-            // Chosen: a small lift and settle, so the answer is felt to land.
-            .keyframeAnimator(initialValue: 1.0, trigger: selected) { card, lift in
-                card.scaleEffect(reduceMotion ? 1 : lift)
-            } keyframes: { _ in
-                SpringKeyframe(selected ? 1.025 : 1, duration: 0.12, spring: .snappy)
-                SpringKeyframe(1, duration: 0.4, spring: .bouncy(duration: 0.4, extraBounce: 0.1))
-            }
+            .background(on ? option.tint.opacity(0.1) : NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).stroke(on ? option.tint.opacity(0.45) : NoopHTMLColor.border, lineWidth: on ? 1 : 0.5))
+            .animation(OnboardingMotion.morph, value: on)
         }
         .buttonStyle(NoopHTMLPressStyle())
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    // MARK: Bluetooth
+
+    private enum OnboardingRadio: Equatable { case waiting, asking, allowed, denied }
+
+    private var radio: OnboardingRadio {
+        switch bluetoothAuth {
+        case .allowedAlways: .allowed
+        case .denied, .restricted: .denied
+        default: bluetoothAsked ? .asking : .waiting
+        }
+    }
+
+    private var bluetoothStep: some View {
+        page {
+            OnboardingLink(state: radio == .allowed ? .open : radio == .denied ? .closed : .waiting,
+                           sourceLabel: "Your strap", destinationLabel: "This iPhone") {
+                OnboardingDarkTile {
+                    OnboardingStrapGlyph(lit: radio == .allowed, tint: NoopHTMLColor.green)
+                        .scaleEffect(0.22)
+                }
+            } destination: {
+                OnboardingDarkTile {
+                    Image(systemName: "iphone")
+                        .font(.system(size: 27, weight: .light))
+                        .foregroundStyle(NoopHTMLColor.inkSoft)
+                }
+            }
+            .frame(height: 132)
+                .onboardingEntrance(0)
+            heading("Bluetooth, for your strap", "This is the one permission Noop can't work without: it is how your strap's data reaches this iPhone.")
+            VStack(alignment: .leading, spacing: 14) {
+                iconLine("arrow.left.and.right", NoopHTMLColor.blueLight, "Straight to your strap", "Noop talks to it directly. Nothing passes through a server.")
+                    .onboardingEntrance(2)
+                iconLine("sensor.tag.radiowaves.forward", NoopHTMLColor.green, "Only straps you add", "A WHOOP, or a heart-rate strap you pair yourself. Nothing else nearby.")
+                    .onboardingEntrance(3)
+                iconLine("location.slash", NoopHTMLColor.blush, "Never your whereabouts", "Bluetooth is not used to work out where you are.")
+                    .onboardingEntrance(4)
+            }
+            switch radio {
+            case .waiting, .asking:
+                OnboardingSystemAlertPreview(
+                    title: "“\(Self.appName)” Would Like to Use Bluetooth",
+                    message: Self.purpose("NSBluetoothAlwaysUsageDescription")
+                )
+                .onboardingEntrance(5)
+            case .allowed:
+                statusLine("checkmark.circle.fill", NoopHTMLColor.green, "Bluetooth is on for Noop Aura.")
+            case .denied:
+                statusLine("exclamationmark.circle.fill", NoopHTMLColor.warm, "Bluetooth is off for Noop Aura. Your strap can't connect until it's on in Settings.")
+            }
+        } footer: {
+            VStack(spacing: 4) {
+                if radio == .waiting || radio == .asking {
+                    // The one action this page has: it opens the system question.
+                    primaryButton("Continue", enabled: radio == .waiting) {
+                        bluetoothAsked = true
+                        model.ble.startBluetooth()
+                    }
+                    secondaryButton(" ") {}.hidden()
+                } else {
+                    primaryButton("Continue") { go() }
+                    if radio == .denied {
+                        secondaryButton("Open Settings") { openSettings() }
+                    } else {
+                        secondaryButton(" ") {}.hidden()
+                    }
+                }
+            }
+        }
+        .onChange(of: radio) { _, now in
+            // Answered yes: the next page is where the strap is found, so go there.
+            guard now == .allowed, bluetoothAsked else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: OnboardingMotion.answerBeat * 3)
+                if step == .bluetooth { go() }
+            }
+        }
+        .sensoryFeedback(trigger: radio) { _, now in
+            switch now {
+            case .allowed: .success
+            case .denied: .warning
+            default: nil
+            }
+        }
     }
 
     // MARK: Strap
 
     private var strapStep: some View {
         page {
-            heading("Connect your strap", "Noop talks to it directly over Bluetooth. There is no server in the middle.")
-            HStack(spacing: 14) {
-                ZStack {
-                    if scanning && !live.bonded && !reduceMotion {
-                        Circle()
-                            .stroke(NoopHTMLColor.blue.opacity(0.5), lineWidth: 1)
-                            .phaseAnimator([false, true]) { ring, out in
-                                ring.scaleEffect(out ? 1.6 : 1).opacity(out ? 0 : 0.9)
-                            } animation: { out in out ? .easeOut(duration: 1.5) : .linear(duration: 0) }
-                    }
-                    Circle().fill(statusTint.opacity(0.13))
-                    Image(systemName: live.bonded ? "checkmark" : "applewatch.side.right")
-                        .font(.system(size: 22, weight: .regular))
-                        .foregroundStyle(statusTint)
-                        .contentTransition(.symbolEffect(.replace))
+            OnboardingStrapScene(looking: scanning, connected: live.bonded, heartRate: live.heartRate)
+                .onboardingEntrance(0)
+            heading(strapTitle, strapDetail)
+                .id(strapTitle)
+                .transition(.opacity)
+                .animation(OnboardingMotion.reveal, value: strapTitle)
+            if !live.bonded {
+                VStack(alignment: .leading, spacing: 11) {
+                    tipLine("Wear it snug, sensor against your skin.")
+                    tipLine("Charged, and within about a metre of this iPhone.")
+                    tipLine("If it's paired with another phone, close that app first.")
                 }
-                .frame(width: 52, height: 52)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(strapTitle)
-                        .font(NoopHTMLFont.sans(14.5, weight: .semibold))
-                        .contentTransition(.opacity)
-                    Text(strapDetail)
-                        .font(NoopHTMLFont.sans(12.5))
-                        .foregroundStyle(NoopHTMLColor.copy)
-                        .lineSpacing(2.5)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
+                .onboardingEntrance(2)
             }
-            .padding(16)
-            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).stroke(live.bonded ? NoopHTMLColor.green.opacity(0.35) : NoopHTMLColor.border, lineWidth: 0.5))
-            .animation(OnboardingMotion.reveal, value: live.bonded)
-            .animation(OnboardingMotion.reveal, value: scanning)
-            .accessibilityElement(children: .combine)
-            .entrance(2)
-            .onReceive(model.ble.$radioStateErrorShown) { blocked in
-                radioBlocked = blocked ? (live.lastSyncError ?? "Turn Bluetooth on to look for your strap.") : nil
-            }
-
-            VStack(alignment: .leading, spacing: 11) {
-                connectionLine("Wear it snug, sensor against your skin.")
-                connectionLine("Charged, and within about a metre of this iPhone.")
-                connectionLine("When iOS asks about Bluetooth, choose Allow.")
-            }
-            .entrance(3)
         } footer: {
             // One primary action per page: until a strap answers, moving on is the quiet choice.
             VStack(spacing: 4) {
                 if live.bonded {
                     primaryButton("Continue") { go() }
+                    secondaryButton(" ") {}.hidden()
+                } else if radio == .denied {
+                    primaryButton("Open Settings") { openSettings() }
+                    secondaryButton("Set up later") { go() }
                 } else {
                     primaryButton(scanning ? "Looking…" : "Start looking", enabled: !scanning && radioBlocked == nil) {
                         startScanning()
@@ -599,28 +743,33 @@ struct NoopOnboardingView: View {
                 }
             }
         }
-    }
-
-    private var statusTint: Color {
-        if live.bonded { return NoopHTMLColor.green }
-        return radioBlocked != nil ? NoopHTMLColor.warm : NoopHTMLColor.blue
+        .onReceive(model.ble.$radioStateErrorShown) { blocked in
+            radioBlocked = blocked ? (live.lastSyncError ?? "Turn Bluetooth on to look for your strap.") : nil
+        }
+        .sensoryFeedback(.success, trigger: live.bonded) { _, bonded in bonded }
     }
 
     private var strapTitle: String {
         if live.bonded { return "Connected" }
+        if radio == .denied { return "Bluetooth is off for Noop" }
         if radioBlocked != nil { return "Bluetooth is unavailable" }
-        return scanning ? "Looking for your strap" : "Not connected yet"
+        return scanning ? "Looking for your strap" : "Connect your strap"
     }
 
     private var strapDetail: String {
-        if live.bonded { return "Noop is reading your strap. The first night fills in tomorrow morning." }
+        if live.bonded {
+            return live.heartRate == nil
+                ? "Noop is reading your strap. Your first night fills in tomorrow morning."
+                : "That's your heart, live. Your first night fills in tomorrow morning."
+        }
+        if radio == .denied { return "Turn it on in Settings › Noop Aura › Bluetooth, or set the strap up later from You › Settings." }
         if let radioBlocked { return radioBlocked }
         return scanning
             ? "Keep it close. This takes a few seconds."
-            : "A WHOOP or a standard heart-rate strap."
+            : "A WHOOP, or a standard heart-rate strap. Noop finds it over Bluetooth."
     }
 
-    private func connectionLine(_ text: String) -> some View {
+    private func tipLine(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "checkmark")
                 .font(.system(size: 11, weight: .bold))
@@ -637,36 +786,80 @@ struct NoopOnboardingView: View {
 
     // MARK: Apple Health
 
+    /// What Noop actually writes (HealthKitBridge.writeTypes), in the words the Health app uses.
+    private static let healthWrites: [(symbol: String, title: String, tint: Color)] = [
+        ("bed.double.fill", "Sleep", NoopHTMLColor.night),
+        ("heart.fill", "Heart rate", NoopHTMLColor.red),
+        ("waveform.path.ecg", "Heart rate variability", NoopHTMLColor.blush),
+        ("lungs.fill", "Respiratory rate", NoopHTMLColor.blueLight),
+        ("figure.run", "Workouts", NoopHTMLColor.green),
+        ("flame.fill", "Active energy", NoopHTMLColor.amber),
+    ]
+
     private var healthStep: some View {
         page {
-            heading("Apple Health", "Noop can write what your strap records, like sleep, heart rate and workouts, into Apple Health, so your other apps see it too. It reads your weigh-ins back. Apple asks about each kind of data.")
-            HStack(spacing: 14) {
-                Image(systemName: health.auth == .authorized ? "checkmark" : "heart.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(healthTint)
-                    .contentTransition(.symbolEffect(.replace))
-                    .frame(width: 52, height: 52)
-                    .background(healthTint.opacity(0.13), in: Circle())
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(healthTitle).font(NoopHTMLFont.sans(14.5, weight: .semibold))
+            VStack(spacing: 12) {
+                OnboardingLink(state: healthLink, sourceLabel: "Noop Aura", destinationLabel: "Health", returns: true) {
+                    OnboardingDarkTile {
+                        Image(systemName: "waveform.path.ecg")
+                            .font(.system(size: 26, weight: .medium))
+                            .foregroundStyle(LinearGradient(colors: [NoopHTMLColor.green, NoopHTMLColor.blueLight], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    }
+                } destination: {
+                    healthAppTile
+                }
+                .frame(height: 132)
+                HStack(spacing: 6) {
+                    Image(systemName: health.auth == .authorized ? "checkmark.circle.fill" : "circle.dashed")
+                        .contentTransition(.symbolEffect(.replace))
+                        .foregroundStyle(healthTint)
+                    Text(healthTitle)
+                        .contentTransition(.opacity)
+                }
+                .font(NoopHTMLFont.sans(13, weight: .semibold))
+                .animation(OnboardingMotion.reveal, value: health.auth)
+                if health.auth != .unknown && health.auth != .authorized {
                     Text(healthDetail)
-                        .font(NoopHTMLFont.sans(12.5))
+                        .font(NoopHTMLFont.sans(12))
                         .foregroundStyle(NoopHTMLColor.copy)
+                        .multilineTextAlignment(.center)
                         .lineSpacing(2.5)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 0)
             }
-            .padding(16)
-            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).stroke(health.auth == .authorized ? NoopHTMLColor.green.opacity(0.35) : NoopHTMLColor.border, lineWidth: 0.5))
-            .animation(OnboardingMotion.reveal, value: health.auth)
+            .frame(maxWidth: .infinity)
             .accessibilityElement(children: .combine)
-            .entrance(2)
+            .onboardingEntrance(0)
+            heading("Apple Health", "Your strap's record, in the one place every health app reads from. Apple then shows a sheet with each kind of data; turn on only what you want.")
+            VStack(alignment: .leading, spacing: 10) {
+                sectionLabel("Noop writes")
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    ForEach(Array(Self.healthWrites.enumerated()), id: \.offset) { i, item in
+                        healthTile(item.symbol, item.title, item.tint, lit: health.auth == .authorized)
+                            .onboardingEntrance(3 + i)
+                    }
+                }
+                sectionLabel("Noop reads back")
+                    .padding(.top, 8)
+                healthTile("scalemass.fill", "Weight and body measurements", NoopHTMLColor.inkSoft, lit: health.auth == .authorized)
+                    .onboardingEntrance(9)
+                Label("Between this iPhone and Health only. Nothing goes anywhere else.", systemImage: "lock.fill")
+                    .font(NoopHTMLFont.sans(12))
+                    .foregroundStyle(NoopHTMLColor.faint)
+                    .padding(.top, 6)
+                    .onboardingEntrance(10)
+            }
+            if health.auth == .unknown {
+                OnboardingHealthSheetPreview(
+                    message: Self.purpose("NSHealthUpdateUsageDescription"),
+                    kinds: ["Sleep", "Heart Rate", "Workouts"]
+                )
+                .onboardingEntrance(11)
+            }
         } footer: {
             VStack(spacing: 4) {
-                if healthCanAsk {
-                    primaryButton(healthAsking ? "Waiting for Apple Health…" : "Connect Apple Health", enabled: !healthAsking) {
+                if health.auth == .unknown {
+                    primaryButton(healthAsking ? "Waiting for Apple Health…" : "Continue", enabled: !healthAsking) {
                         healthAsking = true
                         Task { @MainActor in
                             await health.requestAuthorization()
@@ -676,7 +869,6 @@ struct NoopOnboardingView: View {
                     secondaryButton("Not now") { go() }
                 } else {
                     primaryButton("Continue") { go() }
-                    // Keeps the footer the same height as the asking state, so nothing jumps.
                     secondaryButton(" ") {}.hidden()
                 }
             }
@@ -684,7 +876,27 @@ struct NoopOnboardingView: View {
         .sensoryFeedback(.success, trigger: health.auth) { _, auth in auth == .authorized }
     }
 
-    private var healthCanAsk: Bool { health.auth == .unknown }
+    private var healthLink: OnboardingLinkState {
+        switch health.auth {
+        case .authorized: .open
+        case .unknown: .waiting
+        case .denied, .unavailable, .entitlementMissing: .closed
+        }
+    }
+
+    /// Health's own colours: a white tile and a red heart that beats a little faster once connected.
+    private var healthAppTile: some View {
+        Color.white.overlay(
+            Image(systemName: "heart.fill")
+                .font(.system(size: 28))
+                .foregroundStyle(LinearGradient(colors: [Color(hex: 0xFF5F7E), Color(hex: 0xFF2D55)], startPoint: .top, endPoint: .bottom))
+                .phaseAnimator([false, true]) { heart, beat in
+                    heart.scaleEffect(reduceMotion ? 1 : (beat ? 1.12 : 1))
+                } animation: { beat in
+                    beat ? .spring(duration: 0.18, bounce: 0.4) : .smooth(duration: health.auth == .authorized ? 0.5 : 0.9)
+                }
+        )
+    }
 
     private var healthTint: Color {
         switch health.auth {
@@ -706,70 +918,292 @@ struct NoopOnboardingView: View {
 
     private var healthDetail: String {
         switch health.auth {
-        case .authorized: "Change which kinds of data any time in the Health app."
+        case .authorized, .unknown: ""
         case .denied: "Turn it on in Settings › Health › Data Access & Devices › Noop Aura."
         case .unavailable: "Apple Health isn't on this device. Everything else works the same."
-        case .entitlementMissing: "This install can't reach Apple Health. You can import a Health export later from Settings › Data and connections."
-        case .unknown: "Optional. You can connect later from Settings › Data and connections."
+        case .entitlementMissing: "This install can't reach Apple Health. You can import a Health export on the next page instead."
+        }
+    }
+
+    /// One kind of data. Lit (tinted, ticked) once Health is connected, so the grid itself says what
+    /// changed.
+    private func healthTile(_ symbol: String, _ title: String, _ tint: Color, lit: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(tint.opacity(lit ? 0.2 : 0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            Text(title)
+                .font(NoopHTMLFont.sans(13, weight: .medium))
+                .foregroundStyle(NoopHTMLColor.inkSoft)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            if lit {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(NoopHTMLColor.green)
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+        .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.control + 2, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: NoopRadius.control + 2, style: .continuous).stroke(lit ? tint.opacity(0.3) : NoopHTMLColor.border, lineWidth: 0.5))
+        .animation(OnboardingMotion.morph, value: lit)
+    }
+
+    // MARK: History
+
+    /// The wearables the importer reads, with how to get each one's export (shared with Settings).
+    private static var importSources: [(String, String)] { NoopImportCatalogSheet.groups.first?.1 ?? [] }
+
+    private static let sourceSymbols: [String: String] = [
+        "WHOOP": "w.circle.fill",
+        "Apple Health": "heart.fill",
+        "Oura": "circle.circle",
+        "Fitbit": "circle.grid.3x3.fill",
+        "Garmin": "triangle.fill",
+        "Xiaomi / Mi Band": "capsule.fill",
+    ]
+
+    private var historyStep: some View {
+        page {
+            heading("Bring your history", "Recovery leans on your baselines. An export from the app you used before gives Noop months of them on day one, instead of a week of learning.")
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                ForEach(Array(Self.importSources.enumerated()), id: \.offset) { i, source in
+                    sourceTile(source.0)
+                        .onboardingEntrance(2 + i)
+                }
+            }
+            if let importSource, let how = Self.importSources.first(where: { $0.0 == importSource })?.1 {
+                Label(how, systemImage: "arrow.down.doc")
+                    .font(NoopHTMLFont.sans(12.5))
+                    .foregroundStyle(NoopHTMLColor.inkSoft)
+                    .lineSpacing(2.5)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.control + 2, style: .continuous))
+                    .id(importSource)
+                    .transition(.opacity.combined(with: .offset(y: -6)))
+            }
+            importStatus
+                .animation(OnboardingMotion.morph, value: imports.phase)
+            Text("Noop tells the export apart by what's inside it, so any of these files works with the same button. More arrive later from Settings › Data and connections.")
+                .font(NoopHTMLFont.sans(12))
+                .foregroundStyle(NoopHTMLColor.faint)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .onboardingEntrance(9)
+        } footer: {
+            VStack(spacing: 4) {
+                switch imports.phase {
+                case .imported:
+                    primaryButton("Continue") { go() }
+                    secondaryButton("Add another file") { chooseImport() }
+                case .reading:
+                    // A large Apple Health export can take minutes; it keeps reading behind the next pages.
+                    primaryButton("Continue while it reads") { go() }
+                    secondaryButton(" ") {}.hidden()
+                case .idle, .rejected:
+                    primaryButton(isRejected ? "Choose another file" : "Choose an export") { chooseImport() }
+                    secondaryButton(isRejected ? "Skip" : "I'm new to tracking") { go() }
+                }
+            }
+        }
+        .animation(OnboardingMotion.reveal, value: importSource)
+        .sensoryFeedback(trigger: imports.phase) { _, now in
+            switch now {
+            case .imported: .success
+            case .rejected: .error
+            default: nil
+            }
+        }
+    }
+
+    private var isRejected: Bool { if case .rejected = imports.phase { return true }; return false }
+
+    private func sourceTile(_ name: String) -> some View {
+        let on = importSource == name
+        return Button {
+            importSource = on ? nil : name
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: Self.sourceSymbols[name] ?? "doc.fill")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(on ? NoopHTMLColor.blush : NoopHTMLColor.inkSoft)
+                    .symbolEffect(.bounce, value: on)
+                    .frame(height: 24)
+                Text(name == "Xiaomi / Mi Band" ? "Mi Band" : name)
+                    .font(NoopHTMLFont.sans(12, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 78)
+            .background(on ? NoopHTMLColor.blush.opacity(0.12) : NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.control + 4, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: NoopRadius.control + 4, style: .continuous).stroke(on ? NoopHTMLColor.blush.opacity(0.5) : NoopHTMLColor.border, lineWidth: on ? 1 : 0.5))
+            .animation(OnboardingMotion.morph, value: on)
+        }
+        .buttonStyle(NoopHTMLPressStyle())
+        .accessibilityLabel(name)
+        .accessibilityHint("Shows how to get this export")
+        .accessibilityAddTraits(on ? .isSelected : [])
+        .sensoryFeedback(.selection, trigger: on)
+    }
+
+    @ViewBuilder
+    private var importStatus: some View {
+        switch imports.phase {
+        case .idle:
+            EmptyView()
+        case .reading(let reading):
+            HStack(spacing: 12) {
+                ProgressView()
+                    .tint(NoopHTMLColor.blueLight)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Reading \(reading.fileName)")
+                        .font(NoopHTMLFont.sans(13.5, weight: .semibold))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(reading.fileSize.map { "\(ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file)) · stays on this iPhone" } ?? "Stays on this iPhone")
+                        .font(NoopHTMLFont.sans(12))
+                        .foregroundStyle(NoopHTMLColor.copy)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
+            .transition(.opacity.combined(with: .scale(scale: 0.97)))
+        case .imported(let written):
+            VStack(alignment: .leading, spacing: 6) {
+                Label(written.source, systemImage: "checkmark.circle.fill")
+                    .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                    .foregroundStyle(NoopHTMLColor.green)
+                Text(NoopDataFormat.headline(written.summary))
+                    .font(NoopHTMLFont.outfit(30, weight: .light))
+                    .tracking(-0.6)
+                Text("\(NoopDataFormat.count(written.summary.recordCount)) records written to this iPhone.")
+                    .font(NoopHTMLFont.sans(12.5))
+                    .foregroundStyle(NoopHTMLColor.copy)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(NoopHTMLColor.green.opacity(0.08), in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).stroke(NoopHTMLColor.green.opacity(0.3), lineWidth: 0.5))
+            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+        case .rejected(let refused):
+            VStack(alignment: .leading, spacing: 5) {
+                Label(refused.fileName, systemImage: "exclamationmark.circle.fill")
+                    .font(NoopHTMLFont.sans(12.5, weight: .semibold))
+                    .foregroundStyle(NoopHTMLColor.warm)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(refused.reason)
+                    .font(NoopHTMLFont.sans(12.5))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .lineSpacing(2.5)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
+            .transition(.opacity)
+        }
+    }
+
+    private func chooseImport() {
+        Task { @MainActor in
+            guard let picked = await DocumentPicker.importFile(NoopDataFlow.importTypes) else { return }
+            await imports.read(picked, model: model)
         }
     }
 
     // MARK: Notices
 
+    private static let noticeExamples = [
+        OnboardingNoticeStack.Notice(symbol: "moon.fill", tint: NoopHTMLColor.night, title: "Your night is in", body: "7h 42m asleep. Recovery 82."),
+        OnboardingNoticeStack.Notice(symbol: "battery.25", tint: NoopHTMLColor.green, title: "Strap battery at 15%", body: "About a day left. Charge it tonight."),
+        OnboardingNoticeStack.Notice(symbol: "arrow.triangle.2.circlepath", tint: NoopHTMLColor.blue, title: "Last synced 3 hours ago", body: "Bring this iPhone near your strap."),
+        OnboardingNoticeStack.Notice(symbol: "externaldrive.fill", tint: NoopHTMLColor.blush, title: "Time for a backup", body: "Your record lives only on this iPhone."),
+    ]
+
     /// The permission is asked here, once, with the reason beside it, rather than at whatever moment
     /// a first notice happens to have something to say (26 Oct 2026).
     private var noticesStep: some View {
         page {
-            heading("A few quiet notices", "Noop speaks up rarely, and only about your strap and your record. These four are on; everything else waits in Settings › Notifications.")
+            OnboardingNoticeStack(notices: Self.noticeExamples)
+                .padding(.top, 6)
+                .onboardingEntrance(0)
+            heading("A few quiet notices", "Noop speaks up rarely, and only about your strap and your record. Choose which; everything else waits in Settings › Notifications.")
             VStack(spacing: 0) {
-                noticeRow("Your night is in", "Once last night is scored: its sleep and recovery.", "moon.fill", NoopHTMLColor.night)
+                noticeRow("Your night is in", "Once last night is scored.", "moon.fill", NoopHTMLColor.night, isOn: $noticeNight)
                 divider.padding(.leading, 52)
-                noticeRow("Battery", "At 15%, and once when it finishes charging.", "battery.25", NoopHTMLColor.green)
+                noticeRow("Battery", "At 15%, and once when it's charged.", "battery.25", NoopHTMLColor.green, isOn: $noticeBattery)
                 divider.padding(.leading, 52)
-                noticeRow("Sync reminder", "When the strap hasn't synced for three hours.", "arrow.triangle.2.circlepath", NoopHTMLColor.blue)
+                noticeRow("Sync reminder", "After three hours without a sync.", "arrow.triangle.2.circlepath", NoopHTMLColor.blue, isOn: $noticeSync)
                 divider.padding(.leading, 52)
-                noticeRow("Backup reminder", "Your record lives only on this iPhone. Once a month at most.", "externaldrive.fill", NoopHTMLColor.blush)
+                noticeRow("Backup reminder", "Once a month at most.", "externaldrive.fill", NoopHTMLColor.blush, isOn: $noticeBackup)
             }
             .padding(.horizontal, 16)
             .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-            .entrance(2)
+            .onboardingEntrance(2)
+            if !notificationsAsked {
+                OnboardingSystemAlertPreview(
+                    title: "“\(Self.appName)” Would Like to Send You Notifications",
+                    message: "Notifications may include alerts and sounds. These can be configured in Settings."
+                )
+                .onboardingEntrance(3)
+            }
         } footer: {
             VStack(spacing: 4) {
-                if notificationsAsked {
-                    primaryButton("Continue") { go() }
-                    secondaryButton(" ") {}.hidden()
-                } else {
-                    // Not "Allow": that word belongs to the system alert this opens (HIG, pre-alert screens).
-                    primaryButton("Turn on notices") {
-                        Task { @MainActor in
+                primaryButton("Continue") {
+                    Task { @MainActor in
+                        if !notificationsAsked {
                             notificationsOn = (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
                             notificationsAsked = true
-                            go()
                         }
+                        saveNotices()
+                        go()
                     }
-                    secondaryButton("Not now") { go() }
                 }
+                secondaryButton(" ") {}.hidden()
             }
         }
         .task { await readNotificationStatus() }
     }
 
-    private func noticeRow(_ title: String, _ detail: String, _ symbol: String, _ tint: Color) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+    private func noticeRow(_ title: String, _ detail: String, _ symbol: String, _ tint: Color, isOn: Binding<Bool>) -> some View {
+        HStack(spacing: 14) {
             NoopIconDisc(symbol: symbol, color: tint, size: 36)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(NoopHTMLFont.sans(14, weight: .semibold))
                 Text(detail)
                     .font(NoopHTMLFont.sans(12))
                     .foregroundStyle(NoopHTMLColor.copy)
-                    .lineSpacing(2.5)
-                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
+            NoopHTMLToggle(isOn: isOn.wrappedValue, color: NoopHTMLColor.green) {
+                withAnimation(OnboardingMotion.morph) { isOn.wrappedValue.toggle() }
+            }
+            .sensoryFeedback(.selection, trigger: isOn.wrappedValue)
         }
-        .padding(.vertical, 13)
+        .padding(.vertical, 11)
         .accessibilityElement(children: .combine)
+        .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
+        .accessibilityAction { isOn.wrappedValue.toggle() }
+    }
+
+    private func saveNotices() {
+        AuraNotices.set(.morning, noticeNight)
+        AuraNotices.set(.backup, noticeBackup)
+        behavior.batteryAlerts = noticeBattery
+        behavior.syncReminder = noticeSync
+        Task { await AuraNotices.refresh(repo: model.repo) }
     }
 
     // MARK: Summary
@@ -780,7 +1214,7 @@ struct NoopOnboardingView: View {
                 Text("Your thread starts here.")
                     .font(NoopHTMLFont.outfit(30, weight: .light))
                     .tracking(-0.8)
-                    .entrance(0)
+                    .onboardingEntrance(0)
                 Text(live.bonded
                      ? "Wear it tonight. Your first recovery arrives in the morning."
                      : "Connect your strap when it's to hand. Noop starts reading the moment it answers.")
@@ -788,41 +1222,72 @@ struct NoopOnboardingView: View {
                     .foregroundStyle(NoopHTMLColor.copy)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
-                    .entrance(1)
+                    .onboardingEntrance(1)
             }
             .frame(maxWidth: .infinity)
             VStack(spacing: 0) {
-                summaryRow("Strap", live.bonded ? "Connected" : "Later, from You › Settings", done: live.bonded)
-                    .entrance(3)
-                divider
-                summaryRow("Sleep", schedule?.title ?? (learnsSchedule ? "Noop will learn it" : "At night, mostly"), done: schedule != nil || learnsSchedule)
-                    .entrance(4)
-                divider
-                summaryRow("Apple Health", health.auth == .authorized ? "Connected" : "Not connected", done: health.auth == .authorized)
-                    .entrance(5)
-                divider
-                summaryRow("Notices", notificationsOn ? "On" : "Off", done: notificationsOn)
-                    .entrance(6)
-                divider
-                summaryRow("About you", profileSaved ? "\(profile.age) · \(weightText)" : "Defaults for now", done: profileSaved)
-                    .entrance(7)
+                ForEach(Array(summaryItems.enumerated()), id: \.offset) { i, item in
+                    if i > 0 { divider }
+                    summaryRow(item.title, item.value, done: item.done, landed: landed > i)
+                        .onboardingEntrance(3 + i)
+                }
             }
             .padding(.horizontal, 16)
             .background(NoopHTMLColor.card, in: RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: NoopRadius.card, style: .continuous).stroke(NoopHTMLColor.border, lineWidth: 0.5))
-            .entrance(2)
+            .onboardingEntrance(2)
+            VStack(alignment: .leading, spacing: 12) {
+                sectionLabel("Asked only if you use them")
+                iconLine("location.fill", NoopHTMLColor.blue, "Location", "Drawing the route of an outdoor workout.")
+                iconLine("mic.fill", NoopHTMLColor.blush, "Microphone", "Asking Svea a question by voice, transcribed on this iPhone.")
+            }
+            .onboardingEntrance(9)
         } footer: {
-            primaryButton("Enter Noop Aura") { onFinished() }
+            EmptyView()
         }
-        .sensoryFeedback(.success, trigger: step) { _, now in now == .done }
-        .task { await readNotificationStatus() }
+        .task { await landMarks() }
     }
 
-    private func summaryRow(_ title: String, _ value: String, done: Bool) -> some View {
+    /// What was set, in the order it was asked.
+    private var summaryItems: [(title: String, value: String, done: Bool)] {
+        let imported = { if case .imported = imports.phase { return true }; return false }()
+        return [
+            ("Strap", live.bonded ? "Connected" : "Later, from You › Settings", live.bonded),
+            ("Sleep", schedule?.title ?? (learnsSchedule ? "Noop will learn it" : "At night"), schedule != nil || learnsSchedule),
+            ("Apple Health", health.auth == .authorized ? "Connected" : "Not connected", health.auth == .authorized),
+            ("History", historySummary, imported),
+            ("Notices", notificationsOn ? "On" : "Off", notificationsOn),
+            ("About you", profileSaved ? "\(profile.age) · \(weightText)" : "Defaults for now", profileSaved),
+        ]
+    }
+
+    /// The summary's marks drop in one by one, each with its own tap; then the page is drawn in and
+    /// the way in takes the screen.
+    private func landMarks() async {
+        await readNotificationStatus()
+        let items = summaryItems
+        for i in items.indices {
+            try? await Task.sleep(for: .milliseconds(i == 0 ? 650 : 260))
+            guard step == .done else { return }
+            withAnimation(.spring(duration: 0.4, bounce: 0.3)) { landed = i + 1 }
+            NoopHaptics.play(items[i].done ? .add : .tick)
+        }
+        try? await Task.sleep(for: .milliseconds(1200))
+        guard step == .done else { return }
+        withAnimation(.easeIn(duration: reduceMotion ? 0.3 : 0.55)) { gathered = true }
+    }
+
+    private var historySummary: String {
+        switch imports.phase {
+        case .imported(let written): written.source
+        case .reading: "Still reading"
+        case .idle, .rejected: "Starting fresh"
+        }
+    }
+
+    private func summaryRow(_ title: String, _ value: String, done: Bool, landed: Bool) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: done ? "checkmark.circle.fill" : "circle.dashed")
-                .font(.system(size: 15))
-                .foregroundStyle(done ? NoopHTMLColor.green : NoopHTMLColor.muted)
+            OnboardingDropMark(landed: landed, done: done)
             Text(title).font(NoopHTMLFont.sans(14))
             Spacer(minLength: 12)
             Text(value)
@@ -844,15 +1309,57 @@ struct NoopOnboardingView: View {
                 .tracking(-0.8)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-                .entrance(0)
+                .onboardingEntrance(0)
             Text(detail)
                 .font(NoopHTMLFont.sans(13.5))
                 .foregroundStyle(NoopHTMLColor.copy)
                 .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
-                .entrance(1)
+                .onboardingEntrance(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func iconLine(_ symbol: String, _ tint: Color, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            NoopIconDisc(symbol: symbol, color: tint, size: 36)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(NoopHTMLFont.sans(14.5, weight: .semibold))
+                Text(detail)
+                    .font(NoopHTMLFont.sans(12.5))
+                    .foregroundStyle(NoopHTMLColor.copy)
+                    .lineSpacing(2.5)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func statusLine(_ symbol: String, _ tint: Color, _ text: String) -> some View {
+        Label {
+            Text(text)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(tint)
+        }
+        .font(NoopHTMLFont.sans(13, weight: .medium))
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: NoopRadius.control + 2, style: .continuous))
+        .transition(.opacity.combined(with: .scale(scale: 0.97)))
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(NoopHTMLFont.sans(11.5, weight: .semibold))
+            .tracking(0.8)
+            .textCase(.uppercase)
+            .foregroundStyle(NoopHTMLColor.faint)
+    }
+
+    private var divider: some View {
+        Rectangle().fill(NoopHTMLColor.border).frame(height: 0.5)
     }
 
     private func page<Content: View, Footer: View>(
@@ -885,6 +1392,8 @@ struct NoopOnboardingView: View {
             .animation(OnboardingMotion.reveal, value: enabled)
     }
 
+    /// The quiet second action. Given a blank title and hidden, it holds the footer's height so a page
+    /// whose second action comes and goes doesn't jump.
     private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
             .font(NoopHTMLFont.sans(13.5, weight: .semibold))
@@ -906,12 +1415,27 @@ struct NoopOnboardingView: View {
     // MARK: Actions
 
     private func go(back: Bool = false) {
-        let target = OnboardingStep(rawValue: step.rawValue + (back ? -1 : 1))
-        guard let target else { return }
+        guard let target = OnboardingStep(rawValue: step.rawValue + (back ? -1 : 1)) else { return }
         forward = !back
         moves += 1
         withAnimation(OnboardingMotion.page) { step = target }
-        if target == .done { bursts += 1 }
+    }
+
+    /// ENTER, pressed or run out: the burst and its boom together; as the screen thins, the page underneath takes the
+    /// landing wave and its thud, and the app takes over.
+    private func enter() {
+        guard burstAt == nil else { return }
+        NoopHaptics.play(.welcome)
+        burstAt = Date()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))
+            withAnimation(.easeOut(duration: 0.55)) { dissolving = true }
+            try? await Task.sleep(for: .milliseconds(300))
+            NotificationCenter.default.post(name: .noopWelcomeWave, object: nil)
+            NoopHaptics.play(.land)
+            try? await Task.sleep(for: .milliseconds(300))
+            onFinished()
+        }
     }
 
     private func load() {
@@ -921,11 +1445,18 @@ struct NoopOnboardingView: View {
         sex = profile.sex
         weightKg = profile.weightKg
         heightCm = profile.heightCm
+        noticeNight = AuraNotices.isOn(.morning)
+        noticeBackup = AuraNotices.isOn(.backup)
+        noticeBattery = behavior.batteryAlerts
+        noticeSync = behavior.syncReminder
         #if DEBUG
         if let requested = OnboardingStep.requested { step = requested }
         #endif
     }
 
+    private func openSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+    }
 
     private func readNotificationStatus() async {
         let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
@@ -966,178 +1497,70 @@ struct NoopOnboardingView: View {
         defaults.set(true, forKey: "noop.schedule.inferFromHistory")
         SleepSchedule.current = .dayWorker
     }
-}
 
-// MARK: - Staggered entrance
-
-/// Each block of a page arrives a beat after the one above it: 45 ms apart, never more than 300 ms in
-/// all, and never holding a tap back. With Reduce Motion it is a plain fade.
-private struct OnboardingEntrance: ViewModifier {
-    let index: Int
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var shown = false
-
-    func body(content: Content) -> some View {
-        content
-            .opacity(shown ? 1 : 0)
-            .offset(y: shown || reduceMotion ? 0 : 10)
-            .blur(radius: shown || reduceMotion ? 0 : 4)
-            .onAppear {
-                let delay = min(Double(index) * OnboardingMotion.stagger, OnboardingMotion.staggerCap)
-                withAnimation(OnboardingMotion.reveal.delay(delay)) { shown = true }
-            }
-    }
-}
-
-private extension View {
-    func entrance(_ index: Int) -> some View { modifier(OnboardingEntrance(index: index)) }
-}
-
-// MARK: - Ruler
-
-/// A horizontal ruler that scrolls under a fixed needle and snaps to whole units, with a tick of
-/// haptic for each one passed, like a physical dial. Momentum and rubber-banding are the system
-/// scroll view's own.
-private struct OnboardingRuler: View {
-    let range: ClosedRange<Int>
-    @Binding var value: Int
-    var major: Int = 10
-    let label: (Int) -> String
-
-    @State private var position: Int?
-    private static let pitch: CGFloat = 12
-
-    init(range: ClosedRange<Int>, value: Binding<Int>, major: Int = 10, label: @escaping (Int) -> String) {
-        self.range = range
-        _value = value
-        self.major = major
-        self.label = label
+    /// The name iOS puts in its own questions.
+    private static var appName: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Noop Aura"
     }
 
-    var body: some View {
-        GeometryReader { geo in
-            ScrollView(.horizontal) {
-                // Eager, not lazy: a lazy stack hasn't measured the ticks off screen, so the opening
-                // position landed short of the value (seen at 162 for 178).
-                HStack(spacing: 0) {
-                    ForEach(range, id: \.self) { v in
-                        tick(v).id(v)
-                    }
-                }
-                .scrollTargetLayout()
-            }
-            .contentMargins(.horizontal, (geo.size.width - Self.pitch) / 2, for: .scrollContent)
-            .scrollTargetBehavior(.viewAligned)
-            .scrollPosition(id: $position, anchor: .center)
-            .scrollIndicators(.hidden)
-        }
-        .frame(height: 70)
-        .mask(LinearGradient(stops: [
-            .init(color: .clear, location: 0),
-            .init(color: .black, location: 0.22),
-            .init(color: .black, location: 0.78),
-            .init(color: .clear, location: 1)
-        ], startPoint: .leading, endPoint: .trailing))
-        .overlay(alignment: .top) {
-            Capsule()
-                .fill(NoopHTMLColor.blush)
-                .frame(width: 3, height: 46)
-                .shadow(color: NoopHTMLColor.blush.opacity(0.6), radius: 6)
-                .offset(y: -6)
-                .allowsHitTesting(false)
-        }
-        .onAppear {
-            position = min(max(value, range.lowerBound), range.upperBound)
-        }
-        .onChange(of: position) { _, p in
-            if let p, p != value { value = p }
-        }
-        .onChange(of: value) { _, v in
-            if position != v { position = v }
-        }
-        .sensoryFeedback(.selection, trigger: value)
-        .accessibilityElement()
-        .accessibilityValue(label(value))
-        .accessibilityAdjustableAction { direction in
-            switch direction {
-            case .increment: value = min(value + 1, range.upperBound)
-            case .decrement: value = max(value - 1, range.lowerBound)
-            @unknown default: break
-            }
-        }
-    }
-
-    private func tick(_ v: Int) -> some View {
-        let isMajor = v % major == 0
-        let isHalf = !isMajor && major % 2 == 0 && v % (major / 2) == 0
-        return VStack(spacing: 8) {
-            Capsule()
-                .fill(isMajor ? NoopHTMLColor.inkSoft : Color.white.opacity(isHalf ? 0.4 : 0.2))
-                .frame(width: isMajor ? 2 : 1.5, height: isMajor ? 32 : isHalf ? 22 : 14)
-            Text(isMajor ? label(v) : "")
-                .font(NoopHTMLFont.sans(11.5, weight: .medium))
-                .monospacedDigit()
-                .foregroundStyle(NoopHTMLColor.faint)
-                .fixedSize()
-        }
-        .frame(width: Self.pitch, height: 70, alignment: .top)
-    }
-}
-
-// MARK: - Ring burst
-
-/// A ring of light that leaves the orb when something lands: the strap answering, the setup finishing.
-/// One sharp ring and one soft glow, expanding and fading together. Nothing with Reduce Motion.
-private struct OnboardingRingBurst: View {
-    let trigger: Int
-    let colour: Color
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private struct Frame {
-        var scale = 1.0
-        var opacity = 0.0
-    }
-
-    var body: some View {
-        ZStack {
-            Circle().stroke(colour, lineWidth: 2)
-            Circle().stroke(colour, lineWidth: 12).blur(radius: 10)
-        }
-        .keyframeAnimator(initialValue: Frame(), trigger: trigger) { ring, f in
-            ring.scaleEffect(f.scale).opacity(reduceMotion ? 0 : f.opacity)
-        } keyframes: { _ in
-            KeyframeTrack(\.scale) {
-                MoveKeyframe(0.75)
-                CubicKeyframe(1.9, duration: 1.0)
-            }
-            KeyframeTrack(\.opacity) {
-                MoveKeyframe(0.9)
-                CubicKeyframe(0, duration: 1.0)
-            }
-        }
-        .allowsHitTesting(false)
+    /// A purpose string exactly as Info.plist gives it to iOS, so the preview matches the real question.
+    private static func purpose(_ key: String) -> String {
+        Bundle.main.object(forInfoDictionaryKey: key) as? String ?? ""
     }
 }
 
 private enum OnboardingSchedule: String, CaseIterable, Identifiable {
     case mostlyNights = "mostly-nights"
-    case rotating
     case permanentNights = "permanent-nights"
+    case rotating
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .mostlyNights: "At night, mostly"
-        case .rotating: "Rotating shifts"
-        case .permanentNights: "Permanent nights"
+        case .mostlyNights: "At night"
+        case .permanentNights: "During the day"
+        case .rotating: "It rotates"
         }
     }
 
     var detail: String {
         switch self {
-        case .mostlyNights: "A normal bedtime that lands in the evening. Today means midnight to midnight."
-        case .rotating: "It changes week to week. Noop will anchor your day to your sleep instead of the clock."
-        case .permanentNights: "You sleep in daylight. Every screen in the app will be written for that, not translated into it."
+        case .mostlyNights: "A normal bedtime in the evening. Your day runs midnight to midnight."
+        case .permanentNights: "You work nights and sleep in daylight. Every screen is written for that, not translated into it."
+        case .rotating: "Shifts change week to week. Noop anchors your day to your sleep instead of the clock."
+        }
+    }
+
+    /// Shown over the sky: who this answer describes.
+    var caption: String {
+        switch self {
+        case .mostlyNights: "Awake by day, asleep by night"
+        case .permanentNights: "Awake by night, asleep by day"
+        case .rotating: "Days and nights take turns"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .mostlyNights: "moon.stars.fill"
+        case .permanentNights: "sun.max.fill"
+        case .rotating: "arrow.triangle.2.circlepath"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .mostlyNights: NoopHTMLColor.night
+        case .permanentNights: NoopHTMLColor.warm
+        case .rotating: NoopHTMLColor.blueLight
+        }
+    }
+
+    var sky: OnboardingSky {
+        switch self {
+        case .mostlyNights: .night
+        case .permanentNights: .day
+        case .rotating: .rotating
         }
     }
 }

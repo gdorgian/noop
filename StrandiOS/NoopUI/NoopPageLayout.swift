@@ -325,6 +325,11 @@ struct NoopEditableSections<Section: View>: View {
             let middle = UIScreen.main.bounds.midY - screenFrame.rect.minY
             send(NoopSurfaceWave(origin: CGRect(x: 0, y: middle, width: screenFrame.rect.width, height: 0)))
         }
+        // The first entry into the app lands like a section does.
+        .onReceive(NotificationCenter.default.publisher(for: .noopWelcomeWave)) { _ in
+            let middle = UIScreen.main.bounds.midY - screenFrame.rect.minY
+            send(NoopSurfaceWave(origin: CGRect(x: 0, y: middle, width: screenFrame.rect.width, height: 0)))
+        }
         // Leaving the page mid-edit (another tab) drops the unsaved edit rather than keeping it open.
         .onDisappear { if editing.active { editing.active = false } }
         #if DEBUG

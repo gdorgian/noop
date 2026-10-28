@@ -151,20 +151,18 @@ final class NoopDataFlow: ObservableObject {
     func chooseAndImport(model: AppModel, navigation: NoopNavigation) {
         guard !isReading else { navigation.replace(with: .reading); return }
         Task {
-            let types: [UTType] = [.zip, .xml, .json, .commaSeparatedText, .plainText, .data, .item]
-            guard let picked = await DocumentPicker.importFile(types) else { return }
+            guard let picked = await DocumentPicker.importFile(Self.importTypes) else { return }
             await importFile(picked, model: model, navigation: navigation)
         }
     }
 
+    /// Everything the importers recognise arrives as one of these; the content decides which reads it.
+    static let importTypes: [UTType] = [.zip, .xml, .json, .commaSeparatedText, .plainText, .data, .item]
+
     func importFile(_ picked: URL, model: AppModel, navigation: NoopNavigation) async {
         guard !isReading else { return }
-        let size = (try? picked.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
-        phase = .reading(Reading(fileName: picked.lastPathComponent, fileSize: size, startedAt: Date()))
         navigation.replace(with: .reading)
-        let outcome = await Self.run(picked, model: model)
-        phase = outcome
-        await loadStored(repo: model.repo)
+        let outcome = await read(picked, model: model)
         // A reader who left the flow is not dragged back into it; the result waits for them.
         if navigation.route == .reading {
             switch outcome {
@@ -173,6 +171,19 @@ final class NoopDataFlow: ObservableObject {
             case .idle, .reading: break
             }
         }
+    }
+
+    /// Read one picked file into the record, moving `phase` through `reading` to its outcome. Used by
+    /// this screen and by onboarding, which shows the same phases in its own page.
+    @discardableResult
+    func read(_ picked: URL, model: AppModel) async -> Phase {
+        guard !isReading else { return phase }
+        let size = (try? picked.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+        phase = .reading(Reading(fileName: picked.lastPathComponent, fileSize: size, startedAt: Date()))
+        let outcome = await Self.run(picked, model: model)
+        phase = outcome
+        await loadStored(repo: model.repo)
+        return outcome
     }
 
     #if DEBUG
@@ -1669,7 +1680,8 @@ struct NoopDataScreen: View {
 struct NoopImportCatalogSheet: View {
     @ObservedObject var navigation: NoopNavigation
 
-    private static let groups: [(String, [(String, String)])] = [
+    /// Also the source list on onboarding's import page.
+    static let groups: [(String, [(String, String)])] = [
         ("Wearables · six", [
             ("WHOOP", ".zip or folder — the four CSVs; 4.0, 5.0 and MG. Biomarker export too."),
             ("Apple Health", "export.zip, export.xml or a folder. Streamed and aggregated on-device."),

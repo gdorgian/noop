@@ -8,6 +8,12 @@ import SwiftUI
 // the sections around it, each nudged away and springing back as the wave reaches it, the nearest
 // first and hardest, the farthest last and faintest. The phone feels the drop, then the rings.
 
+extension Notification.Name {
+    /// Posted once, as first-run onboarding dissolves into the app: the page in view answers with a
+    /// wave from its middle, as it does when a section lands.
+    static let noopWelcomeWave = Notification.Name("noop.welcomeWave")
+}
+
 struct NoopSurfaceWave: Equatable {
     /// Where the drop landed, in the page's own coordinates; a zero-height rect for a point.
     var origin: CGRect
@@ -44,7 +50,7 @@ struct NoopSurfaceWave: Equatable {
 /// ripples spreading and thinning, a removal is a small pop, an addition settles in.
 @MainActor
 enum NoopHaptics {
-    enum Kind { case enterEdit, lift, pass, land, save, remove, add, cancel, edge, tick, grab, settle }
+    enum Kind { case enterEdit, lift, pass, land, save, remove, add, cancel, edge, tick, grab, settle, anticipate, welcome }
 
     private static var engine: CHHapticEngine?
     private static var players: [Kind: CHHapticPatternPlayer] = [:]
@@ -124,6 +130,37 @@ enum NoopHaptics {
         case .settle:
             // A zoomed chart easing home: one low, rounded knock.
             return try CHHapticPattern(events: [tap(0, 0.5, 0.25), tap(0.07, 0.18, 0.3)], parameters: [])
+        case .anticipate:
+            // Squeezing the way in, like a hand gripper at its limit: once the orb has come to the
+            // centre, a strained rumble that tightens over the squeeze (OnboardingFinaleScene), with a
+            // fine, uneven tremble of light taps that comes faster and firmer, then one soft settle as
+            // ENTER appears.
+            var tremble: [CHHapticEvent] = []
+            var t: TimeInterval = 1.0, step = 0.13
+            while t < 3.3 {
+                let strain = Float((t - 0.9) / 2.4)
+                tremble.append(tap(t, 0.15 + 0.35 * strain, 0.85))
+                // Uneven, like a shaking grip: alternate long and short gaps, both shrinking.
+                step = max(0.035, step * 0.93)
+                t += step * (tremble.count % 2 == 0 ? 1.3 : 0.7)
+            }
+            return try CHHapticPattern(events:
+                [hum(0.9, 2.4, 0.7, 0.55)] + tremble + [tap(3.3, 0.5, 0.3)],
+                parameterCurves: [
+                    curve(.hapticIntensityControl, at: 0, [(0.9, 0.1), (3.3, 1)]),
+                    curve(.hapticSharpnessControl, at: 0, [(0.9, -0.3), (3.3, 0.3)])
+                ])
+        case .welcome:
+            // ENTER pressed, the grip let go: one big boom as everything bursts toward you, then sparks
+            // crackling away as the pieces fly past.
+            let sparks: [(TimeInterval, Float)] = [(0.1, 0.6), (0.17, 0.52), (0.25, 0.45), (0.33, 0.38),
+                                                   (0.42, 0.31), (0.52, 0.25), (0.63, 0.19), (0.75, 0.14)]
+            return try CHHapticPattern(events:
+                [tap(0, 1, 0.65), hum(0, 0.35, 1, 0.45)]
+                + sparks.map { tap($0.0, $0.1, 0.9) },
+                parameterCurves: [
+                    curve(.hapticIntensityControl, at: 0, [(0, 1), (0.35, 0.6), (0.8, 0.4)])
+                ])
         case .edge:
             // The page starting to carry along: a soft, low push.
             return try CHHapticPattern(events: [hum(0, 0.14, 0.45, 0.1)],
