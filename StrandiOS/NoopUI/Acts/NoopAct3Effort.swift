@@ -18,6 +18,8 @@ struct NoopAct3Screens: View {
     @State private var refusal: NoopRunningSession?
     /// The goal and zone sheet over a running cardio session.
     @State private var cardioGoalOpen = false
+    /// What the route's location is for, behind iOS's question, the one time it is asked.
+    @State private var routeAskOpen = false
 
 
     var body: some View {
@@ -506,6 +508,12 @@ private extension NoopAct3Screens {
                     NoopFitnessModel.markChanged()
                 })
             .onChange(of: elapsed) { model.checkWorkoutGoal(at: timeline.date) }
+            .onAppear { routeAskOpen = model.gpsRecorder.awaitsPermission }
+            .sheet(isPresented: $routeAskOpen) {
+                NoopPermissionPrimer(kind: .location) {
+                    model.gpsRecorder.requestPermission { routeAskOpen = false }
+                }
+            }
             }
             .sheet(isPresented: $cardioGoalOpen) {
                 NoopCardioGoalSheet(sport: active.sport, mode: .edit, goal: active.goal, zone: active.targetZone) { goal, zone in

@@ -521,7 +521,8 @@ final class GpsWorkoutRecorder: NSObject, ObservableObject {
     }
 
     /// Begin recording a fresh route for a workout started at `startMs` (unix milliseconds). Requests
-    /// When-In-Use if not yet decided; fails safe (records nothing) if denied / restricted / unavailable.
+    /// When-In-Use if not yet decided (on iOS, through `requestPermission` from the live screen); fails safe (records nothing) if denied /
+    /// restricted / unavailable.
     /// A re-arm resets the track. Returns immediately — fixes arrive asynchronously via the delegate.
     func start(startMs: Int64) {
         track.removeAll()
@@ -543,8 +544,11 @@ final class GpsWorkoutRecorder: NSObject, ObservableObject {
 
         switch manager.authorizationStatus {
         case .notDetermined:
-            // Ask now; updates begin in `locationManagerDidChangeAuthorization` once the user answers.
+            // Updates begin in `locationManagerDidChangeAuthorization` once the user answers. On iOS the
+            // live session screen asks through `requestPermission`, with the route's explanation behind it.
+            #if !os(iOS)
             manager.requestWhenInUseAuthorization()
+            #endif
         case .authorizedWhenInUse, .authorizedAlways:
             beginUpdates()
         default:
@@ -597,6 +601,20 @@ final class GpsWorkoutRecorder: NSObject, ObservableObject {
 
     /// A route session that is paused: still this session's route, just not taking points.
     var isPaused: Bool { pausedAtMs != nil && startMs > 0 }
+
+    /// An armed route whose location question has not been asked yet: the live screen's cue to ask, with
+    /// the route explained behind the question.
+    var awaitsPermission: Bool { (isRecording || isPaused) && manager.authorizationStatus == .notDetermined }
+
+    /// Called once when the question `requestPermission` put up has been answered.
+    private var permissionAnswered: (() -> Void)?
+
+    /// Ask iOS for When-In-Use location; `answered` runs once the user has chosen. Updates begin if they
+    /// allow it; either answer leaves the session running.
+    func requestPermission(answered: @escaping () -> Void) {
+        permissionAnswered = answered
+        manager.requestWhenInUseAuthorization()
+    }
 
     func pause() {
         guard isRecording else { return }
@@ -705,6 +723,10 @@ final class GpsWorkoutRecorder: NSObject, ObservableObject {
 extension GpsWorkoutRecorder: @preconcurrency CLLocationManagerDelegate {
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        if manager.authorizationStatus != .notDetermined, let answered = permissionAnswered {
+            permissionAnswered = nil
+            answered()
+        }
         guard isRecording else { return }
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:

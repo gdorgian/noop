@@ -44,6 +44,8 @@ private struct NoopSveaCoach: View {
     @State private var micPhase: NoopSveaMicPhase = .idle
     @State private var micStartedAt: Date?
     @State private var micNote: String?
+    /// What voice is for, behind iOS's Speech Recognition and Microphone questions, the one time they are asked.
+    @State private var voiceAskOpen = false
 
     var body: some View {
         NoopSveaScrollScreen(bottomInset: 206) {
@@ -64,6 +66,9 @@ private struct NoopSveaCoach: View {
                 .padding(.bottom, 88 + liveBarInset)
         }
         .onChange(of: navigation.askFocusRequest) { _, _ in askFocused = true }
+        .sheet(isPresented: $voiceAskOpen) {
+            NoopPermissionPrimer(kind: .voice, ask: askForVoice)
+        }
         .task {
             if navigation.askFocusRequest > 0 { askFocused = true }
             grantCount = SveaDataGrants.load().allowed.count
@@ -199,12 +204,10 @@ private struct NoopSveaCoach: View {
         micNote = nil
         switch voice.authorization {
         case .notDetermined:
-            // The first press only asks; recording starts on the next hold, once allowed.
-            voice.requestAuthorization { state in
-                if state != .authorized {
-                    micNote = "Voice needs Microphone and Speech Recognition, both on this phone. Allow them in Settings, or type instead."
-                }
-            }
+            // The first press only asks, with voice explained behind the question; recording starts on the
+            // next hold, once allowed.
+            askFocused = false
+            voiceAskOpen = true
             return
         case .authorized:
             guard voice.canUseVoice else {
@@ -219,6 +222,15 @@ private struct NoopSveaCoach: View {
         micStartedAt = Date()
         withAnimation(.timingCurve(0.22, 0.61, 0.36, 1, duration: 0.2)) { micPhase = .recording }
         voice.startTranscribing { _ in }
+    }
+
+    private func askForVoice() {
+        voice.requestAuthorization { state in
+            voiceAskOpen = false
+            if state != .authorized {
+                micNote = "Voice needs Microphone and Speech Recognition, both on this phone. Allow them in Settings, or type instead."
+            }
+        }
     }
 
     private func micUp() {
