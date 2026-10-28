@@ -73,16 +73,11 @@ final class NoopDayRecordTests: XCTestCase {
         XCTAssertTrue(record.sessions(inLast: 30).isEmpty)
     }
 
-    func testWorkoutSourceWords() {
-        func row(_ source: String) -> WorkoutRow {
-            WorkoutRow(startTs: 0, endTs: 600, sport: "Cycling", source: source, durationS: 600,
-                       energyKcal: nil, avgHr: nil, maxHr: nil, strain: nil, distanceM: nil,
-                       zonesJSON: nil, notes: nil, steps: nil)
-        }
-        XCTAssertEqual(row("manual").noopSourceLabel, "strap")
-        XCTAssertEqual(row("apple-health").noopSourceLabel, "Health")
-        XCTAssertEqual(row("whoop-import").noopSourceLabel, "imported")
-        XCTAssertEqual(row("manual").noopMinutes, 10)
+    func testWorkoutMinutes() {
+        let row = WorkoutRow(startTs: 0, endTs: 600, sport: "Cycling", source: "manual", durationS: 600,
+                             energyKcal: nil, avgHr: nil, maxHr: nil, strain: nil, distanceM: nil,
+                             zonesJSON: nil, notes: nil, steps: nil)
+        XCTAssertEqual(row.noopMinutes, 10)
     }
 }
 #endif

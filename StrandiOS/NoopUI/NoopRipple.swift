@@ -191,9 +191,3 @@ enum NoopHaptics {
         }
     }
 }
-
-/// Kept for callers that send a drop: a save at full strength, a landing below it.
-enum NoopDropHaptic {
-    @MainActor
-    static func play(strength: Float = 1) { NoopHaptics.play(strength >= 1 ? .save : .land) }
-}
